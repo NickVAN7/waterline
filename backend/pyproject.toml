@@ -1,0 +1,128 @@
+[project]
+name = "waterline-backend"
+version = "0.1.0"
+description = "Waterline API and worker"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "anyio>=4.15.1",
+    "httpx>=0.28.1",
+    "import-linter>=2.15",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.9",
+]
+
+# --- Lint & format ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "A", "C4", "DTZ", "T20", "SIM", "PT", "RET", "PTH",
+    "S", "ASYNC", "TID", "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert is how pytest tests are written
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+# --- Types -----------------------------------------------------------------------------------
+
+[tool.pyright]
+include = ["app", "tests"]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+
+# --- Tests & coverage (docs/testing-strategy.md) ---------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "--cov=app",
+    "--cov-report=term-missing:skip-covered",
+]
+filterwarnings = ["error"]
+xfail_strict = true
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_empty = false
+# Imports needed only by the type checker never run, so they can never be covered.
+exclude_also = ["if TYPE_CHECKING:"]
+
+# --- Import rules (docs/build-plan.md, "Backend architecture" and "Feature map") -------------
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: routers -> services -> repositories -> models"
+type = "layers"
+layers = ["app.routers", "app.services", "app.repositories", "app.models"]
+broken_contract_guidance = "Calls flow one way: routers -> services -> repositories -> models."
+
+[[tool.importlinter.contracts]]
+name = "Routers never touch repositories or models directly"
+type = "forbidden"
+source_modules = ["app.routers"]
+forbidden_modules = ["app.repositories", "app.models"]
+allow_indirect_imports = true
+broken_contract_guidance = "Routers call one service method and return a response schema."
+
+[[tool.importlinter.contracts]]
+name = "Rules are pure: no database, no other layers"
+type = "forbidden"
+source_modules = ["app.rules"]
+forbidden_modules = [
+    "app.routers", "app.services", "app.repositories", "app.models", "app.jobs", "app.audit",
+    "sqlalchemy", "psycopg", "procrastinate",
+]
+# Indirect imports count too: a rule must not reach the database through any module.
+allow_indirect_imports = false
+broken_contract_guidance = "rules/ holds pure logic; pass data in instead of querying for it."
+
+[[tool.importlinter.contracts]]
+name = "authz and audit sit below services"
+type = "forbidden"
+source_modules = ["app.authz", "app.audit"]
+forbidden_modules = ["app.routers", "app.services"]
+# Indirect too: e.g. authz -> jobs -> services would quietly put services beneath authz.
+allow_indirect_imports = false
+broken_contract_guidance = "Services call authorize() and log_change(), never the reverse."
+
+[[tool.importlinter.contracts]]
+name = "Jobs never import routers"
+type = "forbidden"
+source_modules = ["app.jobs"]
+forbidden_modules = ["app.routers"]
+allow_indirect_imports = true
+broken_contract_guidance = "Jobs reuse services, not HTTP endpoints."
+
+[[tool.importlinter.contracts]]
+name = "No import cycles between services"
+type = "acyclic_siblings"
+ancestors = ["app.services"]
+broken_contract_guidance = "Services call each other one way; use a registered handler for callbacks."

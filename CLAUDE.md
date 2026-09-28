@@ -16,6 +16,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/developer-guide.md` | Setup, commands, conventions, how-tos (kept current every checkpoint) |
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
+| `docs/reviews/<ID>.md` | Each checkpoint's independent review: every pass, finding, and resolution |
 
 Read the relevant sections before changing anything. If the code needs to differ from the docs,
 **stop and ask** — never silently diverge. An approved change updates the docs in the same

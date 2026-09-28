@@ -88,6 +88,7 @@ tested, what each kind of test is for, and the gates every change passes.
 | Backend overall | 90% line + branch |
 | `backend/app/authz/`, `backend/app/rules/` | 100% line + branch |
 | Frontend | 80% line (composables, stores, and guards held to 90%) |
+| Developer CLI (`tools/cli/`) | 100% line + branch |
 
 Coverage gates fail CI. Excluding code from coverage requires a comment saying why.
 

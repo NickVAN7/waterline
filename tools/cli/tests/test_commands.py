@@ -1,0 +1,104 @@
+import pytest
+import typer
+from typer.core import TyperGroup
+from typer.testing import CliRunner
+
+from waterline_cli.main import app
+
+runner = CliRunner()
+
+BACKEND_LINT = [
+    "(cd backend && uv run ruff check .)",
+    "(cd backend && uv run ruff format --check .)",
+    "(cd backend && uv run pyright)",
+    "(cd backend && uv run lint-imports)",
+]
+BACKEND_FMT = [
+    "(cd backend && uv run ruff format .)",
+    "(cd backend && uv run ruff check --fix .)",
+]
+BACKEND_TEST = [
+    "(cd backend && uv run pytest)",
+    "(cd backend && uv run coverage report --fail-under=100 '--include=app/authz/*,app/rules/*')",
+]
+BACKEND_CHECK = ["(cd backend && uv lock --check)", *BACKEND_LINT, *BACKEND_TEST]
+CLI_LINT = [
+    "(cd tools/cli && uv run ruff check .)",
+    "(cd tools/cli && uv run ruff format --check .)",
+    "(cd tools/cli && uv run pyright)",
+]
+CLI_FMT = [
+    "(cd tools/cli && uv run ruff format .)",
+    "(cd tools/cli && uv run ruff check --fix .)",
+]
+CLI_TEST = ["(cd tools/cli && uv run pytest)"]
+CLI_CHECK = ["uv lock --check", *CLI_LINT, *CLI_TEST]
+
+
+def command_tree() -> dict[tuple[str, ...], bool]:
+    """Every command and group in the CLI, mapped to whether it is a leaf command."""
+    tree: dict[tuple[str, ...], bool] = {}
+
+    def walk(command: object, path: tuple[str, ...]) -> None:
+        tree[path] = not isinstance(command, TyperGroup)
+        if isinstance(command, TyperGroup):
+            for name, sub in command.commands.items():
+                walk(sub, (*path, name))
+
+    walk(typer.main.get_command(app), ())
+    return tree
+
+
+@pytest.mark.parametrize("path", command_tree(), ids=lambda p: " ".join(p) or "wl")
+def test_help_works_for_every_command(path: tuple[str, ...]) -> None:
+    result = runner.invoke(app, [*path, "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "Usage:" in result.output
+
+
+@pytest.mark.parametrize("path", [p for p, leaf in command_tree().items() if leaf], ids=" ".join)
+def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
+    result = runner.invoke(app, [*path, "--help"])
+
+    assert "--dry-run" in result.output
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        pytest.param(["check"], [*BACKEND_CHECK, *CLI_CHECK], id="check"),
+        pytest.param(["test"], [*BACKEND_TEST, *CLI_TEST], id="test"),
+        pytest.param(["lint"], [*BACKEND_LINT, *CLI_LINT], id="lint"),
+        pytest.param(["fmt"], [*BACKEND_FMT, *CLI_FMT], id="fmt"),
+        pytest.param(["backend", "check"], BACKEND_CHECK, id="backend-check"),
+        pytest.param(["backend", "test"], BACKEND_TEST, id="backend-test"),
+        pytest.param(["backend", "lint"], BACKEND_LINT, id="backend-lint"),
+        pytest.param(["backend", "fmt"], BACKEND_FMT, id="backend-fmt"),
+        pytest.param(
+            ["backend", "test", "-k", "approval", "-x"],
+            ["(cd backend && uv run pytest --no-cov -k approval -x)"],
+            id="backend-test-pass-through",
+        ),
+        pytest.param(
+            ["doctor"],
+            [
+                "git --version",
+                "docker --version",
+                "docker info --format '{{.ServerVersion}}'",
+                "docker compose version --short",
+                "uv --version",
+                "uv python find 3.14",
+                "node --version",
+                "npm --version",
+                "git rev-parse --path-format=absolute --git-path hooks/pre-commit",
+            ],
+            id="doctor",
+        ),
+    ],
+)
+def test_dry_run_prints_underlying_commands(args: list[str], expected: list[str]) -> None:
+    result = runner.invoke(app, [*args, "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.splitlines() == expected

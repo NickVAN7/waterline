@@ -25,8 +25,11 @@ Calls flow **routers → services → repositories → models**. Services also u
 - Any service may **read** through any repository.
 - **Writes** to another area's tables go through that area's **service**, so its authorization,
   rules, and logging apply (e.g. the requirement delete dialog calls `TaskService.delete`).
-- No two services import each other. Where a callback is needed, use a registered handler
-  (the approval service calls handlers registered by approvable areas).
+- Services may call each other **one way, never in a cycle** (directly or through other
+  services). Where a callback is needed, use a registered handler (the approval service calls
+  handlers registered by approvable areas).
+- Services reach `jobs/` only through `jobs/enqueue.py`; never import job functions (a job
+  that calls a service would close a cycle the service contract can't see).
 - `testcase` owns `requirement_testcase`.
 
 ## Rules that are easy to break silently
@@ -58,6 +61,13 @@ Calls flow **routers → services → repositories → models**. Services also u
   outbound HTTP via `httpx.AsyncClient`; no sync client libraries in request paths.
 - Jobs are enqueued only through `app/jobs/enqueue.py`; job arguments are IDs and plain values;
   jobs are idempotent.
+
+## Import contracts
+
+- Every contract in `[tool.importlinter]` has a violation case in
+  `tests/unit/test_import_contracts.py`. A purity contract (e.g. `rules/` must not reach the
+  database) sets `allow_indirect_imports = false` and is tested through an indirect path too;
+  a direct-only ban lets `rules → core.db → sqlalchemy` through.
 
 ## Migrations
 

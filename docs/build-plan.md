@@ -51,6 +51,8 @@ minutes. The next checkpoint starts only after the current one is approved.
    - Design, schema, and build-plan docs, if anything drifted.
 5. **Tech-debt log** (`docs/tech-debt.md`): any shortcut is recorded with its reason and the
    checkpoint or slice that will fix it. The goal is an empty log; nothing is left unrecorded.
+6. **Review record** (`docs/reviews/<ID>.md`, e.g. `S0-C1.md`): every reviewer pass with its
+   verdict, findings, and the resolution of each, plus open questions and owner decisions.
 
 ### Verification (three layers)
 1. **Automated gates:** lint, types, all tests, coverage thresholds, import-linter contracts,
@@ -122,12 +124,12 @@ slices only add features.
 | # | Checkpoint | Includes |
 |---|---|---|
 | 1 | Foundation & guardrails | Repo root, `docs/` (design, schema, build plan, testing strategy, empty developer/user guides, tech-debt log), `CLAUDE.md` files (root, backend, frontend), `checkpoint-reviewer` agent and `checkpoint` skill in `.claude/` (from the Project's `repo-seed/` drafts), uv project and Python version check, ruff/pyright, pre-commit hooks, FastAPI skeleton with `/api/health`, layer folders, import-linter contracts (enforced from the start), developer CLI (`waterline` / `wl`) with its first commands and `doctor`, workstation toolchain check |
-| 2 | Database core & test harness | Async engine and session, per-request transaction dependency, base model (UUIDv7, timestamps), constraint naming convention, Alembic (async), pytest + anyio harness with savepoint rollback, polyfactory with fixed seed, `/api/health` checks the database |
+| 2 | Database core & test harness | `docker-compose.yml` with the `postgres` service only (dev and test databases, named volume, `.env.example`), `wl up`/`wl down`, Async engine and session, per-request transaction dependency, base model (UUIDv7, timestamps), constraint naming convention, Alembic (async), pytest + anyio harness with savepoint rollback, polyfactory with fixed seed, `/api/health` checks the database, API docs setting (on in dev/test, off in production) |
 | 3 | procrastinate spike | Decision point: can jobs be queued inside the request's `AsyncSession` transaction? Result and consequences written into the design doc |
 | 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 |
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422), password hashing off the event loop, token generation and hashing helpers |
-| 7 | Compose & frontend shell | Docker Compose (postgres, api, worker, web), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
+| 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
 | 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness), branch protection noted for repo creation, fresh-clone setup by following the developer guide, slice wrap-up |
 
 The sections below describe the content; the table above is the order of work.
@@ -158,7 +160,8 @@ The sections below describe the content; the table above is the order of work.
 │   ├── migrations/               Alembic
 │   ├── tests/
 │   │   ├── unit/                 rules, authz matrix (no database)
-│   │   └── integration/          services and API endpoints against real Postgres
+│   │   ├── integration/          repositories and services against real Postgres
+│   │   └── api/                  endpoints over HTTP against real Postgres
 │   └── openapi.json              generated; input to the frontend client
 │
 ├── frontend/                     Vue 3 + TypeScript (Vite)
@@ -320,7 +323,8 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   edit links through the testcase service. This keeps dependencies one-way (requirement →
   testcase), lets the link table ship with test cases in Slice 5, and keeps coverage queries
   next to test results.
-- CI's import-linter contract also checks that no two services import each other.
+- CI's import-linter contract also checks that services never import each other in a cycle:
+  one service may call another, but never both ways, directly or through other services.
 
 **Naming**
 - Schemas: `TaskCreate`, `TaskUpdate`, `TaskRead`, `TaskListItem`.
@@ -341,7 +345,16 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - Settings via `pydantic-settings` (environment variables, `.env` for local dev).
 
 ### Docker Compose
-- `postgres` (current major version, with a named volume).
+- `postgres` (current major version, with a named volume), added in Checkpoint 2 because the
+  test harness needs a real database. Nothing is installed on the workstation:
+  - the official image creates the dev database and user on first start from `.env`
+    (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`; `.env.example` is committed, `.env` is
+    not);
+  - an init script creates a separate test database (`waterline_test`) so tests never touch
+    dev data;
+  - tables are created by Alembic (`wl migrate`), never by hand;
+  - the host port is configurable in `.env` (default 5432) in case another Postgres is already
+    running on the workstation.
 - `api` — built from `backend/`; uvicorn with reload, mounted source.
 - `worker` — same image as `api`, runs the procrastinate worker.
 - `web` — built from `frontend/`; Vite dev server (in Compose or run locally).
@@ -368,6 +381,9 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - Consistent error body (`{code, message, details}`) and handlers for 404 / 403 / 409 / 422.
 - `GET /api/health` (checks database connectivity).
 - OpenAPI schema exported to a file; the web client is generated from it.
+- `/api/docs` and `/api/openapi.json` are behind a setting (on in dev and test, off in
+  production), added with settings in Checkpoint 2. `wl gen-client` exports the schema from
+  code, so nothing depends on the live URL.
 
 ### Background jobs (§13)
 - procrastinate app and worker entry point; its schema applied as part of the migration flow.

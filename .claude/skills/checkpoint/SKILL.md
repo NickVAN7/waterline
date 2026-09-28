@@ -59,6 +59,12 @@ If fixes changed behavior (not just docs or tests), run the reviewer again on th
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
+**Record every pass** in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include
+the base commit, the totals, and for each pass its verdict, its findings table with each
+resolution (fixed / logged with TD number / rejected with evidence), and the questions it
+raised. End with the questions still open for the owner and any owner decisions made during
+review. The record goes in the checkpoint's commit.
+
 ## 6. Commit
 
 One commit for the whole checkpoint, with this message:
@@ -75,7 +81,7 @@ Tests:
 Decisions / deviations:
 - ... (or "None")
 
-Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected
+Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/<ID>.md)
 Tech debt: <added / resolved entries, or "no change">
 Next: <next checkpoint ID and name>
 ```
@@ -89,7 +95,8 @@ If the claude.ai Project for Waterline is available, write each changed file in 
 
 Send the owner:
 - the review note (the commit message body);
-- the reviewer's findings table with the resolution of each;
+- the reviewer's findings table with the resolution of each (as recorded in
+  `docs/reviews/<ID>.md`);
 - any open questions from the review;
 - what the next checkpoint will cover.
 

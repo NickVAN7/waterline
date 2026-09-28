@@ -1,0 +1,23 @@
+# Root uv workspace. Its only job is to make the developer CLI (`wl`) and the repo-wide dev
+# tools (pre-commit) runnable from the repo root. The backend is a separate uv project with its
+# own lockfile, so the app's dependencies never mix with the CLI's.
+[project]
+name = "waterline-dev"
+version = "0.0.0"
+description = "Waterline repository tooling (not deployed)"
+requires-python = ">=3.12"
+dependencies = ["waterline-cli"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+waterline-cli = { workspace = true }
+
+[tool.uv.workspace]
+members = ["tools/cli"]

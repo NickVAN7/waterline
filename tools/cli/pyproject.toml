@@ -1,0 +1,64 @@
+[project]
+name = "waterline-cli"
+version = "0.1.0"
+description = "Waterline developer CLI (`waterline`, alias `wl`). Never deployed."
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+waterline = "waterline_cli.main:app"
+wl = "waterline_cli.main:app"
+
+[build-system]
+requires = ["uv_build>=0.8,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.9",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "PT", "RET", "PTH", "S", "TID", "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The CLI's job is running fixed developer tools as subprocesses (never through a shell).
+"src/waterline_cli/**" = ["S603", "S607"]
+"tests/**" = ["S101"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "../.."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "--cov=waterline_cli",
+    "--cov-report=term-missing:skip-covered",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+# Small and fully unit-testable: every branch, error paths included, must be exercised.
+fail_under = 100
+show_missing = true
