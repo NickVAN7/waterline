@@ -1,0 +1,76 @@
+# Backend rules
+
+Python 3.14 (fallback 3.13/3.12), FastAPI, async SQLAlchemy 2.0 + psycopg 3, Alembic,
+procrastinate. Architecture and feature map: `docs/build-plan.md`. Conventions: `docs/design-doc.md`
+§3–§5, §10.
+
+## Layers (enforced by import-linter)
+
+Calls flow **routers → services → repositories → models**. Services also use `authz/`, `audit/`,
+`rules/`, and `jobs/enqueue.py`.
+
+- **Routers:** HTTP only. Validate with schemas, resolve user/session, call one service method,
+  return a response schema. No business rules, no database access.
+- **Services:** all business logic. Never commit; never build queries.
+- **Repositories:** all queries (org scoping, soft-delete opt-in, explicit loading). No
+  business rules; never commit.
+- **Models:** tables only; they are the domain entities.
+- **`rules/`:** pure logic with no database access (transition tables, approval policy).
+- Files are named by aggregate and the name repeats in every layer (`models/task.py`,
+  `schemas/task.py`, `repositories/task.py`, `services/task.py`, `routers/task.py`,
+  `authz/policies/task.py`).
+
+## Cross-area rules
+
+- Any service may **read** through any repository.
+- **Writes** to another area's tables go through that area's **service**, so its authorization,
+  rules, and logging apply (e.g. the requirement delete dialog calls `TaskService.delete`).
+- No two services import each other. Where a callback is needed, use a registered handler
+  (the approval service calls handlers registered by approvable areas).
+- `testcase` owns `requirement_testcase`.
+
+## Rules that are easy to break silently
+
+- **Transactions:** one per request, committed only by the request dependency. Services may
+  `flush()`; nothing else commits.
+- **Order of every protected mutation:** authenticate → `authorize()` → change → `log_change()`
+  → commit (design-doc §5).
+- **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
+  denied. Entities a user can't see return **404**, not 403.
+- **`log_change()` is the only writer to `activity_log`**, and never commits.
+- **Enums:** `VARCHAR` + CHECK via the enum helper. Filter with enum members, never string
+  literals.
+- **Numbers** come only from the numbering service (`project_counter`,
+  `task.next_subtask_number`). Never compute `MAX(number)+1`.
+- **Rank and counter writes bypass optimistic locking** via the direct-update helper; content
+  edits go through the ORM so `version` is checked (stale → 409).
+- **Soft delete** is filtered globally; opt in explicitly for trash/restore queries.
+- **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
+  subtasks.
+- **Markdown** is sanitized on render, never trusted.
+
+## Async rules
+
+- Relationships default to `lazy="raise"`: load what you use (`selectinload`/`joinedload`) in
+  the repository. Never rely on implicit loading.
+- Sessions use `expire_on_commit=False`.
+- Nothing blocks the event loop: CPU-heavy work (Argon2id) via `anyio.to_thread.run_sync`;
+  outbound HTTP via `httpx.AsyncClient`; no sync client libraries in request paths.
+- Jobs are enqueued only through `app/jobs/enqueue.py`; job arguments are IDs and plain values;
+  jobs are idempotent.
+
+## Migrations
+
+- Every schema change is an Alembic migration generated with `wl backend migration "<message>"`,
+  then reviewed by hand. Never edit a migration that has been committed; add a new one.
+- Every migration must downgrade cleanly. The schema doc is updated in the same commit.
+
+## Tests
+
+- Real Postgres, never mocks or SQLite. Each test rolls back via savepoint; concurrency tests
+  use the `concurrency` fixture and marker.
+- Data from polyfactory factories in `tests/factories/` (fixed seed). Set explicitly any value
+  the test depends on.
+- Layout: `tests/unit/` (no DB), `tests/integration/` (repositories, services), `tests/api/`
+  (HTTP). Files mirror `app/`.
+- Coverage: 90% overall; 100% for `app/authz/` and `app/rules/`.

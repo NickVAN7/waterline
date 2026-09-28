@@ -1,0 +1,118 @@
+# Waterline — Testing Strategy
+
+Companion to `design-doc.md`, `schema-doc.md`, and `build-plan.md`. How the application is
+tested, what each kind of test is for, and the gates every change passes.
+
+## Principles
+
+- **Test against the real thing.** Integration and API tests run against a real Postgres, not
+  mocks or SQLite. The database enforces much of the design (constraints, partial indexes,
+  CHECKs, transactions), so tests must exercise it.
+- **Every checkpoint ships its tests.** No code lands without the tests that prove it; no step
+  starts while anything is red.
+- **Deterministic.** Fake data uses a fixed seed; tests never depend on each other or on run
+  order; a failure reproduces the same way every time.
+- **Strictest where mistakes are most expensive.** Authorization and business rules are held to
+  100% coverage and written test-first.
+
+## Test layers
+
+| Layer | What it tests | Database | Tools | Location |
+|---|---|---|---|---|
+| Unit | `rules/`, `authz/`, pure helpers (key validation, rank math, serialization) | No | pytest, Hypothesis | `backend/tests/unit/` |
+| Integration | Repositories and services: queries, org scoping, soft delete, locking, numbering, `log_change()`, cross-area calls | Real Postgres | pytest (anyio), polyfactory | `backend/tests/integration/` |
+| API | Endpoints over HTTP: status codes, request/response shapes, auth and cookies, error format, 404-not-403 | Real Postgres | httpx `AsyncClient` against the app, polyfactory | `backend/tests/api/` |
+| Frontend unit/component | Composables, stores, components, route guards | No (API mocked at the client boundary) | Vitest, Vue Test Utils | `frontend/src/**/*.spec.ts` |
+| End-to-end | Critical user flows through the browser against the full stack | Real Postgres (seeded) | Playwright | `frontend/e2e/` |
+
+- **End-to-end tests start in Slice 1** (sign-in and project creation) and cover each slice's
+  critical flows, not every screen. Most behavior is proven at the cheaper layers.
+- Frontend component tests mock only the API client, using the generated types, so mocks can't
+  drift from the real API shapes.
+
+## Test data: polyfactory + Faker
+
+- **Factories create real rows** in the test database with realistic fake values. They are not
+  mocks.
+- **polyfactory** with async SQLAlchemy persistence (`create_async`, `create_batch_async`);
+  Faker underneath. One factory per model, in `backend/tests/factories/`, named after the model
+  (`TaskFactory`, `ProjectFactory`).
+- The same library generates **API request bodies** from the Pydantic schemas for API tests.
+- **Fixed seed:** Faker and polyfactory are seeded once per test session from a constant (and
+  reseeded per test for independence), so failures reproduce exactly.
+- **Explicit over implicit:** a test sets any value it depends on (`TaskFactory(status=...)`);
+  everything else is generated. Factories build valid defaults, including required parents
+  (a task factory creates its project and org unless given one).
+- Factories go through the model layer directly, not services, so tests can set up states the
+  services would refuse (e.g. data from before a rule existed).
+
+## Database isolation
+
+- Each test runs inside an outer transaction on a single connection; the app's session joins it
+  with `join_transaction_mode="create_savepoint"`. Everything rolls back at the end, so tests
+  never see each other's data.
+- The test database is migrated once per session with Alembic (not `create_all`), so tests run
+  against the real migrated schema.
+- **Exception — concurrency tests** need separate connections and real commits; they use a
+  dedicated fixture that truncates the tables they touch afterwards, and are marked
+  `@pytest.mark.concurrency`.
+
+## Specialized tests
+
+- **Property-based (Hypothesis):** for logic with a large input space.
+  - Rank (fractional indexing): any sequence of inserts and moves preserves the intended order;
+    generated keys always sort between their neighbors.
+  - Numbering: any interleaving of allocations yields unique, increasing numbers.
+  - Task transition rules: every (from, to, role, relationship) combination matches the table
+    in design-doc §5.
+  - Project key and username validation.
+  - Hypothesis uses a fixed database of examples in CI (`derandomize` in CI profile) so runs are
+    reproducible.
+- **Concurrency:** truly parallel transactions for number allocation, optimistic locking
+  (second save gets 409), the one-active-sprint rule, and approval completion.
+- **Migrations:**
+  - Every migration upgrades from an empty database to head.
+  - Every migration downgrades one step and upgrades again (round-trip).
+  - Autogenerate against the migrated database reports no drift between models and migrations.
+- **Security (a named category, `@pytest.mark.security`):**
+  - The full `authorize()` matrix: every action × role, plus fail-closed for unknown actions.
+  - Cross-org access returns 404, never 403 or data.
+  - Cookie attributes, token replacement at sign-in and password change, rejected
+    cross-origin mutations, non-JSON bodies rejected.
+  - Disabled-module endpoints return 404.
+
+## Coverage gates
+
+| Scope | Minimum |
+|---|---|
+| Backend overall | 90% line + branch |
+| `backend/app/authz/`, `backend/app/rules/` | 100% line + branch |
+| Frontend | 80% line (composables, stores, and guards held to 90%) |
+
+Coverage gates fail CI. Excluding code from coverage requires a comment saying why.
+
+## Test-first
+
+- **Test-first (TDD)** for `rules/` and `authz/`: the test is written from the design doc's
+  table or rule before the code.
+- **Alongside** everywhere else: tests in the same checkpoint and commit as the code.
+
+## Workflow and gates
+
+- **Pre-commit hooks** (local, fast): ruff format and lint, Prettier and ESLint, and a check
+  that no generated file is hand-edited.
+- **`wl check`** (the developer CLI; `waterline check` in full) runs everything CI runs, locally.
+  CI calls the same command, so local and CI can't diverge.
+- **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
+  tests with coverage, import-linter contracts, migration checks, frontend tests with coverage,
+  generated-client freshness, and end-to-end tests (from Slice 1).
+- **Branch protection:** nothing merges to `main` without green CI.
+- **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
+  tech-debt entry the same day, never retried until green.
+
+## Test naming and structure
+
+- Files mirror the code: `tests/integration/services/test_task.py` tests `services/task.py`.
+- Test names state the behavior: `test_member_cannot_delete_approved_requirement`.
+- Arrange / act / assert, one behavior per test; parametrize tables (roles, transitions) instead
+  of copying tests.
