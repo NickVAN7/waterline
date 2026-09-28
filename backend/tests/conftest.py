@@ -22,6 +22,7 @@ from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.settings import TEST_DATABASE_NAME, Settings
 from tests.factories import SEED, BaseFactory
 from tests.support.concurrency import concurrency_tables, truncate
+from tests.support.models import SupportBase
 
 BACKEND = Path(__file__).resolve().parents[1]
 
@@ -135,3 +136,22 @@ async def scratch_database(migrated_database: URL) -> AsyncIterator[URL]:
         async with admin.connect() as connection:
             await connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         await admin.dispose()
+
+
+@pytest.fixture
+async def support_tables(connection: AsyncConnection) -> None:
+    """Create the test-only tables (tests/support/models.py) inside the test's transaction."""
+    await connection.run_sync(SupportBase.metadata.create_all)
+
+
+@pytest.fixture
+async def committed_support_tables(engine: AsyncEngine) -> AsyncIterator[None]:
+    """The test-only tables, committed, for `concurrency` tests; dropped afterwards. Request it
+    before `concurrency`, so the tables are truncated before they're dropped."""
+    async with engine.begin() as connection:
+        await connection.run_sync(SupportBase.metadata.create_all)
+    try:
+        yield
+    finally:
+        async with engine.begin() as connection:
+            await connection.run_sync(SupportBase.metadata.drop_all)

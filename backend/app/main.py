@@ -1,5 +1,5 @@
-"""FastAPI application factory: settings, database, router registration (and, from S0-C6,
-error handlers). Run with `uvicorn --factory app.main:create_app`."""
+"""FastAPI application factory: settings, database, error handlers, router registration.
+Run with `uvicorn --factory app.main:create_app`."""
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
+from app.core.errors import register_error_handlers
 from app.core.settings import Settings, get_settings
 from app.routers import health
 
@@ -41,5 +42,6 @@ def create_app(
     )
     app.state.settings = settings
     app.state.sessionmaker = sessionmaker
+    register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     return app

@@ -146,7 +146,7 @@ slices only add features.
 | 3 | procrastinate spike | Decision point: can jobs be queued inside the request's `AsyncSession` transaction? Result and consequences written into the design doc |
 | 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 (design-doc §13, "Transactional enqueue": enqueue on the caller's session, by task name) |
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
-| 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too), password hashing off the event loop, token generation and hashing helpers |
+| 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a zero-row update of a non-versioned entity, e.g. one hard-deleted meanwhile, is 404), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
 | 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness), branch protection noted for repo creation, fresh-clone setup by following the developer guide, slice wrap-up |
 
@@ -270,7 +270,7 @@ Calls flow one way: **routers → services → repositories → models**. Servic
 |---|---|---|
 | Routers | HTTP only: validate input (schemas), resolve the current user and session, call one service method, return a response schema. | Business rules; database access. |
 | Services | All business logic: `authorize()`, the design's rules (transitions, delete dialog, approval completion, numbering), `log_change()`, coordinating across entities. | Commit; build queries. |
-| Repositories | All queries: org scoping, soft-delete opt-in, explicit loading of related rows. A generic base (get by ID, add, filtered list); entity-specific methods only for non-trivial queries. | Business rules; commit. |
+| Repositories | All queries: org scoping, soft-delete opt-in, explicit loading of related rows. A generic base (get by ID, add, filtered list); entity-specific methods only for non-trivial queries. Get by ID uses a query, never `session.get()`, so soft-deleted rows stay hidden even within the session that deleted them (TD-8). | Business rules; commit. |
 | Models | SQLAlchemy tables; they are the domain entities. | Business logic. |
 
 - **Schemas** (Pydantic) are separate from models, so the API and the tables can change

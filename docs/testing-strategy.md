@@ -75,7 +75,7 @@ tested, what each kind of test is for, and the gates every change passes.
     reproducible.
 - **Concurrency:** truly parallel transactions for number allocation, optimistic locking
   (second save gets 409), the one-active-sprint rule, and approval completion.
-- **Migrations:**
+- **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):
   - Every migration upgrades from an empty database to head.
   - Every migration downgrades one step and upgrades again (round-trip).
   - Autogenerate against the migrated database reports no drift between models and migrations.

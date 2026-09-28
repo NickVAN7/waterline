@@ -1,5 +1,6 @@
-"""Migrations against real databases: the procrastinate schema migration, and autogenerate
-ignoring procrastinate's objects. (Round-trip and drift checks for every migration: S0-C5.)"""
+"""Migrations against real databases: every migration applies from empty, round-trips (down one
+step and up again), and leaves no drift between the models and the database; plus the
+procrastinate schema migration and the autogenerate filter."""
 
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import URL, Connection, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
@@ -29,13 +31,55 @@ PROCRASTINATE_OBJECTS = text(
 )
 
 
-async def migrate(url: URL, target: str, *, down: bool = False) -> None:
+def alembic_config(url: URL | None = None) -> Config:
     config = Config(BACKEND / "alembic.ini")
     config.attributes["url"] = url
     config.attributes["configure_logger"] = False
+    return config
+
+
+# Every revision, oldest first.
+REVISIONS = [
+    script.revision
+    for script in reversed(list(ScriptDirectory.from_config(alembic_config()).walk_revisions()))
+]
+
+
+async def migrate(url: URL, target: str, *, down: bool = False) -> None:
     step = command.downgrade if down else command.upgrade
     # Alembic's async env runs its own event loop, so it runs in a worker thread.
-    await anyio.to_thread.run_sync(step, config, target)
+    await anyio.to_thread.run_sync(step, alembic_config(url), target)
+
+
+async def current_revision(url: URL) -> str | None:
+    engine = create_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return await connection.run_sync(
+                lambda sync: MigrationContext.configure(sync).get_current_revision()
+            )
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("revision", REVISIONS)
+async def test_migration_round_trips(scratch_database: URL, revision: str) -> None:
+    """Up to this revision, down one step, and up again: the downgrade works and doesn't leave
+    anything behind that would stop the upgrade from running twice."""
+    await migrate(scratch_database, revision)
+    await migrate(scratch_database, "-1", down=True)
+
+    await migrate(scratch_database, revision)
+
+    assert await current_revision(scratch_database) == revision
+
+
+async def test_models_and_migrations_have_not_drifted(scratch_database: URL) -> None:
+    """`alembic check` through migrations/env.py (so it covers env.py's settings, including the
+    procrastinate filter) finds nothing for autogenerate to add."""
+    await migrate(scratch_database, "head")
+
+    await anyio.to_thread.run_sync(command.check, alembic_config(scratch_database))
 
 
 async def procrastinate_objects(url: URL) -> tuple[int, int, int]:

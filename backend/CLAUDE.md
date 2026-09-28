@@ -66,12 +66,23 @@ Calls flow **routers → services → repositories → models**. Services also u
 - Leave constraint `name=` off (the naming convention names them), except a short name for
   CHECK constraints. Import every model module in `app/models/__init__.py`.
 - A new parent and child added without a `relationship()` between them: flush the parent first.
+- Mixins: `SoftDeleteMixin` for `deleted_at`, `VersionMixin` for `version` — listed **before**
+  `BaseModel` (`class Task(VersionMixin, SoftDeleteMixin, BaseModel)`). Enum columns use
+  `enum_type(MyEnum, "<column>")`, with the `StrEnum` defined outside SQLAlchemy code.
+- Every update to a versioned entity calls `check_version(entity, payload.version)` before
+  changing it. Rank and counter writes use `direct_update` (no version bump).
+- Trash/restore queries opt in with `.execution_options(include_deleted=True)`; nothing else
+  does.
 
 ## Async rules
 
-- Relationships default to `lazy="raise"`: load what you use (`selectinload`/`joinedload`) in
-  the repository. Never rely on implicit loading.
+- Every relationship must declare `lazy="raise"` (there's no global default; the convention
+  tests fail if one doesn't): load what you use (`selectinload`/`joinedload`) in the
+  repository. Never rely on implicit loading.
 - Sessions use `expire_on_commit=False`.
+- A write outside the unit of work (`direct_update`, any ORM-enabled `UPDATE`) must not leave a
+  loaded object with expired attributes: reading one later needs a lazy load, which fails. Test
+  it with `assert inspect(obj).expired_attributes == set()`.
 - Nothing blocks the event loop: CPU-heavy work (Argon2id) via `anyio.to_thread.run_sync`;
   outbound HTTP via `httpx.AsyncClient`; no sync client libraries in request paths.
 - Jobs are enqueued only through `app/jobs/enqueue.py`, passing the caller's session (the job
@@ -113,6 +124,9 @@ Calls flow **routers → services → repositories → models**. Services also u
 - Every test that calls `create_app` passes `sessionmaker=` (the test transaction), or points
   `postgres_db` at `TEST_DATABASE_NAME` when it tests the app's own engine. Never override the
   session dependency instead.
+- `now()` is the transaction's start time, so within one test every database timestamp is the
+  same instant. To test that a timestamp changes, backdate the row first (and reload any
+  object that should hold the old value); otherwise the assertion can't fail.
 - Data from polyfactory factories in `tests/factories/` (fixed seed). Set explicitly any value
   the test depends on.
 - Layout: `tests/unit/` (no DB), `tests/integration/` (repositories, services), `tests/api/`

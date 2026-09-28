@@ -200,6 +200,60 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 
 - Import every model module in `app/models/__init__.py`, so Alembic autogenerate sees it.
 
+**Enums** (`app/core/enums.py`). Define the enum as a `StrEnum` in a module that doesn't import
+SQLAlchemy (so `rules/` can use it), and map it with `enum_type`, naming it after the column:
+
+```python
+status: Mapped[TaskStatus] = mapped_column(enum_type(TaskStatus, "status"))
+```
+
+It's a `VARCHAR(64)` with a CHECK named `ck_<table>_status` that lists the values (`"in_review"`,
+not `"IN_REVIEW"`); the ORM rejects other strings before they reach the database. Filter with
+members (`Task.status == TaskStatus.DONE`), never string literals. Adding, renaming, or removing a
+value needs a hand-written migration (autogenerate doesn't see CHECK changes; see the `migration`
+skill).
+
+**Soft delete** (`SoftDeleteMixin`, for `deleted_at` tables). Every ORM `SELECT`, including the
+related rows a query loads, hides rows with `deleted_at` set. Trash and restore queries opt in:
+`select(Task).execution_options(include_deleted=True)` (the key is `INCLUDE_DELETED`). Two
+caveats: `session.get()` returns an object already in the session's identity map without
+querying, and raw SQL (`text()`) is never filtered. The filter also applies to loading a
+**parent**: a comment whose task is soft-deleted loads with `comment.task == None`, so trash
+and restore screens put `include_deleted=True` on the query that loads the parents too. And the
+filter reaches related rows only through the query that loaded the object: loading a
+relationship on an object no filtered query loaded (one just created in the session, or loaded
+with `include_deleted=True`), e.g. `await session.refresh(task, ["comments"])`, isn't filtered.
+Load related rows with a query and `selectinload` instead.
+
+**Optimistic locking** (`VersionMixin`, for `version` tables). List it **before** `BaseModel`:
+
+```python
+class Task(VersionMixin, SoftDeleteMixin, BaseModel): ...
+```
+
+Every ORM update checks and increments `version`. Update schemas carry the version the client
+loaded, and the service calls `check_version(task, payload.version)` before changing anything;
+the ORM's own check then catches a write between this request's load and its commit. Both raise
+`StaleDataError`, which the API returns as **409** `{"code": "stale_version", ...}`
+(`app/core/errors.py`); the UI prompts a reload.
+
+**Direct updates** (`app/repositories/base.py`). Rank moves and counters use `direct_update`,
+which runs `UPDATE … RETURNING` outside the unit of work, so it doesn't bump `version` (someone
+editing the item's content at the same time doesn't get a 409). It still moves `updated_at`
+(the database sets it), returns the new values (so
+`{"next_subtask_number": Task.next_subtask_number + 1}` works as a counter), and writes every
+changed column, `updated_at` included, onto the object if the session has it loaded, so it
+stays readable without a lazy load.
+
+**Relationships** are always `lazy="raise"`: load what you use with `selectinload` /
+`joinedload` in the repository. Touching an unloaded relationship raises instead of emitting
+SQL (which async sessions can't do).
+
+**Convention checks** (`tests/unit/core/test_model_conventions.py`) walk every mapped model and
+fail if a relationship isn't `lazy="raise"`, a model dropped `eager_defaults=True` (for example
+by replacing `__mapper_args__`), or a model has a `version` column that isn't checked (for
+example `VersionMixin` listed after `TimestampMixin`).
+
 ### Migrations
 
 - Change the models, then `wl backend migration "add phase"` to autogenerate a revision in
@@ -212,8 +266,10 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 - There is one migration history: every migration, app tables or infrastructure (such as
   procrastinate's schema), chains after the current head. No branch labels.
 - The database URL comes from app settings (`migrations/env.py`), never from `alembic.ini`.
-- Check for drift between models and migrations: `uv run --directory backend alembic check`
-  (added to `wl check` with the migration checks in S0-C5).
+- **Migration checks** run with the tests (so in `wl check`), each on a scratch database:
+  every migration upgrades from empty, round-trips (down one step and up again), and
+  `alembic check` finds no drift between the models and the migrations. To check drift by hand
+  against the dev database: `uv run --directory backend alembic check`.
 
 ## 6. Background jobs
 
@@ -350,6 +406,12 @@ async def test_committed_job_is_processed_by_the_worker(concurrency: SessionMake
     ...
 ```
 
+For a race, hold one transaction's row lock, start the other in a task, and use
+`wait_until_blocked_on_a_lock(engine, pid)` (`tests/support/concurrency.py`) before letting the
+first commit, so the two really overlap; bound it with `anyio.fail_after`. See
+`tests/integration/core/test_versioning_concurrency.py`, which also uses
+`committed_support_tables` for committed test-only tables.
+
 **Migration tests** use `scratch_database`: a new, empty database for one test, dropped
 afterwards (see `tests/integration/test_migrations.py`).
 
@@ -401,7 +463,9 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 | `wl up`: port 5432 is already allocated | Another Postgres is running. Set `POSTGRES_PORT` in `.env` (e.g. 5433) and rerun `wl up`. |
 | `wl up`: `set POSTGRES_DB in .env` | No `.env` yet: `cp .env.example .env`. |
 | The API fails at startup with a validation error for `postgres_user` | No `.env` (or the variables aren't set): `cp .env.example .env`. |
-| `MissingGreenlet` when reading `created_at`/`updated_at` | The model replaced `__mapper_args__` without keeping `eager_defaults`; merge `TimestampMixin.__mapper_args__` (see "Models"). |
+| `MissingGreenlet` when reading `created_at`/`updated_at` | The model replaced `__mapper_args__` without keeping `eager_defaults`; merge `TimestampMixin.__mapper_args__` (see "Models"). The convention checks catch this. |
+| `InvalidRequestError: 'Task.subtasks' is not available due to lazy='raise'` | The repository didn't load that relationship; add `selectinload(Task.subtasks)` to its query. |
+| A versioned model never raises `StaleDataError` | `VersionMixin` is listed after `BaseModel`/`TimestampMixin`; list it first. The convention checks catch this. |
 | `ForeignKeyViolation` flushing a new parent and child together | No `relationship()` between them, so the child may be inserted first; flush the parent first. |
 | The worker logs `TaskNotFound` | The job's module isn't imported in `app/jobs/tasks/__init__.py`, or its name differs from the one in `task_names.py`. |
 | `ModuleNotFoundError: No module named 'app'` in tests | Run pytest from `backend/` (or through `wl`); `pythonpath` is set in `backend/pyproject.toml`. |

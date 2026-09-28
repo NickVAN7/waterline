@@ -76,7 +76,10 @@ Entry format:
 - **Why:** These are best designed with the first real race test, so they fit what it needs
   and can be sabotage-checked against it (a non-atomic allocation must fail the test).
 - **Fix by:** Slice 1, the checkpoint that adds `allocate_number` and its concurrency tests.
-- **Status:** open (partly done in S0-C4: real commits and cleanup of named tables)
+- **Status:** open. Partly done: real commits and cleanup of named tables (S0-C4); one
+  race test pattern, `wait_until_blocked_on_a_lock` plus a time limit, used by the
+  optimistic-locking race test (S0-C5), which covers items 1 and 5 for that single case. The
+  general `run_in_parallel(n, fn)` helper, pool sizing, factories, and cleanup safety remain.
 
 ### TD-5: Factories generate random strings, not realistic fake values
 - **Added:** S0-C2
@@ -97,4 +100,25 @@ Entry format:
   `alembic check` shows no drift today.
 - **Why:** The migration drift check (`alembic check` in `wl check`) is Checkpoint 5's scope.
 - **Fix by:** S0-C5 (the drift check runs through `env.py`, so it covers the wiring).
+- **Status:** resolved in S0-C5 (`test_models_and_migrations_have_not_drifted` runs
+  `alembic check` through `env.py`; removing the filter fails it)
+
+### TD-7: `direct_update` moves `updated_at` for rank writes
+- **Added:** S0-C5
+- **What:** `direct_update` sets `updated_at` (via its `onupdate`) on every write. The owner
+  decided rank writes (a display-order change) must leave `updated_at` alone, while counter
+  writes (e.g. adding a subtask) still move it. Needs a parameter on `direct_update`
+  controlling whether `onupdate` columns are set, with tests for both.
+- **Why:** Decided after S0-C5's review; the checkpoint was already approved.
+- **Fix by:** S0-C6 (in the build plan's Checkpoint 6 row).
+- **Status:** open
+
+### TD-8: `session.get()` returns an object soft-deleted in the same session
+- **Added:** S0-C5
+- **What:** `session.get()` checks the identity map before querying, so an object
+  soft-deleted earlier in the same session is still returned (documented in the developer
+  guide). The owner decided the base repository's get-by-ID uses a query instead, so the
+  soft-delete filter always applies.
+- **Why:** No repository exists yet; the base repository is built with the first area.
+- **Fix by:** Slice 1, the base repository (build plan, "Backend architecture").
 - **Status:** open

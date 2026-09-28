@@ -2,6 +2,7 @@
 
 from collections.abc import Collection, Sequence
 
+import anyio
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -30,3 +31,13 @@ async def truncate(engine: AsyncEngine, tables: Sequence[str]) -> None:
         quote = connection.dialect.identifier_preparer.quote
         names = ", ".join(quote(table) for table in tables)
         await connection.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
+
+
+async def wait_until_blocked_on_a_lock(engine: AsyncEngine, backend_pid: int) -> None:
+    """Return once Postgres reports the backend `backend_pid` waiting on a lock (it has reached
+    the contended row). The caller bounds the wait with anyio.fail_after."""
+    query = text("SELECT wait_event_type FROM pg_stat_activity WHERE pid = :pid")
+    async with engine.connect() as connection:
+        # Polling is the only option: the state lives in Postgres, not in this process.
+        while await connection.scalar(query, {"pid": backend_pid}) != "Lock":  # noqa: ASYNC110
+            await anyio.sleep(0.02)

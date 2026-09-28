@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.pool import QueuePool
 
+from app.core.base_model import StaleVersionError
 from app.core.db import SessionMaker
 from app.core.settings import TEST_DATABASE_NAME, Settings
 from app.main import create_app
@@ -49,3 +50,19 @@ async def test_app_leaves_an_injected_sessionmaker_open(
         pass
 
     assert await session.scalar(text("SELECT 1")) == 1
+
+
+async def test_app_returns_409_for_a_stale_version(
+    settings: Settings, sessionmaker: SessionMaker
+) -> None:
+    app = create_app(settings, sessionmaker=sessionmaker)
+
+    @app.get("/stale")
+    async def stale() -> None:
+        raise StaleVersionError("Document is at version 2, not 1")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+        response = await c.get("/stale")
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "stale_version"
