@@ -7,6 +7,9 @@ Companion to `design-doc.md` (section references like §6.1 point there).
 - Timestamps are `timestamptz`; `created_at`/`updated_at` exist on every table, with
   `updated_at` maintained by the ORM.
 - "enum" means `VARCHAR` + `CHECK` constraint (`native_enum=False`), not a native Postgres enum.
+- Constraint and index names follow one naming convention: `pk_<table>`,
+  `fk_<table>_<column>_<referred table>`, `uq_<table>_<columns>`, `ck_<table>_<name>`,
+  `ix_<table>_<columns>`.
 - Soft-deleted tables (`deleted_at`) are filtered out globally unless a query opts in.
 
 ## Entity-Relationship Diagram

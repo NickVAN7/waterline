@@ -1,0 +1,28 @@
+# Local development stack (build-plan.md, "Docker Compose"). Start with `uv run wl up`.
+# postgres is added in S0-C2; api, worker, and web follow in S0-C7.
+name: waterline
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env (copy .env.example)}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env (copy .env.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (copy .env.example)}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Postgres 18+ images keep PGDATA in a versioned directory under /var/lib/postgresql.
+      - postgres-data:/var/lib/postgresql
+      # Runs once, on first start with an empty volume: creates the test database.
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Over TCP: during first-start init the image runs a temporary socket-only server, so a
+      # socket check could pass before the init scripts finish.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  postgres-data:

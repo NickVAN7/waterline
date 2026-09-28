@@ -53,6 +53,25 @@ def backend_check() -> list[Step]:
     return [step("uv", "lock", "--check", cwd=BACKEND), *backend_lint(), *backend_test()]
 
 
+def backend_migration(message: str) -> list[Step]:
+    return [step("uv", "run", "alembic", "revision", "--autogenerate", "-m", message, cwd=BACKEND)]
+
+
+def migrate() -> list[Step]:
+    """Apply migrations to the dev database (from the host until the api container, S0-C7)."""
+    return [step("uv", "run", "alembic", "upgrade", "head", cwd=BACKEND)]
+
+
+def up(extra: Sequence[str] = ()) -> list[Step]:
+    """Start the stack in the background and wait until every service is healthy."""
+    return [step("docker", "compose", "up", "--detach", "--wait", *extra)]
+
+
+def down(extra: Sequence[str] = ()) -> list[Step]:
+    """Stop the stack. Data survives in the named volume unless `-v` is passed."""
+    return [step("docker", "compose", "down", *extra)]
+
+
 def cli_lint() -> list[Step]:
     return [
         step("uv", "run", "ruff", "check", ".", cwd=CLI),

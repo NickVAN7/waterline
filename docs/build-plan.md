@@ -99,8 +99,8 @@ Choices the design docs left open.
 
 | # | Decision | Status |
 |---|---|---|
-| 1 | **Plain SQLAlchemy 2.0 (typed ORM), not SQLModel.** The conventions lean on SQLAlchemy-native features (`version_id_col`, `with_loader_criteria`, `Enum(native_enum=False)`, direct `UPDATE`s that bypass versioning); SQLModel adds a layer over exactly those. API shapes are separate Pydantic models. | Confirmed |
-| 2 | **Async throughout:** SQLAlchemy 2.0 asyncio (`AsyncSession`) with the psycopg 3 async driver, `async def` endpoints, services, and repositories. Chosen over sync because the team is comfortable with async and it avoids a later migration if streaming (v2 AI) or live updates arrive. Rules in "Async rules" below. | Confirmed |
+| 1 | **Plain SQLAlchemy 2.x (2.0-style typed ORM), not SQLModel.** The conventions lean on SQLAlchemy-native features (`version_id_col`, `with_loader_criteria`, `Enum(native_enum=False)`, direct `UPDATE`s that bypass versioning); SQLModel adds a layer over exactly those. API shapes are separate Pydantic models. | Confirmed |
+| 2 | **Async throughout:** SQLAlchemy 2.x asyncio (`AsyncSession`) with the psycopg 3 async driver, `async def` endpoints, services, and repositories. Chosen over sync because the team is comfortable with async and it avoids a later migration if streaming (v2 AI) or live updates arrive. Rules in "Async rules" below. | Confirmed |
 | 3 | **Typed API client generated from the backend's OpenAPI schema:** `openapi-typescript` (generates TypeScript types) + `openapi-fetch` (typed fetch client). CI fails if the generated client is stale. | Confirmed |
 | 4 | **Only system admins create organizations in v1.** A system admin creates the org and assigns its first owner. | Confirmed |
 | 5 | **Monorepo** with `backend/`, `frontend/`, and `docs/` at the root, laid out as in "Repository layout" below. | Confirmed |
@@ -128,7 +128,7 @@ slices only add features.
 | 3 | procrastinate spike | Decision point: can jobs be queued inside the request's `AsyncSession` transaction? Result and consequences written into the design doc |
 | 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 |
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
-| 6 | API conventions & security helpers | Error format and handlers (404/403/409/422), password hashing off the event loop, token generation and hashing helpers |
+| 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
 | 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness), branch protection noted for repo creation, fresh-clone setup by following the developer guide, slice wrap-up |
 
@@ -161,7 +161,9 @@ The sections below describe the content; the table above is the order of work.
 │   ├── tests/
 │   │   ├── unit/                 rules, authz matrix (no database)
 │   │   ├── integration/          repositories and services against real Postgres
-│   │   └── api/                  endpoints over HTTP against real Postgres
+│   │   ├── api/                  endpoints over HTTP against real Postgres
+│   │   ├── factories/            polyfactory factories, one per model
+│   │   └── support/              test-only helpers (e.g. tables for base-model tests)
 │   └── openapi.json              generated; input to the frontend client
 │
 ├── frontend/                     Vue 3 + TypeScript (Vite)
@@ -184,6 +186,7 @@ The sections below describe the content; the table above is the order of work.
 │                                 (source of truth once code exists; synced to the Project)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, api, worker, web
+├── docker/postgres/initdb/       first-start scripts for postgres (creates the test database)
 ├── tools/cli/                    developer CLI (`waterline`, alias `wl`); own pyproject, Typer
 ├── pyproject.toml                root uv workspace; makes `wl` runnable from the repo root
 ├── .env.example
@@ -368,7 +371,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - **Naming convention** on `MetaData` for indexes, unique, check, FK, and PK constraints, so
   Alembic produces stable, predictable names.
 - **Enums:** a helper around `StrEnum` + `Enum(native_enum=False, create_constraint=True)`.
-  (`create_constraint` defaults to false in SQLAlchemy 2.0; without it there is no CHECK.)
+  (`create_constraint` defaults to false in SQLAlchemy 2.x; without it there is no CHECK.)
 - **Soft delete:** a mixin with `deleted_at`, plus a global `do_orm_execute` hook applying
   `with_loader_criteria`. Queries opt in with an execution option (e.g.
   `include_deleted=True`).
@@ -379,7 +382,9 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 
 ### API foundations
 - Consistent error body (`{code, message, details}`) and handlers for 404 / 403 / 409 / 422.
-- `GET /api/health` (checks database connectivity).
+- `GET /api/health` (checks database connectivity): 200 with `{status, database}` when healthy;
+  when the database is unavailable, 503 with the standard `{code, message, details}` error body
+  (from Checkpoint 6; until then the 503 body is `{status, database}`).
 - OpenAPI schema exported to a file; the web client is generated from it.
 - `/api/docs` and `/api/openapi.json` are behind a setting (on in dev and test, off in
   production), added with settings in Checkpoint 2. `wl gen-client` exports the schema from

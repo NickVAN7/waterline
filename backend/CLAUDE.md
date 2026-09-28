@@ -1,6 +1,6 @@
 # Backend rules
 
-Python 3.14 (fallback 3.13/3.12), FastAPI, async SQLAlchemy 2.0 + psycopg 3, Alembic,
+Python 3.14 (fallback 3.13/3.12), FastAPI, async SQLAlchemy 2.x + psycopg 3, Alembic,
 procrastinate. Architecture and feature map: `docs/build-plan.md`. Conventions: `docs/design-doc.md`
 §3–§5, §10.
 
@@ -35,7 +35,10 @@ Calls flow **routers → services → repositories → models**. Services also u
 ## Rules that are easy to break silently
 
 - **Transactions:** one per request, committed only by the request dependency. Services may
-  `flush()`; nothing else commits.
+  `flush()`; nothing else commits. Endpoints get their session through `SessionDep`;
+  `SessionMakerDep` is only for work that must stay outside the request transaction (the health
+  check). Never make `get_session` swallow a failed transaction: a request that can't commit
+  must fail.
 - **Order of every protected mutation:** authenticate → `authorize()` → change → `log_change()`
   → commit (design-doc §5).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
@@ -51,6 +54,16 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
   subtasks.
 - **Markdown** is sanitized on render, never trusted.
+
+## Models
+
+- App tables subclass `BaseModel` (`app/core/base_model.py`): UUIDv7 `id` assigned at
+  construction, database-clock `created_at`/`updated_at`. Never set the timestamps by hand.
+- A model that defines `__mapper_args__` must merge `TimestampMixin.__mapper_args__`
+  (`{**TimestampMixin.__mapper_args__, ...}`); replacing it drops `eager_defaults`.
+- Leave constraint `name=` off (the naming convention names them), except a short name for
+  CHECK constraints. Import every model module in `app/models/__init__.py`.
+- A new parent and child added without a `relationship()` between them: flush the parent first.
 
 ## Async rules
 
@@ -78,7 +91,11 @@ Calls flow **routers → services → repositories → models**. Services also u
 ## Tests
 
 - Real Postgres, never mocks or SQLite. Each test rolls back via savepoint; concurrency tests
-  use the `concurrency` fixture and marker.
+  use the `concurrency` fixture and marker (TD-4). Tests only ever use the test database
+  (`waterline_test`); never point a test at the dev database.
+- Every test that calls `create_app` passes `sessionmaker=` (the test transaction), or points
+  `postgres_db` at `TEST_DATABASE_NAME` when it tests the app's own engine. Never override the
+  session dependency instead.
 - Data from polyfactory factories in `tests/factories/` (fixed seed). Set explicitly any value
   the test depends on.
 - Layout: `tests/unit/` (no DB), `tests/integration/` (repositories, services), `tests/api/`

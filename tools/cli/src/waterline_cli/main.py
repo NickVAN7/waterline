@@ -75,6 +75,33 @@ def fmt(dry_run: DryRun = False) -> None:
     run_steps([*steps.backend_fmt(), *steps.cli_fmt()], dry_run=dry_run)
 
 
+@app.command(context_settings=PASS_THROUGH)
+def up(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """Start the Docker Compose stack and wait until it's healthy. Extra args go to compose."""
+    run_steps(steps.up(ctx.args), dry_run=dry_run)
+
+
+@app.command(context_settings=PASS_THROUGH)
+def down(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """Stop the stack (`wl down -v` also deletes the database volume). Extra args go to compose."""
+    run_steps(steps.down(ctx.args), dry_run=dry_run)
+
+
+@app.command()
+def migrate(dry_run: DryRun = False) -> None:
+    """Apply all migrations to the dev database (alembic upgrade head)."""
+    run_steps(steps.migrate(), dry_run=dry_run)
+
+
+@backend.command("migration")
+def backend_migration(
+    message: Annotated[str, typer.Argument(help="What the migration does, e.g. 'add phase'.")],
+    dry_run: DryRun = False,
+) -> None:
+    """Autogenerate a migration from the models. Review it by hand before committing."""
+    run_steps(steps.backend_migration(message), dry_run=dry_run)
+
+
 @backend.command("check")
 def backend_check(dry_run: DryRun = False) -> None:
     """Everything CI runs, for the backend only."""

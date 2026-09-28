@@ -80,6 +80,18 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
             ["(cd backend && uv run pytest --no-cov -k approval -x)"],
             id="backend-test-pass-through",
         ),
+        pytest.param(["up"], ["docker compose up --detach --wait"], id="up"),
+        pytest.param(
+            ["up", "postgres"], ["docker compose up --detach --wait postgres"], id="up-service"
+        ),
+        pytest.param(["down"], ["docker compose down"], id="down"),
+        pytest.param(["down", "-v"], ["docker compose down -v"], id="down-volumes"),
+        pytest.param(["migrate"], ["(cd backend && uv run alembic upgrade head)"], id="migrate"),
+        pytest.param(
+            ["backend", "migration", "add phase"],
+            ["(cd backend && uv run alembic revision --autogenerate -m 'add phase')"],
+            id="backend-migration",
+        ),
         pytest.param(
             ["doctor"],
             [

@@ -50,3 +50,25 @@ Entry format:
 - **Fix by:** S0-C4 (Background jobs): add a forbidden contract (services → job-function
   modules), with a violation test for the loop above.
 - **Status:** open
+
+### TD-4: No concurrency-test fixture yet
+- **Added:** S0-C2
+- **What:** `testing-strategy.md` ("Database isolation") and `backend/CLAUDE.md` describe a
+  `concurrency` fixture and marker for tests that need real commits on separate connections
+  (it truncates the tables it touches afterwards). The S0-C2 harness has only the rolled-back
+  per-test transaction.
+- **Why:** No concurrency test exists yet, and the fixture's truncation list depends on the
+  tables the first such test touches.
+- **Fix by:** Slice 1, with the first concurrency test (`project_counter` allocation).
+- **Status:** open
+
+### TD-5: Factories generate random strings, not realistic fake values
+- **Added:** S0-C2
+- **What:** `testing-strategy.md` ("Test data") says factories create rows "with realistic
+  fake values". polyfactory only uses Faker for a field that is configured to; a plain `str`
+  column gets random characters (e.g. `'JUJNbXOYVkKAbbIuDPQW'`).
+- **Why:** The only factory so far is for a test-only table, where realistic values don't
+  matter; which Faker provider fits each field is decided per model.
+- **Fix by:** Slice 1, with the first real model factories (user, org, project): set a Faker
+  provider on each text field (names, emails, usernames, keys) that has a realistic form.
+- **Status:** open

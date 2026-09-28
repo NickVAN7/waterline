@@ -4,15 +4,21 @@ version = "0.1.0"
 description = "Waterline API and worker"
 requires-python = ">=3.14,<3.15"
 dependencies = [
+    "alembic>=1.20.0",
     "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.6",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy[asyncio]>=2.1.1",
     "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
     "anyio>=4.15.1",
+    "faker>=40.39.0",
     "httpx>=0.28.1",
     "import-linter>=2.15",
+    "polyfactory>=3.3.0",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
@@ -40,7 +46,7 @@ ban-relative-imports = "all"
 # --- Types -----------------------------------------------------------------------------------
 
 [tool.pyright]
-include = ["app", "tests"]
+include = ["app", "migrations", "tests"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."

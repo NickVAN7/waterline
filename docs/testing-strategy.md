@@ -38,8 +38,9 @@ tested, what each kind of test is for, and the gates every change passes.
   Faker underneath. One factory per model, in `backend/tests/factories/`, named after the model
   (`TaskFactory`, `ProjectFactory`).
 - The same library generates **API request bodies** from the Pydantic schemas for API tests.
-- **Fixed seed:** Faker and polyfactory are seeded once per test session from a constant (and
-  reseeded per test for independence), so failures reproduce exactly.
+- **Fixed seed:** Faker and polyfactory are reseeded from a fixed constant before every test,
+  so each test's generated data is the same whether it runs alone, in the full suite, or in any
+  order, and a failure reproduces exactly when the test is rerun on its own.
 - **Explicit over implicit:** a test sets any value it depends on (`TaskFactory(status=...)`);
   everything else is generated. Factories build valid defaults, including required parents
   (a task factory creates its project and org unless given one).
