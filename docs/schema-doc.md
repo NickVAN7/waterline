@@ -904,7 +904,9 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 
 ## Infrastructure tables
 - **procrastinate** creates and manages its own job tables in the same database (via its own
-  migrations); they are not modeled in the app's ORM.
+  migrations); they are not modeled in the app's ORM. Its schema and migration files are
+  applied through our Alembic migrations, and its tables are excluded from autogenerate
+  (design-doc §13, "Transactional enqueue").
 
 ## Deferred tables (not in v1)
 | Table | When |

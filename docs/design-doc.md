@@ -701,13 +701,75 @@ attribution; a scoped "system actor" is the alternative. Left as a v2 design que
 - **Why not FastAPI `BackgroundTasks`:** in-process, no retries, lost on restart.
 - **Portability conventions** (keep a future switch to ARQ/Celery + Redis to a day or two):
   1. All enqueueing goes through one module (e.g. `app/jobs/enqueue.py`,
-     `enqueue_webhook_processing(delivery_id)`); endpoints never call the queue library
+     `enqueue_webhook_processing(session, delivery_id)`); endpoints never call the queue library
      directly.
   2. Job arguments are IDs and plain values, never ORM objects.
   3. Jobs are idempotent (every queue retries).
   4. Work whose loss matters is also tracked in the app's own tables (outbox pattern), not only
      in the queue.
   5. Library-specific features used in business logic are wrapped in our own helpers.
+
+### Transactional enqueue (S0-C3 spike result)
+
+**Question:** can a job be enqueued inside the request's own `AsyncSession` transaction, so it
+commits or rolls back with the data? **Answer: yes**, with one condition: the job must be
+deferred on the request's database connection. procrastinate (3.10) accepts an external
+connection: `task.configure(connection=<psycopg AsyncConnection>).defer_async(...)`. The
+request's psycopg connection comes from the session
+(`(await (await session.connection()).get_raw_connection()).driver_connection`). procrastinate's
+default `defer_async()` does **not** share the transaction: it uses its own connection pool.
+
+Evidence (`docs/spikes/S0-C3-transactional-enqueue.py`, run through the real `SessionDep`
+dependency; procrastinate 3.10.0, SQLAlchemy 2.1.1, psycopg 3.3.6, Postgres 18.6):
+
+| # | Scenario | Observed |
+|---|---|---|
+| A | Default `defer_async()` in a request that then fails | Data rolled back, **job kept** |
+| B | Defer on the request's connection; request succeeds | Data and job both committed |
+| C | Defer on the request's connection; request fails | Data and job both rolled back |
+| D | Another connection looks for the job before the request commits | Not visible until commit |
+| E | Worker wake-up (procrastinate's `NOTIFY`) | Sent only on commit, never for a rolled-back job |
+| F | Worker runs the committed job | Succeeds and reads the row the request wrote. The orphan job from A also ran, against a row that never existed |
+| G | Same `queueing_lock` deferred twice in one request | `AlreadyEnqueued`, after which the request's transaction is aborted (`InFailedSqlTransaction`); inside a savepoint (`begin_nested()`) the conflict raises there and the request's transaction stays usable |
+| H | Test harness (outer transaction, `join_transaction_mode="create_savepoint"`) | Job visible inside the test; gone after its rollback |
+| I | Defer **by task name** (`App.configure_task(name, connection=...)`) from an app where the task isn't registered | Committed with the data; a worker that registers the task runs it |
+| J | Same, from a procrastinate app that was **never opened** | Works: deferring on the request's connection doesn't use procrastinate's pool |
+
+**Consequences:**
+1. **`app/jobs/enqueue.py` defers on the caller's session.** Every enqueue function takes the
+   `AsyncSession` (e.g. `enqueue_webhook_processing(session, delivery_id)`) and defers on its
+   connection, so the job commits or rolls back with the data (convention 1). Nothing calls
+   procrastinate's pool-based `defer_async()` from request or service code: an orphan job would
+   run against data that was never committed (scenario A/F).
+2. **No race with the worker.** A job is invisible, and the worker isn't woken, until the
+   request commits, so a job never runs before its data exists.
+3. **Getting the driver connection is library-specific**, so it lives only in `enqueue.py`
+   (convention 5).
+4. **A failed enqueue fails the request.** The defer runs in the request's transaction, so an
+   error there aborts it. Where a conflict is expected (a `queueing_lock` for "at most one
+   pending job"), `enqueue.py` defers inside a savepoint and treats `AlreadyEnqueued` as
+   "already queued".
+5. **Convention 4 (outbox) still applies.** Transactional enqueue makes the job itself
+   reliable, but a later move to a Redis-backed queue couldn't be transactional, so work whose
+   loss matters (webhook deliveries) keeps its own row (`github_webhook_delivery`) as the
+   source of truth; the job carries only its ID.
+6. **Tests:** the rolled-back per-test transaction covers enqueueing (assert the job row inside
+   the test). A test in which a worker processes a job needs real commits, so it uses the
+   concurrency-style fixture (TD-4) or cleans up after itself.
+7. **`enqueue.py` defers by task name and never imports job modules.** Job functions call
+   services, often in higher layers (webhook processing calls the `webhook` service, layer 6),
+   so importing them into `enqueue.py`, which services at every layer use, would break the
+   service layers contract. Only the worker imports the job modules. Scenario I shows deferring
+   by name works on the request's connection. The API process doesn't need to open
+   procrastinate's app or pool at all: every defer runs on the request's connection
+   (scenario J). Only the worker opens it.
+8. **Schema:** procrastinate ships `schema.sql` plus versioned migration files (38 at 3.10,
+   in `procrastinate/sql/migrations/`; since 3.0 a change can come as a `_pre_` file, applied
+   before deploying the new code, and a `_post_` file, applied after), and one pending file in
+   `future_migrations/`. They are applied through Alembic; a procrastinate upgrade gets an
+   Alembic migration applying its new files in their order (Checkpoint 4 decides how the
+   pre/post split maps onto our deploys); procrastinate's tables are excluded from
+   autogenerate.
 
 ## 14. Search
 

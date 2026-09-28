@@ -62,7 +62,8 @@ Entry format:
   per-test transaction.
 - **Why:** No concurrency test exists yet, and the fixture's truncation list depends on the
   tables the first such test touches.
-- **Fix by:** Slice 1, with the first concurrency test (`project_counter` allocation).
+- **Fix by:** S0-C4, with the end-to-end background-job test, which is the first to need real
+  commits (moved from Slice 1 by the owner at S0-C3).
 - **Status:** open
 
 ### TD-5: Factories generate random strings, not realistic fake values

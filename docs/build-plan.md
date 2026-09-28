@@ -144,7 +144,7 @@ slices only add features.
 | 1 | Foundation & guardrails | Repo root, `docs/` (design, schema, build plan, testing strategy, empty developer/user guides, tech-debt log), `CLAUDE.md` files (root, backend, frontend), `checkpoint-reviewer` agent and `checkpoint` skill in `.claude/` (from the Project's `repo-seed/` drafts), uv project and Python version check, ruff/pyright, pre-commit hooks, FastAPI skeleton with `/api/health`, layer folders, import-linter contracts (enforced from the start), developer CLI (`waterline` / `wl`) with its first commands and `doctor`, workstation toolchain check |
 | 2 | Database core & test harness | `docker-compose.yml` with the `postgres` service only (dev and test databases, named volume, `.env.example`), `wl up`/`wl down`, Async engine and session, per-request transaction dependency, base model (UUIDv7, timestamps), constraint naming convention, Alembic (async), pytest + anyio harness with savepoint rollback, polyfactory with fixed seed, `/api/health` checks the database, API docs setting (on in dev/test, off in production) |
 | 3 | procrastinate spike | Decision point: can jobs be queued inside the request's `AsyncSession` transaction? Result and consequences written into the design doc |
-| 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 |
+| 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 (design-doc §13, "Transactional enqueue": enqueue on the caller's session, by task name) |
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
@@ -432,6 +432,9 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   request's own `AsyncSession` transaction, so it commits or rolls back with the data. If
   procrastinate can't share the SQLAlchemy transaction, the design's outbox rule (§13, convention 4) already covers the
   critical case (webhook deliveries); record the finding in the design doc.
+  **Result (S0-C3):** it can, when the job is deferred on the request's own connection;
+  procrastinate's default `defer_async()` uses a separate pool and does not. Details, evidence,
+  and the consequences for Checkpoint 4 are in design-doc §13, "Transactional enqueue".
 
 ### Tests & CI
 - pytest (anyio plugin) against a real Postgres (Compose service in dev, service container in
