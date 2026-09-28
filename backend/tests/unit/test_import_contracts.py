@@ -111,6 +111,29 @@ def test_current_app_keeps_every_contract(tmp_path: Path) -> None:
             id="audit-imports-router",
         ),
         pytest.param(
+            {"app/services/user.py": "import app.jobs.tasks\n"},
+            "Only the worker imports job modules",
+            id="service-imports-job-module",
+        ),
+        pytest.param(
+            {"app/main.py": "import app.jobs.tasks\n"},
+            "Only the worker imports job modules",
+            id="api-entry-point-imports-job-module",
+        ),
+        pytest.param(
+            {"app/jobs/enqueue.py": "import app.jobs.tasks.ping\n"},
+            "Only the worker imports job modules",
+            id="enqueue-imports-job-module",
+        ),
+        pytest.param(
+            {
+                "app/services/user.py": "import app.core.helper\n",
+                "app/core/helper.py": "import app.jobs.worker\n",
+            },
+            "Only the worker imports job modules",
+            id="service-reaches-worker-indirectly",
+        ),
+        pytest.param(
             {"app/jobs/widget.py": "import app.routers\n"},
             "Jobs never import routers",
             id="job-imports-router",
@@ -150,6 +173,12 @@ def test_rules_may_import_pure_core_modules(tmp_path: Path) -> None:
         tmp_path,
         {"app/core/text.py": "import re\n", "app/rules/widget.py": "import app.core.text\n"},
     )
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_services_may_enqueue_jobs(tmp_path: Path) -> None:
+    result = lint_copy(tmp_path, {"app/services/user.py": "import app.jobs.enqueue\n"})
 
     assert result.returncode == 0, result.stdout
 

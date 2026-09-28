@@ -903,10 +903,12 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 ---
 
 ## Infrastructure tables
-- **procrastinate** creates and manages its own job tables in the same database (via its own
-  migrations); they are not modeled in the app's ORM. Its schema and migration files are
-  applied through our Alembic migrations, and its tables are excluded from autogenerate
-  (design-doc §13, "Transactional enqueue").
+- **procrastinate**'s job tables live in the same database and are not modeled in the app's
+  ORM. Our Alembic migration `add procrastinate schema` applies a vendored copy of
+  procrastinate 3.10.0's `schema.sql` (`backend/migrations/sql/`); an upgrade adds a migration
+  applying procrastinate's own migration files for the versions in between, a version's
+  `_pre_` and `_post_` files together, with the workers stopped. Autogenerate ignores these
+  tables (design-doc §13, "Transactional enqueue", item 8).
 
 ## Deferred tables (not in v1)
 | Table | When |

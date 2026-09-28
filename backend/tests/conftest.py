@@ -6,19 +6,22 @@ gets one connection inside an outer transaction; the app's sessions join it with
 everything is rolled back when the test ends.
 """
 
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import cast
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import URL
+from sqlalchemy import URL, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.core.db import SessionMaker, create_engine
+from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.settings import TEST_DATABASE_NAME, Settings
 from tests.factories import SEED, BaseFactory
+from tests.support.concurrency import concurrency_tables, truncate
 
 BACKEND = Path(__file__).resolve().parents[1]
 
@@ -100,3 +103,35 @@ async def session(sessionmaker: SessionMaker) -> AsyncIterator[AsyncSession]:
             yield session
         finally:
             BaseFactory.__async_session__ = None
+
+
+@pytest.fixture
+async def concurrency(
+    request: pytest.FixtureRequest, engine: AsyncEngine
+) -> AsyncIterator[SessionMaker]:
+    """Sessions with real commits, for tests that need separate connections or another process
+    (a worker) to see their data. The tables named in `@pytest.mark.concurrency(...)` are
+    truncated afterwards, pass or fail. Never combine with the rolled-back `connection`/
+    `session` fixtures: the truncate would wait on that open transaction's locks."""
+    item = cast(pytest.Item, request.node)  # pyright: ignore[reportUnknownMemberType] -- untyped in pytest
+    marker = item.get_closest_marker("concurrency")
+    tables = concurrency_tables(marker.args if marker else (), request.fixturenames)
+    try:
+        yield create_sessionmaker(engine)
+    finally:
+        await truncate(engine, tables)
+
+
+@pytest.fixture
+async def scratch_database(migrated_database: URL) -> AsyncIterator[URL]:
+    """A new, empty database for the test (e.g. to run migrations up and down), dropped after."""
+    name = f"{migrated_database.database}_scratch_{uuid.uuid4().hex[:8]}"
+    admin = create_engine(migrated_database).execution_options(isolation_level="AUTOCOMMIT")
+    try:
+        async with admin.connect() as connection:
+            await connection.execute(text(f'CREATE DATABASE "{name}"'))
+        yield migrated_database.set(database=name)
+    finally:
+        async with admin.connect() as connection:
+            await connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+        await admin.dispose()

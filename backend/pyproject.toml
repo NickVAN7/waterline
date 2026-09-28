@@ -6,6 +6,7 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
     "alembic>=1.20.0",
     "fastapi>=0.141.1",
+    "procrastinate==3.10.0",
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.15.0",
     "sqlalchemy[asyncio]>=2.1.1",
@@ -38,7 +39,10 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # assert is how pytest tests are written
+"tests/**" = [
+    "S101",  # assert is how pytest tests are written
+    "S105", "S106",  # fake credentials are test data
+]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -66,6 +70,9 @@ addopts = [
 ]
 filterwarnings = ["error"]
 xfail_strict = true
+markers = [
+    "concurrency(*tables): real commits on separate connections (the `concurrency` fixture); the named tables are truncated afterwards",
+]
 
 [tool.coverage.run]
 branch = true
@@ -118,6 +125,17 @@ forbidden_modules = ["app.routers", "app.services"]
 # Indirect too: e.g. authz -> jobs -> services would quietly put services beneath authz.
 allow_indirect_imports = false
 broken_contract_guidance = "Services call authorize() and log_change(), never the reverse."
+
+[[tool.importlinter.contracts]]
+name = "Only the worker imports job modules"
+type = "forbidden"
+source_modules = [
+    "app.main", "app.routers", "app.services", "app.repositories", "app.models", "app.schemas",
+    "app.core", "app.authz", "app.audit", "app.rules", "app.jobs.enqueue", "app.jobs.app",
+]
+forbidden_modules = ["app.jobs.tasks", "app.jobs.worker"]
+# A new top-level app.* module (e.g. app/cli.py) is added to source_modules.
+broken_contract_guidance = "Enqueue by task name through app.jobs.enqueue; only the worker imports jobs."
 
 [[tool.importlinter.contracts]]
 name = "Jobs never import routers"

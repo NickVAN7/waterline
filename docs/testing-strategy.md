@@ -57,9 +57,10 @@ tested, what each kind of test is for, and the gates every change passes.
   never see each other's data.
 - The test database is migrated once per session with Alembic (not `create_all`), so tests run
   against the real migrated schema.
-- **Exception — concurrency tests** need separate connections and real commits; they use a
-  dedicated fixture that truncates the tables they touch afterwards, and are marked
-  `@pytest.mark.concurrency`.
+- **Exception — concurrency tests** need separate connections and real commits (parallel
+  transactions, or a background worker processing a job); they use the `concurrency` fixture,
+  whose sessions really commit, and are marked `@pytest.mark.concurrency("<table>", ...)`;
+  the named tables are truncated afterwards, pass or fail.
 
 ## Specialized tests
 

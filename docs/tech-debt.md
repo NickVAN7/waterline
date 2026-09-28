@@ -54,17 +54,29 @@ Entry format:
   through `jobs/` breaks it (`lower-service-reaches-higher-through-jobs` in
   `tests/unit/test_import_contracts.py`).
 
-### TD-4: No concurrency-test fixture yet
-- **Added:** S0-C2
-- **What:** `testing-strategy.md` ("Database isolation") and `backend/CLAUDE.md` describe a
-  `concurrency` fixture and marker for tests that need real commits on separate connections
-  (it truncates the tables it touches afterwards). The S0-C2 harness has only the rolled-back
-  per-test transaction.
-- **Why:** No concurrency test exists yet, and the fixture's truncation list depends on the
-  tables the first such test touches.
-- **Fix by:** S0-C4, with the end-to-end background-job test, which is the first to need real
-  commits (moved from Slice 1 by the owner at S0-C3).
-- **Status:** open
+### TD-4: The concurrency fixture can't yet support real race tests
+- **Added:** S0-C2 (reopened at S0-C4)
+- **What:** S0-C4 added the `concurrency` fixture and marker: sessions that really commit, and
+  the named tables truncated afterwards. That covers a worker processing a job, but not the
+  race tests `testing-strategy.md` names (number allocation, optimistic locking, one active
+  sprint, approval completion). Missing:
+  1. **Guaranteed overlap:** a `run_in_parallel(n, fn)` helper that holds every transaction
+     open at a barrier until all have started. Without it, "parallel" transactions can run one
+     after another and a racy implementation passes by luck.
+  2. **Pool size:** the test engine's default pool (5 + 10 overflow) caps parallelism below
+     the 20 transactions the `test-writer` skill's example uses.
+  3. **Factories:** they persist only through the `session` fixture, which `concurrency`
+     refuses to combine with, so a race test can't create its committed parent rows (an org,
+     a project) with factories.
+  4. **Cleanup safety:** truncation relies on a hand-kept table list; a missed table leaks
+     committed rows into later tests. Truncate every app table (plus procrastinate's)
+     automatically, or fail the test if any table isn't empty afterwards.
+  5. **Timeouts:** a deadlocked race test hangs the run instead of failing; the parallel
+     section needs a time limit (and the connections a Postgres `lock_timeout`).
+- **Why:** These are best designed with the first real race test, so they fit what it needs
+  and can be sabotage-checked against it (a non-atomic allocation must fail the test).
+- **Fix by:** Slice 1, the checkpoint that adds `allocate_number` and its concurrency tests.
+- **Status:** open (partly done in S0-C4: real commits and cleanup of named tables)
 
 ### TD-5: Factories generate random strings, not realistic fake values
 - **Added:** S0-C2
@@ -75,4 +87,14 @@ Entry format:
   matter; which Faker provider fits each field is decided per model.
 - **Fix by:** Slice 1, with the first real model factories (user, org, project): set a Faker
   provider on each text field (names, emails, usernames, keys) that has a realistic form.
+- **Status:** open
+
+### TD-6: No gated check that `env.py` applies the autogenerate filter
+- **Added:** S0-C4
+- **What:** `tests/integration/test_migrations.py` passes `include_object` to `compare_metadata`
+  directly, so removing `include_object=include_object` from `migrations/env.py` would fail no
+  test (autogenerate would then propose dropping procrastinate's tables). A manual
+  `alembic check` shows no drift today.
+- **Why:** The migration drift check (`alembic check` in `wl check`) is Checkpoint 5's scope.
+- **Fix by:** S0-C5 (the drift check runs through `env.py`, so it covers the wiring).
 - **Status:** open

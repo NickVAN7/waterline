@@ -755,7 +755,7 @@ dependency; procrastinate 3.10.0, SQLAlchemy 2.1.1, psycopg 3.3.6, Postgres 18.6
    source of truth; the job carries only its ID.
 6. **Tests:** the rolled-back per-test transaction covers enqueueing (assert the job row inside
    the test). A test in which a worker processes a job needs real commits, so it uses the
-   concurrency-style fixture (TD-4) or cleans up after itself.
+   `concurrency` fixture.
 7. **`enqueue.py` defers by task name and never imports job modules.** Job functions call
    services, often in higher layers (webhook processing calls the `webhook` service, layer 6),
    so importing them into `enqueue.py`, which services at every layer use, would break the
@@ -767,9 +767,10 @@ dependency; procrastinate 3.10.0, SQLAlchemy 2.1.1, psycopg 3.3.6, Postgres 18.6
    in `procrastinate/sql/migrations/`; since 3.0 a change can come as a `_pre_` file, applied
    before deploying the new code, and a `_post_` file, applied after), and one pending file in
    `future_migrations/`. They are applied through Alembic; a procrastinate upgrade gets an
-   Alembic migration applying its new files in their order (Checkpoint 4 decides how the
-   pre/post split maps onto our deploys); procrastinate's tables are excluded from
-   autogenerate.
+   Alembic migration applying its new files in their order; procrastinate's tables are
+   excluded from autogenerate. *Decided in S0-C4:* a version's `_pre_` and `_post_` files go in
+   the same migration, applied with the workers stopped (v1 accepts a brief job-processing
+   pause during deploys, so there is no mixed-version window to split them across).
 
 ## 14. Search
 

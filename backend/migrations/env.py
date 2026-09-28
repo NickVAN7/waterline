@@ -11,6 +11,7 @@ from sqlalchemy.engine import Connection
 import app.models  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every model
 from app.core.base_model import Base
 from app.core.db import create_engine
+from app.core.migration_filters import include_object
 from app.core.settings import get_settings
 
 config = context.config
@@ -31,6 +32,7 @@ def configure(**kwargs: object) -> None:
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
+        include_object=include_object,
         **kwargs,  # pyright: ignore[reportArgumentType]
     )
 

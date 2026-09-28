@@ -114,7 +114,7 @@ backend/app/
   rules/          pure business rules, no database
   authz/          authorize() and friends (Slice 1)
   audit/          log_change() (Slice 2)
-  jobs/           procrastinate (S0-C4)
+  jobs/           background jobs: app.py (jobs_app), enqueue.py, task_names.py, tasks/, worker.py
 ```
 
 - Every route lives under `/api` (including the OpenAPI schema at `/api/openapi.json` and
@@ -137,6 +137,7 @@ backend/app/
 | Routers never touch repositories or models | Routers go through a service |
 | Rules are pure | `app/rules/` may not reach SQLAlchemy, psycopg, procrastinate, models, repositories, services, routers, jobs, or audit — **directly or indirectly**. Anything a rule needs (e.g. an enum) must live in a module that doesn't import SQLAlchemy |
 | authz and audit sit below services | `app/authz/` and `app/audit/` never reach services or routers, directly or indirectly (services call them) |
+| Only the worker imports job modules | `app.main`, routers, services, repositories, models, schemas, core, authz, audit, rules, `jobs.enqueue`, and `jobs.app` never import `app.jobs.tasks` or `app.jobs.worker`, directly or indirectly; enqueue by task name. A new top-level `app.*` module is added to this contract's list |
 | Jobs never import routers | Jobs reuse services, not HTTP endpoints |
 | Service layers: services call lower layers only | Each service is in a layer (`docs/build-plan.md`, "Cross-area rules"); it may import only services in lower layers, directly or through any other module (e.g. `jobs/`), never a same-layer sibling. Reach upward with a registered handler. A new service module is added to its layer in the contract |
 
@@ -208,11 +209,72 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 - `wl migrate` applies it to the dev database; the test run applies all migrations to the test
   database automatically.
 - Never edit a committed migration; add a new one. Every migration must downgrade cleanly.
+- There is one migration history: every migration, app tables or infrastructure (such as
+  procrastinate's schema), chains after the current head. No branch labels.
 - The database URL comes from app settings (`migrations/env.py`), never from `alembic.ini`.
 - Check for drift between models and migrations: `uv run --directory backend alembic check`
   (added to `wl check` with the migration checks in S0-C5).
 
-## 6. Conventions
+## 6. Background jobs
+
+Jobs run on procrastinate, with the queue in Postgres (design-doc §13). The rules come from the
+S0-C3 spike (design-doc §13, "Transactional enqueue").
+
+### Running the worker
+
+```bash
+uv run --directory backend python -m app.jobs.worker
+```
+
+It processes jobs until stopped (Ctrl+C or SIGTERM finish the current job first). Compose runs
+it as the `worker` service from S0-C7. The API never opens a procrastinate connection; only the
+worker does.
+
+### Enqueueing
+
+- Enqueue **only** through a function in `app/jobs/enqueue.py`, passing the caller's session:
+  `await enqueue_ping(session, "hello")`. The job is written in the caller's transaction, so it
+  commits or rolls back with the data, and the worker isn't woken until the commit.
+- Arguments are IDs and plain values, never ORM objects. Jobs must be idempotent (every queue
+  retries).
+- For "at most one pending job" pass a `queueing_lock`; the function returns `None` when a job
+  with that lock is already queued, and the caller's transaction stays usable.
+- Never call procrastinate's `defer_async()` directly: without the caller's connection it uses
+  a separate transaction, and a failed request leaves an orphan job behind.
+
+### Adding a job
+
+1. Add its name to `app/jobs/task_names.py`.
+2. Write it in a module under `app/jobs/tasks/`, registered with
+   `@jobs_app.task(name=task_names.MY_JOB)`, and import the module in
+   `app/jobs/tasks/__init__.py`. Put run-time options (e.g. `retry=`) on the decorator, but
+   **defer-time options (`queue`, `priority`, `lock`, `queueing_lock`) only in `enqueue.py`**:
+   the API process never registers jobs, so decorator options would apply in the worker but be
+   silently ignored when enqueueing. `tests/unit/jobs/test_task_registry.py` checks this for
+   every name in `task_names.py`.
+3. Add an `enqueue_my_job(session, ...)` function to `app/jobs/enqueue.py` that calls
+   `_defer(session, task_names.MY_JOB, ...)`.
+4. Test the enqueue function in the rolled-back harness, and the job itself (the job function
+   can be called directly; a full worker run needs the `concurrency` fixture).
+
+`enqueue.py` defers by **name** and never imports job modules: jobs call services, often in
+higher layers, and the import-linter contract "Only the worker imports job modules" enforces
+it.
+
+### procrastinate's schema
+
+- The migration `add procrastinate schema` applies a vendored copy of procrastinate 3.10.0's
+  `schema.sql` (`backend/migrations/sql/`), so it never changes when procrastinate does. Its
+  downgrade removes every procrastinate object, including queued jobs.
+- Autogenerate ignores procrastinate's objects (`app/core/migration_filters.py`).
+- **Upgrading procrastinate:** stop the workers, bump the pinned version, then add a hand-written
+  migration that applies procrastinate's migration files for the versions in between
+  (`procrastinate/sql/migrations/`, in file-name order, vendored under `migrations/sql/`). A
+  version's `_pre_` and `_post_` files go in the same migration: v1 deploys with the workers
+  stopped, so there's no mixed-version window to split them across. Restart the workers after
+  deploying.
+
+## 7. Conventions
 
 - **Python 3.14**, pyright **strict**, ruff (rules and line length 100 in `pyproject.toml`).
   No relative imports.
@@ -225,7 +287,7 @@ case there — including an indirect path (A → B → forbidden) wherever indir
   project.
 - Warnings are errors in tests (`filterwarnings = ["error"]`).
 
-## 7. Testing
+## 8. Testing
 
 Strategy, layers, and gates: `testing-strategy.md`. Layout in `backend/tests/`:
 
@@ -271,8 +333,25 @@ persists with `flush` (never commit), leaves `id` and database-set timestamps to
 is reseeded from a fixed seed before every test, so generated values are reproducible. Set any
 value the test depends on explicitly.
 
-**Concurrency tests** need real commits on separate connections, so they can't use these
-fixtures; their fixture arrives with the first one (TD-4).
+**Concurrency tests** need real commits on separate connections (parallel transactions, or a
+worker in the same test), so they use the `concurrency` fixture instead: it yields a
+sessionmaker whose sessions really commit, and afterwards (pass or fail) truncates the tables
+named in the marker. It refuses to run alongside any rolled-back-transaction fixture
+(`connection`, `sessionmaker`, `session`, `client`). It doesn't yet support true race tests:
+there's no helper that forces transactions to overlap, factories can't write through it, and
+cleanup relies on the table list you give it (TD-4, Slice 1).
+
+```python
+@pytest.mark.concurrency("procrastinate_jobs", "procrastinate_workers")
+async def test_committed_job_is_processed_by_the_worker(concurrency: SessionMaker, ...) -> None:
+    async with concurrency() as session:
+        await enqueue_ping(session, "hello")
+        await session.commit()
+    ...
+```
+
+**Migration tests** use `scratch_database`: a new, empty database for one test, dropped
+afterwards (see `tests/integration/test_migrations.py`).
 
 - Name tests after the behavior (`test_member_cannot_delete_approved_requirement`); one
   behavior per test; parametrize tables.
@@ -284,7 +363,7 @@ fixtures; their fixture arrives with the first one (TD-4).
   `tools/cli/pyproject.toml`), so a test that claims to cover an error path but never reaches
   it fails the gate.
 
-## 8. Git workflow
+## 9. Git workflow
 
 - Work proceeds one **checkpoint** at a time (`build-plan.md`), one commit per checkpoint,
   closed out with the `checkpoint` skill.
@@ -293,7 +372,7 @@ fixtures; their fixture arrives with the first one (TD-4).
   `git add`, and commit again.
 - `uv run wl check` must pass before a checkpoint goes to review.
 
-## 9. Claude Code configuration
+## 10. Claude Code configuration
 
 The repository's Claude Code setup lives in `.claude/` and is version-controlled.
 
@@ -309,7 +388,7 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -324,4 +403,5 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 | The API fails at startup with a validation error for `postgres_user` | No `.env` (or the variables aren't set): `cp .env.example .env`. |
 | `MissingGreenlet` when reading `created_at`/`updated_at` | The model replaced `__mapper_args__` without keeping `eager_defaults`; merge `TimestampMixin.__mapper_args__` (see "Models"). |
 | `ForeignKeyViolation` flushing a new parent and child together | No `relationship()` between them, so the child may be inserted first; flush the parent first. |
+| The worker logs `TaskNotFound` | The job's module isn't imported in `app/jobs/tasks/__init__.py`, or its name differs from the one in `task_names.py`. |
 | `ModuleNotFoundError: No module named 'app'` in tests | Run pytest from `backend/` (or through `wl`); `pythonpath` is set in `backend/pyproject.toml`. |

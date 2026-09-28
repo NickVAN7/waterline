@@ -74,8 +74,14 @@ Calls flow **routers → services → repositories → models**. Services also u
 - Sessions use `expire_on_commit=False`.
 - Nothing blocks the event loop: CPU-heavy work (Argon2id) via `anyio.to_thread.run_sync`;
   outbound HTTP via `httpx.AsyncClient`; no sync client libraries in request paths.
-- Jobs are enqueued only through `app/jobs/enqueue.py`; job arguments are IDs and plain values;
-  jobs are idempotent.
+- Jobs are enqueued only through `app/jobs/enqueue.py`, passing the caller's session (the job
+  commits or rolls back with the data); never call procrastinate's `defer_async()` directly.
+  `enqueue.py` defers by task name (`task_names.py`) and never imports job modules; only the
+  worker does. Job arguments are IDs and plain values; jobs are idempotent.
+- Defer-time options (`queue`, `priority`, `lock`, `queueing_lock`) are set only in `enqueue.py`,
+  never on `@jobs_app.task`: the API process doesn't register jobs, so decorator options would
+  apply in the worker but be silently ignored when enqueueing. (Run-time options such as
+  `retry` belong on the decorator.)
 
 ## Import contracts
 
@@ -83,6 +89,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   `tests/unit/test_import_contracts.py`. A purity contract (e.g. `rules/` must not reach the
   database) sets `allow_indirect_imports = false` and is tested through an indirect path too;
   a direct-only ban lets `rules → core.db → sqlalchemy` through.
+
+- A new top-level `app.*` module (e.g. `app/cli.py`) is added to the `source_modules` of the
+  "Only the worker imports job modules" contract in `pyproject.toml`.
 
 ## Migrations
 
@@ -98,8 +107,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   (test-first for `rules/` and `authz/`, a sabotage check elsewhere, mutation testing on
   `rules/` and `authz/` from Slice 1).
 - Real Postgres, never mocks or SQLite. Each test rolls back via savepoint; concurrency tests
-  use the `concurrency` fixture and marker (TD-4). Tests only ever use the test database
-  (`waterline_test`); never point a test at the dev database.
+  use the `concurrency` fixture and `@pytest.mark.concurrency("<table>", ...)`. Tests only
+  ever use the test database (`waterline_test`, or a `scratch_database` created from it for one
+  test); never point a test at the dev database.
 - Every test that calls `create_app` passes `sessionmaker=` (the test transaction), or points
   `postgres_db` at `TEST_DATABASE_NAME` when it tests the app's own engine. Never override the
   session dependency instead.
