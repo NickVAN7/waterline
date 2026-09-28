@@ -43,7 +43,19 @@ You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff a
    CSRF, injection, XSS in rendered markdown, leaked existence of other orgs' data).
 5. **Tests:** every behavior added has a test at the right layer; edge cases and failure paths
    covered; factories used with explicit values where they matter; no test depends on another;
-   coverage thresholds plausible.
+   coverage thresholds plausible. **Every new or changed test must catch a nameable bug:** for
+   each one, identify the change to the code that would make it fail. Report as **major** any
+   test for which no plausible bug would, and specifically:
+   - assertions on the status code alone, with no check of state or side effects;
+   - assertions on values the factory set, as though the code produced them;
+   - expected values computed by the code under test;
+   - allowed cases with no denied counterpart;
+   - rules tested in `rules/` or `authz/` with no API or integration test showing the endpoint
+     enforces them;
+   - `if`, loops, or `try/except` inside tests.
+   Once mutation testing is enabled (docs/testing-strategy.md), surviving mutants in
+   `app/rules/` or `app/authz/`, or a `# pragma: no mutate` without a convincing reason, are a
+   **blocker**.
 6. **Migrations:** match the schema doc; downgrade works; no edits to committed migrations.
 7. **Documentation:** `docs/developer-guide.md` and `docs/user-guide.md` accurately describe
    what was built; design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`

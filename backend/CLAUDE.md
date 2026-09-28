@@ -25,11 +25,13 @@ Calls flow **routers → services → repositories → models**. Services also u
 - Any service may **read** through any repository.
 - **Writes** to another area's tables go through that area's **service**, so its authorization,
   rules, and logging apply (e.g. the requirement delete dialog calls `TaskService.delete`).
-- Services may call each other **one way, never in a cycle** (directly or through other
-  services). Where a callback is needed, use a registered handler (the approval service calls
-  handlers registered by approvable areas).
+- Services call services in **lower layers only** — never the same layer or a higher one,
+  directly or through any other module. The order is the table in `docs/build-plan.md`
+  ("Cross-area rules"), enforced by the import-linter layers contract. Anything that needs to
+  reach upward uses a registered handler (the approval service calls handlers registered by
+  approvable areas).
 - Services reach `jobs/` only through `jobs/enqueue.py`; never import job functions (a job
-  that calls a service would close a cycle the service contract can't see).
+  that calls a higher-layer service would make the importing service reach upward).
 - `testcase` owns `requirement_testcase`.
 
 ## Rules that are easy to break silently
@@ -84,12 +86,17 @@ Calls flow **routers → services → repositories → models**. Services also u
 
 ## Migrations
 
+- Follow the `migration` skill. Autogenerate misses CHECK-constraint and partial-index changes,
+  so review each migration by hand and test each constraint.
 - Every schema change is an Alembic migration generated with `wl backend migration "<message>"`,
   then reviewed by hand. Never edit a migration that has been committed; add a new one.
 - Every migration must downgrade cleanly. The schema doc is updated in the same commit.
 
 ## Tests
 
+- Follow the `test-writer` skill: every test names the bug it catches and is shown to fail
+  (test-first for `rules/` and `authz/`, a sabotage check elsewhere, mutation testing on
+  `rules/` and `authz/` from Slice 1).
 - Real Postgres, never mocks or SQLite. Each test rolls back via savepoint; concurrency tests
   use the `concurrency` fixture and marker (TD-4). Tests only ever use the test database
   (`waterline_test`); never point a test at the dev database.

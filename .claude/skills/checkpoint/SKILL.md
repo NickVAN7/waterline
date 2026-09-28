@@ -45,11 +45,20 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 
 - Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit (the
   previous checkpoint's commit, or the root commit for the first).
-- Do not pass it your reasoning or a summary of the work; it reviews from the docs and the diff.
+- Also invoke the `security-reviewer` agent, with the same inputs and in parallel, when the diff
+  touches any of: `backend/app/authz/`; session, token, password, or cookie code in
+  `backend/app/core/`; the `auth`, `user`, `org`, or `project` areas; any router; rendered
+  markdown (`v-html` or a markdown renderer); CORS, CSRF, or `Origin` handling; `github` or
+  `webhook` code.
+- Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
+  and the diff.
+- **Last checkpoint of a slice:** also run `uv run wl down` (so ports are free) and invoke the
+  `fresh-clone-verifier` agent with the repository's absolute path and the checkpoint ID. Its
+  findings are fixed in `docs/developer-guide.md` like any other finding.
 
 ## 5. Resolve every finding
 
-For each finding, exactly one of:
+For each finding from every reviewer that ran, exactly one of:
 - **Fixed:** make the fix, then rerun `uv run wl check`.
 - **Logged:** add a tech-debt entry (reason and target) — only for minor findings, or others
   the owner has agreed to defer.
@@ -59,8 +68,9 @@ If fixes changed behavior (not just docs or tests), run the reviewer again on th
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
-**Record every pass** in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include
-the base commit, the totals, and for each pass its verdict, its findings table with each
+**Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone) in
+`docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include the base commit, the totals,
+and for each pass its verdict, its findings table with each
 resolution (fixed / logged with TD number / rejected with evidence), and the questions it
 raised. End with the questions still open for the owner and any owner decisions made during
 review. The record goes in the checkpoint's commit.
@@ -82,6 +92,8 @@ Decisions / deviations:
 - ... (or "None")
 
 Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/<ID>.md)
+Security review: <n> findings — … (or "not required")
+Fresh-clone verification: <result> (last checkpoint of a slice only)
 Tech debt: <added / resolved entries, or "no change">
 Next: <next checkpoint ID and name>
 ```
@@ -95,8 +107,8 @@ If the claude.ai Project for Waterline is available, write each changed file in 
 
 Send the owner:
 - the review note (the commit message body);
-- the reviewer's findings table with the resolution of each (as recorded in
-  `docs/reviews/<ID>.md`);
+- each reviewer's findings table (checkpoint, security, fresh-clone) with the resolution of
+  each finding (as recorded in `docs/reviews/<ID>.md`);
 - any open questions from the review;
 - what the next checkpoint will cover.
 

@@ -138,7 +138,7 @@ backend/app/
 | Rules are pure | `app/rules/` may not reach SQLAlchemy, psycopg, procrastinate, models, repositories, services, routers, jobs, or audit — **directly or indirectly**. Anything a rule needs (e.g. an enum) must live in a module that doesn't import SQLAlchemy |
 | authz and audit sit below services | `app/authz/` and `app/audit/` never reach services or routers, directly or indirectly (services call them) |
 | Jobs never import routers | Jobs reuse services, not HTTP endpoints |
-| No import cycles between services | One service may call another, but never both ways; use a registered handler for callbacks |
+| Service layers: services call lower layers only | Each service is in a layer (`docs/build-plan.md`, "Cross-area rules"); it may import only services in lower layers, directly or through any other module (e.g. `jobs/`), never a same-layer sibling. Reach upward with a registered handler. A new service module is added to its layer in the contract |
 
 `backend/tests/unit/test_import_contracts.py` proves each contract fails on a real violation,
 so a contract can't silently stop working. If you add or change a contract, add a violation
@@ -293,7 +293,23 @@ fixtures; their fixture arrives with the first one (TD-4).
   `git add`, and commit again.
 - `uv run wl check` must pass before a checkpoint goes to review.
 
-## 9. Troubleshooting
+## 9. Claude Code configuration
+
+The repository's Claude Code setup lives in `.claude/` and is version-controlled.
+
+- **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`.
+- **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
+  `fresh-clone-verifier`.
+- **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
+  on your `PATH`:
+  - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or
+    a committed migration. Regenerate the client with `uv run wl gen-client` (from S0-C7); fix a
+    committed migration with a new one.
+  - After Claude edits a file, it is formatted with ruff (backend) or Prettier (frontend).
+- Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
+  own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
+
+## 10. Troubleshooting
 
 | Symptom | Fix |
 |---|---|

@@ -49,7 +49,10 @@ Entry format:
   functions depends on the layout S0-C4 creates.
 - **Fix by:** S0-C4 (Background jobs): add a forbidden contract (services → job-function
   modules), with a violation test for the loop above.
-- **Status:** open
+- **Status:** resolved in the Claude configuration change after S0-C2: the service layers
+  contract checks import chains through any module, so a lower service reaching a higher one
+  through `jobs/` breaks it (`lower-service-reaches-higher-through-jobs` in
+  `tests/unit/test_import_contracts.py`).
 
 ### TD-4: No concurrency-test fixture yet
 - **Added:** S0-C2

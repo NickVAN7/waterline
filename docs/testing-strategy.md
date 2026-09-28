@@ -10,6 +10,9 @@ tested, what each kind of test is for, and the gates every change passes.
   CHECKs, transactions), so tests must exercise it.
 - **Every checkpoint ships its tests.** No code lands without the tests that prove it; no step
   starts while anything is red.
+- **Every test must be able to fail.** A test exists to catch a specific bug. Test-first (for
+  `rules/` and `authz/`) and the sabotage check (everywhere else) prove each test can fail;
+  mutation testing measures it. A test no plausible bug would break is fixed or removed.
 - **Deterministic.** Fake data uses a fixed seed; tests never depend on each other or on run
   order; a failure reproduces the same way every time.
 - **Strictest where mistakes are most expensive.** Authorization and business rules are held to
@@ -87,17 +90,36 @@ tested, what each kind of test is for, and the gates every change passes.
 | Scope | Minimum |
 |---|---|
 | Backend overall | 90% line + branch |
-| `backend/app/authz/`, `backend/app/rules/` | 100% line + branch |
+| `backend/app/authz/`, `backend/app/rules/` | 100% line + branch, and no surviving mutants |
 | Frontend | 80% line (composables, stores, and guards held to 90%) |
 | Developer CLI (`tools/cli/`) | 100% line + branch |
 
 Coverage gates fail CI. Excluding code from coverage requires a comment saying why.
 
-## Test-first
+## Test-first and proving tests can fail
 
 - **Test-first (TDD)** for `rules/` and `authz/`: the test is written from the design doc's
-  table or rule before the code.
-- **Alongside** everywhere else: tests in the same checkpoint and commit as the code.
+  table or rule before the code, and must fail for the right reason before the code is written.
+- **Sabotage check** everywhere else: for each behavior, make the smallest change that breaks it
+  (invert a condition, remove a `log_change()` call, drop an org filter), confirm a test fails,
+  and restore the code.
+- Tests are written **alongside** the code: in the same checkpoint and commit.
+- The `test-writer` skill (`.claude/skills/test-writer/`) is the working procedure: a behavior
+  table with a source, layer, the bug each test catches, and the proof it fails; rules for
+  assertions; banned patterns.
+
+## Mutation testing
+
+- **Tool:** mutmut (backend dev dependency). It makes small deliberate changes to the code
+  (flipped comparisons, removed conditions, swapped operators) and checks that some test fails
+  for each one.
+- **Scope:** `backend/app/rules/` and `backend/app/authz/`, which are pure, fast to test, and
+  where a missed bug is a security or business-rule defect.
+- **Gate:** no surviving mutants. A survivor is killed with a new or sharper test. Only a mutant
+  that cannot change behavior (an equivalent mutant) may be excluded, with `# pragma: no mutate`
+  and a comment explaining why.
+- **When:** from Slice 1, when those folders first contain code. Run by
+  `wl backend mutate`, included in `wl check` and CI.
 
 ## Workflow and gates
 
@@ -106,7 +128,7 @@ Coverage gates fail CI. Excluding code from coverage requires a comment saying w
 - **`wl check`** (the developer CLI; `waterline check` in full) runs everything CI runs, locally.
   CI calls the same command, so local and CI can't diverge.
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
-  tests with coverage, import-linter contracts, migration checks, frontend tests with coverage,
+  tests with coverage, mutation testing on `rules/` and `authz/`, import-linter contracts, migration checks, frontend tests with coverage,
   generated-client freshness, and end-to-end tests (from Slice 1).
 - **Branch protection:** nothing merges to `main` without green CI.
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a

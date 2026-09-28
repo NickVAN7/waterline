@@ -116,12 +116,23 @@ def test_current_app_keeps_every_contract(tmp_path: Path) -> None:
             id="job-imports-router",
         ),
         pytest.param(
+            {"app/services/user.py": "import app.services.task\n", "app/services/task.py": ""},
+            "Service layers: services call lower layers only",
+            id="lower-service-imports-higher",
+        ),
+        pytest.param(
+            {"app/services/project.py": "import app.services.phase\n", "app/services/phase.py": ""},
+            "Service layers: services call lower layers only",
+            id="same-layer-services-import-each-other",
+        ),
+        pytest.param(
             {
-                "app/services/alpha.py": "import app.services.beta\n",
-                "app/services/beta.py": "import app.services.alpha\n",
+                "app/services/user.py": "import app.jobs.widget\n",
+                "app/jobs/widget.py": "import app.services.task\n",
+                "app/services/task.py": "",
             },
-            "No import cycles between services",
-            id="services-import-each-other",
+            "Service layers: services call lower layers only",
+            id="lower-service-reaches-higher-through-jobs",
         ),
     ],
 )
@@ -143,10 +154,17 @@ def test_rules_may_import_pure_core_modules(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout
 
 
-def test_one_way_service_calls_are_allowed(tmp_path: Path) -> None:
+def test_services_may_call_lower_layers(tmp_path: Path) -> None:
     result = lint_copy(
         tmp_path,
-        {"app/services/alpha.py": "import app.services.beta\n", "app/services/beta.py": ""},
+        {
+            "app/services/requirement.py": (
+                "import app.services.approval\nimport app.services.task\n"
+            ),
+            "app/services/task.py": "import app.services.numbering\n",
+            "app/services/numbering.py": "",
+            "app/services/approval.py": "",
+        },
     )
 
     assert result.returncode == 0, result.stdout

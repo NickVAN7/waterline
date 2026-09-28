@@ -127,8 +127,20 @@ forbidden_modules = ["app.routers"]
 allow_indirect_imports = true
 broken_contract_guidance = "Jobs reuse services, not HTTP endpoints."
 
+# Service layer order (docs/build-plan.md, "Cross-area rules"), highest layer first. A service
+# may import only services in lower layers, directly or through any other module; `|` siblings
+# may not import each other. Every entry is optional "(module)", so each is enforced the moment
+# its file exists. A new service module is added to its layer here.
 [[tool.importlinter.contracts]]
-name = "No import cycles between services"
-type = "acyclic_siblings"
-ancestors = ["app.services"]
-broken_contract_guidance = "Services call each other one way; use a registered handler for callbacks."
+name = "Service layers: services call lower layers only"
+type = "layers"
+containers = ["app.services"]
+layers = [
+    "(requirement) | (webhook)",
+    "(sprint) | (testcase) | (test_run) | (github)",
+    "(task)",
+    "(project) | (phase) | (workstream) | (milestone)",
+    "(auth) | (org)",
+    "(user) | (numbering) | (approval) | (activity) | (comment) | (tag) | (link) | (search) | (health)",
+]
+broken_contract_guidance = "Call only services in lower layers; reach upward with a registered handler."

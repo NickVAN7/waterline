@@ -57,4 +57,16 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - When a review catches a mistake that a rule would have prevented, add that rule to the
   relevant `CLAUDE.md` as part of the fix.
 
+## Skills, agents, and hooks
+
+- `test-writer` — for every test you write or change.
+- `migration` — for every schema change.
+- `new-area` — for a new aggregate, or a new endpoint or action in an existing one.
+- `checkpoint` — to close every checkpoint; it runs `checkpoint-reviewer`, `security-reviewer`
+  (when the diff touches security-relevant code), and `fresh-clone-verifier` (last checkpoint
+  of a slice).
+- Hooks block edits to generated files and committed migrations, and format files after edits.
+  When a hook blocks you, do what its message says. Never work around a hook with shell
+  commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
+
 See `backend/CLAUDE.md` and `frontend/CLAUDE.md` for the rules specific to each half.

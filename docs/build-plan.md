@@ -19,7 +19,7 @@ what was built (any drift is fixed in the docs in the same change).
 |---|---|
 | **0** | Skeleton: stack, shared conventions, CI, app shell. No features. |
 | **1** | Auth, tenancy, projects (types, modules, keys), number allocation, `authorize()`. |
-| 2 | Requirements: tree, `RQ` numbering, revisions, approvals, `log_change()` and the activity log. Starts by writing the `new-area` skill from Slice 1's `project` area. |
+| 2 | Requirements: tree, `RQ` numbering, revisions, approvals, `log_change()` and the activity log. Starts by verifying the `new-area` skill (drafted earlier) against Slice 1's `project` area and correcting it where they differ. |
 | 3 | Tasks and subtasks, phases, workstreams, transition rules, rank; backlog and board. |
 | 4 | Sprints (module) and milestones/gates. |
 | 5 | Test cases, runs, results, ad-hoc runs. |
@@ -59,13 +59,16 @@ minutes. The next checkpoint starts only after the current one is approved.
    migration checks. A checkpoint doesn't go to review until these pass.
 2. **Independent review:** a separate reviewer agent that did not write the code, with fresh
    context, reads the design docs and the checkpoint's changes and reports on design and
-   convention conformance, bugs, missing tests, and whether the docs match what was built.
-   Every finding is fixed or logged in the tech-debt log with a reason.
+   convention conformance, bugs, tests that couldn't fail, and whether the docs match what was
+   built. Checkpoints touching authentication, authorization, routers, rendered markdown, or
+   GitHub code also get a security-focused reviewer. Every finding is fixed or logged in the
+   tech-debt log with a reason.
 3. **Owner approval:** the review note, the reviewer's findings, and their resolution go to
    the project owner, who signs off before the next checkpoint.
 
-**End of each slice:** a fresh clone is set up by following `docs/developer-guide.md` exactly
-as written; any wrong or missing step is fixed in the guide.
+**End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
+by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
+the guide.
 
 ### Claude configuration (in the repo)
 Everything lives in the repository, version-controlled and present on every workstation.
@@ -80,10 +83,25 @@ Everything lives in the repository, version-controlled and present on every work
   checkpoint ends with — scope check, `wl check`, docs and tech-debt updates, the reviewer,
   resolving findings, one commit with the review note, syncing `docs/` to the Project, and
   stopping for approval.
-- **`new-area` skill** (added in Slice 2): the recipe for adding an aggregate through every
-  layer (model, migration, schema, repository, service, router, authz policy, factory, tests).
-  Deliberately written after the first real area (`project`, Slice 1) has been built by hand,
-  so it's derived from a working example.
+- **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
+  alongside `checkpoint-reviewer` when a checkpoint touches auth, sessions, authorization,
+  routers, rendered markdown, or GitHub code.
+- **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
+  sets up a temporary copy of the repository by following the developer guide literally and
+  reports every wrong or missing step.
+- **`test-writer` skill** (`.claude/skills/test-writer/`): the procedure for every test —
+  behavior table from the docs, layer choice, assertions that can fail, banned patterns, and
+  proof that each test fails (test-first, sabotage check, mutation testing).
+- **`migration` skill** (`.claude/skills/migration/`): schema changes — model changes, Alembic
+  generation, hand review of what autogenerate misses, downgrade, constraint tests, schema-doc
+  sync.
+- **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
+  every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
+  verified and corrected against the hand-built `project` area at the start of Slice 2.
+- **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
+  generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`) and committed
+  migrations; format each file after Claude edits it (ruff for the backend, Prettier for the
+  frontend).
 
 ### Where the work happens
 Code is written and run on the owner's workstation(s) and lives in GitHub. The repository is
@@ -179,9 +197,11 @@ The sections below describe the content; the table above is the order of work.
 ├── CLAUDE.md                     project rules for Claude sessions (backend/ and frontend/
 │                                 each have their own CLAUDE.md too)
 ├── .claude/
-│   ├── agents/checkpoint-reviewer.md   independent checkpoint reviewer
-│   └── skills/checkpoint/SKILL.md      checkpoint close-out procedure
-│                                       (skills/new-area/ added in Slice 2)
+│   ├── settings.json                   hooks configuration
+│   ├── hooks/                          protect_files.py, format_file.py
+│   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
+│   │                                   fresh-clone-verifier.md
+│   └── skills/                         checkpoint/, test-writer/, migration/, new-area/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md
 │                                 (source of truth once code exists; synced to the Project)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
@@ -221,9 +241,12 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   | Group | Commands | Runs |
   |---|---|---|
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
-  | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`) | one half; extra arguments pass straight through |
+  | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
   | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed` | `docker compose`, including commands inside the api container |
   | Cross-cutting | `wl gen-client`, `wl doctor` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version) |
+
+  `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
+  on any surviving mutant; `wl check` includes it.
 
 - **Rules:**
   1. **Thin orchestrator only:** each command runs existing tools (docker compose, uv, npm,
@@ -317,7 +340,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   owning service is where authorization, rules, and logging happen. Example: the requirement
   delete dialog soft-deletes linked tasks by calling the task service's delete for each one,
   so each task's own delete permission is checked (design-doc §9: no indirect deletes).
-- **Callbacks instead of cycles:** the approval service never imports the areas it approves.
+- **Callbacks instead of upward calls:** the approval service (in the lowest service layer) never imports the areas it approves.
   Each approvable area (requirement now; milestone gates and test runs later) registers a
   handler (`on_approved`, `on_rejected`) with it, and the approval service calls the handler
   for the request's entity type. The requirement area calls the approval service directly (e.g.
@@ -326,8 +349,20 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   edit links through the testcase service. This keeps dependencies one-way (requirement →
   testcase), lets the link table ship with test cases in Slice 5, and keeps coverage queries
   next to test results.
-- CI's import-linter contract also checks that services never import each other in a cycle:
-  one service may call another, but never both ways, directly or through other services.
+- **Service layer order:** services call services in **lower layers only**, never a service in
+  the same layer or a higher one, directly or through any other module. Anything that needs to
+  reach upward uses a registered handler, as the approval service does. CI's import-linter
+  layers contract enforces this order (`backend/pyproject.toml`); a new area goes in the lowest
+  layer that is above everything it calls, and its service module is added to the contract.
+
+  | Layer | Services | May call |
+  |---|---|---|
+  | 1 | user, numbering, approval, activity, comment, tag, link, search, health | no other service (approval reaches areas only through registered handlers) |
+  | 2 | auth, org | layer 1 |
+  | 3 | project, phase, workstream, milestone | layers 1–2 |
+  | 4 | task | layers 1–3 |
+  | 5 | sprint, testcase, test_run, github | layers 1–4 |
+  | 6 | requirement, webhook | layers 1–5 |
 
 **Naming**
 - Schemas: `TaskCreate`, `TaskUpdate`, `TaskRead`, `TaskListItem`.
@@ -466,6 +501,9 @@ Tables: `user`, `session`, `organization`, `membership`, `project`, `project_cou
   (tested with `sprints`/`github`, which have no endpoints yet).
 - **Test matrix:** one parametrized test per action × role (viewer, member, admin, owner,
   system admin, non-member), plus a fail-closed test for an unregistered action.
+- **Mutation testing:** mutmut over `app/rules/` and `app/authz/`, run by `wl backend mutate`,
+  included in `wl check` and CI; fails on any surviving mutant not marked equivalent
+  (`testing-strategy.md`, "Mutation testing").
 
 ### Organizations & memberships
 - System admin: create org, assign its first owner, list all orgs.
@@ -522,4 +560,6 @@ Tables: `user`, `session`, `organization`, `membership`, `project`, `project_cou
 - [ ] The `authorize()` matrix and fail-closed test pass; archived projects reject mutations.
 - [ ] Last-owner and last-system-admin guards, and the org-admin scope limits, are tested.
 - [ ] `project_counter` concurrency tests pass.
+- [ ] Mutation testing runs in `wl check` and CI with no surviving mutants in `app/rules/` and
+      `app/authz/`.
 - [ ] CI is green.
