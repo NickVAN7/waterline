@@ -98,10 +98,17 @@ Tech debt: <added / resolved entries, or "no change">
 Next: <next checkpoint ID and name>
 ```
 
-## 7. Sync the docs to the Project
+## 7. Prepare the Project upload
 
-If the claude.ai Project for Waterline is available, write each changed file in `docs/` to it
-(same file names), replacing the previous versions.
+Claude Code can't write to the claude.ai Project, so the owner uploads changed files by hand.
+
+- List every file this commit changed or added that the Project keeps a copy of:
+  `git diff --name-only <base>..HEAD -- docs CLAUDE.md backend/CLAUDE.md frontend/CLAUDE.md .claude`.
+  Files under `docs/` go to the Project under the same path; `CLAUDE.md` files and `.claude/`
+  go under `repo-seed/` (same relative path).
+- Copy them into one folder in the scratchpad, laid out as they go in the Project
+  (`docs/…`, `repo-seed/…`), so the owner can upload them together.
+- Never say the Project was updated: it wasn't.
 
 ## 8. Report and stop
 
@@ -110,6 +117,8 @@ Send the owner:
 - each reviewer's findings table (checkpoint, security, fresh-clone) with the resolution of
   each finding (as recorded in `docs/reviews/<ID>.md`);
 - any open questions from the review;
+- the Project upload list from step 7 (each file, whether it's new or changed, and the folder
+  it was copied to);
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.

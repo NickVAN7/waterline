@@ -81,8 +81,8 @@ Everything lives in the repository, version-controlled and present on every work
   format.
 - **`checkpoint` skill** (`.claude/skills/checkpoint/`): the close-out procedure every
   checkpoint ends with — scope check, `wl check`, docs and tech-debt updates, the reviewer,
-  resolving findings, one commit with the review note, syncing `docs/` to the Project, and
-  stopping for approval.
+  resolving findings, one commit with the review note, a list of changed docs and Claude files
+  for the owner to upload to the Project, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   alongside `checkpoint-reviewer` when a checkpoint touches auth, sessions, authorization,
   routers, rendered markdown, or GitHub code.
@@ -203,7 +203,7 @@ The sections below describe the content; the table above is the order of work.
 │   │                                   fresh-clone-verifier.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md
-│                                 (source of truth once code exists; synced to the Project)
+│                                 (source of truth; the owner uploads changed files to the Project)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, api, worker, web
 ├── docker/postgres/initdb/       first-start scripts for postgres (creates the test database)
