@@ -23,6 +23,9 @@ Solid lines are real foreign keys. Dotted lines are polymorphic references
 
 ```mermaid
 erDiagram
+  WORKSPACE ||--o{ ORGANIZATION : contains
+  WORKSPACE ||--o{ WORKSPACE_MEMBERSHIP : has
+  USER ||--o{ WORKSPACE_MEMBERSHIP : has
   ORGANIZATION ||--o{ MEMBERSHIP : has
   USER ||--o{ MEMBERSHIP : has
   USER ||--o{ USER_IDENTITY : "links"
@@ -31,6 +34,8 @@ erDiagram
   ORGANIZATION ||--o{ TAG : defines
   ORGANIZATION ||--o{ GITHUB_INSTALLATION : has
 
+  PROJECT ||--o{ PROJECT_MEMBERSHIP : has
+  USER ||--o{ PROJECT_MEMBERSHIP : has
   PROJECT ||--o{ PROJECT_COUNTER : "numbers via"
   PROJECT ||--o{ PHASE : "timeline of"
   PROJECT ||--o{ WORKSTREAM : "organized by"
@@ -89,8 +94,20 @@ erDiagram
   TASK ||--o{ TASK_GITHUB_LINK : links
   GITHUB_INSTALLATION |o--o{ GITHUB_WEBHOOK_DELIVERY : receives
 
+  WORKSPACE {
+    uuid id PK
+    varchar name
+    varchar slug UK
+  }
+  WORKSPACE_MEMBERSHIP {
+    uuid id PK
+    uuid workspace_id FK
+    uuid user_id FK
+    varchar role
+  }
   ORGANIZATION {
     uuid id PK
+    uuid workspace_id FK
     varchar name
   }
   USER {
@@ -129,8 +146,13 @@ erDiagram
     varchar name
     varchar type
     text_array enabled_modules
-    bool is_restricted
     timestamptz archived_at
+  }
+  PROJECT_MEMBERSHIP {
+    uuid id PK
+    uuid project_id FK
+    uuid user_id FK
+    varchar role
   }
   PROJECT_COUNTER {
     uuid project_id PK, FK
@@ -384,14 +406,46 @@ below.
 
 ## Users, Tenancy & Auth
 
+Three levels: workspace → organization → project, each with its own membership table and roles
+(design-doc §4). Project access is always an explicit `project_membership`, except for the
+admins who inherit project admin (system admins, workspace owners/admins, owners/admins of the
+project's org; design-doc §5).
+
+### `workspace`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| name | varchar | the firm |
+| slug | varchar | unique |
+| created_at / updated_at | timestamptz | |
+
+The tenant boundary. The schema supports many; v1 deploys with one, created by the seed CLI
+(`wl seed`) alongside the first system admin. No UI creates workspaces.
+
+### `workspace_membership`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| workspace_id | UUID (FK → workspace) | |
+| user_id | UUID (FK → user) | |
+| role | enum: owner / admin / member | internal staff |
+| created_at / updated_at | timestamptz | |
+
+`UNIQUE(workspace_id, user_id)`; index on `user_id` (access scoping looks memberships up by
+user). Members see only the orgs and projects they are assigned to;
+owners/admins see everything in the workspace. The last owner of a workspace cannot leave or be
+demoted (service-layer check).
+
 ### `organization`
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
+| workspace_id | UUID (FK → workspace) | NOT NULL |
 | name | varchar | |
 | created_at / updated_at | timestamptz | |
 
-GitHub installations moved to `github_installation` (an org can have several).
+Index on `workspace_id`. Normally one client; a software-only setup is one workspace with one internal org. GitHub
+installations moved to `github_installation` (an org can have several).
 
 ### `user`
 | Field | Type | Notes |
@@ -432,8 +486,8 @@ Last active system admin cannot be deactivated or demoted (service-layer check).
 | expires_at | timestamptz | |
 | created_at / updated_at | timestamptz | |
 
-Deleted on sign-out, deactivation, removal from all orgs, and (other sessions) on password
-change.
+Deleted on sign-out, deactivation, removal from all orgs and workspaces, and (other sessions)
+on password change.
 
 ### `membership`
 | Field | Type | Notes |
@@ -441,7 +495,7 @@ change.
 | id | UUID (PK) | |
 | user_id | UUID (FK → user) | |
 | organization_id | UUID (FK → organization) | |
-| role | enum: owner / admin / member / viewer | |
+| role | enum: owner / admin / member | owners/admins inherit project admin on the org's projects; members get project access only through `project_membership` |
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(user_id, organization_id)`. Last owner of an org cannot leave or be demoted
@@ -454,15 +508,28 @@ change.
 | organization_id | UUID (FK → organization) | |
 | key | varchar | user-entered; 3–6 chars `^[A-Z][A-Z0-9]{2,5}$`; immutable |
 | name | varchar | |
-| type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by owner/admin |
+| type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | enabled_modules | text[] | seeded from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
-| is_restricted | boolean, default false | prepares for `project_membership` |
 | archived_at | timestamptz, nullable | archived = read-only, hidden by default |
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(organization_id, key)`.
 `CHECK (enabled_modules <@ ARRAY[...shipped modules])` — each module's value is added to the
 check when that module ships. Disabling a module hides its data; nothing is deleted.
+No visibility flag: access is always explicit project membership (plus inherited admin).
+
+### `project_membership`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| project_id | UUID (FK → project) | |
+| user_id | UUID (FK → user) | |
+| role | enum: admin / member / viewer | design-doc §5, "Project roles" |
+| created_at / updated_at | timestamptz | |
+
+`UNIQUE(project_id, user_id)`; index on `user_id` (access scoping: "my projects"). Inherited
+admins (system admins, workspace owners/admins,
+owners/admins of the project's org) need no row.
 
 ### `project_counter`
 | Field | Type | Notes |
@@ -524,7 +591,7 @@ logged.
 | number | integer | displayed `{KEY}-RQ-n`; never reused |
 | parent_requirement_id | UUID (FK → requirement), nullable | null = top level; same project; no cycles (service check) |
 | workstream_id | UUID (FK → workstream), nullable | same project; UI defaults a child to its parent's |
-| reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by owner/admin; drives delete permission |
+| reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by project admins; drives delete permission |
 | title | varchar | |
 | description_md | text | markdown; includes `## Acceptance Criteria` from template |
 | status | enum: draft / approved / in_progress / done / rejected / deferred | |
@@ -676,7 +743,7 @@ are ignored.
 | project_id | UUID (FK → project) | NOT NULL |
 | number | integer | displayed `{KEY}-TC-n`; never reused |
 | workstream_id | UUID (FK → workstream), nullable | same project |
-| reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by owner/admin; drives delete permission |
+| reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by project admins; drives delete permission |
 | title | varchar | |
 | description | text | test steps folded in |
 | test_type | enum: unit / integration / e2e / manual / sit / uat / parallel / regression (extendable) | |
@@ -734,13 +801,13 @@ current status.
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| project_id | UUID (FK → project) | for "pending approvals" lists and org scoping |
+| project_id | UUID (FK → project) | for "pending approvals" lists and access scoping |
 | entity_type | enum: requirement / milestone / test_run | polymorphic; milestone requests are for gates |
 | entity_id | UUID | polymorphic, no FK; parent verified by service layer |
 | requirement_revision_id | UUID (FK → requirement_revision), nullable | the revision being approved; required for requirements |
 | status | enum: pending / approved / rejected / cancelled | |
 | note | text, nullable | context for approvers |
-| requested_by | UUID (FK → user) | owner/admin |
+| requested_by | UUID (FK → user) | a project admin (including inherited) |
 | completed_at | timestamptz, nullable | set on approved / rejected / cancelled |
 | created_at / updated_at | timestamptz | |
 
@@ -756,7 +823,7 @@ rejection.
 |---|---|---|
 | id | UUID (PK) | |
 | approval_request_id | UUID (FK → approval_request) | |
-| approver_id | UUID (FK → user) | any role, including viewer |
+| approver_id | UUID (FK → user) | any project role, including viewer |
 | decision | enum: pending / approved / rejected | |
 | comment | text, nullable | |
 | decided_at | timestamptz, nullable | |
@@ -924,8 +991,9 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 | `api_token` (user_id, name, token_hash, prefix, last_used_at, expires_at, revoked_at) | first need |
 | `login_attempt` (sign-in throttling per account and per IP, design-doc §4) | before the first non-local deployment |
 | `session.user_agent`, `session.ip_address` columns (active-sessions page, design-doc §4) | before the first non-local deployment |
-| ERP modules, design pending: `raid_item`, `entity_link`, `status_report`, `budget_line`, `cost_entry`, `data_object`, `load_cycle`, `data_load`, runbook step / rehearsal tables | after the v1 core (design-doc §16) |
-| `invitation`, `project_membership`, `time_entry`, `sprint_project`, `sprint_snapshot`, file attachments | v2+ (`project_membership` and `time_entry` may move up with ERP) |
+| ERP modules, design pending: `raid_item`, `entity_link`, `status_report`, `budget_line`, `cost_entry`, `data_object`, `load_cycle`, `data_load`, runbook step / rehearsal tables | v2 (design-doc §16) |
+| ERP portfolio and team tables, design pending: project portfolio fields and templates (PMO dashboard), workspace teams (resourcing), workstream members | v2 (design-doc §16) |
+| `invitation`, `time_entry`, `sprint_project`, `sprint_snapshot`, file attachments | v2+ (`time_entry` may move up with the budget module) |
 
 ## Known v1 Limitations (by design)
 
@@ -945,7 +1013,6 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 - **Flat comments**, no threading.
 - **Links only**, no file uploads.
 - **Passive GitHub sync** — no automatic `task.status` changes from GitHub events.
-- **No project-level access control** — `project.is_restricted` exists but isn't enforced.
 - **Polymorphic references** (`comment`, `entity_tag`, `link_attachment`, `activity_log`,
   `approval_request`) have no database-level FK; integrity is a service-layer responsibility.
 - **Items can't move** between projects (requirements, tasks, test cases) or between tasks

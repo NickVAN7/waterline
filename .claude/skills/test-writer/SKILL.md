@@ -38,7 +38,7 @@ Use the cheapest layer that can catch the bug.
 | Behavior | Layer |
 |---|---|
 | Pure logic: transition table, approval policy, key/username validation, rank math | Unit (`tests/unit/`) |
-| Queries, org scoping, soft delete, optimistic locking, numbering, `log_change()`, cross-area service calls | Integration (`tests/integration/`) |
+| Queries, access scoping, soft delete, optimistic locking, numbering, `log_change()`, cross-area service calls | Integration (`tests/integration/`) |
 | HTTP contract: status codes, error body, cookies, CSRF/Origin, 404-not-403, request validation | API (`tests/api/`) |
 | Component rendering, composables, stores, route guards | Vitest |
 | A user flow across screens | Playwright (only the slice's critical flows) |
@@ -94,8 +94,8 @@ showing the real endpoint or service denies the forbidden case.
   right reason* (a wrong result, not an `ImportError`: create a stub that returns the wrong
   answer if needed). Then implement until green. Record "red first" in the table.
 - **Everything else: sabotage check.** For each behavior in the table, make the smallest change
-  to the code that breaks it (invert a condition, remove the `log_change()` call, drop the org
-  filter, skip the version check, return early), run the related tests, and confirm at least
+  to the code that breaks it (invert a condition, remove the `log_change()` call, drop the
+  access-scoping filter, skip the version check, return early), run the related tests, and confirm at least
   one fails. Restore the code and confirm with `git diff` that no sabotage remains (a leftover
   would also fail `wl check`). Record what you broke and which test caught it.
 - **If nothing fails, the test is shallow.** Fix the test; don't move on.

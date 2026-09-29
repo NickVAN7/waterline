@@ -46,21 +46,26 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    request changes state.
 3. **Authorization** (§5):
    - every single-entity endpoint gets its entity only through the load-and-authorize
-     dependency; every list query is org-scoped;
+     dependency; every list query is scoped to the user's accessible projects and orgs;
    - every action is registered; unknown actions are denied (fail closed);
-   - order: system admin → membership role → targeted rules; module gating before
+   - order: system admin → workspace owner/admin → owner/admin of the project's org → project
+     role → targeted rules; inherited project admin only for those admin levels (never for
+     org or workspace members); module gating before
      `authorize()`; archived projects reject mutations;
    - targeted rules match the design tables exactly (transitions, deletion, approvals — only
      the named approver decides, with no admin or system-admin override);
-   - org-admin scope limits (users in more than one org), last-owner and
-     last-system-admin guards, and only owners granting owner/admin roles.
+   - org-admin scope limits (a user who also holds a workspace membership or a membership in
+     another org is workspace-admin or system-admin only), last-owner (org and workspace) and
+     last-system-admin guards, and only owners granting owner/admin roles at their level.
 4. **Tenant isolation and existence leaks:**
    - entities the user can't see return 404, never 403, and never partial data;
-   - error messages and `details` don't reveal other orgs' names, keys, or IDs;
-   - lookups by `(key, number)` or by UUID are scoped to the caller's org;
+   - error messages and `details` don't reveal other orgs' or projects' names, keys, or IDs;
+   - lookups by `(key, number)` or by UUID are scoped to projects the caller can access;
+   - internal staff (workspace members) see only the orgs and projects they're assigned to;
+     org members see only projects they're members of;
    - polymorphic references (comments, tags, links, approvals) verify the parent exists *and*
-     is in the caller's org;
-   - search and activity feeds are org-scoped.
+     is in a project the caller can access;
+   - search and activity feeds are scoped to the caller's accessible projects.
 5. **Input and output:**
    - no string-built SQL (`text()` with f-strings or concatenation);
    - request schemas don't accept privileged or immutable fields (`role`, `is_system_admin`,

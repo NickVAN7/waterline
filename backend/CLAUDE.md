@@ -12,7 +12,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Routers:** HTTP only. Validate with schemas, resolve user/session, call one service method,
   return a response schema. No business rules, no database access.
 - **Services:** all business logic. Never commit; never build queries.
-- **Repositories:** all queries (org scoping, soft-delete opt-in, explicit loading). No
+- **Repositories:** all queries (access scoping to the user's orgs and projects, soft-delete
+  opt-in, explicit loading). No
   business rules; never commit.
 - **Models:** tables only; they are the domain entities.
 - **`rules/`:** pure logic with no database access (transition tables, approval policy).

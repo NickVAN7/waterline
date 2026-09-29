@@ -13,6 +13,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/schema-doc.md` | Every table, column, constraint, and index |
 | `docs/build-plan.md` | Slices, checkpoints, architecture, feature map, developer CLI |
 | `docs/testing-strategy.md` | Test layers, factories, coverage gates, workflow |
+| `docs/screen-inventory.md` | People and personas, v1 scope, tenancy & access model, screens (derived step by step) |
 | `docs/developer-guide.md` | Setup, commands, conventions, how-tos (kept current every checkpoint) |
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |

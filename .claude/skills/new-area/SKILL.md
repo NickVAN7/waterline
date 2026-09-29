@@ -48,8 +48,9 @@ Follow the `migration` skill.
 ## 4. Repository — `repositories/<area>.py`
 
 - Extend the base repository; add methods only for non-trivial queries.
-- Every lookup is org-scoped. Lookups by URL use `(project key, number)` scoped to the caller's
-  org, never a bare number.
+- Every lookup is access-scoped: only projects (and orgs) the caller can see (design-doc §4,
+  "Visibility"). Lookups by URL use `(project key, number)` within an accessible project, never
+  a bare number.
 - Load explicitly what each use needs (`selectinload`/`joinedload`).
 - Soft-deleted rows are hidden unless the query opts in (trash/restore only).
 
@@ -58,7 +59,8 @@ Follow the `migration` skill.
 - Pure logic (transition tables, policy decisions) goes in `rules/`, with no database access.
 - Register every action explicitly in the policy; unknown actions are denied.
 - **Test first** (`test-writer` skill): the full action × role matrix from the design doc,
-  including non-members and system admins, allowed and denied rows, and the targeted rules
+  across project, org, and workspace roles (including inherited project admin), users with no
+  access, and system admins, allowed and denied rows, and the targeted rules
   (reporter, assignee, reviewer, approval-state conditions). Then implement.
 - Archived projects are read-only; module-gated areas are checked by the module dependency
   before `authorize()`.
@@ -88,7 +90,7 @@ Follow the `migration` skill.
 - URLs nested under the project with human-readable IDs:
   `/api/projects/{key}/<areas>/{number}`.
 - Single-entity endpoints use the load-and-authorize dependency, so there is no way to get the
-  entity without the check; list endpoints use the org-scoping helper. Invisible entities
+  entity without the check; list endpoints use the access-scoping helper. Invisible entities
   return **404**, never 403.
 - Module-gated areas add the module dependency.
 - Register the router in `main.py`.
@@ -105,7 +107,8 @@ Follow the `test-writer` skill. The minimum for a new area:
 - `log_change()` entries for each logged field;
 - soft delete and restore, including who may restore;
 - 409 on a stale `version`; 422 on invalid input with field errors;
-- cross-org 404 for every endpoint;
+- 404 for every endpoint for a user with no access: in another org, in the same org but not on
+  the project, or a workspace member not assigned to it;
 - numbering: first number, sequence, never reused after delete.
 
 ## 10. Frontend
@@ -129,5 +132,5 @@ Follow the `test-writer` skill. The minimum for a new area:
 
 Use steps 3 and 5–10 only: schema for the request/response, the action registered and its
 matrix rows written first, the service method, the router endpoint with the load-and-authorize
-dependency, tests (including a wiring test and a cross-org 404), `wl gen-client`, and the user
+dependency, tests (including a wiring test and the no-access 404s), `wl gen-client`, and the user
 guide.

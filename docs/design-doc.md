@@ -10,8 +10,13 @@
 >    (RAID, status reports, budget, data migration, cutover) are planned but not yet designed.
 > 3. Settles number allocation (`project_counter` table) and switches subtasks to
 >    parent-referenced IDs (`PMT-TA-45.2`).
+> 4. Sets the v1 scope to software projects, with ERP implementations in v2 (§1), and replaces
+>    the tenancy model: a workspace above organizations, workspace/org/project roles, and
+>    explicit project membership instead of `project.is_restricted` (§4, §5). Source:
+>    `screen-inventory.md` (Sept 28, 2026).
 >
-> Table-level detail lives in `schema-doc.md`.
+> Table-level detail lives in `schema-doc.md`. The people who use Waterline, the tenancy and
+access model, and the screens derived from them are in `screen-inventory.md`.
 
 ## 1. Overview
 
@@ -22,15 +27,22 @@ is used for the repository (`waterline`), container images, the developer CLI (`
 `wl`), and the app's title; the Python package stays `app`, so a later rename is cheap.
 
 A tool for gathering requirements, planning work scope, executing, testing, and reporting on a
-project. It serves two kinds of work from one codebase:
+project. It is designed to serve two kinds of work from one codebase:
 
 - **Software projects** — requirements, tasks, sprints, test cases, GitHub integration.
 - **ERP implementations**, run from a finance/operations point of view — phases and gates,
   functional workstreams, formal sign-offs, UAT cycles, and (as modules land) RAID logs, budget
   vs. actuals, data migration, cutover, and status reporting.
 
-Built for personal use initially, with the data model designed to scale to multiple teams,
-projects, and organizations later.
+**Scope: v1 is built for software projects; ERP implementations come in v2.** The core
+generalizations ERP needs stay in v1: phases, workstreams, generalized approvals (§6.2), and
+project type and modules (§1.1). They are cheap to build now and would be an expensive retrofit
+later, once v1 data and screens assume a software-only shape. ERP personas and modules are
+recorded (`screen-inventory.md`, §16) so v1 doesn't paint them into a corner, but their modules
+and screens are designed in v2.
+
+Built for personal use initially, with the data model designed to scale to a firm (a
+workspace, §4) running projects for several client organizations.
 
 **Product direction:** a traditional PM tool first (v1). AI-assisted features (requirements
 drafting, task breakdown, test-case generation, etc.) are a deliberate v2+ addition.
@@ -49,21 +61,21 @@ per kind of project.
 - **Core (always on):** requirements, tasks and subtasks, phases, milestones, workstreams, test
   cases and runs, approvals, comments, tags, links, dependencies, activity log, search.
 - **`project.type`** — `software` / `erp` / `general`. It seeds the project's default modules
-  when the project is created and selects the display labels the UI uses. Owners/admins can
+  when the project is created and selects the display labels the UI uses. Project admins can
   change it later; changing it changes labels and recommendations only, never data or enabled
   modules.
-- **`project.enabled_modules`** — seeded from the type; org owners/admins can turn modules on
-  or off at any time.
+- **`project.enabled_modules`** — seeded from the type; project admins can turn modules on or
+  off at any time.
 
 | Module | Adds | Default on for | Status |
 |---|---|---|---|
 | `sprints` | Sprint planning; sprint board | software | v1 |
 | `github` | GitHub App, repo mapping, PR/branch links (§12) | software | v1 |
-| `raid` | Risks, assumptions, issues, decisions, change requests | erp | planned |
-| `status_reports` | Published RAG status snapshots | erp | planned |
-| `budget` | Budget lines, actuals, forecast | erp | planned |
-| `data_migration` | Data objects, load cycles, reconciliation | erp | planned |
-| `cutover` | Cutover runbook and rehearsals | erp | planned |
+| `raid` | Risks, assumptions, issues, decisions, change requests | erp | v2 |
+| `status_reports` | Published RAG status snapshots | erp | v2 |
+| `budget` | Budget lines, actuals, forecast | erp | v2 |
+| `data_migration` | Data objects, load cycles, reconciliation | erp | v2 |
+| `cutover` | Cutover runbook and rehearsals | erp | v2 |
 
 A module can be enabled only once it has shipped.
 
@@ -183,13 +195,41 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
 ## 4. Tenancy, Users & Authentication
 
 ### Tenancy
-- `Organization` ↔ `User` is **many-to-many** via `Membership`; `role` lives on the membership
-  (`owner` / `admin` / `member` / `viewer`), so one person can hold different roles in
-  different orgs.
-- `Project` belongs to **exactly one** `Organization`.
-- `Project.is_restricted` (default `false`) prepares for project-level access control
-  (`ProjectMembership`) without building it yet. In v1, every project is visible to the whole
-  org. ERP use (outside consultants on client projects) may pull this forward — see §15.
+Decided Sept 28, 2026; `screen-inventory.md` ("Tenancy & access model") has the reasoning and
+the people it serves.
+
+```
+Workspace (the firm: tenant boundary)
+├── Internal staff: workspace members
+└── Organization (normally one per client)
+    ├── Client users: org members
+    └── Project
+        └── Project members (admin / member / viewer)
+```
+
+- **`Workspace`** is the tenant boundary: the firm running the projects. The schema supports
+  many; v1 deploys with **one**, created by the seed CLI alongside the first system admin.
+  There is no UI to create workspaces.
+- **`Organization`** belongs to exactly one workspace (`organization.workspace_id`). An org is
+  normally one client; a software-only setup is one workspace with one internal org.
+- **`Project`** belongs to **exactly one** `Organization`.
+- **Three membership levels**, each with its own role, so one person can hold different roles
+  in different places:
+
+  | Level | Table | Roles | Who |
+  |---|---|---|---|
+  | Workspace | `workspace_membership` | owner / admin / member | Internal staff |
+  | Organization | `membership` | owner / admin / member | Users of that org (client users) |
+  | Project | `project_membership` | admin / member / viewer | The project's team |
+
+- **Project access is always explicit project membership.** There is no "visible to the whole
+  org" flag. System admins, workspace owners/admins, and owners/admins of the project's org
+  **inherit project admin** on every project they can see, without a `project_membership` row.
+- **Visibility:** internal staff (workspace members) see only the orgs and projects they are
+  assigned to; workspace owners/admins see every org and project in the workspace. A user sees
+  an org they belong to or hold a project membership in, and a project they are a member of
+  (or inherit admin on).
+- **Client users normally belong to one org.** This is typical, not enforced.
 
 ### Users
 - `username` — unique across the app (users can belong to several orgs); lowercase letters,
@@ -199,22 +239,28 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   immediately. Their past work (tasks, comments, log entries) still references them and is shown
   with a "deactivated" badge. Their open tasks stay assigned; the UI highlights them for manual
   reassignment.
-- `is_system_admin` — may perform any action in any org or project (one exception: deciding
-  another person's approval, §6.2). Orgs still have their own owners/admins with full control
-  over their org. The first system admin is created by a CLI / seed script. The last active
-  system admin cannot be deactivated or demoted (lockout safeguard).
+- `is_system_admin` — may perform any action in any workspace, org, or project (one exception:
+  deciding another person's approval, §6.2). Workspaces and orgs still have their own
+  owners/admins with full control within them. The first system admin is created by a CLI /
+  seed script. The last active system admin cannot be deactivated or demoted (lockout
+  safeguard).
 - `must_change_password` — set when an admin creates an account or resets a password; the user
   is prompted to choose their own on next sign-in.
 
-### Account creation (no invitations in v1)
-- **System admins** create accounts.
-- **Org owners/admins** can also create accounts; doing so creates the user *and* their
-  membership in that org in one step. If the email already has an account (the person belongs
-  to another org), the existing user is added to the org instead of creating a duplicate.
-- **Scope limit for org admins:** they can add/remove members and change roles within their own
-  org. Deactivating an account or resetting the password of a user who belongs to **more than
-  one** org is system-admin-only — otherwise one org's admin could lock someone out of, or take
-  over, their access elsewhere.
+### Account management (no invitations in v1)
+- **System admins** create accounts anywhere.
+- **Workspace owners/admins** create accounts and add existing users for any org in their
+  workspace, and manage the workspace's staff (workspace memberships).
+- **Org owners/admins** (including client admins) create accounts in their org and add existing
+  users to it. Creating an account creates the user *and* their membership in that org in one
+  step. If the email already has an account (the person belongs elsewhere), the existing user
+  is added to the org instead of creating a duplicate.
+- **Scope limit for org admins:** they add and remove members within their own org (owners
+  also manage roles, §5). Deactivating, resetting the password of, or signing out everywhere a
+  user who **also** holds a workspace membership or a membership in another org is
+  **workspace-admin or system-admin only** — otherwise one org's admin could lock someone out
+  of, or take over, their access elsewhere. By the same reasoning, a user in more than one
+  workspace is system-admin only.
 
 ### Sign-in
 - **Email + password** is primary (`user.hashed_password`, required).
@@ -259,35 +305,60 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   `authorize(user, action, entity)`, which **fails closed** (unrecognized action → deny) and has
   one unit test per action/role combination. Its internals can later be swapped for a
   data-driven `Permission`/`RolePermission` table without touching endpoints.
-- `authorize()` checks `user.is_system_admin` first; then membership role; then the targeted
-  field-based rules below.
+- `authorize()` checks, in order: `user.is_system_admin`; then a workspace owner/admin role in
+  the entity's workspace; then an owner/admin role in the project's org; then the user's
+  project role; then the targeted field-based rules below. Anything not granted along the way
+  is denied.
 - **Reads are authorized too**, not just mutations:
   - Single-entity reads call `authorize(user, "view", entity)`.
-  - List endpoints can't check row by row, so their queries are **org-scoped** at the query
-    level.
+  - List endpoints can't check row by row, so their queries are **scoped at the query level to
+    the user's accessible projects (and orgs)** (§4, "Visibility").
   - Both are enforced through a FastAPI dependency so an endpoint can't obtain an entity without
     the check.
   - Failures on entities the user can't see return **404, not 403**, so existence isn't leaked.
 - **Module gating** is a separate dependency: a request to a module that is disabled for the
   project returns 404 before `authorize()` runs.
 
-### Role capabilities (org level)
+### Role capabilities
+
+Roles at each level include the capabilities of the roles listed above them at that level.
+"Project admin" below always includes **inherited** project admin (system admins, workspace
+owners/admins, and owners/admins of the project's org).
+
+**Project roles** (`project_membership`)
 
 | Role | Capabilities |
 |---|---|
-| viewer | View everything in the org; comment on tasks and requirements; edit/delete own comments; decide approvals they are named on |
+| viewer | View the project and everything in it; comment on tasks and requirements; edit/delete own comments; decide approvals they are named on |
 | member | Viewer + create and edit requirements, tasks, subtasks, test cases; record test results; manage sprints, phases, milestones, workstreams, tags, dependencies, links |
-| admin | Member + create and cancel approval requests; create/archive projects; change project type and enabled modules; manage members and roles; create users in the org; every targeted-rule override below |
-| owner | Admin + manage the org itself and its owners/admins |
-| system admin | Anything, in any org (except deciding someone else's approval) |
+| admin | Member + create and cancel approval requests; edit the project's name, type, and enabled modules; manage the project's members and their roles; every targeted-rule override below |
+
+**Org roles** (`membership`)
+
+| Role | Capabilities |
+|---|---|
+| member | Belongs to the org; can be added to its projects. No project access by itself |
+| admin | Create and archive the org's projects; project admin on every project in the org; create users in the org, add existing users as members, and remove members |
+| owner | Admin + manage the org itself and grant, change, or remove its owner and admin roles |
+
+**Workspace roles** (`workspace_membership`)
+
+| Role | Capabilities |
+|---|---|
+| member | Internal staff: sees only the orgs and projects they are assigned to; no inherited access |
+| admin | Manage the workspace's staff; create orgs and assign their first owner; org owner capabilities in every org of the workspace, and so project admin on every project; account actions on any user in the workspace, including users with several memberships |
+| owner | Admin + manage the workspace itself and grant, change, or remove its owner and admin roles |
+
+**System admin:** anything, in any workspace, org, or project (except deciding someone else's
+approval).
 
 ### Targeted rules — Task status transitions
 
 | Transition | Allowed |
 |---|---|
-| `in_review → done` | assignee or reviewer; always owner/admin |
-| `in_review →` any other status | reviewer; if no reviewer, the assignee; always owner/admin |
-| `→ done` from any other status | assignee; if unassigned, the reviewer; always owner/admin |
+| `in_review → done` | assignee or reviewer; always project admin |
+| `in_review →` any other status | reviewer; if no reviewer, the assignee; always project admin |
+| `→ done` from any other status | assignee; if unassigned, the reviewer; always project admin |
 | Assignee is also the reviewer | allowed |
 
 Review is therefore *supported but not enforced* (consistent with §1). Enforced review and
@@ -298,18 +369,18 @@ blocking self-review are candidates for per-org settings later.
 
   | Item | Who can delete |
   |---|---|
-  | Task | reporter, or owner/admin |
-  | Requirement | reporter while it has never been approved (`approved_revision_id IS NULL`); once approved, owner/admin only |
-  | Test case | reporter, or owner/admin |
-  | Subtask (hard delete) | any member |
-  | Phase, milestone (hard delete) | any member, only while nothing references them |
+  | Task | reporter, or project admin |
+  | Requirement | reporter while it has never been approved (`approved_revision_id IS NULL`); once approved, project admin only |
+  | Test case | reporter, or project admin |
+  | Subtask (hard delete) | any project member (member role or above) |
+  | Phase, milestone (hard delete) | any project member (member role or above), only while nothing references them |
 
-  An approved requirement is a signed-off artifact, which is why it needs an owner/admin.
-- **Approvals (§6.2):** owners/admins create and cancel approval requests. Only the **named
-  approver** can decide their own approval row. This is personal: nobody, including owners,
-  admins, or system admins, decides on another approver's behalf. An admin can cancel the
-  request instead.
-- The **last owner** of an org cannot leave or be demoted.
+  An approved requirement is a signed-off artifact, which is why it needs a project admin.
+- **Approvals (§6.2):** project admins create and cancel approval requests. Only the **named
+  approver** can decide their own approval row. This is personal: nobody, including project,
+  org, or workspace admins, or system admins, decides on another approver's behalf. A project
+  admin can cancel the request instead.
+- The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted.
 
 ### Request shape
 Every protected mutation follows the same order, inside **one database transaction per
@@ -324,14 +395,19 @@ versa).
 ## 6. Core Entities
 
 ```
-Organization → Project ─┬─ Requirement (self-referencing tree) ─┬─ RequirementRevision
-                        │                                        └─ Task (optional link)
-                        ├─ Task (always) → Subtask
-                        ├─ TestCase (always) ⇄ Requirement (many-to-many)
-                        ├─ TestRun → TestResult
-                        ├─ Phase ── Milestone (optional phase)
-                        ├─ Workstream  (owner of requirements, tasks, test cases)
-                        └─ Sprint      (sprints module)
+Workspace ─┬─ WorkspaceMembership (internal staff)
+           └─ Organization ─┬─ Membership (org users)
+                            └─ Project (below)
+
+Project ─┬─ ProjectMembership (admin / member / viewer)
+         ├─ Requirement (self-referencing tree) ─┬─ RequirementRevision
+         │                                        └─ Task (optional link)
+         ├─ Task (always) → Subtask
+         ├─ TestCase (always) ⇄ Requirement (many-to-many)
+         ├─ TestRun → TestResult
+         ├─ Phase ── Milestone (optional phase)
+         ├─ Workstream  (owner of requirements, tasks, test cases)
+         └─ Sprint      (sprints module)
 
 Task → Phase, Sprint, Milestone, Workstream: each optional and independent.
 ApprovalRequest → Approval (one per approver), attached to a requirement, gate, or test run.
@@ -344,7 +420,7 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   must be in the same project; parent cycles are prevented by a service-layer check (same
   approach as task dependencies).
 - `priority` (critical/high/medium/low), markdown `description_md`, `rank` among siblings.
-- `reporter_id` (NOT NULL, set to the creator; owners/admins can reassign it). Drives delete
+- `reporter_id` (NOT NULL, set to the creator; project admins can reassign it). Drives delete
   permission (§5). Distinct from any ERP "business owner" role, which is covered by approvals
   (§6.2).
 - `workstream_id` (nullable). A new child requirement defaults to its parent's workstream in the
@@ -380,9 +456,11 @@ requirement approval.
   pending at a time.
 - **Policy (v1): every named approver must approve.** Any rejection rejects the whole request;
   a further round is a new request. Other policies (any-one, quorum) are v2+.
-- **Who does what:** owners/admins create and cancel requests; each named approver decides only
-  their own row (§5). Named approvers may hold any role, including viewer, so business
-  stakeholders can sign off without edit rights.
+- **Who does what:** project admins (including inherited, §5) create and cancel requests; each
+  named approver decides only their own row (§5). Named approvers may hold any project role,
+  including viewer, so business stakeholders can sign off without edit rights.
+- **v2:** the RAID module adds change requests and decisions as approvable entities, so the
+  steering committee (project viewers named as approvers) can sign them off.
 - **Completing a requirement request** sets `approved_revision_id` to the request's revision,
   `approved_at` to the completion time, and `approved_by` to the approver whose decision
   completed it (the full list lives in the `approval` rows). A `draft` requirement moves to
@@ -586,7 +664,7 @@ could delete directly (§5). For linked items or children they can't delete, onl
 indirectly what they couldn't delete directly.
 
 **Restore** follows delete: whoever may delete an item may restore it. The trash view shows each
-user what they can restore; owners/admins see everything.
+user what they can restore; project admins see everything in the project.
 
 **Pending approvals:** deleting a requirement, gate, or test run cancels any pending approval
 request on it (logged). Restoring the item does not reopen the request.
@@ -625,7 +703,7 @@ request on it (logged). Restoring the item does not reopen the request.
 
 ### Comments
 - Flat list (threading is v2), on **tasks and requirements**. Markdown body.
-- Viewers can comment. Authors edit/delete their own comments; owners/admins can delete any.
+- Viewers can comment. Authors edit/delete their own comments; project admins can delete any.
 - Soft-deleted.
 
 ### Tags
@@ -786,8 +864,7 @@ All earlier core items (number allocation, rank UI, delete permissions, session 
 now settled in their sections; what remains is tied to the ERP modules.
 
 - **ERP permissions** (decided with the ERP modules):
-  - a financial-visibility flag on membership, checked in `authorize()`, for budget data;
-  - whether `project_membership` moves up from v2 (outside consultants on client projects);
+  - a financial-visibility flag on a membership, checked in `authorize()`, for budget data;
   - a targeted rule letting business-user testers record results on runs assigned to them;
   - how outside consultants and integrator staff are onboarded.
 - **ERP modules:** each needs its own design pass (§16).
@@ -801,8 +878,11 @@ now settled in their sections; what remains is tied to the ERP modules.
   requested, approval requested, status changes on tasks you're involved in, @mentions (via
   `username`). Generated by a worker job queued from `log_change()`.
 
-### ERP modules (after the v1 core; design pending)
-Proposed order, adjustable once priorities are clear:
+### v2 — ERP implementations
+v1 is built for software projects (§1); v2 adds what ERP implementations need. Each item needs
+its own design pass.
+
+**ERP modules** (design pending). Proposed order, adjustable once priorities are clear:
 1. **RAID & change requests** (`raid`) — one table typed risk / assumption / issue / decision /
    change; owner, workstream, due date; probability × impact scoring; mitigation/resolution;
    cost and schedule impact for change requests; a generic `entity_link` to connect items to
@@ -818,6 +898,19 @@ Proposed order, adjustable once priorities are clear:
    reconciliation sign-off. Mirrors the testcase / run / result pattern.
 5. **Cutover** (`cutover`) — runbook steps (sequence, planned duration, owner, dependencies)
    executed and timed in each rehearsal. Same definition/execution pattern.
+
+**Workspace and steering views:**
+- **PMO dashboard** at workspace level. The first version rolls up **published status reports**
+  only, with no live drill-down. Needs comparable portfolio fields on every project (client,
+  PM, go-live date, current phase, health) and project templates, so phase and workstream names
+  line up across clients.
+- **Steering committee landing page:** RAG status, change requests and decisions awaiting their
+  sign-off (§6.2), and escalated risks and issues. RAID items need an escalation level.
+- **Resourcing and resource management:** workspace-level internal teams (e.g. Finance,
+  Operations, Data Migration) that project workstreams link to, giving cross-client views of
+  each team's work and load. Needs its own design pass (v2+).
+- **Workstream members**, for a client core team's "my team's work" view (a department maps to
+  a workstream; today a workstream has only a lead). Decided in the ERP design pass.
 
 ### Deferred until first need
 - **API tokens** (`api_token`: hashed, prefixed, expiring, revocable; resolve to a `User` so
@@ -835,8 +928,6 @@ Proposed order, adjustable once priorities are clear:
 - Multiple reviewers per task
 - Watchers/subscribers; email notifications
 - `project.estimation_unit` (points vs. hours) for display
-- Project-level access control (`project_membership`), gated by `project.is_restricted` (may move
-  up with ERP)
 - Comment threading
 - Real file uploads (storage backend decision)
 - Automatic `Task.status` changes from GitHub events

@@ -23,7 +23,7 @@ tested, what each kind of test is for, and the gates every change passes.
 | Layer | What it tests | Database | Tools | Location |
 |---|---|---|---|---|
 | Unit | `rules/`, `authz/`, pure helpers (key validation, rank math, serialization) | No | pytest, Hypothesis | `backend/tests/unit/` |
-| Integration | Repositories and services: queries, org scoping, soft delete, locking, numbering, `log_change()`, cross-area calls | Real Postgres | pytest (anyio), polyfactory | `backend/tests/integration/` |
+| Integration | Repositories and services: queries, access scoping, soft delete, locking, numbering, `log_change()`, cross-area calls | Real Postgres | pytest (anyio), polyfactory | `backend/tests/integration/` |
 | API | Endpoints over HTTP: status codes, request/response shapes, auth and cookies, error format, 404-not-403 | Real Postgres | httpx `AsyncClient` against the app, polyfactory | `backend/tests/api/` |
 | Frontend unit/component | Composables, stores, components, route guards | No (API mocked at the client boundary) | Vitest, Vue Test Utils | `frontend/src/**/*.spec.ts` |
 | End-to-end | Critical user flows through the browser against the full stack | Real Postgres (seeded) | Playwright | `frontend/e2e/` |
@@ -81,7 +81,12 @@ tested, what each kind of test is for, and the gates every change passes.
   - Autogenerate against the migrated database reports no drift between models and migrations.
 - **Security (a named category, `@pytest.mark.security`):**
   - The full `authorize()` matrix: every action × role, plus fail-closed for unknown actions.
-  - Cross-org access returns 404, never 403 or data.
+    Roles span three levels (design-doc §5): project viewer, member, and admin; org member,
+    admin, and owner; workspace member, admin, and owner; plus system admin and users with no
+    access. Inherited project admin (org and workspace owners/admins, system admins) is tested
+    on its own rows, and so is its absence for org and workspace members.
+  - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;
+    list endpoints return only the user's accessible projects and orgs.
   - Cookie attributes, token replacement at sign-in and password change, rejected
     cross-origin mutations, non-JSON bodies rejected.
   - Disabled-module endpoints return 404.

@@ -47,7 +47,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   previous checkpoint's commit, or the root commit for the first).
 - Also invoke the `security-reviewer` agent, with the same inputs and in parallel, when the diff
   touches any of: `backend/app/authz/`; session, token, password, or cookie code in
-  `backend/app/core/`; the `auth`, `user`, `org`, or `project` areas; any router; rendered
+  `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project` areas; any router; rendered
   markdown (`v-html` or a markdown renderer); CORS, CSRF, or `Origin` handling; `github` or
   `webhook` code.
 - Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
