@@ -4,10 +4,14 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** Slice 0, Checkpoint 2. The backend has its database core (Postgres in Docker
-> Compose, async SQLAlchemy, Alembic, the base model) and a test harness; `GET /api/health`
-> checks the database. There is no frontend yet, and Compose runs only Postgres. Sections
-> marked *(from S0-Cn)* describe what arrives in a later checkpoint.
+> **Status:** Slice 0, Checkpoint 5 done (next: Checkpoint 6, API conventions & security
+> helpers). The backend has its database core (Postgres in Docker Compose, async SQLAlchemy,
+> Alembic, the base model and its mixins), a test harness with a `concurrency` fixture,
+> background jobs on procrastinate (worker, `enqueue.py`, procrastinate's schema), and the model
+> conventions (enums, soft delete, optimistic locking with 409, `direct_update`, convention and
+> migration checks); `GET /api/health` checks the database. There is no frontend yet, and
+> Compose runs only Postgres. Sections marked *(from S0-Cn)* describe what arrives in a later
+> checkpoint.
 
 ## 1. Workstation setup
 
@@ -50,13 +54,15 @@ failing) if the pre-commit hooks aren't installed.
 ```
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (from S0-C7)
-docs/           design, schema, build plan, testing strategy, these guides, tech-debt log
+docs/           design, schema, build plan, testing strategy, screen inventory, these guides,
+                tech-debt log, reviews/ (one record per checkpoint), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack (postgres now; api, worker, web from S0-C7)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
-.claude/        checkpoint-reviewer agent and checkpoint skill
+.claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area), agents
+                (checkpoint-reviewer, security-reviewer, fresh-clone-verifier), hooks (§10)
 ```
 
 There are **three Python environments**, deliberately separate:
@@ -108,8 +114,12 @@ backend/app/
   main.py         create_app(): settings, database, routers (all under /api)
   core/settings.py     Settings (env vars / repo-root .env), TEST_DATABASE_NAME
   core/db.py           engine, sessionmaker, get_session / SessionDep (one transaction per request)
-  core/base_model.py   Base, naming convention, IdMixin, TimestampMixin, BaseModel
-  core/           (later) errors, security
+  core/base_model.py   Base, naming convention, IdMixin, TimestampMixin, BaseModel,
+                       SoftDeleteMixin, VersionMixin, check_version
+  core/enums.py        enum_type (VARCHAR + CHECK enum columns)
+  core/errors.py       error responses (the 409 for stale versions; the rest from S0-C6)
+  core/migration_filters.py   what Alembic autogenerate ignores (procrastinate's objects)
+  core/security.py     (from S0-C6) password hashing, token generation and hashing
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
   rules/          pure business rules, no database
   authz/          authorize() and friends (Slice 1)

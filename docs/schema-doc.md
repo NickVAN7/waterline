@@ -3,9 +3,13 @@
 Companion to `design-doc.md` (section references like §6.1 point there).
 
 **Conventions applied to every table** (not repeated below unless relevant):
-- `id` is a UUIDv7 primary key.
+- `id` is a UUIDv7 primary key (except tables with a composite key, e.g. `project_counter`,
+  `requirement_testcase`).
 - Timestamps are `timestamptz`; `created_at`/`updated_at` exist on every table, with
-  `updated_at` maintained by the ORM.
+  `updated_at` maintained by the ORM. They come from the base model (`BaseModel`, or `Base` +
+  `TimestampMixin` for a composite key), so join and append-only tables have them too.
+  Event-time columns such as `linked_at`, `received_at`, and `changed_at` are domain fields
+  kept alongside them.
 - "enum" means `VARCHAR` + `CHECK` constraint (`native_enum=False`), not a native Postgres enum.
 - Constraint and index names follow one naming convention: `pk_<table>`,
   `fk_<table>_<column>_<referred table>`, `uq_<table>_<columns>`, `ck_<table>_<name>`,
@@ -413,6 +417,7 @@ Last active system admin cannot be deactivated or demoted (service-layer check).
 | provider_user_id | varchar | GitHub's numeric user ID (stable across renames) |
 | provider_login | varchar | GitHub username, for display |
 | linked_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
 `UNIQUE(provider, provider_user_id)` — one GitHub account links to one user.
 `UNIQUE(user_id, provider)` — one GitHub account per user.
@@ -423,9 +428,9 @@ Last active system admin cannot be deactivated or demoted (service-layer check).
 | id | UUID (PK) | |
 | user_id | UUID (FK → user) | |
 | token_hash | varchar | unique; the cookie holds the raw token, only its hash is stored |
-| created_at | timestamptz | |
 | last_seen_at | timestamptz | |
 | expires_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
 Deleted on sign-out, deactivation, removal from all orgs, and (other sessions) on password
 change.
@@ -548,17 +553,17 @@ logged.
 | description_md | text | snapshot |
 | change_note | text, nullable | optional "why" |
 | created_by | UUID (FK → user) | |
-| created_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
 `UNIQUE(requirement_id, revision_number)`. Created on explicit save only when title or
-description actually changed. Append-only (no `updated_at` needed in practice).
+description actually changed. Append-only, so `updated_at` never moves from `created_at`.
 
 ### `requirement_testcase`
 | Field | Type | Notes |
 |---|---|---|
 | requirement_id | UUID (FK → requirement) | composite PK |
 | testcase_id | UUID (FK → testcase) | composite PK |
-| created_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
 Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 
@@ -654,7 +659,7 @@ Hard delete only while unreferenced (service-layer check). Date and status chang
 | task_id | UUID (FK → task) | |
 | depends_on_task_id | UUID (FK → task) | |
 | type | enum: blocks / related_to | `related_to` stored in canonical order (lower id first) |
-| created_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
 `UNIQUE(task_id, depends_on_task_id, type)`; `CHECK(task_id <> depends_on_task_id)`.
 Cycle prevention for `blocks` is a service-layer graph traversal. Dependencies on deleted tasks
@@ -777,6 +782,7 @@ admin or system-admin override). Index `(approver_id, decision)` for "my pending
 | new_value | text, nullable | serialized; for link events, the other entity's ID |
 | changed_by | UUID (FK → user) | |
 | changed_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
 `field_changed` values: `status`, `assignee_id`, `reporter_id`, `reviewer_id`, `sprint_id`,
 `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`, `start_date`, `end_date`,
@@ -823,7 +829,7 @@ Index `(entity_type, entity_id, created_at)`.
 | tag_id | UUID (FK → tag) | tag's org must match the entity's org |
 | entity_type | enum: task / requirement / testcase | |
 | entity_id | UUID | polymorphic |
-| created_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
 
 `UNIQUE(tag_id, entity_type, entity_id)`; index `(entity_type, entity_id)`.
 
@@ -897,6 +903,7 @@ Auto-detection: task IDs in PR titles and branch names, case-insensitive.
 | received_at | timestamptz | |
 | processed_at | timestamptz, nullable | null = pending; the sweeper re-enqueues these |
 | error | text, nullable | last processing error |
+| created_at / updated_at | timestamptz | |
 
 Signature (`X-Hub-Signature-256`) is verified before a row is written.
 
@@ -915,6 +922,8 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 |---|---|
 | `notification` (user_id, type, entity_type, entity_id, actor_id, created_at, read_at) | v1.5 |
 | `api_token` (user_id, name, token_hash, prefix, last_used_at, expires_at, revoked_at) | first need |
+| `login_attempt` (sign-in throttling per account and per IP, design-doc §4) | before the first non-local deployment |
+| `session.user_agent`, `session.ip_address` columns (active-sessions page, design-doc §4) | before the first non-local deployment |
 | ERP modules, design pending: `raid_item`, `entity_link`, `status_report`, `budget_line`, `cost_entry`, `data_object`, `load_cycle`, `data_load`, runbook step / rehearsal tables | after the v1 core (design-doc §16) |
 | `invitation`, `project_membership`, `time_entry`, `sprint_project`, `sprint_snapshot`, file attachments | v2+ (`project_membership` and `time_entry` may move up with ERP) |
 

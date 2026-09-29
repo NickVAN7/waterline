@@ -80,9 +80,12 @@ Everything lives in the repository, version-controlled and present on every work
   reviewer that reads the docs and the diff, never edits files, and reports findings in a fixed
   format.
 - **`checkpoint` skill** (`.claude/skills/checkpoint/`): the close-out procedure every
-  checkpoint ends with — scope check, `wl check`, docs and tech-debt updates, the reviewer,
-  resolving findings, one commit with the review note, a list of changed docs and Claude files
-  for the owner to upload to the Project, and stopping for approval.
+  checkpoint ends with — scope check, `wl check`, docs and tech-debt updates, the reviewers
+  (`checkpoint-reviewer`; `security-reviewer` when the diff touches security-relevant code;
+  `fresh-clone-verifier` at the end of a slice), resolving findings, the review record
+  (`docs/reviews/<ID>.md`), one commit with the review note, a list of changed docs and Claude
+  files for the owner to upload to the Project (Claude never writes to the Project), and
+  stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   alongside `checkpoint-reviewer` when a checkpoint touches auth, sessions, authorization,
   routers, rendered markdown, or GitHub code.
@@ -104,10 +107,9 @@ Everything lives in the repository, version-controlled and present on every work
   frontend).
 
 ### Where the work happens
-Code is written and run on the owner's workstation(s) and lives in GitHub. The repository is
-created once the app has a working name; until then the work lives in one local folder.
-Workstations need Git, Docker, uv, and Node 22 (verified by `wl doctor` in Checkpoint 1).
-The repository will be named `waterline`.
+Code is written and run on the owner's workstation(s) in the `waterline` repository (the
+working name is decided, design-doc §1), which is pushed to GitHub. Workstations need Git,
+Docker, uv, and Node 22 (verified by `wl doctor`).
 
 ---
 
@@ -122,9 +124,9 @@ Choices the design docs left open.
 | 3 | **Typed API client generated from the backend's OpenAPI schema:** `openapi-typescript` (generates TypeScript types) + `openapi-fetch` (typed fetch client). CI fails if the generated client is stale. | Confirmed |
 | 4 | **Only system admins create organizations in v1.** A system admin creates the org and assigns its first owner. | Confirmed |
 | 5 | **Monorepo** with `backend/`, `frontend/`, and `docs/` at the root, laid out as in "Repository layout" below. | Confirmed |
+| 6 | **Python 3.14** (built-in `uuid.uuid7()`); fallback to 3.13, then 3.12, with the `uuid-utils` package for UUIDv7 if a dependency lags. | Confirmed |
 | 7 | **Layered backend** (routers → services → repositories → models), organized layer-first, as in "Backend architecture" below. Includes a repository layer (the app is database-operation-heavy); SQLAlchemy models serve as the domain entities (no separate domain layer). | Confirmed |
 | 8 | **Feature map:** one file name per aggregate across every layer, with ownership and cross-area rules, as in "Feature map" below. | Confirmed |
-| 6 | **Python 3.14** (built-in `uuid.uuid7()`); fallback to 3.13, then 3.12, with the `uuid-utils` package for UUIDv7 if a dependency lags. | Confirmed |
 
 **v1 operating assumption:** users are few and a system admin is always available. Anything
 that needs one (creating orgs, password resets, deactivating users in several orgs) has no
@@ -148,7 +150,7 @@ slices only add features.
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a zero-row update of a non-versioned entity, e.g. one hard-deleted meanwhile, is 404), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
-| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness), branch protection noted for repo creation, fresh-clone setup by following the developer guide, slice wrap-up |
+| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness), branch protection configured on the GitHub repo, fresh-clone setup by following the developer guide, slice wrap-up |
 
 The sections below describe the content; the table above is the order of work.
 
@@ -202,7 +204,10 @@ The sections below describe the content; the table above is the order of work.
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/
-├── docs/                         design-doc.md, schema-doc.md, build-plan.md
+├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
+│                                 testing-strategy.md, developer-guide.md, user-guide.md,
+│                                 tech-debt.md, screen-inventory.md, reviews/ (one record per
+│                                 checkpoint), spikes/ (spike code kept as evidence)
 │                                 (source of truth; the owner uploads changed files to the Project)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, api, worker, web
@@ -473,6 +478,10 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 
 **Goal:** people can sign in, orgs and memberships exist, projects can be created with a type,
 modules, and a key, and every request goes through `authorize()`.
+
+**Carry-in tech debt** (Fix by: Slice 1, `tech-debt.md`): TD-2 (authz/rules coverage gate
+outside `wl`), TD-4 (concurrency fixture for real race tests), TD-5 (realistic factory
+values), TD-8 (base repository get-by-ID uses a query, not `session.get()`).
 
 ### Migration
 Tables: `user`, `session`, `organization`, `membership`, `project`, `project_counter`

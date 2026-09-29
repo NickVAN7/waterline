@@ -119,6 +119,7 @@ Entry format:
   soft-deleted earlier in the same session is still returned (documented in the developer
   guide). The owner decided the base repository's get-by-ID uses a query instead, so the
   soft-delete filter always applies.
-- **Why:** No repository exists yet; the base repository is built with the first area.
+- **Why:** The base repository has only `direct_update` so far; its get-by-ID is built with the
+  first area.
 - **Fix by:** Slice 1, the base repository (build plan, "Backend architecture").
 - **Status:** open

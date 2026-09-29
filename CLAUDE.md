@@ -44,7 +44,8 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - Never start work while anything is red, and never start the next checkpoint without the
   owner's explicit approval.
 - Finish every checkpoint with the `checkpoint` skill (gates → docs → independent review by the
-  `checkpoint-reviewer` agent → commit → report → stop).
+  `checkpoint-reviewer` agent, plus the other reviewers when they apply → review record in
+  `docs/reviews/<ID>.md` → commit → upload list for the owner → report → stop).
 - One commit per checkpoint. The docs, tests, and tech-debt log change in the same commit as the
   code they describe.
 - A shortcut is allowed only if it's logged in `docs/tech-debt.md` with its reason and target.
