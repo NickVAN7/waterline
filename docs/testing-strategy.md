@@ -75,6 +75,11 @@ tested, what each kind of test is for, and the gates every change passes.
     reproducible.
 - **Concurrency:** truly parallel transactions for number allocation, optimistic locking
   (second save gets 409), the one-active-sprint rule, and approval completion.
+- **Approvals** (Slice 2 for requirements, Slices 4–5 for gates and test runs): completion
+  moves a requirement to `approved`, a gate to `approved`, and a test run to `completed`; a
+  rejection changes nothing on the entity; requests log `created` and every status change,
+  including a cancellation caused by deleting the item; a gate with any approval request can't
+  be deleted; `approved` is refused on non-gate milestones.
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):
   - Every migration upgrades from an empty database to head.
   - Every migration downgrades one step and upgrades again (round-trip).
@@ -87,6 +92,18 @@ tested, what each kind of test is for, and the gates every change passes.
     on its own rows, and so is its absence for org and workspace members.
   - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;
     list endpoints return only the user's accessible projects and orgs.
+  - Account actions (deactivate, reactivate, reset password, sign out everywhere) follow the rank rule
+    (design-doc §4), tested on both sides of each boundary: same rank allowed, higher rank or
+    a membership outside the actor's scope denied, and a user with no memberships denied to
+    org admins.
+  - Project membership: adding by user ID someone outside the project org's members and the
+    workspace's staff returns 404 (the email path follows design-doc §4); removing a membership ends access on the user's next request.
+  - Workspace pages return 404 to everyone but workspace owners/admins and system admins.
+  - Adding by email reveals at most whether an account exists, never its org or workspace;
+    an existing account from another org is added to the project's org and the project only
+    after confirmation.
+  - Only a project admin moves a gate into or out of `approved` by hand; members are denied.
+  - An org-slug redirect happens only for a project the user can see.
   - Cookie attributes, token replacement at sign-in and password change, rejected
     cross-origin mutations, non-JSON bodies rejected.
   - Disabled-module endpoints return 404.

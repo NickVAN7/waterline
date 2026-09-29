@@ -23,7 +23,7 @@ what was built (any drift is fixed in the docs in the same change).
 | 3 | Tasks and subtasks, phases, workstreams, transition rules, rank; backlog and board. |
 | 4 | Sprints (module) and milestones/gates. |
 | 5 | Test cases, runs, results, ad-hoc runs. |
-| 6 | Comments, tags, dependencies, links, search. |
+| 6 | Comments, tags (with the built-in per-type defaults, copied into new orgs and backfilled into existing ones), dependencies, links, search. |
 | 7 | GitHub (module): App, repo mapping, webhooks, auto-linking. |
 | 8+ | v2, ERP implementations (design-doc §16): RAID & change requests → status reports → budget → data migration → cutover; PMO dashboard, steering committee page, resourcing, workstream members. |
 
@@ -317,10 +317,10 @@ it is the only place that writes them.
 | File name | Owns (tables) | Slice | Calls into (services) |
 |---|---|---|---|
 | `user` | user | 1 | — |
-| `auth` | session; user_identity (added in Slice 7) | 1 | user |
+| `auth` | session; user_identity (added in Slice 7). Runs every action that ends sessions: sign-out, change password, and the admin actions deactivate, reset password, and sign out everywhere (it updates the user through the user service) | 1 | user |
 | `workspace` | workspace, workspace_membership | 1 | user |
-| `org` | organization, membership | 1 | user |
-| `project` | project (incl. modules and module guidance), project_membership | 1 | org |
+| `org` | organization, membership | 1 | user; tag (copies the default tags into a new org, from Slice 6) |
+| `project` | project (incl. modules and module guidance), project_membership | 1 | org, user (creating a user for the project goes through the org service) |
 | `numbering` *(service + repository only)* | project_counter; `task.next_subtask_number` | 1 | — |
 | `requirement` | requirement, requirement_revision | 2 | numbering, approval, task, testcase |
 | `approval` | approval_request, approval | 2 | approvable areas via registered handlers only |
@@ -331,7 +331,7 @@ it is the only place that writes them.
 | `milestone` | milestone | 4 | — |
 | `sprint` | sprint | 4 | task |
 | `testcase` | testcase, requirement_testcase | 5 | numbering |
-| `test_run` | test_run, test_result | 5 | task (bug creation) |
+| `test_run` | test_run, test_result | 5 | task (bug creation), approval (cancels a pending request on delete) |
 | `comment` | comment | 6 | — |
 | `tag` | tag, entity_tag | 6 | — |
 | `link` | link_attachment | 6 | — |
@@ -349,8 +349,9 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   so each task's own delete permission is checked (design-doc §9: no indirect deletes).
 - **Callbacks instead of upward calls:** the approval service (in the lowest service layer) never imports the areas it approves.
   Each approvable area (requirement now; milestone gates and test runs later) registers a
-  handler (`on_approved`, `on_rejected`) with it, and the approval service calls the handler
-  for the request's entity type. The requirement area calls the approval service directly (e.g.
+  handler (`on_approved`) with it, and the approval service calls the handler for the request's
+  entity type. There is no `on_rejected`: a rejection changes nothing on the entity
+  (design-doc §6.2). The requirement area calls the approval service directly (e.g.
   to cancel pending requests on delete).
 - **Requirement ↔ test case links** are owned by `testcase`. The requirement screens show and
   edit links through the testcase service. This keeps dependencies one-way (requirement →
@@ -376,8 +377,11 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - Classes: `TaskService`, `TaskRepository`; authorization policies in `authz/policies/task.py`.
 - URLs are nested under the project and use the human-readable key and number, not UUIDs:
   `/api/projects/{key}/tasks/{number}`, subtasks at `/api/projects/{key}/tasks/{number}/subtasks/{n}`.
-  This is safe because project keys are immutable and items never move (design-doc §3). UUIDs
-  stay internal.
+  This is safe because project keys are immutable and unique in the workspace, and items never
+  move (design-doc §3). UUIDs stay internal. Browser routes add the org slug for readability
+  (`/{org_slug}/projects/{key}/tasks/{number}`); the frontend resolves the project by key and,
+  once it is authorized, redirects a stale or wrong slug to the current one. A project the user
+  can't see is a 404, never a redirect that would reveal its org.
 
 ### Tooling
 - Python: `uv` (dependencies, lockfile, Python version), `ruff` (lint + format), `pyright`,
@@ -503,7 +507,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   token and deletes the user's other sessions).
 - **Seed command:** an app admin command (`app/cli.py`, run as `wl seed`) that creates the
   workspace (prompts for name and slug) and the first system admin (prompts for email,
-  username, name, password). There is no UI or endpoint for creating workspaces.
+  username, name, password), and makes that admin the workspace's owner
+  (`workspace_membership`, role owner). There is no UI or endpoint for creating workspaces.
 
 ### Authorization (§5)
 - `authorize(user, action, entity)`: an explicit action registry; unknown action → deny;
@@ -529,29 +534,47 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 ### Workspace, organizations & memberships
 - Workspace owner/admin (and system admin): list, add, and create staff (workspace members);
   change their roles; remove them. Create orgs, assign each its first owner, list all orgs in
-  the workspace.
+  the workspace. An org is created with a name and slug; its owners rename it and change its
+  slug.
 - Org owner/admin (and workspace owner/admin): list members; add an existing user by email;
-  create a new user and their membership in one step (existing email → add instead of
-  duplicate); remove members.
+  create a new user and their membership in one step; remove members. Adding by email uses
+  the email-first form (§4): an existing account is added after confirmation, otherwise the
+  form continues to account creation.
 - Project admin (including inherited): list the project's members; add a user with a project
-  role (admin, member, viewer); change roles; remove members.
+  role (admin, member, viewer), choosing from the org's members and the workspace's staff (the
+  picker lists no one else, and adding by user ID rejects anyone else with a 404); add by email with
+  the email-first form (§4): a new email creates the user, an org membership (member), and the
+  project membership; an org member's or staff member's email adds only the project membership
+  (staff never get an org membership this way); any other existing account is added to the org
+  as a member and to the project after the admin confirms; change roles; remove members.
+- Removing any membership leaves the user's sessions alone (§4): access ends on the next
+  request because `authorize()` re-checks memberships.
 - Guards: the last owner of an org, and of the workspace, can't leave or be demoted; only
   owners can grant, change, or remove the owner and admin roles at their level (§5 role
   tables).
 
 ### Users (system admin, plus workspace-admin and org-admin scope)
-- Create, deactivate, reactivate, reset password (sets `must_change_password`).
+- Create, deactivate, reactivate, reset password (sets `must_change_password`), sign out
+  everywhere. Deactivate, reset password, and sign out everywhere run in the `auth` service.
 - Deactivation deletes all the user's sessions immediately.
-- Org admins may reset passwords or deactivate only users who belong to their org alone; a user
-  who also holds a workspace membership or a membership in another org is workspace-admin or
-  system-admin only (§4).
+- **Account actions follow rank (§4)** (deactivate, reactivate, reset password, sign out
+  everywhere): the target holds at least one membership in the actor's scope, and every
+  membership the target holds is covered by an actor role at an equal or higher rank (system
+  admin > workspace owner > workspace admin > workspace member > org owner > org admin > org
+  member > project-only user). Users with no memberships: workspace owners/admins and system
+  admins.
+  Tested both ways at each boundary: e.g. an org admin can reset another admin of their org but
+  not a workspace member, a user in another org, or a user on another org's project; a
+  workspace admin can't reset the workspace owner or a system admin.
 - Guard: the last active system admin can't be deactivated or demoted.
 - Users can update their own name and username (format and uniqueness checked).
 
 ### Projects (§1.1, §3)
 - Create (org owner/admin, including inherited): name, key (3–6 characters,
-  `^[A-Z][A-Z0-9]{2,5}$`, unique in the org, uppercased as typed), type; `enabled_modules`
-  seeded from the type.
+  `^[A-Z][A-Z0-9]{2,5}$`, unique in the workspace, uppercased as typed), type; `enabled_modules`
+  seeded from the type. The creator names the project's first admin (possibly themself) from
+  the org's members and the workspace's staff; that admin always gets a `project_membership`
+  row, even if they also inherit admin.
 - List (scoped to the user's accessible projects; archived hidden unless requested), view,
   update name / type / enabled modules (project admin), archive and unarchive (org
   owner/admin).
@@ -577,21 +600,30 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Org members page: list, add or create user, change role, remove.
 - Project members page: list, add with a role, change role, remove.
 - Workspace admin pages: staff, organizations, users (create, deactivate, reset password).
+  Only workspace owners/admins and system admins see workspace pages.
+- Browser routes include the org slug (`/{org_slug}/projects/{key}/…`); a stale slug
+  redirects.
 
 ### Done when
-- [ ] `wl seed` creates the workspace and a system admin, who signs in, creates an org, and
-      creates its owner.
+- [ ] `wl seed` creates the workspace and a system admin who is its owner; the admin signs in,
+      creates an org, and creates its owner.
 - [ ] The owner signs in (forced to change password first), creates a project with a key, type,
       and modules, and adds a project member and a project viewer.
 - [ ] The member sees the project; the viewer sees it but can't change its settings; an org
       member not on the project, a workspace member not assigned to it, and a user in another
       org all get a 404 for it; a workspace admin sees it and has project admin on it.
+- [ ] A project admin creates a new user for the project, who gets an org membership and the
+      project membership; adding by user ID someone outside the org's members and the
+      workspace's staff returns 404; adding another org's user by email adds them to the org
+      and project after confirmation.
+- [ ] A browser link with a stale org slug redirects to the current one; the same link for a
+      project the user can't see is a 404.
 - [ ] Deactivating a user ends their active sessions on the next request.
 - [ ] Every checklist item from §4 has a test (cookie attributes, rejected cross-origin
       mutation, token replaced at sign-in and on password change, expiry).
 - [ ] The `authorize()` matrix and fail-closed test pass; archived projects reject mutations.
-- [ ] Last-owner (org and workspace) and last-system-admin guards, and the org-admin scope
-      limits, are tested.
+- [ ] Last-owner (org and workspace) and last-system-admin guards, and the rank rule for
+      account actions, are tested.
 - [ ] `project_counter` concurrency tests pass.
 - [ ] Mutation testing runs in `wl check` and CI with no surviving mutants in `app/rules/` and
       `app/authz/`.

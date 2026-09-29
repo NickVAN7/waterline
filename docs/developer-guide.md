@@ -204,7 +204,7 @@ case there — including an indirect path (A → B → forbidden) wherever indir
   |---|---|---|
   | Primary key | `pk_<table>` | `pk_task` |
   | Foreign key | `fk_<table>_<column>_<referred table>` | `fk_task_project_id_project` |
-  | Unique | `uq_<table>_<columns>` | `uq_project_organization_id_key` |
+  | Unique | `uq_<table>_<columns>` | `uq_project_workspace_id_key` |
   | Check | `ck_<table>_<name>` | `ck_task_status` |
   | Index | `ix_<table>_<columns>` | `ix_task_project_id` |
 

@@ -30,7 +30,7 @@ erDiagram
   USER ||--o{ MEMBERSHIP : has
   USER ||--o{ USER_IDENTITY : "links"
   USER ||--o{ SESSION : has
-  ORGANIZATION ||--o{ PROJECT : owns
+  ORGANIZATION ||--o{ PROJECT : "owns (composite FK with workspace_id)"
   ORGANIZATION ||--o{ TAG : defines
   ORGANIZATION ||--o{ GITHUB_INSTALLATION : has
 
@@ -109,6 +109,7 @@ erDiagram
     uuid id PK
     uuid workspace_id FK
     varchar name
+    varchar slug
   }
   USER {
     uuid id PK
@@ -142,6 +143,7 @@ erDiagram
   PROJECT {
     uuid id PK
     uuid organization_id FK
+    uuid workspace_id FK
     varchar key
     varchar name
     varchar type
@@ -343,6 +345,7 @@ erDiagram
     uuid organization_id FK
     varchar name
     varchar color
+    varchar project_type
   }
   ENTITY_TAG {
     uuid id PK
@@ -416,11 +419,16 @@ project's org; design-doc §5).
 |---|---|---|
 | id | UUID (PK) | |
 | name | varchar | the firm |
-| slug | varchar | unique |
+| slug | varchar | NOT NULL, unique; format below |
 | created_at / updated_at | timestamptz | |
 
+Slugs (workspace and org): lowercase letters, digits, and hyphens, 2–40 characters, starting
+with a letter; suggested from the name at creation.
+
 The tenant boundary. The schema supports many; v1 deploys with one, created by the seed CLI
-(`wl seed`) alongside the first system admin. No UI creates workspaces.
+(`wl seed`) alongside the first system admin, who is given a `workspace_membership` with role
+owner. No UI creates workspaces. Only workspace owners/admins (and system admins) see the
+workspace pages.
 
 ### `workspace_membership`
 | Field | Type | Notes |
@@ -442,8 +450,10 @@ demoted (service-layer check).
 | id | UUID (PK) | |
 | workspace_id | UUID (FK → workspace) | NOT NULL |
 | name | varchar | |
+| slug | varchar | NOT NULL; same format as the workspace slug; shown in browser URLs (`/{slug}/projects/{key}/…`); renameable, since it only decorates project URLs (design-doc §3). Org-level pages (e.g. `/{slug}/members`) under an old slug 404 after a rename; no slug history is kept |
 | created_at / updated_at | timestamptz | |
 
+`UNIQUE(workspace_id, slug)`; `UNIQUE(id, workspace_id)` (target of the project's composite FK).
 Index on `workspace_id`. Normally one client; a software-only setup is one workspace with one internal org. GitHub
 installations moved to `github_installation` (an org can have several).
 
@@ -486,8 +496,10 @@ Last active system admin cannot be deactivated or demoted (service-layer check).
 | expires_at | timestamptz | |
 | created_at / updated_at | timestamptz | |
 
-Deleted on sign-out, deactivation, removal from all orgs and workspaces, and (other sessions)
-on password change.
+Deleted on sign-out, deactivation, admin password reset, "sign out everywhere", and (other
+sessions) on password change. Removing a membership leaves sessions alone: every request
+re-checks memberships (design-doc §4, "Sessions"). Session-ending account actions run in the
+`auth` area, which owns this table.
 
 ### `membership`
 | Field | Type | Notes |
@@ -505,15 +517,20 @@ on password change.
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| organization_id | UUID (FK → organization) | |
-| key | varchar | user-entered; 3–6 chars `^[A-Z][A-Z0-9]{2,5}$`; immutable |
+| organization_id | UUID (FK → organization) | referenced through the composite FK below |
+| workspace_id | UUID (part of the composite FK → organization) | NOT NULL; the org's workspace, copied so keys can be unique per workspace |
+| key | varchar | user-entered; 3–6 chars `^[A-Z][A-Z0-9]{2,5}$`; immutable; unique in the workspace |
 | name | varchar | |
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | enabled_modules | text[] | seeded from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
 | archived_at | timestamptz, nullable | archived = read-only, hidden by default |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(organization_id, key)`.
+Composite FK `(organization_id, workspace_id)` → `organization(id, workspace_id)`: keeps
+`workspace_id` consistent with the org, and replaces a plain FK on `organization_id` (both would
+get the same conventional name, `fk_project_organization_id_organization`).
+`UNIQUE(workspace_id, key)` (design-doc §3: an ID like `ERP-TA-45` is unambiguous across the
+firm's clients).
 `CHECK (enabled_modules <@ ARRAY[...shipped modules])` — each module's value is added to the
 check when that module ships. Disabling a module hides its data; nothing is deleted.
 No visibility flag: access is always explicit project membership (plus inherited admin).
@@ -714,10 +731,11 @@ Partial unique index: `UNIQUE(project_id) WHERE status = 'active'`.
 | kind | enum: milestone / gate / release | gates are signed off via approvals |
 | target_date | date, nullable | current plan |
 | baseline_date | date, nullable | approved plan, for slippage |
-| status | enum: planned / in_progress / released / cancelled | |
+| status | enum: planned / in_progress / approved / released / cancelled | `approved`: gates only (service check), set when the gate's approval request completes or by a project admin (design-doc §6.2) |
 | created_at / updated_at | timestamptz | |
 
-Hard delete only while unreferenced (service-layer check). Date and status changes are logged.
+Hard delete only while unreferenced (service-layer check); for a gate, any approval request
+(pending or past) counts as a reference. Date and status changes are logged.
 
 ### `task_dependency`
 | Field | Type | Notes |
@@ -841,7 +859,7 @@ admin or system-admin override). Index `(approver_id, decision)` for "my pending
 |---|---|---|
 | id | UUID (PK) | |
 | project_id | UUID (FK → project) | NOT NULL |
-| entity_type | enum: requirement / task / testcase / phase / milestone | |
+| entity_type | enum: requirement / task / testcase / phase / milestone / approval_request | approval requests log `created` and every `status` change |
 | entity_id | UUID | polymorphic, no FK (log outlives its subject) |
 | action | enum: created / updated / deleted / restored / linked / unlinked | |
 | field_changed | enum, nullable | required when `action = updated`; values below |
@@ -885,9 +903,12 @@ Index `(entity_type, entity_id, created_at)`.
 | organization_id | UUID (FK → organization) | org-wide vocabulary |
 | name | varchar | |
 | color | varchar | |
+| project_type | enum: software / erp / general, nullable | set on tags seeded from a type's built-in defaults, or by org admins; null = general, offered on every project (tags project members create are general) |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(organization_id, name)`.
+`UNIQUE(organization_id, name)`. Built-in defaults per project type are copied in when an org is
+created. Project members create tags; renaming and deleting are for org owners/admins
+(design-doc §11).
 
 ### `entity_tag`
 | Field | Type | Notes |
@@ -929,6 +950,9 @@ All tables in this section belong to the `github` module.
 | account_type | enum: user / organization | |
 | suspended_at | timestamptz, nullable | GitHub can suspend installations |
 | created_at / updated_at | timestamptz | |
+
+Connected by org owners/admins. Optional: a project uses GitHub only through
+`project_repository` rows.
 
 ### `project_repository`
 | Field | Type | Notes |

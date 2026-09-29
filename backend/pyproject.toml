@@ -158,7 +158,7 @@ layers = [
     "(sprint) | (testcase) | (test_run) | (github)",
     "(task)",
     "(project) | (phase) | (workstream) | (milestone)",
-    "(auth) | (org)",
+    "(auth) | (workspace) | (org)",
     "(user) | (numbering) | (approval) | (activity) | (comment) | (tag) | (link) | (search) | (health)",
 ]
 broken_contract_guidance = "Call only services in lower layers; reach upward with a registered handler."

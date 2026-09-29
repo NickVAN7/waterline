@@ -170,9 +170,16 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   approach as project key renames, §16).
 - **Project key rules:** entered by the user at project creation; **3–6** uppercase
   letters/digits, starting with a letter (`^[A-Z][A-Z0-9]{2,5}$`); unique within the
-  organization; **immutable** after creation (renaming would break every external reference).
+  **workspace** (§4), so an ID like `ERP-TA-45` means one item across every client the firm
+  works for; **immutable** after creation (renaming would break every external reference).
   Because every entity prefix is two letters, a 3-character minimum means no project key can
   ever collide with a current or future prefix — no reserved-word list is needed.
+- **URLs:** API URLs identify a project by its key alone (`/api/projects/{key}/…`). Browser URLs
+  also show the org for readability (`/{org_slug}/projects/{key}/tasks/45`), but the slug only
+  decorates: the key identifies the project, and a stale or wrong slug (e.g. after an org is
+  renamed) redirects to the current one, so old links keep working. The redirect happens only
+  after the project is authorized; for a project the user can't see it's a 404, so the redirect
+  never reveals an org.
 - **Timestamps:** `timestamptz` everywhere. Every table has `created_at`/`updated_at`, with
   `updated_at` maintained by the ORM, never set by hand.
 - **Enums:** stored as `VARCHAR` + `CHECK` constraint (`Enum(..., native_enum=False)`), not
@@ -208,10 +215,11 @@ Workspace (the firm: tenant boundary)
 ```
 
 - **`Workspace`** is the tenant boundary: the firm running the projects. The schema supports
-  many; v1 deploys with **one**, created by the seed CLI alongside the first system admin.
-  There is no UI to create workspaces.
+  many; v1 deploys with **one**, created by the seed CLI alongside the first system admin, who
+  also becomes its owner. There is no UI to create workspaces.
 - **`Organization`** belongs to exactly one workspace (`organization.workspace_id`). An org is
-  normally one client; a software-only setup is one workspace with one internal org.
+  normally one client; a software-only setup is one workspace with one internal org. Its
+  `slug` (unique in the workspace, renameable) appears in browser URLs (§3).
 - **`Project`** belongs to **exactly one** `Organization`.
 - **Three membership levels**, each with its own role, so one person can hold different roles
   in different places:
@@ -226,10 +234,20 @@ Workspace (the firm: tenant boundary)
   org" flag. System admins, workspace owners/admins, and owners/admins of the project's org
   **inherit project admin** on every project they can see, without a `project_membership` row.
 - **Visibility:** internal staff (workspace members) see only the orgs and projects they are
-  assigned to; workspace owners/admins see every org and project in the workspace. A user sees
-  an org they belong to or hold a project membership in, and a project they are a member of
-  (or inherit admin on).
+  assigned to; workspace owners/admins see every org and project in the workspace.
+  "Assigned" means a membership:
+  - a user sees a **project** they hold a `project_membership` on, or inherit admin on;
+  - a user sees an **org** they hold a `membership` in or a project membership on one of its
+    projects. An org membership alone (role member) shows the org, not its projects;
+  - only workspace owners/admins (and system admins) see the **workspace pages** (staff, org
+    list, users). Workspace members and client users see only their orgs and projects, through
+    the org switcher.
 - **Client users normally belong to one org.** This is typical, not enforced.
+- **One workspace for the foreseeable future.** It exists mainly to roll up dashboards and
+  statistics across clients. Rules that only matter with several workspaces (e.g. users in more
+  than one) are decided if a second workspace is ever needed.
+- **Staff may also hold org memberships**, e.g. a workspace member who is an admin of a client
+  org to manage that client's users.
 
 ### Users
 - `username` — unique across the app (users can belong to several orgs); lowercase letters,
@@ -253,14 +271,44 @@ Workspace (the firm: tenant boundary)
   workspace, and manage the workspace's staff (workspace memberships).
 - **Org owners/admins** (including client admins) create accounts in their org and add existing
   users to it. Creating an account creates the user *and* their membership in that org in one
-  step. If the email already has an account (the person belongs elsewhere), the existing user
-  is added to the org instead of creating a duplicate.
-- **Scope limit for org admins:** they add and remove members within their own org (owners
-  also manage roles, §5). Deactivating, resetting the password of, or signing out everywhere a
-  user who **also** holds a workspace membership or a membership in another org is
-  **workspace-admin or system-admin only** — otherwise one org's admin could lock someone out
-  of, or take over, their access elsewhere. By the same reasoning, a user in more than one
-  workspace is system-admin only.
+  step.
+- **The add-person form asks for the email first.** If the email already has an account, the
+  admin is asked to confirm adding that person (no name or password is asked for, and no
+  duplicate is created); otherwise the form continues to full account creation (name,
+  temporary password). The form therefore shows whether an email has an account, never which
+  org it belongs to; invitations (v2+) would hide even that.
+- **Project admins** add people to their project from the project org's members and the
+  workspace's staff; the picker lists only those, never other clients' users, and adding by
+  user ID rejects anyone else with a 404. They can also add by email, with the same email-first
+  form:
+  - a **new** email creates the user, an org membership (role member) in the project's org, and
+    the project membership;
+  - an org member's or workspace staff member's email adds only the project membership (staff
+    never get an org membership this way);
+  - any **other** existing account (e.g. a user in another client org) is added to the project's
+    org as a member and to the project, after the admin confirms. The rank rule then keeps
+    both orgs' admins from deactivating or resetting them.
+- **Account actions follow rank.** Deactivating, resetting the password of, or signing out
+  everywhere another user, or reactivating them, is allowed only when the target holds at least
+  one membership in the actor's scope, and for **every** membership the target holds, the actor
+  has a role covering it (the same workspace, org, or project, or one above it) at an equal or
+  higher rank. The system-admin flag counts as a membership at the top rank. A user with no
+  memberships left is managed by the workspace's owners/admins and system admins. The ranking,
+  highest first:
+
+  ```
+  system admin
+    > workspace owner > workspace admin > workspace member
+      > org owner > org admin > org member
+        > project-only user (project roles only)
+  ```
+
+  So an org admin can manage other admins and members of their own org and project-only users
+  on its projects, but not a workspace member or admin, nor anyone who also belongs to another
+  org or to a project outside it; otherwise one org's admin could lock someone out of, or take
+  over, their access elsewhere. A workspace admin can't manage the workspace owner or a system
+  admin (users in several workspaces: see "One workspace" above). Project admins
+  have no account actions.
 
 ### Sign-in
 - **Email + password** is primary (`user.hashed_password`, required).
@@ -276,7 +324,10 @@ Workspace (the firm: tenant boundary)
 
 ### Sessions
 - Server-side sessions in a `session` table, referenced by an httpOnly cookie (not JWTs), so
-  deactivation, removal, and password changes take effect immediately by deleting session rows.
+  deactivation, password changes and resets, and "sign out everywhere" take effect immediately
+  by deleting session rows. **Removing a membership doesn't touch sessions:** every request
+  re-checks memberships, so the lost access ends at once; a user with no memberships left can
+  still sign in and sees a "no access" page. Deactivation is how someone is cut off.
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
@@ -291,7 +342,7 @@ Workspace (the firm: tenant boundary)
   - Sign-in throttling per account and per IP, with progressive delays and no permanent
     lockout (`login_attempt` table).
   - Active-sessions page (adds `user_agent` and `ip_address` to `session`) with per-session
-    revoke; admin "sign out everywhere" with the same scope limits as deactivation.
+    revoke; admin "sign out everywhere" with the same rank rule as deactivation (see "Account management").
   - Password re-entry for sensitive actions (changing email, linking/unlinking GitHub, admin
     password resets).
   - Nightly worker job deleting expired sessions.
@@ -330,23 +381,23 @@ owners/admins, and owners/admins of the project's org).
 | Role | Capabilities |
 |---|---|
 | viewer | View the project and everything in it; comment on tasks and requirements; edit/delete own comments; decide approvals they are named on |
-| member | Viewer + create and edit requirements, tasks, subtasks, test cases; record test results; manage sprints, phases, milestones, workstreams, tags, dependencies, links |
-| admin | Member + create and cancel approval requests; edit the project's name, type, and enabled modules; manage the project's members and their roles; every targeted-rule override below |
+| member | Viewer + create and edit requirements, tasks, subtasks, test cases; record test results; manage sprints, phases, milestones, workstreams, dependencies, links; create and apply tags |
+| admin | Member + create and cancel approval requests; edit the project's name, type, and enabled modules; manage the project's members and their roles, and create users for it (§4); map GitHub repositories to the project; every targeted-rule override below |
 
 **Org roles** (`membership`)
 
 | Role | Capabilities |
 |---|---|
 | member | Belongs to the org; can be added to its projects. No project access by itself |
-| admin | Create and archive the org's projects; project admin on every project in the org; create users in the org, add existing users as members, and remove members |
+| admin | Create, archive, and unarchive the org's projects, naming each new project's first admin (from the org's members and the workspace's staff; always given a `project_membership` row, even if they also inherit admin); project admin on every project in the org; create users in the org, add existing users as members, and remove members; rename and delete the org's tags; connect GitHub installations; account actions by rank (§4) |
 | owner | Admin + manage the org itself and grant, change, or remove its owner and admin roles |
 
 **Workspace roles** (`workspace_membership`)
 
 | Role | Capabilities |
 |---|---|
-| member | Internal staff: sees only the orgs and projects they are assigned to; no inherited access |
-| admin | Manage the workspace's staff; create orgs and assign their first owner; org owner capabilities in every org of the workspace, and so project admin on every project; account actions on any user in the workspace, including users with several memberships |
+| member | Internal staff: sees only the orgs and projects they are assigned to, with no inherited access and no workspace pages |
+| admin | Manage the workspace's staff; create orgs and assign their first owner; org owner capabilities in every org of the workspace, and so project admin on every project; account actions by rank (§4) on users in the workspace |
 | owner | Admin + manage the workspace itself and grant, change, or remove its owner and admin roles |
 
 **System admin:** anything, in any workspace, org, or project (except deciding someone else's
@@ -376,6 +427,10 @@ blocking self-review are candidates for per-org settings later.
   | Phase, milestone (hard delete) | any project member (member role or above), only while nothing references them |
 
   An approved requirement is a signed-off artifact, which is why it needs a project admin.
+- **Gate sign-off status:** only a project admin moves a gate into `approved` by hand or moves
+  it out of `approved` to any other status; completing the gate's approval request sets it as
+  a system effect. Members change other milestone statuses as usual. `approved` is refused on
+  non-gate milestones.
 - **Approvals (§6.2):** project admins create and cancel approval requests. Only the **named
   approver** can decide their own approval row. This is personal: nobody, including project,
   org, or workspace admins, or system admins, decides on another approver's behalf. A project
@@ -465,6 +520,12 @@ requirement approval.
   `approved_at` to the completion time, and `approved_by` to the approver whose decision
   completed it (the full list lives in the `approval` rows). A `draft` requirement moves to
   `approved`.
+- **Completing a gate request** moves the milestone to `approved`. Only gates use `approved`;
+  a project admin can also set it or move it out of `approved` by hand (§5; logged like any
+  status change), so a gate signed off outside the app can still be recorded. **Completing a test-run
+  request** moves the run to `completed` (if it isn't already).
+- **A rejected request changes nothing** on the entity, for every entity type; the request's
+  status and the `approval` rows record the rejection, and a new round is a new request.
 - **Stale requests:** because a request is bound to its revision, approving it after a newer
   revision was saved still records exactly what was approved; the requirement then shows
   "Approved · modified" (§6.1). The UI warns approvers when a newer revision exists.
@@ -585,7 +646,7 @@ v1 uses **fixed status values per entity** (stored as varchar + CHECK).
 | Test result | `not_run` / `passed` / `failed` / `blocked` / `skipped` |
 | Sprint | `planned` / `active` / `completed` |
 | Phase | `planned` / `active` / `completed` |
-| Milestone | `planned` / `in_progress` / `released` / `cancelled` |
+| Milestone | `planned` / `in_progress` / `approved` / `released` / `cancelled` (`approved`: gates only, set by the gate's approval request or by a project admin, §6.2) |
 | Approval request | `pending` / `approved` / `rejected` / `cancelled` |
 | Approval (per approver) | `pending` / `approved` / `rejected` |
 
@@ -637,7 +698,7 @@ written after a bug); it is flagged in the UI, not blocked.
 | Project | `archived_at`: read-only, hidden from default lists, still browsable |
 | Requirement, Task, TestCase, Comment | `deleted_at`: hidden everywhere, restorable |
 | Workstream | `archived_at`: hidden from pickers, still shown on existing items and in reports |
-| Phase, Milestone | hard delete, only while nothing references them (references must be cleared or moved first) |
+| Phase, Milestone | hard delete, only while nothing references them (references must be cleared or moved first; an approval request on a gate counts and can't be cleared) |
 | Approval request | never deleted; cancelled instead |
 | Subtask | hard delete |
 
@@ -666,22 +727,27 @@ indirectly what they couldn't delete directly.
 **Restore** follows delete: whoever may delete an item may restore it. The trash view shows each
 user what they can restore; project admins see everything in the project.
 
-**Pending approvals:** deleting a requirement, gate, or test run cancels any pending approval
-request on it (logged). Restoring the item does not reopen the request.
+**Pending approvals:** deleting a requirement or test run cancels any pending approval request
+on it, logged on the request (§10). Restoring the item does not reopen the request. A gate
+with any approval request (pending or past) can't be deleted: its sign-off history must keep
+pointing at a real milestone. Cancel the gate instead (status `cancelled`).
 
 **Comments** are soft-deleted and shown as "comment deleted" so threads stay readable.
 
 ## 10. Audit — ActivityLog
 
 - One generic table records **created / updated / deleted / restored / linked / unlinked**
-  events for requirements, tasks, test cases, **phases, and milestones**. Sprint changes are not
-  logged. Phase and milestone date and status changes are, so baselines and re-baselining are
+  events for requirements, tasks, test cases, **phases, milestones, and approval requests**.
+  Sprint changes are not logged. Phase and milestone date and status changes are, so baselines and re-baselining are
   auditable.
 - `field_changed` is required for `updated` events. Logged fields:
   - **Requirement / task / test case:** `status`, `assignee_id`, `reporter_id`, `reviewer_id`,
     `sprint_id`, `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`,
     `start_date`, `due_date`, `requirement_id`, `parent_requirement_id`, `time_estimate`,
     `approved_revision_id`.
+  - **Approval request:** `created` when it is made, and `status` for every change (`pending`
+    → `approved` / `rejected` / `cancelled`, whether cancelled by a project admin or by deleting
+    the item). Individual decisions stay in the `approval` rows.
   - **Phase / milestone:** `status`, `start_date`, `end_date`, `baseline_start`,
     `baseline_end`, `target_date`, `baseline_date`.
   - `rank` is deliberately excluded — drag-and-drop would flood the log.
@@ -710,6 +776,18 @@ request on it (logged). Restoring the item does not reopen the request.
 - Org-scoped vocabulary (`UNIQUE(organization_id, name)`), applied to tasks, requirements, and
   test cases through a polymorphic `entity_tag` table. Tags are free-form labels; structured
   rollups use workstreams (§6).
+- **Defaults:** Waterline ships a built-in default set per project type (e.g. software:
+  tech-debt, security, ux, performance; erp: fit-gap, customization, data-quality, regulatory),
+  copied into each org when it is created (orgs that exist before tags ship get them then). A
+  seeded tag keeps its project type (`tag.project_type`), so a project's picker offers the
+  general tags plus its own type's. A name in several types' default sets is seeded once, as a
+  general tag.
+- **Who:** project members and admins create new tags (always general) and apply them;
+  renaming, deleting, or setting a tag's type, which affects every project in the org, is for
+  org owners/admins (including inherited).
+- The picker doesn't offer another type's tags, but the server doesn't reject them (workflow
+  over enforcement). Changing a project's type changes what the picker offers; tags already
+  applied stay.
 
 ### Task dependencies
 - `blocks` (directional) or `related_to` (symmetric; stored in canonical order so A↔B is saved
@@ -740,8 +818,10 @@ projects and off for ERP projects. Integration is passive (read and mirror repo 
 does not write code or push to repos.
 
 1. **Connection** — a GitHub App. Installations are stored in `github_installation` (an org may
-   have several, e.g. a personal account and a company org). API tokens are fetched short-lived
-   per request from the installation ID.
+   have several, e.g. a personal account and a company org), connected by org owners/admins
+   (including inherited). API tokens are fetched short-lived per request from the installation
+   ID. A project needs no installation: it links to repos only through optional
+   `project_repository` rows, which project admins manage.
 2. **Repo ↔ Project mapping** — `project_repository`, linked to its installation. A repo may map
    to **multiple projects** (e.g. a monorepo); this is unambiguous because every ID carries its
    project key.

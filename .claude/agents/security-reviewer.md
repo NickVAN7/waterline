@@ -37,7 +37,9 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    - token is 32 random bytes; only its SHA-256 hash is stored; never logged or returned;
    - cookie is `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`;
    - a fresh token at every sign-in; password change replaces the current token and deletes the
-     user's other sessions; deactivation deletes all sessions;
+     user's other sessions; deactivation, admin password reset, and "sign out everywhere" delete
+     all the user's sessions (all run in the `auth` area); removing a membership leaves sessions
+     alone, so every request must re-check memberships in `authorize()`;
    - idle and absolute expiry enforced server-side on every request;
    - `must_change_password` blocks everything except change-password and sign-out;
    - Argon2id, run off the event loop; sign-in doesn't reveal whether an email exists (same
@@ -54,9 +56,23 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      `authorize()`; archived projects reject mutations;
    - targeted rules match the design tables exactly (transitions, deletion, approvals — only
      the named approver decides, with no admin or system-admin override);
-   - org-admin scope limits (a user who also holds a workspace membership or a membership in
-     another org is workspace-admin or system-admin only), last-owner (org and workspace) and
-     last-system-admin guards, and only owners granting owner/admin roles at their level.
+   - account actions (deactivate, reactivate, reset password, sign out everywhere) follow the
+     rank rule (design-doc §4): the target holds at least one membership in the actor's scope,
+     and every membership the target holds is covered by an actor role at an equal or higher
+     rank, so no one can reset a higher-ranked user's password (a system admin's, the workspace
+     owner's, or, for an org admin, a workspace member's) and take over the account;
+     last-owner (org and workspace) and last-system-admin guards; only owners grant owner/admin
+     roles at their level;
+   - adding a project member by user ID accepts only the org's members and the workspace's
+     staff, enforced by the endpoint (404 otherwise), not just by the picker; the email path
+     follows design-doc §4 (another org's existing user is added only after confirmation);
+   - an org-slug redirect happens only after the project is authorized (otherwise 404);
+     workspace pages are visible only to workspace owners/admins and system admins;
+   - adding a person by email reveals at most whether an account exists, never its orgs or
+     workspace;
+   - only project admins move a gate into or out of `approved` by hand;
+   - the rank rule requires at least one target membership in the actor's scope (a user with
+     no memberships isn't open to every org admin);
 4. **Tenant isolation and existence leaks:**
    - entities the user can't see return 404, never 403, and never partial data;
    - error messages and `details` don't reveal other orgs' or projects' names, keys, or IDs;
