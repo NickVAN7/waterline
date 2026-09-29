@@ -44,6 +44,11 @@ Calls flow **routers → services → repositories → models**. Services also u
   must fail.
 - **Order of every protected mutation:** authenticate → `authorize()` → change → `log_change()`
   → commit (design-doc §5).
+- **Errors:** raise an `AppError` subclass (`NotFoundError`, `ForbiddenError`, …) from
+  `app/core/errors.py`; the handlers build the `{code, message, details}` body. Never raise
+  `HTTPException` or return an error `JSONResponse`. Clients branch on `code`.
+- **Passwords and tokens** only through `app/core/security.py` (`hash_password` /
+  `verify_password` run off the event loop; store `hash_token(token)`, never the token).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
 - **`log_change()` is the only writer to `activity_log`**, and never commits.
@@ -52,7 +57,7 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Numbers** come only from the numbering service (`project_counter`,
   `task.next_subtask_number`). Never compute `MAX(number)+1`.
 - **Rank and counter writes bypass optimistic locking** via the direct-update helper; content
-  edits go through the ORM so `version` is checked (stale → 409).
+  edits go through the ORM so `version` is checked (stale → 409, or 404 if the row is gone).
 - **Soft delete** is filtered globally; opt in explicitly for trash/restore queries.
 - **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
   subtasks.
@@ -71,7 +76,8 @@ Calls flow **routers → services → repositories → models**. Services also u
   `BaseModel` (`class Task(VersionMixin, SoftDeleteMixin, BaseModel)`). Enum columns use
   `enum_type(MyEnum, "<column>")`, with the `StrEnum` defined outside SQLAlchemy code.
 - Every update to a versioned entity calls `check_version(entity, payload.version)` before
-  changing it. Rank and counter writes use `direct_update` (no version bump).
+  changing it. Rank and counter writes use `direct_update` (no version bump), passing
+  `touch_updated_at=False` for rank writes and `True` for counters.
 - Trash/restore queries opt in with `.execution_options(include_deleted=True)`; nothing else
   does.
 

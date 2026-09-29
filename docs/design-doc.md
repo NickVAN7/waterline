@@ -199,7 +199,10 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   deleted rows from every query unless a query explicitly opts in (trash/restore screens).
 - **Optimistic locking:** `version` column on requirement, task, and test case
   (`version_id_col`). A save based on a stale version returns **409 Conflict**; the UI prompts a
-  reload instead of silently overwriting someone else's edit.
+  reload instead of silently overwriting someone else's edit. If the item is **gone** instead
+  (deleted, or soft-deleted since the user loaded it), the save returns **404**: there is
+  nothing to reload. An item that was already soft-deleted when loaded (e.g. one being
+  restored) isn't "gone", so a conflict there is still 409.
 - **Manual ordering:** `rank` (sortable string, fractional indexing) on task, requirement, and
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
   that row. See §6.
@@ -629,7 +632,8 @@ requirement approval.
     the server derives the new fractional-index value. Clients never write rank strings.
   - **Rank writes bypass optimistic locking.** Rank is updated with a direct `UPDATE` that does
     not bump `version`, so reordering never causes a 409 for someone editing the item's content
-    (same approach as the subtask counter, §3).
+    (same approach as the subtask counter, §3). A rank write also leaves `updated_at` alone: a
+    display-order change isn't an edit (the subtask counter does move it).
   - **Ties:** every ordered query sorts by `(rank, id)`, so two items that receive the same rank
     in a simultaneous drop still order deterministically. No locking or periodic rebalancing in
     v1.

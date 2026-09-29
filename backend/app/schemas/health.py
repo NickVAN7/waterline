@@ -2,9 +2,10 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-type Status = Literal["ok", "unavailable"]
-
 
 class HealthRead(BaseModel):
-    status: Status
-    database: Status
+    """A healthy response. When the database is unreachable the endpoint returns 503 with the
+    standard error body instead (`service_unavailable`)."""
+
+    status: Literal["ok"]
+    database: Literal["ok"]

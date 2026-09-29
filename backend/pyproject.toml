@@ -5,6 +5,7 @@ description = "Waterline API and worker"
 requires-python = ">=3.14,<3.15"
 dependencies = [
     "alembic>=1.20.0",
+    "argon2-cffi>=25.1.0",
     "fastapi>=0.141.1",
     "procrastinate==3.10.0",
     "psycopg[binary]>=3.3.6",
@@ -71,6 +72,7 @@ addopts = [
 filterwarnings = ["error"]
 xfail_strict = true
 markers = [
+    "security: security-relevant behavior (testing-strategy.md, \"Specialized tests\"); run alone with -m security",
     "concurrency(*tables): real commits on separate connections (the `concurrency` fixture); the named tables are truncated afterwards",
 ]
 

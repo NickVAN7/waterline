@@ -14,17 +14,27 @@ from app.core.base_model import IdMixin
 
 
 async def direct_update(
-    session: AsyncSession, model: type[IdMixin], entity_id: uuid.UUID, values: Mapping[str, Any]
+    session: AsyncSession,
+    model: type[IdMixin],
+    entity_id: uuid.UUID,
+    values: Mapping[str, Any],
+    *,
+    touch_updated_at: bool,
 ) -> dict[str, Any] | None:
     """`UPDATE … WHERE id = … RETURNING` outside the unit of work, for writes that must not bump
     `version` (rank, counters; design-doc §3): someone editing the row's content at the same
     time doesn't get a 409. Values may be expressions (`{"counter": Model.counter + 1}`).
 
-    Returns the updated values, or None if no row has that id. The row's `onupdate` columns
-    (`updated_at`) are set by the database too. If the session has the object loaded, every
-    changed attribute is written onto it, so nothing is left expired (reading an expired
-    attribute would need a lazy load, which fails in async code). Soft-deleted rows are updated
-    like any other.
+    Returns the updated values, or None if no row has that id (the caller decides what that
+    means, usually a 404).
+
+    `touch_updated_at` says whether the row's `onupdate` columns (`updated_at`) move too. It has
+    no default, so every caller decides: a counter write (adding a subtask) changes the row and
+    passes True; a rank write (a display-order change) passes False and leaves them alone.
+
+    If the session has the object loaded, every changed attribute is written onto it, so
+    nothing is left expired (reading an expired attribute would need a lazy load, which fails
+    in async code). Soft-deleted rows are updated like any other.
     """
     mapper = class_mapper(model)
     onupdate = [
@@ -32,12 +42,18 @@ async def direct_update(
         for column in mapper.columns
         if column.onupdate is not None and column.key not in values
     ]
-    keys = [*values, *onupdate]
+    assigned = dict(values)
+    if touch_updated_at:
+        keys = [*values, *onupdate]
+    else:
+        # Assigning a column to itself keeps its value and stops its onupdate from firing.
+        assigned.update({key: getattr(model, key) for key in onupdate})
+        keys = list(values)
     columns: list[InstrumentedAttribute[Any]] = [getattr(model, key) for key in keys]
     changed: Update = (
         update(model)
         .where(model.id == entity_id)
-        .values(dict(values))
+        .values(assigned)
         .execution_options(synchronize_session=False)
     )
     # returning() over a runtime list of columns can't be typed row by row.

@@ -4,12 +4,13 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S0-C5 (Model conventions) done; next is S0-C6 (API conventions & security
-> helpers). The backend has its database core (Postgres in Docker Compose, async SQLAlchemy,
+> **Status:** S0-C6 (API conventions & security helpers) done; next is S0-C7 (Compose &
+> frontend shell). The backend has its database core (Postgres in Docker Compose, async SQLAlchemy,
 > Alembic, the base model and its mixins), a test harness with a `concurrency` fixture,
 > background jobs on procrastinate (worker, `enqueue.py`, procrastinate's schema), and the model
 > conventions (enums, soft delete, optimistic locking with 409, `direct_update`, convention and
-> migration checks); `GET /api/health` checks the database. There is no frontend yet, and
+> migration checks), the standard error format and handlers, and the password and token
+> helpers; `GET /api/health` checks the database. There is no frontend yet, and
 > Compose runs only Postgres. Sections marked *(from S0-Cn)* describe what arrives in a later
 > checkpoint.
 
@@ -120,9 +121,9 @@ backend/app/
   core/base_model.py   Base, naming convention, IdMixin, TimestampMixin, BaseModel,
                        SoftDeleteMixin, VersionMixin, check_version
   core/enums.py        enum_type (VARCHAR + CHECK enum columns)
-  core/errors.py       error responses (the 409 for stale versions; the rest from S0-C6)
+  core/errors.py       error format: AppError and its subclasses, ErrorBody, the handlers
   core/migration_filters.py   what Alembic autogenerate ignores (procrastinate's objects)
-  core/security.py     (from S0-C6) password hashing, token generation and hashing
+  core/security.py     password hashing (Argon2id, off the event loop), session tokens
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
   rules/          pure business rules, no database
   authz/          authorize() and friends (Slice 1)
@@ -138,6 +139,54 @@ backend/app/
   `uv run --directory backend uvicorn --factory app.main:create_app --reload`, then open
   <http://localhost:8000/api/health>. `create_app` is a factory, so settings are read when the
   app starts, not on import. (Compose takes this over in S0-C7.)
+
+### Errors
+
+Every error response has one body: `{"code": ..., "message": ..., "details": {...}}`
+(`ErrorBody` in `app/core/errors.py`). Clients branch on `code`, never on `message`.
+
+- **Raise, don't build responses.** Services and repositories raise an `AppError` subclass;
+  handlers registered in `create_app` turn it into the response. Never raise FastAPI's
+  `HTTPException` or return an error `JSONResponse` from an endpoint.
+
+  | Raise | Status | Default `code` |
+  |---|---|---|
+  | `NotFoundError` | 404 | `not_found` (also for entities the caller may not see: 404, not 403) |
+  | `ForbiddenError` | 403 | `forbidden` |
+  | `ServiceUnavailableError` | 503 | `service_unavailable` |
+
+  Pass a more specific message, `code`, or `details` where the client needs them:
+  `ForbiddenError("Change your password first.", code="password_change_required")`. A new kind
+  of error is a new subclass with its own status and code.
+- **Handled for you:** request validation is 422 `validation_error` with
+  `details.fields = [{"loc": [...], "message": ..., "type": ...}]`; an unknown route is 404
+  `not_found`; a wrong method is 405 `method_not_allowed`.
+- **Stale rows:** a stale save is 409 `stale_version` when the row was changed by someone else,
+  and 404 `not_found` when it's gone: deleted, or soft-deleted since this request loaded it (a
+  row already soft-deleted when loaded, e.g. one being restored, isn't gone). On a
+  non-versioned table a stale row can only mean it's gone. On a versioned table SQLAlchemy
+  can't tell the two apart, so `get_session` checks: a `before_flush` hook records the
+  versioned rows each flush writes (and whether each was soft-deleted when loaded), and after
+  the rollback it looks them up. `direct_update` returning `None` means the
+  row is gone too: raise `NotFoundError`. An error whose table can't be read stays 409 (the
+  conservative answer; a test using SQLAlchemy's real wording fails if the wording changes).
+- Document an endpoint's error statuses with `responses={404: {"model": ErrorBody}}`.
+
+### Security helpers
+
+`app/core/security.py`:
+
+- `await hash_password(password)` → an Argon2id hash for storing; `await
+  verify_password(hash, password)` → `True`/`False` (a malformed hash is `False`, never an
+  error). Both run in a worker thread: always await them, never call argon2 directly.
+- `await verify_password_for_unknown_user(password)` → always `False`, after the same hashing
+  work: sign-in calls it when the email has no account, so timing doesn't reveal which emails
+  exist. `password_needs_rehash(hash)` → whether a stored hash uses older parameters (re-hash
+  on a successful sign-in).
+- `generate_token()` → a new session token (32 random bytes, 43 URL-safe characters) for the
+  cookie; `hash_token(token)` → its SHA-256 hex digest, the only form ever stored.
+- Mark tests of security behavior `@pytest.mark.security` (run just those with
+  `wl backend test -m security`).
 
 ### Import rules (enforced)
 
@@ -247,16 +296,17 @@ class Task(VersionMixin, SoftDeleteMixin, BaseModel): ...
 Every ORM update checks and increments `version`. Update schemas carry the version the client
 loaded, and the service calls `check_version(task, payload.version)` before changing anything;
 the ORM's own check then catches a write between this request's load and its commit. Both raise
-`StaleDataError`, which the API returns as **409** `{"code": "stale_version", ...}`
-(`app/core/errors.py`); the UI prompts a reload.
+`StaleDataError`, which the API returns as **409** `{"code": "stale_version", ...}` (see
+"Errors" in section 4); the UI prompts a reload.
 
 **Direct updates** (`app/repositories/base.py`). Rank moves and counters use `direct_update`,
 which runs `UPDATE … RETURNING` outside the unit of work, so it doesn't bump `version` (someone
-editing the item's content at the same time doesn't get a 409). It still moves `updated_at`
-(the database sets it), returns the new values (so
-`{"next_subtask_number": Task.next_subtask_number + 1}` works as a counter), and writes every
-changed column, `updated_at` included, onto the object if the session has it loaded, so it
-stays readable without a lazy load.
+editing the item's content at the same time doesn't get a 409). Every call says whether
+`updated_at` moves, with the required `touch_updated_at` keyword: a rank write passes `False`
+(a display-order change isn't an edit), a counter write such as adding a subtask passes
+`True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
+works as a counter), or `None` if no row has that id, and writes every changed column onto the
+object if the session has it loaded, so it stays readable without a lazy load.
 
 **Relationships** are always `lazy="raise"`: load what you use with `selectinload` /
 `joinedload` in the repository. Touching an unloaded relationship raises instead of emitting

@@ -165,7 +165,7 @@ slices only add features.
 | 3 | procrastinate spike | Decision point: can jobs be queued inside the request's `AsyncSession` transaction? Result and consequences written into the design doc |
 | 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 (design-doc §13, "Transactional enqueue": enqueue on the caller's session, by task name) |
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
-| 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a zero-row update of a non-versioned entity, e.g. one hard-deleted meanwhile, is 404), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
+| 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a save to a row that's gone, e.g. hard-deleted meanwhile, is 404: always for a non-versioned entity, and, after a check, for a versioned one deleted or soft-deleted since it was loaded), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
 | 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests), branch protection configured on the GitHub repo, fresh-clone setup by following the developer guide, slice wrap-up |
 
@@ -449,8 +449,10 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - **Soft delete:** a mixin with `deleted_at`, plus a global `do_orm_execute` hook applying
   `with_loader_criteria`. Queries opt in with an execution option (e.g.
   `include_deleted=True`).
-- **Optimistic locking:** a mixin with `version_id_col`; `StaleDataError` maps to **409**.
-- **Direct-update helper** for writes that must not bump `version` (rank, subtask counter).
+- **Optimistic locking:** a mixin with `version_id_col`; a stale save is **409**, or **404** when
+  the row is gone (deleted, or soft-deleted since it was loaded; design-doc §3).
+- **Direct-update helper** for writes that must not bump `version` (rank, subtask counter);
+  each call says whether `updated_at` moves (rank writes: no; counters: yes).
 - **One transaction per request:** a FastAPI dependency that opens a session, commits on
   success, rolls back on any exception.
 
@@ -458,7 +460,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - Consistent error body (`{code, message, details}`) and handlers for 404 / 403 / 409 / 422.
 - `GET /api/health` (checks database connectivity): 200 with `{status, database}` when healthy;
   when the database is unavailable, 503 with the standard `{code, message, details}` error body
-  (from Checkpoint 6; until then the 503 body is `{status, database}`).
+  (`service_unavailable`).
 - OpenAPI schema exported to a file; the web client is generated from it.
 - `/api/docs` and `/api/openapi.json` are behind a setting (on in dev and test, off in
   production), added with settings in Checkpoint 2. `wl gen-client` exports the schema from

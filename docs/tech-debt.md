@@ -111,7 +111,8 @@ Entry format:
   controlling whether `onupdate` columns are set, with tests for both.
 - **Why:** Decided after S0-C5's review; the checkpoint was already approved.
 - **Fix by:** S0-C6 (in the build plan's Checkpoint 6 row).
-- **Status:** open
+- **Status:** resolved in S0-C6 (`direct_update(..., touch_updated_at=...)`, a required
+  keyword; tests for both rank and counter writes)
 
 ### TD-8: `session.get()` returns an object soft-deleted in the same session
 - **Added:** S0-C5
@@ -122,4 +123,17 @@ Entry format:
 - **Why:** The base repository has only `direct_update` so far; its get-by-ID is built with the
   first area.
 - **Fix by:** Slice 1, the base repository (build plan, "Backend architecture").
+- **Status:** open
+
+### TD-9: Unhandled exceptions return a plain-text 500
+- **Added:** S0-C6
+- **What:** An exception no handler covers returns Starlette's plain-text `Internal Server
+  Error`, not the `{code, message, details}` body, so the client can't parse it like other
+  errors.
+- **Why:** S0-C6's scope is 404/403/409/422 and the 503, and nothing consumes errors yet.
+  **Owner decision (S0-C6 review):** add a catch-all handler returning 500 `{"code":
+  "internal_error", "message": "Something went wrong.", "details": {}}` and logging the
+  exception with its traceback on the server; nothing about the error reaches the client.
+- **Fix by:** S0-C7 (Compose & frontend shell), when the frontend's API client first parses
+  error bodies.
 - **Status:** open

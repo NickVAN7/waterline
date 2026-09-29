@@ -22,7 +22,8 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   it's enforcing permissions. Don't duplicate business rules; e.g. rank is computed by the
   server (send neighbor IDs, not rank values), and transitions are validated by the server.
 - **Handle the error format** (`{code, message, details}`) consistently: 409 → prompt to
-  reload; 404 → not-found view; 422 → field errors.
+  reload; 404 → not-found view; 422 → field errors from `details.fields`
+  (`loc`, `message`, `type` per field).
 - **Requests:** same origin through the Vite proxy (`/api`), `credentials: 'include'`, JSON
   bodies only.
 - **Rendered markdown** is sanitized before display.

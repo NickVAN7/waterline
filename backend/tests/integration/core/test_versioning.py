@@ -75,7 +75,7 @@ async def test_direct_update_does_not_bump_the_version(session: AsyncSession) ->
     session.add(document)
     await session.flush()
 
-    await direct_update(session, Document, document.id, {"rank": "b"})
+    await direct_update(session, Document, document.id, {"rank": "b"}, touch_updated_at=False)
 
     row = (await session.execute(text("SELECT rank, version FROM support_document"))).one()
     assert tuple(row) == ("b", 1)
@@ -87,7 +87,7 @@ async def test_direct_update_does_not_make_a_concurrent_content_edit_stale(
     document = await saved_document(sessionmaker)
     async with sessionmaker() as editor, sessionmaker() as mover:
         editing = await editor.get_one(Document, document.id)
-        await direct_update(mover, Document, document.id, {"rank": "z"})
+        await direct_update(mover, Document, document.id, {"rank": "z"}, touch_updated_at=False)
         await mover.commit()
 
         editing.title = "edited"
@@ -104,55 +104,66 @@ async def test_direct_update_returns_values_computed_by_the_database(session: As
     session.add(document)
     await session.flush()
 
-    first = await direct_update(
-        session, Document, document.id, {"next_note_number": Document.next_note_number + 1}
-    )
-    second = await direct_update(
-        session, Document, document.id, {"next_note_number": Document.next_note_number + 1}
-    )
+    counter = {"next_note_number": Document.next_note_number + 1}
+    first = await direct_update(session, Document, document.id, counter, touch_updated_at=True)
+    second = await direct_update(session, Document, document.id, counter, touch_updated_at=True)
 
     assert (first, second) == ({"next_note_number": 2}, {"next_note_number": 3})
 
 
-async def test_direct_update_leaves_the_loaded_object_fully_readable(
-    session: AsyncSession,
-) -> None:
+async def _backdated_document(session: AsyncSession) -> Document:
+    """A saved document whose `updated_at` is a day old, reloaded so the object holds that value.
+    now() is fixed within a transaction, so without this a change to it couldn't be seen."""
     document = Document(title="a")
     session.add(document)
     await session.flush()
-    # now() is fixed within a transaction: backdate the row and reload the object from it, so
-    # the value the database sets next differs from the one the object holds.
     await session.execute(text("UPDATE support_document SET updated_at = now() - interval '1 day'"))
     session.expunge_all()
-    document = await session.get_one(Document, document.id)
+    return await session.get_one(Document, document.id)
+
+
+async def test_counter_write_moves_updated_at_and_leaves_the_object_readable(
+    session: AsyncSession,
+) -> None:
+    document = await _backdated_document(session)
     backdated = document.updated_at
 
-    await direct_update(session, Document, document.id, {"rank": "b"})
+    await direct_update(
+        session,
+        Document,
+        document.id,
+        {"next_note_number": Document.next_note_number + 1},
+        touch_updated_at=True,
+    )
 
     stored = await session.scalar(text("SELECT updated_at FROM support_document"))
     assert inspect(document).expired_attributes == set()  # no lazy load needed for any read
-    assert (document.rank, document.version) == ("b", 1)
+    assert (document.next_note_number, document.version) == (2, 1)
     assert document.updated_at == stored
     assert document.updated_at > backdated
+
+
+async def test_rank_write_leaves_updated_at_alone_and_the_object_readable(
+    session: AsyncSession,
+) -> None:
+    """Owner decision (TD-7): a display-order change isn't an edit, so `updated_at` stays."""
+    document = await _backdated_document(session)
+    backdated = document.updated_at
+
+    await direct_update(session, Document, document.id, {"rank": "b"}, touch_updated_at=False)
+
+    stored = await session.scalar(text("SELECT updated_at FROM support_document"))
+    assert inspect(document).expired_attributes == set()
+    assert (document.rank, document.version) == ("b", 1)
+    assert stored == backdated
+    assert document.updated_at == backdated
 
 
 async def test_direct_update_of_a_missing_row_returns_none(session: AsyncSession) -> None:
     document = Document(title="never saved")
 
-    assert await direct_update(session, Document, document.id, {"rank": "b"}) is None
+    assert (
+        await direct_update(session, Document, document.id, {"rank": "b"}, touch_updated_at=False)
+        is None
+    )
     assert await session.scalar(select(Document.id)) is None
-
-
-async def test_direct_update_still_moves_updated_at(session: AsyncSession) -> None:
-    document = Document(title="a")
-    session.add(document)
-    await session.flush()
-    await session.execute(text("UPDATE support_document SET updated_at = now() - interval '1 day'"))
-    before = await session.scalar(text("SELECT updated_at FROM support_document"))
-
-    await direct_update(session, Document, document.id, {"rank": "b"})
-
-    after = await session.scalar(text("SELECT updated_at FROM support_document"))
-    assert before is not None
-    assert after is not None
-    assert after > before

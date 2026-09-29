@@ -31,7 +31,11 @@ async def test_health_is_503_when_the_database_is_unreachable(settings: Settings
         await engine.dispose()
 
     assert response.status_code == 503
-    assert response.json() == {"status": "unavailable", "database": "unavailable"}
+    assert response.json() == {
+        "code": "service_unavailable",
+        "message": "The database is unavailable.",
+        "details": {"database": "unavailable"},
+    }
 
 
 async def test_health_is_503_not_500_when_a_pooled_connection_has_died(
@@ -61,13 +65,18 @@ async def test_health_is_503_not_500_when_a_pooled_connection_has_died(
 
     assert before.status_code == 200
     assert after.status_code == 503
-    assert after.json() == {"status": "unavailable", "database": "unavailable"}
+    assert after.json() == {
+        "code": "service_unavailable",
+        "message": "The database is unavailable.",
+        "details": {"database": "unavailable"},
+    }
 
 
 async def test_health_is_only_served_under_api_prefix(client: AsyncClient) -> None:
     response = await client.get("/health")
 
     assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
 
 
 async def test_api_docs_are_served_when_enabled(client: AsyncClient) -> None:
@@ -76,6 +85,10 @@ async def test_api_docs_are_served_when_enabled(client: AsyncClient) -> None:
 
     assert schema.status_code == docs.status_code == 200
     assert "/api/health" in schema.json()["paths"]
+    documented_503 = schema.json()["paths"]["/api/health"]["get"]["responses"]["503"]
+    assert documented_503["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorBody"
+    }
 
 
 async def test_api_docs_are_not_served_when_disabled(
