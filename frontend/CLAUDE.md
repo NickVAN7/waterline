@@ -30,6 +30,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   module, never inline strings.
 - UI guidance text (e.g. module recommendations) is rendered from the API response, not
   hard-coded.
+- An enabled module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7)
+  shows its features and links greyed out or disabled (design-doc §1.1), never as broken
+  screens. Whether a module is available comes from the API's module guidance (`available`),
+  never a frontend list.
 
 ## Tests
 

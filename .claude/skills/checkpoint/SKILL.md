@@ -82,6 +82,11 @@ resolution (fixed / logged with TD number / rejected with evidence), and the que
 raised. End with the questions still open for the owner and any owner decisions made during
 review. The record goes in the checkpoint's commit.
 
+**Tech debt due now:** before committing, list every open `docs/tech-debt.md` entry whose
+Fix by is this checkpoint (or this slice, at its last checkpoint). Each is resolved in this
+checkpoint, or re-targeted with the owner's approval (record the new Fix by and why). None
+may be left open past its Fix by: the docs consistency tests fail on it after the commit.
+
 ## 6. Commit
 
 One commit for the whole checkpoint, with this message:

@@ -77,7 +77,14 @@ per kind of project.
 | `data_migration` | Data objects, load cycles, reconciliation | erp | v2 |
 | `cutover` | Cutover runbook and rehearsals | erp | v2 |
 
-A module can be enabled only once it has shipped.
+The v1 modules (`sprints`, `github`) can be enabled from the start (Slice 1), so software
+projects are seeded with their defaults before those modules' screens exist; until a module's
+slice ships, the UI shows its features and links greyed out or disabled. The API's module
+guidance tells the UI which modules are **available** (shipped), from one place in the backend
+that is updated when a module's slice ships. The v2 (ERP) modules can be enabled only once they
+have shipped. Until then, seeding skips them (an `erp` or `general` project created in v1 starts
+with no modules), while module guidance still lists them as recommended, with `available`
+false.
 
 - **Disabling a module hides it; it never deletes data.** Re-enabling brings everything back.
   A disabled module's endpoints return 404 for that project.
@@ -527,6 +534,8 @@ requirement approval.
   request** moves the run to `completed` (if it isn't already).
 - **A rejected request changes nothing** on the entity, for every entity type; the request's
   status and the `approval` rows record the rejection, and a new round is a new request.
+- **Cancelling a test run** (status `cancelled`) cancels any pending exit sign-off request on
+  it, logged on the request (§10). Cancelled runs are left out of metrics and default lists.
 - **Stale requests:** because a request is bound to its revision, approving it after a newer
   revision was saved still records exactly what was approved; the requirement then shows
   "Approved · modified" (§6.1). The UI warns approvers when a newer revision exists.
@@ -643,7 +652,7 @@ v1 uses **fixed status values per entity** (stored as varchar + CHECK).
 |---|---|
 | Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` |
 | Task | `todo` / `in_progress` / `blocked` / `in_review` / `done` / `cancelled` |
-| Test run | `planned` / `in_progress` / `completed` |
+| Test run | `planned` / `in_progress` / `completed` / `cancelled` |
 | Test result | `not_run` / `passed` / `failed` / `blocked` / `skipped` |
 | Sprint | `planned` / `active` / `completed` |
 | Phase | `planned` / `active` / `completed` |
@@ -701,6 +710,7 @@ written after a bug); it is flagged in the UI, not blocked.
 | Workstream | `archived_at`: hidden from pickers, still shown on existing items and in reports |
 | Phase, Milestone | hard delete, only while nothing references them (references must be cleared or moved first; an approval request on a gate counts and can't be cleared) |
 | Approval request | never deleted; cancelled instead |
+| Test run, recorded test result | not deleted in v1: a run is completed or cancelled, never removed; a result with an outcome is permanent. A result still `not_run` (a case only planned into a run) can be removed from the run |
 | Subtask | hard delete |
 
 **Deleting a task:** its subtasks, comments, tags, attachments, and GitHub links are left in
@@ -708,8 +718,8 @@ place and hidden with it — restoring the task restores everything. Dependencie
 ignored while it's deleted. Webhook updates to its GitHub links continue, so a restore shows
 accurate PR status.
 
-**Deleting a test case:** its requirement links and past results remain for history; it drops
-out of planned runs.
+**Deleting a test case:** its requirement links and recorded results remain for history; its
+`not_run` rows are removed from open runs.
 
 **Deleting a requirement** opens a dialog listing what's affected, with a choice per category:
 - **Linked tasks and test cases:** *detach* them (they remain, now without a requirement, and
@@ -728,8 +738,8 @@ indirectly what they couldn't delete directly.
 **Restore** follows delete: whoever may delete an item may restore it. The trash view shows each
 user what they can restore; project admins see everything in the project.
 
-**Pending approvals:** deleting a requirement or test run cancels any pending approval request
-on it, logged on the request (§10). Restoring the item does not reopen the request. A gate
+**Pending approvals:** deleting a requirement cancels any pending approval request on it,
+logged on the request (§10). Restoring the item does not reopen the request. A gate
 with any approval request (pending or past) can't be deleted: its sign-off history must keep
 pointing at a real milestone. Cancel the gate instead (status `cancelled`).
 
@@ -747,8 +757,8 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
     `start_date`, `due_date`, `requirement_id`, `parent_requirement_id`, `time_estimate`,
     `approved_revision_id`.
   - **Approval request:** `created` when it is made, and `status` for every change (`pending`
-    → `approved` / `rejected` / `cancelled`, whether cancelled by a project admin or by deleting
-    the item). Individual decisions stay in the `approval` rows.
+    → `approved` / `rejected` / `cancelled`, whether cancelled by a project admin, by deleting a
+    requirement, or by cancelling a test run). Individual decisions stay in the `approval` rows.
   - **Phase / milestone:** `status`, `start_date`, `end_date`, `baseline_start`,
     `baseline_end`, `target_date`, `baseline_date`.
   - `rank` is deliberately excluded — drag-and-drop would flood the log.
@@ -948,6 +958,10 @@ now settled in their sections; what remains is tied to the ERP modules.
   - a financial-visibility flag on a membership, checked in `authorize()`, for budget data;
   - a targeted rule letting business-user testers record results on runs assigned to them;
   - how outside consultants and integrator staff are onboarded.
+- **Test-run lifecycle details** (decided when Slice 5 is designed): removing a planned case
+  from a run, and what happens to a deleted test case's planned slots; who may cancel a run;
+  what a cancelled run allows (reopening, results, requests); whether results in a cancelled
+  run count toward a test case's current status.
 - **ERP modules:** each needs its own design pass (§16).
 - **Reporting:** which reports and dashboards define a usable ERP version, and which numbers get
   frozen in published snapshots.

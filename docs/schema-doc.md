@@ -531,8 +531,9 @@ Composite FK `(organization_id, workspace_id)` → `organization(id, workspace_i
 get the same conventional name, `fk_project_organization_id_organization`).
 `UNIQUE(workspace_id, key)` (design-doc §3: an ID like `ERP-TA-45` is unambiguous across the
 firm's clients).
-`CHECK (enabled_modules <@ ARRAY[...shipped modules])` — each module's value is added to the
-check when that module ships. Disabling a module hides its data; nothing is deleted.
+`CHECK (enabled_modules <@ ARRAY[...allowed modules])` — `sprints` and `github` are allowed from
+Slice 1 (design-doc §1.1: the UI disables their features until their slices ship); each v2
+module's value is added when that module ships. Disabling a module hides its data; nothing is deleted.
 No visibility flag: access is always explicit project membership (plus inherited admin).
 
 ### `project_membership`
@@ -787,12 +788,13 @@ non-`not_run` `test_result`. **No `requirement_id`** — links live in `requirem
 | milestone_id | UUID (FK → milestone), nullable | |
 | environment | varchar, nullable | "staging", "local", … |
 | commit_sha | varchar, nullable | code under test |
-| status | enum: planned / in_progress / completed | |
+| status | enum: planned / in_progress / completed / cancelled | cancelled: abandoned; left out of metrics |
 | created_by | UUID (FK → user) | |
 | started_at / completed_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
 
-Exit sign-off uses an approval request (`entity_type = test_run`).
+Exit sign-off uses an approval request (`entity_type = test_run`); cancelling the run cancels a
+pending one. Test runs are never deleted in v1; an abandoned run is cancelled (design-doc §9).
 
 ### `test_result`
 | Field | Type | Notes |
@@ -808,7 +810,9 @@ Exit sign-off uses an approval request (`entity_type = test_run`).
 | executed_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(test_run_id, testcase_id)`. Index on `(testcase_id, executed_at DESC)` for computing
+`UNIQUE(test_run_id, testcase_id)`. A result with an outcome is never deleted; a `not_run` row
+(a case only planned into the run) can be removed, and is removed from open runs when its test
+case is deleted (design-doc §9). Index on `(testcase_id, executed_at DESC)` for computing
 current status.
 
 ---

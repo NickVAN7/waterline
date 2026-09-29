@@ -78,7 +78,7 @@ tested, what each kind of test is for, and the gates every change passes.
 - **Approvals** (Slice 2 for requirements, Slices 4–5 for gates and test runs): completion
   moves a requirement to `approved`, a gate to `approved`, and a test run to `completed`; a
   rejection changes nothing on the entity; requests log `created` and every status change,
-  including a cancellation caused by deleting the item; a gate with any approval request can't
+  including a cancellation caused by deleting a requirement or cancelling a test run; a gate with any approval request can't
   be deleted; `approved` is refused on non-gate milestones.
 - **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code
   and each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map

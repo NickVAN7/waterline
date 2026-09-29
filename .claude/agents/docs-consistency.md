@@ -18,13 +18,14 @@ a side on a design question.
 ## Inputs
 
 The caller gives you a trigger (`slice-end` or `design-change`) and a base commit. Use
-`git diff <base>..HEAD --stat` to see what changed, but review **every** file in scope: drift
-usually sits in files the change didn't touch.
+`git diff <base> --stat` (the working tree against the base, so uncommitted changes count) and
+`git status --short` (for new, untracked files) to see what changed, but review **every** file
+in scope: drift usually sits in files the change didn't touch.
 
 ## Scope
 
 - `docs/*.md` (design doc, schema doc, build plan, testing strategy, developer guide, user guide,
-  tech-debt log), and `docs/reviews/` for context only
+  tech-debt log, screen inventory), `docs/spikes/`, and `docs/reviews/` for context only
 - `CLAUDE.md`, `backend/CLAUDE.md`, `frontend/CLAUDE.md`
 - `.claude/agents/*.md`, `.claude/skills/*/SKILL.md`, `.claude/settings.json`
 - `backend/pyproject.toml` `[tool.importlinter]` contracts, where docs describe them
@@ -70,7 +71,7 @@ source). If they're at the same level, or the higher source is itself ambiguous,
 
 Return exactly this format and nothing else:
 
-    ## Docs consistency: <trigger>, <base>..<HEAD short sha>
+    ## Docs consistency: <trigger>, <base>..<HEAD short sha> (+ uncommitted changes, if any)
 
     ### Fixes (clear-cut; the recorded decision is cited)
     | # | Kind | Where it's wrong | Authoritative source | Proposed change |

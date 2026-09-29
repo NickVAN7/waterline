@@ -18,6 +18,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
 | `docs/reviews/<ID>.md` | Each checkpoint's independent review: every pass, finding, and resolution |
+| `docs/spikes/` | Spike code kept as evidence for a recorded decision (e.g. design-doc §13) |
 
 Read the relevant sections before changing anything. If the code needs to differ from the docs,
 **stop and ask** — never silently diverge. An approved change updates the docs in the same

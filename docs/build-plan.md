@@ -348,10 +348,10 @@ it is the only place that writes them.
 | `phase` | phase | 3 | — |
 | `workstream` | workstream | 3 | — |
 | `task` | task, subtask, task_dependency | 3 | numbering |
-| `milestone` | milestone | 4 | — |
+| `milestone` | milestone | 4 | approval (registers `on_approved`) |
 | `sprint` | sprint | 4 | task |
 | `testcase` | testcase, requirement_testcase | 5 | numbering |
-| `test_run` | test_run, test_result | 5 | task (bug creation), approval (cancels a pending request on delete) |
+| `test_run` | test_run, test_result | 5 | task (bug creation), approval (registers `on_approved`; cancels a pending request when the run is cancelled) |
 | `comment` | comment | 6 | — |
 | `tag` | tag, entity_tag | 6 | — |
 | `link` | link_attachment | 6 | — |
@@ -549,7 +549,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - **Archived projects are read-only:** mutations on an archived project, or anything inside it,
   are denied in `authorize()`.
 - **Module gating dependency:** a request to a module disabled for the project returns 404
-  (tested with `sprints`/`github`, which have no endpoints yet).
+  (tested with `sprints`/`github`, which have no endpoints yet). Both are allowed values from
+  Slice 1 and seeded from the project type (design-doc §1.1).
 - **Test matrix:** one parametrized test per action × role, covering project roles (viewer,
   member, admin), org roles (member; admin and owner, with inherited project admin), workspace
   roles (member; admin and owner, with inherited admin), system admin, and users with no
@@ -600,7 +601,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 ### Projects (§1.1, §3)
 - Create (org owner/admin, including inherited): name, key (3–6 characters,
   `^[A-Z][A-Z0-9]{2,5}$`, unique in the workspace, uppercased as typed), type; `enabled_modules`
-  seeded from the type. The creator names the project's first admin (possibly themself) from
+  seeded from the type, skipping modules not yet allowed (in v1 an `erp` or `general` project
+  starts with none). The creator names the project's first admin (possibly themself) from
   the org's members and the workspace's staff; that admin always gets a `project_membership`
   row, even if they also inherit admin.
 - List (scoped to the user's accessible projects; archived hidden unless requested), view,
@@ -609,7 +611,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Key is immutable: no endpoint accepts a key change.
 - **Module guidance** returned by the API alongside project settings (recommended modules per
   type, a best-practice note per module, and warnings when disabling a recommended module or
-  one that holds data), so the UI only renders it.
+  one that holds data), plus each module's `available` flag (shipped or not; `sprints` and
+  `github` are not yet), so the UI only renders it and greys out unavailable modules.
 
 ### Number allocation (§3)
 - `allocate_number(project, prefix)` using the lazy upsert on `project_counter`.
@@ -627,6 +630,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   warnings; archive/unarchive.
 - Org members page: list, add or create user, change role, remove.
 - Project members page: list, add with a role, change role, remove.
+- Features and links of an enabled module whose slice hasn't shipped (`sprints`, `github`) are
+  shown greyed out or disabled (design-doc §1.1).
 - A "no access" page for a signed-in user with no memberships left (design-doc §4,
   "Sessions").
 - Workspace admin pages: staff, organizations, users (create, deactivate, reset password).
