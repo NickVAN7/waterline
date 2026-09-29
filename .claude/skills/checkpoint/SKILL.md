@@ -18,7 +18,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 2. Run the gates
 
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
-  import-linter contracts, migration checks, generated-client freshness.
+  import-linter contracts, migration checks, and generated-client freshness (from S0-C7).
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
 
 ## 3. Update the docs
@@ -55,6 +55,9 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - **Last checkpoint of a slice:** also run `uv run wl down` (so ports are free) and invoke the
   `fresh-clone-verifier` agent with the repository's absolute path and the checkpoint ID. Its
   findings are fixed in `docs/developer-guide.md` like any other finding.
+- **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
+  agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
+  (the root commit for Slice 0). It reports **Fixes** and **Decisions**.
 
 ## 5. Resolve every finding
 
@@ -64,11 +67,15 @@ For each finding from every reviewer that ran, exactly one of:
   the owner has agreed to defer.
 - **Rejected:** only when the finding is factually wrong; record the evidence.
 
+`docs-consistency` **Fixes** are resolved the same way. Its **Decisions** are not yours to
+resolve: leave them undecided and put them in the report (step 8) for the owner.
+
 If fixes changed behavior (not just docs or tests), run the reviewer again on the fixes.
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
-**Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone) in
+**Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
+docs-consistency) in
 `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include the base commit, the totals,
 and for each pass its verdict, its findings table with each
 resolution (fixed / logged with TD number / rejected with evidence), and the questions it
@@ -94,6 +101,7 @@ Decisions / deviations:
 Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/<ID>.md)
 Security review: <n> findings — … (or "not required")
 Fresh-clone verification: <result> (last checkpoint of a slice only)
+Docs consistency: <n> fixes — …; <m> decisions for the owner (last checkpoint of a slice only)
 Tech debt: <added / resolved entries, or "no change">
 Next: <next checkpoint ID and name>
 ```
@@ -106,16 +114,19 @@ Claude Code can't write to the claude.ai Project, so the owner uploads changed f
   `git diff --name-only <base>..HEAD -- docs CLAUDE.md backend/CLAUDE.md frontend/CLAUDE.md .claude`.
   Files under `docs/` go to the Project under the same path; `CLAUDE.md` files and `.claude/`
   go under `repo-seed/` (same relative path).
-- Copy them into one folder in the scratchpad, laid out as they go in the Project
-  (`docs/…`, `repo-seed/…`), so the owner can upload them together.
+- Copy them into `project-upload/` at the repo root (gitignored, never committed), laid out as
+  they go in the Project (`docs/…`, `repo-seed/…`), so the owner can upload them together.
+  Overwrite files already there but don't delete others: the owner may not have uploaded them
+  yet. The owner empties the folder after uploading.
 - Never say the Project was updated: it wasn't.
 
 ## 8. Report and stop
 
 Send the owner:
 - the review note (the commit message body);
-- each reviewer's findings table (checkpoint, security, fresh-clone) with the resolution of
-  each finding (as recorded in `docs/reviews/<ID>.md`);
+- each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency) with
+  the resolution of each finding (as recorded in `docs/reviews/<ID>.md`);
+- the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review;
 - the Project upload list from step 7 (each file, whether it's new or changed, and the folder
   it was copied to);

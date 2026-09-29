@@ -80,6 +80,13 @@ tested, what each kind of test is for, and the gates every change passes.
   rejection changes nothing on the entity; requests log `created` and every status change,
   including a cancellation caused by deleting the item; a gate with any approval request can't
   be deleted; `approved` is refused on non-gate milestones.
+- **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code
+  and each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map
+  owner per table; the tech-debt log's format, references, and deadlines; the developer guide's
+  status line vs. `git log`; design-doc § references; the agents and skills listed vs. those in
+  `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
+  instead of passing by finding nothing. Judgment calls (contradictions in prose, superseded
+  rules) are the `docs-consistency` agent's job.
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):
   - Every migration upgrades from an empty database to head.
   - Every migration downgrades one step and upgrades again (round-trip).

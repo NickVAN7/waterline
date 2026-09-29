@@ -24,3 +24,6 @@ coverage/
 .idea/
 .vscode/
 .DS_Store
+
+# Files for the owner to upload to the claude.ai Project (checkpoint skill, step 7)
+project-upload/

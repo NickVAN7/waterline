@@ -342,7 +342,8 @@ Workspace (the firm: tenant boundary)
   - Sign-in throttling per account and per IP, with progressive delays and no permanent
     lockout (`login_attempt` table).
   - Active-sessions page (adds `user_agent` and `ip_address` to `session`) with per-session
-    revoke; admin "sign out everywhere" with the same rank rule as deactivation (see "Account management").
+    revoke. (Admin "sign out everywhere" is built in Slice 1, under the rank rule in "Account
+    management".)
   - Password re-entry for sensitive actions (changing email, linking/unlinking GitHub, admin
     password resets).
   - Nightly worker job deleting expired sessions.
@@ -389,7 +390,7 @@ owners/admins, and owners/admins of the project's org).
 | Role | Capabilities |
 |---|---|
 | member | Belongs to the org; can be added to its projects. No project access by itself |
-| admin | Create, archive, and unarchive the org's projects, naming each new project's first admin (from the org's members and the workspace's staff; always given a `project_membership` row, even if they also inherit admin); project admin on every project in the org; create users in the org, add existing users as members, and remove members; rename and delete the org's tags; connect GitHub installations; account actions by rank (§4) |
+| admin | Create, archive, and unarchive the org's projects, naming each new project's first admin (from the org's members and the workspace's staff; always given a `project_membership` row, even if they also inherit admin); project admin on every project in the org; create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
 | owner | Admin + manage the org itself and grant, change, or remove its owner and admin roles |
 
 **Workspace roles** (`workspace_membership`)

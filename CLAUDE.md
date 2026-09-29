@@ -28,13 +28,15 @@ commit.
 Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <command>`.
 
 - `wl doctor` — check the toolchain
-- `wl up` / `wl down` / `wl logs [service]` — the Docker Compose stack
-- `wl check` — everything CI runs (lint, types, tests, coverage, import rules, migrations,
-  client freshness). Must pass before any checkpoint goes to review.
-- `wl test`, `wl lint`, `wl fmt` — both halves; scope with `wl backend <cmd>` / `wl frontend <cmd>`
+- `wl up` / `wl down` — the Docker Compose stack (`wl logs [service]` from S0-C7)
+- `wl check` — everything CI runs (lint, types, tests, coverage, import rules, migrations, and
+  from S0-C7 client freshness). Must pass before any checkpoint goes to review.
+- `wl test`, `wl lint`, `wl fmt` — both halves; scope with `wl backend <cmd>` (and
+  `wl frontend <cmd>` from S0-C7)
 - `wl migrate`, `wl backend migration "<message>"` — Alembic
-- `wl gen-client` — regenerate frontend API types after any API change
-- `wl seed` — create the first system admin
+- `wl gen-client` — regenerate frontend API types after any API change (from S0-C7)
+- `wl seed` — create the workspace and its first system admin, who is the workspace owner
+  (Slice 1)
 
 ## How work is done: checkpoints
 
@@ -58,6 +60,9 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - Never hand-edit generated files: `backend/openapi.json`, `frontend/src/api/schema.d.ts`.
 - When a review catches a mistake that a rule would have prevented, add that rule to the
   relevant `CLAUDE.md` as part of the fix.
+- After applying design changes that came from a chat session (not a checkpoint), run the
+  `docs-consistency` agent (trigger `design-change`, base = the commit before the changes)
+  before committing. Fix its clear-cut Fixes; bring its Decisions to the owner undecided.
 
 ## Skills, agents, and hooks
 
@@ -65,8 +70,10 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `migration` — for every schema change.
 - `new-area` — for a new aggregate, or a new endpoint or action in an existing one.
 - `checkpoint` — to close every checkpoint; it runs `checkpoint-reviewer`, `security-reviewer`
-  (when the diff touches security-relevant code), and `fresh-clone-verifier` (last checkpoint
-  of a slice).
+  (when the diff touches security-relevant code), `fresh-clone-verifier` (last checkpoint of a
+  slice), and `docs-consistency` (last checkpoint of a slice).
+- `docs-consistency` — also on its own, after design changes made outside a checkpoint (see
+  "Always").
 - Hooks block edits to generated files and committed migrations, and format files after edits.
   When a hook blocks you, do what its message says. Never work around a hook with shell
   commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).

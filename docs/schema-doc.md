@@ -907,7 +907,7 @@ Index `(entity_type, entity_id, created_at)`.
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(organization_id, name)`. Built-in defaults per project type are copied in when an org is
-created. Project members create tags; renaming and deleting are for org owners/admins
+created. Project members create tags; renaming, deleting, and setting a tag's type are for org owners/admins
 (design-doc §11).
 
 ### `entity_tag`

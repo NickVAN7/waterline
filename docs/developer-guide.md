@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** Slice 0, Checkpoint 5 done (next: Checkpoint 6, API conventions & security
+> **Status:** S0-C5 (Model conventions) done; next is S0-C6 (API conventions & security
 > helpers). The backend has its database core (Postgres in Docker Compose, async SQLAlchemy,
 > Alembic, the base model and its mixins), a test harness with a `concurrency` fixture,
 > background jobs on procrastinate (worker, `enqueue.py`, procrastinate's schema), and the model
@@ -61,8 +61,11 @@ pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the r
 docker-compose.yml   the local stack (postgres now; api, worker, web from S0-C7)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
+project-upload/ changed docs and Claude files waiting for the owner to upload to the claude.ai
+                Project (gitignored; filled by the checkpoint skill)
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area), agents
-                (checkpoint-reviewer, security-reviewer, fresh-clone-verifier), hooks (§10)
+                (checkpoint-reviewer, security-reviewer, fresh-clone-verifier, docs-consistency),
+                hooks (see section 10)
 ```
 
 There are **three Python environments**, deliberately separate:
@@ -435,6 +438,27 @@ afterwards (see `tests/integration/test_migrations.py`).
   `tools/cli/pyproject.toml`), so a test that claims to cover an error path but never reaches
   it fails the gate.
 
+**Docs consistency tests** (`tests/unit/docs/test_docs_consistency.py`, parsers in
+`tests/support/docs.py`) read the docs, `.claude/`, `Base.metadata`, and `git log`; no
+database. They check:
+
+| Check | Fails when |
+|---|---|
+| Model tables documented | a model table has no ``### `<table>` `` section in `schema-doc.md`, or is listed under "Deferred tables" |
+| Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table |
+| One owner per table | a schema-doc table isn't in exactly one "Owns (tables)" cell of the build plan's feature map, or the map names a table schema-doc lacks |
+| Tech-debt log | an entry lacks Added/What/Why/Fix by/Status, numbers aren't 1..n, a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
+| Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it |
+| § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` always means a design-doc section, so refer to this guide's sections as "section N" |
+| Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 10 below |
+
+Fixing a failure: the message names both files and the mismatch. Update whichever side is
+wrong (usually the doc); when the right answer is a design question, ask the owner. A
+`DocsStructureError` means a doc no longer has the structure the parser expects (a heading,
+table header, or field line); restore the structure, or update the parser in the same commit.
+Never skip or weaken a check to get green. The status and overdue checks need full git history
+(a shallow clone fails with a message saying so).
+
 ## 9. Git workflow
 
 - Work proceeds one **checkpoint** at a time (`build-plan.md`), one commit per checkpoint,
@@ -450,7 +474,13 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`.
+  `fresh-clone-verifier`, `docs-consistency`.
+- **When the agents run:** `checkpoint-reviewer` at every checkpoint, `security-reviewer` when
+  a checkpoint touches security-relevant code, `fresh-clone-verifier` and `docs-consistency` at
+  the last checkpoint of a slice (all through the `checkpoint` skill). `docs-consistency` also
+  runs on its own after a design change applied outside a checkpoint, before committing. It is
+  read-only: it reports clear-cut fixes (citing the recorded decision) and decisions for the
+  owner, which are never decided for them.
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
   - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or

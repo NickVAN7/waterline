@@ -69,7 +69,16 @@ minutes. The next checkpoint starts only after the current one is approved.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
-the guide.
+the guide. The `docs-consistency` agent, run after `checkpoint-reviewer`, reviews every doc, `CLAUDE.md` file, and `.claude/`
+file against the others (after `checkpoint-reviewer`).
+
+**Design changes outside a checkpoint** (e.g. applied from a chat session): run
+`docs-consistency` before committing, and bring its decisions to the owner.
+
+**Docs consistency tests** (`backend/tests/unit/docs/`, part of `wl check`) check the mechanical
+part on every run: models vs. schema doc (tables, columns, enum values), one feature-map owner
+per table, the tech-debt log's format, references, and deadlines, the developer guide's status
+line, design-doc § references, and the lists of agents and skills.
 
 ### Claude configuration (in the repo)
 Everything lives in the repository, version-controlled and present on every workstation.
@@ -83,9 +92,11 @@ Everything lives in the repository, version-controlled and present on every work
 - **`checkpoint` skill** (`.claude/skills/checkpoint/`): the close-out procedure every
   checkpoint ends with — scope check, `wl check`, docs and tech-debt updates, the reviewers
   (`checkpoint-reviewer`; `security-reviewer` when the diff touches security-relevant code;
-  `fresh-clone-verifier` at the end of a slice), resolving findings, the review record
+  `fresh-clone-verifier` and `docs-consistency`, after `checkpoint-reviewer`, at the end of a
+  slice), resolving findings, the review record
   (`docs/reviews/<ID>.md`), one commit with the review note, a list of changed docs and Claude
-  files for the owner to upload to the Project (Claude never writes to the Project), and
+  files for the owner to upload to the Project, copied into the gitignored `project-upload/`
+  folder (Claude never writes to the Project), and
   stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   alongside `checkpoint-reviewer` when a checkpoint touches auth, sessions, authorization,
@@ -93,6 +104,11 @@ Everything lives in the repository, version-controlled and present on every work
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
   sets up a temporary copy of the repository by following the developer guide literally and
   reports every wrong or missing step.
+- **`docs-consistency` agent** (`.claude/agents/`): a read-only reviewer that checks the docs,
+  `CLAUDE.md` files, and `.claude/` against each other (contradictions, superseded rules, stale
+  status, broken references, gaps). It reports clear-cut **fixes** (citing the recorded
+  decision) and **decisions** for the owner, and never edits files. Runs at the last checkpoint
+  of each slice and after any design change applied outside a checkpoint.
 - **`test-writer` skill** (`.claude/skills/test-writer/`): the procedure for every test —
   behavior table from the docs, layer choice, assertions that can fail, banned patterns, and
   proof that each test fails (test-first, sabotage check, mutation testing).
@@ -151,7 +167,7 @@ slices only add features.
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a zero-row update of a non-versioned entity, e.g. one hard-deleted meanwhile, is 404), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
-| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness), branch protection configured on the GitHub repo, fresh-clone setup by following the developer guide, slice wrap-up |
+| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests), branch protection configured on the GitHub repo, fresh-clone setup by following the developer guide, slice wrap-up |
 
 The sections below describe the content; the table above is the order of work.
 
@@ -180,7 +196,8 @@ The sections below describe the content; the table above is the order of work.
 │   │   └── jobs/                 procrastinate app, enqueue.py (only entry point), job functions
 │   ├── migrations/               Alembic
 │   ├── tests/
-│   │   ├── unit/                 rules, authz matrix (no database)
+│   │   ├── unit/                 rules, authz matrix (no database); unit/docs/: docs
+│   │   │                         consistency tests
 │   │   ├── integration/          repositories and services against real Postgres
 │   │   ├── api/                  endpoints over HTTP against real Postgres
 │   │   ├── factories/            polyfactory factories, one per model
@@ -203,7 +220,7 @@ The sections below describe the content; the table above is the order of work.
 │   ├── settings.json                   hooks configuration
 │   ├── hooks/                          protect_files.py, format_file.py
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
-│   │                                   fresh-clone-verifier.md
+│   │                                   fresh-clone-verifier.md, docs-consistency.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
@@ -216,6 +233,8 @@ The sections below describe the content; the table above is the order of work.
 ├── tools/cli/                    developer CLI (`waterline`, alias `wl`); own pyproject, Typer
 ├── pyproject.toml                root uv workspace; makes `wl` runnable from the repo root
 ├── .env.example
+├── project-upload/               gitignored: changed docs and Claude files for the owner to upload
+│                                 to the Project (filled by the checkpoint skill)
 └── README.md
 ```
 
@@ -317,14 +336,15 @@ it is the only place that writes them.
 | File name | Owns (tables) | Slice | Calls into (services) |
 |---|---|---|---|
 | `user` | user | 1 | — |
-| `auth` | session; user_identity (added in Slice 7). Runs every action that ends sessions: sign-out, change password, and the admin actions deactivate, reset password, and sign out everywhere (it updates the user through the user service) | 1 | user |
+| `auth` | session; user_identity (added in Slice 7) | 1 | user |
 | `workspace` | workspace, workspace_membership | 1 | user |
 | `org` | organization, membership | 1 | user; tag (copies the default tags into a new org, from Slice 6) |
 | `project` | project (incl. modules and module guidance), project_membership | 1 | org, user (creating a user for the project goes through the org service) |
 | `numbering` *(service + repository only)* | project_counter; `task.next_subtask_number` | 1 | — |
 | `requirement` | requirement, requirement_revision | 2 | numbering, approval, task, testcase |
 | `approval` | approval_request, approval | 2 | approvable areas via registered handlers only |
-| `activity` *(read side)* | none; reads activity_log (writes stay in `audit/`) | 2 | — |
+| `audit` *(`log_change()` in `app/audit/`; not a service)* | activity_log | 2 | — |
+| `activity` *(read side)* | none (reads activity_log) | 2 | — |
 | `phase` | phase | 3 | — |
 | `workstream` | workstream | 3 | — |
 | `task` | task, subtask, task_dependency | 3 | numbering |
@@ -335,9 +355,17 @@ it is the only place that writes them.
 | `comment` | comment | 6 | — |
 | `tag` | tag, entity_tag | 6 | — |
 | `link` | link_attachment | 6 | — |
-| `search` *(no tables)* | none; reads requirements, tasks, test cases | 6 | — |
+| `search` *(no tables)* | none (reads requirements, tasks, test cases) | 6 | — |
 | `github` | github_installation, project_repository, task_github_link | 7 | task |
-| `webhook` | github_webhook_delivery; processing job | 7 | github |
+| `webhook` | github_webhook_delivery (and its processing job) | 7 | github |
+
+The **Owns** cell lists table names (and column references such as
+`task.next_subtask_number`), with notes in parentheses; the docs consistency tests
+check that every table in `schema-doc.md` has exactly one owner here.
+
+`auth` runs every action that ends sessions: sign-out, change password, and the admin actions
+deactivate, reset password, and sign out everywhere (it updates the user through the user
+service).
 
 ERP modules (Slices 8+) get their own entries when they're designed.
 
@@ -599,6 +627,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   warnings; archive/unarchive.
 - Org members page: list, add or create user, change role, remove.
 - Project members page: list, add with a role, change role, remove.
+- A "no access" page for a signed-in user with no memberships left (design-doc §4,
+  "Sessions").
 - Workspace admin pages: staff, organizations, users (create, deactivate, reset password).
   Only workspace owners/admins and system admins see workspace pages.
 - Browser routes include the org slug (`/{org_slug}/projects/{key}/…`); a stale slug

@@ -153,10 +153,13 @@ async def test_task_is_404_for_user_in_another_org(client_for, task, outsider):
     assert task.title not in r.text
 ```
 
-**Concurrency (`@pytest.mark.concurrency`) — parallel transactions, real commits:**
+**Concurrency (`@pytest.mark.concurrency`) — parallel transactions, real commits.** Name every
+table the test commits to in the marker (it truncates exactly those afterwards).
+`separate_sessions` and `gather_in_parallel` are illustrative: the general parallel helper
+doesn't exist yet (TD-4).
 
 ```python
-@pytest.mark.concurrency
+@pytest.mark.concurrency("project_counter", "project", "organization", "workspace")
 async def test_parallel_allocations_never_collide(project, separate_sessions):
     numbers = await gather_in_parallel(
         [allocate_number_in(s, project, "TA") for s in separate_sessions(20)]
