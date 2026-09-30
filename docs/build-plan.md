@@ -166,7 +166,7 @@ slices only add features.
 | 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 (design-doc §13, "Transactional enqueue": enqueue on the caller's session, by task name) |
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a save to a row that's gone, e.g. hard-deleted meanwhile, is 404: always for a non-versioned entity, and, after a check, for a versioned one deleted or soft-deleted since it was loaded), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
-| 7 | Compose & frontend shell | Rest of Docker Compose (api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
+| 7 | Compose & frontend shell | Rest of Docker Compose (migrate, api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
 | 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests), branch protection configured on the GitHub repo, fresh-clone setup by following the developer guide, slice wrap-up |
 
 The sections below describe the content; the table above is the order of work.
@@ -177,9 +177,10 @@ The sections below describe the content; the table above is the order of work.
 /
 ├── backend/                      Python backend (FastAPI)
 │   ├── pyproject.toml            dependencies (uv), ruff, pyright, pytest config
-│   ├── Dockerfile                one image for both api and worker
+│   ├── Dockerfile                one image for the api, worker, and migrate services
 │   ├── app/
 │   │   ├── main.py               FastAPI app, router registration, error handlers
+│   │   ├── openapi_export.py     writes openapi.json from the code (`wl gen-client`)
 │   │   ├── cli.py                app admin commands, run inside the app (e.g. create first
 │   │   │                         system admin); invoked by `wl seed`
 │   │   ├── core/                 settings, db session & transaction dependency, base model &
@@ -206,6 +207,7 @@ The sections below describe the content; the table above is the order of work.
 │
 ├── frontend/                     Vue 3 + TypeScript (Vite)
 │   ├── package.json
+│   ├── Dockerfile                the Vite dev server (the web service)
 │   └── src/
 │       ├── api/                  generated types (schema.d.ts) + configured openapi-fetch client
 │       ├── app/                  layout, router, route guards
@@ -228,7 +230,7 @@ The sections below describe the content; the table above is the order of work.
 │                                 checkpoint), spikes/ (spike code kept as evidence)
 │                                 (source of truth; the owner uploads changed files to the Project)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
-├── docker-compose.yml            postgres, api, worker, web
+├── docker-compose.yml            postgres, migrate, api, worker, web
 ├── docker/postgres/initdb/       first-start scripts for postgres (creates the test database)
 ├── tools/cli/                    developer CLI (`waterline`, alias `wl`); own pyproject, Typer
 ├── pyproject.toml                root uv workspace; makes `wl` runnable from the repo root
@@ -267,7 +269,7 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   |---|---|---|
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
   | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
-  | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed` | `docker compose`, including commands inside the api container |
+  | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed` | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
   | Cross-cutting | `wl gen-client`, `wl doctor` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version) |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
@@ -429,9 +431,13 @@ ERP modules (Slices 8+) get their own entries when they're designed.
     not);
   - an init script creates a separate test database (`waterline_test`) so tests never touch
     dev data;
-  - tables are created by Alembic (`wl migrate`), never by hand;
+  - tables are created by Alembic (the `migrate` service, or `wl migrate`), never by hand;
   - the host port is configurable in `.env` (default 5432) in case another Postgres is already
     running on the workstation.
+- `migrate` — same image as `api`; runs `alembic upgrade head` and exits. `api` and `worker`
+  start only after it succeeds, because the worker can't run against a database without
+  procrastinate's schema. So `wl up` always leaves a migrated stack; `wl migrate` runs it again
+  to apply a new migration while the stack is up (owner decision, S0-C7).
 - `api` — built from `backend/`; uvicorn with reload, mounted source.
 - `worker` — same image as `api`, runs the procrastinate worker.
 - `web` — built from `frontend/`; Vite dev server (in Compose or run locally).

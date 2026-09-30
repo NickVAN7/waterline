@@ -546,7 +546,7 @@ def claude_config_in_build_plan() -> ClaudeConfig:
 
 
 def claude_config_in_developer_guide() -> ClaudeConfig:
-    body = section(read(DEVELOPER_GUIDE), "## 10. Claude Code configuration", DEVELOPER_GUIDE)
+    body = section(read(DEVELOPER_GUIDE), "## 11. Claude Code configuration", DEVELOPER_GUIDE)
     return ClaudeConfig(agents=_bullet_names(body, "Agents"), skills=_bullet_names(body, "Skills"))
 
 

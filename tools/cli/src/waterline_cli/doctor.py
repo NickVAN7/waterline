@@ -11,6 +11,7 @@ from waterline_cli.runner import subprocess_env
 
 PYTHON_VERSION = "3.14"  # build-plan.md, implementation decision 6
 NODE_MAJOR = 22
+MIN_NODE = (22, 18)  # frontend/package.json "engines"
 MIN_GIT = (2, 31)  # rev-parse --path-format
 MIN_DOCKER = (20, 10)
 MIN_COMPOSE = (2, 20)
@@ -101,14 +102,15 @@ def _docker_daemon(probe: Probe) -> Result:
 
 def _node(probe: Probe) -> Result:
     name = "Node"
-    hint = f"Install Node {NODE_MAJOR} (e.g. with nvm or fnm)"
+    hint = f"Install Node {NODE_MAJOR}, {_fmt(MIN_NODE)} or later (e.g. with nvm or fnm)"
     if probe.returncode is None:
         return Result(name, Status.FAIL, "not installed", hint)
     version = parse_version(probe.output)
     if probe.returncode != 0 or version is None:
         return Result(name, Status.FAIL, "could not read version", hint)
-    if version[0] != NODE_MAJOR:
-        return Result(name, Status.FAIL, f"{_fmt(version)} (need {NODE_MAJOR}.x)", hint)
+    if version[0] != NODE_MAJOR or version < MIN_NODE:
+        need = f"need {NODE_MAJOR}.x, ≥ {_fmt(MIN_NODE)}"
+        return Result(name, Status.FAIL, f"{_fmt(version)} ({need})", hint)
     return Result(name, Status.OK, _fmt(version))
 
 

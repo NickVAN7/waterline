@@ -111,7 +111,7 @@ false.
 | Database | PostgreSQL | Also hosts the job queue and full-text search — no extra services in v1 |
 | Background jobs | procrastinate (Postgres-backed queue) | No new infrastructure; jobs enqueue in the same transaction as the data they act on |
 | Frontend | Vue 3 + TypeScript | Existing familiarity |
-| Local dev | Docker Compose: `api`, `worker`, `web`, `postgres` | Worker runs the same image as `api` with a different command; `web` is the Vite dev server |
+| Local dev | Docker Compose: `api`, `worker`, `web`, `postgres`, plus a one-shot `migrate` | Worker and migrate run the same image as `api` with a different command; `migrate` applies migrations before `api` and `worker` start; `web` is the Vite dev server |
 | Deployment | Self-hosted/local initially | Stateless API + externalized DB keeps it cloud-portable |
 
 **Backend language decision:** a Node/TypeScript backend was considered for shared types with

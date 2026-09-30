@@ -1,6 +1,23 @@
-# Local development stack (build-plan.md, "Docker Compose"). Start with `uv run wl up`.
-# postgres is added in S0-C2; api, worker, and web follow in S0-C7.
+# Local development stack (build-plan.md, "Docker Compose"). Start with `uv run wl up`, which
+# builds the images, applies migrations (the one-shot migrate service), and waits until every
+# service is up: postgres, api (http://localhost:8000/api), worker, and web (http://localhost:5173).
 name: waterline
+
+# api, worker, and migrate run the backend image with the source mounted, against the postgres
+# service (inside Compose it listens on 5432, whatever POSTGRES_PORT publishes on the host).
+x-backend: &backend
+  build: ./backend
+  # One image, shared by all three services (built once, rebuilt by `wl up` / `wl migrate`).
+  image: waterline-backend
+  environment:
+    POSTGRES_DB: ${POSTGRES_DB}
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
+  volumes:
+    - ./backend:/app
 
 services:
   postgres:
@@ -10,7 +27,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env (copy .env.example)}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (copy .env.example)}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Loopback only: the dev password is public, and the proxy is the one origin to use.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       # Postgres 18+ images keep PGDATA in a versioned directory under /var/lib/postgresql.
       - postgres-data:/var/lib/postgresql
@@ -23,6 +41,61 @@ services:
       interval: 2s
       timeout: 5s
       retries: 15
+
+  # Applies migrations and exits; api and worker start only once it has succeeded (the worker
+  # can't run against a database without procrastinate's schema).
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    command:
+      ["uvicorn", "--factory", "app.main:create_app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # No curl in the slim image; any error or non-2xx status fails the check.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.jobs.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build: ./frontend
+    environment:
+      # Vite proxies /api here (frontend/vite.config.ts).
+      API_PROXY_TARGET: http://api:8000
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      # node_modules from the image, not the host's; `wl up` renews it on every start.
+      - /app/node_modules
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
 
 volumes:
   postgres-data:

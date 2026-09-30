@@ -1,4 +1,4 @@
-"""Worker entry point: `python -m app.jobs.worker` (the Compose `worker` service from S0-C7).
+"""Worker entry point: `python -m app.jobs.worker` (the Compose `worker` service).
 
 The worker is the only process that opens a procrastinate connection pool, and the only
 importer of the job modules.

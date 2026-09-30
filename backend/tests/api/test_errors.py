@@ -2,11 +2,13 @@
 foundations"): app errors, request validation, Starlette's own errors, and stale rows (409 for
 a version conflict, 404 for a non-versioned row that's gone)."""
 
+import logging
 import uuid
 from collections.abc import AsyncIterator
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, text
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -74,6 +76,18 @@ def build_app(sessionmaker: SessionMaker) -> FastAPI:
     @app.get("/teapot")
     async def teapot() -> None:
         raise StarletteHTTPException(status_code=418, detail="I'm a teapot.")
+
+    @app.get("/boom")
+    async def boom() -> None:
+        raise RuntimeError("database password is hunter2")
+
+    @app.get("/boom-mid-stream")
+    async def boom_mid_stream() -> StreamingResponse:
+        async def chunks() -> AsyncIterator[bytes]:
+            yield b"first chunk"
+            raise RuntimeError("failed after the response started")
+
+        return StreamingResponse(chunks())
 
     @app.post("/widgets")
     async def create_widget(name: str, quantity: int) -> dict[str, str]:
@@ -221,3 +235,38 @@ async def test_other_http_errors_keep_their_status_and_detail(client: AsyncClien
 
     assert response.status_code == 418
     assert response.json() == {"code": "http_error", "message": "I'm a teapot.", "details": {}}
+
+
+@pytest.mark.security
+async def test_unhandled_exception_is_500_in_the_standard_format_without_its_details(
+    client: AsyncClient,
+) -> None:
+    response = await client.get("/boom")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "code": "internal_error",
+        "message": "Something went wrong.",
+        "details": {},
+    }
+    assert "hunter2" not in response.text
+
+
+async def test_unhandled_exception_is_logged_with_its_traceback(
+    client: AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.ERROR, logger="app.core.errors"):
+        await client.get("/boom")
+
+    [record] = caplog.records
+    assert record.getMessage() == "Unhandled error on GET /boom"
+    assert record.exc_info is not None
+    assert str(record.exc_info[1]) == "database password is hunter2"
+
+
+async def test_exception_after_the_response_started_is_reraised_not_replaced(
+    client: AsyncClient,
+) -> None:
+    # The 200 and first chunk are already sent; a 500 body can't follow them.
+    with pytest.raises(RuntimeError, match="failed after the response started"):
+        await client.get("/boom-mid-stream")

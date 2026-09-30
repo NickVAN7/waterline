@@ -103,8 +103,9 @@ def test_healthy_toolchain_has_no_failures() -> None:
         ("uv --version", Probe(0, "uv 0.4.0"), "uv", "0.4.0 (need ≥ 0.8)"),
         ("uv python find 3.14", Probe(2, "not found"), "Python 3.14", "not found by uv"),
         ("uv python find 3.14", Probe(None), "Python 3.14", "uv not installed"),
-        ("node --version", Probe(0, "v20.11.0"), "Node", "20.11.0 (need 22.x)"),
-        ("node --version", Probe(0, "v24.1.0"), "Node", "24.1.0 (need 22.x)"),
+        ("node --version", Probe(0, "v20.11.0"), "Node", "20.11.0 (need 22.x, ≥ 22.18)"),
+        ("node --version", Probe(0, "v24.1.0"), "Node", "24.1.0 (need 22.x, ≥ 22.18)"),
+        ("node --version", Probe(0, "v22.17.1"), "Node", "22.17.1 (need 22.x, ≥ 22.18)"),
         ("node --version", Probe(None), "Node", "not installed"),
         ("node --version", Probe(0, "???"), "Node", "could not read version"),
         ("npm --version", Probe(None), "npm", "not installed"),
@@ -123,6 +124,12 @@ def test_problem_is_reported_as_failure_with_a_hint(
 
     assert (result.status, result.detail) == (Status.FAIL, detail)
     assert result.hint
+
+
+def test_oldest_supported_node_passes() -> None:
+    result = by_name(run_checks(prober({"node --version": Probe(0, "v22.18.0\n")})))["Node"]
+
+    assert (result.status, result.detail) == (Status.OK, "22.18.0")
 
 
 def hooks_result(probe: Probe) -> Result:

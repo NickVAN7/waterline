@@ -29,13 +29,15 @@ commit.
 Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <command>`.
 
 - `wl doctor` — check the toolchain
-- `wl up` / `wl down` — the Docker Compose stack (`wl logs [service]` from S0-C7)
-- `wl check` — everything CI runs (lint, types, tests, coverage, import rules, migrations, and
-  from S0-C7 client freshness). Must pass before any checkpoint goes to review.
-- `wl test`, `wl lint`, `wl fmt` — both halves; scope with `wl backend <cmd>` (and
-  `wl frontend <cmd>` from S0-C7)
+- `wl up` / `wl down` — the Docker Compose stack (`wl up` also applies migrations);
+  `wl logs [service]`
+- `wl check` — everything CI runs (lint, types, tests, coverage, import rules, migrations,
+  client freshness). Must pass before any checkpoint goes to review.
+- `wl test`, `wl lint`, `wl fmt` — both halves; scope with `wl backend <cmd>` or
+  `wl frontend <cmd>`
 - `wl migrate`, `wl backend migration "<message>"` — Alembic
-- `wl gen-client` — regenerate frontend API types after any API change (from S0-C7)
+- `wl gen-client` — regenerate `backend/openapi.json` and the frontend API types after any API
+  change; commit both
 - `wl seed` — create the workspace and its first system admin, who is the workspace owner
   (Slice 1)
 

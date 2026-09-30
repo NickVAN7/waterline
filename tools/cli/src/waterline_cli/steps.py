@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from waterline_cli.runner import Step, step
 
 BACKEND = "backend"
+FRONTEND = "frontend"
 CLI = "tools/cli"
 
 # Held to 100% line + branch coverage (docs/testing-strategy.md, "Coverage gates").
@@ -50,7 +51,13 @@ def backend_test(extra: Sequence[str] = ()) -> list[Step]:
 
 
 def backend_check() -> list[Step]:
-    return [step("uv", "lock", "--check", cwd=BACKEND), *backend_lint(), *backend_test()]
+    return [
+        step("uv", "lock", "--check", cwd=BACKEND),
+        # backend/openapi.json matches the code (client freshness, first half).
+        step("uv", "run", "python", "-m", "app.openapi_export", "--check", cwd=BACKEND),
+        *backend_lint(),
+        *backend_test(),
+    ]
 
 
 def backend_migration(message: str) -> list[Step]:
@@ -58,18 +65,74 @@ def backend_migration(message: str) -> list[Step]:
 
 
 def migrate() -> list[Step]:
-    """Apply migrations to the dev database (from the host until the api container, S0-C7)."""
-    return [step("uv", "run", "alembic", "upgrade", "head", cwd=BACKEND)]
+    """Apply migrations to the dev database with the Compose migrate service (its image rebuilt
+    first, so a dependency change since the last `wl up` is included)."""
+    return [step("docker", "compose", "run", "--rm", "--build", "migrate")]
 
 
 def up(extra: Sequence[str] = ()) -> list[Step]:
-    """Start the stack in the background and wait until every service is healthy."""
-    return [step("docker", "compose", "up", "--detach", "--wait", *extra)]
+    """Build the images, start the stack in the background, and wait until every service is up.
+    `--renew-anon-volumes` refreshes the web container's node_modules from its image."""
+    return [
+        step(
+            "docker",
+            "compose",
+            "up",
+            "--detach",
+            "--wait",
+            "--build",
+            "--renew-anon-volumes",
+            *extra,
+        )
+    ]
 
 
 def down(extra: Sequence[str] = ()) -> list[Step]:
     """Stop the stack. Data survives in the named volume unless `-v` is passed."""
     return [step("docker", "compose", "down", *extra)]
+
+
+def logs(extra: Sequence[str] = ()) -> list[Step]:
+    """Follow the stack's logs (one service's, when named)."""
+    return [step("docker", "compose", "logs", "--follow", *extra)]
+
+
+def gen_client() -> list[Step]:
+    """Export the OpenAPI schema from the backend's code, then generate the frontend's types."""
+    return [
+        step("uv", "run", "python", "-m", "app.openapi_export", cwd=BACKEND),
+        step("npm", "run", "gen:client", cwd=FRONTEND),
+    ]
+
+
+def frontend_lint() -> list[Step]:
+    return [
+        step("npm", "run", "lint", cwd=FRONTEND),
+        step("npm", "run", "typecheck", cwd=FRONTEND),
+    ]
+
+
+def frontend_fmt() -> list[Step]:
+    return [
+        step("npm", "run", "format", cwd=FRONTEND),
+        step("npm", "run", "lint:fix", cwd=FRONTEND),
+    ]
+
+
+def frontend_test(extra: Sequence[str] = ()) -> list[Step]:
+    """All tests with the coverage gates, or a filtered run (no coverage) when given arguments."""
+    if extra:
+        return [step("npx", "vitest", "run", *extra, cwd=FRONTEND)]
+    return [step("npm", "run", "test", cwd=FRONTEND)]
+
+
+def frontend_check() -> list[Step]:
+    return [
+        # src/api/schema.d.ts matches backend/openapi.json (client freshness, second half).
+        step("npm", "run", "check:client", cwd=FRONTEND),
+        *frontend_lint(),
+        *frontend_test(),
+    ]
 
 
 def cli_lint() -> list[Step]:

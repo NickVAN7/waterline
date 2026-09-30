@@ -46,7 +46,12 @@ Calls flow **routers → services → repositories → models**. Services also u
   → commit (design-doc §5).
 - **Errors:** raise an `AppError` subclass (`NotFoundError`, `ForbiddenError`, …) from
   `app/core/errors.py`; the handlers build the `{code, message, details}` body. Never raise
-  `HTTPException` or return an error `JSONResponse`. Clients branch on `code`.
+  `HTTPException` or return an error `JSONResponse`. Clients branch on `code`. Anything
+  unhandled becomes a 500 `internal_error` (logged with its traceback, never sent to the
+  client); don't catch exceptions just to hide them.
+- **API changes:** after changing a route, schema, or error response, run `wl gen-client` and
+  commit `backend/openapi.json` and `frontend/src/api/schema.d.ts` with it; `wl check` fails
+  while either is stale.
 - **Passwords and tokens** only through `app/core/security.py` (`hash_password` /
   `verify_password` run off the event loop; store `hash_token(token)`, never the token).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are

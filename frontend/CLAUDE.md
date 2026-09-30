@@ -5,8 +5,9 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 
 ## Layout
 
-- `src/api/` — `schema.d.ts` (generated) and the configured `openapi-fetch` client
-- `src/app/` — layout, router, route guards
+- `src/api/` — `schema.d.ts` (generated) and `client.ts`: the configured `openapi-fetch`
+  `client`, `api()`, and `ApiError`
+- `src/app/` — layout, router, styles; route guards in `src/app/guards/`
 - `src/components/` — shared UI components
 - `src/composables/` — shared logic (auth state, permissions, forms)
 - `src/stores/` — Pinia stores (current user, current org)
@@ -16,8 +17,12 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 
 ## Rules
 
-- **All API calls go through the generated client.** Never hand-write API types or call `fetch`
-  directly. After any backend API change, run `wl gen-client`; never edit `schema.d.ts` by hand.
+- **All API calls go through the generated client:** `await api(client.GET('/api/...'))`.
+  `api()` returns the data or throws an `ApiError` (`status`, `code`, `message`, `details`;
+  `code` is `network_error` or `unexpected_response` when there's no standard body). Never
+  hand-write API types, call `fetch`, or import `openapi-fetch` outside `src/api/` (ESLint
+  enforces the last two). After any backend API change, run `wl gen-client`; never edit
+  `schema.d.ts` by hand.
 - **The server is authoritative.** The UI may hide actions a user can't take, but never assumes
   it's enforcing permissions. Don't duplicate business rules; e.g. rank is computed by the
   server (send neighbor IDs, not rank values), and transitions are validated by the server.
@@ -27,6 +32,8 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 - **Requests:** same origin through the Vite proxy (`/api`), `credentials: 'include'`, JSON
   bodies only.
 - **Rendered markdown** is sanitized before display.
+- **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
+  must stay last.
 - **Display labels** for stored values (e.g. task type per project type) come from one mapping
   module, never inline strings.
 - UI guidance text (e.g. module recommendations) is rendered from the API response, not
@@ -38,7 +45,8 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 
 ## Tests
 
-- Component and composable tests with Vitest; mock only the API client, typed with the generated
-  types.
+- Component and composable tests with Vitest, in a `*.spec.ts` next to the code; mock only the
+  API client (`vi.spyOn(client, 'GET')`), with results typed from the generated schema. Assert
+  what the user sees, not component internals.
 - Coverage: 80% overall; 90% for composables, stores, and route guards.
 - Playwright covers each slice's critical flows against the full stack.

@@ -3,10 +3,11 @@ foundations").
 
 Services and repositories raise an `AppError` subclass; the handlers registered here turn it,
 FastAPI's request validation errors, Starlette's own HTTP errors (unknown route, wrong method),
-and SQLAlchemy's stale-row errors into that shape. Clients branch on `code`, never on
-`message`.
+and SQLAlchemy's stale-row errors into that shape; anything else becomes a 500 in the same shape.
+Clients branch on `code`, never on `message`.
 """
 
+import logging
 import re
 from typing import Any, ClassVar, cast
 
@@ -17,8 +18,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.base_model import StaleVersionError, VersionMixin
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorBody(BaseModel):
@@ -174,8 +178,41 @@ async def http_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     return response
 
 
+class UnhandledErrorMiddleware:
+    """An exception no handler covers becomes a 500 `internal_error` in the standard body, and is
+    logged here with its traceback; nothing about it reaches the client. (Starlette's fallback
+    returns plain text.) If the response has already started, the status can't change: the
+    exception is re-raised for the server to log and close the connection."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = False
+
+        async def send_tracking_start(message: Message) -> None:
+            nonlocal started
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_tracking_start)
+        except Exception:
+            if started:
+                raise
+            logger.exception("Unhandled error on %s %s", scope["method"], scope["path"])
+            response = error_response(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, AppError.code, AppError.message
+            )
+            await response(scope, receive, send)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(StaleDataError, stale_data_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
+    app.add_middleware(UnhandledErrorMiddleware)

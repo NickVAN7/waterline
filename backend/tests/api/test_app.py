@@ -72,7 +72,8 @@ async def test_app_returns_409_for_a_stale_version(
 async def test_app_returns_the_standard_error_body_for_every_kind_of_error(
     settings: Settings, sessionmaker: SessionMaker
 ) -> None:
-    """create_app registers every handler: app errors, request validation, Starlette's own."""
+    """create_app registers every handler: app errors, request validation, Starlette's own, and
+    the catch-all for anything else."""
     app = create_app(settings, sessionmaker=sessionmaker)
 
     @app.get("/gone")
@@ -83,11 +84,17 @@ async def test_app_returns_the_standard_error_body_for_every_kind_of_error(
     async def count(n: int) -> int:
         return n
 
+    @app.get("/crash")
+    async def crash() -> None:
+        raise RuntimeError("unhandled")
+
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
         app_error = await c.get("/gone")
         invalid = await c.get("/count", params={"n": "x"})
         unknown = await c.get("/api/no-such-route")
+        crashed = await c.get("/crash")
 
     assert (app_error.status_code, app_error.json()["code"]) == (404, "not_found")
     assert (invalid.status_code, invalid.json()["code"]) == (422, "validation_error")
     assert (unknown.status_code, unknown.json()["code"]) == (404, "not_found")
+    assert (crashed.status_code, crashed.json()["code"]) == (500, "internal_error")

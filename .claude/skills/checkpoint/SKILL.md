@@ -18,7 +18,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 2. Run the gates
 
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
-  import-linter contracts, migration checks, and generated-client freshness (from S0-C7).
+  import-linter contracts, migration checks, and generated-client freshness.
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
 
 ## 3. Update the docs

@@ -40,3 +40,32 @@ repos:
         language: system
         files: ^tools/cli/.*\.py$
         pass_filenames: false
+
+      # Frontend: Prettier and ESLint from the frontend's own node_modules (`npm ci` first).
+      - id: prettier-frontend
+        name: prettier (frontend)
+        entry: npm --prefix frontend run --silent format
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+      - id: eslint-frontend
+        name: eslint (frontend)
+        entry: npm --prefix frontend run --silent lint:fix
+        language: system
+        files: ^frontend/.*\.(ts|vue)$
+        pass_filenames: false
+
+      # Generated files are never hand-edited: each must match what its generator produces
+      # from its source (`uv run wl gen-client` regenerates both).
+      - id: openapi-fresh
+        name: backend/openapi.json matches the API
+        entry: uv run --directory backend python -m app.openapi_export --check
+        language: system
+        files: ^backend/(app/.*\.py|openapi\.json)$
+        pass_filenames: false
+      - id: client-fresh
+        name: frontend/src/api/schema.d.ts matches backend/openapi.json
+        entry: npm --prefix frontend run --silent check:client
+        language: system
+        files: ^(backend/openapi\.json|frontend/src/api/schema\.d\.ts)$
+        pass_filenames: false

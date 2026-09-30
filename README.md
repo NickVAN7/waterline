@@ -11,8 +11,11 @@ Needs Git, Docker, uv, and Node 22.
 
 ```bash
 uv sync --all-packages
-uv run wl doctor     # check your toolchain
-uv run wl check      # everything CI runs
+uv run wl doctor            # check your toolchain
+npm ci --prefix frontend    # frontend tools
+cp .env.example .env
+uv run wl up                # the stack: http://localhost:5173
+uv run wl check             # everything CI runs
 ```
 
 Full setup, commands, and conventions: [docs/developer-guide.md](docs/developer-guide.md).

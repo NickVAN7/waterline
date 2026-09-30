@@ -24,7 +24,8 @@ Entry format:
   hooks exist.
 - **Why:** There is no frontend and no generated file (`openapi.json`, `schema.d.ts`) yet.
 - **Fix by:** S0-C7 (Compose & frontend shell)
-- **Status:** open
+- **Status:** resolved in S0-C7 (Prettier and ESLint hooks on the frontend; `openapi-fresh` and
+  `client-fresh` hooks fail when a generated file differs from what `wl gen-client` produces)
 
 ### TD-2: The 100% authz/rules coverage gate runs only through `wl`
 - **Added:** S0-C1
@@ -136,4 +137,5 @@ Entry format:
   exception with its traceback on the server; nothing about the error reaches the client.
 - **Fix by:** S0-C7 (Compose & frontend shell), when the frontend's API client first parses
   error bodies.
-- **Status:** open
+- **Status:** resolved in S0-C7 (`UnhandledErrorMiddleware` in `app/core/errors.py`: 500
+  `internal_error`, logged with its traceback; tests in `tests/api/test_errors.py`)
