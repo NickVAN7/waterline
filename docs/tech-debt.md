@@ -162,3 +162,40 @@ Entry format:
 - **Fix by:** Slice 1: the owner decides then whether to add a non-root user to the dev images
   or re-target this entry.
 - **Status:** open
+
+### TD-12: Password minimum is 8 characters
+- **Added:** S1 planning (Sept 30, 2026)
+- **What:** `rules/password_policy.py` requires 8 characters. NIST accepts 8 only alongside a
+  second factor; 12 is the intended minimum.
+- **Why:** v1 runs locally for a few users; the owner chose 8 for now.
+- **Fix by:** Slice 7 (before the first non-local deployment, and by the end of v1 at the
+  latest; re-target if deployment moves later): raise the minimum to 12, and at sign-in
+  (the only time the plaintext is available) set `must_change_password` when the entered
+  password fails the current policy, so existing short passwords are changed at next sign-in.
+- **Status:** open
+
+### TD-13: End-to-end tests run on Chromium only; no local HTTPS
+- **Added:** S1 planning (Sept 30, 2026)
+- **What:** Production cookie settings (`__Host-session`, `Secure`) are kept in dev and test.
+  Chromium treats `http://localhost` as secure; WebKit has historically not, so Playwright runs
+  Chromium only, and the dev server works only at `localhost` (not a LAN IP or custom
+  hostname).
+- **Why:** Avoids an insecure-cookie switch that could reach production (build plan,
+  implementation decision 9); cross-browser coverage matters little for a few local users.
+- **Fix by:** Slice 7 (before the first non-local deployment, and by the end of v1 at the
+  latest; re-target if deployment moves later): local HTTPS for the dev server (e.g.
+  mkcert with Vite's `https` option) and end-to-end runs on Firefox and WebKit.
+- **Status:** open
+
+### TD-14: The pre-deployment items in design-doc §4 have no slice
+- **Added:** S1 planning (Sept 30, 2026)
+- **What:** Design-doc §4, "Before the first non-local deployment", lists work with no slice
+  of its own: sign-in throttling (`login_attempt`), the active-sessions page, password
+  re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
+  lengths, the reverse proxy forwarding `Host`, re-evaluating the `Origin` check against an
+  allowed-origins setting, and the admin audit-event screen. (The password minimum and local
+  HTTPS have their own entries, TD-12 and TD-13.)
+- **Why:** v1 runs locally for a few users; none of these matter until the app is deployed.
+- **Fix by:** Slice 7 (before the first non-local deployment, and by the end of v1 at the
+  latest; re-target if deployment moves later): build each item, or give it its own slice.
+- **Status:** open

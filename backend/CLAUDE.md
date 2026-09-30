@@ -43,8 +43,8 @@ Calls flow **routers → services → repositories → models**. Services also u
   check). Never make `get_session` swallow a failed transaction: a request that can't commit
   must fail.
 - **Order of every protected mutation:** `Origin` check → JSON-only check (requests with a
-  body) → authenticate → `authorize()` → change → `log_change()` → commit (design-doc §4,
-  §5).
+  body) → authenticate → `authorize()` → change → `log_change()` (and `log_admin_event()`
+  for admin and security actions) → commit (design-doc §4, §5, §10.1).
 - **Errors:** raise an `AppError` subclass (`NotFoundError`, `ForbiddenError`, …) from
   `app/core/errors.py`; the handlers build the `{code, message, details}` body. Never raise
   `HTTPException` or return an error `JSONResponse`. Clients branch on `code`. Anything
@@ -58,6 +58,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
 - **`log_change()` is the only writer to `activity_log`**, and never commits.
+- **`log_admin_event()` is the only writer to `audit_event`**, and never commits (design-doc
+  §10.1).
 - **Enums:** `VARCHAR` + CHECK via the enum helper. Filter with enum members, never string
   literals.
 - **Numbers** come only from the numbering service (`project_counter`,

@@ -18,7 +18,7 @@ what was built (any drift is fixed in the docs in the same change).
 | Slice | Scope |
 |---|---|
 | **0** | Skeleton: stack, shared conventions, CI, app shell. No features. |
-| **1** | Auth, tenancy (workspace, organizations, workspace/org/project memberships), projects (types, modules, keys), number allocation, `authorize()`. |
+| **1** | Auth, tenancy (workspace, organizations, workspace/org/project memberships), projects (types, modules, keys), number allocation, `authorize()`, admin audit events, and the API conventions (lists, errors, allowed actions, identifiers). |
 | 2 | Requirements: tree, `RQ` numbering, revisions, approvals, `log_change()` and the activity log. Starts by verifying the `new-area` skill (drafted earlier) against Slice 1's `project` area and correcting it where they differ. |
 | 3 | Tasks and subtasks, phases, workstreams, transition rules, rank; backlog and board. |
 | 4 | Sprints (module) and milestones/gates. |
@@ -144,6 +144,8 @@ Choices the design docs left open.
 | 6 | **Python 3.14** (built-in `uuid.uuid7()`); fallback to 3.13, then 3.12, with the `uuid-utils` package for UUIDv7 if a dependency lags. | Confirmed |
 | 7 | **Layered backend** (routers → services → repositories → models), organized layer-first, as in "Backend architecture" below. Includes a repository layer (the app is database-operation-heavy); SQLAlchemy models serve as the domain entities (no separate domain layer). | Confirmed |
 | 8 | **Feature map:** one file name per aggregate across every layer, with ownership and cross-area rules, as in "Feature map" below. | Confirmed |
+| 9 | **Production cookie settings in every environment.** `__Host-session` with `Secure` in dev and test too; no switch that loosens it. Browsers treat `localhost` as secure, so the dev server is reached at `localhost`; API tests use an `https://` base URL (httpx won't send a Secure cookie over `http://`); Playwright runs Chromium only in v1. Local HTTPS and Safari/WebKit coverage are tech debt (TD-13). | Confirmed |
+| 10 | **API conventions are set in Slice 1** ("API conventions" below) and followed by every later slice. | Confirmed |
 
 **v1 operating assumption:** users are few and a workspace admin or system admin is always
 available. Anything that needs one (creating orgs, resetting the password of or deactivating a
@@ -181,19 +183,23 @@ The sections below describe the content; the table above is the order of work.
 │   ├── app/
 │   │   ├── main.py               FastAPI app, router registration, error handlers
 │   │   ├── openapi_export.py     writes openapi.json from the code (`wl gen-client`)
-│   │   ├── cli.py                app admin commands, run inside the app (e.g. create first
-│   │   │                         system admin); invoked by `wl seed`
+│   │   ├── cli.py                app admin commands, run inside the app (e.g. seed the first
+│   │   │                         system admin, grant-system-admin, revoke-system-admin);
+│   │   │                         invoked by `wl seed` and `wl admin <command>`
 │   │   ├── core/                 settings, db session & transaction dependency, base model &
-│   │   │                         mixins, enum helper, errors, security (hashing, tokens)
+│   │   │                         mixins, enum helper, errors, security (hashing, tokens),
+│   │   │                         list helpers (paging, sort, filter specs), constraint error
+│   │   │                         registry
 │   │   ├── models/               SQLAlchemy models: user.py, org.py, project.py, …
 │   │   ├── schemas/              Pydantic request/response shapes, same file names
 │   │   ├── repositories/         base.py + one per model file, same file names
 │   │   ├── services/             business logic, same file names, plus numbering.py
 │   │   ├── routers/              thin HTTP endpoints, same file names
-│   │   ├── rules/                pure business rules, no database: task_transitions.py,
+│   │   ├── rules/                pure business rules, no database: identifiers.py,
+│   │   │                         password_policy.py, account_rank.py, task_transitions.py,
 │   │   │                         approval_policy.py, …
 │   │   ├── authz/                authorize(), action registry, module gating dependency
-│   │   ├── audit/                log_change()
+│   │   ├── audit/                log_change(), log_admin_event()
 │   │   └── jobs/                 procrastinate app, enqueue.py (only entry point), job functions
 │   ├── migrations/               Alembic
 │   ├── tests/
@@ -215,6 +221,7 @@ The sections below describe the content; the table above is the order of work.
 │       ├── composables/          shared logic (auth state, permissions, forms)
 │       ├── stores/               Pinia stores (current user, current org)
 │       └── views/                screens, grouped by area: auth/, orgs/, projects/, …
+│   └── e2e/                      Playwright end-to-end tests (from Slice 1)
 │
 ├── CLAUDE.md                     project rules for Claude sessions (backend/ and frontend/
 │                                 each have their own CLAUDE.md too)
@@ -269,7 +276,7 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   |---|---|---|
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
   | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
-  | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed` | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
+  | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
   | Cross-cutting | `wl gen-client`, `wl doctor` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version) |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
@@ -286,17 +293,17 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
      commands.
 - **Not the same as the app's admin CLI:** `backend/app/cli.py` holds administration commands
   that run inside the app against the database (e.g. seeding the first system admin). The
-  developer CLI calls it (`wl seed`) but is never deployed.
+  developer CLI calls it (`wl seed`, `wl admin <command>`) but is never deployed.
 
 ### Backend architecture
 
 Calls flow one way: **routers → services → repositories → models**. Services also call
-`authorize()`, `log_change()`, `rules/`, and `jobs/enqueue.py`.
+`authorize()`, `log_change()`, `log_admin_event()`, `rules/`, and `jobs/enqueue.py`.
 
 | Layer | Responsibility | Never |
 |---|---|---|
 | Routers | HTTP only: validate input (schemas), resolve the current user and session, call one service method, return a response schema. | Business rules; database access. |
-| Services | All business logic: `authorize()`, the design's rules (transitions, delete dialog, approval completion, numbering), `log_change()`, coordinating across entities. | Commit; build queries. |
+| Services | All business logic: `authorize()`, the design's rules (transitions, delete dialog, approval completion, numbering), `log_change()` and `log_admin_event()`, coordinating across entities. | Commit; build queries. |
 | Repositories | All queries: access scoping (the user's accessible orgs and projects), soft-delete opt-in, explicit loading of related rows. A generic base (get by ID, add, filtered list); entity-specific methods only for non-trivial queries. Get by ID uses a query, never `session.get()`, so soft-deleted rows stay hidden even within the session that deleted them (TD-8). | Business rules; commit. |
 | Models | SQLAlchemy tables; they are the domain entities. | Business logic. |
 
@@ -339,13 +346,14 @@ it is the only place that writes them.
 |---|---|---|---|
 | `user` | user | 1 | — |
 | `auth` | session; user_identity (added in Slice 7) | 1 | user |
-| `workspace` | workspace, workspace_membership | 1 | user |
-| `org` | organization, membership | 1 | user; tag (copies the default tags into a new org, from Slice 6) |
-| `project` | project (incl. modules and module guidance), project_membership | 1 | org, user (creating a user for the project goes through the org service) |
+| `workspace` | workspace, workspace_membership | 1 | user; project (only through its registered `on_member_removed` handler) |
+| `org` | organization, membership | 1 | user; tag (copies the default tags into a new org, from Slice 6); project (only through its registered `on_member_removed` handler) |
+| `project` | project (incl. modules and module guidance), project_membership | 1 | org, workspace (registers `on_member_removed` with both), user (creating a user for the project goes through the org service) |
 | `numbering` *(service + repository only)* | project_counter; `task.next_subtask_number` | 1 | — |
 | `requirement` | requirement, requirement_revision | 2 | numbering, approval, task, testcase |
 | `approval` | approval_request, approval | 2 | approvable areas via registered handlers only |
 | `audit` *(`log_change()` in `app/audit/`; not a service)* | activity_log | 2 | — |
+| `audit_event` *(`log_admin_event()` in `app/audit/`; not a service)* | audit_event | 1 | — |
 | `activity` *(read side)* | none (reads activity_log) | 2 | — |
 | `phase` | phase | 3 | — |
 | `workstream` | workstream | 3 | — |
@@ -383,6 +391,10 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   entity type. There is no `on_rejected`: a rejection changes nothing on the entity
   (design-doc §6.2). The requirement area calls the approval service directly (e.g.
   to cancel pending requests on delete).
+- **Membership removal handlers:** the org and workspace services never import the project
+  area. When an org member or staff member is removed "with their project memberships", the
+  service calls the `on_member_removed` handler the project area registered, which removes
+  the project memberships (design-doc §4, "Removing a member with their projects").
 - **Requirement ↔ test case links** are owned by `testcase`. The requirement screens show and
   edit links through the testcase service. This keeps dependencies one-way (requirement →
   testcase), lets the link table ship with test cases in Slice 5, and keeps coverage queries
@@ -405,20 +417,22 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 **Naming**
 - Schemas: `TaskCreate`, `TaskUpdate`, `TaskRead`, `TaskListItem`.
 - Classes: `TaskService`, `TaskRepository`; authorization policies in `authz/policies/task.py`.
-- URLs are nested under the project and use the human-readable key and number, not UUIDs:
-  `/api/projects/{key}/tasks/{number}`, subtasks at `/api/projects/{key}/tasks/{number}/subtasks/{n}`.
-  This is safe because project keys are immutable and unique in the workspace, and items never
-  move (design-doc §3). UUIDs stay internal. Browser routes add the org slug for readability
-  (`/{org_slug}/projects/{key}/tasks/{number}`); the frontend resolves the project by key and,
-  once it is authorized, redirects a stale or wrong slug to the current one. A project the user
-  can't see is a 404, never a redirect that would reveal its org.
+- Project items' URLs are nested under the project and use the human-readable key and number:
+  `/api/projects/{key}/tasks/{number}`, subtasks at
+  `/api/projects/{key}/tasks/{number}/subtasks/{n}`. This is safe because project keys are immutable
+  and unique in the workspace, and items never move (design-doc §3). Everything else (orgs, users,
+  workspaces, memberships, and entity references in bodies) uses UUIDs ("API conventions",
+  "Identifiers"). Browser routes add the org slug for readability
+  (`/{org_slug}/projects/{key}/tasks/{number}`); the frontend resolves the project by key and, once
+  it is authorized, redirects a stale or wrong slug to the current one. A project the user can't see
+  is a 404, never a redirect that would reveal its org.
 
 ### Tooling
 - Python: `uv` (dependencies, lockfile, Python version), `ruff` (lint + format), `pyright`,
   `pytest` with `anyio`, `pytest-cov`, `polyfactory` + Faker (fixed seed), Hypothesis,
   import-linter.
 - Frontend: Vite, Vue Router, Pinia, ESLint + Prettier, `vue-tsc`, Vitest + Vue Test Utils;
-  Playwright from Slice 1.
+  Playwright from Slice 1 (Chromium only in v1; implementation decision 9).
 - `pre-commit` for local hooks; `wl check` runs everything CI runs.
 - Testing approach, layers, and gates: see `testing-strategy.md`.
 - Settings via `pydantic-settings` (environment variables, `.env` for local dev).
@@ -472,6 +486,80 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   production), added with settings in Checkpoint 2. `wl gen-client` exports the schema from
   code, so nothing depends on the live URL.
 
+### API conventions (set in Slice 1)
+
+Every endpoint follows these; the `new-area` skill carries them into later slices.
+
+**Lists**
+- **Offset paging by default:** `?limit=50&offset=0` (maximum 200; above it → 422), returning
+  `{items, total, limit, offset}`.
+- **Append-only feeds** (activity log, audit events) use a cursor: `?before=<id>`, returning
+  `{items, next_cursor}`. UUIDv7 IDs sort by creation time, so the ID is the cursor.
+- **Ranked views** (backlog, board, requirement tree) return complete lists with a hard cap
+  (set in Slice 3), because drag-and-drop needs the whole list.
+- **Sorting:** `?sort=name,-created_at`, from a per-endpoint allowlist; `id` is always the last
+  tiebreaker, so order is deterministic and offsets never skip or repeat rows. Each endpoint
+  documents its default sort.
+- **Filters are declared,** once per list, as a filter spec (field, type, operators). The spec
+  generates the endpoint's query-parameter model (so the filters are in the OpenAPI schema and
+  the generated client) and drives one shared translator to SQL; endpoints never hand-write
+  filter logic. Only declared fields are filterable, never arbitrary columns; a declared field
+  can require an action. Filters that need a join (e.g. tasks by tag) are declared as custom
+  filters backed by a function.
+- **Operators by type:** enum and references: any of (repeat the parameter), none of, is empty
+  (`__is_null`), and `me` for user references; dates: `__lt`, `__gt`, `__is_null`; text:
+  `__contains` (case-insensitive, `%` and `_` escaped); booleans: equals; numbers: `__gte`,
+  `__lte`.
+- **Combining:** different fields AND together; repeated values of one field OR together. No
+  OR across fields in v1.
+- **Free-text search:** `?q=`, a simple name/title match until Slice 6 swaps in full-text
+  search behind the same parameter.
+- **Hidden rows:** `?include_archived=true` (projects, workstreams) and `?include_deleted=true`
+  (soft-deleted items).
+- **Unknown query parameters → 422** (query-parameter models with `extra="forbid"`), so a typo
+  never silently returns an unfiltered list.
+- **Scoping before paging:** access scoping applies first, so `total` counts only rows the user
+  can see.
+- **Frontend:** `useListQuery` keeps paging, sort, and filters in the URL's query string; one
+  filter bar per list (built in Slice 3) adds any number of declared filters as chips.
+
+**Errors from constraints**
+- A uniqueness, CHECK, or user-triggerable foreign-key violation returns **422** in the
+  standard error body, in the same shape as request validation (built in S0-C6): code
+  `validation_error`, with `details.fields` entries `{loc, message, type}` (e.g.
+  `loc: ["body", "key"]`, `type: "taken"`), so the frontend has one field-error parser. 409
+  stays reserved for version conflicts.
+- The service checks first (clear message, live availability checks); the database constraint
+  is the source of truth. An `IntegrityError` is translated through a registry that maps
+  constraint names (from the naming convention) to a field and code. A test fails if any unique
+  constraint has no mapping. An unmapped `IntegrityError` stays a **500**.
+- Availability checks (project key, org slug, username) reveal only whether a value is taken,
+  never where.
+
+**Allowed actions**
+- Single-entity reads return `allowed_actions`, evaluated through `authorize()`; `/me` returns
+  workspace-level actions. Lists include per-row actions only where the screen needs per-row
+  buttons (member lists).
+- Action names (`project.update`, `org_member.manage`, …) come from the action registry and are
+  exported as an OpenAPI enum, so the generated client types them.
+- Rules that depend on data get their own field next to `allowed_actions` (e.g. Slice 3's
+  `allowed_transitions` on tasks).
+- The UI hides actions not allowed. `allowed_actions` is a hint: the server re-checks every
+  request, and a failed action shows the error and refetches the entity.
+
+**Identifiers**
+- Project items are addressed by project key and number (`/api/projects/{key}/tasks/{number}`).
+- Entities with no permanent human-readable identifier are addressed by UUID:
+  `/api/orgs/{org_id}`, `/api/users/{user_id}`, `/api/workspaces/{workspace_id}`.
+- Memberships are addressed by scope plus user: `/api/workspaces/{workspace_id}/staff/{user_id}`,
+  `/api/orgs/{org_id}/members/{user_id}`, `/api/projects/{key}/members/{user_id}`.
+- Request and response bodies reference other entities by UUID; every response includes the
+  entity's `id`. The one exception is the email-first add-person form, where the email is the
+  input.
+- A malformed UUID in a path is FastAPI's 422; a well-formed ID the user can't see is 404.
+- Browser URLs keep the org slug (`/{org_slug}/projects/{key}/…`) and resolve it from the
+  user's org list; workspace pages are `/workspace/…` in v1.
+
 ### Background jobs (§13)
 - procrastinate app and worker entry point; its schema applied as part of the migration flow.
 - `app/jobs/enqueue.py` as the only enqueue entry point, with one trivial test job.
@@ -519,19 +607,47 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 ## Slice 1 — Auth, tenancy & projects
 
 **Goal:** people can sign in; the workspace, orgs, and workspace, org, and project memberships
-exist; projects can be created with a type, modules, and a key; and every request goes through
-`authorize()`.
+exist; projects can be created with a type, modules, and a key; every request goes through
+`authorize()`; admin and security events are recorded; and the API conventions every later
+slice copies (lists, uniqueness errors, allowed actions, identifiers) are in place.
 
-**Carry-in tech debt** (Fix by: Slice 1, `tech-debt.md`): TD-2 (authz/rules coverage gate
-outside `wl`), TD-4 (concurrency fixture for real race tests), TD-5 (realistic factory
-values), TD-8 (base repository get-by-ID uses a query, not `session.get()`), TD-10 (prove the
-installed Pinia is wired, with the first store), TD-11 (dev containers run as root: owner
-decides).
+**Before starting:** met. TD-1 and TD-7 (due in Slice 0) were resolved in S0-C7 and S0-C6;
+the `security-reviewer` agent and the drafted `new-area` skill exist in `.claude/`.
 
-### Migration
+**Carry-in tech debt** (Fix by: Slice 1, `tech-debt.md`): TD-2 (Checkpoint 3), TD-4
+(Checkpoint 2), TD-5 (Checkpoint 1), TD-8 (Checkpoint 1), TD-10 (Checkpoint 13, with the
+current-user store), TD-11 (Checkpoint 16: the owner decides on a non-root dev user).
+
+### Checkpoints
+
+| # | Checkpoint | Includes |
+|---|---|---|
+| 1 | Tenancy models & migration | Models and one migration for `user`, `session`, `workspace`, `workspace_membership`, `organization`, `membership`, `project`, `project_membership`, `project_counter`, `audit_event` (schema-doc); constraint tests (uniques, lowercase email CHECK, project composite FK, `enabled_modules` CHECK); a factory per model with realistic Faker values (TD-5); base repository with get-by-ID through a query (TD-8) |
+| 2 | Number allocation & race harness | `allocate_number(project, prefix)` (numbering service and repository); the concurrency harness finished (TD-4): `run_in_parallel(n, fn)` with a start barrier, a test pool sized for 20 connections, factories usable in concurrency tests, an automatic empty-tables check after each test, a time limit plus `lock_timeout`; the allocation tests, sabotage-checked against a non-atomic allocator |
+| 3 | Pure rules & mutation testing | `rules/identifiers.py` (project key, slug with the reserved list, username), `rules/password_policy.py`, `rules/account_rank.py`, all test-first, with Hypothesis where the input space is large; `wl backend mutate` (mutmut over `app/rules/` and `app/authz/`) in `wl check` and CI; TD-2 resolved |
+| 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
+| 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token, cookie, fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL |
+| 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`) with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
+| 7 | Authorization core | Action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first; unarchive and member-removal exceptions); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions`; the full matrix and fail-closed tests |
+| 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events |
+| 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add, create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
+| 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); users list for workspace pages; own profile update (name, username); boundary tests both ways at each rank; audit events |
+| 11 | Projects | Create (key, type, module seeding, first admin), list, view, update (name, type, modules), archive and unarchive; key availability; module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
+| 12 | Project members | List (per-row `allowed_actions`); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its three cases (design-doc §4); change role; remove; registers the `on_member_removed` handler with the org and workspace services, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
+| 13 | Web: auth & app shell | Current-user store (TD-10); sign-in; forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
+| 14 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions); org settings; org members page (email-first add-person form with a "Generate" temporary password, role changes, account actions, the D2 removal dialog) |
+| 15 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, module selection with guidance); project settings (module toggles and warnings, archive/unarchive); project members page; unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
+| 16 | Slice verification | "Done when" walked through (as end-to-end tests where practical); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision) |
+
+Checkpoints touching authentication, sessions, authorization, or routers get the
+`security-reviewer` as well (every checkpoint from 1 to 15). The sections below describe the
+content; the table above is the order of work. The decisions behind this plan (F1–F10, D1–D7,
+C1–C5) are recorded in `docs/reviews/S1-plan.md`.
+
+### Migration (Checkpoint 1)
 Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, `membership`,
-`project`, `project_membership`, `project_counter` (schema-doc, Users/Tenancy/Auth and
-`project_counter`).
+`project`, `project_membership`, `project_counter`, `audit_event` (schema-doc, "Users, Tenancy
+& Auth", `project_counter`, and "Audit").
 
 ### Authentication (§4)
 - Argon2id password hashing, run in a worker thread so it doesn't block the event loop.
@@ -543,55 +659,95 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   `Host`; hostnames compared ignoring case; an exemption list, empty until the Slice 7
   webhook; the API test client sends a matching `Origin` by default; checked first, before
   authentication; 403 `origin_rejected`), JSON-only bodies (checked next, only when there
-  is a body; 415 `unsupported_media_type`),
-  configurable idle/absolute expiry, throttled `last_seen_at`.
-- `must_change_password`: while set, every endpoint except change-password and sign-out returns
-  403 with a specific error code; the web app redirects to the change-password screen.
-- `POST /api/auth/change-password` (requires current password; replaces the current session's
-  token and deletes the user's other sessions).
+  is a body; 415 `unsupported_media_type`), configurable idle/absolute expiry, throttled
+  `last_seen_at`.
+- **Sign-in responses** (§4, "Sign-in"): unknown email and wrong password both return
+  `invalid_credentials`, and an unknown email still runs a password verification against a
+  dummy hash, so timing doesn't reveal which emails have accounts; a deactivated account returns
+  `account_inactive` only after the password is verified; emails are lowercased before lookup;
+  a hash made with older Argon2 parameters is upgraded after a successful sign-in. The sign-in
+  response has the same shape as `/me`.
+- **`/me`**: the user, `is_system_admin`, their workspaces and roles, their orgs (for the
+  switcher), `must_change_password`, and workspace-level `allowed_actions` (from Checkpoint 7).
+- **Password policy** (`rules/password_policy.py`, §4): 8–256 characters, no composition rules,
+  not equal to the email or username (ignoring case); on change, the new password differs from
+  the current one. Used by change password, admin reset, and account creation.
+- `must_change_password`: while set, every endpoint except `GET /api/auth/me`, change-password,
+  and sign-out returns 403 with the error code `password_change_required`; the web app redirects
+  to the change-password screen.
+- `POST /api/auth/change-password` (requires the current password; replaces the current
+  session's token and deletes the user's other sessions).
 - **Seed command:** an app admin command (`app/cli.py`, run as `wl seed`) that creates the
-  workspace (prompts for name and slug) and the first system admin (prompts for email,
-  username, name, password), and makes that admin the workspace's owner
-  (`workspace_membership`, role owner). There is no UI or endpoint for creating workspaces.
+  workspace (name and slug) and the first system admin (email, username, name, password), and
+  makes that admin the workspace's owner (`workspace_membership`, role owner). It prompts by
+  default; with flags or environment variables it runs non-interactively (CI end-to-end tests,
+  `fresh-clone-verifier`). It refuses to run when a workspace already exists. There is no UI or
+  endpoint for creating workspaces.
+- **System-admin commands:** `grant-system-admin` and `revoke-system-admin` (`app/cli.py`, by
+  email), run as `wl admin <command>`: a pass-through to the app CLI in the backend image, covered
+  by the CLI's dry-run tests. Revoking refuses when it would leave no active system admin. Both are
+  recorded as audit events with no actor.
 
 ### Authorization (§5)
 - `authorize(user, action, entity)`: an explicit action registry; unknown action → deny;
-  checks in order: system admin → workspace owner/admin → owner/admin of the project's org →
-  project role → targeted rules (§5). The admin levels grant inherited project admin.
+  checks in order: archived project (deny every mutation on it or inside it, except unarchive
+  and removing a member with their projects, §5)
+  → system admin → workspace owner/admin → owner/admin of the project's org → project role →
+  targeted rules (§5). The admin levels grant inherited project admin.
+- **Authorization context:** the user's system-admin flag and their workspace, org, and project
+  memberships, loaded once per request and reused by every check, by `allowed_actions`, and by
+  list scoping.
 - A FastAPI dependency that loads an entity and authorizes it in one step, so an endpoint can't
   get an entity without the check. Entities the user can't see → **404**.
 - An access-scoping helper for list queries: results are limited to the user's accessible
   projects and orgs (§4, "Visibility"), with no row-by-row checks.
-- **Archived projects are read-only:** mutations on an archived project, or anything inside it,
-  are denied in `authorize()`.
-- **Module gating dependency:** a request to a module disabled for the project returns 404
-  (tested with `sprints`/`github`, which have no endpoints yet). Both are allowed values from
-  Slice 1 and seeded from the project type (design-doc §1.1).
+- **`allowed_actions`** (build plan, "API conventions"): single-entity reads return the actions
+  the user may take, evaluated through `authorize()`. Action names come from the registry and are
+  exported as an OpenAPI enum.
+- **Module gating dependency:** a request to a module disabled for the project returns 404,
+  tested through a test-only gated router in `tests/support/` (`sprints` and `github` have no
+  endpoints yet). Both are allowed values from Slice 1 and seeded from the project type
+  (design-doc §1.1).
 - **Test matrix:** one parametrized test per action × role, covering project roles (viewer,
   member, admin), org roles (member; admin and owner, with inherited project admin), workspace
   roles (member; admin and owner, with inherited admin), system admin, and users with no
   access (not on the project, in another org, in another workspace), plus a fail-closed test
-  for an unregistered action.
+  for an unregistered action, and archived-project cases for every mutating action.
 - **Mutation testing:** mutmut over `app/rules/` and `app/authz/`, run by `wl backend mutate`,
   included in `wl check` and CI; fails on any surviving mutant not marked equivalent
   (`testing-strategy.md`, "Mutation testing").
+
+### Admin audit events (§10.1)
+- `log_admin_event()` (in `app/audit/`, beside `log_change()`) is the only writer of
+  `audit_event`; it adds the row to the request's session, so the event commits or rolls back
+  with the change.
+- Every Slice 1 admin and security action records an event (schema-doc, `audit_event`, action
+  values). Each action has a test asserting its event.
+- No screen and no read endpoint in Slice 1; events are read with SQL. Sign-in successes and
+  failures are not recorded
+  (they come with sign-in throttling, before the first non-local deployment).
 
 ### Workspace, organizations & memberships
 - Workspace owner/admin (and system admin): list, add, and create staff (workspace members);
   change their roles; remove them. Create orgs, assign each its first owner, list all orgs in
   the workspace. An org is created with a name and slug; its owners rename it and change its
-  slug.
+  slug. Slugs follow `rules/identifiers.py`, including the reserved list (§3).
 - Org owner/admin (and workspace owner/admin): list members; add an existing user by email;
-  create a new user and their membership in one step; remove members. Adding by email uses
-  the email-first form (§4): an existing account is added after confirmation, otherwise the
-  form continues to account creation.
+  create a new user (email, username, name, temporary password) and their membership in one
+  step; change roles; remove members. Adding by email uses the email-first form (§4): an
+  existing account is added after confirmation, otherwise the form continues to account
+  creation.
 - Project admin (including inherited): list the project's members; add a user with a project
   role (admin, member, viewer), choosing from the org's members and the workspace's staff (the
-  picker lists no one else, and adding by user ID rejects anyone else with a 404); add by email with
-  the email-first form (§4): a new email creates the user, an org membership (member), and the
-  project membership; an org member's or staff member's email adds only the project membership
-  (staff never get an org membership this way); any other existing account is added to the org
-  as a member and to the project after the admin confirms; change roles; remove members.
+  picker lists no one else, and adding by user ID rejects anyone else with a 404); add by email
+  with the email-first form (§4): a new email creates the user, an org membership (member), and
+  the project membership; an org member's or staff member's email adds only the project
+  membership (staff never get an org membership this way); any other existing account is added
+  to the org as a member and to the project after the admin confirms; change roles; remove
+  members.
+- **Removing an org member, or workspace staff,** offers to also remove their project
+  memberships (in that org; for staff, in the workspace's projects), checked by default
+  (§4). Each removal is its own audit event.
 - Removing any membership leaves the user's sessions alone (§4): access ends on the next
   request because `authorize()` re-checks memberships.
 - Guards: the last owner of an org, and of the workspace, can't leave or be demoted; only
@@ -599,20 +755,22 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   tables).
 
 ### Users (system admin, plus workspace-admin and org-admin scope)
-- Create, deactivate, reactivate, reset password (sets `must_change_password`), sign out
-  everywhere. Deactivate, reset password, and sign out everywhere run in the `auth` service.
+- Create (through the org and project flows above), deactivate, reactivate, reset password
+  (sets `must_change_password`), sign out everywhere. Deactivate, reset password, and sign out
+  everywhere run in the `auth` service.
 - Deactivation deletes all the user's sessions immediately.
 - **Account actions follow rank (§4)** (deactivate, reactivate, reset password, sign out
-  everywhere): the target holds at least one membership in the actor's scope, and every
-  membership the target holds is covered by an actor role at an equal or higher rank (system
-  admin > workspace owner > workspace admin > workspace member > org owner > org admin > org
-  member > project-only user). Users with no memberships: workspace owners/admins and system
-  admins.
+  everywhere), decided by `rules/account_rank.py`: the target holds at least one membership in
+  the actor's scope, and every membership the target holds is covered by an actor role at an
+  equal or higher rank (system admin \> workspace owner \> workspace admin \> workspace member \>
+  org owner \> org admin \> org member \> project-only user). Users with no memberships:
+  workspace owners/admins and system admins.
   Tested both ways at each boundary: e.g. an org admin can reset another admin of their org but
   not a workspace member, a user in another org, or a user on another org's project; a
   workspace admin can't reset the workspace owner or a system admin.
-- Guard: the last active system admin can't be deactivated or demoted.
-- Users can update their own name and username (format and uniqueness checked).
+- Guard: the last active system admin can't be deactivated or have the flag revoked.
+- Users can update their own name and username (format and uniqueness checked). Email can't be
+  changed in v1 (§4).
 
 ### Projects (§1.1, §3)
 - Create (org owner/admin, including inherited): name, key (3–6 characters,
@@ -621,17 +779,20 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   starts with none). The creator names the project's first admin (possibly themself) from
   the org's members and the workspace's staff; that admin always gets a `project_membership`
   row, even if they also inherit admin.
-- List (scoped to the user's accessible projects; archived hidden unless requested), view,
-  update name / type / enabled modules (project admin), archive and unarchive (org
-  owner/admin).
-- Key is immutable: no endpoint accepts a key change.
+- List (scoped to the user's accessible projects; archived hidden unless
+  `include_archived=true`), view, update name / type / enabled modules (project admin), archive
+  and unarchive (org owner/admin).
+- Key is immutable: no endpoint accepts a key change. Key availability is checked live
+  (`taken`, in the "Errors from constraints" shape of "API conventions").
 - **Module guidance** returned by the API alongside project settings (recommended modules per
   type, a best-practice note per module, and warnings when disabling a recommended module or
   one that holds data), plus each module's `available` flag (shipped or not; `sprints` and
-  `github` are not yet), so the UI only renders it and greys out unavailable modules.
+  `github` are not yet), so the UI only renders it and greys out unavailable modules. "Holds
+  data" is a per-module hook that returns false until the module's slice implements it.
 
 ### Number allocation (§3)
-- `allocate_number(project, prefix)` using the lazy upsert on `project_counter`.
+- `allocate_number(project, prefix)` using the lazy upsert on `project_counter`; prefixes come
+  from an enum, not strings.
 - Tests: first allocation returns 1; sequential allocations increase; **concurrent allocations
   from parallel transactions never collide**; a rolled-back transaction doesn't consume a
   number; different prefixes and projects are independent.
@@ -644,38 +805,57 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Project list; create-project dialog with live key validation, type selection, and module
   selection showing the recommendations and notes; project settings with module toggles and
   warnings; archive/unarchive.
-- Org members page: list, add or create user, change role, remove.
+- Org settings: rename, change slug.
+- Org members page: list, add (email-first) or create user, change role, account actions by
+  rank, remove (with the project-membership option).
 - Project members page: list, add with a role, change role, remove.
+- Account creation and password reset forms offer a "Generate" button that fills in a random
+  password meeting the policy, shown once for the admin to pass on.
 - Features and links of an enabled module whose slice hasn't shipped (`sprints`, `github`) are
   shown greyed out or disabled (design-doc §1.1).
 - A "no access" page for a signed-in user with no memberships left (design-doc §4,
   "Sessions").
-- Workspace admin pages: staff, organizations, users (create, deactivate, reset password).
-  Only workspace owners/admins and system admins see workspace pages.
+- Workspace admin pages: staff (add, create, change role, remove), organizations (create,
+  list), users (create, deactivate, reactivate, reset password, sign out everywhere). Only
+  workspace owners/admins and system admins see workspace pages.
 - Browser routes include the org slug (`/{org_slug}/projects/{key}/…`); a stale slug
-  redirects.
+  redirects; a lowercase key is uppercased and redirected. Top-level routes (`/workspace`,
+  `/account`, `/sign-in`, …) are on the reserved-slug list.
+- Actions the user can't take are hidden (`allowed_actions`); a state-based denial (archived
+  project, last owner) is explained from data the screen already has.
+- End-to-end tests (Playwright, Chromium): sign-in, forced password change, project creation,
+  adding a project member.
 
 ### Done when
-- [ ] `wl seed` creates the workspace and a system admin who is its owner; the admin signs in,
-      creates an org, and creates its owner.
+- [ ] `wl seed` creates the workspace and a system admin who is its owner (interactively and
+      with flags); the admin signs in, creates an org, and creates its owner.
 - [ ] The owner signs in (forced to change password first), creates a project with a key, type,
       and modules, and adds a project member and a project viewer.
-- [ ] The member sees the project; the viewer sees it but can't change its settings; an org
-      member not on the project, a workspace member not assigned to it, and a user in another
-      org all get a 404 for it; a workspace admin sees it and has project admin on it.
+- [ ] The member sees the project; the viewer sees it but can't change its settings; an org member
+      not on the project, a workspace member not assigned to it, and a user in another org all get a
+      404 for it; a workspace admin sees it and has project admin on it.
 - [ ] A project admin creates a new user for the project, who gets an org membership and the
       project membership; adding by user ID someone outside the org's members and the
       workspace's staff returns 404; adding another org's user by email adds them to the org
       and project after confirmation.
+- [ ] Removing an org member offers to remove their project memberships; with it unchecked,
+      they keep their projects as a project-only user.
 - [ ] A browser link with a stale org slug redirects to the current one; the same link for a
-      project the user can't see is a 404.
-- [ ] Deactivating a user ends their active sessions on the next request.
-- [ ] Every checklist item from §4 has a test (cookie attributes, rejected cross-origin
-      mutation, token replaced at sign-in and on password change, expiry).
-- [ ] The `authorize()` matrix and fail-closed test pass; archived projects reject mutations.
+      project the user can't see is a 404; a reserved slug is rejected.
+- [ ] Deactivating a user ends their active sessions on the next request; `grant-system-admin`
+      and `revoke-system-admin` work, and revoking the last active system admin is refused.
+- [ ] Every checklist item from §4 has a test (cookie attributes, rejected cross-origin and
+      missing-`Origin` mutations, token replaced at sign-in and on password change, expiry),
+      as do the sign-in responses and the password policy.
+- [ ] The `authorize()` matrix and fail-closed test pass; archived projects reject mutations
+      (unarchive and removing a member with their projects excepted).
 - [ ] Last-owner (org and workspace) and last-system-admin guards, and the rank rule for
       account actions, are tested.
+- [ ] Every Slice 1 admin and security action records its audit event.
+- [ ] List endpoints follow the API conventions: unknown query parameters return 422, and every
+      unique constraint is mapped in the error registry.
 - [ ] `project_counter` concurrency tests pass.
 - [ ] Mutation testing runs in `wl check` and CI with no surviving mutants in `app/rules/` and
       `app/authz/`.
+- [ ] End-to-end tests run in CI against a seeded stack.
 - [ ] CI is green.

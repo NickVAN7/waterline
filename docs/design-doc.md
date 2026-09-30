@@ -14,6 +14,10 @@
 >    the tenancy model: a workspace above organizations, workspace/org/project roles, and
 >    explicit project membership instead of `project.is_restricted` (§4, §5). Source:
 >    `screen-inventory.md` (Sept 28, 2026).
+> 5. Slice 1 readiness review (Sept 30, 2026): admin audit events (§10.1), sign-in behavior and
+>    password policy (§4), identifiers (§3), reserved slugs (§3), system-admin CLI (§4),
+>    removing members with their project memberships (§4), and the archive check's place in
+>    `authorize()` (§5). API conventions are in `build-plan.md`.
 >
 > Table-level detail lives in `schema-doc.md`. The people who use Waterline, the tenancy and
 access model, and the screens derived from them are in `screen-inventory.md`.
@@ -181,12 +185,21 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   works for; **immutable** after creation (renaming would break every external reference).
   Because every entity prefix is two letters, a 3-character minimum means no project key can
   ever collide with a current or future prefix — no reserved-word list is needed.
-- **URLs:** API URLs identify a project by its key alone (`/api/projects/{key}/…`). Browser URLs
-  also show the org for readability (`/{org_slug}/projects/{key}/tasks/45`), but the slug only
-  decorates: the key identifies the project, and a stale or wrong slug (e.g. after an org is
-  renamed) redirects to the current one, so old links keep working. The redirect happens only
-  after the project is authorized; for a project the user can't see it's a 404, so the redirect
-  never reveals an org.
+- **URLs and identifiers:** project items are addressed by project key and number; API URLs
+  identify a project by its key alone (`/api/projects/{key}/…`). Entities with no permanent
+  human-readable identifier (orgs, users, workspaces) are addressed by UUID in API URLs, and
+  request bodies always reference other entities by UUID (build plan, "API conventions").
+  Browser URLs also show the org for readability (`/{org_slug}/projects/{key}/tasks/45`), but
+  the slug only decorates: the key identifies the project, and a stale or wrong slug (e.g.
+  after an org is renamed) redirects to the current one, so old links keep working. The
+  redirect happens only after the project is authorized; for a project the user can't see
+  it's a 404, so the redirect never reveals an org.
+- **Reserved slugs:** org slugs sit at the root of browser URLs, so they can't use a reserved
+  list of top-level routes (`workspace`, `account`, `sign-in`, …). Workspace slugs follow the
+  same list only to keep root-level workspace URLs possible later; in v1 workspace pages are
+  `/workspace/…`. The list lives in `rules/identifiers.py` and is exported through the OpenAPI
+  schema (an enum), so a frontend test checks every top-level route in the router against the
+  generated list.
 - **Timestamps:** `timestamptz` everywhere. Every table has `created_at`/`updated_at`, with
   `updated_at` maintained by the ORM, never set by hand.
 - **Enums:** stored as `VARCHAR` + `CHECK` constraint (`Enum(..., native_enum=False)`), not
@@ -260,6 +273,9 @@ Workspace (the firm: tenant boundary)
   org to manage that client's users.
 
 ### Users
+- `email` — stored lowercase and compared case-insensitively (a CHECK enforces lowercase).
+  Not changeable in v1: there is no email-change feature; an administrator with database
+  access can change it directly.
 - `username` — unique across the app (users can belong to several orgs); lowercase letters,
   digits, hyphens; set at account creation, changeable by the user. Exists now so @mentions can
   be added with notifications (v1.5); mentions will store user IDs, so renames break nothing.
@@ -268,10 +284,11 @@ Workspace (the firm: tenant boundary)
   with a "deactivated" badge. Their open tasks stay assigned; the UI highlights them for manual
   reassignment.
 - `is_system_admin` — may perform any action in any workspace, org, or project (one exception:
-  deciding another person's approval, §6.2). Workspaces and orgs still have their own
-  owners/admins with full control within them. The first system admin is created by a CLI /
-  seed script. The last active system admin cannot be deactivated or demoted (lockout
-  safeguard).
+  deciding another person's approval, §6.2). Workspaces and orgs still have their own owners/admins
+  with full control within them. The first system admin is created by the seed command; afterwards
+  the flag is granted and revoked only through app CLI commands (`grant-system-admin`,
+  `revoke-system-admin`), never through the UI or API. The last active system admin cannot be
+  deactivated or demoted (lockout safeguard).
 - `must_change_password` — set when an admin creates an account or resets a password; the user
   is prompted to choose their own on next sign-in.
 
@@ -284,8 +301,9 @@ Workspace (the firm: tenant boundary)
   step.
 - **The add-person form asks for the email first.** If the email already has an account, the
   admin is asked to confirm adding that person (no name or password is asked for, and no
-  duplicate is created); otherwise the form continues to full account creation (name,
-  temporary password). The form therefore shows whether an email has an account, never which
+  duplicate is created); otherwise the form continues to full account creation (username,
+  name, temporary password; the form can generate a temporary password that meets the
+  policy). The form therefore shows whether an email has an account, never which
   org it belongs to; invitations (v2+) would hide even that.
 - **Project admins** add people to their project from the project org's members and the
   workspace's staff; the picker lists only those, never other clients' users, and adding by
@@ -298,6 +316,11 @@ Workspace (the firm: tenant boundary)
   - any **other** existing account (e.g. a user in another client org) is added to the project's
     org as a member and to the project, after the admin confirms. The rank rule then keeps
     both orgs' admins from deactivating or resetting them.
+- **Removing a member with their projects.** Removing someone from an org offers to also
+  remove their project memberships on that org's projects; removing staff from the
+  workspace offers the same for the workspace's projects. The option is checked by default.
+  Left unchecked, the person keeps those projects as a project-only user (which lowers their
+  rank for account actions).
 - **Account actions follow rank.** Deactivating, resetting the password of, or signing out
   everywhere another user, or reactivating them, is allowed only when the target holds at least
   one membership in the actor's scope, and for **every** membership the target holds, the actor
@@ -331,6 +354,17 @@ Workspace (the firm: tenant boundary)
   user's other sessions.
 - **Forgot password:** admin reset in v1 (no email infrastructure yet); self-service email reset
   later.
+- **Sign-in responses:** an unknown email and a wrong password return the same
+  `invalid_credentials` error in the same time (an unknown email still verifies against a
+  dummy hash). A deactivated account gets `account_inactive`, but only after its password is
+  verified. Emails are lowercased before lookup. After a successful sign-in, a hash made with
+  older Argon2 parameters is re-hashed with the current ones.
+- **Password policy:** 8–256 characters, no composition rules, not equal to the account's
+  email or username (ignoring case); a new password must differ from the current one. The same
+  rule applies to changes, admin resets, and new accounts. The minimum rises to 12 before the
+  first non-local deployment.
+- **Forced change:** while `must_change_password` is set, every endpoint except `/me`,
+  change-password, and sign-out returns 403 (`password_change_required`).
 
 ### Sessions
 - Server-side sessions in a `session` table, referenced by an httpOnly cookie (not JWTs), so
@@ -383,19 +417,29 @@ Workspace (the firm: tenant boundary)
   - Passwords hashed with Argon2id.
   - Idle timeout and absolute lifetime as configuration (defaults 7 and 30 days);
     `last_seen_at` written at most every 5 minutes.
+  - The same cookie settings in every environment, dev and test included (build plan,
+    implementation decision 9).
 - **Before the first non-local deployment** (features, not design questions):
   - Sign-in throttling per account and per IP, with progressive delays and no permanent
     lockout (`login_attempt` table).
   - Active-sessions page (adds `user_agent` and `ip_address` to `session`) with per-session
     revoke. (Admin "sign out everywhere" is built in Slice 1, under the rank rule in "Account
     management".)
-  - Password re-entry for sensitive actions (changing email, linking/unlinking GitHub, admin
+  - Password re-entry for sensitive actions (changing email, once that feature exists;
+    linking/unlinking GitHub; admin
     password resets).
   - Nightly worker job deleting expired sessions.
   - Per-org session-length settings, if any org needs shorter limits.
   - The reverse proxy in front of the app forwards the original `Host` header (e.g. nginx
     `proxy_set_header Host $host`), which the `Origin` check depends on; a proxy that rewrites
     it makes every mutating request fail with 403.
+  - Re-evaluate the `Origin` check's `Host` comparison against an allowed-origins setting,
+    once the application and API are more mature (owner decision, Slice 1 planning: the
+    `Host` comparison stays for now).
+  - Raise the password minimum to 12 characters (existing shorter passwords are flagged for
+    change at their next sign-in).
+  - Local HTTPS for the dev server, and end-to-end tests beyond Chromium.
+  - A screen for the admin audit events (§10.1).
 - GitHub OAuth `state` + PKCE are part of the GitHub slice. The OAuth callback is a frontend
   route that `POST`s `code` and `state` to the API (see CSRF above).
 
@@ -406,10 +450,13 @@ Workspace (the firm: tenant boundary)
   `authorize(user, action, entity)`, which **fails closed** (unrecognized action → deny) and has
   one unit test per action/role combination. Its internals can later be swapped for a
   data-driven `Permission`/`RolePermission` table without touching endpoints.
-- `authorize()` checks, in order: `user.is_system_admin`; then a workspace owner/admin role in
-  the entity's workspace; then an owner/admin role in the project's org; then the user's
-  project role; then the targeted field-based rules below. Anything not granted along the way
-  is denied.
+- `authorize()` checks, in order: an archived project first (every mutation on the project or
+  anything inside it is denied, for every role including system admins). Two exceptions: unarchive,
+  and removing someone's project memberships when they're removed from an org or the workspace "with
+  their projects" (§4), since taking access away is always allowed; then `user.is_system_admin`;
+  then a workspace owner/admin role in the entity's workspace; then an owner/admin role in the
+  project's org; then the user's project role; then the targeted field-based rules below. Anything
+  not granted along the way is denied.
 - **Reads are authorized too**, not just mutations:
   - Single-entity reads call `authorize(user, "view", entity)`.
   - List endpoints can't check row by row, so their queries are **scoped at the query level to
@@ -419,6 +466,9 @@ Workspace (the firm: tenant boundary)
   - Failures on entities the user can't see return **404, not 403**, so existence isn't leaked.
 - **Module gating** is a separate dependency: a request to a module that is disabled for the
   project returns 404 before `authorize()` runs.
+- **The UI asks the server.** Single-entity responses include `allowed_actions`, evaluated
+  through `authorize()`, so the frontend never re-implements role rules; it hides what the
+  user can't do (build plan, "API conventions").
 
 ### Role capabilities
 
@@ -492,7 +542,7 @@ Every protected mutation follows the same order, inside **one database transacti
 request**:
 
 **`Origin` check → JSON-only check → authenticate → authorize() → apply the change →
-log_change() → commit**
+log_change() (and `log_admin_event()` for admin and security actions, §10.1) → commit**
 
 (The `Origin` and JSON-only checks, §4, run before anything else, so a rejected request never
 touches a session.)
@@ -822,6 +872,29 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
   through `approved_revision_id`.
 - Logging `time_estimate` changes, plus a future nightly snapshot job, is what makes a real
   burndown chart possible later.
+
+### 10.1 Admin audit events
+
+`activity_log` is work history for project members. Administrative and security events are a
+different kind of record, with different readers, scope, and shape, so they live in their own
+table, `audit_event` (schema-doc, "Audit").
+
+- **What's recorded:** account actions (created, deactivated, reactivated, password reset, password
+  changed, signed out everywhere, username changed), system-admin grants and revocations, workspace
+  creation (by the seed command), workspace/org/project membership changes (added, role changed,
+  removed), org creation and changes, and project creation, changes, archiving, and unarchiving.
+- **Scope:** every event has its workspace (none for instance-level events such as system-admin
+  grants) and, where it applies, its org and project. A user-level event (e.g. a password
+  reset or username change) has the workspace it happened in, and the org when the actor acted
+  as that org's owner or admin, which is what lets that org's admins see it.
+- **Readers:** system admins see everything; workspace owners/admins see their workspace's
+  events; org owners/admins see their org's events. Project members never see them.
+- **Content:** the actor (none for app CLI commands), the target user, the entity, and
+  action-specific details (e.g. old and new role). Never passwords, hashes, or tokens.
+- **Write path:** only `log_admin_event()`, in the same transaction as the change (the same
+  rule as `log_change()`).
+- **Not yet:** a screen (before the first non-local deployment, §4), and sign-in successes and
+  failures (recorded with sign-in throttling, `login_attempt`).
 
 ## 11. Collaboration Features
 

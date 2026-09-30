@@ -41,9 +41,11 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      all the user's sessions (all run in the `auth` area); removing a membership leaves sessions
      alone, so every request must re-check memberships in `authorize()`;
    - idle and absolute expiry enforced server-side on every request;
-   - `must_change_password` blocks everything except change-password and sign-out;
+   - `must_change_password` blocks everything except `GET /api/auth/me`, change-password, and
+     sign-out, with 403 `password_change_required`;
    - Argon2id, run off the event loop; sign-in doesn't reveal whether an email exists (same
-     error; the unknown-user path still does comparable hashing work).
+     error; the unknown-user path still does comparable hashing work); `account_inactive` is
+     returned only after the password is verified.
 2. **CSRF:** every mutating method (`POST`, `PUT`, `PATCH`, `DELETE`) checks `Origin`: its
    host and port must equal the request's `Host` (a missing port is the default for the
    `Origin`'s scheme; the request's own scheme is never used; hostnames compared ignoring
@@ -52,22 +54,22 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    authentication (design-doc §4); a request with a body must have `Content-Type:
    application/json` (parameters such as `; charset=utf-8` allowed), else 415
    `unsupported_media_type`, checked right after `Origin` and also before authentication;
-   bodyless mutations pass; no `GET`
-   request changes
-   state (session bookkeeping such as `last_seen_at` aside; an outside redirect such as
-   GitHub's OAuth callback lands on a frontend route that `POST`s to the API). The exemption
-   list is in design-doc §4 (only the GitHub webhook), and only the owner adds to it. An
-   endpoint exempt in code but not listed there is a **blocker**; a listed one
-   must authenticate its caller another way, carry no browser session, and have a test that
-   its own authentication rejects an unauthenticated request, or it is a finding.
+   bodyless mutations pass; no `GET` request changes state (session bookkeeping such as
+   `last_seen_at` aside; an outside redirect such as GitHub's OAuth callback lands on a
+   frontend route that `POST`s to the API). The exemption list is in design-doc §4 (only the
+   GitHub webhook), and only the owner adds to it. An endpoint exempt in code but not listed
+   there is a **blocker**; a listed one must authenticate its caller another way, carry no
+   browser session, and have a test that its own authentication rejects an unauthenticated
+   request, or it is a finding.
 3. **Authorization** (§5):
    - every single-entity endpoint gets its entity only through the load-and-authorize
      dependency; every list query is scoped to the user's accessible projects and orgs;
    - every action is registered; unknown actions are denied (fail closed);
-   - order: system admin → workspace owner/admin → owner/admin of the project's org → project
-     role → targeted rules; inherited project admin only for those admin levels (never for
-     org or workspace members); module gating before
-     `authorize()`; archived projects reject mutations;
+   - order: archived project (every mutation on it or inside it denied, for every role including
+     system admins; unarchive and removing a member with their projects excepted) → system admin →
+     workspace owner/admin → owner/admin of the project's org → project role → targeted rules;
+     inherited project admin only for those admin levels (never for org or workspace members);
+     module gating before `authorize()`;
    - targeted rules match the design tables exactly (transitions, deletion, approvals — only
      the named approver decides, with no admin or system-admin override);
    - account actions (deactivate, reactivate, reset password, sign out everywhere) follow the

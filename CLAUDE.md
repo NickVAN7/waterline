@@ -40,6 +40,7 @@ Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <
   change; commit both
 - `wl seed` — create the workspace and its first system admin, who is the workspace owner
   (Slice 1)
+- `wl admin <command>` — app admin commands, e.g. `grant-system-admin <email>` (Slice 1)
 
 ## How work is done: checkpoints
 

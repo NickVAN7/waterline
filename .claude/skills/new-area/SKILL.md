@@ -22,6 +22,11 @@ Conventions: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, design-doc §3–§5 and
 - Read the design-doc sections and schema-doc tables for the area.
 - List the actions it needs (`view`, `create`, `update`, `delete`, `restore`, plus targeted
   actions such as transitions or reorder) and the roles allowed for each, from the design doc.
+- Read the build plan's "API conventions" and follow them in every step below: list paging,
+  sorting, and declared filters (unknown query parameters → 422); constraint errors through
+  the constraint-name registry; `allowed_actions` on single-entity reads; identifiers (key and
+  number for project items, UUIDs otherwise, `id` in every response); `useListQuery` on the
+  frontend.
 
 ## 1. Model — `models/<area>.py`
 

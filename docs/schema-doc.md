@@ -30,6 +30,8 @@ erDiagram
   USER ||--o{ MEMBERSHIP : has
   USER ||--o{ USER_IDENTITY : "links"
   USER ||--o{ SESSION : has
+  WORKSPACE |o--o{ AUDIT_EVENT : "scope of"
+  USER |o--o{ AUDIT_EVENT : "actor / target"
   ORGANIZATION ||--o{ PROJECT : "owns (composite FK with workspace_id)"
   ORGANIZATION ||--o{ TAG : defines
   ORGANIZATION ||--o{ GITHUB_INSTALLATION : has
@@ -332,6 +334,19 @@ erDiagram
     uuid changed_by FK
     timestamptz changed_at
   }
+  AUDIT_EVENT {
+    uuid id PK
+    uuid workspace_id FK
+    uuid organization_id FK
+    uuid project_id FK
+    varchar action
+    uuid actor_id FK
+    uuid target_user_id FK
+    varchar entity_type
+    uuid entity_id
+    jsonb details
+    timestamptz occurred_at
+  }
   COMMENT {
     uuid id PK
     varchar entity_type
@@ -423,7 +438,8 @@ project's org; design-doc §5).
 | created_at / updated_at | timestamptz | |
 
 Slugs (workspace and org): lowercase letters, digits, and hyphens, 2–40 characters, starting
-with a letter; suggested from the name at creation.
+with a letter; suggested from the name at creation. Slugs can't be on the reserved list of
+top-level browser routes (`rules/identifiers.py`; design-doc §3).
 
 The tenant boundary. The schema supports many; v1 deploys with one, created by the seed CLI
 (`wl seed`) alongside the first system admin, who is given a `workspace_membership` with role
@@ -461,16 +477,16 @@ installations moved to `github_installation` (an org can have several).
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| email | varchar | unique |
+| email | varchar | unique; stored lowercase (`CHECK (email = lower(email))`); not changeable in v1 |
 | username | varchar | unique app-wide; lowercase letters, digits, hyphens; user-changeable |
 | name | varchar | display name |
 | hashed_password | varchar | required (email/password is the primary sign-in) |
 | is_active | boolean, default true | false = cannot sign in; sessions deleted on deactivation |
-| is_system_admin | boolean, default false | may do anything in any org/project (except decide another person's approval) |
+| is_system_admin | boolean, default false | may do anything in any org/project (except decide another person's approval); granted and revoked only by app CLI commands |
 | must_change_password | boolean, default false | set on admin create/reset |
 | created_at / updated_at | timestamptz | |
 
-Last active system admin cannot be deactivated or demoted (service-layer check).
+Last active system admin cannot be deactivated or have the flag revoked (service-layer check).
 
 ### `user_identity`
 | Field | Type | Notes |
@@ -883,6 +899,36 @@ the project feed.
 **Write path:** only via `log_change(...)`, in the same transaction as the change (design-doc
 §10).
 
+### `audit_event`
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| workspace_id | UUID (FK → workspace), nullable | null only for instance-level events (system-admin grants and revocations) |
+| organization_id | UUID (FK → organization), nullable | set for org- and project-level events, and for user-level events when the actor acted as that org's owner/admin (design-doc §10.1) |
+| project_id | UUID (FK → project), nullable | set for project-level events |
+| action | enum | values below |
+| actor_id | UUID (FK → user), nullable | null when run from the app CLI |
+| target_user_id | UUID (FK → user), nullable | the user acted on |
+| entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
+| entity_id | UUID, nullable | polymorphic, no FK |
+| details | jsonb | action-specific values (old/new role, old/new name or slug, modules); never passwords, hashes, or tokens |
+| occurred_at | timestamptz | |
+| created_at / updated_at | timestamptz | |
+
+`action` values: `workspace_created`, `user_created`, `user_deactivated`, `user_reactivated`,
+`password_reset`, `password_changed`, `signed_out_everywhere`, `username_changed`,
+`system_admin_granted`, `system_admin_revoked`, `workspace_member_added`,
+`workspace_member_role_changed`, `workspace_member_removed`, `org_created`, `org_updated`,
+`org_member_added`, `org_member_role_changed`, `org_member_removed`, `project_created`,
+`project_updated`, `project_archived`, `project_unarchived`, `project_member_added`,
+`project_member_role_changed`, `project_member_removed`.
+Indexes: `(workspace_id, occurred_at)`, `(organization_id, occurred_at)`,
+`(target_user_id, occurred_at)`.
+Append-only: `updated_at` never moves from `created_at`.
+**Write path:** only via `log_admin_event(...)`, in the same transaction as the change
+(design-doc §10.1). Visible to system admins, workspace owners/admins (their workspace), and
+org owners/admins (their org); never to project members.
+
 ---
 
 ## Collaboration
@@ -1045,3 +1091,6 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
   `approval_request`) have no database-level FK; integrity is a service-layer responsibility.
 - **Items can't move** between projects (requirements, tasks, test cases) or between tasks
   (subtasks) — the move would change their IDs.
+- **Admin audit events have no screen** yet (it comes before the first non-local deployment,
+  design-doc §4, §10.1); they're queryable only. Sign-in attempts aren't
+  recorded until sign-in throttling (`login_attempt`).

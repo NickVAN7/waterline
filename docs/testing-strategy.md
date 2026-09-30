@@ -26,10 +26,11 @@ tested, what each kind of test is for, and the gates every change passes.
 | Integration | Repositories and services: queries, access scoping, soft delete, locking, numbering, `log_change()`, cross-area calls | Real Postgres | pytest (anyio), polyfactory | `backend/tests/integration/` |
 | API | Endpoints over HTTP: status codes, request/response shapes, auth and cookies, error format, 404-not-403 | Real Postgres | httpx `AsyncClient` against the app, polyfactory | `backend/tests/api/` |
 | Frontend unit/component | Composables, stores, components, route guards | No (API mocked at the client boundary) | Vitest, Vue Test Utils | `frontend/src/**/*.spec.ts` |
-| End-to-end | Critical user flows through the browser against the full stack | Real Postgres (seeded) | Playwright | `frontend/e2e/` |
+| End-to-end | Critical user flows through the browser against the full stack | Real Postgres (seeded) | Playwright (Chromium only in v1) | `frontend/e2e/` |
 
 - **End-to-end tests start in Slice 1** (sign-in and project creation) and cover each slice's
-  critical flows, not every screen. Most behavior is proven at the cheaper layers.
+  critical flows, not every screen. Most behavior is proven at the cheaper layers. CI seeds
+  the stack with the non-interactive `wl seed` before running them.
 - Frontend component tests mock only the API client, using the generated types, so mocks can't
   drift from the real API shapes.
 
@@ -70,7 +71,8 @@ tested, what each kind of test is for, and the gates every change passes.
   - Numbering: any interleaving of allocations yields unique, increasing numbers.
   - Task transition rules: every (from, to, role, relationship) combination matches the table
     in design-doc §5.
-  - Project key and username validation.
+  - Project key, slug (including the reserved list), username, and password policy
+    validation.
   - Hypothesis uses a fixed database of examples in CI (`derandomize` in CI profile) so runs are
     reproducible.
 - **Concurrency:** truly parallel transactions for number allocation, optimistic locking
@@ -125,6 +127,12 @@ tested, what each kind of test is for, and the gates every change passes.
     endpoint (from Slice 7) is reachable without `Origin` and still rejects a request that
     fails its own authentication.
   - Disabled-module endpoints return 404.
+  - The API test client uses an `https://` base URL (a shared fixture): httpx won't send the
+    `Secure` session cookie over `http://`, which would make a signed-in test silently
+    unauthenticated.
+  - Sign-in with an unknown email runs the dummy-hash verification (asserted by call, not by
+    measuring time, which would be flaky).
+  - Every Slice 1 admin action records its audit event.
 
 ## Coverage gates
 

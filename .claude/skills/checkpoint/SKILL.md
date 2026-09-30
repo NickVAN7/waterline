@@ -46,7 +46,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit (the
   previous checkpoint's commit, or the root commit for the first).
 - Also invoke the `security-reviewer` agent, with the same inputs and in parallel, when the diff
-  touches any of: `backend/app/authz/`; session, token, password, or cookie code in
+  touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py` or
+  `backend/app/rules/password_policy.py`; session, token, password, or cookie code in
   `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project` areas; any router; rendered
   markdown (`v-html` or a markdown renderer); CORS, CSRF, or `Origin` handling; `github` or
   `webhook` code.
