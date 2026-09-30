@@ -524,7 +524,9 @@ exist; projects can be created with a type, modules, and a key; and every reques
 
 **Carry-in tech debt** (Fix by: Slice 1, `tech-debt.md`): TD-2 (authz/rules coverage gate
 outside `wl`), TD-4 (concurrency fixture for real race tests), TD-5 (realistic factory
-values), TD-8 (base repository get-by-ID uses a query, not `session.get()`).
+values), TD-8 (base repository get-by-ID uses a query, not `session.get()`), TD-10 (prove the
+installed Pinia is wired, with the first store), TD-11 (dev containers run as root: owner
+decides).
 
 ### Migration
 Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, `membership`,
@@ -535,7 +537,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Argon2id password hashing, run in a worker thread so it doesn't block the event loop.
 - `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`.
 - Every item on the **Slice 1 security checklist** (§4): token generation and hashing, cookie
-  attributes, fresh token at sign-in, `Origin` check on mutating requests, JSON-only bodies,
+  attributes, fresh token at sign-in, `Origin` check on mutating requests (against the
+  request's `Host`), JSON-only bodies,
   configurable idle/absolute expiry, throttled `last_seen_at`.
 - `must_change_password`: while set, every endpoint except change-password and sign-out returns
   403 with a specific error code; the web app redirects to the change-password screen.

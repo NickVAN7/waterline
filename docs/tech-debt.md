@@ -139,3 +139,26 @@ Entry format:
   error bodies.
 - **Status:** resolved in S0-C7 (`UnhandledErrorMiddleware` in `app/core/errors.py`: 500
   `internal_error`, logged with its traceback; tests in `tests/api/test_errors.py`)
+
+### TD-10: Pinia is installed but not yet proven wired
+- **Added:** S0-C7
+- **What:** `main.ts` installs Pinia, but there is no store, and `main.ts` is excluded from
+  coverage, so no test shows the app's Pinia instance is actually in use.
+- **Why:** No state needs a store in Slice 0. **Owner decision (S0-C7 review):** installing it
+  is enough for now; verify the installation in Slice 1.
+- **Fix by:** Slice 1, with the first store (the current user): a test that the running app
+  resolves that store through the Pinia instance `main.ts` installs.
+- **Status:** open
+
+### TD-11: Dev containers run as root
+- **Added:** S0-C7
+- **What:** The api, worker, migrate, and web containers run as root with the source mounted.
+  Nothing root-owned is written today (`PYTHONDONTWRITEBYTECODE`; `node_modules` in a volume),
+  but a tool that writes into the mount (a cache, a generated file) would leave root-owned
+  files on the host, and `frontend/node_modules` is created as root if `wl up` runs before the
+  host's `npm ci` (documented in the developer guide).
+- **Why:** Dev-only images, no problem seen yet. **Owner decision (S0-C7 review):** undecided;
+  kept as a note to revisit.
+- **Fix by:** Slice 1: the owner decides then whether to add a non-root user to the dev images
+  or re-target this entry.
+- **Status:** open

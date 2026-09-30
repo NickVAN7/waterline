@@ -344,7 +344,9 @@ Workspace (the firm: tenant boundary)
   - A fresh token at every sign-in (never reuse an existing session); a password change
     replaces the current session's token and deletes the user's other sessions.
   - CSRF: `SameSite=Lax`, plus an `Origin` check on every mutating request, plus JSON-only
-    request bodies.
+    request bodies. The `Origin` check compares the `Origin` header with the request's own
+    `Host` header (there is no allowed-origins setting); the Vite proxy forwards the browser's
+    `Host` unchanged, so this holds through the proxy (owner decision after S0-C7).
   - Passwords hashed with Argon2id.
   - Idle timeout and absolute lifetime as configuration (defaults 7 and 30 days);
     `last_seen_at` written at most every 5 minutes.
