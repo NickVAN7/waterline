@@ -42,8 +42,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   `SessionMakerDep` is only for work that must stay outside the request transaction (the health
   check). Never make `get_session` swallow a failed transaction: a request that can't commit
   must fail.
-- **Order of every protected mutation:** authenticate → `authorize()` → change → `log_change()`
-  → commit (design-doc §5).
+- **Order of every protected mutation:** `Origin` check → JSON-only check (requests with a
+  body) → authenticate → `authorize()` → change → `log_change()` → commit (design-doc §4,
+  §5).
 - **Errors:** raise an `AppError` subclass (`NotFoundError`, `ForbiddenError`, …) from
   `app/core/errors.py`; the handlers build the `{code, message, details}` body. Never raise
   `HTTPException` or return an error `JSONResponse`. Clients branch on `code`. Anything

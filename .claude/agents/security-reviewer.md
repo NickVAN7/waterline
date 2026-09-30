@@ -44,8 +44,22 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    - `must_change_password` blocks everything except change-password and sign-out;
    - Argon2id, run off the event loop; sign-in doesn't reveal whether an email exists (same
      error; the unknown-user path still does comparable hashing work).
-2. **CSRF:** every mutating method checks `Origin`; request bodies must be JSON; no `GET`
-   request changes state.
+2. **CSRF:** every mutating method (`POST`, `PUT`, `PATCH`, `DELETE`) checks `Origin`: its
+   host and port must equal the request's `Host` (a missing port is the default for the
+   `Origin`'s scheme; the request's own scheme is never used; hostnames compared ignoring
+   case), and a missing or `null` `Origin`, a non-`http(s)` or unparseable `Origin`, and a
+   missing `Host` are rejected with 403 `origin_rejected`, never a 500; the check runs before
+   authentication (design-doc §4); a request with a body must have `Content-Type:
+   application/json` (parameters such as `; charset=utf-8` allowed), else 415
+   `unsupported_media_type`, checked right after `Origin` and also before authentication;
+   bodyless mutations pass; no `GET`
+   request changes
+   state (session bookkeeping such as `last_seen_at` aside; an outside redirect such as
+   GitHub's OAuth callback lands on a frontend route that `POST`s to the API). The exemption
+   list is in design-doc §4 (only the GitHub webhook), and only the owner adds to it. An
+   endpoint exempt in code but not listed there is a **blocker**; a listed one
+   must authenticate its caller another way, carry no browser session, and have a test that
+   its own authentication rejects an unauthenticated request, or it is a finding.
 3. **Authorization** (§5):
    - every single-entity endpoint gets its entity only through the load-and-authorize
      dependency; every list query is scoped to the user's accessible projects and orgs;
@@ -97,8 +111,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    output and stack traces not returned to clients.
 8. **Security tests** (`@pytest.mark.security`): each behavior above that the checkpoint added
    has a test, including the denied side (cross-org 404, rejected cross-origin mutation,
-   non-JSON body rejected, stale token rejected, wrong role denied). A rule enforced in code but
-   untested is a **major** finding.
+   missing or `null` `Origin` rejected, non-JSON body rejected, stale token rejected, wrong
+   role denied). A rule enforced in code but untested is a **major** finding.
 
 ## Output format
 

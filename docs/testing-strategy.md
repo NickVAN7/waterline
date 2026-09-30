@@ -111,8 +111,19 @@ tested, what each kind of test is for, and the gates every change passes.
     after confirmation.
   - Only a project admin moves a gate into or out of `approved` by hand; members are denied.
   - An org-slug redirect happens only for a project the user can see.
-  - Cookie attributes, token replacement at sign-in and password change, rejected
-    cross-origin mutations, non-JSON bodies rejected.
+  - Cookie attributes, token replacement at sign-in and password change, non-JSON bodies
+    rejected (415 `unsupported_media_type`; `application/json; charset=utf-8` and a bodyless
+    mutation are allowed).
+  - No API `GET` changes state (session bookkeeping aside).
+  - The `Origin` check (design-doc §4) on each mutating method: allowed when host and port
+    match (`Host: x` with `https://x` and with `http://x`; `Host: x:443` with `https://x`;
+    `Host: x:8000` with `http://x:8000`; `Host: X` with `https://x`, since case is ignored);
+    403 `origin_rejected` for a different host, a different port (`Host: x:8000` with
+    `https://x`), a missing `Origin`, `Origin: null`, a non-`http(s)` `Origin` (e.g.
+    `file://x`), an unparseable `Origin`, and a missing `Host`, including for a request with
+    no session or with `must_change_password` set (the check runs first). Each exempt
+    endpoint (from Slice 7) is reachable without `Origin` and still rejects a request that
+    fails its own authentication.
   - Disabled-module endpoints return 404.
 
 ## Coverage gates

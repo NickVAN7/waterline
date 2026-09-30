@@ -537,8 +537,13 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Argon2id password hashing, run in a worker thread so it doesn't block the event loop.
 - `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`.
 - Every item on the **Slice 1 security checklist** (§4): token generation and hashing, cookie
-  attributes, fresh token at sign-in, `Origin` check on mutating requests (against the
-  request's `Host`), JSON-only bodies,
+  attributes, fresh token at sign-in, `Origin` check on mutating requests (host and port
+  against the request's `Host`, a missing port being the default for the `Origin`'s scheme;
+  missing or `null` rejected, as are a non-`http(s)` or unparseable `Origin` and a missing
+  `Host`; hostnames compared ignoring case; an exemption list, empty until the Slice 7
+  webhook; the API test client sends a matching `Origin` by default; checked first, before
+  authentication; 403 `origin_rejected`), JSON-only bodies (checked next, only when there
+  is a body; 415 `unsupported_media_type`),
   configurable idle/absolute expiry, throttled `last_seen_at`.
 - `must_change_password`: while set, every endpoint except change-password and sign-out returns
   403 with a specific error code; the web app redirects to the change-password screen.

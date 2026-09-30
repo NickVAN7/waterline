@@ -344,9 +344,42 @@ Workspace (the firm: tenant boundary)
   - A fresh token at every sign-in (never reuse an existing session); a password change
     replaces the current session's token and deletes the user's other sessions.
   - CSRF: `SameSite=Lax`, plus an `Origin` check on every mutating request, plus JSON-only
-    request bodies. The `Origin` check compares the `Origin` header with the request's own
-    `Host` header (there is no allowed-origins setting); the Vite proxy forwards the browser's
-    `Host` unchanged, so this holds through the proxy (owner decision after S0-C7).
+    request bodies, plus no `GET` ever changing state (so links from other sites, which only
+    ever `GET`, are always safe to follow). Owner decisions after S0-C7:
+    - **No API `GET` changes state.** Session bookkeeping on any request (writing
+      `last_seen_at`, expiring a session) isn't "state" for this rule. A redirect from an
+      outside service (GitHub's OAuth callback and App setup redirect) lands on a frontend
+      route, which `POST`s what it received (`code`, `state`, `installation_id`) to the API,
+      so the `Origin` check applies to it like any other change.
+    - **Order and errors:** the `Origin` check runs first, then the JSON-only check, both
+      before authentication, the `must_change_password` check, and body parsing, so a
+      rejected request never touches a session. Every `Origin` rejection is 403 with code
+      `origin_rejected`. JSON-only applies to requests that have a body: its `Content-Type`
+      must be `application/json` (parameters such as `; charset=utf-8` allowed), otherwise
+      415 with code `unsupported_media_type`; a mutating request with no body (e.g. sign-out,
+      a delete) passes.
+
+    The `Origin` check:
+    - applies to every `POST`, `PUT`, `PATCH`, and `DELETE`, except the endpoints on a short
+      exemption list, each of which authenticates its caller another way and carries no
+      browser session. The list is only the GitHub webhook (Slice 7; its
+      `X-Hub-Signature-256`, §12). Adding an endpoint needs the owner's approval, recorded by
+      adding it to this list; the security reviewer checks that it authenticates another way,
+      carries no browser session, and has a test that its own authentication rejects an
+      unauthenticated request;
+    - compares the `Origin` header with the request's own `Host` header: the hosts must be
+      equal, and so must the ports, where a side with no port has the default port of the
+      `Origin`'s scheme (80 for `http`, 443 for `https`). So `Host: x` matches `https://x`
+      and `http://x`, `Host: x:443` matches `https://x`, and `Host: x:8000` matches only an
+      `Origin` on port 8000. The request's own scheme is never used (behind a proxy that
+      terminates TLS the app sees plain `http`), and there is no allowed-origins setting. The
+      Vite proxy forwards the browser's `Host` unchanged, so this holds through the proxy;
+    - rejects a missing `Origin`, and `Origin: null`: browsers always send `Origin`
+      on these methods, so only non-browser clients omit it, and they must send one (the test
+      client does by default);
+    - fails closed on anything else it can't compare: an `Origin` whose scheme isn't `http` or
+      `https`, an `Origin` that can't be parsed, and a request with no `Host` are all
+      rejected (never a 500). Hostnames are compared ignoring letter case.
   - Passwords hashed with Argon2id.
   - Idle timeout and absolute lifetime as configuration (defaults 7 and 30 days);
     `last_seen_at` written at most every 5 minutes.
@@ -360,7 +393,11 @@ Workspace (the firm: tenant boundary)
     password resets).
   - Nightly worker job deleting expired sessions.
   - Per-org session-length settings, if any org needs shorter limits.
-- GitHub OAuth `state` + PKCE are part of the GitHub slice.
+  - The reverse proxy in front of the app forwards the original `Host` header (e.g. nginx
+    `proxy_set_header Host $host`), which the `Origin` check depends on; a proxy that rewrites
+    it makes every mutating request fail with 403.
+- GitHub OAuth `state` + PKCE are part of the GitHub slice. The OAuth callback is a frontend
+  route that `POST`s `code` and `state` to the API (see CSRF above).
 
 ## 5. Authorization
 
@@ -454,7 +491,11 @@ blocking self-review are candidates for per-org settings later.
 Every protected mutation follows the same order, inside **one database transaction per
 request**:
 
-**authenticate → authorize() → apply the change → log_change() → commit**
+**`Origin` check → JSON-only check → authenticate → authorize() → apply the change →
+log_change() → commit**
+
+(The `Origin` and JSON-only checks, §4, run before anything else, so a rejected request never
+touches a session.)
 
 A failed authorization produces a clean 403/404 with no side effects. Because the change and
 its log entry commit together, a change is never saved without its audit record (and vice
@@ -837,8 +878,12 @@ does not write code or push to repos.
 1. **Connection** — a GitHub App. Installations are stored in `github_installation` (an org may
    have several, e.g. a personal account and a company org), connected by org owners/admins
    (including inherited). API tokens are fetched short-lived per request from the installation
-   ID. A project needs no installation: it links to repos only through optional
-   `project_repository` rows, which project admins manage.
+   ID. GitHub's setup redirect after installing lands on a frontend route, which `POST`s the
+   `installation_id` to the API (§4, CSRF). **Open, for the Slice 7 design pass:** how the
+   API verifies that the posted `installation_id` belongs to the requesting user and org
+   before storing it (anyone can put any ID in that URL); until then, never store an ID from
+   the redirect unverified. A project needs no installation: it links to repos
+   only through optional `project_repository` rows, which project admins manage.
 2. **Repo ↔ Project mapping** — `project_repository`, linked to its installation. A repo may map
    to **multiple projects** (e.g. a monorepo); this is unambiguous because every ID carries its
    project key.
@@ -853,7 +898,9 @@ does not write code or push to repos.
    - **Commits** can be linked manually by pasting a URL; they are not auto-detected.
    - If an ID is later removed from a PR title, the existing link stays; removal is manual.
 4. **Webhooks** — each delivery is recorded in `github_webhook_delivery`:
-   - Reject any request whose `X-Hub-Signature-256` doesn't verify.
+   - Reject any request whose `X-Hub-Signature-256` doesn't verify. The signature is the
+     endpoint's authentication; it is exempt from the `Origin` check (§4), since GitHub sends
+     no `Origin`.
    - `delivery_id` is unique, so GitHub redeliveries are processed once.
    - The endpoint stores the delivery, enqueues a job in the same transaction, and responds
      immediately; the worker does the matching and updates `github_status` (PRs only:
