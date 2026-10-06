@@ -377,10 +377,10 @@ it is the only place that writes them.
 | File name | Owns (tables) | Slice | Calls into (services) |
 |---|---|---|---|
 | `user` | user | 1 | — |
-| `auth` | session; user_identity (added in Slice 7) | 1 | user |
-| `workspace` | workspace, workspace_membership | 1 | user; project (only through its registered `on_member_removed` handler) |
-| `org` | organization, membership | 1 | user; tag (copies the default tags into a new org, from Slice 6); project (only through its registered `on_member_removed` handler) |
-| `project` | project (incl. modules and module guidance), project_membership | 1 | org, workspace (registers `on_member_removed` with both), user (creating a user for the project goes through the org service) |
+| `auth` | session; user_identity (added in Slice 7) | 1 | user; approval (approver replacement, from Slice 2) |
+| `workspace` | workspace, workspace_membership | 1 | user; project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
+| `org` | organization, membership | 1 | user; tag (copies the default tags into a new org, from Slice 6); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
+| `project` | project (incl. modules and module guidance), project_membership | 1 | org, workspace (registers `on_member_removed` with both), user (creating a user for the project goes through the org service); approval (approver replacement, from Slice 2) |
 | `numbering` *(service + repository only)* | project_counter; `task.next_subtask_number` | 1 | — |
 | `requirement` | requirement, requirement_revision | 2 | numbering, approval, task, testcase |
 | `approval` | approval_request, approval | 2 | approvable areas via registered handlers only |
@@ -407,7 +407,9 @@ check that every table in `schema-doc.md` has exactly one owner here.
 
 `auth` runs every action that ends sessions: sign-out, change password, and the admin actions
 deactivate, reset password, and sign out everywhere (it updates the user through the user
-service).
+service). It also runs granting and revoking the system-admin flag (the app CLI commands call
+it), so Slice 2 can add approver replacement to a revoke from layer 2 (owner decision, Oct 6,
+2026).
 
 ERP modules (Slices 8+) get their own entries when they're designed.
 
@@ -660,7 +662,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 3 | Pure rules & mutation testing | `rules/identifiers.py` (project key, slug with the reserved list, username), `rules/password_policy.py`, `rules/account_rank.py`, all test-first, with Hypothesis where the input space is large; `wl backend mutate` (mutmut over `app/rules/` and `app/authz/`) in `wl check` and CI; TD-2 resolved |
 | 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
 | 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL |
-| 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`) with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
+| 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
 | 7 | Authorization core | Action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions`; the full matrix (including personal actions) and fail-closed tests |
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add, create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
@@ -732,9 +734,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   `fresh-clone-verifier`). It refuses to run when a workspace already exists. There is no UI or
   endpoint for creating workspaces.
 - **System-admin commands:** `grant-system-admin` and `revoke-system-admin` (`app/cli.py`, by
-  email), run as `wl admin <command>`: a pass-through to the app CLI in the backend image, covered
-  by the CLI's dry-run tests. Revoking refuses when it would leave no active system admin. Both are
-  recorded as audit events with no actor.
+  email), run as `wl admin <command>`: a pass-through to the app CLI in the backend image,
+  covered by the CLI's dry-run tests. Revoking refuses when it would leave no active system
+  admin. Both are recorded as audit events with no actor. The commands call the `auth` service
+  (layer 2), not `user` (layer 1), so Slice 2 can add approver replacement to a revoke.
 
 ### Authorization (§5)
 - `authorize(user, action, entity)`: an explicit action registry; unknown action → deny; checks
@@ -998,15 +1001,14 @@ What's decided so far. This is not the slice's plan, which is written when Slice
     access to the project (§5, "The choke point");
   - approver eligibility and replacement, including a replacement that completes a request
     (§6.2).
-- **Approver replacement touches Slice 1 flows.** Every path that takes away the access
-  needed to decide (§6.2) gets the replacement: removing a project membership (directly, or
-  with an org or workspace removal); removing or changing the org or workspace membership or
-  role that gave inherited admin; `revoke-system-admin` (app CLI: `changed_by` is null, so
-  `activity_log.changed_by` is nullable); marking a project export-controlled, or removing an
-  explicit membership on one; deactivating a user. Services in layers 2–3 (auth, workspace,
-  org, project) call the approval service (layer 1) directly, which the layer order allows.
-  To decide whether the requester still holds project admin, the approval service builds the
-  requester's authorization context and calls `authorize(requester,
-  "approval_request.create", project)`, so the export-control rule is applied in one place,
-  with no upward call. The Slice 2 plan decides the exact call sites, with an API test for
-  each path.
+- **Approver replacement touches Slice 1 flows.** Every path that takes away the access needed
+  to decide (§6.2) gets the replacement: removing a project membership (directly, or with an org
+  or workspace removal); removing or changing the org or workspace membership or role that gave
+  inherited admin; `revoke-system-admin` (in the `auth` service, called by the app CLI:
+  `changed_by` is null, so `activity_log.changed_by` is nullable); marking a project
+  export-controlled, or removing an explicit membership on one; deactivating a user. Services in
+  layers 2–3 (auth, workspace, org, project) call the approval service (layer 1) directly, which
+  the layer order allows. To decide whether the requester still holds project admin, the
+  approval service builds the requester's authorization context and calls `authorize(requester,
+  "approval_request.create", project)`, so the export-control rule is applied in one place, with
+  no upward call. The Slice 2 plan decides the exact call sites, with an API test for each path.
