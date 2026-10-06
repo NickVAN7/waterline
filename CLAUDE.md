@@ -55,6 +55,9 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   `docs/reviews/<ID>.md` → commit → upload list for the owner → report → stop).
 - One commit per checkpoint. The docs, tests, and tech-debt log change in the same commit as the
   code they describe.
+- Checkpoints land in groups, one PR per group, on the group's branch (build plan, "Pull
+  requests"). Push after every checkpoint commit; CI must be green before review is reported.
+  Merge (rebase and merge, never squash) only when the owner says so.
 - A shortcut is allowed only if it's logged in `docs/tech-debt.md` with its reason and target.
 
 ## Always

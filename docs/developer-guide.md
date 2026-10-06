@@ -4,15 +4,16 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S0-C7 (Compose & frontend shell) done; next is S0-C8 (CI & slice verification).
-> The backend has its database core (Postgres, async SQLAlchemy, Alembic, the base model and its
-> mixins), a test harness with a `concurrency` fixture, background jobs on procrastinate, the
-> model conventions (enums, soft delete, optimistic locking with 409, `direct_update`), the
-> standard error format (including a catch-all 500), and the password and token helpers;
-> `GET /api/health` checks the database. Docker Compose runs the whole stack (postgres, migrate,
-> api, worker, web). The frontend is a Vue shell: layout, router with a 404 page, Pinia, the
-> generated API client, and a home page showing the health check through the Vite proxy. CI
-> arrives in S0-C8.
+> **Status:** S0-C8 (CI & slice verification) done, closing Slice 0; next is S1-C1 (Tenancy
+> models & migration), on the `s1-foundations` branch. The backend has its database core
+> (Postgres, async SQLAlchemy, Alembic, the base model and its mixins), a test harness with a
+> `concurrency` fixture, background jobs on procrastinate, the model conventions (enums, soft
+> delete, optimistic locking with 409, `direct_update`), the standard error format (including a
+> catch-all 500), and the password and token helpers; `GET /api/health` checks the database.
+> Docker Compose runs the whole stack (postgres, migrate, api, worker, web). The frontend is a
+> Vue shell: layout, router with a 404 page, Pinia, the generated API client, and a home page
+> showing the health check through the Vite proxy. CI runs `wl check` on every push to `main`
+> and every pull request.
 
 ## 1. Workstation setup
 
@@ -67,6 +68,7 @@ docs/           design, schema, build plan, testing strategy, screen inventory, 
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
+.github/workflows/ci.yml   CI: `wl check` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
 project-upload/ changed docs and Claude files waiting for the owner to upload to the claude.ai
@@ -627,6 +629,21 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
 
 - Work proceeds one **checkpoint** at a time (`build-plan.md`), one commit per checkpoint,
   closed out with the `checkpoint` skill.
+- **Pull requests:** checkpoints land on `main` in groups, one PR per group (build plan, "Pull
+  requests"; each slice's section lists its groups). A group works on its own branch
+  (`s1-foundations`, …); push after every checkpoint commit (the group's first checkpoint opens
+  the PR as a draft), and once the owner approves the group's last checkpoint, merge with
+  **rebase and merge**, never squash: `main` keeps one `checkpoint(<ID>):` commit per
+  checkpoint, which the docs consistency tests read. `main` isn't protected yet (TD-15), so
+  check CI before merging: `gh pr checks <number>`.
+- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check` on every push to
+  `main` and every pull request, so a green `wl check` locally means a green run there. It
+  checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the
+  dependencies from the lockfiles (`uv sync --locked`, `npm ci`), and runs the tests against a
+  `postgres:18` service container; the test database is created by the same init script as in
+  Compose (`docker/postgres/initdb/`). There's no `.env` in CI: the workflow sets the
+  `POSTGRES_*` variables. A new tool the checks need goes into the workflow's setup steps and
+  the developer guide's prerequisites together.
 - The pre-commit hooks run ruff (lint with safe fixes, and format) on the backend and CLI;
   Prettier and ESLint (safe fixes) on the frontend (they need `frontend/node_modules`); a check
   that `backend/openapi.json` and `frontend/src/api/schema.d.ts` match what `wl gen-client`
@@ -681,4 +698,6 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 | A versioned model never raises `StaleDataError` | `VersionMixin` is listed after `BaseModel`/`TimestampMixin`; list it first. The convention checks catch this. |
 | `ForeignKeyViolation` flushing a new parent and child together | No `relationship()` between them, so the child may be inserted first; flush the parent first. |
 | The worker logs `TaskNotFound` | The job's module isn't imported in `app/jobs/tasks/__init__.py`, or its name differs from the one in `task_names.py`. |
+| CI fails at the docs consistency tests with "git history is shallow" | The checkout lost `fetch-depth: 0`; restore it in `.github/workflows/ci.yml`. |
+| CI fails at "Install dependencies" (`--locked`) | A `pyproject.toml` or `package.json` changed without its lockfile: run `uv lock` (root or `backend/`) or `npm install --prefix frontend`, and commit the lockfile. |
 | `ModuleNotFoundError: No module named 'app'` in tests | Run pytest from `backend/` (or through `wl`); `pythonpath` is set in `backend/pyproject.toml`. |
