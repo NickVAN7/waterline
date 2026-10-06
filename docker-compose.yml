@@ -8,7 +8,9 @@ name: waterline
 x-backend: &backend
   build: ./backend
   # One image, shared by all three services (built once, rebuilt by `wl up` / `wl migrate`).
-  image: waterline-backend
+  # Named after the Compose project (`waterline-backend` by default), so a second stack under
+  # another project name (e.g. a fresh-clone check) builds its own image, not over this one.
+  image: ${COMPOSE_PROJECT_NAME}-backend
   environment:
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_USER: ${POSTGRES_USER}
