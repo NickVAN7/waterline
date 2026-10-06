@@ -1,0 +1,82 @@
+# CI: everything `wl check` runs, on every push to main and every pull request (build-plan.md,
+# "Tests & CI"; testing-strategy.md, "Workflow and gates"). CI calls the developer CLI, so a
+# green `uv run wl check` locally means a green run here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: wl check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    # The same Postgres as docker-compose.yml. The tests read these through app/core/settings.py
+    # (there is no .env in CI) and only ever use the test database, waterline_test.
+    env:
+      POSTGRES_DB: waterline
+      POSTGRES_USER: waterline
+      POSTGRES_PASSWORD: waterline-ci-password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: waterline
+          POSTGRES_USER: waterline
+          POSTGRES_PASSWORD: waterline-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username waterline --dbname waterline"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      # Full history: the docs consistency tests read `git log` for the latest checkpoint
+      # commit, and fail on a shallow clone.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            backend/uv.lock
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/package.json
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # A service container can't mount the repo, so the Compose init script that creates the
+      # test database runs inside it instead (it reads POSTGRES_USER and POSTGRES_DB there).
+      - name: Create the test database
+        run: docker exec -i "${{ job.services.postgres.id }}" bash < docker/postgres/initdb/01-create-test-database.sh
+
+      # The developer guide's first-time setup, minus the parts CI doesn't need (doctor,
+      # pre-commit hooks, .env, the Compose stack).
+      - name: Install dependencies
+        run: |
+          uv sync --all-packages --locked
+          uv sync --directory backend --locked
+          npm ci --prefix frontend
+
+      - name: wl check
+        run: uv run wl check
