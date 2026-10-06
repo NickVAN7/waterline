@@ -259,10 +259,10 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 - The `api` reloads on code changes. The `worker` doesn't: after changing a job or a service it
   calls, restart it (`docker compose restart worker`).
 - `wl logs` follows every service's logs; `wl logs api` just one.
-- The backend image has a fixed tag (`waterline-backend`). A second stack under another project
-  name (`COMPOSE_PROJECT_NAME`, e.g. a fresh-clone check) builds and tags the same image, so
-  building an older or different checkout there replaces the main stack's image until its next
-  `wl up` (which rebuilds it). Containers and volumes stay separate.
+- The backend image is named after the Compose project (`waterline-backend`). A second stack
+  under another project name (`COMPOSE_PROJECT_NAME`, e.g. a fresh-clone check) gets its own
+  image, containers, network, and volumes. It publishes the same host ports, though, so stop the
+  main stack first (`wl down`) or change the ports in its `.env`.
 - Ports are published on `127.0.0.1` only, so nothing in the stack (the dev database, with its
   public default password, included) is reachable from other machines on your network.
 
