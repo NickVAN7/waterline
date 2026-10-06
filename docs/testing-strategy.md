@@ -101,6 +101,11 @@ tested, what each kind of test is for, and the gates every change passes.
     when the requester no longer holds project admin; decided rows are never replaced;
     `replaced` rows don't count toward the policy; the change is logged (`approver_id`, old and
     new user IDs, `changed_by` the actor, null from the CLI);
+  - no replacement in an archived project, on each path that still takes access away there
+    (removal from the org or workspace with their projects; an org or workspace role change or
+    removal; `revoke-system-admin`; deactivation): the access is removed, the approver's row
+    stays pending, and the request is flagged; removing a project member directly is still
+    denied there;
   - a replacement that leaves every counted row approved completes the request (`approved_by`
     the counted approver with the latest `decided_at`; the `status` change logged; the
     entity's `on_approved` effect applied);

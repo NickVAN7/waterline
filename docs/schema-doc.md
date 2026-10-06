@@ -507,7 +507,7 @@ installations moved to `github_installation` (an org can have several).
 | username | varchar | unique app-wide; same format as slugs (lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter), but the reserved-route list doesn't apply (`rules/identifiers.py`); user-changeable |
 | name | varchar | display name |
 | hashed_password | varchar | required (email/password is the primary sign-in) |
-| is_active | boolean, default true | false = cannot sign in; sessions deleted and pending approvals replaced on deactivation (design-doc §6.2) |
+| is_active | boolean, default true | false = cannot sign in; sessions deleted and pending approvals replaced on deactivation (design-doc §6.2; not in an archived project) |
 | is_system_admin | boolean, default false | may do anything in any org/project, except personal actions such as deciding another person's approval (design-doc §5) and the content of an export-controlled project without an explicit membership (§3.1); granted and revoked only by app CLI commands |
 | must_change_password | boolean, default false | set on admin create/reset |
 | created_at / updated_at | timestamptz | |
@@ -913,7 +913,7 @@ completes the request (design-doc §6.2).
 | id | UUID (PK) | |
 | approval_request_id | UUID (FK → approval_request) | |
 | approver_id | UUID (FK → user) | any project role, including viewer; must have project access when the request is created (an explicit membership on an export-controlled project) |
-| decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost the access needed to decide while the row was pending, and the requester still holds project admin; the row keeps its history, and a pending row for the requester is added unless they're already named. If the requester no longer holds project admin, the row stays `pending` and the request is flagged (design-doc §6.2). Decided rows are never replaced |
+| decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost the access needed to decide while the row was pending, and the requester still holds project admin; the row keeps its history, and a pending row for the requester is added unless they're already named. If the requester no longer holds project admin, or the project is archived, the row stays `pending` and the request is flagged (design-doc §6.2). Decided rows are never replaced |
 | comment | text, nullable | |
 | decided_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
