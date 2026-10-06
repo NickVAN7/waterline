@@ -106,7 +106,8 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl migrate` | `docker compose run --rm --build migrate`: `alembic upgrade head` against the dev database, in the Compose `migrate` service (its image rebuilt first if dependencies changed) |
 | `wl backend migration "<message>"` | `alembic revision --autogenerate -m "<message>"` on the host; review the generated file by hand |
 
-Still to come: `wl seed` (Slice 1).
+Still to come (Slice 1): `wl seed`, `wl admin <command>` (app admin commands, e.g.
+`wl admin grant-system-admin <email>`), and `wl backend mutate` (mutation testing).
 
 The CLI is a **thin orchestrator**: the real tool configuration is in each project's
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
@@ -138,7 +139,7 @@ backend/app/
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
   rules/          pure business rules, no database
   authz/          authorize() and friends (Slice 1)
-  audit/          log_change() (Slice 2)
+  audit/          log_admin_event() (Slice 1, S1-C4) and log_change() (Slice 2)
   jobs/           background jobs: app.py (jobs_app), enqueue.py, task_names.py, tasks/, worker.py
 ```
 
@@ -458,7 +459,8 @@ frontend/src/
   components/        shared UI components
   composables/       shared logic
   stores/            Pinia stores
-  views/<area>/      screens by backend area name; views/home/ (health), views/errors/ (404)
+  views/<area>/      screens by backend area name, singular (views/project/, views/task/, …);
+                     plus views/home/ (health) and views/errors/ (404)
 ```
 
 - **Running it:** `wl up` serves it at <http://localhost:5173> (the `web` service, hot reload on
@@ -607,7 +609,7 @@ database. They check:
 | Check | Fails when |
 |---|---|
 | Model tables documented | a model table has no ``### `<table>` `` section in `schema-doc.md`, or is listed under "Deferred tables" |
-| Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table |
+| Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table. The column check runs per column (`table.column`). A documented column whose Notes cell starts with `Added in Slice <n>.` is **skipped** (`added in Slice <n> (schema-doc)`) while the latest `checkpoint(<ID>):` commit is in an earlier slice, and required once slice `<n>` has started; a malformed marker is a `DocsStructureError`. A model column with no documented row always fails |
 | One owner per table | a schema-doc table isn't in exactly one "Owns (tables)" cell of the build plan's feature map, or the map names a table schema-doc lacks |
 | Tech-debt log | an entry lacks Added/What/Why/Fix by/Status, numbers aren't 1..n, a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it |

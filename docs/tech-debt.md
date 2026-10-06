@@ -193,8 +193,11 @@ Entry format:
   of its own: sign-in throttling (`login_attempt`), the active-sessions page, password
   re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
   lengths, the reverse proxy forwarding `Host`, re-evaluating the `Origin` check against an
-  allowed-origins setting, and the admin audit-event screen. (The password minimum and local
-  HTTPS have their own entries, TD-12 and TD-13.)
+  allowed-origins setting, the admin audit-event screen, general API rate limiting (per IP at
+  the reverse proxy, per user in the app for expensive endpoints; 429 `rate_limited` with
+  `Retry-After`; added Oct 5, 2026), and a compliant deployment for export-controlled data
+  (design-doc §3.1; added Oct 5, 2026). (The password minimum and local HTTPS have their own
+  entries, TD-12 and TD-13.)
 - **Why:** v1 runs locally for a few users; none of these matter until the app is deployed.
 - **Fix by:** Slice 7 (before the first non-local deployment, and by the end of v1 at the
   latest; re-target if deployment moves later): build each item, or give it its own slice.

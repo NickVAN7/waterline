@@ -30,7 +30,8 @@ Conventions: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, design-doc §3–§5 and
 
 ## 1. Model — `models/<area>.py`
 
-- Base model and the mixins the schema doc calls for (soft delete, `version`).
+- Base model and the mixins the schema doc calls for (soft delete, `version`,
+  `ClassificationMixin`).
 - Enums through the enum helper; relationships `lazy="raise"`.
 - Human-readable numbers: an `int number` column with `UNIQUE(project_id, number)`; never
   computed here.
@@ -62,11 +63,15 @@ Follow the `migration` skill.
 ## 5. Rules and authorization — `rules/<area>.py`, `authz/policies/<area>.py`
 
 - Pure logic (transition tables, policy decisions) goes in `rules/`, with no database access.
-- Register every action explicitly in the policy; unknown actions are denied.
+- Register every action explicitly in the policy, marked content or management (design-doc
+  §3.1, §5), and marked personal where the right comes from the user's relationship to the item
+  (e.g. `approval.decide`); unknown actions are denied.
 - **Test first** (`test-writer` skill): the full action × role matrix from the design doc,
   across project, org, and workspace roles (including inherited project admin), users with no
   access, and system admins, allowed and denied rows, and the targeted rules
-  (reporter, assignee, reviewer, approval-state conditions). Then implement.
+  (reporter, assignee, reviewer, approval-state conditions); personal-action rows (every admin
+  level denied) and export-control rows (inherited admins denied content on an
+  export-controlled project). Then implement.
 - Archived projects are read-only; module-gated areas are checked by the module dependency
   before `authorize()`.
 

@@ -66,8 +66,11 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      dependency; every list query is scoped to the user's accessible projects and orgs;
    - every action is registered; unknown actions are denied (fail closed);
    - order: archived project (every mutation on it or inside it denied, for every role including
-     system admins; unarchive and removing a member with their projects excepted) → system admin →
-     workspace owner/admin → owner/admin of the project's org → project role → targeted rules;
+     system admins; unarchive and removing a member with their projects excepted) →
+     export-control gate (from S1-C13) → personal actions → system admin → workspace
+     owner/admin → owner/admin of the project's org → project role → targeted rules;
+     personal actions (e.g. `approval.decide`) are decided by their relationship rule alone and
+     never granted by any admin level, system admin included;
      inherited project admin only for those admin levels (never for org or workspace members);
      module gating before `authorize()`;
    - targeted rules match the design tables exactly (transitions, deletion, approvals — only
@@ -86,7 +89,13 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      workspace pages are visible only to workspace owners/admins and system admins;
    - adding a person by email reveals at most whether an account exists, never its orgs or
      workspace;
-   - only project admins move a gate into or out of `approved` by hand;
+   - only project admins move a gate into or out of `approved`, or a requirement into
+     `approved`, by hand;
+   - export control (design-doc §3.1, from S1-C13): every action is marked content or
+     management; on an export-controlled project, inherited admins without an explicit
+     membership get 404 on content and keep management access; the export-control confirmation
+     is required on every member-add path and when marking a project export-controlled; only an
+     explicit project admin can remove `export_controlled`;
    - the rank rule requires at least one target membership in the actor's scope (a user with
      no memberships isn't open to every org admin);
 4. **Tenant isolation and existence leaks:**

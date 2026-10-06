@@ -15,6 +15,25 @@ Companion to `design-doc.md` (section references like §6.1 point there).
   `fk_<table>_<column>_<referred table>`, `uq_<table>_<columns>`, `ck_<table>_<name>`,
   `ix_<table>_<columns>`.
 - Soft-deleted tables (`deleted_at`) are filtered out globally unless a query opts in.
+- **Classification** (`ClassificationMixin`, design-doc §3.1) on `project`, `requirement`,
+  `task`, and `testcase`, each getting the columns in its own slice:
+  - `classification_level`: enum internal / confidential / restricted, nullable; null =
+    unclassified;
+  - `classification_categories`: `text[]`, NOT NULL, default `{}`, with a CHECK that the values
+    are a subset of the allowed list: on `project`, `financial`, `proprietary`, `pii`,
+    `export_controlled`; on content items, `financial`, `proprietary`, `pii` in v1
+    (`export_controlled` is project-only).
+
+  Effective classification (the stricter level, the union of categories) is computed, never
+  stored.
+- **Columns added in a later slice.** A column that ships in a later slice than its table (it
+  references a table, or belongs to a feature, from that slice) has a Notes cell starting with
+  exactly `Added in Slice <n>.`, where `<n>` is the slice that adds it. The docs consistency
+  tests report such a column as skipped until slice `<n>` has started (it has a
+  `checkpoint(S<n>-C…)` commit), then require it like any other column; a malformed marker is
+  an error. Because a marked column is required as soon as its slice's first checkpoint is
+  committed, it (and the table it references) is built in that **first** checkpoint of slice
+  `<n>`. The migration that adds the column follows the `migration` skill.
 
 ## Entity-Relationship Diagram
 
@@ -150,6 +169,8 @@ erDiagram
     varchar name
     varchar type
     text_array enabled_modules
+    varchar classification_level
+    text_array classification_categories
     timestamptz archived_at
   }
   PROJECT_MEMBERSHIP {
@@ -194,6 +215,8 @@ erDiagram
     varchar status
     varchar priority
     varchar rank
+    varchar classification_level
+    text_array classification_categories
     uuid current_revision_id FK
     uuid approved_revision_id FK
     uuid approved_by FK
@@ -236,6 +259,8 @@ erDiagram
     uuid workstream_id FK
     numeric time_estimate
     numeric time_taken
+    varchar classification_level
+    text_array classification_categories
     int next_subtask_number
     int version
     timestamptz deleted_at
@@ -260,6 +285,8 @@ erDiagram
     varchar test_type
     text expected_result
     varchar automation_ref
+    varchar classification_level
+    text_array classification_categories
     int version
     timestamptz deleted_at
   }
@@ -478,11 +505,11 @@ installations moved to `github_installation` (an org can have several).
 |---|---|---|
 | id | UUID (PK) | |
 | email | varchar | unique; stored lowercase (`CHECK (email = lower(email))`); not changeable in v1 |
-| username | varchar | unique app-wide; lowercase letters, digits, hyphens; user-changeable |
+| username | varchar | unique app-wide; same format as slugs (lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter), but the reserved-route list doesn't apply (`rules/identifiers.py`); user-changeable |
 | name | varchar | display name |
 | hashed_password | varchar | required (email/password is the primary sign-in) |
-| is_active | boolean, default true | false = cannot sign in; sessions deleted on deactivation |
-| is_system_admin | boolean, default false | may do anything in any org/project (except decide another person's approval); granted and revoked only by app CLI commands |
+| is_active | boolean, default true | false = cannot sign in; sessions deleted and pending approvals replaced on deactivation (design-doc §6.2) |
+| is_system_admin | boolean, default false | may do anything in any org/project, except personal actions such as deciding another person's approval (design-doc §5) and the content of an export-controlled project without an explicit membership (§3.1); granted and revoked only by app CLI commands |
 | must_change_password | boolean, default false | set on admin create/reset |
 | created_at / updated_at | timestamptz | |
 
@@ -539,6 +566,8 @@ re-checks memberships (design-doc §4, "Sessions"). Session-ending account actio
 | name | varchar | |
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | enabled_modules | text[] | seeded from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
+| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; null = unclassified; the floor for the project's items (design-doc §3.1) |
+| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
 | archived_at | timestamptz, nullable | archived = read-only, hidden by default |
 | created_at / updated_at | timestamptz | |
 
@@ -550,6 +579,12 @@ firm's clients).
 `CHECK (enabled_modules <@ ARRAY[...allowed modules])` — `sprints` and `github` are allowed from
 Slice 1 (design-doc §1.1: the UI disables their features until their slices ship); each v2
 module's value is added when that module ships. Disabling a module hides its data; nothing is deleted.
+`CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii',
+'export_controlled'])`. Only project admins lower the level or remove a category; removing
+`export_controlled` needs an explicit project admin (a `project_membership` with role admin).
+With `export_controlled`, inherited admins keep management access but see content only with an
+explicit membership (design-doc §3.1). Classification changes are recorded as
+`project_classification_changed` audit events.
 No visibility flag: access is always explicit project membership (plus inherited admin).
 
 ### `project_membership`
@@ -624,25 +659,32 @@ logged.
 | project_id | UUID (FK → project) | |
 | number | integer | displayed `{KEY}-RQ-n`; never reused |
 | parent_requirement_id | UUID (FK → requirement), nullable | null = top level; same project; no cycles (service check) |
-| workstream_id | UUID (FK → workstream), nullable | same project; UI defaults a child to its parent's |
+| workstream_id | UUID (FK → workstream), nullable | Added in Slice 3. Same project; UI defaults a child to its parent's |
 | reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by project admins; drives delete permission |
 | title | varchar | |
 | description_md | text | markdown; includes `## Acceptance Criteria` from template |
-| status | enum: draft / approved / in_progress / done / rejected / deferred | |
+| status | enum: draft / approved / in_progress / done / rejected / deferred | only a project admin moves it into `approved` by hand (design-doc §5) |
 | priority | enum: critical / high / medium / low | default medium |
 | rank | varchar | fractional index; order among siblings |
-| current_revision_id | UUID (FK → requirement_revision), nullable | latest content revision |
-| approved_revision_id | UUID (FK → requirement_revision), nullable | revision of the last completed approval request |
-| approved_by | UUID (FK → user), nullable | approver whose decision completed the request |
-| approved_at | timestamptz, nullable | when the request completed |
+| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; members raise it, project admins lower it; never below the project's in effect (design-doc §3.1) |
+| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
+| current_revision_id | UUID (FK → requirement_revision), nullable | latest content revision; set to revision 1 in the transaction that creates the requirement, so never null after creation (nullable only because the requirement row is inserted before its first revision: circular FK) |
+| approved_revision_id | UUID (FK → requirement_revision), nullable | revision of the last approval: the request's revision when a request completes, or the current revision when a project admin approves by hand; stays set when the status moves out of `approved` |
+| approved_by | UUID (FK → user), nullable | approver whose decision completed the request, or the project admin who approved by hand |
+| approved_at | timestamptz, nullable | when the request completed, or when the project admin approved by hand |
 | version | integer | optimistic locking |
-| search_vector | tsvector (generated) | title + description; GIN index |
+| search_vector | tsvector (generated) | Added in Slice 6. Title + description; GIN index |
 | deleted_at | timestamptz, nullable | soft delete |
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(project_id, number)`.
+`CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
 "Changed since approval" is derived: `approved_revision_id IS NOT NULL AND approved_revision_id
 <> current_revision_id`.
+`current_revision_id` and `approved_revision_id` → `requirement_revision`, which references
+`requirement`: the foreign keys are circular, so the migration adds them with `use_alter` (or
+after both tables exist). Autogenerate gets this wrong; review it by hand and test the
+downgrade.
 
 ### `requirement_revision`
 | Field | Type | Notes |
@@ -656,8 +698,9 @@ logged.
 | created_by | UUID (FK → user) | |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(requirement_id, revision_number)`. Created on explicit save only when title or
-description actually changed. Append-only, so `updated_at` never moves from `created_at`.
+`UNIQUE(requirement_id, revision_number)`. Revision 1 is created with the requirement, in the
+same transaction; later revisions on explicit save only when title or description actually
+changed (design-doc §6.1). Append-only, so `updated_at` never moves from `created_at`.
 
 ### `requirement_testcase`
 | Field | Type | Notes |
@@ -692,19 +735,22 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | reporter_id | UUID (FK → user) | NOT NULL, set to creator |
 | reviewer_id | UUID (FK → user), nullable | single reviewer; may equal assignee |
 | phase_id | UUID (FK → phase), nullable | same project |
-| sprint_id | UUID (FK → sprint), nullable | same project |
-| milestone_id | UUID (FK → milestone), nullable | same project |
+| sprint_id | UUID (FK → sprint), nullable | Added in Slice 4. Same project |
+| milestone_id | UUID (FK → milestone), nullable | Added in Slice 4. Same project |
 | workstream_id | UUID (FK → workstream), nullable | same project |
 | time_estimate | numeric, nullable | unit-agnostic |
 | time_taken | numeric, nullable | unit-agnostic |
+| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin` (design-doc §3.1) |
+| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | next_subtask_number | integer, default 1 | subtask counter; incremented by a direct `UPDATE … RETURNING` outside the ORM so it doesn't bump `version` |
 | version | integer | optimistic locking |
-| search_vector | tsvector (generated) | GIN index |
+| search_vector | tsvector (generated) | Added in Slice 6. GIN index |
 | deleted_at | timestamptz, nullable | soft delete |
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(project_id, number)`; `project_id` is immutable. Index on `(project_id, status, rank)`
-for board and backlog views.
+for board and backlog views. `CHECK (classification_categories <@ ARRAY['financial',
+'proprietary', 'pii'])`.
 
 ### `subtask`
 | Field | Type | Notes |
@@ -784,12 +830,15 @@ are ignored.
 | test_type | enum: unit / integration / e2e / manual / sit / uat / parallel / regression (extendable) | |
 | expected_result | text | |
 | automation_ref | varchar, nullable | e.g. `tests/api/test_auth.py::test_login` |
+| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin` (design-doc §3.1) |
+| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | version | integer | optimistic locking |
-| search_vector | tsvector (generated) | GIN index |
+| search_vector | tsvector (generated) | Added in Slice 6. GIN index |
 | deleted_at | timestamptz, nullable | soft delete |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(project_id, number)`. **No `status`** — current status is computed from the latest
+`UNIQUE(project_id, number)`. `CHECK (classification_categories <@ ARRAY['financial',
+'proprietary', 'pii'])`. **No `status`** — current status is computed from the latest
 non-`not_run` `test_result`. **No `requirement_id`** — links live in `requirement_testcase`.
 
 ### `test_run`
@@ -852,23 +901,25 @@ current status.
 `CHECK (entity_type <> 'requirement' OR requirement_revision_id IS NOT NULL)`.
 Partial unique index: `UNIQUE(entity_type, entity_id) WHERE status = 'pending'` — one pending
 request per entity.
-Index `(entity_type, entity_id, created_at)`. Never deleted; cancelled instead.
-**Policy (v1):** approved when every `approval` row is approved; rejected on the first
-rejection.
+Index `(entity_type, entity_id, created_at)`. Never deleted; cancelled instead (including when a
+project admin approves the requirement by hand, design-doc §6.2).
+**Policy (v1):** `replaced` rows don't count: approved when every other `approval` row is
+approved; rejected on the first rejection.
 
 ### `approval`
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
 | approval_request_id | UUID (FK → approval_request) | |
-| approver_id | UUID (FK → user) | any project role, including viewer |
-| decision | enum: pending / approved / rejected | |
+| approver_id | UUID (FK → user) | any project role, including viewer; must have project access when the request is created (an explicit membership on an export-controlled project) |
+| decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost project access while the row was pending; the row keeps its history, and a pending row for the requester is added unless they're already named, or the request is flagged if the requester no longer holds project admin (design-doc §6.2). Decided rows are never replaced |
 | comment | text, nullable | |
 | decided_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(approval_request_id, approver_id)`. Only the named approver can set `decision` (no
-admin or system-admin override). Index `(approver_id, decision)` for "my pending approvals".
+`UNIQUE(approval_request_id, approver_id)`. Only the named approver can set `decision` to
+approved or rejected (a personal action: no admin or system-admin override, design-doc §5);
+`replaced` is a system effect of losing access. Index `(approver_id, decision)` for "my pending approvals".
 
 ---
 
@@ -879,7 +930,7 @@ admin or system-admin override). Index `(approver_id, decision)` for "my pending
 |---|---|---|
 | id | UUID (PK) | |
 | project_id | UUID (FK → project) | NOT NULL |
-| entity_type | enum: requirement / task / testcase / phase / milestone / approval_request | approval requests log `created` and every `status` change |
+| entity_type | enum: requirement / task / testcase / phase / milestone / approval_request | approval requests log `created`, every `status` change, and `approver_id` when an approver is replaced |
 | entity_id | UUID | polymorphic, no FK (log outlives its subject) |
 | action | enum: created / updated / deleted / restored / linked / unlinked | |
 | field_changed | enum, nullable | required when `action = updated`; values below |
@@ -892,7 +943,8 @@ admin or system-admin override). Index `(approver_id, decision)` for "my pending
 `field_changed` values: `status`, `assignee_id`, `reporter_id`, `reviewer_id`, `sprint_id`,
 `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`, `start_date`, `end_date`,
 `due_date`, `target_date`, `baseline_start`, `baseline_end`, `baseline_date`, `requirement_id`,
-`parent_requirement_id`, `time_estimate`, `approved_revision_id`.
+`parent_requirement_id`, `time_estimate`, `approved_revision_id`, `approver_id`,
+`classification_level`, `classification_categories`.
 `CHECK (action <> 'updated' OR field_changed IS NOT NULL)`.
 Indexes: `(entity_type, entity_id, changed_at)` for item history; `(project_id, changed_at)` for
 the project feed.
@@ -911,7 +963,7 @@ the project feed.
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | action-specific values (old/new role, old/new name or slug, modules); never passwords, hashes, or tokens |
+| details | jsonb | action-specific values (old/new role, old/new name or slug, modules; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | |
 | created_at / updated_at | timestamptz | |
 
@@ -920,7 +972,8 @@ the project feed.
 `system_admin_granted`, `system_admin_revoked`, `workspace_member_added`,
 `workspace_member_role_changed`, `workspace_member_removed`, `org_created`, `org_updated`,
 `org_member_added`, `org_member_role_changed`, `org_member_removed`, `project_created`,
-`project_updated`, `project_archived`, `project_unarchived`, `project_member_added`,
+`project_updated`, `project_archived`, `project_unarchived`, `project_classification_changed`,
+`project_member_added`,
 `project_member_role_changed`, `project_member_removed`.
 Indexes: `(workspace_id, occurred_at)`, `(organization_id, occurred_at)`,
 `(target_user_id, occurred_at)`.

@@ -14,11 +14,18 @@ follows the model; tests prove the database enforces what the doc says.
   doc (UUIDv7, timestamps, enums, soft delete).
 - If the change isn't in the doc yet, stop: it needs the owner's approval, and the doc is
   updated in the same commit (see "Docs" below).
+- **Columns added in a later slice.** A schema-doc column whose Notes cell starts with
+  `Added in Slice <n>.` is built in slice `<n>`, not with its table. When adding a table, leave
+  out its marked columns from later slices. In slice `<n>`, add every column marked
+  `Added in Slice <n>.` (search the schema doc for it) in the slice's **first** checkpoint:
+  once that checkpoint is committed, the docs consistency tests require the column, and the
+  next checkpoint's `wl check` fails without it.
 
 ## 2. Change the models
 
 - Use the shared base and mixins (UUIDv7 `id`, `created_at`/`updated_at`, soft delete,
-  `version` for optimistic locking) rather than declaring those columns by hand.
+  `version` for optimistic locking, `ClassificationMixin` where the schema doc calls for it)
+  rather than declaring those columns by hand.
 - Enums through the enum helper only (`native_enum=False`, `create_constraint=True`); without
   `create_constraint` there is no CHECK.
 - Relationships default to `lazy="raise"`.

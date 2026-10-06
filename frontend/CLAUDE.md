@@ -11,8 +11,8 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 - `src/components/` — shared UI components
 - `src/composables/` — shared logic (auth state, permissions, forms)
 - `src/stores/` — Pinia stores (current user, current org)
-- `src/views/<area>/` — screens, grouped by the same area names as the backend (`projects/`,
-  `tasks/`, …)
+- `src/views/<area>/` — screens, grouped by the same area names as the backend, singular
+  (`project/`, `task/`, …); `home/` and `errors/` aren't backend areas
 - `e2e/` — Playwright tests
 
 ## Rules
@@ -38,6 +38,15 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   module, never inline strings.
 - UI guidance text (e.g. module recommendations) is rendered from the API response, not
   hard-coded.
+- **Accessibility: WCAG 2.2 AA** (design-doc §1). Every drag has a single-pointer alternative
+  (menu actions; on the board, the card's status control); status, RAG, and badges never rely on
+  color alone (always text or an icon too); controls are at least 24×24 CSS pixels; sticky
+  headers and toasts never cover the focused element; password fields allow paste and password
+  managers. axe-core checks run in component and end-to-end tests and fail on any violation.
+- **Loading states are skeleton loaders, not spinners:** an outline of the content's layout,
+  shown only after about 200 ms (fast loads don't flash), on a region with `aria-busy="true"`,
+  with any shimmer off under `prefers-reduced-motion`. Actions such as saving a form show a
+  pending state on the control itself, not a skeleton.
 - An enabled module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7)
   shows its features and links greyed out or disabled (design-doc §1.1), never as broken
   screens. Whether a module is available comes from the API's module guidance (`available`),

@@ -10,6 +10,7 @@ from enum import StrEnum
 from pathlib import Path
 
 import pytest
+from _pytest.mark import ParameterSet
 from sqlalchemy import Column, MetaData, String, Table
 
 import app.models  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every model
@@ -33,10 +34,22 @@ def test_every_model_table_is_documented_and_not_deferred() -> None:
     assert problems == [], _report(problems)
 
 
-def test_model_columns_match_schema_doc() -> None:
-    problems = docs.column_mismatches(Base.metadata, docs.schema_doc_tables())
+def _column_params() -> list[ParameterSet]:
+    """One parameter per model column, decided at collection: a column the schema doc marks
+    `Added in Slice <n>.` for a slice that hasn't started is collected as skipped, so it shows in
+    the report. A malformed schema doc fails collection of this module (a DocsStructureError)."""
+    current_slice = docs.latest_checkpoint().slice
+    params: list[ParameterSet] = []
+    for check in docs.column_checks(Base.metadata, docs.schema_doc_tables()):
+        verdict = docs.column_verdict(check, current_slice)
+        marks = [pytest.mark.skip(reason=verdict.skip_reason)] if verdict.skip_reason else []
+        params.append(pytest.param(verdict, id=str(check), marks=marks))
+    return params
 
-    assert problems == [], _report(problems)
+
+@pytest.mark.parametrize("verdict", _column_params())
+def test_model_column_matches_schema_doc(verdict: docs.ColumnVerdict) -> None:
+    assert verdict.problem is None, verdict.problem
 
 
 def test_model_enum_values_match_schema_doc() -> None:
@@ -83,15 +96,134 @@ def test_missing_and_deferred_model_tables_are_reported() -> None:
     ]
 
 
-def test_missing_and_extra_columns_are_reported_separately() -> None:
-    problems = docs.column_mismatches(
-        _synthetic_metadata(), _documented({"id", "colour", "size"}, {"red", "blue"})
+def _verdicts(
+    documented: dict[str, docs.DocTable], current_slice: int
+) -> dict[str, docs.ColumnVerdict]:
+    return {
+        str(check): docs.column_verdict(check, current_slice)
+        for check in docs.column_checks(_synthetic_metadata(), documented)
+    }
+
+
+def test_missing_and_extra_columns_are_reported_per_column() -> None:
+    verdicts = _verdicts(_documented({"id", "colour", "size"}, {"red", "blue"}), current_slice=2)
+
+    assert verdicts == {
+        "widget.colour": docs.ColumnVerdict(),
+        "widget.id": docs.ColumnVerdict(),
+        "widget.name": docs.ColumnVerdict(
+            problem="`widget.name` is in the model but not in docs/schema-doc.md"
+        ),
+        "widget.size": docs.ColumnVerdict(
+            problem="`widget.size` is in docs/schema-doc.md but not in the model"
+        ),
+    }
+
+
+def _with_marked_size(added_in: int) -> dict[str, docs.DocTable]:
+    columns = frozenset({"id", "name", "colour", "size"})
+    table = docs.DocTable(
+        "widget", columns, {"colour": frozenset({"red", "blue"})}, {"size": added_in}
+    )
+    return {"widget": table}
+
+
+def test_marked_column_from_a_later_slice_is_skipped() -> None:
+    verdicts = _verdicts(_with_marked_size(added_in=3), current_slice=2)
+
+    assert verdicts["widget.size"] == docs.ColumnVerdict(
+        skip_reason="added in Slice 3 (schema-doc)"
     )
 
-    assert problems == [
-        "`widget`: columns in the model but not in docs/schema-doc.md: name",
-        "`widget`: columns in docs/schema-doc.md but not in the model: size",
-    ]
+
+@pytest.mark.parametrize("current_slice", [3, 4])  # the marked slice has started, or is past
+def test_marked_column_is_required_once_its_slice_has_started(current_slice: int) -> None:
+    verdicts = _verdicts(_with_marked_size(added_in=3), current_slice=current_slice)
+
+    assert verdicts["widget.size"] == docs.ColumnVerdict(
+        problem="`widget.size` is in docs/schema-doc.md but not in the model (marked `Added in "
+        "Slice 3.`, and that slice has started)"
+    )
+
+
+def test_marked_column_in_the_model_passes_before_its_slice() -> None:
+    metadata = _synthetic_metadata()
+    metadata.tables["widget"].append_column(Column("size", String))
+
+    checks = docs.column_checks(metadata, _with_marked_size(added_in=3))
+
+    assert [docs.column_verdict(check, 2) for check in checks] == [docs.ColumnVerdict()] * 4
+
+
+def test_undocumented_model_column_fails_even_in_a_table_with_markers() -> None:
+    columns = frozenset({"id", "colour", "size"})
+    documented = {"widget": docs.DocTable("widget", columns, {}, {"size": 3})}
+
+    verdicts = _verdicts(documented, current_slice=2)
+
+    assert verdicts["widget.name"] == docs.ColumnVerdict(
+        problem="`widget.name` is in the model but not in docs/schema-doc.md"
+    )
+
+
+@pytest.mark.parametrize(
+    ("table", "slice_number", "skipped"),
+    [
+        ("requirement", 2, {"workstream_id": 3, "search_vector": 6}),
+        ("task", 3, {"sprint_id": 4, "milestone_id": 4, "search_vector": 6}),
+        ("testcase", 5, {"search_vector": 6}),
+    ],
+)
+def test_schema_doc_marks_columns_from_later_slices(
+    table: str, slice_number: int, skipped: dict[str, int]
+) -> None:
+    """The real schema doc, against a model built in the table's own slice (every documented
+    column except the marked ones): exactly the marked columns are skipped, nothing fails."""
+    documented = docs.schema_doc_tables()
+    metadata = MetaData()
+    built = sorted(documented[table].columns - set(skipped))
+    Table(table, metadata, *(Column(name, String) for name in built))
+
+    verdicts = {
+        check.column: docs.column_verdict(check, slice_number)
+        for check in docs.column_checks(metadata, documented)
+    }
+
+    assert verdicts == dict.fromkeys(built, docs.ColumnVerdict()) | {
+        column: docs.ColumnVerdict(skip_reason=f"added in Slice {n} (schema-doc)")
+        for column, n in skipped.items()
+    }
+
+
+@pytest.mark.parametrize(
+    "notes",
+    [
+        "added in Slice 3. Same project",  # wrong case
+        "Added in Slice 3 Same project",  # no period
+        "Added in Slice three. Same project",  # not a number
+        "Same project. Added in Slice 3.",  # not at the start
+    ],
+)
+def test_malformed_added_in_marker_is_a_structure_error(
+    monkeypatch: pytest.MonkeyPatch, notes: str
+) -> None:
+    def fake_read(_path: str) -> str:
+        return (
+            "### `widget`\n| Field | Type | Notes |\n|---|---|---|\n"
+            f"| id | UUID (PK) | |\n| size | varchar | {notes} |\n"
+        )
+
+    monkeypatch.setattr(docs, "read", fake_read)
+
+    with pytest.raises(docs.DocsStructureError, match=r"`widget`\.size: malformed marker"):
+        docs.schema_doc_tables()
+
+
+def test_well_formed_added_in_marker_is_parsed() -> None:
+    assert docs.schema_doc_tables()["requirement"].added_in == {
+        "workstream_id": 3,
+        "search_vector": 6,
+    }
 
 
 def test_differing_enum_values_are_reported() -> None:

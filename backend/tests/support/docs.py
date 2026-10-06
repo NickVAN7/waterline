@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import total_ordering
 from pathlib import Path
 
@@ -88,10 +88,14 @@ class DocTable:
     name: str
     columns: frozenset[str]
     enums: dict[str, frozenset[str]]  # enum column -> documented values
+    added_in: dict[str, int] = field(default_factory=dict[str, int])  # marked column -> slice
 
 
 _TABLE_HEADING = re.compile(r"^### `([a-z_]+)`$", re.MULTILINE)
 _FIELD_HEADER = "| Field | Type | Notes |"
+# A column built in a later slice than its table (schema-doc conventions): its Notes cell
+# starts with exactly this.
+_ADDED_IN = re.compile(r"^Added in Slice (\d+)\.(?=\s|$)")
 
 
 def schema_doc_tables() -> dict[str, DocTable]:
@@ -105,15 +109,33 @@ def schema_doc_tables() -> dict[str, DocTable]:
         body = section(text, f"### `{name}`", SCHEMA_DOC)
         columns: set[str] = set()
         enums: dict[str, frozenset[str]] = {}
+        added_in: dict[str, int] = {}
         for cells in table_rows(body, _FIELD_HEADER, f"{SCHEMA_DOC} `{name}`"):
             field_names = [_unquote(part) for part in cells[0].split(" / ")]
             columns.update(field_names)
             type_cell = cells[1]
             if type_cell.startswith("enum"):
-                for field in field_names:
-                    enums[field] = _enum_values(name, field, type_cell, body)
-        tables[name] = DocTable(name, frozenset(columns), enums)
+                for field_name in field_names:
+                    enums[field_name] = _enum_values(name, field_name, type_cell, body)
+            marker_slice = _added_in_slice(name, cells[0], cells[2])
+            if marker_slice is not None:
+                added_in.update(dict.fromkeys(field_names, marker_slice))
+        tables[name] = DocTable(name, frozenset(columns), enums, added_in)
     return tables
+
+
+def _added_in_slice(table: str, field_cell: str, notes: str) -> int | None:
+    """The slice in an `Added in Slice <n>.` marker at the start of a Notes cell; None when
+    the cell has no marker. Anything else mentioning "added in slice" is malformed."""
+    match = _ADDED_IN.match(notes)
+    if match:
+        return int(match.group(1))
+    if re.search(r"added in slice", notes, re.IGNORECASE):
+        raise DocsStructureError(
+            f"{SCHEMA_DOC} `{table}`.{_unquote(field_cell)}: malformed marker in {notes!r}; the "
+            f"Notes cell must start with exactly `Added in Slice <n>.`"
+        )
+    return None
 
 
 def _enum_values(table: str, field: str, type_cell: str, body: str) -> frozenset[str]:
@@ -163,24 +185,62 @@ def model_tables_missing_from_schema_doc(
     return problems
 
 
-def column_mismatches(metadata: MetaData, documented: dict[str, DocTable]) -> list[str]:
-    problems: list[str] = []
+@dataclass(frozen=True)
+class ColumnCheck:
+    """One column of a model table, from either side: the model, the schema doc, or both."""
+
+    table: str
+    column: str
+    in_model: bool
+    documented: bool
+    added_in: int | None  # the schema doc's `Added in Slice <n>.` marker, if any
+
+    def __str__(self) -> str:
+        return f"{self.table}.{self.column}"
+
+
+@dataclass(frozen=True)
+class ColumnVerdict:
+    problem: str | None = None
+    skip_reason: str | None = None
+
+
+def column_checks(metadata: MetaData, documented: dict[str, DocTable]) -> list[ColumnCheck]:
+    """Every column of every model table that the schema doc documents, from both sides."""
+    checks: list[ColumnCheck] = []
     for name, table in sorted(metadata.tables.items()):
         if name not in documented:
             continue  # reported by model_tables_missing_from_schema_doc
+        doc_table = documented[name]
         model_columns = {column.name for column in table.columns}
-        doc_columns = documented[name].columns
-        missing = sorted(model_columns - doc_columns)
-        extra = sorted(doc_columns - model_columns)
-        if missing:
-            problems.append(
-                f"`{name}`: columns in the model but not in {SCHEMA_DOC}: {', '.join(missing)}"
+        for column in sorted(model_columns | doc_table.columns):
+            checks.append(
+                ColumnCheck(
+                    table=name,
+                    column=column,
+                    in_model=column in model_columns,
+                    documented=column in doc_table.columns,
+                    added_in=doc_table.added_in.get(column),
+                )
             )
-        if extra:
-            problems.append(
-                f"`{name}`: columns in {SCHEMA_DOC} but not in the model: {', '.join(extra)}"
-            )
-    return problems
+    return checks
+
+
+def column_verdict(check: ColumnCheck, current_slice: int) -> ColumnVerdict:
+    """A model column must be documented. A documented column must be in the model, unless
+    its marker names a slice that hasn't started yet (later than `current_slice`)."""
+    if not check.documented:
+        return ColumnVerdict(problem=f"`{check}` is in the model but not in {SCHEMA_DOC}")
+    if check.in_model:
+        return ColumnVerdict()
+    if check.added_in is not None and check.added_in > current_slice:
+        return ColumnVerdict(skip_reason=f"added in Slice {check.added_in} (schema-doc)")
+    started = (
+        f" (marked `Added in Slice {check.added_in}.`, and that slice has started)"
+        if check.added_in is not None
+        else ""
+    )
+    return ColumnVerdict(problem=f"`{check}` is in {SCHEMA_DOC} but not in the model{started}")
 
 
 def enum_mismatches(metadata: MetaData, documented: dict[str, DocTable]) -> list[str]:

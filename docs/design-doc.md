@@ -18,6 +18,11 @@
 >    password policy (§4), identifiers (§3), reserved slugs (§3), system-admin CLI (§4),
 >    removing members with their project memberships (§4), and the archive check's place in
 >    `authorize()` (§5). API conventions are in `build-plan.md`.
+> 6. Oct 5, 2026 review: personal actions in `authorize()` (§5), approver eligibility and
+>    replacement (§6.2), manual requirement approval by project admins (§5, §6.2), revision 1 at
+>    creation (§6.1), data classification and export control (§3.1), accessibility (WCAG 2.2
+>    AA, §1) and loading states (`screen-inventory.md`, step 5), API rate limiting (§4), and
+>    malware scanning for future file uploads (§16).
 >
 > Table-level detail lives in `schema-doc.md`. The people who use Waterline, the tenancy and
 access model, and the screens derived from them are in `screen-inventory.md`.
@@ -56,6 +61,17 @@ force it. Where a rule is really a team's process choice (review before done, re
 every test case, reassigning work when someone leaves), the app makes the state *visible*
 (flags, warnings, badges) rather than blocking the action. Hard constraints are reserved for
 data integrity and security (uniqueness, tenant isolation, lockout prevention).
+
+**Accessibility: WCAG 2.2 Level AA.** Every screen targets WCAG 2.2 AA, which includes everything
+in 2.1 AA except the removed 4.1.1. Consequences for the design:
+- **Dragging (2.5.7):** every drag has a single-pointer alternative (§6, "Non-drag
+  alternatives").
+- **Never color alone:** status, RAG, and badges always carry text or an icon too.
+- **Target size (2.5.8):** controls are at least 24×24 CSS pixels.
+- **Focus not obscured (2.4.11):** sticky headers and toasts never cover the focused element.
+- **Accessible authentication (3.3.8):** password fields allow paste and password managers.
+
+How it's tested: `testing-strategy.md`, "Accessibility".
 
 ### 1.1 Project types & modules
 
@@ -222,6 +238,86 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
 - **Markdown:** rendered markdown (descriptions, comments) is sanitized on render to prevent
   stored XSS.
 
+### 3.1 Data classification
+
+Owner decisions, Oct 5, 2026. Classification labels say how sensitive a project's content is and
+why. In v1 they drive a banner and badges, logging, and the export-control access rules below.
+Columns: `ClassificationMixin` (schema-doc, conventions).
+
+- **Two parts:**
+  - a **level**, one per entity: empty (unclassified, the default) → **Internal** →
+    **Confidential** → **Restricted**;
+  - **categories**, any number: `financial`, `proprietary`, `pii`, `export_controlled`.
+
+  Categories say *why* something is sensitive; the level says *how* sensitive. They're
+  independent (PII can be Confidential or Restricted).
+- **Levels.** The "Means" text is the UI's description beside each choice:
+
+  | Level | Means | Examples |
+  |---|---|---|
+  | *(none)* | Not yet classified; treated like Internal for every rule; no banner | — |
+  | Internal | For the firm and the client's project team; not for the public. Disclosure is embarrassing, not damaging | plans, schedules, ordinary tasks |
+  | Confidential | Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement | client financials, pricing, contract terms, proprietary process designs, business-contact PII |
+  | Restricted | Disclosure would cause serious harm or breach a legal or regulatory duty; need-to-know | sensitive PII (government IDs, bank details, payroll, health), unpatched security vulnerabilities, M&A |
+
+- **What's classified:**
+  - The **project** sets the floor.
+  - **Content items** (requirements, tasks, test cases; later RAID items, status reports, budget
+    lines, attachments) can raise the level and add categories, never go below the project's.
+  - **Effective classification** = the stricter of the item's and the project's levels, plus
+    the union of their categories.
+  - **Everything else inherits:** phases, milestones, workstreams, sprints, and test runs from
+    the project; subtasks, comments, and links from their parent; approval requests from what
+    they approve; a test result from its test case.
+- **`export_controlled` is project-only in v1.** Its protection comes from access control,
+  which is project-level in v1. Item-level `export_controlled` arrives with v2 per-person
+  visibility (§16).
+- **Who sets it:**
+  - A project's level and categories start empty (no seeding by project type).
+  - Project admins (including inherited) set and raise them.
+  - Members can raise an item's level and add categories.
+  - Lowering a level or removing a category is project-admin only.
+  - **Removing `export_controlled` from a project requires an explicit project admin** (a
+    `project_membership` with role admin). Inherited admins can't remove it.
+- **Export-controlled projects (who sees content).** When a project has `export_controlled`:
+  - **Content needs explicit membership.** Inherited admins (system admins, workspace
+    owners/admins, org owners/admins) keep **management** access: the project in lists, its
+    settings, members, archive and unarchive, and raising its classification. They lose
+    **content** access unless they hold an explicit `project_membership`. Content means
+    requirements, tasks, test cases, subtasks, comments, links, approvals, test runs, the
+    activity feed, and anything else inside the project. Content they can't see is a 404, as
+    elsewhere. `authorize()` applies this as the export-control gate (§5).
+  - **Adding a member needs a confirmation.** Adding anyone to the project (picker, email-first
+    add, or creating a user for it) requires the admin to confirm the person is authorized for
+    export-controlled data (a required field in the request; 422 without it). The confirmation
+    is recorded in that membership's audit event (§10.1).
+  - **Inherited admins can add themselves** the same way, so the project can always be
+    administered. The confirmation and the audit event are the control.
+  - **Marking a project export-controlled** requires the admin to confirm that the current
+    explicit members are authorized (one confirmation, listing them), recorded in the audit
+    event. From then on, inherited admins lose content access.
+  - **Approvers on an export-controlled project** must be explicit members. Approver
+    replacement (§6.2) goes to the requester only if they're an explicit project admin;
+    otherwise the request is flagged.
+- **What the labels control:**
+
+  | Rule | Arrives |
+  |---|---|
+  | Banner on project pages and a badge on items: level and categories, as text, never color alone | v1 |
+  | Changes logged: `audit_event` for projects (§10.1), `activity_log` for items (§10) | v1 |
+  | The export-controlled rules above | v1 |
+  | Notifications show no content for Confidential and above, only a link | v1.5 |
+  | Exports carry a classification header; Restricted exports for project admins only | when exports exist |
+  | AI features: never Restricted or `export_controlled`; Confidential only through a workspace-approved provider | v2 |
+  | Retention rules per level or category | v2+ |
+
+- **Not in v1** (§16): per-person visibility of items (v2, a separate access table); item-level
+  `export_controlled` (v2); configurable levels and categories per workspace (v2+, reference
+  tables on top of the columns). The budget financial-visibility flag (§15) is separate and
+  unchanged.
+- **Deployment:** Waterline's controls are app-level only; export-controlled data also needs a
+  compliant deployment (§4, "Before the first non-local deployment").
+
 ## 4. Tenancy, Users & Authentication
 
 ### Tenancy
@@ -255,7 +351,9 @@ Workspace (the firm: tenant boundary)
 
 - **Project access is always explicit project membership.** There is no "visible to the whole
   org" flag. System admins, workspace owners/admins, and owners/admins of the project's org
-  **inherit project admin** on every project they can see, without a `project_membership` row.
+  **inherit project admin** on every project they can see, without a `project_membership` row
+  (on an export-controlled project, management only: content needs an explicit membership,
+  §3.1).
 - **Visibility:** internal staff (workspace members) see only the orgs and projects they are
   assigned to; workspace owners/admins see every org and project in the workspace.
   "Assigned" means a membership:
@@ -276,16 +374,19 @@ Workspace (the firm: tenant boundary)
 - `email` — stored lowercase and compared case-insensitively (a CHECK enforces lowercase).
   Not changeable in v1: there is no email-change feature; an administrator with database
   access can change it directly.
-- `username` — unique across the app (users can belong to several orgs); lowercase letters,
-  digits, hyphens; set at account creation, changeable by the user. Exists now so @mentions can
-  be added with notifications (v1.5); mentions will store user IDs, so renames break nothing.
+- `username` — unique across the app (users can belong to several orgs); the same format as
+  slugs (§3): lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter.
+  Unlike slugs, the reserved-route list doesn't apply. Set at account creation, changeable by
+  the user. Exists now so @mentions can be added with notifications (v1.5); mentions will
+  store user IDs, so renames break nothing.
 - `is_active` — an inactive user **cannot sign in at all**; deactivation deletes their sessions
   immediately. Their past work (tasks, comments, log entries) still references them and is shown
   with a "deactivated" badge. Their open tasks stay assigned; the UI highlights them for manual
-  reassignment.
-- `is_system_admin` — may perform any action in any workspace, org, or project (one exception:
-  deciding another person's approval, §6.2). Workspaces and orgs still have their own owners/admins
-  with full control within them. The first system admin is created by the seed command; afterwards
+  reassignment. Their pending approvals are replaced (§6.2).
+- `is_system_admin` — may perform any action in any workspace, org, or project, except
+  personal actions such as deciding another person's approval (§5) and the content of an
+  export-controlled project they aren't an explicit member of (§3.1). Workspaces and orgs
+  still have their own owners/admins with full control within them. The first system admin is created by the seed command; afterwards
   the flag is granted and revoked only through app CLI commands (`grant-system-admin`,
   `revoke-system-admin`), never through the UI or API. The last active system admin cannot be
   deactivated or demoted (lockout safeguard).
@@ -440,6 +541,13 @@ Workspace (the firm: tenant boundary)
     change at their next sign-in).
   - Local HTTPS for the dev server, and end-to-end tests beyond Chromium.
   - A screen for the admin audit events (§10.1).
+  - General API rate limiting, beyond sign-in throttling: per IP at the reverse proxy, and per
+    user in the app for expensive endpoints (search, exports, later AI features). A limited
+    request gets 429 with a `Retry-After` header and the standard error body (code
+    `rate_limited`).
+  - Export-controlled data (§3.1) also needs a compliant deployment: hosting location, and
+    infrastructure, database, and backup access limited to authorized people. Waterline's
+    controls are app-level only; anyone with database access bypasses them.
 - GitHub OAuth `state` + PKCE are part of the GitHub slice. The OAuth callback is a frontend
   route that `POST`s `code` and `state` to the API (see CSRF above).
 
@@ -450,13 +558,31 @@ Workspace (the firm: tenant boundary)
   `authorize(user, action, entity)`, which **fails closed** (unrecognized action → deny) and has
   one unit test per action/role combination. Its internals can later be swapped for a
   data-driven `Permission`/`RolePermission` table without touching endpoints.
-- `authorize()` checks, in order: an archived project first (every mutation on the project or
-  anything inside it is denied, for every role including system admins). Two exceptions: unarchive,
-  and removing someone's project memberships when they're removed from an org or the workspace "with
-  their projects" (§4), since taking access away is always allowed; then `user.is_system_admin`;
-  then a workspace owner/admin role in the entity's workspace; then an owner/admin role in the
-  project's org; then the user's project role; then the targeted field-based rules below. Anything
-  not granted along the way is denied.
+- `authorize()` checks, in order:
+  1. **Archived project:** every mutation on the project or anything inside it is denied, for
+     every role including system admins. Two exceptions: unarchive, and removing someone's
+     project memberships when they're removed from an org or the workspace "with their
+     projects" (§4), since taking access away is always allowed.
+  2. **Export-control gate:** a content action on an export-controlled project needs an
+     explicit `project_membership`; without one it is denied whatever the user's admin level
+     (§3.1). Management actions pass through.
+  3. **Personal actions** (below): the relationship rule alone decides.
+  4. `user.is_system_admin`.
+  5. A workspace owner/admin role in the entity's workspace.
+  6. An owner/admin role in the project's org.
+  7. The user's project role.
+  8. The targeted field-based rules below.
+
+  Anything not granted along the way is denied. The action registry marks every action as
+  **content** or **management** (§3.1), and marks the personal actions.
+- **Personal actions** are actions whose right comes from the user's relationship to the item,
+  not from a role. For a personal action, the relationship rule alone decides: the admin levels
+  and project roles never grant it, and nothing later in the order overrides it. The archived
+  check and the export-control gate still come first, so a personal action inside an archived
+  project is denied like any other mutation. Known personal actions:
+  - `approval.decide`: only the approval row's named approver (§6.2; Slice 2);
+  - editing one's own comment: only its author (§11; Slice 6). Deleting any comment stays a
+    project-admin action.
 - **Reads are authorized too**, not just mutations:
   - Single-entity reads call `authorize(user, "view", entity)`.
   - List endpoints can't check row by row, so their queries are **scoped at the query level to
@@ -474,7 +600,8 @@ Workspace (the firm: tenant boundary)
 
 Roles at each level include the capabilities of the roles listed above them at that level.
 "Project admin" below always includes **inherited** project admin (system admins, workspace
-owners/admins, and owners/admins of the project's org).
+owners/admins, and owners/admins of the project's org). On an export-controlled project,
+inherited admin covers management only; content needs an explicit membership (§3.1).
 
 **Project roles** (`project_membership`)
 
@@ -489,7 +616,7 @@ owners/admins, and owners/admins of the project's org).
 | Role | Capabilities |
 |---|---|
 | member | Belongs to the org; can be added to its projects. No project access by itself |
-| admin | Create, archive, and unarchive the org's projects, naming each new project's first admin (from the org's members and the workspace's staff; always given a `project_membership` row, even if they also inherit admin); project admin on every project in the org; create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
+| admin | Create, archive, and unarchive the org's projects, naming each new project's first admin (from the org's members and the workspace's staff; always given a `project_membership` row, even if they also inherit admin); project admin on every project in the org (on an export-controlled project, management only without an explicit membership, §3.1); create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
 | owner | Admin + manage the org itself and grant, change, or remove its owner and admin roles |
 
 **Workspace roles** (`workspace_membership`)
@@ -497,11 +624,12 @@ owners/admins, and owners/admins of the project's org).
 | Role | Capabilities |
 |---|---|
 | member | Internal staff: sees only the orgs and projects they are assigned to, with no inherited access and no workspace pages |
-| admin | Manage the workspace's staff; create orgs and assign their first owner; org owner capabilities in every org of the workspace, and so project admin on every project; account actions by rank (§4) on users in the workspace |
+| admin | Manage the workspace's staff; create orgs and assign their first owner; org owner capabilities in every org of the workspace, and so project admin on every project (on an export-controlled project, management only without an explicit membership, §3.1); account actions by rank (§4) on users in the workspace |
 | owner | Admin + manage the workspace itself and grant, change, or remove its owner and admin roles |
 
-**System admin:** anything, in any workspace, org, or project (except deciding someone else's
-approval).
+**System admin:** anything, in any workspace, org, or project, except personal actions (such as
+deciding someone else's approval) and the content of an export-controlled project without an
+explicit membership (§3.1).
 
 ### Targeted rules — Task status transitions
 
@@ -531,10 +659,17 @@ blocking self-review are candidates for per-org settings later.
   it out of `approved` to any other status; completing the gate's approval request sets it as
   a system effect. Members change other milestone statuses as usual. `approved` is refused on
   non-gate milestones.
+- **Requirement approval by hand:** only a project admin (including inherited) moves a
+  requirement into `approved` by hand; members get 403 for that transition. Doing so sets
+  `approved_revision_id` to the current revision, `approved_by` to that admin, and
+  `approved_at` to now, and cancels any pending approval request on the requirement (§6.2).
+  Moving a requirement *out* of `approved` (e.g. to `in_progress`) follows the normal edit
+  rules; `approved_revision_id` stays set, so "Approved · modified" (§6.1) and the delete rule
+  above still work. Logged like any change (`status` and `approved_revision_id`, §10).
 - **Approvals (§6.2):** project admins create and cancel approval requests. Only the **named
-  approver** can decide their own approval row. This is personal: nobody, including project,
-  org, or workspace admins, or system admins, decides on another approver's behalf. A project
-  admin can cancel the request instead.
+  approver** can decide their own approval row. This is a personal action (see "The choke
+  point"): nobody, including project, org, or workspace admins, or system admins, decides on
+  another approver's behalf. A project admin can cancel the request instead.
 - The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted.
 
 ### Request shape
@@ -590,12 +725,16 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
 - Revision history and approval tracking — see §6.1 and §6.2.
 
 ### 6.1 Requirement revisions
-- Every **explicit save** that actually changes `title` or `description_md` creates a
-  `requirement_revision` (full snapshot + optional `change_note`). No-op saves and autosaves do
-  not create revisions.
+- **Creating a requirement creates revision 1**, in the same transaction, and sets
+  `current_revision_id` to it, so after creation `current_revision_id` is never null. (The
+  column stays nullable only because the requirement row is inserted before its first revision:
+  the foreign keys are circular.) Later **explicit saves** that actually change `title` or
+  `description_md` create the next `requirement_revision` (full snapshot + optional
+  `change_note`). No-op saves and autosaves do not create revisions.
 - `requirement.current_revision_id` points to the latest revision;
   `requirement.approved_revision_id` (+ `approved_by`, `approved_at`) records exactly which
-  revision was approved, set when an approval request completes (§6.2).
+  revision was approved, set when an approval request completes (§6.2) or when a project admin
+  approves the requirement by hand (§5).
 - **"Changed since approval"** is *derived*, never stored:
   `approved_revision_id IS NOT NULL AND approved_revision_id <> current_revision_id`.
   The status stays `approved`; the UI shows "Approved · modified" with a diff between the two
@@ -614,10 +753,45 @@ requirement approval.
   requirement request is bound to a specific revision. At most one request per entity is
   pending at a time.
 - **Policy (v1): every named approver must approve.** Any rejection rejects the whole request;
-  a further round is a new request. Other policies (any-one, quorum) are v2+.
+  a further round is a new request. Rows marked `replaced` (below) don't count: a request is
+  approved when every other row is approved. Other policies (any-one, quorum) are v2+.
 - **Who does what:** project admins (including inherited, §5) create and cancel requests; each
-  named approver decides only their own row (§5). Named approvers may hold any project role,
-  including viewer, so business stakeholders can sign off without edit rights.
+  named approver decides only their own row, a personal action that no admin level grants (§5,
+  "The choke point").
+- **Who can be an approver.** Named approvers may hold any project role, viewers included, so
+  stakeholders and (in v2) steering committees can sign off without edit rights. They must have
+  access to the project when the request is created: a `project_membership` of any role, or
+  inherited project admin (on an export-controlled project, only an explicit membership,
+  §3.1). Naming anyone else is rejected the same way the project-member picker rejects a user
+  outside its scope (404, §4).
+- **Replacing an approver who loses access.** When a user can no longer see the project, each
+  of their pending `approval` rows on its requests is replaced, in the same transaction as the
+  change that took their access away:
+  - **Causes:** their project membership is removed (directly, or with an org or workspace
+    removal, §4); a role change removes the inherited admin that was their only access; they
+    are deactivated.
+  - **By whom:** the request's requester (`requested_by`), if they still hold project admin
+    (explicit or inherited; on an export-controlled project, explicit only, §3.1). A project
+    admin can then decide how to handle the request: approve, reject, or cancel and re-request.
+  - **How:** the departed approver's row keeps its history, with `decision` set to `replaced`,
+    and a new pending row is added for the requester. If the requester is already a named
+    approver on that request, no new row is added. Rows already decided (approved or rejected)
+    are never replaced.
+  - **If the requester no longer holds project admin either,** the row stays pending and the
+    request is flagged in the UI ("an approver no longer has access") for any project admin to
+    cancel or re-request. Nothing else is reassigned automatically.
+  - **Logged** on the request: `field_changed = approver_id`, old and new values the two user
+    IDs (§10).
+  - It runs in an archived project too: it's part of taking access away, which the archived
+    check exempts (§5).
+  - It's a system effect, not an action anyone takes on the approver's behalf, so it doesn't
+    conflict with `approval.decide` being a personal action.
+  - **Approvals only.** Tasks keep their rule: a deactivated user's tasks stay assigned and are
+    highlighted for manual reassignment (§4).
+- **Approving a requirement by hand.** A project admin can move a requirement to `approved`
+  without a request (§5, "Requirement approval by hand"), e.g. to record a sign-off made
+  outside the app. A pending approval request on the requirement is then moot, so it is
+  cancelled, logged on the request (`status`, §10).
 - **v2:** the RAID module adds change requests and decisions as approvable entities, so the
   steering committee (project viewers named as approvers) can sign them off.
 - **Completing a requirement request** sets `approved_revision_id` to the request's revision,
@@ -738,8 +912,11 @@ requirement approval.
   Parent changes are logged (§10).
 - **Sprint planning** (`sprints` module): the backlog shows sprint sections; dragging a task into
   a section sets its `sprint_id` and rank in one request.
-- **Non-drag alternatives:** every draggable list offers "Move to top" / "Move to bottom" menu
-  actions, for keyboard users and long lists.
+- **Non-drag alternatives:** every draggable list offers "Move to top" / "Move to bottom",
+  "Move up" / "Move down", and "Move after…" (place the item after one the user picks) menu
+  actions, so every drag has a single-pointer alternative (WCAG 2.5.7, §1) and keyboard users
+  and long lists are served. On the board, the card's status control is the alternative to a
+  cross-column drop.
 
 ## 7. Status Model
 
@@ -747,7 +924,7 @@ v1 uses **fixed status values per entity** (stored as varchar + CHECK).
 
 | Entity | Values |
 |---|---|
-| Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` |
+| Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` (`approved`: set by completing an approval request, or by hand by a project admin only, §5, §6.2) |
 | Task | `todo` / `in_progress` / `blocked` / `in_review` / `done` / `cancelled` |
 | Test run | `planned` / `in_progress` / `completed` / `cancelled` |
 | Test result | `not_run` / `passed` / `failed` / `blocked` / `skipped` |
@@ -755,7 +932,7 @@ v1 uses **fixed status values per entity** (stored as varchar + CHECK).
 | Phase | `planned` / `active` / `completed` |
 | Milestone | `planned` / `in_progress` / `approved` / `released` / `cancelled` (`approved`: gates only, set by the gate's approval request or by a project admin, §6.2) |
 | Approval request | `pending` / `approved` / `rejected` / `cancelled` |
-| Approval (per approver) | `pending` / `approved` / `rejected` |
+| Approval (per approver) | `pending` / `approved` / `rejected` / `replaced` (`replaced`: the approver lost project access, §6.2) |
 
 - `blocked` is a real task status, not a flag. "All active work" = `status IN ('in_progress',
   'blocked')`.
@@ -852,10 +1029,12 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
   - **Requirement / task / test case:** `status`, `assignee_id`, `reporter_id`, `reviewer_id`,
     `sprint_id`, `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`,
     `start_date`, `due_date`, `requirement_id`, `parent_requirement_id`, `time_estimate`,
-    `approved_revision_id`.
-  - **Approval request:** `created` when it is made, and `status` for every change (`pending`
+    `approved_revision_id`, `classification_level`, `classification_categories` (§3.1).
+  - **Approval request:** `created` when it is made, `status` for every change (`pending`
     → `approved` / `rejected` / `cancelled`, whether cancelled by a project admin, by deleting a
-    requirement, or by cancelling a test run). Individual decisions stay in the `approval` rows.
+    requirement, by a project admin approving the requirement by hand, or by cancelling a test
+    run), and `approver_id` when an approver who lost project access is replaced (old and new
+    values: the two user IDs, §6.2). Individual decisions stay in the `approval` rows.
   - **Phase / milestone:** `status`, `start_date`, `end_date`, `baseline_start`,
     `baseline_end`, `target_date`, `baseline_date`.
   - `rank` is deliberately excluded — drag-and-drop would flood the log.
@@ -882,7 +1061,10 @@ table, `audit_event` (schema-doc, "Audit").
 - **What's recorded:** account actions (created, deactivated, reactivated, password reset, password
   changed, signed out everywhere, username changed), system-admin grants and revocations, workspace
   creation (by the seed command), workspace/org/project membership changes (added, role changed,
-  removed), org creation and changes, and project creation, changes, archiving, and unarchiving.
+  removed), org creation and changes, and project creation, changes, archiving, unarchiving, and
+  classification changes (§3.1). A project member added to an export-controlled project, and a
+  project marked export-controlled, record the admin's export-control confirmation in the
+  event's details.
 - **Scope:** every event has its workspace (none for instance-level events such as system-admin
   grants) and, where it applies, its org and project. A user-level event (e.g. a password
   reset or username change) has the workspace it happened in, and the org when the actor acted
@@ -900,7 +1082,8 @@ table, `audit_event` (schema-doc, "Audit").
 
 ### Comments
 - Flat list (threading is v2), on **tasks and requirements**. Markdown body.
-- Viewers can comment. Authors edit/delete their own comments; project admins can delete any.
+- Viewers can comment. Authors edit their own comments (a personal action, §5) and delete
+  them; project admins can delete any.
 - Soft-deleted.
 
 ### Tags
@@ -1124,9 +1307,14 @@ its own design pass.
 - **PMO dashboard** at workspace level. The first version rolls up **published status reports**
   only, with no live drill-down. Needs comparable portfolio fields on every project (client,
   PM, go-live date, current phase, health) and project templates, so phase and workstream names
-  line up across clients.
+  line up across clients. It leaves out export-controlled content for anyone without an
+  explicit membership on that project (§3.1).
 - **Steering committee landing page:** RAG status, change requests and decisions awaiting their
-  sign-off (§6.2), and escalated risks and issues. RAID items need an escalation level.
+  sign-off (§6.2), and escalated risks and issues. RAID items need an escalation level. Like the
+  PMO dashboard, it leaves out export-controlled content for anyone without an explicit
+  membership (§3.1).
+- **Per-person visibility of items** (a separate access table), and with it item-level
+  `export_controlled` (§3.1).
 - **Resourcing and resource management:** workspace-level internal teams (e.g. Finance,
   Operations, Data Migration) that project workstreams link to, giving cross-client views of
   each team's work and load. Needs its own design pass (v2+).
@@ -1150,7 +1338,16 @@ its own design pass.
 - Watchers/subscribers; email notifications
 - `project.estimation_unit` (points vs. hours) for display
 - Comment threading
-- Real file uploads (storage backend decision)
+- Real file uploads (storage backend decision). Requirements recorded for when uploads are
+  designed:
+  - every file is scanned for malware before it's stored anywhere it can be served from:
+    upload to quarantine, scan in a worker job (e.g. ClamAV), and only then move it to storage;
+  - a file that fails the scan is rejected and recorded;
+  - size limits and content-type checks (by content, not just extension);
+  - files are served as downloads (`Content-Disposition: attachment`), never rendered inline
+    from the app's origin.
+- Configurable classification levels and categories per workspace (reference tables on top of
+  the columns, §3.1)
 - Automatic `Task.status` changes from GitHub events
 - Approval policies beyond all-must-approve (any-one, quorum); per-org settings for enforced
   review / no self-review

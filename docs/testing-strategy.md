@@ -77,18 +77,45 @@ tested, what each kind of test is for, and the gates every change passes.
     reproducible.
 - **Concurrency:** truly parallel transactions for number allocation, optimistic locking
   (second save gets 409), the one-active-sprint rule, and approval completion.
-- **Approvals** (Slice 2 for requirements, Slices 4–5 for gates and test runs): completion
-  moves a requirement to `approved`, a gate to `approved`, and a test run to `completed`; a
-  rejection changes nothing on the entity; requests log `created` and every status change,
-  including a cancellation caused by deleting a requirement or cancelling a test run; a gate with any approval request can't
-  be deleted; `approved` is refused on non-gate milestones.
+- **Approvals** (Slice 2 for requirements, Slices 4–5 for gates and test runs):
+  - completion moves a requirement to `approved`, a gate to `approved`, and a test run to
+    `completed`; a rejection changes nothing on the entity;
+  - requests log `created` and every status change, including a cancellation caused by
+    deleting a requirement, by a project admin approving the requirement by hand, or by
+    cancelling a test run;
+  - manual requirement approval (design-doc §5): a project admin (including inherited) moving
+    a requirement into `approved` sets `approved_revision_id` to the current revision,
+    `approved_by` to that admin, and `approved_at`, and cancels a pending request; members get
+    403; moving out of `approved` keeps `approved_revision_id`; `status` and
+    `approved_revision_id` are logged;
+  - eligibility (design-doc §6.2): a viewer can be named; someone without project access is
+    rejected with 404 (on an export-controlled project, an inherited admin without an explicit
+    membership too);
+  - replacement of an approver who loses access, once for each cause (project membership
+    removed directly, with an org removal, and with a workspace removal; a role change removing
+    the only inherited admin; deactivation): the row becomes `replaced` and the requester gets
+    a new pending row; no new row when the requester is already named; the row stays pending
+    and the request is flagged when the requester no longer holds project admin; decided rows
+    are never replaced; `replaced` rows don't count toward the policy; the change is logged
+    (`approver_id`, old and new user IDs);
+  - a gate with any approval request can't be deleted; `approved` is refused on non-gate
+    milestones.
 - **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code
   and each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map
   owner per table; the tech-debt log's format, references, and deadlines; the developer guide's
   status line vs. `git log`; design-doc § references; the agents and skills listed vs. those in
   `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
-  instead of passing by finding nothing. Judgment calls (contradictions in prose, superseded
-  rules) are the `docs-consistency` agent's job.
+  instead of passing by finding nothing. The column check runs per column: a documented
+  column whose Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is
+  reported as **skipped** (`added in Slice <n> (schema-doc)`) while slice `<n>` hasn't started
+  (the latest `checkpoint(<ID>):` commit is in an earlier slice), and required like any other
+  column once it has; a malformed marker is a `DocsStructureError`. Judgment calls
+  (contradictions in prose, superseded rules) are the `docs-consistency` agent's job.
+- **Accessibility** (WCAG 2.2 AA, design-doc §1; from Slice 1, Checkpoint 14):
+  - automated checks with axe-core in component tests (`vitest-axe`) and end-to-end tests
+    (`@axe-core/playwright`), failing on any violation;
+  - a manual keyboard and screen-reader pass on each slice's new screens at slice
+    verification, since automated checks find only part of the problems.
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):
   - Every migration upgrades from an empty database to head.
   - Every migration downgrades one step and upgrades again (round-trip).
@@ -99,6 +126,17 @@ tested, what each kind of test is for, and the gates every change passes.
     admin, and owner; workspace member, admin, and owner; plus system admin and users with no
     access. Inherited project admin (org and workspace owners/admins, system admins) is tested
     on its own rows, and so is its absence for org and workspace members.
+  - Personal actions (design-doc §5): rows for each, with every admin level (system admin
+    included) and every project role denied, and only the relationship rule allowing it.
+  - Export control (design-doc §3.1): on an export-controlled project, inherited admins without
+    an explicit membership are denied every content action (404 for reads) and allowed
+    management actions; explicit members are allowed; removing `export_controlled` is refused
+    for an inherited admin and allowed for an explicit project admin; every member-add path
+    (picker, email-first add, creating a user for the project) and marking a project
+    export-controlled require the confirmation (422 without it); classification changes
+    record their audit event.
+  - Effective classification (Hypothesis property): never lower than the project's level, and
+    its categories are always a superset of the project's.
   - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;
     list endpoints return only the user's accessible projects and orgs.
   - Account actions (deactivate, reactivate, reset password, sign out everywhere) follow the rank rule
@@ -111,7 +149,8 @@ tested, what each kind of test is for, and the gates every change passes.
   - Adding by email reveals at most whether an account exists, never its org or workspace;
     an existing account from another org is added to the project's org and the project only
     after confirmation.
-  - Only a project admin moves a gate into or out of `approved` by hand; members are denied.
+  - Only a project admin moves a gate into or out of `approved`, or a requirement into
+    `approved`, by hand; members are denied.
   - An org-slug redirect happens only for a project the user can see.
   - Cookie attributes, token replacement at sign-in and password change, non-JSON bodies
     rejected (415 `unsupported_media_type`; `application/json; charset=utf-8` and a bodyless
