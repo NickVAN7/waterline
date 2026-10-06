@@ -74,7 +74,8 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `migration` — for every schema change.
 - `new-area` — for a new aggregate, or a new endpoint or action in an existing one.
 - `checkpoint` — to close every checkpoint; it runs `checkpoint-reviewer`, `security-reviewer`
-  (when the diff touches security-relevant code), `fresh-clone-verifier` (last checkpoint of a
+  (when the build plan names the checkpoint for it, or the diff touches security-relevant
+  code), `fresh-clone-verifier` (last checkpoint of a
   slice), and `docs-consistency` (last checkpoint of a slice).
 - `docs-consistency` — also on its own, after design changes made outside a checkpoint (see
   "Always").

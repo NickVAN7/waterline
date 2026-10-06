@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Security-focused reviewer for a Waterline checkpoint. Use (via the checkpoint skill) when a checkpoint touches authentication, sessions, authorization, any router, rendered markdown, cookie/CORS/CSRF settings, or GitHub/webhook code. Reports findings only; never edits files.
+description: Security-focused reviewer for a Waterline checkpoint. Use (via the checkpoint skill) when the build plan's section for the slice names the checkpoint for it, or when a checkpoint touches authentication, sessions, authorization, any router, rendered markdown, cookie/CORS/CSRF settings, or GitHub/webhook code. Reports findings only; never edits files.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -67,10 +67,11 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    - every action is registered; unknown actions are denied (fail closed);
    - order: archived project (every mutation on it or inside it denied, for every role including
      system admins; unarchive and removing a member with their projects excepted) →
-     export-control gate (from S1-C13) → personal actions → system admin → workspace
+     export-control gate (from Slice 2) → personal actions → system admin → workspace
      owner/admin → owner/admin of the project's org → project role → targeted rules;
-     personal actions (e.g. `approval.decide`) are decided by their relationship rule alone and
-     never granted by any admin level, system admin included;
+     personal actions (e.g. `approval.decide`) are allowed only by their relationship rule, and
+     only for a user with content access to the project; no admin level, system admin
+     included, ever grants one;
      inherited project admin only for those admin levels (never for org or workspace members);
      module gating before `authorize()`;
    - targeted rules match the design tables exactly (transitions, deletion, approvals — only
@@ -91,11 +92,14 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      workspace;
    - only project admins move a gate into or out of `approved`, or a requirement into
      `approved`, by hand;
-   - export control (design-doc §3.1, from S1-C13): every action is marked content or
-     management; on an export-controlled project, inherited admins without an explicit
-     membership get 404 on content and keep management access; the export-control confirmation
-     is required on every member-add path and when marking a project export-controlled; only an
-     explicit project admin can remove `export_controlled`;
+   - classification (design-doc §3.1, from S1-C13): every action is marked content or
+     management; the export-control confirmation is required on every member-add path, when
+     marking a project export-controlled, and when creating one; only an explicit project admin
+     can remove `export_controlled`, or lower the level or remove a category on an
+     export-controlled project;
+   - the export-control gate (from Slice 2): on an export-controlled project, inherited admins
+     without an explicit membership get 404 on every content action, read or mutation, and
+     keep management access;
    - the rank rule requires at least one target membership in the actor's scope (a user with
      no memberships isn't open to every org admin);
 4. **Tenant isolation and existence leaks:**

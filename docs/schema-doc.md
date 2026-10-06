@@ -28,12 +28,11 @@ Companion to `design-doc.md` (section references like §6.1 point there).
   stored.
 - **Columns added in a later slice.** A column that ships in a later slice than its table (it
   references a table, or belongs to a feature, from that slice) has a Notes cell starting with
-  exactly `Added in Slice <n>.`, where `<n>` is the slice that adds it. The docs consistency
-  tests report such a column as skipped until slice `<n>` has started (it has a
-  `checkpoint(S<n>-C…)` commit), then require it like any other column; a malformed marker is
-  an error. Because a marked column is required as soon as its slice's first checkpoint is
-  committed, it (and the table it references) is built in that **first** checkpoint of slice
-  `<n>`. The migration that adds the column follows the `migration` skill.
+  exactly `Added in Slice <n>.`, where `<n>` is the slice that adds it, in any of its
+  checkpoints. The docs consistency tests report such a column as skipped until slice `<n>` is
+  finished (its last checkpoint, or a later slice's, is committed), then require it like any
+  other column; a malformed marker is an error. The migration that adds the column follows the
+  `migration` skill.
 
 ## Entity-Relationship Diagram
 
@@ -580,11 +579,12 @@ firm's clients).
 Slice 1 (design-doc §1.1: the UI disables their features until their slices ship); each v2
 module's value is added when that module ships. Disabling a module hides its data; nothing is deleted.
 `CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii',
-'export_controlled'])`. Only project admins lower the level or remove a category; removing
-`export_controlled` needs an explicit project admin (a `project_membership` with role admin).
-With `export_controlled`, inherited admins keep management access but see content only with an
-explicit membership (design-doc §3.1). Classification changes are recorded as
-`project_classification_changed` audit events.
+'export_controlled'])`. Set at creation (recorded in `project_created`) or later. Only project
+admins lower the level or remove a category; removing `export_controlled` needs an explicit
+project admin (a `project_membership` with role admin), and on an export-controlled project so
+does any lowering or removal. With `export_controlled`, inherited admins keep management access
+but see content only with an explicit membership (design-doc §3.1; the gate is built in Slice
+2). Classification changes are recorded as `project_classification_changed` audit events.
 No visibility flag: access is always explicit project membership (plus inherited admin).
 
 ### `project_membership`
@@ -670,7 +670,7 @@ logged.
 | classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | current_revision_id | UUID (FK → requirement_revision), nullable | latest content revision; set to revision 1 in the transaction that creates the requirement, so never null after creation (nullable only because the requirement row is inserted before its first revision: circular FK) |
 | approved_revision_id | UUID (FK → requirement_revision), nullable | revision of the last approval: the request's revision when a request completes, or the current revision when a project admin approves by hand; stays set when the status moves out of `approved` |
-| approved_by | UUID (FK → user), nullable | approver whose decision completed the request, or the project admin who approved by hand |
+| approved_by | UUID (FK → user), nullable | approver whose decision completed the request (when an approver replacement completed it, the counted approver with the latest `decided_at`), or the project admin who approved by hand |
 | approved_at | timestamptz, nullable | when the request completed, or when the project admin approved by hand |
 | version | integer | optimistic locking |
 | search_vector | tsvector (generated) | Added in Slice 6. Title + description; GIN index |
@@ -904,7 +904,8 @@ request per entity.
 Index `(entity_type, entity_id, created_at)`. Never deleted; cancelled instead (including when a
 project admin approves the requirement by hand, design-doc §6.2).
 **Policy (v1):** `replaced` rows don't count: approved when every other `approval` row is
-approved; rejected on the first rejection.
+approved; rejected on the first rejection. A replacement that leaves every counted row approved
+completes the request (design-doc §6.2).
 
 ### `approval`
 | Field | Type | Notes |
@@ -912,7 +913,7 @@ approved; rejected on the first rejection.
 | id | UUID (PK) | |
 | approval_request_id | UUID (FK → approval_request) | |
 | approver_id | UUID (FK → user) | any project role, including viewer; must have project access when the request is created (an explicit membership on an export-controlled project) |
-| decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost project access while the row was pending; the row keeps its history, and a pending row for the requester is added unless they're already named, or the request is flagged if the requester no longer holds project admin (design-doc §6.2). Decided rows are never replaced |
+| decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost the access needed to decide while the row was pending, and the requester still holds project admin; the row keeps its history, and a pending row for the requester is added unless they're already named. If the requester no longer holds project admin, the row stays `pending` and the request is flagged (design-doc §6.2). Decided rows are never replaced |
 | comment | text, nullable | |
 | decided_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
@@ -936,7 +937,7 @@ approved or rejected (a personal action: no admin or system-admin override, desi
 | field_changed | enum, nullable | required when `action = updated`; values below |
 | old_value | text, nullable | serialized; for link events, the other entity's ID |
 | new_value | text, nullable | serialized; for link events, the other entity's ID |
-| changed_by | UUID (FK → user) | |
+| changed_by | UUID (FK → user), nullable | the user whose action made the change; null only when an app CLI command caused it (e.g. an approver replaced after `revoke-system-admin`, design-doc §6.2, §10) |
 | changed_at | timestamptz | |
 | created_at / updated_at | timestamptz | |
 
@@ -963,7 +964,7 @@ the project feed.
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | action-specific values (old/new role, old/new name or slug, modules; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation); never passwords, hashes, or tokens |
+| details | jsonb | action-specific values (old/new role, old/new name or slug, modules; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | |
 | created_at / updated_at | timestamptz | |
 
@@ -1035,7 +1036,7 @@ created. Project members create tags; renaming, deleting, and setting a tag's ty
 | added_by | UUID (FK → user) | |
 | created_at / updated_at | timestamptz | |
 
-Index `(entity_type, entity_id)`. Links only in v1; file uploads are v2.
+Index `(entity_type, entity_id)`. Links only in v1; file uploads are v2+ (design-doc §16).
 
 ---
 

@@ -132,5 +132,5 @@ Workspace (the firm: tenant boundary)
   managers.
 - **Data classification** (design-doc §3.1): a banner on project pages and a badge on items
   showing the level and categories as text, never color alone; the export-control
-  confirmation dialogs (adding a member to an export-controlled project, and marking a project
-  export-controlled, listing its explicit members).
+  confirmation dialogs (adding a member to an export-controlled project; marking a project
+  export-controlled, listing its explicit members; and creating a project export-controlled).

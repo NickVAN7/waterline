@@ -13,9 +13,11 @@ Each slice is a thin vertical cut through the stack, in the same order every tim
 A slice is done when its "Done when" list passes, CI is green, and the design docs still match
 what was built (any drift is fixed in the docs in the same change).
 
-A slice's **first checkpoint** builds every schema-doc column marked `Added in Slice <n>.` for
-that slice, with the tables those columns reference: from its commit on, the docs consistency
-tests require them (schema-doc conventions).
+Every schema-doc column marked `Added in Slice <n>.` is built during slice `<n>`, in any of
+its checkpoints (usually with the table it references): once the slice's last checkpoint is
+committed, the docs consistency tests require it (schema-doc conventions). The tests can't see
+a miss before that commit, so the slice's last checkpoint confirms by hand that every column
+marked for the slice is in the model (the `checkpoint` skill, step 2).
 
 ### Slice overview
 
@@ -97,17 +99,18 @@ Everything lives in the repository, version-controlled and present on every work
   checkpoint ends with:
   - a scope check, then `wl check`;
   - docs and tech-debt updates;
-  - the reviewers: `checkpoint-reviewer` every time, `security-reviewer` when the diff touches
-    security-relevant code, and at the end of a slice `fresh-clone-verifier`, plus
-    `docs-consistency` after `checkpoint-reviewer`;
+  - the reviewers: `checkpoint-reviewer` every time, `security-reviewer` when the slice's
+    section names the checkpoint for it or the diff touches security-relevant code, and at the
+    end of a slice `fresh-clone-verifier`, plus `docs-consistency` after `checkpoint-reviewer`;
   - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
   - one commit with the review note;
   - the list of changed docs and Claude files for the owner to upload to the Project, copied
     into the gitignored `project-upload/` folder (Claude never writes to the Project);
   - stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
-  alongside `checkpoint-reviewer` when a checkpoint touches auth, sessions, authorization,
-  routers, rendered markdown, or GitHub code.
+  alongside `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
+  when a checkpoint touches auth, sessions, authorization, routers, rendered markdown, or
+  GitHub code.
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
   sets up a temporary copy of the repository by following the developer guide literally and
   reports every wrong or missing step.
@@ -637,23 +640,25 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
 | 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL |
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`) with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
-| 7 | Authorization core | Action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied and only its relationship rule allows; the export-control gate's slot comes in Checkpoint 13); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions`; the full matrix (including personal actions) and fail-closed tests |
+| 7 | Authorization core | Action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions`; the full matrix (including personal actions) and fail-closed tests |
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add, create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); users list for workspace pages; own profile update (name, username); boundary tests both ways at each rank; audit events |
-| 11 | Projects | Create (key, type, module seeding, first admin), list, view, update (name, type, modules), archive and unarchive; key availability; module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
+| 11 | Projects | Create (key, type, module seeding, first admin, optional classification level and categories), list, view, update (name, type, modules), archive and unarchive; key availability; module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
 | 12 | Project members | List (per-row `allowed_actions`); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its three cases (design-doc §4); change role; remove; registers the `on_member_removed` handler with the org and workspace services, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
-| 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first and mutation-tested; setting a project's classification (project admin; removing `export_controlled` needs an explicit project admin); the export-control gate in `authorize()` (design-doc §5, §3.1), with every action in the registry marked content or management and matrix rows for it (inherited admins denied content but allowed management; explicit members allowed); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it) and when marking a project export-controlled; approver eligibility on export-controlled projects (explicit members only) recorded for Slice 2; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
+| 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first and mutation-tested; setting a project's classification at creation and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
 | 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
 | 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions); org settings; org members page (email-first add-person form with a "Generate" temporary password, role changes, account actions, the D2 removal dialog) |
 | 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, module selection with guidance); project settings (module toggles and warnings, archive/unarchive); classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
 | 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision) |
 
 Checkpoints touching authentication, sessions, authorization, or routers get the
-`security-reviewer` as well (every checkpoint from 1 to 16). The sections below describe the
-content; the table above is the order of work. The decisions behind this plan (F1–F10, D1–D7,
-C1–C5) are recorded in `docs/reviews/S1-plan.md`. That record predates Checkpoint 13
-(Classification & export control, added Oct 5, 2026): its Checkpoints 13–16 are now 14–17.
+`security-reviewer` as well: every checkpoint from 1 to 16. The `checkpoint` skill runs it for
+every checkpoint this paragraph names, and also whenever a diff touches security-relevant code.
+The sections below describe the content; the table above is the order of work. The decisions
+behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/S1-plan.md`. That record
+predates Checkpoint 13 (Classification & export control, added Oct 5, 2026): its Checkpoints
+13–16 are now 14–17.
 
 ### Migration (Checkpoint 1)
 Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, `membership`,
@@ -701,17 +706,20 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   recorded as audit events with no actor.
 
 ### Authorization (§5)
-- `authorize(user, action, entity)`: an explicit action registry; unknown action → deny;
-  checks in order (§5): archived project (deny every mutation on it or inside it, except
-  unarchive and removing a member with their projects) → export-control gate (a content action
-  on an export-controlled project needs an explicit project membership, §3.1; Checkpoint 13) →
-  personal actions (the relationship rule alone decides; no admin level or project role grants
-  them) → system admin → workspace owner/admin → owner/admin of the project's org → project
-  role → targeted rules. The admin levels grant inherited project admin.
+- `authorize(user, action, entity)`: an explicit action registry; unknown action → deny; checks
+  in order (§5): archived project (deny every mutation on it or inside it, except unarchive and
+  removing a member with their projects) → export-control gate (a content action on an
+  export-controlled project needs an explicit project membership, §3.1; built in Slice 2 with
+  the first content) → personal actions (the relationship rule decides, for a user with project
+  access; no admin level or project role grants them) → system admin → workspace owner/admin →
+  owner/admin of the project's org → project role → targeted rules. The admin levels grant
+  inherited project admin.
 - **Action registry:** every action is marked content or management (§3.1; from Checkpoint
-  13), and personal actions are marked as such (from Checkpoint 7). Slice 1 has no real personal action yet (`approval.decide` comes
-  in Slice 2), so Checkpoint 7 tests the step through a test-only personal action: denied to
-  every admin level, system admin included, and allowed only through its relationship rule.
+  13), and personal actions are marked as such (from Checkpoint 7). Slice 1 has no real
+  personal action yet (`approval.decide` comes in Slice 2), so Checkpoint 7 tests the step
+  through a test-only personal action: denied to every admin level, system admin included,
+  allowed only through its relationship rule, and denied to a user with the relationship but
+  no project access.
 - **Authorization context:** the user's system-admin flag and their workspace, org, and project
   memberships, loaded once per request and reused by every check, by `allowed_actions`, and by
   list scoping.
@@ -731,8 +739,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   roles (member; admin and owner, with inherited admin), system admin, and users with no
   access (not on the project, in another org, in another workspace), plus a fail-closed test
   for an unregistered action, archived-project cases for every mutating action, personal
-  actions (every admin level denied), and the export-control rows (inherited admins denied
-  content but allowed management; explicit members allowed).
+  actions (every admin level denied; the relationship without project access denied), and
+  the classification rows (removing `export_controlled`, and on an export-controlled project
+  any lowering or removal, denied to inherited admins and allowed to an explicit project
+  admin). The export-control gate's rows come in Slice 2.
 - **Mutation testing:** mutmut over `app/rules/` and `app/authz/`, run by `wl backend mutate`,
   included in `wl check` and CI; fails on any surviving mutant not marked equivalent
   (`testing-strategy.md`, "Mutation testing").
@@ -813,15 +823,16 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 ### Classification & export control (§3.1; Checkpoint 13)
 - `rules/classification.py`: effective classification (the stricter level, the union of
   categories) and the raise and lower rules, test-first and mutation-tested.
-- Setting a project's level and categories: project admins (including inherited) set and
-  raise; lowering or removing a category is project-admin only; removing `export_controlled`
-  needs an explicit project admin. Each change records `project_classification_changed`.
-- The export-control gate in `authorize()`, the content/management marking on every action,
-  and `allowed_actions` reflecting both.
-- The export-control confirmation (a required field; 422 without it) on every member-add path
-  and when marking a project export-controlled, recorded in the audit event.
-- Approver eligibility on export-controlled projects (explicit members only) is recorded here
-  for Slice 2.
+- Setting a project's level and categories, at creation (recorded in `project_created`) or
+  in settings: project admins (including inherited) set and raise; lowering or removing a
+  category is project-admin only; removing `export_controlled`, and on an export-controlled
+  project any lowering or removal, needs an explicit project admin. Each change records
+  `project_classification_changed`.
+- The content/management marking on every action, and `allowed_actions` reflecting the rules
+  above. The export-control gate that uses the marking is built in Slice 2, with the first
+  content.
+- The export-control confirmation (a required field; 422 without it) on every member-add path,
+  when marking a project export-controlled, and when creating one, recorded in the audit event.
 - A convention test that every classifiable model uses `ClassificationMixin`.
 
 ### Number allocation (§3)
@@ -891,10 +902,12 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - [ ] The `authorize()` matrix and fail-closed test pass, including personal actions (denied
       to every admin level); archived projects reject mutations (unarchive and removing a member
       with their projects excepted).
-- [ ] An export-controlled project hides its content from an inherited admin who isn't a
-      member and shows it once they're added with the confirmation; removing
-      `export_controlled` is refused for an inherited admin; classification changes record
-      their audit event.
+- [ ] A project can be classified at creation and in settings; marking it export-controlled
+      (at creation or later) and adding a member to it require the confirmation; on an
+      export-controlled project, inherited admins keep management access (the project, its
+      settings and members), while removing `export_controlled`, lowering the level, or
+      removing a category is refused for them and allowed for an explicit project admin;
+      classification changes record their audit events. (Hiding content is Slice 2's.)
 - [ ] Last-owner (org and workspace) and last-system-admin guards, and the rank rule for
       account actions, are tested.
 - [ ] Every Slice 1 admin and security action records its audit event.
@@ -934,15 +947,30 @@ What's decided so far. This is not the slice's plan, which is written when Slice
 - **Classification:** requirements get `ClassificationMixin`; members raise an item's level and
   add categories, project admins lower them; item changes are logged (`classification_level`,
   `classification_categories`; design-doc §3.1, §10).
+- **The export-control gate** (design-doc §5, §3.1) is built here, with requirements as the
+  first content: on an export-controlled project, every content action (read or mutation) by a
+  user without an explicit membership is a 404, whatever their admin level; management actions
+  pass. Matrix rows: inherited admins denied content and allowed management; explicit members
+  allowed. The Done-when gets the Slice 1 item's other half: content hidden from an inherited
+  admin who isn't a member, and shown once they're added with the confirmation.
+- **Approver eligibility** on export-controlled projects: explicit members only (§3.1, §6.2).
 - **Decided:**
   - manual approval by project admins, which cancels a pending request (design-doc §5,
     "Requirement approval by hand"; §6.2);
   - revision 1 at creation (§6.1);
-  - `approval.decide` is a personal action (§5, "The choke point");
-  - approver eligibility and replacement (§6.2).
-- **Approver replacement touches Slice 1 flows.** Removing a project membership (directly, or
-  with an org or workspace removal), changing a role that carried inherited admin, and
-  deactivating a user can each leave an approver without project access. Slice 2 adds the
-  replacement (§6.2) to every one of those paths. Services in layers 2–3 (auth, workspace, org,
-  project) call the approval service (layer 1) directly, which the layer order allows. The
-  Slice 2 plan decides the exact call sites, with an API test for each path.
+  - `approval.decide` is a personal action, allowed only to a named approver with content
+    access to the project (§5, "The choke point");
+  - approver eligibility and replacement, including a replacement that completes a request
+    (§6.2).
+- **Approver replacement touches Slice 1 flows.** Every path that takes away the access
+  needed to decide (§6.2) gets the replacement: removing a project membership (directly, or
+  with an org or workspace removal); removing or changing the org or workspace membership or
+  role that gave inherited admin; `revoke-system-admin` (app CLI: `changed_by` is null, so
+  `activity_log.changed_by` is nullable); marking a project export-controlled, or removing an
+  explicit membership on one; deactivating a user. Services in layers 2–3 (auth, workspace,
+  org, project) call the approval service (layer 1) directly, which the layer order allows.
+  To decide whether the requester still holds project admin, the approval service builds the
+  requester's authorization context and calls `authorize(requester,
+  "approval_request.create", project)`, so the export-control rule is applied in one place,
+  with no upward call. The Slice 2 plan decides the exact call sites, with an API test for
+  each path.

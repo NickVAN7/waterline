@@ -226,21 +226,21 @@ def column_checks(metadata: MetaData, documented: dict[str, DocTable]) -> list[C
     return checks
 
 
-def column_verdict(check: ColumnCheck, current_slice: int) -> ColumnVerdict:
+def column_verdict(check: ColumnCheck, latest: Checkpoint, counts: dict[int, int]) -> ColumnVerdict:
     """A model column must be documented. A documented column must be in the model, unless
-    its marker names a slice that hasn't started yet (later than `current_slice`)."""
+    its marker names a slice that isn't finished yet (`slice_finished`)."""
     if not check.documented:
         return ColumnVerdict(problem=f"`{check}` is in the model but not in {SCHEMA_DOC}")
     if check.in_model:
         return ColumnVerdict()
-    if check.added_in is not None and check.added_in > current_slice:
+    if check.added_in is not None and not slice_finished(check.added_in, latest, counts):
         return ColumnVerdict(skip_reason=f"added in Slice {check.added_in} (schema-doc)")
-    started = (
-        f" (marked `Added in Slice {check.added_in}.`, and that slice has started)"
+    finished = (
+        f" (marked `Added in Slice {check.added_in}.`, and that slice is finished)"
         if check.added_in is not None
         else ""
     )
-    return ColumnVerdict(problem=f"`{check}` is in {SCHEMA_DOC} but not in the model{started}")
+    return ColumnVerdict(problem=f"`{check}` is in {SCHEMA_DOC} but not in the model{finished}")
 
 
 def enum_mismatches(metadata: MetaData, documented: dict[str, DocTable]) -> list[str]:
@@ -368,6 +368,15 @@ def _git(*args: str) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def slice_finished(slice_number: int, latest: Checkpoint, counts: dict[int, int]) -> bool:
+    """Whether `slice_number` is done, given the latest `checkpoint(...)` commit: a later slice
+    has started, or the latest commit is the slice's last checkpoint (`counts`, from its
+    "### Checkpoints" table; a slice without one is finished only once a later slice starts)."""
+    return latest.slice > slice_number or latest == Checkpoint(
+        slice_number, counts.get(slice_number, -1)
+    )
 
 
 def checkpoints_per_slice() -> dict[int, int]:
@@ -506,10 +515,7 @@ def overdue_tech_debt(
                 f"{TECH_DEBT} TD-{entry.number} is open, but its Fix by ({checkpoint}) is done "
                 f"(latest checkpoint commit: {latest})"
             )
-        if slice_number is not None and (
-            latest.slice > slice_number
-            or latest == Checkpoint(slice_number, counts.get(slice_number, -1))
-        ):
+        if slice_number is not None and slice_finished(slice_number, latest, counts):
             problems.append(
                 f"{TECH_DEBT} TD-{entry.number} is open, but its Fix by (Slice {slice_number}) "
                 f"is finished (latest checkpoint commit: {latest})"

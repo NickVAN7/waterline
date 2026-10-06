@@ -609,7 +609,7 @@ database. They check:
 | Check | Fails when |
 |---|---|
 | Model tables documented | a model table has no ``### `<table>` `` section in `schema-doc.md`, or is listed under "Deferred tables" |
-| Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table. The column check runs per column (`table.column`). A documented column whose Notes cell starts with `Added in Slice <n>.` is **skipped** (`added in Slice <n> (schema-doc)`) while the latest `checkpoint(<ID>):` commit is in an earlier slice, and required once slice `<n>` has started; a malformed marker is a `DocsStructureError`. A model column with no documented row always fails |
+| Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table. The column check runs per column (`table.column`). A documented column whose Notes cell starts with `Added in Slice <n>.` is **skipped** (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished (its last checkpoint, or a later slice's, has a `checkpoint(<ID>):` commit), and required from then on; a malformed marker is a `DocsStructureError`. A model column with no documented row always fails |
 | One owner per table | a schema-doc table isn't in exactly one "Owns (tables)" cell of the build plan's feature map, or the map names a table schema-doc lacks |
 | Tech-debt log | an entry lacks Added/What/Why/Fix by/Status, numbers aren't 1..n, a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it |
@@ -643,11 +643,11 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
   `fresh-clone-verifier`, `docs-consistency`.
 - **When the agents run:** `checkpoint-reviewer` at every checkpoint, `security-reviewer` when
-  a checkpoint touches security-relevant code, `fresh-clone-verifier` and `docs-consistency` at
-  the last checkpoint of a slice (all through the `checkpoint` skill). `docs-consistency` also
-  runs on its own after a design change applied outside a checkpoint, before committing. It is
-  read-only: it reports clear-cut fixes (citing the recorded decision) and decisions for the
-  owner, which are never decided for them.
+  the build plan names the checkpoint for it or it touches security-relevant code,
+  `fresh-clone-verifier` and `docs-consistency` at the last checkpoint of a slice (all through
+  the `checkpoint` skill). `docs-consistency` also runs on its own after a design change applied
+  outside a checkpoint, before committing. It is read-only: it reports clear-cut fixes (citing
+  the recorded decision) and decisions for the owner, which are never decided for them.
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
   - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or

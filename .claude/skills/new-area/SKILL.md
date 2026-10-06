@@ -68,10 +68,12 @@ Follow the `migration` skill.
   (e.g. `approval.decide`); unknown actions are denied.
 - **Test first** (`test-writer` skill): the full action × role matrix from the design doc,
   across project, org, and workspace roles (including inherited project admin), users with no
-  access, and system admins, allowed and denied rows, and the targeted rules
-  (reporter, assignee, reviewer, approval-state conditions); personal-action rows (every admin
-  level denied) and export-control rows (inherited admins denied content on an
-  export-controlled project). Then implement.
+  access, and system admins, allowed and denied rows, and the targeted rules (reporter,
+  assignee, reviewer, approval-state conditions); personal-action rows (every admin level
+  denied, and the relationship without content access to the project denied: on an
+  export-controlled project, without an explicit membership) and, from Slice 2 (when the gate
+  exists), export-control rows (inherited admins denied content on an export-controlled
+  project). Then implement.
 - Archived projects are read-only; module-gated areas are checked by the module dependency
   before `authorize()`.
 

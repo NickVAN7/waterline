@@ -17,9 +17,9 @@ follows the model; tests prove the database enforces what the doc says.
 - **Columns added in a later slice.** A schema-doc column whose Notes cell starts with
   `Added in Slice <n>.` is built in slice `<n>`, not with its table. When adding a table, leave
   out its marked columns from later slices. In slice `<n>`, add every column marked
-  `Added in Slice <n>.` (search the schema doc for it) in the slice's **first** checkpoint:
-  once that checkpoint is committed, the docs consistency tests require the column, and the
-  next checkpoint's `wl check` fails without it.
+  `Added in Slice <n>.` (search the schema doc for it), usually with the table it references:
+  once the slice's last checkpoint is committed, the docs consistency tests require the column,
+  so it must land within the slice.
 
 ## 2. Change the models
 

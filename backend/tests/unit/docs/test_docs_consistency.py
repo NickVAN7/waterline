@@ -36,12 +36,12 @@ def test_every_model_table_is_documented_and_not_deferred() -> None:
 
 def _column_params() -> list[ParameterSet]:
     """One parameter per model column, decided at collection: a column the schema doc marks
-    `Added in Slice <n>.` for a slice that hasn't started is collected as skipped, so it shows in
+    `Added in Slice <n>.` for a slice that isn't finished is collected as skipped, so it shows in
     the report. A malformed schema doc fails collection of this module (a DocsStructureError)."""
-    current_slice = docs.latest_checkpoint().slice
+    latest, counts = docs.latest_checkpoint(), docs.checkpoints_per_slice()
     params: list[ParameterSet] = []
     for check in docs.column_checks(Base.metadata, docs.schema_doc_tables()):
-        verdict = docs.column_verdict(check, current_slice)
+        verdict = docs.column_verdict(check, latest, counts)
         marks = [pytest.mark.skip(reason=verdict.skip_reason)] if verdict.skip_reason else []
         params.append(pytest.param(verdict, id=str(check), marks=marks))
     return params
@@ -96,17 +96,24 @@ def test_missing_and_deferred_model_tables_are_reported() -> None:
     ]
 
 
+# Slice 3 has five checkpoints in these tests; slice 2 is long finished.
+_SLICE_3_OF_5 = {3: 5}
+_MID_SLICE_2 = docs.Checkpoint(2, 4)
+
+
 def _verdicts(
-    documented: dict[str, docs.DocTable], current_slice: int
+    documented: dict[str, docs.DocTable],
+    latest: docs.Checkpoint = _MID_SLICE_2,
+    counts: dict[int, int] = _SLICE_3_OF_5,
 ) -> dict[str, docs.ColumnVerdict]:
     return {
-        str(check): docs.column_verdict(check, current_slice)
+        str(check): docs.column_verdict(check, latest, counts)
         for check in docs.column_checks(_synthetic_metadata(), documented)
     }
 
 
 def test_missing_and_extra_columns_are_reported_per_column() -> None:
-    verdicts = _verdicts(_documented({"id", "colour", "size"}, {"red", "blue"}), current_slice=2)
+    verdicts = _verdicts(_documented({"id", "colour", "size"}, {"red", "blue"}))
 
     assert verdicts == {
         "widget.colour": docs.ColumnVerdict(),
@@ -128,21 +135,41 @@ def _with_marked_size(added_in: int) -> dict[str, docs.DocTable]:
     return {"widget": table}
 
 
-def test_marked_column_from_a_later_slice_is_skipped() -> None:
-    verdicts = _verdicts(_with_marked_size(added_in=3), current_slice=2)
+@pytest.mark.parametrize(
+    ("latest", "counts"),
+    [
+        (docs.Checkpoint(2, 4), _SLICE_3_OF_5),  # an earlier slice
+        (docs.Checkpoint(3, 1), _SLICE_3_OF_5),  # the slice has started
+        (docs.Checkpoint(3, 4), _SLICE_3_OF_5),  # one checkpoint before its last
+        (docs.Checkpoint(3, 7), {}),  # no checkpoint table yet: not finished within the slice
+    ],
+)
+def test_marked_column_is_skipped_until_its_slice_is_finished(
+    latest: docs.Checkpoint, counts: dict[int, int]
+) -> None:
+    verdicts = _verdicts(_with_marked_size(added_in=3), latest, counts)
 
     assert verdicts["widget.size"] == docs.ColumnVerdict(
         skip_reason="added in Slice 3 (schema-doc)"
     )
 
 
-@pytest.mark.parametrize("current_slice", [3, 4])  # the marked slice has started, or is past
-def test_marked_column_is_required_once_its_slice_has_started(current_slice: int) -> None:
-    verdicts = _verdicts(_with_marked_size(added_in=3), current_slice=current_slice)
+@pytest.mark.parametrize(
+    ("latest", "counts"),
+    [
+        (docs.Checkpoint(3, 5), _SLICE_3_OF_5),  # the slice's last checkpoint is committed
+        (docs.Checkpoint(4, 1), _SLICE_3_OF_5),  # a later slice has started
+        (docs.Checkpoint(4, 1), {}),  # a later slice has started, no table for slice 3
+    ],
+)
+def test_marked_column_is_required_once_its_slice_is_finished(
+    latest: docs.Checkpoint, counts: dict[int, int]
+) -> None:
+    verdicts = _verdicts(_with_marked_size(added_in=3), latest, counts)
 
     assert verdicts["widget.size"] == docs.ColumnVerdict(
         problem="`widget.size` is in docs/schema-doc.md but not in the model (marked `Added in "
-        "Slice 3.`, and that slice has started)"
+        "Slice 3.`, and that slice is finished)"
     )
 
 
@@ -152,14 +179,16 @@ def test_marked_column_in_the_model_passes_before_its_slice() -> None:
 
     checks = docs.column_checks(metadata, _with_marked_size(added_in=3))
 
-    assert [docs.column_verdict(check, 2) for check in checks] == [docs.ColumnVerdict()] * 4
+    assert [docs.column_verdict(check, _MID_SLICE_2, _SLICE_3_OF_5) for check in checks] == [
+        docs.ColumnVerdict()
+    ] * 4
 
 
 def test_undocumented_model_column_fails_even_in_a_table_with_markers() -> None:
     columns = frozenset({"id", "colour", "size"})
     documented = {"widget": docs.DocTable("widget", columns, {}, {"size": 3})}
 
-    verdicts = _verdicts(documented, current_slice=2)
+    verdicts = _verdicts(documented)
 
     assert verdicts["widget.name"] == docs.ColumnVerdict(
         problem="`widget.name` is in the model but not in docs/schema-doc.md"
@@ -177,15 +206,16 @@ def test_undocumented_model_column_fails_even_in_a_table_with_markers() -> None:
 def test_schema_doc_marks_columns_from_later_slices(
     table: str, slice_number: int, skipped: dict[str, int]
 ) -> None:
-    """The real schema doc, against a model built in the table's own slice (every documented
-    column except the marked ones): exactly the marked columns are skipped, nothing fails."""
+    """The real schema doc, against a model built at the end of the table's own slice (every
+    documented column except the marked ones): exactly the marked columns are skipped."""
     documented = docs.schema_doc_tables()
     metadata = MetaData()
     built = sorted(documented[table].columns - set(skipped))
     Table(table, metadata, *(Column(name, String) for name in built))
+    end_of_slice = docs.Checkpoint(slice_number, 6)
 
     verdicts = {
-        check.column: docs.column_verdict(check, slice_number)
+        check.column: docs.column_verdict(check, end_of_slice, {slice_number: 6})
         for check in docs.column_checks(metadata, documented)
     }
 

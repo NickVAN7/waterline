@@ -273,20 +273,26 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
   which is project-level in v1. Item-level `export_controlled` arrives with v2 per-person
   visibility (§16).
 - **Who sets it:**
-  - A project's level and categories start empty (no seeding by project type).
+  - A project's level and categories start empty (no seeding by project type). The creator
+    can set them when creating the project, or project admins later.
   - Project admins (including inherited) set and raise them.
   - Members can raise an item's level and add categories.
   - Lowering a level or removing a category is project-admin only.
   - **Removing `export_controlled` from a project requires an explicit project admin** (a
     `project_membership` with role admin). Inherited admins can't remove it.
+  - **On an export-controlled project, inherited admins without an explicit membership may only
+    raise:** lowering the level or removing any category needs an explicit project admin, since
+    they can't see the content they'd be judging.
 - **Export-controlled projects (who sees content).** When a project has `export_controlled`:
   - **Content needs explicit membership.** Inherited admins (system admins, workspace
     owners/admins, org owners/admins) keep **management** access: the project in lists, its
     settings, members, archive and unarchive, and raising its classification. They lose
     **content** access unless they hold an explicit `project_membership`. Content means
     requirements, tasks, test cases, subtasks, comments, links, approvals, test runs, the
-    activity feed, and anything else inside the project. Content they can't see is a 404, as
-    elsewhere. `authorize()` applies this as the export-control gate (§5).
+    activity feed, and anything else inside the project. Every content action denied to them,
+    read or mutation, is a 404, as elsewhere. `authorize()` applies this as the export-control
+    gate (§5), built in Slice 2 with the first content (requirements); the project's own record
+    (`project.view`: name, key, settings, members, classification) is management.
   - **Adding a member needs a confirmation.** Adding anyone to the project (picker, email-first
     add, or creating a user for it) requires the admin to confirm the person is authorized for
     export-controlled data (a required field in the request; 422 without it). The confirmation
@@ -295,9 +301,12 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
     administered. The confirmation and the audit event are the control.
   - **Marking a project export-controlled** requires the admin to confirm that the current
     explicit members are authorized (one confirmation, listing them), recorded in the audit
-    event. From then on, inherited admins lose content access.
-  - **Approvers on an export-controlled project** must be explicit members. Approver
-    replacement (§6.2) goes to the requester only if they're an explicit project admin;
+    event. From then on, inherited admins lose content access. This applies at creation too:
+    the only explicit member is then the first admin, and the confirmation is recorded in
+    `project_created`.
+  - **Approvers on an export-controlled project** must be explicit members; an approver who
+    loses that (including when the project is marked export-controlled) is replaced (§6.2).
+    Approver replacement goes to the requester only if they're an explicit project admin;
     otherwise the request is flagged.
 - **What the labels control:**
 
@@ -563,10 +572,11 @@ Workspace (the firm: tenant boundary)
      every role including system admins. Two exceptions: unarchive, and removing someone's
      project memberships when they're removed from an org or the workspace "with their
      projects" (§4), since taking access away is always allowed.
-  2. **Export-control gate:** a content action on an export-controlled project needs an
-     explicit `project_membership`; without one it is denied whatever the user's admin level
-     (§3.1). Management actions pass through.
-  3. **Personal actions** (below): the relationship rule alone decides.
+  2. **Export-control gate** (built in Slice 2, with the first content): a content action on
+     an export-controlled project needs an explicit `project_membership`; without one it is
+     denied (404) whatever the user's admin level (§3.1). Management actions pass through.
+  3. **Personal actions** (below): the relationship rule decides, for a user with content
+     access to the project.
   4. `user.is_system_admin`.
   5. A workspace owner/admin role in the entity's workspace.
   6. An owner/admin role in the project's org.
@@ -574,10 +584,13 @@ Workspace (the firm: tenant boundary)
   8. The targeted field-based rules below.
 
   Anything not granted along the way is denied. The action registry marks every action as
-  **content** or **management** (§3.1), and marks the personal actions.
+  **content** or **management** (§3.1; from Slice 1, Checkpoint 13), and marks the personal
+  actions.
 - **Personal actions** are actions whose right comes from the user's relationship to the item,
-  not from a role. For a personal action, the relationship rule alone decides: the admin levels
-  and project roles never grant it, and nothing later in the order overrides it. The archived
+  not from a role. A personal action is allowed only when the relationship holds **and** the
+  user has content access to the project (any `project_membership` or inherited project admin;
+  on an export-controlled project, an explicit membership, §3.1). The admin levels and project
+  roles never grant it, and nothing later in the order overrides it. The archived
   check and the export-control gate still come first, so a personal action inside an archived
   project is denied like any other mutation. Known personal actions:
   - `approval.decide`: only the approval row's named approver (§6.2; Slice 2);
@@ -764,12 +777,16 @@ requirement approval.
   inherited project admin (on an export-controlled project, only an explicit membership,
   §3.1). Naming anyone else is rejected the same way the project-member picker rejects a user
   outside its scope (404, §4).
-- **Replacing an approver who loses access.** When a user can no longer see the project, each
-  of their pending `approval` rows on its requests is replaced, in the same transaction as the
-  change that took their access away:
+- **Replacing an approver who loses access.** When an approver loses the access needed to
+  decide (content access to the project: any `project_membership` or inherited project admin;
+  on an export-controlled project, an explicit membership, §3.1), each of their pending
+  `approval` rows on its requests is replaced, in the same transaction as the change that took
+  the access away. The rule is the loss of access, whatever the path; the paths today:
   - **Causes:** their project membership is removed (directly, or with an org or workspace
-    removal, §4); a role change removes the inherited admin that was their only access; they
-    are deactivated.
+    removal, §4); the org or workspace membership or role that gave them inherited admin is
+    removed or changed; their system-admin flag is revoked (`revoke-system-admin`); the project
+    is marked export-controlled while they have no explicit membership, or their explicit
+    membership on an export-controlled project is removed; they are deactivated.
   - **By whom:** the request's requester (`requested_by`), if they still hold project admin
     (explicit or inherited; on an export-controlled project, explicit only, §3.1). A project
     admin can then decide how to handle the request: approve, reject, or cancel and re-request.
@@ -781,7 +798,13 @@ requirement approval.
     request is flagged in the UI ("an approver no longer has access") for any project admin to
     cancel or re-request. Nothing else is reassigned automatically.
   - **Logged** on the request: `field_changed = approver_id`, old and new values the two user
-    IDs (§10).
+    IDs (§10). `changed_by` is the user whose action took the access away; it is null only
+    when an app CLI command caused it (as for `audit_event.actor_id`, §10.1).
+  - **It can complete the request.** If every row that still counts is approved afterwards (the
+    requester was already named and had approved), the request completes as a system effect
+    in the same transaction: `approved_by` is the counted approver with the latest
+    `decided_at`, the completion time is now, the request's `status` change is logged with the
+    replacement's `changed_by`, and the entity's `on_approved` handler runs.
   - It runs in an archived project too: it's part of taking access away, which the archived
     check exempts (§5).
   - It's a system effect, not an action anyone takes on the approver's behalf, so it doesn't
@@ -796,7 +819,8 @@ requirement approval.
   steering committee (project viewers named as approvers) can sign them off.
 - **Completing a requirement request** sets `approved_revision_id` to the request's revision,
   `approved_at` to the completion time, and `approved_by` to the approver whose decision
-  completed it (the full list lives in the `approval` rows). A `draft` requirement moves to
+  completed it, or, when a replacement completed it, the counted approver with the latest
+  `decided_at` (the full list lives in the `approval` rows). A `draft` requirement moves to
   `approved`.
 - **Completing a gate request** moves the milestone to `approved`. Only gates use `approved`;
   a project admin can also set it or move it out of `approved` by hand (§5; logged like any
@@ -1033,8 +1057,10 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
   - **Approval request:** `created` when it is made, `status` for every change (`pending`
     → `approved` / `rejected` / `cancelled`, whether cancelled by a project admin, by deleting a
     requirement, by a project admin approving the requirement by hand, or by cancelling a test
-    run), and `approver_id` when an approver who lost project access is replaced (old and new
-    values: the two user IDs, §6.2). Individual decisions stay in the `approval` rows.
+    run; approved also when a replacement completes it), and `approver_id` when an approver
+    who lost the access needed to decide is replaced (old and new values: the two user IDs, §6.2). For
+    changes caused by an app CLI command (e.g. `revoke-system-admin`), `changed_by` is null.
+    Individual decisions stay in the `approval` rows.
   - **Phase / milestone:** `status`, `start_date`, `end_date`, `baseline_start`,
     `baseline_end`, `target_date`, `baseline_date`.
   - `rank` is deliberately excluded — drag-and-drop would flood the log.
@@ -1062,9 +1088,10 @@ table, `audit_event` (schema-doc, "Audit").
   changed, signed out everywhere, username changed), system-admin grants and revocations, workspace
   creation (by the seed command), workspace/org/project membership changes (added, role changed,
   removed), org creation and changes, and project creation, changes, archiving, unarchiving, and
-  classification changes (§3.1). A project member added to an export-controlled project, and a
-  project marked export-controlled, record the admin's export-control confirmation in the
-  event's details.
+  classification changes (§3.1). A project member added to an export-controlled project, a
+  project marked export-controlled, and a project created export-controlled (in
+  `project_created`, with its initial level and categories) record the admin's export-control
+  confirmation in the event's details.
 - **Scope:** every event has its workspace (none for instance-level events such as system-admin
   grants) and, where it applies, its org and project. A user-level event (e.g. a password
   reset or username change) has the workspace it happened in, and the org when the actor acted
@@ -1112,7 +1139,7 @@ table, `audit_event` (schema-doc, "Audit").
   time (a DB constraint can't detect transitive cycles).
 
 ### Link attachments
-- URL + label on tasks, requirements, and test cases. Real file uploads are v2 (needs a storage
+- URL + label on tasks, requirements, and test cases. Real file uploads are v2+ (§16; needs a storage
   backend decision, e.g. MinIO → S3/R2).
 
 ### Polymorphic tables

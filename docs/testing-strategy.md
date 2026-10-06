@@ -91,13 +91,19 @@ tested, what each kind of test is for, and the gates every change passes.
   - eligibility (design-doc §6.2): a viewer can be named; someone without project access is
     rejected with 404 (on an export-controlled project, an inherited admin without an explicit
     membership too);
-  - replacement of an approver who loses access, once for each cause (project membership
-    removed directly, with an org removal, and with a workspace removal; a role change removing
-    the only inherited admin; deactivation): the row becomes `replaced` and the requester gets
-    a new pending row; no new row when the requester is already named; the row stays pending
-    and the request is flagged when the requester no longer holds project admin; decided rows
-    are never replaced; `replaced` rows don't count toward the policy; the change is logged
-    (`approver_id`, old and new user IDs);
+  - replacement of an approver who loses the access needed to decide, once for each path
+    (project membership removed directly, with an org removal, and with a workspace removal;
+    the org or workspace membership or role that gave inherited admin removed or changed;
+    `revoke-system-admin`; the project marked export-controlled while the approver has no
+    explicit membership, and an explicit membership removed on an export-controlled project;
+    deactivation): the row becomes `replaced` and the requester gets a new pending row; no new
+    row when the requester is already named; the row stays pending and the request is flagged
+    when the requester no longer holds project admin; decided rows are never replaced;
+    `replaced` rows don't count toward the policy; the change is logged (`approver_id`, old and
+    new user IDs, `changed_by` the actor, null from the CLI);
+  - a replacement that leaves every counted row approved completes the request (`approved_by`
+    the counted approver with the latest `decided_at`; the `status` change logged; the
+    entity's `on_approved` effect applied);
   - a gate with any approval request can't be deleted; `approved` is refused on non-gate
     milestones.
 - **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code
@@ -107,9 +113,9 @@ tested, what each kind of test is for, and the gates every change passes.
   `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
   instead of passing by finding nothing. The column check runs per column: a documented
   column whose Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is
-  reported as **skipped** (`added in Slice <n> (schema-doc)`) while slice `<n>` hasn't started
-  (the latest `checkpoint(<ID>):` commit is in an earlier slice), and required like any other
-  column once it has; a malformed marker is a `DocsStructureError`. Judgment calls
+  reported as **skipped** (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished
+  (its last checkpoint, or any later slice's, has a `checkpoint(<ID>):` commit), and required
+  like any other column from then on; a malformed marker is a `DocsStructureError`. Judgment calls
   (contradictions in prose, superseded rules) are the `docs-consistency` agent's job.
 - **Accessibility** (WCAG 2.2 AA, design-doc §1; from Slice 1, Checkpoint 14):
   - automated checks with axe-core in component tests (`vitest-axe`) and end-to-end tests
@@ -127,14 +133,17 @@ tested, what each kind of test is for, and the gates every change passes.
     access. Inherited project admin (org and workspace owners/admins, system admins) is tested
     on its own rows, and so is its absence for org and workspace members.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
-    included) and every project role denied, and only the relationship rule allowing it.
-  - Export control (design-doc §3.1): on an export-controlled project, inherited admins without
-    an explicit membership are denied every content action (404 for reads) and allowed
-    management actions; explicit members are allowed; removing `export_controlled` is refused
-    for an inherited admin and allowed for an explicit project admin; every member-add path
-    (picker, email-first add, creating a user for the project) and marking a project
-    export-controlled require the confirmation (422 without it); classification changes
-    record their audit event.
+    included) and every project role denied, the relationship rule allowing it only for a user
+    with content access to the project, and the relationship without that access denied.
+  - Classification (design-doc §3.1, Slice 1): removing `export_controlled`, and on an
+    export-controlled project lowering the level or removing any category, is refused for an
+    inherited admin and allowed for an explicit project admin; every member-add path (picker,
+    email-first add, creating a user for the project), marking a project export-controlled,
+    and creating one export-controlled require the confirmation (422 without it);
+    classification changes record their audit event.
+  - The export-control gate (design-doc §5, Slice 2 onward): on an export-controlled project,
+    inherited admins without an explicit membership get 404 for every content action, read or
+    mutation, and are allowed management actions; explicit members are allowed.
   - Effective classification (Hypothesis property): never lower than the project's level, and
     its categories are always a superset of the project's.
   - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;

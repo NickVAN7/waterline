@@ -20,6 +20,10 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
   import-linter contracts, migration checks, and generated-client freshness.
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
+- **Last checkpoint of a slice:** search `docs/schema-doc.md` for `Added in Slice <n>.` (this
+  slice's number) and confirm each marked column is in its model. The docs consistency tests
+  require these columns only once this checkpoint is committed, so `wl check` can't catch a
+  miss yet.
 
 ## 3. Update the docs
 
@@ -45,12 +49,16 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 
 - Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit (the
   previous checkpoint's commit, or the root commit for the first).
-- Also invoke the `security-reviewer` agent, with the same inputs and in parallel, when the diff
-  touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py` or
-  `backend/app/rules/password_policy.py`; session, token, password, or cookie code in
-  `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project` areas; any router; rendered
-  markdown (`v-html` or a markdown renderer); CORS, CSRF, or `Origin` handling; `github` or
-  `webhook` code.
+- Also invoke the `security-reviewer` agent, with the same inputs and in parallel, when
+  **either** holds:
+  - the build plan's section for the slice says the checkpoint gets the security reviewer
+    (e.g. Slice 1: "every checkpoint from 1 to 16"); or
+  - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
+    `password_policy.py`, `identifiers.py`, or `classification.py`; session, token, password,
+    or cookie code in `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project`
+    areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
+    `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
+    store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
 - Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
   and the diff.
 - **Last checkpoint of a slice:** also run `uv run wl down` (so ports are free) and invoke the

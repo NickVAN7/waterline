@@ -59,10 +59,11 @@ Calls flow **routers → services → repositories → models**. Services also u
   denied. Entities a user can't see return **404**, not 403.
 - **`authorize()` order** (design-doc §5): archived project → export-control gate → personal
   actions → system admin → workspace owner/admin → org owner/admin → project role → targeted
-  rules. From S1-C13, every registered action is marked content or management and the
-  export-control gate applies (design-doc §3.1). **Personal actions** (e.g.
-  `approval.decide`) are checked before the admin levels and never granted by them: only the
-  relationship rule (e.g. the named approver) allows one.
+  rules. From S1-C13, every registered action is marked content or management; the
+  export-control gate that uses the marking is built in Slice 2 (design-doc §3.1). **Personal
+  actions** (e.g. `approval.decide`) are checked before the admin levels and never granted by
+  them: only the relationship rule (e.g. the named approver) allows one, and only for a user
+  with content access to the project.
 - **`log_change()` is the only writer to `activity_log`**, and never commits.
 - **`log_admin_event()` is the only writer to `audit_event`**, and never commits (design-doc
   §10.1).
