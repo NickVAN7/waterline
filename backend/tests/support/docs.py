@@ -622,10 +622,10 @@ def _bullet_names(body: str, label: str) -> frozenset[str]:
         rf"^- \*\*{label}\*\* \([^)]*\): (.*?)(?=^- |\Z)", body, re.MULTILINE | re.DOTALL
     )
     if match is None:
-        raise DocsStructureError(f"{DEVELOPER_GUIDE} §10: no `- **{label}** (...):` bullet")
+        raise DocsStructureError(f"{DEVELOPER_GUIDE} section 11: no `- **{label}** (...):` bullet")
     names = frozenset(name for name in re.findall(r"`([a-z-]+)`", match.group(1)))
     if not names:
-        raise DocsStructureError(f"{DEVELOPER_GUIDE} §10: the {label} bullet names nothing")
+        raise DocsStructureError(f"{DEVELOPER_GUIDE} section 11: the {label} bullet names nothing")
     return names
 
 

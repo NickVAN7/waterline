@@ -225,9 +225,12 @@ Coverage gates fail CI. Excluding code from coverage requires a comment saying w
 - **`wl check`** (the developer CLI; `waterline check` in full) runs everything CI runs, locally.
   CI calls the same command, so local and CI can't diverge.
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
-  tests with coverage, mutation testing on `rules/` and `authz/`, import-linter contracts, migration checks, frontend tests with coverage,
-  generated-client freshness, and end-to-end tests (from Slice 1).
-- **Branch protection:** nothing merges to `main` without green CI.
+  tests with coverage, mutation testing on `rules/` and `authz/` (from Slice 1, S1-C3),
+  import-linter contracts, migration checks, frontend tests with coverage, generated-client
+  freshness, and end-to-end tests (from Slice 1).
+- **Pull requests:** checkpoints merge to `main` in groups, one PR each, only with green CI
+  (build-plan, "Pull requests"). Until branch protection is enabled (TD-15), that is checked
+  by hand before merging.
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
   tech-debt entry the same day, never retried until green.
 

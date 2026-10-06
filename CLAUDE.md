@@ -55,6 +55,11 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   `docs/reviews/<ID>.md` → commit → upload list for the owner → report → stop).
 - One commit per checkpoint. The docs, tests, and tech-debt log change in the same commit as the
   code they describe.
+- Checkpoints land in groups, one PR per group, on the group's branch (build plan, "Pull
+  requests"). Push after every checkpoint commit (never work in progress, and never rewrite a
+  pushed commit: fix red CI with a `fix(<ID>):` commit); CI must be green before review is
+  reported.
+  Merge (rebase and merge, never squash) only when the owner says so.
 - A shortcut is allowed only if it's logged in `docs/tech-debt.md` with its reason and target.
 
 ## Always
@@ -66,7 +71,8 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   relevant `CLAUDE.md` as part of the fix.
 - After applying design changes that came from a chat session (not a checkpoint), run the
   `docs-consistency` agent (trigger `design-change`, base = the commit before the changes)
-  before committing. Fix its clear-cut Fixes; bring its Decisions to the owner undecided.
+  before committing. Fix its clear-cut Fixes; bring its Decisions to the owner undecided. Commit
+  on a branch and land it through a PR, like a checkpoint group.
 
 ## Skills, agents, and hooks
 

@@ -61,6 +61,26 @@ minutes. The next checkpoint starts only after the current one is approved.
 6. **Review record** (`docs/reviews/<ID>.md`, e.g. `S0-C1.md`): every reviewer pass with its
    verdict, findings, and the resolution of each, plus open questions and owner decisions.
 
+### Pull requests (owner decision, S0-C8)
+Checkpoints land on `main` in **groups**, one pull request per group; each slice's section lists
+its groups. The practice starts with Slice 1; Slice 0's checkpoints, S0-C8 included, were
+committed directly to `main` (S0-C8's CI was proven on a trial PR, #1, closed unmerged).
+- A group works on one branch from `main`, named `s<slice>-<group>` (e.g. `s1-foundations`).
+  Each checkpoint is still one commit, approved by the owner before the next begins.
+- After each checkpoint's commit, the branch is pushed; the group's first checkpoint opens the
+  PR as a draft. CI runs on every push and must be green before the checkpoint goes to the
+  owner. Only finished checkpoint commits are pushed, never work in progress.
+- **Pushed history is never rewritten** (owner decision, S0-C8): no amend, rebase, or force-push
+  of a pushed commit. A checkpoint whose pushed commit turns CI red is fixed with a follow-up
+  commit, `fix(<ID>): <what>`, before it goes to the owner; it is the only exception to one
+  commit per checkpoint.
+- When the owner approves the group's last checkpoint, and only on their say-so, the PR is
+  merged with **rebase and merge**, never squash, so `main` keeps one `checkpoint(<ID>):`
+  commit per checkpoint (the docs consistency tests read them). The branch is then deleted.
+- Changes made outside a checkpoint (e.g. `docs:` design changes) go through a PR too.
+- GitHub doesn't enforce this yet: branch protection needs a paid plan for a private
+  repository (TD-15). Until then, check CI by hand before merging (`gh pr checks`).
+
 ### Verification (three layers)
 1. **Automated gates:** lint, types, all tests, coverage thresholds, import-linter contracts,
    migration checks. A checkpoint doesn't go to review until these pass.
@@ -136,7 +156,8 @@ Everything lives in the repository, version-controlled and present on every work
 ### Where the work happens
 Code is written and run on the owner's workstation(s) in the `waterline` repository (the
 working name is decided, design-doc §1), which is pushed to GitHub. Workstations need Git,
-Docker, uv, and Node 22 (verified by `wl doctor`).
+Docker, uv, and Node 22 (verified by `wl doctor`), and the GitHub CLI (`gh`, signed in) for the
+pull-request workflow (not checked by `wl doctor`).
 
 ---
 
@@ -179,7 +200,7 @@ slices only add features.
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a save to a row that's gone, e.g. hard-deleted meanwhile, is 404: always for a non-versioned entity, and, after a check, for a versioned one deleted or soft-deleted since it was loaded), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (migrate, api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
-| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests), branch protection configured on the GitHub repo, fresh-clone setup by following the developer guide, slice wrap-up |
+| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests); the pull-request workflow ("Pull requests" above; branch protection deferred, TD-15), fresh-clone setup by following the developer guide, slice wrap-up |
 
 The sections below describe the content; the table above is the order of work.
 
@@ -602,17 +623,17 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   `/api/health`.
 
 ### Done when
-- [ ] `docker compose up` starts postgres, api, worker (and web); the web shell loads and shows
+- [x] `docker compose up` starts postgres, api, worker (and web); the web shell loads and shows
       the health check through the Vite proxy.
-- [ ] A test job enqueued through `enqueue.py` is processed by the worker.
-- [ ] The same-transaction enqueue spike has a written result.
-- [ ] All convention tests pass.
-- [ ] Migrations apply cleanly on an empty database with no autogenerate drift.
-- [ ] CI is green on a pull request, with coverage thresholds met.
-- [ ] Developer guide covers setup, commands, architecture, conventions, and testing; a fresh
-      clone set up by following it works.
-- [ ] Every checkpoint passed independent review and owner approval; the tech-debt log is empty
-      or every entry has a target.
+- [x] A test job enqueued through `enqueue.py` is processed by the worker.
+- [x] The same-transaction enqueue spike has a written result.
+- [x] All convention tests pass.
+- [x] Migrations apply cleanly on an empty database with no autogenerate drift.
+- [x] CI is green on a pull request, with coverage thresholds met (trial PR #1).
+- [x] Developer guide covers setup, commands, architecture, conventions, and testing; a fresh
+      clone set up by following it works (`fresh-clone-verifier`, S0-C8).
+- [x] Every checkpoint passed independent review and owner approval (S0-C8's approval follows
+      this commit); the tech-debt log is empty or every entry has a target.
 
 ---
 
@@ -651,6 +672,16 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions); org settings; org members page (email-first add-person form with a "Generate" temporary password, role changes, account actions, the D2 removal dialog) |
 | 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, module selection with guidance); project settings (module toggles and warnings, archive/unarchive); classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
 | 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision) |
+
+**Pull requests** ("Development process"): five groups, each one PR.
+
+| PR | Branch | Checkpoints |
+|---|---|---|
+| 1 | `s1-foundations` | 1–4 (models, numbering, pure rules, API conventions) |
+| 2 | `s1-auth` | 5–7 (sessions, passwords and CLI, authorization core) |
+| 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions) |
+| 4 | `s1-projects` | 11–13 (projects, project members, classification) |
+| 5 | `s1-web` | 14–17 (web screens and slice verification) |
 
 Checkpoints touching authentication, sessions, authorization, or routers get the
 `security-reviewer` as well: every checkpoint from 1 to 16. The `checkpoint` skill runs it for

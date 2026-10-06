@@ -398,7 +398,7 @@ def test_developer_guide_lists_every_agent_and_skill() -> None:
     problems = docs.config_differences(
         docs.claude_config_on_disk(),
         docs.claude_config_in_developer_guide(),
-        f"{docs.DEVELOPER_GUIDE} §10",
+        f"{docs.DEVELOPER_GUIDE} section 11",
     )
 
     assert problems == [], _report(problems)

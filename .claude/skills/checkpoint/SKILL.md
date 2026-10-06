@@ -96,9 +96,11 @@ Fix by is this checkpoint (or this slice, at its last checkpoint). Each is resol
 checkpoint, or re-targeted with the owner's approval (record the new Fix by and why). None
 may be left open past its Fix by: the docs consistency tests fail on it after the commit.
 
-## 6. Commit
+## 6. Commit and push
 
-One commit for the whole checkpoint, with this message:
+Work on the checkpoint's group branch (`docs/build-plan.md`, "Pull requests"; the slice's
+section lists the groups), never on `main` (from Slice 1; Slice 0 landed on `main`). One commit
+for the whole checkpoint, with this message:
 
 ```
 checkpoint(<ID>): <checkpoint name>
@@ -119,6 +121,16 @@ Docs consistency: <n> fixes — …; <m> decisions for the owner (last checkpoin
 Tech debt: <added / resolved entries, or "no change">
 Next: <next checkpoint ID and name>
 ```
+
+Then:
+- Push the branch. At the group's first checkpoint, open the group's PR as a draft
+  (`gh pr create --draft`, titled with the group, listing its checkpoints).
+- Push only the finished checkpoint commit, never work in progress. Wait for CI on it
+  (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
+  fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
+  report. Never report a checkpoint whose CI isn't green.
+- Never merge. At the group's last checkpoint, the owner's approval decides the merge
+  (rebase and merge, never squash); merge only when they say so.
 
 ## 7. Prepare the Project upload
 
@@ -144,6 +156,8 @@ Send the owner:
 - any open questions from the review;
 - the Project upload list from step 7 (each file, whether it's new or changed, and the folder
   it was copied to);
+- the PR link and its CI result, and whether this checkpoint ends the group (so the PR is
+  ready to merge on approval);
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.

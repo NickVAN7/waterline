@@ -1,3 +1,5 @@
+import re
+
 import pytest
 import typer
 from typer.core import TyperGroup
@@ -6,6 +8,16 @@ from typer.testing import CliRunner
 from waterline_cli.main import app
 
 runner = CliRunner()
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def help_text(path: tuple[str, ...]) -> str:
+    """`--help` output without ANSI styling: Typer forces a styled terminal when it sees
+    GITHUB_ACTIONS (or FORCE_COLOR), which splits words like `--dry-run` with escape codes."""
+    result = runner.invoke(app, [*path, "--help"])
+    assert result.exit_code == 0, result.output
+    return _ANSI_ESCAPE.sub("", result.output)
+
 
 BACKEND_LINT = [
     "(cd backend && uv run ruff check .)",
@@ -61,17 +73,12 @@ def command_tree() -> dict[tuple[str, ...], bool]:
 
 @pytest.mark.parametrize("path", command_tree(), ids=lambda p: " ".join(p) or "wl")
 def test_help_works_for_every_command(path: tuple[str, ...]) -> None:
-    result = runner.invoke(app, [*path, "--help"])
-
-    assert result.exit_code == 0, result.output
-    assert "Usage:" in result.output
+    assert "Usage:" in help_text(path)
 
 
 @pytest.mark.parametrize("path", [p for p, leaf in command_tree().items() if leaf], ids=" ".join)
 def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
-    result = runner.invoke(app, [*path, "--help"])
-
-    assert "--dry-run" in result.output
+    assert "--dry-run" in help_text(path)
 
 
 @pytest.mark.parametrize(

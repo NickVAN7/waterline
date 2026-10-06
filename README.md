@@ -7,7 +7,7 @@ so does most of a project.)
 
 ## Quick start
 
-Needs Git, Docker, uv, and Node 22.
+Needs Git, Docker, uv, and Node 22, plus the GitHub CLI (`gh`, signed in) for pull requests.
 
 ```bash
 uv sync --all-packages
