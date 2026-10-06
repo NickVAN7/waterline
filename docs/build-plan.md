@@ -528,7 +528,9 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 - **Offset paging by default:** `?limit=50&offset=0` (maximum 200; above it → 422), returning
   `{items, total, limit, offset}`.
 - **Append-only feeds** (activity log, audit events) use a cursor: `?before=<id>`, returning
-  `{items, next_cursor}`. UUIDv7 IDs sort by creation time, so the ID is the cursor.
+  `{items, next_cursor}`. UUIDv7 IDs sort by creation time, so the ID is the cursor, and they
+  also order the entries one request writes (which share one timestamp, the transaction's
+  start). Feed indexes are `(scope, id)` (schema-doc, `audit_event` and `activity_log`).
 - **Ranked views** (backlog, board, requirement tree) return complete lists with a hard cap
   (set in Slice 2, with the requirement tree, the first ranked view), because drag-and-drop
   needs the whole list.
