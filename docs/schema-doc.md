@@ -938,7 +938,7 @@ approved or rejected (a personal action: no admin or system-admin override, desi
 | old_value | text, nullable | serialized; for link events, the other entity's ID |
 | new_value | text, nullable | serialized; for link events, the other entity's ID |
 | changed_by | UUID (FK → user), nullable | the user whose action made the change; null only when an app CLI command caused it (e.g. an approver replaced after `revoke-system-admin`, design-doc §6.2, §10) |
-| changed_at | timestamptz | |
+| changed_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_change()` never sets it |
 | created_at / updated_at | timestamptz | |
 
 `field_changed` values: `status`, `assignee_id`, `reporter_id`, `reviewer_id`, `sprint_id`,
@@ -947,8 +947,10 @@ approved or rejected (a personal action: no admin or system-admin override, desi
 `parent_requirement_id`, `time_estimate`, `approved_revision_id`, `approver_id`,
 `classification_level`, `classification_categories`.
 `CHECK (action <> 'updated' OR field_changed IS NOT NULL)`.
-Indexes: `(entity_type, entity_id, changed_at)` for item history; `(project_id, changed_at)` for
-the project feed.
+Indexes: `(entity_type, entity_id, id)` for item history; `(project_id, id)` for the project
+feed. Feeds page by `id` (UUIDv7, increasing in creation order), not by `changed_at`, which is
+the transaction's start time and so ties for every entry one request writes; `changed_at` is
+for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
 **Write path:** only via `log_change(...)`, in the same transaction as the change (design-doc
 §10).
 
@@ -965,7 +967,7 @@ the project feed.
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
 | details | jsonb | action-specific values (old/new role, old/new name or slug, modules; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation); never passwords, hashes, or tokens |
-| occurred_at | timestamptz | |
+| occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 
 `action` values: `workspace_created`, `user_created`, `user_deactivated`, `user_reactivated`,
@@ -976,8 +978,8 @@ the project feed.
 `project_updated`, `project_archived`, `project_unarchived`, `project_classification_changed`,
 `project_member_added`,
 `project_member_role_changed`, `project_member_removed`.
-Indexes: `(workspace_id, occurred_at)`, `(organization_id, occurred_at)`,
-`(target_user_id, occurred_at)`.
+Indexes: `(workspace_id, id)`, `(organization_id, id)`, `(target_user_id, id)`. The feed pages
+by `id`, not `occurred_at`, as for `activity_log`; `occurred_at` is for display.
 Append-only: `updated_at` never moves from `created_at`.
 **Write path:** only via `log_admin_event(...)`, in the same transaction as the change
 (design-doc §10.1). Visible to system admins, workspace owners/admins (their workspace), and

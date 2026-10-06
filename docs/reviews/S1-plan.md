@@ -150,3 +150,14 @@ The plan was written against the Project's copy of the docs; the repository was 
    (indexes) and 4 (cursor helper).
 5. **When TD-2 is fixed:** (a) Checkpoint 3, rewording TD-2's "Fix by"; (b) Checkpoint 7,
    moving it in the build plan. Needed by Checkpoint 3.
+
+## Update (Oct 6, 2026)
+
+- Decision 1 (security review trigger) was decided in the S0-C8 work: option (a) plus a wider
+  path list (build plan, Slice 1; checkpoint skill step 4).
+- Decision 4 (feed paging) is **decided: option (a)**, page by `id` with `(scope, id)` indexes
+  on `audit_event` and `activity_log` (schema-doc; build plan, "API conventions").
+  With it, `audit_event.occurred_at` and `activity_log.changed_at` are NOT NULL with
+  `server_default now()`, never set by the logging helpers (owner decision on the
+  docs-consistency pass for this change).
+- Decisions 2, 3, and 5 are still open.
