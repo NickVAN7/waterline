@@ -305,7 +305,8 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
     the only explicit member is then the first admin, and the confirmation is recorded in
     `project_created`.
   - **Approvers on an export-controlled project** must be explicit members; an approver who
-    loses that (including when the project is marked export-controlled) is replaced (§6.2).
+    loses that (including when the project is marked export-controlled) is replaced, except in
+    an archived project (§6.2).
     Approver replacement goes to the requester only if they're an explicit project admin;
     otherwise the request is flagged.
 - **What the labels control:**
@@ -391,7 +392,8 @@ Workspace (the firm: tenant boundary)
 - `is_active` — an inactive user **cannot sign in at all**; deactivation deletes their sessions
   immediately. Their past work (tasks, comments, log entries) still references them and is shown
   with a "deactivated" badge. Their open tasks stay assigned; the UI highlights them for manual
-  reassignment. Their pending approvals are replaced (§6.2).
+  reassignment. Their pending approvals are replaced (§6.2; in an archived project the rows stay
+  pending and the requests are flagged).
 - `is_system_admin` — may perform any action in any workspace, org, or project, except
   personal actions such as deciding another person's approval (§5) and the content of an
   export-controlled project they aren't an explicit member of (§3.1). Workspaces and orgs
@@ -805,8 +807,14 @@ requirement approval.
     in the same transaction: `approved_by` is the counted approver with the latest
     `decided_at`, the completion time is now, the request's `status` change is logged with the
     replacement's `changed_by`, and the entity's `on_approved` handler runs.
-  - It runs in an archived project too: it's part of taking access away, which the archived
-    check exempts (§5).
+  - **Not in an archived project** (owner decision, Oct 6, 2026). The paths that can still
+    take access away there (removal from the org or workspace "with their projects", which the
+    archived check exempts, §5; and changes that aren't project mutations: an org or workspace
+    role change or removal, `revoke-system-admin`, deactivation) don't replace the approver:
+    their row stays pending and the request is flagged, for a project admin to cancel or
+    re-request once the project is unarchived. So no request completes in an archived project
+    either. (Removing a project member directly, or marking the project export-controlled, is a
+    project mutation and is denied there anyway.)
   - It's a system effect, not an action anyone takes on the approver's behalf, so it doesn't
     conflict with `approval.decide` being a personal action.
   - **Approvals only.** Tasks keep their rule: a deactivated user's tasks stay assigned and are
