@@ -108,7 +108,8 @@ per kind of project.
     and defaults to the project's first admin (§5, "Org roles"). Removing the lead's project
     membership (by any path, §4, including in an archived project, as part of removal "with
     their projects") clears `lead_id` in the same transaction, recorded in the
-    `project_member_removed` event's details; the UI flags a project with no lead. A
+    `project_member_removed` event's details and, from Slice 2, as a `lead_id` change in the
+    project activity feed (§10); the UI flags a project with no lead. A
     deactivated lead stays the lead and is shown with the "deactivated" badge (§4), for a
     project admin to replace.
   - Status and lead changes also appear in the project activity feed (§10), from Slice 2.
@@ -671,7 +672,7 @@ inherited admin covers management only; content needs an explicit membership (§
 | Role | Capabilities |
 |---|---|
 | member | Belongs to the org; can be added to its projects; creates projects in the org, becoming each one's first project admin (an explicit `project_membership` row) and its lead. No access to the org's other projects by itself. Users whose only link to an org is a project membership (staff or client) can't create projects in it |
-| admin | Member + archive and unarchive the org's projects; when creating a project, may name someone else as its first admin (from the org's members and the workspace's staff; anyone else is a 404, as in the member picker, §4) instead of themself, the default; the first admin always gets the explicit `project_membership` row, even if they also inherit admin, and becomes the lead; project admin on every project in the org (on an export-controlled project, management only without an explicit membership, §3.1); create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
+| admin | Member + archive and unarchive the org's projects; when creating a project, may name someone else as its first admin (from the org's members and the workspace's staff; anyone else is a 404, as in the member picker, §4) instead of themself, the default (a separate action, `project.assign_first_admin`, returned in the org's `allowed_actions` so the create dialog shows the field only to those who may use it; a plain org member sending it gets 403); the first admin always gets the explicit `project_membership` row, even if they also inherit admin, and becomes the lead; project admin on every project in the org (on an export-controlled project, management only without an explicit membership, §3.1); create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
 | owner | Admin + manage the org itself and grant, change, or remove its owner and admin roles |
 
 **Workspace roles** (`workspace_membership`)
@@ -746,8 +747,11 @@ no schema change.
   open them on an export-controlled project too.
 - **Who opens them** (owner decision, Oct 7, 2026): the per-project view, project admins
   (including inherited); the per-person view, workspace owners/admins and system admins for
-  anyone, org owners/admins for a person within their rank scope ("Account management", §4),
-  and every user for themselves.
+  anyone, org owners/admins for a person within their rank scope, and every user for
+  themselves. "Within their rank scope" is the full rank rule ("Account management", §4): every
+  membership the person holds is covered by the org admin's roles, so the view never shows one
+  client's admin the person's access at another client. Anyone else gets a 404, as for the
+  workspace pages, so the views don't reveal who exists.
 
 ### Request shape
 Every protected mutation follows the same order, inside **one database transaction per

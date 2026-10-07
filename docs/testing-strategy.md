@@ -141,8 +141,9 @@ tested, what each kind of test is for, and the gates every change passes.
     so to workspace owners/admins and system admins); denied to users whose only link to the org is
     a project membership (staff or client), to workspace members with no role in the org, and (404)
     to users of another org. The first admin (the creator, or someone an org owner/admin names) gets
-    a `project_membership` with role admin and becomes the lead; naming another first admin is
-    denied to a plain org member. Editing the project's description, status, and lead is a
+    a `project_membership` with role admin and becomes the lead; naming another first admin
+    (`project.assign_first_admin`) is allowed to org owners/admins, including inherited, and
+    denied (403) to a plain org member. Editing the project's description, status, and lead is a
     project-admin action.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
     included) and every project role denied, the relationship rule allowing it only for a user
@@ -170,7 +171,9 @@ tested, what each kind of test is for, and the gates every change passes.
   - Workspace pages return 404 to everyone but workspace owners/admins and system admins.
   - Access review (design-doc §5): the per-project view only for project admins (including
     inherited); the per-person view for workspace owners/admins and system admins, for org
-    owners/admins only within their rank scope, and for the user themselves; everyone else 404.
+    owners/admins only within their rank scope (the full rank rule: an org admin is denied a
+    person who also belongs to another org or to a project outside it), and for the user
+    themselves; everyone else 404.
   - My work (design-doc §11) shows only the user's accessible projects, never an archived
     one, and leaves out export-controlled content without an explicit membership; a section
     whose query fails is returned as unavailable while the others still return.

@@ -683,7 +683,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners; live slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add, create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
-| 11 | Projects | Create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
+| 11 | Projects | Create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin, a separate action `project.assign_first_admin` in the org's `allowed_actions`; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
 | 12 | Project members | List (per-row `allowed_actions`); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its three cases (design-doc §4); change role; remove (removing the lead's membership clears `lead_id`, recorded in the `project_member_removed` details, also in archived projects through removal with their projects); the per-project access review (design-doc §5); registers the `on_member_removed` handler with the org and workspace services, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
 | 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first and mutation-tested; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
 | 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; My work as the home page, with its projects section (design-doc §11); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
@@ -866,8 +866,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   revoking stay in the CLI).
 - **Access review, per person** (design-doc §5, "Access review"): every org and project the
   person can reach and through what, derived from memberships. Workspace owners/admins and
-  system admins open it for anyone, org owners/admins for a person within their rank scope,
-  and every user for themselves.
+  system admins open it for anyone, org owners/admins for a person within their rank scope
+  (the full rank rule: every membership the person holds is covered), and every user for
+  themselves; anyone else gets a 404.
 
 ### Projects (§1.1, §3)
 - Create (any org member, and so org owners/admins, including inherited): name, key (3–6
@@ -875,7 +876,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   optional description; `enabled_modules` seeded from the type, skipping modules not yet
   allowed (in v1 an `erp` or `general` project starts with none); `status` `planning`. The
   creator becomes the project's first admin by default; an org owner/admin (including
-  inherited) may name someone else from the org's members and the workspace's staff instead.
+  inherited) may name someone else from the org's members and the workspace's staff instead:
+  a separate action, `project.assign_first_admin`, returned in the org's `allowed_actions`; a
+  plain org member sending it gets 403, and a named user outside those two groups is a 404.
   The first admin gets a `project_membership` row with role admin, even if they also inherit
   admin, and becomes the lead (`lead_id`). Users whose only link to the org is a project
   membership can't create projects there.
@@ -885,7 +888,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   `project_updated`), archive and unarchive (org owner/admin).
 - Removing the lead's project membership, by any path (including the `on_member_removed`
   handler, and in an archived project), clears `lead_id` in the same transaction, recorded in
-  the `project_member_removed` event's details (Checkpoint 12). A deactivated lead stays the
+  the `project_member_removed` event's details (Checkpoint 12) and, from Slice 2, in the
+  activity feed. A deactivated lead stays the
   lead, shown with the "deactivated" badge.
 - **Access review, per project** (design-doc §5, "Access review"; Checkpoint 12): everyone with
   access and why, separating management from content access on an export-controlled project.
@@ -1055,7 +1059,9 @@ What's decided so far. This is not the slice's plan, which is written when Slice
   decision (§11), using the `approval` index on `(approver_id, decision)`.
 - **Project status and lead in the activity feed:** with `log_change()`, the project service
   also logs `status` and `lead_id` changes to `activity_log` (`entity_type = project`; §10),
-  besides their `project_updated` audit event.
+  besides their `project_updated` audit event. That includes a lead cleared because the lead's
+  membership was removed (by any path, archived projects included), alongside its
+  `project_member_removed` event.
 - **Personal actions and export control:** the personal-action matrix rows for an
   export-controlled project (the relationship without an explicit membership denied) are
   tested here, with the gate and `approval.decide` (§5).
