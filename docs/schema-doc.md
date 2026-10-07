@@ -1007,7 +1007,13 @@ Indexes: `(workspace_id, id)`, `(organization_id, id)`, `(project_id, id)` (proj
 reads), `(target_user_id, id)`; all ship with the table in Slice 1. The read rules are built
 with the audit-event screen (design-doc §4, "Before the first non-local deployment"). The feed pages
 by `id`, not `occurred_at`, as for `activity_log`; `occurred_at` is for display.
-Append-only: `updated_at` never moves from `created_at`.
+Append-only, enforced in the database (owner decision, Oct 7, 2026): the trigger
+`tr_audit_event_append_only` (function `audit_event_append_only()`) rejects every `UPDATE` and
+`DELETE` with SQLSTATE `23001` (`restrict_violation`), so `updated_at` never moves from
+`created_at`. `TRUNCATE` isn't blocked (only test cleanup uses it). A role that may change the
+schema can still disable or drop the trigger, and the app currently connects as the table's
+owner; a runtime role without schema rights is planned before the first non-local deployment
+(design-doc §10.1, §4; TD-17).
 **Write path:** only via `log_admin_event(...)`, in the same transaction as the change
 (design-doc §10.1). Visible to system admins, workspace owners/admins (their workspace), and
 org owners/admins (their org), and project admins, including inherited (their project); never

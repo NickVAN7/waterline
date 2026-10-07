@@ -131,7 +131,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 ## Migrations
 
 - Follow the `migration` skill. Autogenerate misses CHECK-constraint and partial-index changes,
-  so review each migration by hand and test each constraint.
+  and never emits functions or triggers (write those with `op.execute`), so review each
+  migration by hand and test each constraint and trigger.
 - Every schema change is an Alembic migration generated with `wl backend migration "<message>"`,
   then reviewed by hand. Never edit a migration that has been committed; add a new one.
 - Every migration must downgrade cleanly. The schema doc is updated in the same commit.

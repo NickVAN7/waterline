@@ -72,6 +72,9 @@ Open the generated file and check each item against the schema doc:
 - [ ] **Adding a NOT NULL column to a table with data**: add it nullable, backfill, then set
       NOT NULL (or give it a `server_default`). Tests start from an empty database, so this
       mistake won't show up there.
+- [ ] **Functions and triggers** (e.g. `audit_event`'s append-only trigger) aren't in the
+      models, so autogenerate never emits or compares them: write them with `op.execute`, drop
+      them in the downgrade, and test their effect like a constraint.
 - [ ] **No unrelated changes**: procrastinate's tables are excluded from autogenerate; nothing
       else outside this change appears.
 

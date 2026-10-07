@@ -591,6 +591,9 @@ Workspace (the firm: tenant boundary)
     change at their next sign-in).
   - Local HTTPS for the dev server, and end-to-end tests beyond Chromium.
   - A screen for the admin audit events (§10.1).
+  - Separate database roles: migrations run as the owner; the app runs as a role with only data
+    rights (no `ALTER`, `DROP`, or `TRUNCATE`), so the `audit_event` append-only trigger can't
+    be disabled from the app's own connection (§10.1).
   - General API rate limiting, beyond sign-in throttling: per IP at the reverse proxy, and per
     user in the app for expensive endpoints (search, exports, later AI features). A limited
     request gets 429 with a `Retry-After` header and the standard error body (code
@@ -1206,6 +1209,12 @@ table, `audit_event` (schema-doc, "Audit").
   action-specific details (e.g. old and new role). Never passwords, hashes, or tokens.
 - **Write path:** only `log_admin_event()`, in the same transaction as the change (the same
   rule as `log_change()`).
+- **Append-only, in the database** (owner decision, Oct 7, 2026): no one can edit or delete an
+  event. A trigger rejects every `UPDATE` and `DELETE` on `audit_event` (schema-doc), so the
+  record holds against an ORM bug or an ordinary hand-written query. It doesn't hold against
+  schema changes: a role that may alter the table can disable or drop the trigger first, and
+  today the app connects as the table's owner (in Compose, a superuser). Running the app as a
+  role without schema rights closes that gap before the first non-local deployment (§4).
 - **Not yet:** a screen (before the first non-local deployment, §4), and sign-in successes and
   failures (recorded with sign-in throttling, `login_attempt`).
 
