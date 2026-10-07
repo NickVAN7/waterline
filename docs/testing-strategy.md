@@ -142,9 +142,10 @@ tested, what each kind of test is for, and the gates every change passes.
     a project membership (staff or client), to workspace members with no role in the org, and (404)
     to users of another org. The first admin (the creator, or someone an org owner/admin names) gets
     a `project_membership` with role admin and becomes the lead; naming another first admin
-    (`project.assign_first_admin`) is allowed to org owners/admins, including inherited, and
-    denied (403) to a plain org member. Editing the project's description, status, and lead is a
-    project-admin action.
+    (`project.assign_first_admin`) is allowed to org owners/admins, including inherited, and denied
+    (403) to a plain org member. The org entries in `/me` list `project.create` and
+    `project.assign_first_admin` exactly where this matrix allows them. Editing the project's
+    description, status, and lead is a project-admin action.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
     included) and every project role denied, the relationship rule allowing it only for a user
     with content access to the project, and the relationship without that access denied.
