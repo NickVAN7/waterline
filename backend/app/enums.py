@@ -53,6 +53,18 @@ class ProjectModule(StrEnum):
     GITHUB = "github"
 
 
+# --- Numbering (design-doc §3, "Number allocation") --------------------------------------------
+
+
+class NumberPrefix(StrEnum):
+    """Entity prefixes numbered per project (`project_counter.prefix`). Module prefixes (e.g.
+    risks, issues) are added when those modules are designed."""
+
+    REQUIREMENT = "RQ"
+    TASK = "TA"
+    TEST_CASE = "TC"
+
+
 # --- Classification (design-doc §3.1) -----------------------------------------------------------
 
 

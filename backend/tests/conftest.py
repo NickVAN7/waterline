@@ -21,10 +21,18 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, a
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.settings import TEST_DATABASE_NAME, Settings
 from tests.factories import SEED, BaseFactory
-from tests.support.concurrency import concurrency_tables, truncate
+from tests.support.concurrency import (
+    check_tables_are_empty,
+    concurrency_tables,
+    create_concurrency_engine,
+    truncate,
+)
 from tests.support.models import SupportBase
 
 BACKEND = Path(__file__).resolve().parents[1]
+
+# `pytester` runs a test in a separate pytest process (the concurrency fixture's wiring test).
+pytest_plugins = ["pytester"]
 
 
 @pytest.fixture(scope="session")
@@ -106,21 +114,33 @@ async def session(sessionmaker: SessionMaker) -> AsyncIterator[AsyncSession]:
             BaseFactory.__async_session__ = None
 
 
+@pytest.fixture(scope="session")
+async def concurrency_engine(migrated_database: URL) -> AsyncIterator[AsyncEngine]:
+    """The engine behind `concurrency`: a pool sized for `run_in_parallel` and a Postgres
+    `lock_timeout` on every connection (tests/support/concurrency.py)."""
+    engine = create_concurrency_engine(migrated_database)
+    yield engine
+    await engine.dispose()
+
+
 @pytest.fixture
 async def concurrency(
-    request: pytest.FixtureRequest, engine: AsyncEngine
+    request: pytest.FixtureRequest, concurrency_engine: AsyncEngine
 ) -> AsyncIterator[SessionMaker]:
     """Sessions with real commits, for tests that need separate connections or another process
-    (a worker) to see their data. The tables named in `@pytest.mark.concurrency(...)` are
-    truncated afterwards, pass or fail. Never combine with the rolled-back `connection`/
-    `session` fixtures: the truncate would wait on that open transaction's locks."""
+    (a worker) to see their data. Afterwards, pass or fail, the tables named in
+    `@pytest.mark.concurrency(...)` are truncated and every table must be empty: a test that
+    left rows elsewhere fails (and those rows are removed). Never combine with the rolled-back
+    `connection`/`session` fixtures: the truncate would wait on that open transaction's
+    locks."""
     item = cast(pytest.Item, request.node)  # pyright: ignore[reportUnknownMemberType] -- untyped in pytest
     marker = item.get_closest_marker("concurrency")
     tables = concurrency_tables(marker.args if marker else (), request.fixturenames)
     try:
-        yield create_sessionmaker(engine)
+        yield create_sessionmaker(concurrency_engine)
     finally:
-        await truncate(engine, tables)
+        await truncate(concurrency_engine, tables)
+        await check_tables_are_empty(concurrency_engine)
 
 
 @pytest.fixture
