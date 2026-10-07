@@ -85,7 +85,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      rank, so no one can reset a higher-ranked user's password (a system admin's, the workspace
      owner's, or, for an org admin, a workspace member's) and take over the account;
      last-owner (org and workspace) and last-system-admin guards; only owners grant owner/admin
-     roles at their level;
+     roles at their level; the admin path refuses the actor's own account for the password reset
+     and the email change (they use change password, which asks for the current one);
    - adding a project member by user ID accepts only the org's members and the workspace's
      staff, enforced by the endpoint (404 otherwise), not just by the picker; the email path
      follows design-doc §4 (another org's existing user is added only after confirmation);

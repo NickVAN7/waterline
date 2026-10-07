@@ -492,9 +492,11 @@ Workspace (the firm: tenant boundary)
   over, their access elsewhere. A workspace admin can't manage the workspace owner or a system
   admin (users in several workspaces: see "One workspace" above). Project admins
   have no account actions. Admins may take these actions on their own account through the
-  admin path, under the same rule and the last-owner and last-system-admin guards, except
-  changing their own email, which waits for verification emails like everyone else's (owner
-  decision, Oct 7, 2026).
+  admin path, under the same rule and the last-owner and last-system-admin guards, with two
+  exceptions (owner decisions, Oct 7, 2026): changing their own email, which waits for
+  verification emails like everyone else's; and resetting their own password, since an admin
+  reset asks for no current password and would let anyone holding the admin's session take
+  the account (they use change password, which does). A better path may come later.
 
 ### Sign-in
 - **Email + password** is primary (`user.hashed_password`, required).

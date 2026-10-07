@@ -163,10 +163,11 @@ tested, what each kind of test is for, and the gates every change passes.
   - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;
     list endpoints return only the user's accessible projects and orgs.
   - Account actions (deactivate, reactivate, reset password, sign out everywhere, and an admin
-    changing another user's email, name, or username; the email change refuses the actor's own
-    account and ends the target's sessions) follow the rank rule (design-doc §4), tested on both
-    sides of each boundary: same rank allowed, higher rank or a membership outside the actor's scope
-    denied, and a user with no memberships denied to org admins.
+    changing another user's email, name, or username; the email change and the admin password reset
+    refuse the actor's own account, and the email change ends the target's sessions) follow the rank
+    rule (design-doc §4), tested on both sides of each boundary: same rank allowed, higher rank or a
+    membership outside the actor's scope denied, and a user with no memberships denied to org
+    admins.
   - Project membership: adding by user ID someone outside the project org's members and the
     workspace's staff returns 404 (the email path follows design-doc §4); removing a membership ends access on the user's next request.
   - Workspace pages return 404 to everyone but workspace owners/admins and system admins.
