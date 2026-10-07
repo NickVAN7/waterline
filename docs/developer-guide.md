@@ -4,8 +4,10 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S0-C8 (CI & slice verification) done, closing Slice 0; next is S1-C1 (Tenancy
-> models & migration), on the `s1-foundations` branch. The backend has its database core
+> **Status:** S1-C1 (Tenancy models & migration) done; next is S1-C2 (Number allocation &
+> race harness), on the `s1-foundations` branch. The tenancy, project, and audit tables exist
+> (models, one migration, constraint tests, a factory per model), with the domain enums in
+> `app/enums.py` and get-by-ID in the base repository. The backend has its database core
 > (Postgres, async SQLAlchemy, Alembic, the base model and its mixins), a test harness with a
 > `concurrency` fixture, background jobs on procrastinate, the model conventions (enums, soft
 > delete, optimistic locking with 409, `direct_update`), the standard error format (including a
@@ -317,8 +319,9 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 
 - Import every model module in `app/models/__init__.py`, so Alembic autogenerate sees it.
 
-**Enums** (`app/core/enums.py`). Define the enum as a `StrEnum` in a module that doesn't import
-SQLAlchemy (so `rules/` can use it), and map it with `enum_type`, naming it after the column:
+**Enums** (`app/core/enums.py`). Define the enum as a `StrEnum` in `app/enums.py`, which
+doesn't import SQLAlchemy (so `rules/` can use it), and map it with `enum_type`, naming it after
+the column:
 
 ```python
 status: Mapped[TaskStatus] = mapped_column(enum_type(TaskStatus, "status"))
@@ -334,13 +337,14 @@ skill).
 related rows a query loads, hides rows with `deleted_at` set. Trash and restore queries opt in:
 `select(Task).execution_options(include_deleted=True)` (the key is `INCLUDE_DELETED`). Two
 caveats: `session.get()` returns an object already in the session's identity map without
-querying, and raw SQL (`text()`) is never filtered. The filter also applies to loading a
-**parent**: a comment whose task is soft-deleted loads with `comment.task == None`, so trash
-and restore screens put `include_deleted=True` on the query that loads the parents too. And the
-filter reaches related rows only through the query that loaded the object: loading a
-relationship on an object no filtered query loaded (one just created in the session, or loaded
-with `include_deleted=True`), e.g. `await session.refresh(task, ["comments"])`, isn't filtered.
-Load related rows with a query and `selectinload` instead.
+querying (so load by ID with `get_by_id`, below), and raw SQL (`text()`) is never filtered. The
+filter also applies to loading a **parent**: a comment whose task is soft-deleted loads with
+`comment.task == None`, so trash and restore screens put `include_deleted=True` on the query
+that loads the parents too. And the filter reaches related rows only through the query that
+loaded the object: loading a relationship on an object no filtered query loaded (one just
+created in the session, or loaded with `include_deleted=True`), e.g. `await
+session.refresh(task, ["comments"])`, isn't filtered. Load related rows with a query and
+`selectinload` instead.
 
 **Optimistic locking** (`VersionMixin`, for `version` tables). List it **before** `BaseModel`:
 
@@ -362,6 +366,19 @@ editing the item's content at the same time doesn't get a 409). Every call says 
 `True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
 works as a counter), or `None` if no row has that id, and writes every changed column onto the
 object if the session has it loaded, so it stays readable without a lazy load.
+
+**Get by ID** (`app/repositories/base.py`): `get_by_id(session, Model, id)` is always a query,
+never `session.get()`, so the soft-delete filter applies even to an object already in the
+session (`include_deleted=True` for trash and restore screens). Repositories use it for every
+load by ID. It is **not scoped** to the user's orgs and projects: endpoints reach single
+entities only through the load-and-authorize dependency, and any other caller authorizes
+before using or returning the row. List and feed queries never use it.
+
+**Classification** (`ClassificationMixin`, design-doc §3.1): adds `classification_level` (enum,
+nullable) and `classification_categories` (`text[]`, default `{}`). The model also adds
+`classification_categories_check(...)` to its `__table_args__` with the categories it allows:
+`PROJECT_CATEGORIES` on `project`, `CONTENT_ITEM_CATEGORIES` on content items
+(`export_controlled` is project-only in v1).
 
 **Relationships** are always `lazy="raise"`: load what you use with `selectinload` /
 `joinedload` in the repository. Touching an unloaded relationship raises instead of emitting
@@ -561,6 +578,19 @@ then `await TaskFactory.create_async(status=...)` in a test that uses `session`.
 persists with `flush` (never commit), leaves `id` and database-set timestamps to the model, and
 is reseeded from a fixed seed before every test, so generated values are reproducible. Set any
 value the test depends on explicitly.
+
+- Each factory sets `__set_as_default_factory_for_type__ = True`, so a related model is built
+  through its own factory. Foreign keys are never generated: a model's many-to-one
+  `relationship()` builds the parent (`ProjectFactory` builds an org and its workspace), or the
+  test passes one (`ProjectFactory.create_async(organization=org)`).
+- Text fields get realistic values with `Use(...)` and Faker (`BaseFactory.__faker__`), in the
+  formats the rules expect: lowercase emails, slug-format usernames and slugs (`fake_slug`),
+  project keys. Nullable fields default to `None` explicitly, so a factory never makes an
+  archived or classified row by chance.
+- Every factory user's password is `FACTORY_PASSWORD` (`tests/factories/user.py`), hashed once
+  per run.
+- A primary-key column that isn't a foreign key (e.g. `project_counter.prefix`) is only set if
+  the factory sets `__set_primary_key__ = True`.
 
 **Concurrency tests** need real commits on separate connections (parallel transactions, or a
 worker in the same test), so they use the `concurrency` fixture instead: it yields a

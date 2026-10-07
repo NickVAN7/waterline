@@ -48,6 +48,12 @@ Open the generated file and check each item against the schema doc:
 - [ ] **Every column**: type, nullability, and default match the doc. Python-side defaults
       (`default=`) don't exist in the database; use `server_default` where the database must
       supply a value.
+- [ ] **Enum CHECK constraints appear once each.** For a non-native enum, autogenerate emits
+      the CHECK up to three times: the column's `sa.Enum(..., create_constraint=True)`, a
+      `sa.CheckConstraint(..., name="<column>")` with an ad-hoc name, and the named
+      `op.f("ck_<table>_<column>")` one. Keep only the named one: set
+      `create_constraint=False` on the column's `sa.Enum` and delete the ad-hoc copy (found in
+      S1-C1).
 - [ ] **Enum CHECK constraints** are present and list every value. Autogenerate does **not**
       detect changes to CHECK constraints: adding, renaming, or removing an enum value needs
       hand-written `op.drop_constraint` + `op.create_check_constraint` (plus a data `UPDATE` for

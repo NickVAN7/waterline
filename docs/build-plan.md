@@ -223,6 +223,7 @@ The sections below describe the content; the table above is the order of work.
 │   │   │                         mixins, enum helper, errors, security (hashing, tokens),
 │   │   │                         list helpers (paging, sort, filter specs), constraint error
 │   │   │                         registry
+│   │   ├── enums.py              domain StrEnums (no SQLAlchemy, so rules/ can use them)
 │   │   ├── models/               SQLAlchemy models: user.py, org.py, project.py, …
 │   │   ├── schemas/              Pydantic request/response shapes, same file names
 │   │   ├── repositories/         base.py + one per model file, same file names

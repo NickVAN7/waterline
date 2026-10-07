@@ -576,7 +576,7 @@ ends sessions through the handler `auth` registers with it (build plan, "Feature
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | status | enum: planning / active / on_hold / completed / cancelled | NOT NULL, default `planning`; informational only: gates nothing, separate from `archived_at` (design-doc §1.1, §7); changed by project admins |
 | lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check; otherwise a 422 field error); defaults to the first admin; cleared in the same transaction when that membership is removed, recorded in `project_member_removed` and, from Slice 2, as an `activity_log` `lead_id` change (design-doc §1.1) |
-| enabled_modules | text[] | seeded from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
+| enabled_modules | text[] | NOT NULL, no default: the service always seeds it from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
 | classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; null = unclassified; the floor for the project's items (design-doc §3.1) |
 | classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
 | archived_at | timestamptz, nullable | archived = read-only, hidden by default |
@@ -990,7 +990,7 @@ for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, whether it cleared the project's lead); never passwords, hashes, or tokens |
+| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, whether it cleared the project's lead); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 

@@ -132,7 +132,7 @@ broken_contract_guidance = "Services call authorize() and log_change(), never th
 name = "Only the worker imports job modules"
 type = "forbidden"
 source_modules = [
-    "app.main", "app.openapi_export", "app.routers", "app.services", "app.repositories",
+    "app.main", "app.openapi_export", "app.enums", "app.routers", "app.services", "app.repositories",
     "app.models", "app.schemas",
     "app.core", "app.authz", "app.audit", "app.rules", "app.jobs.enqueue", "app.jobs.app",
 ]
