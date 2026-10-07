@@ -648,9 +648,9 @@ Workspace (the firm: tenant boundary)
   - Failures on entities the user can't see return **404, not 403**, so existence isn't leaked.
 - **Module gating** is a separate dependency: a request to a module that is disabled for the
   project returns 404 before `authorize()` runs.
-- **The UI asks the server.** Single-entity responses include `allowed_actions`, evaluated
-  through `authorize()`, so the frontend never re-implements role rules; it hides what the
-  user can't do (build plan, "API conventions").
+- **The UI asks the server.** Single-entity responses include `allowed_actions`, evaluated through
+  `authorize()` (`/me` carries the workspace-level actions and each org's), so the frontend never
+  re-implements role rules; it hides what the user can't do (build plan, "API conventions").
 
 ### Role capabilities
 
@@ -672,7 +672,7 @@ inherited admin covers management only; content needs an explicit membership (§
 | Role | Capabilities |
 |---|---|
 | member | Belongs to the org; can be added to its projects; creates projects in the org, becoming each one's first project admin (an explicit `project_membership` row) and its lead. No access to the org's other projects by itself. Users whose only link to an org is a project membership (staff or client) can't create projects in it |
-| admin | Member + archive and unarchive the org's projects; when creating a project, may name someone else as its first admin (from the org's members and the workspace's staff; anyone else is a 404, as in the member picker, §4) instead of themself, the default (a separate action, `project.assign_first_admin`, returned in the org's `allowed_actions` so the create dialog shows the field only to those who may use it; a plain org member sending it gets 403); the first admin always gets the explicit `project_membership` row, even if they also inherit admin, and becomes the lead; project admin on every project in the org (on an export-controlled project, management only without an explicit membership, §3.1); create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
+| admin | Member + archive and unarchive the org's projects; when creating a project, may name someone else as its first admin (from the org's members and the workspace's staff; anyone else is a 404, as in the member picker, §4) instead of themself, the default (a separate action, `project.assign_first_admin`, returned in the org's `allowed_actions` on that org's entry in `/me` so the create dialog shows the field only to those who may use it; a plain org member sending it gets 403); the first admin always gets the explicit `project_membership` row, even if they also inherit admin, and becomes the lead; project admin on every project in the org (on an export-controlled project, management only without an explicit membership, §3.1); create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
 | owner | Admin + manage the org itself and grant, change, or remove its owner and admin roles |
 
 **Workspace roles** (`workspace_membership`)
