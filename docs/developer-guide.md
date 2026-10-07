@@ -394,7 +394,9 @@ example `VersionMixin` listed after `TimestampMixin`).
 - Change the models, then `wl backend migration "add phase"` to autogenerate a revision in
   `backend/migrations/versions/` (named `YYYY_MM_DD_HHMM-<rev>_<slug>.py`, formatted by ruff).
   **Review it by hand**: autogenerate misses some changes (e.g. renames) and can't write data
-  migrations.
+  migrations. Database functions and triggers aren't in the models at all, so they are always
+  written by hand with `op.execute` (e.g. `audit_event`'s append-only trigger), with a
+  downgrade that drops them.
 - `wl migrate` applies it to the dev database; the test run applies all migrations to the test
   database automatically.
 - Never edit a committed migration; add a new one. Every migration must downgrade cleanly.
