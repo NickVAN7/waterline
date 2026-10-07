@@ -12,9 +12,6 @@ BACKEND = "backend"
 FRONTEND = "frontend"
 CLI = "tools/cli"
 
-# Held to 100% line + branch coverage (docs/testing-strategy.md, "Coverage gates").
-STRICT_COVERAGE_PACKAGES = ("app/authz/*", "app/rules/*")
-
 
 def backend_lint() -> list[Step]:
     return [
@@ -33,20 +30,23 @@ def backend_fmt() -> list[Step]:
 
 
 def backend_test(extra: Sequence[str] = ()) -> list[Step]:
-    """The full suite with coverage gates, or a filtered run (no coverage) when given arguments."""
+    """The full suite with coverage gates, or a filtered run (no coverage) when given arguments.
+    pytest enforces both gates itself: coverage's fail_under, and 100% for app/authz and
+    app/rules (a hook in backend/tests/conftest.py)."""
     if extra:
         return [step("uv", "run", "pytest", "--no-cov", *extra, cwd=BACKEND)]
+    return [step("uv", "run", "pytest", cwd=BACKEND)]
+
+
+def backend_mutate() -> list[Step]:
+    """Mutation testing over app/rules and app/authz ([tool.mutmut] in backend/pyproject.toml),
+    from a clean slate; fails on any mutant not killed (mutmut itself always exits 0)."""
+    gate = ("uv", "run", "python", "-m", "tests.support.mutation_gate")
     return [
-        step("uv", "run", "pytest", cwd=BACKEND),
-        step(
-            "uv",
-            "run",
-            "coverage",
-            "report",
-            "--fail-under=100",
-            f"--include={','.join(STRICT_COVERAGE_PACKAGES)}",
-            cwd=BACKEND,
-        ),
+        step(*gate, "clean", cwd=BACKEND),
+        step("uv", "run", "mutmut", "run", cwd=BACKEND),
+        step("uv", "run", "mutmut", "export-cicd-stats", cwd=BACKEND),
+        step(*gate, "check", cwd=BACKEND),
     ]
 
 
@@ -57,6 +57,7 @@ def backend_check() -> list[Step]:
         step("uv", "run", "python", "-m", "app.openapi_export", "--check", cwd=BACKEND),
         *backend_lint(),
         *backend_test(),
+        *backend_mutate(),
     ]
 
 

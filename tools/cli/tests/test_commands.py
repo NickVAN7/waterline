@@ -29,15 +29,19 @@ BACKEND_FMT = [
     "(cd backend && uv run ruff format .)",
     "(cd backend && uv run ruff check --fix .)",
 ]
-BACKEND_TEST = [
-    "(cd backend && uv run pytest)",
-    "(cd backend && uv run coverage report --fail-under=100 '--include=app/authz/*,app/rules/*')",
+BACKEND_TEST = ["(cd backend && uv run pytest)"]
+BACKEND_MUTATE = [
+    "(cd backend && uv run python -m tests.support.mutation_gate clean)",
+    "(cd backend && uv run mutmut run)",
+    "(cd backend && uv run mutmut export-cicd-stats)",
+    "(cd backend && uv run python -m tests.support.mutation_gate check)",
 ]
 BACKEND_CHECK = [
     "(cd backend && uv lock --check)",
     "(cd backend && uv run python -m app.openapi_export --check)",
     *BACKEND_LINT,
     *BACKEND_TEST,
+    *BACKEND_MUTATE,
 ]
 FRONTEND_LINT = ["(cd frontend && npm run lint)", "(cd frontend && npm run typecheck)"]
 FRONTEND_FMT = ["(cd frontend && npm run format)", "(cd frontend && npm run lint:fix)"]
@@ -91,6 +95,7 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
         pytest.param(["backend", "check"], BACKEND_CHECK, id="backend-check"),
         pytest.param(["backend", "test"], BACKEND_TEST, id="backend-test"),
         pytest.param(["backend", "lint"], BACKEND_LINT, id="backend-lint"),
+        pytest.param(["backend", "mutate"], BACKEND_MUTATE, id="backend-mutate"),
         pytest.param(["backend", "fmt"], BACKEND_FMT, id="backend-fmt"),
         pytest.param(
             ["backend", "test", "-k", "approval", "-x"],

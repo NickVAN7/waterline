@@ -37,7 +37,9 @@ Entry format:
   dry-run test and CI uses `wl check`, so the gate is never skipped in CI.
 - **Fix by:** Slice 1, when `app/authz/` gets code: either move the gate into a pytest hook
   in `tests/conftest.py`, or record this split as the accepted design in the build plan.
-- **Status:** open
+- **Status:** resolved in S1-C3 (a `pytest_runtestloop` hook in `tests/conftest.py` fails the
+  session below 100% for `app/authz/` and `app/rules/`; the CLI's separate `coverage report`
+  step is gone, so `uv run pytest` and `wl backend test` give the same result)
 
 ### TD-3: A service cycle through `jobs/` isn't caught by import-linter
 - **Added:** S0-C1
@@ -254,4 +256,5 @@ Entry format:
 - **Why:** Hypothesis isn't a dependency yet; S1-C3 adds it (with the pure rules).
 - **Fix by:** S1-C3: a Hypothesis property over sequences of (project, prefix) allocations,
   each sequence numbered 1, 2, 3, … per (project, prefix).
-- **Status:** open
+- **Status:** resolved in S1-C3 (`test_any_interleaving_numbers_each_sequence_1_2_3`; an
+  allocator that ignores the prefix fails it)

@@ -4,19 +4,20 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C2 (Number allocation & race harness) done; next is S1-C3 (Pure rules & mutation
-> testing), on the `s1-foundations` branch. The tenancy, project, and audit tables exist (models,
-> migrations, constraint tests, a factory per model; `audit_event` is append-only), with the
-> domain enums in `app/enums.py`, get-by-ID in the base repository, and
-> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The backend
-> has its database core (Postgres, async SQLAlchemy, Alembic, the base model and its mixins), a
-> test harness with a `concurrency` fixture, background jobs on procrastinate, the model
-> conventions (enums, soft delete, optimistic locking with 409, `direct_update`), the standard
-> error format (including a catch-all 500), and the password and token helpers; `GET /api/health`
-> checks the database. Docker Compose runs the whole stack (postgres, migrate, api, worker, web).
-> The frontend is a Vue shell: layout, router with a 404 page, Pinia, the generated API client,
-> and a home page showing the health check through the Vite proxy. CI runs `wl check` on every
-> push to `main` and every pull request.
+> **Status:** S1-C3 (Pure rules & mutation testing) done; next is S1-C4 (API conventions), on the
+> `s1-foundations` branch. The tenancy, project, and audit tables exist (models, migrations,
+> constraint tests, a factory per model; `audit_event` is append-only), with the domain enums in
+> `app/enums.py`, get-by-ID in the base repository, and `NumberingService.allocate_number`. Race
+> tests have a harness (`run_in_parallel`). The pure rules (identifiers, password policy, account
+> rank) are in `app/rules/`, held to 100% coverage and mutation-tested (`wl backend mutate`). The
+> backend has its database core (Postgres, async SQLAlchemy, Alembic, the base model and its
+> mixins), a test harness with a `concurrency` fixture, background jobs on procrastinate, the
+> model conventions (enums, soft delete, optimistic locking with 409, `direct_update`), the
+> standard error format (including a catch-all 500), and the password and token helpers; `GET
+> /api/health` checks the database. Docker Compose runs the whole stack (postgres, migrate, api,
+> worker, web). The frontend is a Vue shell: layout, router with a 404 page, Pinia, the generated
+> API client, and a home page showing the health check through the Vite proxy. CI runs `wl check`
+> on every push to `main` and every pull request.
 
 ## 1. Workstation setup
 
@@ -96,11 +97,12 @@ underlying commands instead of running them, and stops at the first failing step
 | Command | Does |
 |---|---|
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
-| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates — backend, then frontend, then CLI |
+| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc |
 | `wl test` | All tests with coverage gates |
 | `wl fmt` | ruff format and safe ruff fixes; Prettier and safe ESLint fixes |
 | `wl backend check\|lint\|test\|fmt` | The same, backend only |
+| `wl backend mutate` | Mutation testing (mutmut) over `app/rules/` and `app/authz/`, from a clean slate; fails on any mutant not killed (section 9) |
 | `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate |
 | `wl frontend check\|lint\|test\|fmt` | The same, frontend only (the npm scripts in `frontend/package.json`) |
 | `wl frontend test <args>` | `vitest run <args>`, e.g. `wl frontend test src/api -t network`, without the coverage gate |
@@ -111,13 +113,13 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl migrate` | `docker compose run --rm --build migrate`: `alembic upgrade head` against the dev database, in the Compose `migrate` service (its image rebuilt first if dependencies changed) |
 | `wl backend migration "<message>"` | `alembic revision --autogenerate -m "<message>"` on the host; review the generated file by hand |
 
-Still to come (Slice 1): `wl seed`, `wl admin <command>` (app admin commands, e.g.
-`wl admin grant-system-admin <email>`), and `wl backend mutate` (mutation testing).
+Still to come (Slice 1): `wl seed` and `wl admin <command>` (app admin commands, e.g.
+`wl admin grant-system-admin <email>`).
 
 The CLI is a **thin orchestrator**: the real tool configuration is in each project's
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
-with one exception: the 100% coverage gate on `app/authz/` and `app/rules/` is a separate
-`coverage report` step that only `wl backend test` runs (TD-2).
+both coverage gates included (the 100% gate on `app/authz/` and `app/rules/` is a pytest hook in
+`backend/tests/conftest.py`).
 
 **Adding a command:** add a function returning its steps to `tools/cli/src/waterline_cli/steps.py`,
 a Typer command in `main.py` that calls `run_steps(..., dry_run=dry_run)`, and a dry-run case in
@@ -553,8 +555,8 @@ Strategy, layers, and gates: `testing-strategy.md`. Layout in `backend/tests/`:
 | `factories/` | polyfactory factories, one per model (`TaskFactory` in `task.py`) | `BaseFactory` |
 | `support/` | Test-only helpers, e.g. tables for exercising the base model | `models.py` |
 
-- One skip is expected until Slice 1 adds the first models: the per-column docs check
-  (`test_model_column_matches_schema_doc`) reports "got empty parameter set".
+- A schema-doc column marked `Added in Slice <n>.` for a slice that isn't finished shows as a
+  skipped case of `test_model_column_matches_schema_doc`; nothing else should skip.
 - Tests use pytest's `importlib` import mode, so test folders have no `__init__.py` (only the
   importable helper packages `factories/` and `support/` do).
 - **Postgres must be running** (`wl up`). The run migrates the test database, `waterline_test`,
@@ -601,6 +603,34 @@ value the test depends on explicitly.
   per run.
 - A primary-key column that isn't a foreign key (e.g. `project_counter.prefix`) is only set if
   the factory sets `__set_primary_key__ = True`.
+
+**Rules** (`app/rules/`, pure: no database) are written **test-first**: the test from the
+design doc's rule or table, run red for the right reason (against a stub returning the wrong
+answer, not an `ImportError`), then the code. So far: `identifiers.py` (project keys, slugs and
+the reserved top-level routes in `RESERVED_SLUGS`, usernames; each check returns an
+`IdentifierProblem` for the field error), `password_policy.py` (`password_problems(...)`; the
+caller checks the hash and passes `same_as_current`), and `account_rank.py`
+(`can_manage_account(actor, target)`, from both users' memberships). `app/rules/` and
+`app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
+plain `uv run pytest` fails below it. A `match` that covers every type of its subject (pyright
+checks: the function's return type would otherwise allow `None`) marks its last `case` with
+`# pragma: no branch`, since that case can't fail to match.
+
+**Property tests** (Hypothesis) cover rules with a large input space: generate inputs, check an
+invariant against an independent oracle (e.g. "accepted exactly when 3-6 uppercase letters or
+digits, starting with a letter"), never against the code under test. Locally, examples vary
+between runs and failures are replayed from `.hypothesis/` (gitignored); CI (`CI` set) uses the
+`ci` profile, derandomized. A property over the database (e.g. numbering) runs each example in
+a savepoint it rolls back, with `suppress_health_check=[HealthCheck.function_scoped_fixture]`.
+
+**Mutation testing** (`wl backend mutate`, in `wl check` and CI): mutmut changes `app/rules/`
+and `app/authz/` one small edit at a time (`[tool.mutmut]` in `pyproject.toml`) and runs their
+unit tests against each; every mutant must be killed. On a failure, `uv run mutmut results`
+lists the survivors and `uv run mutmut show <name>` shows one: kill it with a new or sharper
+test. Only an equivalent mutant (one that can't change behavior) may be excluded, with
+`# pragma: no mutate` and a comment why. The run starts from a clean `mutants/` (gitignored),
+since mutmut's cached results can be stale. When `app/authz/` gets code, add its unit tests to
+`pytest_add_cli_args_test_selection`.
 
 **Concurrency tests** need real commits on separate connections (parallel transactions, or a
 worker in the same test), so they use the `concurrency` fixture instead: it yields a

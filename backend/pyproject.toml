@@ -19,7 +19,9 @@ dev = [
     "anyio>=4.15.1",
     "faker>=40.39.0",
     "httpx>=0.28.1",
+    "hypothesis>=6.168.5",
     "import-linter>=2.15",
+    "mutmut>=3.8.0",
     "polyfactory>=3.3.0",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
@@ -86,6 +88,16 @@ show_missing = true
 skip_empty = false
 # Imports needed only by the type checker never run, so they can never be covered.
 exclude_also = ["if TYPE_CHECKING:"]
+
+# --- Mutation testing (docs/testing-strategy.md, "Mutation testing") ---------------------------
+# mutmut copies the code to mutants/ and runs the selected tests against each mutant: only the
+# unit tests of the mutated packages (pure, no database). When app/authz/ gets code (S1-C7), its
+# unit tests (tests/unit/authz) join the selection.
+[tool.mutmut]
+source_paths = ["app"]
+only_mutate = ["app/rules/*", "app/authz/*"]
+pytest_add_cli_args_test_selection = ["tests/unit/rules"]
+pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider"]
 
 # --- Import rules (docs/build-plan.md, "Backend architecture" and "Feature map") -------------
 

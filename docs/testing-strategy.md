@@ -214,7 +214,9 @@ tested, what each kind of test is for, and the gates every change passes.
 | Frontend | 80% line (composables, stores, and guards held to 90%) |
 | Developer CLI (`tools/cli/`) | 100% line + branch |
 
-Coverage gates fail CI. Excluding code from coverage requires a comment saying why.
+Coverage gates fail CI, and plain `pytest` (the backend's 100% gate is a hook in
+`tests/conftest.py`, not a separate step). Excluding code from coverage requires a comment
+saying why.
 
 ## Test-first and proving tests can fail
 
@@ -239,7 +241,10 @@ Coverage gates fail CI. Excluding code from coverage requires a comment saying w
   that cannot change behavior (an equivalent mutant) may be excluded, with `# pragma: no mutate`
   and a comment explaining why.
 - **When:** from Slice 1, when those folders first contain code. Run by
-  `wl backend mutate`, included in `wl check` and CI.
+  `wl backend mutate`, included in `wl check` and CI. mutmut exits 0 whatever survives, so the
+  command finishes with a gate (`tests/support/mutation_gate.py`) that fails on any mutant not
+  killed (survived, untested, timed out, or otherwise), and starts from a clean slate so a
+  cached result can't hide a survivor.
 
 ## Workflow and gates
 

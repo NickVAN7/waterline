@@ -156,4 +156,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   the test depends on.
 - Layout: `tests/unit/` (no DB), `tests/integration/` (repositories, services), `tests/api/`
   (HTTP). Files mirror `app/`.
-- Coverage: 90% overall; 100% for `app/authz/` and `app/rules/`.
+- Coverage: 90% overall; 100% for `app/authz/` and `app/rules/` (a hook in `tests/conftest.py`
+  enforces it in plain `uv run pytest` too). A `match` covering every type of its subject marks
+  its last `case` `# pragma: no branch` (it can't fail to match; pyright checks exhaustiveness).
+- Mutation testing (`wl backend mutate`, in `wl check`): no surviving mutants in `app/rules/` or
+  `app/authz/`. Kill a survivor with a sharper test; `# pragma: no mutate` only for an
+  equivalent mutant, with a comment why.
