@@ -55,6 +55,7 @@ def create_concurrency_engine(url: URL) -> AsyncEngine:
         max_overflow=0,
         pool_timeout=PARALLEL_TIME_LIMIT,
         pool_pre_ping=True,
+        hide_parameters=True,
         connect_args={"connect_timeout": 5, "options": f"-c lock_timeout={LOCK_TIMEOUT}"},
     )
 

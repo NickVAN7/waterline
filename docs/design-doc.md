@@ -472,13 +472,12 @@ Workspace (the firm: tenant boundary)
   Left unchecked, the person keeps those projects as a project-only user (which lowers their
   rank for account actions).
 - **Account actions follow rank.** Deactivating, resetting the password of, or signing out
-  everywhere another user, reactivating them, or changing their email, name, or username, is
-  allowed only when the target holds at least
-  one membership in the actor's scope, and for **every** membership the target holds, the actor
-  has a role covering it (the same workspace, org, or project, or one above it) at an equal or
-  higher rank. The system-admin flag counts as a membership at the top rank. A user with no
-  memberships left is managed by the workspace's owners/admins and system admins. The ranking,
-  highest first:
+  everywhere another user, reactivating them, or changing their email, name, or username, is allowed
+  only when the target holds at least one membership in the actor's scope, and for **every**
+  membership the target holds, the actor has a role covering it (the same workspace, org, or
+  project, or one above it) at an equal or higher rank. The system-admin flag counts as a membership
+  at the top rank. A user with no memberships left is managed by the workspace's owners/admins and
+  system admins. The ranking, highest first:
 
   ```
   system admin
@@ -492,7 +491,10 @@ Workspace (the firm: tenant boundary)
   org or to a project outside it; otherwise one org's admin could lock someone out of, or take
   over, their access elsewhere. A workspace admin can't manage the workspace owner or a system
   admin (users in several workspaces: see "One workspace" above). Project admins
-  have no account actions.
+  have no account actions. Admins may take these actions on their own account through the
+  admin path, under the same rule and the last-owner and last-system-admin guards, except
+  changing their own email, which waits for verification emails like everyone else's (owner
+  decision, Oct 7, 2026).
 
 ### Sign-in
 - **Email + password** is primary (`user.hashed_password`, required).
@@ -511,9 +513,10 @@ Workspace (the firm: tenant boundary)
   verified. Emails are lowercased before lookup. After a successful sign-in, a hash made with
   older Argon2 parameters is re-hashed with the current ones.
 - **Password policy:** 8–256 characters, no composition rules, not equal to the account's
-  email or username (ignoring case); a new password must differ from the current one. The same
-  rule applies to changes, admin resets, and new accounts. The minimum rises to 12 before the
-  first non-local deployment.
+  email or username (ignoring case). The same rule applies to changes, admin resets, and new
+  accounts. When users change their own password, the new one must also differ from the
+  current one; an admin reset doesn't check that (owner decision, Oct 7, 2026: not needed in
+  v1). The minimum rises to 12 before the first non-local deployment.
 - **Forced change:** while `must_change_password` is set, every endpoint except `/me`,
   change-password, and sign-out returns 403 (`password_change_required`).
 

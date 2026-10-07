@@ -6,6 +6,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app import models  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every model
+from app.core.base_model import Base
+from app.core.constraint_errors import constraint_registry
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.errors import register_error_handlers
 from app.core.settings import Settings, get_settings
@@ -42,6 +45,8 @@ def create_app(
     )
     app.state.settings = settings
     app.state.sessionmaker = sessionmaker
+    # Every model is imported (app.models), so the registry sees every table's constraints.
+    app.state.constraint_errors = constraint_registry(Base.metadata)
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     return app

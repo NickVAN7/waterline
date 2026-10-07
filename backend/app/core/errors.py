@@ -9,6 +9,7 @@ Clients branch on `code`, never on `message`.
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any, ClassVar, cast
 
 from fastapi import FastAPI, Request, status
@@ -16,6 +17,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -47,6 +49,16 @@ def error_response(
 
 
 # --- Errors the app raises --------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FieldError:
+    """One invalid field: where it is (`("query", "sort")`, `("body", "email")`), what's wrong in
+    words, and a machine-readable type (`taken`, `invalid_sort`, ...)."""
+
+    loc: tuple[str | int, ...]
+    message: str
+    type: str
 
 
 class AppError(Exception):
@@ -86,6 +98,27 @@ class ForbiddenError(AppError):
     status_code = status.HTTP_403_FORBIDDEN
     code = "forbidden"
     message = "You don't have permission to do this."
+
+
+class ValidationFailedError(AppError):
+    """422 `validation_error` raised by the app (a query value the endpoint can't use, a
+    constraint violation), in the same shape as FastAPI's request validation: one
+    `{loc, message, type}` entry per field in `details.fields`, so the frontend has one parser."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = "validation_error"
+    message = "The request is invalid."
+
+    def __init__(self, fields: list[FieldError], message: str | None = None) -> None:
+        super().__init__(
+            message,
+            details={
+                "fields": [
+                    {"loc": list(field.loc), "message": field.message, "type": field.type}
+                    for field in fields
+                ]
+            },
+        )
 
 
 class ServiceUnavailableError(AppError):
@@ -136,8 +169,7 @@ def is_version_conflict(exc: StaleDataError) -> bool:
 
 
 async def app_error_handler(_request: Request, exc: Exception) -> JSONResponse:
-    exc = cast(AppError, exc)  # registered for AppError only
-    return error_response(exc.status_code, exc.error_code, exc.error_message, exc.details)
+    return app_error_handler_response(cast(AppError, exc))  # registered for AppError only
 
 
 async def stale_data_handler(_request: Request, exc: Exception) -> JSONResponse:
@@ -145,6 +177,42 @@ async def stale_data_handler(_request: Request, exc: Exception) -> JSONResponse:
     if is_version_conflict(exc):
         return error_response(status.HTTP_409_CONFLICT, "stale_version", STALE_VERSION_MESSAGE)
     return error_response(status.HTTP_404_NOT_FOUND, NotFoundError.code, NotFoundError.message)
+
+
+def violated_constraint(exc: IntegrityError) -> str | None:
+    """The name of the constraint an `IntegrityError` reports (psycopg's diagnostics), if any."""
+    diag = getattr(exc.orig, "diag", None)
+    name = getattr(diag, "constraint_name", None)
+    return name if isinstance(name, str) else None
+
+
+async def integrity_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """A constraint violation the registry maps (`app.state.constraint_errors`, built from each
+    constraint's `user_error(...)`) is a 422 field error; any other is a 500, logged, as if
+    unhandled (build plan, "Errors from constraints")."""
+    exc = cast(IntegrityError, exc)
+    registry: dict[str, Any] = getattr(request.app.state, "constraint_errors", {})
+    name = violated_constraint(exc)
+    mapped = registry.get(name) if name else None
+    if mapped is None:
+        # Only the constraint name and Postgres's primary message: its DETAIL, and the
+        # traceback's statement text, can hold the clashing value (a token's hash, an email).
+        diag = getattr(exc.orig, "diag", None)
+        logger.error(
+            "Unmapped constraint violation (%s: %s) on %s %s",
+            name,
+            getattr(diag, "message_primary", None),
+            request.method,
+            request.url.path,
+        )
+        return error_response(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, AppError.code, AppError.message
+        )
+    return app_error_handler_response(ValidationFailedError([mapped.as_field_error()]))
+
+
+def app_error_handler_response(exc: AppError) -> JSONResponse:
+    return error_response(exc.status_code, exc.error_code, exc.error_message, exc.details)
 
 
 async def validation_error_handler(_request: Request, exc: Exception) -> JSONResponse:
@@ -213,6 +281,7 @@ class UnhandledErrorMiddleware:
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(StaleDataError, stale_data_handler)
+    app.add_exception_handler(IntegrityError, integrity_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.add_middleware(UnhandledErrorMiddleware)

@@ -4,13 +4,18 @@ from sqlalchemy import CheckConstraint, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base_model import BaseModel
+from app.core.constraint_errors import user_error
 
 
 class User(BaseModel):
     __tablename__ = "user"
     __table_args__ = (
-        UniqueConstraint("email"),
-        UniqueConstraint("username"),
+        UniqueConstraint(
+            "email", info=user_error("email", "taken", "This email is already in use.")
+        ),
+        UniqueConstraint(
+            "username", info=user_error("username", "taken", "This username is taken.")
+        ),
         CheckConstraint("email = lower(email)", name="email_lowercase"),
     )
 

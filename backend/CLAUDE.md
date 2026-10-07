@@ -51,7 +51,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   `app/core/errors.py`; the handlers build the `{code, message, details}` body. Never raise
   `HTTPException` or return an error `JSONResponse`. Clients branch on `code`. Anything
   unhandled becomes a 500 `internal_error` (logged with its traceback, never sent to the
-  client); don't catch exceptions just to hide them.
+  client); don't catch exceptions just to hide them. One exception: an unmapped constraint
+  violation is logged with its constraint name, primary message, method, and path only (no
+  traceback), since Postgres's DETAIL can hold the clashing value.
 - **API changes:** after changing a route, schema, or error response, run `wl gen-client` and
   commit `backend/openapi.json` and `frontend/src/api/schema.d.ts` with it; `wl check` fails
   while either is stale.
@@ -68,7 +70,12 @@ Calls flow **routers → services → repositories → models**. Services also u
   user with content access to the project.
 - **`log_change()` is the only writer to `activity_log`**, and never commits.
 - **`log_admin_event()` is the only writer to `audit_event`**, and never commits (design-doc
-  §10.1).
+  §10.1). Never put a password, hash, or token in `details`, under any key: the guard only
+  catches keys that name one.
+- **Constraints a user can hit:** every unique constraint declares `info=user_error(field,
+  type, message)` (422 on that field) or `info=internal_only()` (a violation is a bug: 500);
+  a test fails otherwise. List endpoints declare a `ListSpec` (`app/core/lists.py`) and never
+  hand-write filters, sorting, or paging.
 - **Enums:** `VARCHAR` + CHECK via the enum helper. Filter with enum members, never string
   literals.
 - **Numbers** come only from the numbering service (`project_counter`,
