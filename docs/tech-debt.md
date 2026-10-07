@@ -91,7 +91,9 @@ Entry format:
   matter; which Faker provider fits each field is decided per model.
 - **Fix by:** Slice 1, with the first real model factories (user, org, project): set a Faker
   provider on each text field (names, emails, usernames, keys) that has a realistic form.
-- **Status:** open
+- **Status:** resolved in S1-C1 (every model factory sets realistic Faker values: names,
+  lowercase emails, slug-format usernames and slugs, project keys; tested in
+  `tests/integration/test_factories.py`)
 
 ### TD-6: No gated check that `env.py` applies the autogenerate filter
 - **Added:** S0-C4
@@ -124,7 +126,8 @@ Entry format:
 - **Why:** The base repository has only `direct_update` so far; its get-by-ID is built with the
   first area.
 - **Fix by:** Slice 1, the base repository (build plan, "Backend architecture").
-- **Status:** open
+- **Status:** resolved in S1-C1 (`get_by_id` in `app/repositories/base.py` always queries;
+  tested against an object soft-deleted earlier in the same session)
 
 ### TD-9: Unhandled exceptions return a plain-text 500
 - **Added:** S0-C6

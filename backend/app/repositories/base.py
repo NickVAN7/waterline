@@ -4,13 +4,32 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import Result, update
+from sqlalchemy import Result, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, class_mapper
 from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.sql import Executable, Update
 
-from app.core.base_model import IdMixin
+from app.core.base_model import INCLUDE_DELETED, IdMixin
+
+
+async def get_by_id[M: IdMixin](
+    session: AsyncSession, model: type[M], entity_id: uuid.UUID, *, include_deleted: bool = False
+) -> M | None:
+    """The row with this id, or None. Always a query, never `session.get()`: `get()` returns an
+    object from the identity map without asking the database, so a row soft-deleted earlier in
+    the same session would still come back. A query goes through the soft-delete filter.
+
+    `include_deleted` is for trash and restore screens only.
+
+    It is **not scoped** to the user's orgs and projects: endpoints reach single entities only
+    through the load-and-authorize dependency, and any other caller authorizes before using or
+    returning the row. List and feed queries never use it (they scope at the query level).
+    """
+    statement = select(model).where(model.id == entity_id)
+    if include_deleted:
+        statement = statement.execution_options(**{INCLUDE_DELETED: True})
+    return await session.scalar(statement)
 
 
 async def direct_update(
