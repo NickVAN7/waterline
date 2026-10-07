@@ -140,10 +140,12 @@ Claude Code can't write to the claude.ai Project, so the owner uploads changed f
   `git diff --name-only <base>..HEAD -- docs CLAUDE.md backend/CLAUDE.md frontend/CLAUDE.md .claude`.
   Files under `docs/` go to the Project under the same path; `CLAUDE.md` files and `.claude/`
   go under `repo-seed/` (same relative path).
-- Copy them into `project-upload/` at the repo root (gitignored, never committed), laid out as
-  they go in the Project (`docs/…`, `repo-seed/…`), so the owner can upload them together.
-  Overwrite files already there but don't delete others: the owner may not have uploaded them
-  yet. The owner empties the folder after uploading.
+- Copy them into the owner's upload folder, `waterline-project-upload` on their Windows desktop
+  (from WSL: `/mnt/c/Users/Nick/Desktop/waterline-project-upload`), laid out as they go in the Project (`docs/…`,
+  `repo-seed/…`), so the owner can upload them together. It's outside the repository, so
+  nothing in it is ever committed. If the folder doesn't exist, ask the owner; don't create it
+  elsewhere. Overwrite files already there but don't delete others: the owner may not have
+  uploaded them yet. The owner empties the folder after uploading.
 - Never say the Project was updated: it wasn't.
 
 ## 8. Report and stop

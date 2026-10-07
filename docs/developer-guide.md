@@ -73,8 +73,6 @@ docker-compose.yml   the local stack: postgres, migrate, api, worker, web (secti
 .github/workflows/ci.yml   CI: `wl check` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
-project-upload/ changed docs and Claude files waiting for the owner to upload to the claude.ai
-                Project (gitignored; filled by the checkpoint skill)
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area), agents
                 (checkpoint-reviewer, security-reviewer, fresh-clone-verifier, docs-consistency),
                 hooks (see section 11)
