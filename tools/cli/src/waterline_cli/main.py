@@ -131,6 +131,12 @@ def backend_test(ctx: typer.Context, dry_run: DryRun = False) -> None:
     run_steps(steps.backend_test(ctx.args), dry_run=dry_run)
 
 
+@backend.command("mutate")
+def backend_mutate(dry_run: DryRun = False) -> None:
+    """Mutation testing over app/rules and app/authz; fails on any surviving mutant."""
+    run_steps(steps.backend_mutate(), dry_run=dry_run)
+
+
 @backend.command("lint")
 def backend_lint(dry_run: DryRun = False) -> None:
     """Lint, format check, type check, and import rules for the backend."""

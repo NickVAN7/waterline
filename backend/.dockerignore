@@ -10,3 +10,7 @@ tests/
 # Local settings never go into an image.
 .env
 .env.*
+
+# Test tools' local state (mutmut's working copy, Hypothesis's example database)
+mutants/
+.hypothesis/

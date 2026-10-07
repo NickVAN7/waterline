@@ -855,7 +855,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   with no memberships: workspace owners/admins and system admins. Tested both ways at each boundary:
   e.g. an org admin can reset another admin of their org but not a workspace member, a user in
   another org, or a user on another org's project; a workspace admin can't reset the workspace owner
-  or a system admin.
+  or a system admin. The rule trusts the memberships it's given, so the loader builds them from real
+  joins (a project membership's org and workspace from `project.organization_id` and
+  `project.workspace_id`, never from the actor's context), with an integration test of a
+  project-only user in another org (S1-C3 security review).
 - Guard: the last active system admin can't be deactivated or have the flag revoked.
 - Users can update their own name and username (format and uniqueness checked); they can't
   change their own email in v1 (§4).

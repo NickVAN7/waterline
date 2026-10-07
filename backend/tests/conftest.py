@@ -6,14 +6,17 @@ gets one connection inside an outer transaction; the app's sessions join it with
 everything is rolled back when the test ends.
 """
 
+import io
+import os
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Generator
 from pathlib import Path
 from typing import cast
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from hypothesis import settings as hypothesis_settings
 from sqlalchemy import URL, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
@@ -33,6 +36,58 @@ BACKEND = Path(__file__).resolve().parents[1]
 
 # `pytester` runs a test in a separate pytest process (the concurrency fixture's wiring test).
 pytest_plugins = ["pytester"]
+
+# Hypothesis (testing-strategy.md, "Specialized tests"): CI derandomizes, so a run is
+# reproducible; locally, examples vary between runs and failures are saved in .hypothesis/.
+hypothesis_settings.register_profile("ci", derandomize=True, print_blob=True)
+# mutmut (MUTANT_UNDER_TEST set) uses the CI profile too, so a mutant a property test kills
+# locally is killed the same way in CI.
+_DETERMINISTIC = os.environ.get("CI") or os.environ.get("MUTANT_UNDER_TEST")
+hypothesis_settings.load_profile("ci" if _DETERMINISTIC else "default")
+
+# Held to 100% line and branch coverage (testing-strategy.md, "Coverage gates"); the rest of the
+# app is held to coverage's own fail_under (pyproject.toml). Enforced here, not in a separate
+# `coverage report` step, so `uv run pytest` and `wl backend test` give the same result (TD-2).
+STRICT_COVERAGE_PACKAGES = ("app/authz", "app/rules")
+
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtestloop(session: pytest.Session) -> Generator[None, object, object]:
+    """After pytest-cov has measured the run (this wrapper is outside its own), fail the session
+    if a strict package is below 100%. Skipped only when coverage is off (`--no-cov`) or nothing
+    runs (`--collect-only`); if pytest-cov's internals ever change, it fails instead of quietly
+    dropping the gate."""
+    result = yield
+    option = session.config.option
+    if getattr(option, "no_cov", False) or option.collectonly:
+        return result
+    reporter = cast(
+        pytest.TerminalReporter, session.config.pluginmanager.getplugin("terminalreporter")
+    )
+    plugin = session.config.pluginmanager.getplugin("_cov")
+    controller = getattr(plugin, "cov_controller", None)
+    if controller is None:
+        reporter.write(
+            "\nERROR: coverage is on, but the strict coverage gate found no pytest-cov "
+            "controller; update the hook in tests/conftest.py.\n",
+            red=True,
+            bold=True,
+        )
+        session.testsfailed += 1
+        return result
+    report = io.StringIO()
+    include = [str(BACKEND / package / "*") for package in STRICT_COVERAGE_PACKAGES]
+    # pytest-cov's plugin objects are untyped.
+    total: float = controller.cov.report(include=include, show_missing=True, file=report)  # pyright: ignore[reportUnknownMemberType]
+    if total < 100:
+        reporter.write(
+            f"\nERROR: {', '.join(STRICT_COVERAGE_PACKAGES)} must have 100% coverage "
+            f"(line and branch), not {total:.2f}%:\n{report.getvalue()}\n",
+            red=True,
+            bold=True,
+        )
+        session.testsfailed += 1
+    return result
 
 
 @pytest.fixture(scope="session")

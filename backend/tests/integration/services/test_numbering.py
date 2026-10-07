@@ -1,6 +1,11 @@
 """`allocate_number` (design-doc §3, "Number allocation"; build plan, "Number allocation")."""
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,3 +99,41 @@ async def test_a_rolled_back_allocation_hands_out_the_same_number_again(
     await savepoint.rollback()
 
     assert await numbering.allocate_number(project, NumberPrefix.TASK) == 2
+
+
+@asynccontextmanager
+async def rolled_back(session: AsyncSession) -> AsyncGenerator[None]:
+    """A savepoint that is rolled back however the block ends, so a failing example doesn't
+    leave later examples (Hypothesis's shrinking) inside an aborted transaction."""
+    savepoint = await session.begin_nested()
+    try:
+        yield
+    finally:
+        await savepoint.rollback()
+
+
+# Any interleaving of allocations across projects and prefixes (testing-strategy.md,
+# "Specialized tests"). Each example runs in a savepoint that is rolled back, so the shared
+# `session` fixture is safe to reuse across examples.
+@settings(
+    max_examples=40,
+    deadline=None,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+@given(
+    st.lists(st.tuples(st.integers(0, 1), st.sampled_from(NumberPrefix)), min_size=1, max_size=12)
+)
+async def test_any_interleaving_numbers_each_sequence_1_2_3(
+    session: AsyncSession, allocations: list[tuple[int, NumberPrefix]]
+) -> None:
+    async with rolled_back(session):
+        projects = await ProjectFactory.create_batch_async(2)
+        numbering = NumberingService(session)
+        numbers = [
+            await numbering.allocate_number(projects[index], prefix)
+            for index, prefix in allocations
+        ]
+
+    # The oracle: the nth allocation for a (project, prefix) gets n.
+    expected = [allocations[: position + 1].count(key) for position, key in enumerate(allocations)]
+    assert numbers == expected

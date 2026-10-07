@@ -24,3 +24,7 @@ coverage/
 .idea/
 .vscode/
 .DS_Store
+
+# Test tools' local state: Hypothesis's example database, mutmut's working copy
+.hypothesis/
+mutants/
