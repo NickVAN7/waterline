@@ -126,7 +126,8 @@ Everything lives in the repository, version-controlled and present on every work
   - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
   - one commit with the review note;
   - the list of changed docs and Claude files for the owner to upload to the Project, copied
-    into the gitignored `project-upload/` folder (Claude never writes to the Project);
+    into the owner's `waterline-project-upload` folder on their desktop, outside the
+    repository (Claude never writes to the Project);
   - stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   alongside `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
@@ -276,8 +277,6 @@ The sections below describe the content; the table above is the order of work.
 ├── tools/cli/                    developer CLI (`waterline`, alias `wl`); own pyproject, Typer
 ├── pyproject.toml                root uv workspace; makes `wl` runnable from the repo root
 ├── .env.example
-├── project-upload/               gitignored: changed docs and Claude files for the owner to upload
-│                                 to the Project (filled by the checkpoint skill)
 └── README.md
 ```
 
