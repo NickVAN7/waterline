@@ -4,20 +4,22 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C3 (Pure rules & mutation testing) done; next is S1-C4 (API conventions), on the
-> `s1-foundations` branch. The tenancy, project, and audit tables exist (models, migrations,
-> constraint tests, a factory per model; `audit_event` is append-only), with the domain enums in
-> `app/enums.py`, get-by-ID in the base repository, and `NumberingService.allocate_number`. Race
-> tests have a harness (`run_in_parallel`). The pure rules (identifiers, password policy, account
-> rank) are in `app/rules/`, held to 100% coverage and mutation-tested (`wl backend mutate`). The
-> backend has its database core (Postgres, async SQLAlchemy, Alembic, the base model and its
-> mixins), a test harness with a `concurrency` fixture, background jobs on procrastinate, the
-> model conventions (enums, soft delete, optimistic locking with 409, `direct_update`), the
-> standard error format (including a catch-all 500), and the password and token helpers; `GET
-> /api/health` checks the database. Docker Compose runs the whole stack (postgres, migrate, api,
-> worker, web). The frontend is a Vue shell: layout, router with a 404 page, Pinia, the generated
-> API client, and a home page showing the health check through the Vite proxy. CI runs `wl check`
-> on every push to `main` and every pull request.
+> **Status:** S1-C4 (API conventions) done, closing the `s1-foundations` group; next is S1-C5
+> (Sessions & sign-in), on the `s1-auth` branch. The tenancy, project, and audit tables exist
+> (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
+> the domain enums in `app/enums.py`, get-by-ID in the base repository, and
+> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure
+> rules (identifiers, password policy, account rank) are in `app/rules/`, held to 100% coverage
+> and mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
+> (`app/core/lists.py`), constraint errors as field errors (`app/core/constraint_errors.py`), and
+> `log_admin_event()`. The backend has its database core (Postgres, async SQLAlchemy, Alembic, the
+> base model and its mixins), a test harness with a `concurrency` fixture, background jobs on
+> procrastinate, the model conventions (enums, soft delete, optimistic locking with 409,
+> `direct_update`), the standard error format (including a catch-all 500), and the password and
+> token helpers; `GET /api/health` checks the database. Docker Compose runs the whole stack
+> (postgres, migrate, api, worker, web). The frontend is a Vue shell: layout, router with a 404
+> page, Pinia, the generated API client, and a home page showing the health check through the Vite
+> proxy. CI runs `wl check` on every push to `main` and every pull request.
 
 ## 1. Workstation setup
 
@@ -180,6 +182,7 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   |---|---|---|
   | `NotFoundError` | 404 | `not_found` (also for entities the caller may not see: 404, not 403) |
   | `ForbiddenError` | 403 | `forbidden` |
+  | `ValidationFailedError([FieldError(loc, message, type)])` | 422 | `validation_error` (same `details.fields` shape as request validation) |
   | `ServiceUnavailableError` | 503 | `service_unavailable` |
 
   Pass a more specific message, `code`, or `details` where the client needs them:
@@ -188,6 +191,15 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
 - **Handled for you:** request validation is 422 `validation_error` with
   `details.fields = [{"loc": [...], "message": ..., "type": ...}]`; an unknown route is 404
   `not_found`; a wrong method is 405 `method_not_allowed`.
+- **Constraint violations** (`app/core/constraint_errors.py`): every unique constraint
+  declares, in its `info`, either the field error a user gets when they trigger it,
+  `info=user_error("email", "taken", "This email is already in use.")`, or `internal_only()`
+  when no request should ever violate it (a random token). A mapped violation becomes 422
+  `validation_error` on that field (`loc: ["body", "email"]`); an unmapped `IntegrityError` is
+  a logged 500. `test_every_unique_constraint_in_the_app_declares_its_error` fails if a new
+  unique constraint declares neither. CHECK and foreign-key constraints may declare one too.
+  The service still checks first (a clear message, live availability checks): the constraint
+  is the source of truth for a race.
 - **Anything else** (an exception no handler covers) is 500 `internal_error`, "Something went
   wrong.", with empty `details`: nothing about the error reaches the client. It is logged on the
   server (logger `app.core.errors`) with its traceback. `UnhandledErrorMiddleware` does this;
@@ -369,6 +381,29 @@ editing the item's content at the same time doesn't get a 409). Every call says 
 `True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
 works as a counter), or `None` if no row has that id, and writes every changed column onto the
 object if the session has it loaded, so it stays readable without a lazy load.
+
+**List endpoints** (`app/core/lists.py`; build plan, "API conventions", "Lists"). Declare a
+`ListSpec` per list: sortable fields (an allowlist; `id` is always the last tiebreaker), the
+default sort, filters (`Filter(name, column, FilterType.ENUM, enum=...)`, or `CustomFilter` for
+a join), `search` columns for `?q=`, `archived_column`, `soft_deleted`, and `paging="cursor"`
+for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
+parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
+the service; the **repository** builds a statement already scoped to what the user may see and
+calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)` (newest first,
+`next_cursor`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
+some users may filter by) and `include_deleted` (the trash: design-doc §9) apply only when the
+endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
+`not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`.
+Parameters by filter type: enum, reference, and user `name` (repeat for any of; a user filter
+also takes `me`), `name__not`, `name__is_null`; date `name__lt`, `name__gt`, `name__is_null`;
+text `name__contains`; boolean `name`; number `name__gte`, `name__lte`. Examples:
+`tests/support/lists.py`.
+
+**Admin events** (`app/audit/admin_event.py`, design-doc §10.1): every admin and security action
+calls `log_admin_event(session, action=..., actor_id=..., workspace_id=..., ...)` in the same
+request. It adds the row to the session (no flush, no commit), so the event and the change
+commit together; the database refuses any later edit. `details` must never hold a password,
+hash, or token: a key that names one raises `SecretInDetailsError`.
 
 **Numbers** (`app/services/numbering.py`, design-doc §3): requirements, tasks, and test cases
 get their per-project number from `NumberingService(session).allocate_number(project,

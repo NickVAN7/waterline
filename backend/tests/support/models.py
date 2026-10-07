@@ -8,6 +8,7 @@ their own rolled-back transaction with the `support_tables` fixture.
 from __future__ import annotations
 
 import uuid
+from datetime import date, datetime
 from enum import StrEnum
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, MetaData, UniqueConstraint
@@ -21,6 +22,7 @@ from app.core.base_model import (
     TimestampMixin,
     VersionMixin,
 )
+from app.core.constraint_errors import user_error
 from app.core.enums import enum_type
 from tests.factories import BaseFactory
 
@@ -33,8 +35,12 @@ class SupportBase(DeclarativeBase):
 class Widget(IdMixin, TimestampMixin, SupportBase):
     __tablename__ = "support_widget"
     __table_args__ = (
-        UniqueConstraint("name"),
-        CheckConstraint("quantity >= 0", name="quantity_not_negative"),
+        UniqueConstraint("name", info=user_error("name", "taken", "This name is taken.")),
+        CheckConstraint(
+            "quantity >= 0",
+            name="quantity_not_negative",
+            info=user_error("quantity", "out_of_range", "The quantity can't be negative."),
+        ),
         Index(None, "quantity"),
     )
 
@@ -75,6 +81,25 @@ class Note(SoftDeleteMixin, IdMixin, TimestampMixin, SupportBase):
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(Document.id))
     body: Mapped[str]
     document: Mapped[Document] = relationship(back_populates="notes", lazy="raise")
+
+
+class Record(SoftDeleteMixin, IdMixin, TimestampMixin, SupportBase):
+    """Shaped like any listable entity, for the list conventions: one column per filter type,
+    a tenant to scope by, archiving, and soft delete. `(tenant, name)` is unique with no
+    mapping, for an unmapped constraint violation."""
+
+    __tablename__ = "support_record"
+    __table_args__ = (UniqueConstraint("tenant", "name"),)
+
+    tenant: Mapped[str]
+    name: Mapped[str]
+    notes: Mapped[str | None] = mapped_column(default=None)
+    status: Mapped[DocumentStatus | None] = mapped_column(enum_type(DocumentStatus, "status"))
+    owner_id: Mapped[uuid.UUID | None]
+    due: Mapped[date | None]
+    is_flagged: Mapped[bool] = mapped_column(default=False)
+    score: Mapped[int] = mapped_column(default=0)
+    archived_at: Mapped[datetime | None] = mapped_column(default=None)
 
 
 class WidgetFactory(BaseFactory[Widget]):

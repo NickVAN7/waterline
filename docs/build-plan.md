@@ -539,6 +539,8 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 Every endpoint follows these; the `new-area` skill carries them into later slices.
 
 **Lists**
+- **Limits:** text filters and `?q=` take at most 200 characters, a repeated filter at most 50
+  values, and `offset` at most a bigint; beyond any of these → 422.
 - **Offset paging by default:** `?limit=50&offset=0` (maximum 200; above it → 422), returning
   `{items, total, limit, offset}`.
 - **Append-only feeds** (activity log, audit events) use a cursor: `?before=<id>`, returning
@@ -552,15 +554,18 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   tiebreaker, so order is deterministic and offsets never skip or repeat rows. Each endpoint
   documents its default sort.
 - **Filters are declared,** once per list, as a filter spec (field, type, operators). The spec
-  generates the endpoint's query-parameter model (so the filters are in the OpenAPI schema and
-  the generated client) and drives one shared translator to SQL; endpoints never hand-write
-  filter logic. Only declared fields are filterable, never arbitrary columns; a declared field
-  can require an action. Filters that need a join (e.g. tasks by tag) are declared as custom
-  filters backed by a function.
-- **Operators by type:** enum and references: any of (repeat the parameter), none of, is empty
-  (`__is_null`), and `me` for user references; dates: `__lt`, `__gt`, `__is_null`; text:
-  `__contains` (case-insensitive, `%` and `_` escaped); booleans: equals; numbers: `__gte`,
-  `__lte`.
+  generates the endpoint's query-parameter model (so the filters are in the OpenAPI schema and the
+  generated client) and drives one shared translator to SQL; endpoints never hand-write filter
+  logic. Only declared fields are filterable, never arbitrary columns; a declared field can require
+  an action (`restricted=True`, applied only when the endpoint passes it in `permitted`, decided
+  through `authorize()`; otherwise a 422 `not_permitted`), and `include_deleted` always does. A
+  restricted field is never sortable or searchable (that would reveal what the restriction hides);
+  `ListSpec` refuses it. Filters that need a join (e.g. tasks by tag) are declared as custom filters
+  backed by a function.
+- **Operators by type:** enum and references: any of (repeat the parameter), none of (`__not`; it
+  keeps empty values), is empty (`__is_null`), and `me` for user references; dates: `__lt`, `__gt`,
+  `__is_null`; text: `__contains` (case-insensitive, `%` and `_` escaped); booleans: equals;
+  numbers: `__gte`, `__lte`.
 - **Combining:** different fields AND together; repeated values of one field OR together. No
   OR across fields in v1.
 - **Free-text search:** `?q=`, a simple name/title match until Slice 6 swaps in full-text
@@ -580,10 +585,14 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   `validation_error`, with `details.fields` entries `{loc, message, type}` (e.g.
   `loc: ["body", "key"]`, `type: "taken"`), so the frontend has one field-error parser. 409
   stays reserved for version conflicts.
+- A mapped foreign-key error never replaces the service's scoped lookup: a referenced entity the
+  user can't see is a 404 from the service before anything is written.
 - The service checks first (clear message, live availability checks); the database constraint
   is the source of truth. An `IntegrityError` is translated through a registry that maps
-  constraint names (from the naming convention) to a field and code. A test fails if any unique
-  constraint has no mapping. An unmapped `IntegrityError` stays a **500**.
+  constraint names (from the naming convention) to a field and code, built from each
+  constraint's own declaration (`info=user_error(...)`, or `internal_only()` for one no request
+  can trigger). A test fails if any unique constraint declares neither. An unmapped
+  `IntegrityError` stays a **500**.
 - Availability checks (project key, org and workspace slug, username, email) reveal only whether a
   value is taken, never where.
 
@@ -681,7 +690,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL |
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
 | 7 | Authorization core | Action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions` (per-org actions come in Checkpoint 11); the full matrix (including personal actions) and fail-closed tests |
-| 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners; live slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events |
+| 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners; live slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add, create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
 | 11 | Projects | Create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin, a separate action `project.assign_first_admin` in the org's `allowed_actions`, carried on each org entry in `/me`; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
@@ -743,8 +752,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   each org entry carries that org's `allowed_actions` (from Checkpoint 11, for the
   create-project dialog).
 - **Password policy** (`rules/password_policy.py`, §4): 8–256 characters, no composition rules,
-  not equal to the email or username (ignoring case); on change, the new password differs from
-  the current one. Used by change password, admin reset, and account creation.
+  not equal to the email or username (ignoring case); when users change their own, the new
+  password differs from the current one (`same_as_current`; admin resets and new accounts pass
+  False). Used by change password, admin reset, and account creation.
 - `must_change_password`: while set, every endpoint except `GET /api/auth/me`, change-password,
   and sign-out returns 403 with the error code `password_change_required`; the web app redirects
   to the change-password screen.
@@ -862,12 +872,13 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Guard: the last active system admin can't be deactivated or have the flag revoked.
 - Users can update their own name and username (format and uniqueness checked); they can't
   change their own email in v1 (§4).
-- Admins change another user's email, name, and username under the rank rule, in the `user`
-  service. The email is lowercased and must be unique (`taken`); the admin path refuses the
-  actor's own account (users can't change their own email in v1, §4), with a test; an email
-  change signs the user out everywhere through `auth`'s `on_email_changed` handler. Every
-  profile edit, the user's own or an admin's, records one `user_updated` event with the old
-  and new value of every changed field.
+- Admins change another user's email, name, and username under the rank rule, in the `user` service.
+  The email is lowercased and must be unique (`taken`); the admin path refuses the actor's own
+  account (users can't change their own email in v1, §4), with a test; an email change signs the
+  user out everywhere through `auth`'s `on_email_changed` handler. Every other account action may
+  target the actor's own account (owner decision, Oct 7, 2026; the last-owner and last-system-admin
+  guards still apply), with a test for each. Every profile edit, the user's own or an admin's,
+  records one `user_updated` event with the old and new value of every changed field.
 - The workspace users list shows which users hold system admin (read-only; granting and
   revoking stay in the CLI).
 - **Access review, per person** (design-doc §5, "Access review"): every org and project the

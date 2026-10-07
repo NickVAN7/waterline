@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import BaseModel, ClassificationMixin, classification_categories_check
+from app.core.constraint_errors import user_error
 from app.core.enums import enum_type
 from app.enums import PROJECT_CATEGORIES, ProjectModule, ProjectRole, ProjectStatus, ProjectType
 from app.models.org import Organization
@@ -32,7 +33,9 @@ class Project(ClassificationMixin, BaseModel):
             [Organization.id, Organization.workspace_id],
         ),
         # An ID like ERP-TA-45 means one item across every client the firm works for.
-        UniqueConstraint("workspace_id", "key"),
+        UniqueConstraint(
+            "workspace_id", "key", info=user_error("key", "taken", "This project key is taken.")
+        ),
         CheckConstraint(f"enabled_modules <@ ARRAY[{_MODULES}]::text[]", name="enabled_modules"),
         classification_categories_check(PROJECT_CATEGORIES),
     )
@@ -57,7 +60,11 @@ class Project(ClassificationMixin, BaseModel):
 class ProjectMembership(BaseModel):
     __tablename__ = "project_membership"
     __table_args__ = (
-        UniqueConstraint("project_id", "user_id"),
+        UniqueConstraint(
+            "project_id",
+            "user_id",
+            info=user_error("user_id", "already_member", "This person is already a member."),
+        ),
         # Access scoping: "my projects".
         Index(None, "user_id"),
     )

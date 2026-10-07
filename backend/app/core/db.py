@@ -23,7 +23,13 @@ type SessionMaker = async_sessionmaker[AsyncSession]
 
 
 def create_engine(url: URL) -> AsyncEngine:
-    return create_async_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 5})
+    # hide_parameters: SQLAlchemy leaves a statement's bound values (a password hash, a session
+    # token's hash) out of its error text, and so out of logged tracebacks. Postgres's own
+    # message can still quote a value (a type error on it, a CHECK's "Failing row contains"),
+    # which is why the constraint handler logs only the primary message.
+    return create_async_engine(
+        url, pool_pre_ping=True, hide_parameters=True, connect_args={"connect_timeout": 5}
+    )
 
 
 def create_sessionmaker(engine: AsyncEngine) -> SessionMaker:

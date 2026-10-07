@@ -7,6 +7,7 @@ from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import BaseModel
+from app.core.constraint_errors import internal_only
 from app.models.user import User
 
 
@@ -15,7 +16,8 @@ class UserSession(BaseModel):
     `Session`; the table is `session`."""
 
     __tablename__ = "session"
-    __table_args__ = (UniqueConstraint("token_hash"),)
+    # A hash of 32 random bytes: a clash would be a bug, never a user's doing.
+    __table_args__ = (UniqueConstraint("token_hash", info=internal_only()),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(User.id))
     token_hash: Mapped[str]
