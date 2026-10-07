@@ -56,6 +56,7 @@ erDiagram
 
   PROJECT ||--o{ PROJECT_MEMBERSHIP : has
   USER ||--o{ PROJECT_MEMBERSHIP : has
+  USER |o--o{ PROJECT : leads
   PROJECT ||--o{ PROJECT_COUNTER : "numbers via"
   PROJECT ||--o{ PHASE : "timeline of"
   PROJECT ||--o{ WORKSTREAM : "organized by"
@@ -90,6 +91,7 @@ erDiagram
   TEST_RUN ||--o{ TEST_RESULT : records
   TESTCASE ||--o{ TEST_RESULT : "executed as"
   TASK |o--o{ TEST_RESULT : "bug for"
+  USER |o--o{ TEST_RESULT : "assignee / executor"
 
   PROJECT ||--o{ APPROVAL_REQUEST : contains
   APPROVAL_REQUEST ||--o{ APPROVAL : "decided by"
@@ -166,7 +168,10 @@ erDiagram
     uuid workspace_id FK
     varchar key
     varchar name
+    text description
     varchar type
+    varchar status
+    uuid lead_id FK
     text_array enabled_modules
     varchar classification_level
     text_array classification_categories
@@ -308,6 +313,7 @@ erDiagram
     varchar status
     text actual_result
     uuid bug_task_id FK
+    uuid assignee_id FK
     uuid executed_by FK
     timestamptz executed_at
   }
@@ -459,8 +465,8 @@ project's org; design-doc §5).
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| name | varchar | the firm |
-| slug | varchar | NOT NULL, unique; format below |
+| name | varchar | the firm; changeable by workspace owners |
+| slug | varchar | NOT NULL, unique; format below; changeable by workspace owners |
 | created_at / updated_at | timestamptz | |
 
 Slugs (workspace and org): lowercase letters, digits, and hyphens, 2–40 characters, starting
@@ -503,9 +509,9 @@ installations moved to `github_installation` (an org can have several).
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| email | varchar | unique; stored lowercase (`CHECK (email = lower(email))`); not changeable in v1 |
-| username | varchar | unique app-wide; same format as slugs (lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter), but the reserved-route list doesn't apply (`rules/identifiers.py`); user-changeable |
-| name | varchar | display name |
+| email | varchar | unique; stored lowercase (`CHECK (email = lower(email))`); changed only by admins, under the rank rule (design-doc §4); users can't change their own in v1 |
+| username | varchar | unique app-wide; same format as slugs (lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter), but the reserved-route list doesn't apply (`rules/identifiers.py`); changeable by the user, and by admins under the rank rule |
+| name | varchar | display name; changeable by the user, and by admins under the rank rule |
 | hashed_password | varchar | required (email/password is the primary sign-in) |
 | is_active | boolean, default true | false = cannot sign in; sessions deleted and pending approvals replaced on deactivation (design-doc §6.2; not in an archived project) |
 | is_system_admin | boolean, default false | may do anything in any org/project, except personal actions such as deciding another person's approval (design-doc §5) and the content of an export-controlled project without an explicit membership (§3.1); granted and revoked only by app CLI commands |
@@ -563,7 +569,10 @@ re-checks memberships (design-doc §4, "Sessions"). Session-ending account actio
 | workspace_id | UUID (part of the composite FK → organization) | NOT NULL; the org's workspace, copied so keys can be unique per workspace |
 | key | varchar | user-entered; 3–6 chars `^[A-Z][A-Z0-9]{2,5}$`; immutable; unique in the workspace |
 | name | varchar | |
+| description | text, nullable | plain text |
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
+| status | enum: planning / active / on_hold / completed / cancelled | NOT NULL, default `planning`; informational only: gates nothing, separate from `archived_at` (design-doc §1.1, §7); changed by project admins |
+| lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check); defaults to the creator; cleared in the same transaction when that membership is removed (design-doc §1.1) |
 | enabled_modules | text[] | seeded from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
 | classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; null = unclassified; the floor for the project's items (design-doc §3.1) |
 | classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
@@ -585,7 +594,10 @@ project admin (a `project_membership` with role admin), and on an export-control
 does any lowering or removal. With `export_controlled`, inherited admins keep management access
 but see content only with an explicit membership (design-doc §3.1; the gate is built in Slice
 2). Classification changes are recorded as `project_classification_changed` audit events.
-No visibility flag: access is always explicit project membership (plus inherited admin).
+Changes to the name, description, type, status, lead, and modules are recorded in
+`project_updated` (old and new values in its details).
+No visibility flag: access is always explicit project membership (plus inherited admin). The
+creator gets a `project_membership` with role admin (design-doc §5, "Org roles").
 
 ### `project_membership`
 | Field | Type | Notes |
@@ -749,8 +761,10 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(project_id, number)`; `project_id` is immutable. Index on `(project_id, status, rank)`
-for board and backlog views. `CHECK (classification_categories <@ ARRAY['financial',
-'proprietary', 'pii'])`.
+for board and backlog views. For My work (design-doc §11): `ix_task_assignee_id_status` on
+`(assignee_id, status)` (tasks assigned to the user) and `ix_task_reviewer_id_status` on
+`(reviewer_id, status)` (tasks in review with the user as reviewer).
+`CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
 
 ### `subtask`
 | Field | Type | Notes |
@@ -871,6 +885,7 @@ pending one. Test runs are never deleted in v1; an abandoned run is cancelled (d
 | actual_result | text, nullable | |
 | notes | text, nullable | |
 | bug_task_id | UUID (FK → task), nullable | bug raised from a failure |
+| assignee_id | UUID (FK → user), nullable | who should execute it; set when the case is planned into the run or later (design-doc §8) |
 | executed_by | UUID (FK → user), nullable | null until executed |
 | executed_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
@@ -878,7 +893,9 @@ pending one. Test runs are never deleted in v1; an abandoned run is cancelled (d
 `UNIQUE(test_run_id, testcase_id)`. A result with an outcome is never deleted; a `not_run` row
 (a case only planned into the run) can be removed, and is removed from open runs when its test
 case is deleted (design-doc §9). Index on `(testcase_id, executed_at DESC)` for computing
-current status.
+current status; `ix_test_result_assignee_id_status` on `(assignee_id, status)` for My work
+(`not_run` results assigned to the user; design-doc §11). Re-running failed cases inserts new
+`not_run` rows in a new run; earlier results are never overwritten (design-doc §8).
 
 ---
 
@@ -966,13 +983,14 @@ for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | action-specific values (old/new role, old/new name or slug, modules; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation); never passwords, hashes, or tokens |
+| details | jsonb | action-specific values (old/new role, old/new name or slug, old/new email; for `user_updated`, the changed fields; for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 
 `action` values: `workspace_created`, `user_created`, `user_deactivated`, `user_reactivated`,
 `password_reset`, `password_changed`, `signed_out_everywhere`, `username_changed`,
-`system_admin_granted`, `system_admin_revoked`, `workspace_member_added`,
+`email_changed`, `user_updated`, `system_admin_granted`, `system_admin_revoked`,
+`workspace_updated`, `workspace_member_added`,
 `workspace_member_role_changed`, `workspace_member_removed`, `org_created`, `org_updated`,
 `org_member_added`, `org_member_role_changed`, `org_member_removed`, `project_created`,
 `project_updated`, `project_archived`, `project_unarchived`, `project_classification_changed`,
@@ -1112,7 +1130,9 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
   procrastinate 3.10.0's `schema.sql` (`backend/migrations/sql/`); an upgrade adds a migration
   applying procrastinate's own migration files for the versions in between, a version's
   `_pre_` and `_post_` files together, with the workers stopped. Autogenerate ignores these
-  tables (design-doc §13, "Transactional enqueue", item 8).
+  tables (design-doc §13, "Transactional enqueue", item 8). The system-admin operations screen
+  reads failed jobs through a wrapped helper in `app/jobs/`, never through ORM models
+  (design-doc §13, "Operations screen").
 
 ## Deferred tables (not in v1)
 | Table | When |

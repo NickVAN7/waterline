@@ -68,7 +68,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    - order: archived project (every mutation on it or inside it denied, for every role including
      system admins; unarchive and removing a member with their projects excepted) →
      export-control gate (from Slice 2) → personal actions → system admin → workspace
-     owner/admin → owner/admin of the project's org → project role → targeted rules;
+     owner/admin → org role (owner/admin of the project's org; an org member only for
+     `project.create`) → project role → targeted rules;
      personal actions (e.g. `approval.decide`) are allowed only by their relationship rule, and
      only for a user with content access to the project; no admin level, system admin
      included, ever grants one;
@@ -76,8 +77,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      module gating before `authorize()`;
    - targeted rules match the design tables exactly (transitions, deletion, approvals — only
      the named approver decides, with no admin or system-admin override);
-   - account actions (deactivate, reactivate, reset password, sign out everywhere) follow the
-     rank rule (design-doc §4): the target holds at least one membership in the actor's scope,
+   - account actions (deactivate, reactivate, reset password, sign out everywhere, and changing
+     another user's email, name, or username) follow the rank rule (design-doc §4): the target holds at least one membership in the actor's scope,
      and every membership the target holds is covered by an actor role at an equal or higher
      rank, so no one can reset a higher-ranked user's password (a system admin's, the workspace
      owner's, or, for an org admin, a workspace member's) and take over the account;

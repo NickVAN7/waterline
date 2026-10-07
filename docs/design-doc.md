@@ -23,6 +23,15 @@
 >    creation (§6.1), data classification and export control (§3.1), accessibility (WCAG 2.2
 >    AA, §1) and loading states (`screen-inventory.md`, step 5), API rate limiting (§4), and
 >    malware scanning for future file uploads (§16).
+> 7. Journey decisions (Oct 6–7, 2026), from the screen-inventory journey work: any org member
+>    creates projects and becomes their first admin and lead; project status, lead, and
+>    description (§1.1, §5, §7); admins change a user's email, name, and username under the
+>    rank rule, and workspace owners rename the workspace (§4, §10.1); generated temporary
+>    passwords (§4); My work as the home page (§11), access review (§5), and the system-admin
+>    operations screen (§13); sprint completion with unfinished tasks (§6); comparing any two
+>    requirement revisions (§6.1); test-result assignees and re-running failed cases (§8);
+>    copy branch name and send-back comments (§5, §6, §12); roadmap additions (§16). Questions
+>    still open are listed in §15.
 >
 > Table-level detail lives in `schema-doc.md`. The people who use Waterline, the tenancy and
 access model, and the screens derived from them are in `screen-inventory.md`.
@@ -86,6 +95,15 @@ per kind of project.
   modules.
 - **`project.enabled_modules`** — seeded from the type; project admins can turn modules on or
   off at any time.
+- **Project details** (journey decisions, Oct 6–7, 2026), all editable by project admins:
+  - **`project.status`** — `planning` (the default) / `active` / `on_hold` / `completed` /
+    `cancelled` (§7). Informational only: it gates nothing and is separate from archiving
+    (`archived_at`, §9).
+  - **`project.lead_id`** — who to ask about the project: a label, not a permission. The lead
+    must hold a `project_membership` on the project, and defaults to the creator. Removing the
+    lead's project membership (by any path, §4) clears `lead_id` in the same transaction, and
+    the UI flags a project with no lead.
+  - **`project.description`** — plain text, optional (as on phases and workstreams).
 
 | Module | Adds | Default on for | Status |
 |---|---|---|---|
@@ -302,8 +320,8 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
   - **Marking a project export-controlled** requires the admin to confirm that the current
     explicit members are authorized (one confirmation, listing them), recorded in the audit
     event. From then on, inherited admins lose content access. This applies at creation too:
-    the only explicit member is then the first admin, and the confirmation is recorded in
-    `project_created`.
+    the only explicit member is then the creator, its first admin (§5), and the confirmation is
+    recorded in `project_created`.
   - **Approvers on an export-controlled project** must be explicit members; an approver who
     loses that (including when the project is marked export-controlled) is replaced, except in
     an archived project (§6.2).
@@ -345,7 +363,8 @@ Workspace (the firm: tenant boundary)
 
 - **`Workspace`** is the tenant boundary: the firm running the projects. The schema supports
   many; v1 deploys with **one**, created by the seed CLI alongside the first system admin, who
-  also becomes its owner. There is no UI to create workspaces.
+  also becomes its owner. There is no UI to create workspaces; workspace owners can change the
+  workspace's name and slug.
 - **`Organization`** belongs to exactly one workspace (`organization.workspace_id`). An org is
   normally one client; a software-only setup is one workspace with one internal org. Its
   `slug` (unique in the workspace, renameable) appears in browser URLs (§3).
@@ -382,13 +401,16 @@ Workspace (the firm: tenant boundary)
 
 ### Users
 - `email` — stored lowercase and compared case-insensitively (a CHECK enforces lowercase).
-  Not changeable in v1: there is no email-change feature; an administrator with database
-  access can change it directly.
+  Admins change it under the rank rule for account actions ("Account management"); the new
+  email is lowercased and must be unique (the standard uniqueness error, `taken`). Users can't
+  change their own email in v1: that needs a verification email, which waits for email
+  sending.
 - `username` — unique across the app (users can belong to several orgs); the same format as
   slugs (§3): lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter.
   Unlike slugs, the reserved-route list doesn't apply. Set at account creation, changeable by
-  the user. Exists now so @mentions can be added with notifications (v1.5); mentions will
-  store user IDs, so renames break nothing.
+  the user and, under the rank rule, by admins. Exists now so @mentions can be added with
+  notifications (v1.5); mentions will store user IDs, so renames break nothing.
+- `name` — the display name; changeable by the user and, under the rank rule, by admins.
 - `is_active` — an inactive user **cannot sign in at all**; deactivation deletes their sessions
   immediately. Their past work (tasks, comments, log entries) still references them and is shown
   with a "deactivated" badge. Their open tasks stay assigned; the UI highlights them for manual
@@ -399,8 +421,9 @@ Workspace (the firm: tenant boundary)
   export-controlled project they aren't an explicit member of (§3.1). Workspaces and orgs
   still have their own owners/admins with full control within them. The first system admin is created by the seed command; afterwards
   the flag is granted and revoked only through app CLI commands (`grant-system-admin`,
-  `revoke-system-admin`), never through the UI or API. The last active system admin cannot be
-  deactivated or demoted (lockout safeguard).
+  `revoke-system-admin`), never through the UI or API. The workspace users page shows which
+  users hold it, read-only. The last active system admin cannot be deactivated or demoted
+  (lockout safeguard).
 - `must_change_password` — set when an admin creates an account or resets a password; the user
   is prompted to choose their own on next sign-in.
 
@@ -414,9 +437,12 @@ Workspace (the firm: tenant boundary)
 - **The add-person form asks for the email first.** If the email already has an account, the
   admin is asked to confirm adding that person (no name or password is asked for, and no
   duplicate is created); otherwise the form continues to full account creation (username,
-  name, temporary password; the form can generate a temporary password that meets the
-  policy). The form therefore shows whether an email has an account, never which
-  org it belongs to; invitations (v2+) would hide even that.
+  name, temporary password). The form therefore shows whether an email has an account, never
+  which org it belongs to; invitations (v2+) would hide even that.
+- **Temporary passwords** (account creation and admin password reset): the form generates one
+  that meets the policy and shows it to the admin once, to pass on; it can't be retrieved
+  afterwards. The admin may replace it with their own before saving. Either way the user must
+  change it at next sign-in (`must_change_password`).
 - **Project admins** add people to their project from the project org's members and the
   workspace's staff; the picker lists only those, never other clients' users, and adding by
   user ID rejects anyone else with a 404. They can also add by email, with the same email-first
@@ -434,7 +460,8 @@ Workspace (the firm: tenant boundary)
   Left unchecked, the person keeps those projects as a project-only user (which lowers their
   rank for account actions).
 - **Account actions follow rank.** Deactivating, resetting the password of, or signing out
-  everywhere another user, or reactivating them, is allowed only when the target holds at least
+  everywhere another user, reactivating them, or changing their email, name, or username, is
+  allowed only when the target holds at least
   one membership in the actor's scope, and for **every** membership the target holds, the actor
   has a role covering it (the same workspace, org, or project, or one above it) at an equal or
   higher rank. The system-admin flag counts as a membership at the top rank. A user with no
@@ -537,9 +564,8 @@ Workspace (the firm: tenant boundary)
   - Active-sessions page (adds `user_agent` and `ip_address` to `session`) with per-session
     revoke. (Admin "sign out everywhere" is built in Slice 1, under the rank rule in "Account
     management".)
-  - Password re-entry for sensitive actions (changing email, once that feature exists;
-    linking/unlinking GitHub; admin
-    password resets).
+  - Password re-entry for sensitive actions (an admin changing a user's email;
+    linking/unlinking GitHub; admin password resets).
   - Nightly worker job deleting expired sessions.
   - Per-org session-length settings, if any org needs shorter limits.
   - The reverse proxy in front of the app forwards the original `Host` header (e.g. nginx
@@ -581,7 +607,9 @@ Workspace (the firm: tenant boundary)
      access to the project.
   4. `user.is_system_admin`.
   5. A workspace owner/admin role in the entity's workspace.
-  6. An owner/admin role in the project's org.
+  6. A role in the entity's org (the project's org for a project or anything in it): owner
+     or admin grants inherited project admin; member grants only creating a project in the
+     org (`project.create`, "Org roles" below).
   7. The user's project role.
   8. The targeted field-based rules below.
 
@@ -624,14 +652,14 @@ inherited admin covers management only; content needs an explicit membership (§
 |---|---|
 | viewer | View the project and everything in it; comment on tasks and requirements; edit/delete own comments; decide approvals they are named on |
 | member | Viewer + create and edit requirements, tasks, subtasks, test cases; record test results; manage sprints, phases, milestones, workstreams, dependencies, links; create and apply tags |
-| admin | Member + create and cancel approval requests; edit the project's name, type, and enabled modules; manage the project's members and their roles, and create users for it (§4); map GitHub repositories to the project; every targeted-rule override below |
+| admin | Member + create and cancel approval requests; edit the project's name, description, type, status, lead, and enabled modules (§1.1); manage the project's members and their roles, and create users for it (§4); map GitHub repositories to the project; every targeted-rule override below |
 
 **Org roles** (`membership`)
 
 | Role | Capabilities |
 |---|---|
-| member | Belongs to the org; can be added to its projects. No project access by itself |
-| admin | Create, archive, and unarchive the org's projects, naming each new project's first admin (from the org's members and the workspace's staff; always given a `project_membership` row, even if they also inherit admin); project admin on every project in the org (on an export-controlled project, management only without an explicit membership, §3.1); create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
+| member | Belongs to the org; can be added to its projects; creates projects in the org, becoming each one's first project admin (an explicit `project_membership` row) and its lead. No access to the org's other projects by itself |
+| admin | Member + archive and unarchive the org's projects (a project's creator gets the explicit `project_membership` row even though they also inherit admin); project admin on every project in the org (on an export-controlled project, management only without an explicit membership, §3.1); create users in the org, add existing users as members, and remove members; rename and delete the org's tags and set their type; connect GitHub installations; account actions by rank (§4) |
 | owner | Admin + manage the org itself and grant, change, or remove its owner and admin roles |
 
 **Workspace roles** (`workspace_membership`)
@@ -640,7 +668,7 @@ inherited admin covers management only; content needs an explicit membership (§
 |---|---|
 | member | Internal staff: sees only the orgs and projects they are assigned to, with no inherited access and no workspace pages |
 | admin | Manage the workspace's staff; create orgs and assign their first owner; org owner capabilities in every org of the workspace, and so project admin on every project (on an export-controlled project, management only without an explicit membership, §3.1); account actions by rank (§4) on users in the workspace |
-| owner | Admin + manage the workspace itself and grant, change, or remove its owner and admin roles |
+| owner | Admin + manage the workspace itself (its name and slug) and grant, change, or remove its owner and admin roles |
 
 **System admin:** anything, in any workspace, org, or project, except personal actions (such as
 deciding someone else's approval) and the content of an export-controlled project without an
@@ -656,7 +684,9 @@ explicit membership (§3.1).
 | Assignee is also the reviewer | allowed |
 
 Review is therefore *supported but not enforced* (consistent with §1). Enforced review and
-blocking self-review are candidates for per-org settings later.
+blocking self-review are candidates for per-org settings later. Sending a task back from
+review (`in_review →` any status but `done`) prompts for a comment but doesn't require one
+(comments arrive in Slice 6; until then there is no prompt).
 
 ### Other targeted rules
 - **Deletion** (soft delete; whoever may delete an item may also restore it):
@@ -686,6 +716,21 @@ blocking self-review are candidates for per-org settings later.
   point"): nobody, including project, org, or workspace admins, or system admins, decides on
   another approver's behalf. A project admin can cancel the request instead.
 - The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted.
+
+### Access review
+
+Who can reach what, and why, in v1 (journey decisions, Oct 6–7, 2026). Derived from the
+memberships and the system-admin flag at read time, through the same rules as `authorize()`;
+no schema change.
+
+- **Per project:** everyone with access and why: an explicit project role, or inherited
+  project admin and through which role (system admin, workspace owner/admin, owner/admin of
+  the project's org). On an export-controlled project it separates **management** access from
+  **content** access (§3.1), so inherited admins without an explicit membership show as
+  management only.
+- **Per person:** every org and project the person can reach, and through what (the same
+  reasons).
+- Who may open each view is still open (§15).
 
 ### Request shape
 Every protected mutation follows the same order, inside **one database transaction per
@@ -754,6 +799,8 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   `approved_revision_id IS NOT NULL AND approved_revision_id <> current_revision_id`.
   The status stays `approved`; the UI shows "Approved · modified" with a diff between the two
   revisions. Re-approval is a new approval request for the current revision.
+- **Any two revisions can be compared**, not only the approved one against the current one:
+  the history lets the user pick both sides of the diff.
 - Status and priority changes are *not* revisions — they go to `activity_log`.
 
 ### 6.2 Approvals
@@ -862,6 +909,9 @@ requirement approval.
   convention).
 - Its phase, sprint, milestone, workstream, and requirement must belong to the same project
   (service-layer check).
+- **Copy branch name:** a task offers its branch name to copy: the lowercase task ID plus a
+  slug of the title (e.g. `wtl-ta-45-sign-in-throttling`), which branch auto-detection (§12)
+  matches.
 
 ### Subtask
 - Separate table (not self-referencing) — no multi-level nesting to guard against.
@@ -908,6 +958,9 @@ requirement approval.
 - Belongs to one project (multi-project sprints are a contained v2 migration).
 - `goal` text field. **At most one `active` sprint per project** (partial unique index — a data
   integrity rule, not a workflow rule).
+- **Completing a sprint with unfinished tasks** (any status but `done` or `cancelled`) asks
+  where they go: the next planned sprint, or the backlog (`sprint_id` cleared). It is one
+  request; each task's `sprint_id` change is logged as usual (§10).
 
 ### Milestone
 - Flat, separate from the requirement tree; a point in time for cross-cutting groupings.
@@ -956,6 +1009,7 @@ v1 uses **fixed status values per entity** (stored as varchar + CHECK).
 
 | Entity | Values |
 |---|---|
+| Project | `planning` / `active` / `on_hold` / `completed` / `cancelled` (informational: gates nothing; separate from archiving, §1.1) |
 | Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` (`approved`: set by completing an approval request, or by hand by a project admin only, §5, §6.2) |
 | Task | `todo` / `in_progress` / `blocked` / `in_review` / `done` / `cancelled` |
 | Test run | `planned` / `in_progress` / `completed` / `cancelled` |
@@ -992,7 +1046,11 @@ start failing?", or "against which commit?". Definition and execution are now se
   for a run uses an approval request (§6.2).
 - **`test_result`** — one test case's outcome in one run (`UNIQUE(run, testcase)`): status,
   `actual_result`, notes, executor, time, and an optional `bug_task_id` linking a failure to the
-  bug task it produced.
+  bug task it produced. A case planned into a run can be assigned to someone ahead of execution
+  (`assignee_id`, optional); the assignee sees it in My work (§11) while the run is open.
+
+**Re-running failed cases** creates a new test run containing the failed cases of an existing
+run, as `not_run` rows. A retest never overwrites the earlier result: each run keeps its own.
 
 **Every result belongs to a run**, but manual recording stays quick: the "record result" action
 on a test case finds or creates an **ad-hoc run** (`is_adhoc = true`) for that project and day
@@ -1093,11 +1151,12 @@ different kind of record, with different readers, scope, and shape, so they live
 table, `audit_event` (schema-doc, "Audit").
 
 - **What's recorded:** account actions (created, deactivated, reactivated, password reset, password
-  changed, signed out everywhere, username changed), system-admin grants and revocations, workspace
-  creation (by the seed command), workspace/org/project membership changes (added, role changed,
-  removed), org creation and changes, and project creation, changes, archiving, unarchiving, and
-  classification changes (§3.1). A project member added to an export-controlled project, a
-  project marked export-controlled, and a project created export-controlled (in
+  changed, signed out everywhere, username changed, email changed, name changed), system-admin
+  grants and revocations, workspace creation (by the seed command) and changes (name, slug),
+  workspace/org/project membership changes (added, role changed, removed), org creation and changes,
+  and project creation, changes (name, description, type, status, lead, modules), archiving,
+  unarchiving, and classification changes (§3.1). A project member added to an export-controlled
+  project, a project marked export-controlled, and a project created export-controlled (in
   `project_created`, with its initial level and categories) record the admin's export-control
   confirmation in the event's details.
 - **Scope:** every event has its workspace (none for instance-level events such as system-admin
@@ -1157,6 +1216,22 @@ soft delete, parents are never physically removed, so orphaning isn't a practica
 service layer verifies the parent exists when a row is created, and a composite index on
 `(entity_type, entity_id)` keeps lookups fast.
 
+### My work (home page)
+Journey decisions, Oct 6–7, 2026. **My work is the home page after sign-in for every user**:
+- the projects they can open;
+- their outstanding work across projects: tasks assigned to them (any status but `done` or
+  `cancelled`), tasks awaiting their review (`in_review` with them as reviewer), approvals
+  pending their decision, and test cases assigned to them in open runs (`not_run` results in
+  runs that are `planned` or `in_progress`, §8).
+
+It is scoped like every list endpoint (§5, "Reads are authorized too") and leaves out the
+content of export-controlled projects where the user has no explicit membership (§3.1). Until
+notifications (v1.5), it's how people learn that something is waiting for them. It lives at
+the root route (`/`), so it adds nothing to the reserved-slug list (§3); a top-level route of
+its own would have to join it. Each section arrives with its feature: projects in Slice 1,
+approvals in Slice 2, tasks in Slice 3, test cases in Slice 5. Schema: the assignee and
+reviewer indexes on `task` and `test_result` (schema-doc).
+
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).
 
@@ -1185,7 +1260,8 @@ does not write code or push to repos.
    - **Auto-detection (v1):** task IDs in **PR titles and branch names only**, case-insensitive
      (branches are usually lowercase, e.g. `pmt-ta-45-fix-login`), matched against the project
      keys mapped to that repo. **Tasks only** — requirement IDs are not linked in v1. A subtask
-     ID (e.g. `pmt-ta-45.2-add-validation`) links its parent task, TA-45.
+     ID (e.g. `pmt-ta-45.2-add-validation`) links its parent task, TA-45. A task's "copy branch
+     name" (§6, Task) produces a name this matches.
    - **Commits** can be linked manually by pasting a URL; they are not auto-detected.
    - If an ID is later removed from a PR title, the existing link stays; removal is manual.
 4. **Webhooks** — each delivery is recorded in `github_webhook_delivery`:
@@ -1221,6 +1297,17 @@ attribution; a scoped "system actor" is the alternative. Left as a v2 design que
   4. Work whose loss matters is also tracked in the app's own tables (outbox pattern), not only
      in the queue.
   5. Library-specific features used in business logic are wrapped in our own helpers.
+
+### Operations screen (system admins)
+
+Journey decisions, Oct 6–7, 2026. System admins see an indicator when background jobs or
+GitHub webhook deliveries have failed, leading to a read-only list of the failures: failed
+jobs (from the queue's own tables) and deliveries whose processing recorded an `error`
+(`github_webhook_delivery`, §12). Retrying stays in the CLI. Failed jobs are read through a
+wrapped helper in `app/jobs/` over procrastinate's tables (convention 5), with no ORM models
+for them (schema-doc, "Infrastructure tables"). If the screen gets a top-level route of its
+own, the path joins the reserved-slug list (§3). Built with the webhooks, the first v1 jobs
+(Slice 7). Email notification of failures waits for email sending (§16).
 
 ### Transactional enqueue (S0-C3 spike result)
 
@@ -1296,7 +1383,8 @@ dependency; procrastinate 3.10.0, SQLAlchemy 2.1.1, psycopg 3.3.6, Postgres 18.6
 
 These were deliberately left for implementation time; none changes table shapes significantly.
 All earlier core items (number allocation, rank UI, delete permissions, session handling) are
-now settled in their sections; what remains is tied to the ERP modules.
+now settled in their sections; what remains is tied to the ERP modules, the test-run
+lifecycle, and the open questions from the journey decisions (Oct 7, 2026).
 
 - **ERP permissions** (decided with the ERP modules):
   - a financial-visibility flag on a membership, checked in `authorize()`, for budget data;
@@ -1305,7 +1393,23 @@ now settled in their sections; what remains is tied to the ERP modules.
 - **Test-run lifecycle details** (decided when Slice 5 is designed): removing a planned case
   from a run, and what happens to a deleted test case's planned slots; who may cancel a run;
   what a cancelled run allows (reopening, results, requests); whether results in a cancelled
-  run count toward a test case's current status.
+  run count toward a test case's current status. *Decided Oct 6–7, 2026:* a planned case can
+  be assigned (`test_result.assignee_id`), and re-running failed cases creates a new run, never
+  overwriting a result (§8).
+- **Open from the journey decisions** (raised with the owner, Oct 7, 2026):
+  - project creation: whether org owners/admins can name someone else as the first admin
+    (creator by default), and whether internal staff holding only a project membership in an
+    org can create projects there (§5);
+  - whether project admins see their own project's audit events (§10.1), and whether status
+    and lead changes also appear in the project activity feed;
+  - whether an admin changing a user's email signs that user out everywhere (§4);
+  - correcting a test result while its run is in progress, and how the earlier outcome is kept
+    (result changes aren't logged today, §10);
+  - whether a re-run records the run it came from (a nullable `test_run` column), and which
+    result statuses count as failed for a re-run (§8);
+  - who may open each access-review view (§5);
+  - what happens to `project.lead_id` when the lead is deactivated (§1.1), and which sprint is
+    "the next planned sprint" when several are planned (§6, Sprint).
 - **ERP modules:** each needs its own design pass (§16).
 - **Reporting:** which reports and dashboards define a usable ERP version, and which numbers get
   frozen in published snapshots.
@@ -1356,6 +1460,11 @@ its own design pass.
 - **Workstream members**, for a client core team's "my team's work" view (a department maps to
   a workstream; today a workstream has only a lead). Decided in the ERP design pass.
 
+**Planning and setup** (journey decisions, Oct 6–7, 2026):
+- **Project templates** and **bulk import/export** (requirements, tasks, test cases).
+- A **needs-attention view**; in v1 the filter bar covers it.
+- **Sprint load views**.
+
 ### Deferred until first need
 - **API tokens** (`api_token`: hashed, prefixed, expiring, revocable; resolve to a `User` so
   `authorize()` is unchanged). First likely needs: scripts/imports, v2 Claude/MCP integration.
@@ -1363,8 +1472,15 @@ its own design pass.
 - **CI test results** — likely via the GitHub App instead of tokens: on workflow completion,
   the worker downloads the JUnit XML artifact and records a `test_run` matched by
   `automation_ref`.
+- **Comparing two test runs** side by side (journey decisions, Oct 6–7, 2026).
+- **Creating a linked follow-up task from inside a task.** Linking existing tasks (§11, "Task
+  dependencies") is v1.
+- **Archiving an organization.** In v1, archiving its projects is enough.
+- **Email notification of failed jobs and webhook deliveries** (§13, "Operations screen"),
+  once email sending exists.
 
 ### v2+
+- Bulk edit of tasks
 - Configurable per-project workflows (replacing fixed statuses)
 - User-configurable display labels (beyond the per-type mapping)
 - Multi-project sprints (`sprint_project` join table)
