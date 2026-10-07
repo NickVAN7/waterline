@@ -154,17 +154,24 @@ async def test_task_is_404_for_user_in_another_org(client_for, task, outsider):
 ```
 
 **Concurrency (`@pytest.mark.concurrency`) — parallel transactions, real commits.** Name every
-table the test commits to in the marker (it truncates exactly those afterwards).
-`separate_sessions` and `gather_in_parallel` are illustrative: the general parallel helper
-doesn't exist yet (TD-4).
+table the test commits to in the marker (they're truncated afterwards; a test that leaves rows
+in any other table fails). Committed parents come from factories inside
+`committing_factories(...)`; `run_in_parallel` holds every transaction at a start barrier so
+they really overlap, under a time limit (`tests/support/concurrency.py`). Sabotage-check a race
+test against a non-atomic version of the code.
 
 ```python
 @pytest.mark.concurrency("project_counter", "project", "organization", "workspace")
-async def test_parallel_allocations_never_collide(project, separate_sessions):
-    numbers = await gather_in_parallel(
-        [allocate_number_in(s, project, "TA") for s in separate_sessions(20)]
-    )
-    assert sorted(numbers) == list(range(1, 21))
+async def test_parallel_allocations_never_collide(concurrency: SessionMaker) -> None:
+    async with committing_factories(concurrency):
+        project = await ProjectFactory.create_async()
+
+    async def allocate(session: AsyncSession, _index: int) -> int:
+        return await NumberingService(session).allocate_number(project, NumberPrefix.TASK)
+
+    numbers = await run_in_parallel(concurrency, MAX_PARALLEL, allocate)
+
+    assert sorted(numbers) == list(range(1, MAX_PARALLEL + 1))
 ```
 
 **Property (Hypothesis) — invariants over many inputs:**

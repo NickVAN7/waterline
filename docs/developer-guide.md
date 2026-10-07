@@ -4,18 +4,19 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C1 (Tenancy models & migration) done; next is S1-C2 (Number allocation &
-> race harness), on the `s1-foundations` branch. The tenancy, project, and audit tables exist
-> (models, one migration, constraint tests, a factory per model), with the domain enums in
-> `app/enums.py` and get-by-ID in the base repository. The backend has its database core
-> (Postgres, async SQLAlchemy, Alembic, the base model and its mixins), a test harness with a
-> `concurrency` fixture, background jobs on procrastinate, the model conventions (enums, soft
-> delete, optimistic locking with 409, `direct_update`), the standard error format (including a
-> catch-all 500), and the password and token helpers; `GET /api/health` checks the database.
-> Docker Compose runs the whole stack (postgres, migrate, api, worker, web). The frontend is a
-> Vue shell: layout, router with a 404 page, Pinia, the generated API client, and a home page
-> showing the health check through the Vite proxy. CI runs `wl check` on every push to `main`
-> and every pull request.
+> **Status:** S1-C2 (Number allocation & race harness) done; next is S1-C3 (Pure rules & mutation
+> testing), on the `s1-foundations` branch. The tenancy, project, and audit tables exist (models,
+> migrations, constraint tests, a factory per model; `audit_event` is append-only), with the
+> domain enums in `app/enums.py`, get-by-ID in the base repository, and
+> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The backend
+> has its database core (Postgres, async SQLAlchemy, Alembic, the base model and its mixins), a
+> test harness with a `concurrency` fixture, background jobs on procrastinate, the model
+> conventions (enums, soft delete, optimistic locking with 409, `direct_update`), the standard
+> error format (including a catch-all 500), and the password and token helpers; `GET /api/health`
+> checks the database. Docker Compose runs the whole stack (postgres, migrate, api, worker, web).
+> The frontend is a Vue shell: layout, router with a 404 page, Pinia, the generated API client,
+> and a home page showing the health check through the Vite proxy. CI runs `wl check` on every
+> push to `main` and every pull request.
 
 ## 1. Workstation setup
 
@@ -367,6 +368,13 @@ editing the item's content at the same time doesn't get a 409). Every call says 
 works as a counter), or `None` if no row has that id, and writes every changed column onto the
 object if the session has it loaded, so it stays readable without a lazy load.
 
+**Numbers** (`app/services/numbering.py`, design-doc §3): requirements, tasks, and test cases
+get their per-project number from `NumberingService(session).allocate_number(project,
+NumberPrefix.TASK)`, inside the request's transaction (a rollback undoes it). One atomic upsert
+on `project_counter` locks only that (project, prefix) row until commit, so parallel requests
+never collide and other prefixes and the project itself aren't blocked. Never compute
+`MAX(number) + 1`.
+
 **Get by ID** (`app/repositories/base.py`): `get_by_id(session, Model, id)` is always a query,
 never `session.get()`, so the soft-delete filter applies even to an object already in the
 session (`include_deleted=True` for trash and restore screens). Repositories use it for every
@@ -596,11 +604,26 @@ value the test depends on explicitly.
 
 **Concurrency tests** need real commits on separate connections (parallel transactions, or a
 worker in the same test), so they use the `concurrency` fixture instead: it yields a
-sessionmaker whose sessions really commit, and afterwards (pass or fail) truncates the tables
-named in the marker. It refuses to run alongside any rolled-back-transaction fixture
-(`connection`, `sessionmaker`, `session`, `client`). It doesn't yet support true race tests:
-there's no helper that forces transactions to overlap, factories can't write through it, and
-cleanup relies on the table list you give it (TD-4, Slice 1).
+sessionmaker whose sessions really commit, on an engine with a pool for 20 parallel transactions
+and a Postgres `lock_timeout` of 5 seconds. It refuses to run alongside any
+rolled-back-transaction fixture (`connection`, `sessionmaker`, `session`, `client`). Afterwards,
+pass or fail, it truncates the tables named in `@pytest.mark.concurrency(...)` and then checks
+that **every** table is empty: a test that left rows elsewhere fails with the table's name (and
+the rows are removed, so later tests start clean). Truncating cascades along foreign keys, so
+naming a parent (`workspace`) also empties the tables that reference it. Helpers in
+`tests/support/concurrency.py`:
+
+- `committing_factories(concurrency)`: factories inside it write through a session that commits
+  on exit, for committed parents (`async with committing_factories(concurrency): project = await
+  ProjectFactory.create_async()`).
+- `run_in_parallel(concurrency, n, work)`: runs `work(session, index)` in `n` (up to 20)
+  transactions that are all open before any work starts (a start barrier), commits each, and
+  returns the results in order; the section fails with `TimeoutError` after 10 seconds.
+- `wait_until_blocked_on_a_lock(engine, pid)`: for a test that needs one transaction to be
+  waiting on another's lock before it continues.
+
+Sabotage-check a race test against a non-atomic version of the code (`test-writer` skill): the
+allocation tests fail against a read-then-write allocator.
 
 ```python
 @pytest.mark.concurrency("procrastinate_jobs", "procrastinate_workers")

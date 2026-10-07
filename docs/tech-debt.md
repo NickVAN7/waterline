@@ -77,10 +77,10 @@ Entry format:
 - **Why:** These are best designed with the first real race test, so they fit what it needs
   and can be sabotage-checked against it (a non-atomic allocation must fail the test).
 - **Fix by:** Slice 1, the checkpoint that adds `allocate_number` and its concurrency tests.
-- **Status:** open. Partly done: real commits and cleanup of named tables (S0-C4); one
-  race test pattern, `wait_until_blocked_on_a_lock` plus a time limit, used by the
-  optimistic-locking race test (S0-C5), which covers items 1 and 5 for that single case. The
-  general `run_in_parallel(n, fn)` helper, pool sizing, factories, and cleanup safety remain.
+- **Status:** resolved in S1-C2 (`run_in_parallel` with a start barrier and a time limit; a
+  concurrency engine with a 25-connection pool and `lock_timeout`; `committing_factories`; an
+  empty-tables check after every concurrency test, with a wiring test run in its own pytest
+  process; the allocation race tests fail against a read-then-write allocator)
 
 ### TD-5: Factories generate random strings, not realistic fake values
 - **Added:** S0-C2
@@ -243,4 +243,15 @@ Entry format:
   deployment moves later): migrations run as the owner, the app as a role with only data rights
   on the app's tables (no `ALTER`, `DROP`, or `TRUNCATE`), with a test that the app's role can't
   disable the trigger.
+- **Status:** open
+
+### TD-18: No property-based test for number allocation yet
+- **Added:** S1-C2
+- **What:** `testing-strategy.md` ("Specialized tests") calls for a Hypothesis property:
+  "any interleaving of allocations yields unique, increasing numbers". S1-C2's allocation
+  tests are example-based (sequential, per prefix, per project, rollback) plus the parallel
+  race tests.
+- **Why:** Hypothesis isn't a dependency yet; S1-C3 adds it (with the pure rules).
+- **Fix by:** S1-C3: a Hypothesis property over sequences of (project, prefix) allocations,
+  each sequence numbered 1, 2, 3, … per (project, prefix).
 - **Status:** open
