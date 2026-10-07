@@ -216,3 +216,13 @@ Entry format:
   whichever comes first; re-target if both move later): upgrade the plan (or make the
   repository public) and require the CI check (`wl check`) on `main`, with no direct pushes.
 - **Status:** open
+
+### TD-16: The service-layer contract doesn't list `my_work`
+- **Added:** journey decisions (Oct 7, 2026)
+- **What:** The build plan's layer table puts the new `my_work` read area in layer 1, but the
+  import-linter contract "Service layers" in `backend/pyproject.toml` doesn't list
+  `(my_work)`, so a `services/my_work.py` would have no layer rule.
+- **Why:** The journey-decision pass was docs-only; no code or configuration changed.
+- **Fix by:** S1-C11 (when the `my_work` area is built): add `(my_work)` to the contract's
+  layer-1 entry.
+- **Status:** open
