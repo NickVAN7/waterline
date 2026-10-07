@@ -41,7 +41,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   `flush()`; nothing else commits. Endpoints get their session through `SessionDep`;
   `SessionMakerDep` is only for work that must stay outside the request transaction (the health
   check). Never make `get_session` swallow a failed transaction: a request that can't commit
-  must fail.
+  must fail. The only savepoint-and-continue allowed is the `my_work` service's read-only
+  per-section query (build plan, "Backend architecture", Transactions): `begin_nested()`,
+  catching database errors only.
 - **Order of every protected mutation:** `Origin` check → JSON-only check (requests with a
   body) → authenticate → `authorize()` → change → `log_change()` (and `log_admin_event()`
   for admin and security actions) → commit (design-doc §4, §5, §10.1).

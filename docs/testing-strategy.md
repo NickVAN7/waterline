@@ -137,12 +137,13 @@ tested, what each kind of test is for, and the gates every change passes.
     admin, and owner; workspace member, admin, and owner; plus system admin and users with no
     access. Inherited project admin (org and workspace owners/admins, system admins) is tested
     on its own rows, and so is its absence for org and workspace members.
-  - Project creation (design-doc §5, "Org roles"): allowed to org members, admins, and owners
-    (and so to workspace owners/admins and system admins); denied to users whose only link to
-    the org is a project membership (staff or client; open question in design-doc §15), to
-    workspace members with no role in the org, and (404) to users of another org. The creator
-    gets a `project_membership` with role admin and becomes the lead. Editing the project's
-    description, status, and lead is a project-admin action.
+  - Project creation (design-doc §5, "Org roles"): allowed to org members, admins, and owners (and
+    so to workspace owners/admins and system admins); denied to users whose only link to the org is
+    a project membership (staff or client), to workspace members with no role in the org, and (404)
+    to users of another org. The first admin (the creator, or someone an org owner/admin names) gets
+    a `project_membership` with role admin and becomes the lead; naming another first admin is
+    denied to a plain org member. Editing the project's description, status, and lead is a
+    project-admin action.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
     included) and every project role denied, the relationship rule allowing it only for a user
     with content access to the project, and the relationship without that access denied.
@@ -159,14 +160,20 @@ tested, what each kind of test is for, and the gates every change passes.
     its categories are always a superset of the project's.
   - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;
     list endpoints return only the user's accessible projects and orgs.
-  - Account actions (deactivate, reactivate, reset password, sign out everywhere, and an
-    admin changing another user's email, name, or username; the email change refuses the
-    actor's own account) follow the rank rule (design-doc §4), tested on both sides of each
-    boundary: same rank allowed, higher rank or a membership outside the actor's scope denied,
-    and a user with no memberships denied to org admins.
+  - Account actions (deactivate, reactivate, reset password, sign out everywhere, and an admin
+    changing another user's email, name, or username; the email change refuses the actor's own
+    account and ends the target's sessions) follow the rank rule (design-doc §4), tested on both
+    sides of each boundary: same rank allowed, higher rank or a membership outside the actor's scope
+    denied, and a user with no memberships denied to org admins.
   - Project membership: adding by user ID someone outside the project org's members and the
     workspace's staff returns 404 (the email path follows design-doc §4); removing a membership ends access on the user's next request.
   - Workspace pages return 404 to everyone but workspace owners/admins and system admins.
+  - Access review (design-doc §5): the per-project view only for project admins (including
+    inherited); the per-person view for workspace owners/admins and system admins, for org
+    owners/admins only within their rank scope, and for the user themselves; everyone else 404.
+  - My work (design-doc §11) shows only the user's accessible projects, never an archived
+    one, and leaves out export-controlled content without an explicit membership; a section
+    whose query fails is returned as unavailable while the others still return.
   - Adding by email reveals at most whether an account exists, never its org or workspace;
     an existing account from another org is added to the project's org and the project only
     after confirmation.

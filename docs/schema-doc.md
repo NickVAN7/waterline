@@ -89,6 +89,7 @@ erDiagram
   SPRINT |o--o{ TEST_RUN : "tested in"
   MILESTONE |o--o{ TEST_RUN : "tested for"
   TEST_RUN ||--o{ TEST_RESULT : records
+  TEST_RUN |o--o{ TEST_RUN : "re-run as"
   TESTCASE ||--o{ TEST_RESULT : "executed as"
   TASK |o--o{ TEST_RESULT : "bug for"
   USER |o--o{ TEST_RESULT : "assignee / executor"
@@ -304,6 +305,7 @@ erDiagram
     uuid milestone_id FK
     varchar environment
     varchar commit_sha
+    uuid source_run_id FK
     varchar status
   }
   TEST_RESULT {
@@ -509,7 +511,7 @@ installations moved to `github_installation` (an org can have several).
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| email | varchar | unique; stored lowercase (`CHECK (email = lower(email))`); changed only by admins, under the rank rule (design-doc §4); users can't change their own in v1 |
+| email | varchar | unique; stored lowercase (`CHECK (email = lower(email))`); changed only by admins, under the rank rule, which signs the user out everywhere (design-doc §4); users can't change their own in v1 |
 | username | varchar | unique app-wide; same format as slugs (lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter), but the reserved-route list doesn't apply (`rules/identifiers.py`); changeable by the user, and by admins under the rank rule |
 | name | varchar | display name; changeable by the user, and by admins under the rank rule |
 | hashed_password | varchar | required (email/password is the primary sign-in) |
@@ -544,10 +546,11 @@ Last active system admin cannot be deactivated or have the flag revoked (service
 | expires_at | timestamptz | |
 | created_at / updated_at | timestamptz | |
 
-Deleted on sign-out, deactivation, admin password reset, "sign out everywhere", and (other
-sessions) on password change. Removing a membership leaves sessions alone: every request
-re-checks memberships (design-doc §4, "Sessions"). Session-ending account actions run in the
-`auth` area, which owns this table.
+Deleted on sign-out, deactivation, admin password reset, "sign out everywhere", an admin changing
+the user's email, and (other sessions) on password change. Removing a membership leaves sessions
+alone: every request re-checks memberships (design-doc §4, "Sessions"). Session-ending account
+actions run in the `auth` area, which owns this table; an email change runs in the `user` area and
+ends sessions through the handler `auth` registers with it (build plan, "Feature map").
 
 ### `membership`
 | Field | Type | Notes |
@@ -572,7 +575,7 @@ re-checks memberships (design-doc §4, "Sessions"). Session-ending account actio
 | description | text, nullable | plain text |
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | status | enum: planning / active / on_hold / completed / cancelled | NOT NULL, default `planning`; informational only: gates nothing, separate from `archived_at` (design-doc §1.1, §7); changed by project admins |
-| lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check); defaults to the creator; cleared in the same transaction when that membership is removed (design-doc §1.1) |
+| lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check; otherwise a 422 field error); defaults to the first admin; cleared in the same transaction when that membership is removed, recorded in `project_member_removed` (design-doc §1.1) |
 | enabled_modules | text[] | seeded from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
 | classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; null = unclassified; the floor for the project's items (design-doc §3.1) |
 | classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
@@ -597,7 +600,8 @@ but see content only with an explicit membership (design-doc §3.1; the gate is 
 Changes to the name, description, type, status, lead, and modules are recorded in
 `project_updated` (old and new values in its details).
 No visibility flag: access is always explicit project membership (plus inherited admin). The
-creator gets a `project_membership` with role admin (design-doc §5, "Org roles").
+project's first admin (the creator by default, or someone an org owner/admin names) gets a
+`project_membership` with role admin (design-doc §5, "Org roles").
 
 ### `project_membership`
 | Field | Type | Notes |
@@ -867,6 +871,7 @@ non-`not_run` `test_result`. **No `requirement_id`** — links live in `requirem
 | milestone_id | UUID (FK → milestone), nullable | |
 | environment | varchar, nullable | "staging", "local", … |
 | commit_sha | varchar, nullable | code under test |
+| source_run_id | UUID (FK → test_run), nullable | the run whose failed cases this run re-runs (design-doc §8); same project |
 | status | enum: planned / in_progress / completed / cancelled | cancelled: abandoned; left out of metrics |
 | created_by | UUID (FK → user) | |
 | started_at / completed_at | timestamptz, nullable | |
@@ -895,7 +900,9 @@ pending one. Test runs are never deleted in v1; an abandoned run is cancelled (d
 case is deleted (design-doc §9). Index on `(testcase_id, executed_at DESC)` for computing
 current status; `ix_test_result_assignee_id_status` on `(assignee_id, status)` for My work
 (`not_run` results assigned to the user; design-doc §11). Re-running failed cases inserts new
-`not_run` rows in a new run; earlier results are never overwritten (design-doc §8).
+`not_run` rows in a new run; earlier results are never overwritten by a re-run (design-doc
+§8). A result can be corrected while its run is `planned` or `in_progress`; each `status` and
+`actual_result` change is logged in `activity_log` (design-doc §8, §10).
 
 ---
 
@@ -948,7 +955,7 @@ approved or rejected (a personal action: no admin or system-admin override, desi
 |---|---|---|
 | id | UUID (PK) | |
 | project_id | UUID (FK → project) | NOT NULL |
-| entity_type | enum: requirement / task / testcase / phase / milestone / approval_request | approval requests log `created`, every `status` change, and `approver_id` when an approver is replaced |
+| entity_type | enum: requirement / task / testcase / phase / milestone / approval_request / test_result / project | projects log only `status` and `lead_id` changes (from Slice 2; their other changes are admin audit events); test results log `status` and `actual_result` changes (Slice 5; design-doc §8, §10); approval requests log `created`, every `status` change, and `approver_id` when an approver is replaced |
 | entity_id | UUID | polymorphic, no FK (log outlives its subject) |
 | action | enum: created / updated / deleted / restored / linked / unlinked | |
 | field_changed | enum, nullable | required when `action = updated`; values below |
@@ -962,7 +969,7 @@ approved or rejected (a personal action: no admin or system-admin override, desi
 `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`, `start_date`, `end_date`,
 `due_date`, `target_date`, `baseline_start`, `baseline_end`, `baseline_date`, `requirement_id`,
 `parent_requirement_id`, `time_estimate`, `approved_revision_id`, `approver_id`,
-`classification_level`, `classification_categories`.
+`classification_level`, `classification_categories`, `lead_id`, `actual_result`.
 `CHECK (action <> 'updated' OR field_changed IS NOT NULL)`.
 Indexes: `(entity_type, entity_id, id)` for item history; `(project_id, id)` for the project
 feed. Feeds page by `id` (UUIDv7, increasing in creation order), not by `changed_at`, which is
@@ -983,25 +990,28 @@ for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | action-specific values (old/new role, old/new name or slug, old/new email; for `user_updated`, the changed fields; for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation); never passwords, hashes, or tokens |
+| details | jsonb | action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, whether it cleared the project's lead); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 
 `action` values: `workspace_created`, `user_created`, `user_deactivated`, `user_reactivated`,
-`password_reset`, `password_changed`, `signed_out_everywhere`, `username_changed`,
-`email_changed`, `user_updated`, `system_admin_granted`, `system_admin_revoked`,
-`workspace_updated`, `workspace_member_added`,
+`password_reset`, `password_changed`, `signed_out_everywhere`, `user_updated` (every profile
+edit, by the user or an admin: one event per request), `system_admin_granted`,
+`system_admin_revoked`, `workspace_updated`, `workspace_member_added`,
 `workspace_member_role_changed`, `workspace_member_removed`, `org_created`, `org_updated`,
 `org_member_added`, `org_member_role_changed`, `org_member_removed`, `project_created`,
 `project_updated`, `project_archived`, `project_unarchived`, `project_classification_changed`,
 `project_member_added`,
 `project_member_role_changed`, `project_member_removed`.
-Indexes: `(workspace_id, id)`, `(organization_id, id)`, `(target_user_id, id)`. The feed pages
+Indexes: `(workspace_id, id)`, `(organization_id, id)`, `(project_id, id)` (project admins'
+reads), `(target_user_id, id)`; all ship with the table in Slice 1. The read rules are built
+with the audit-event screen (design-doc §4, "Before the first non-local deployment"). The feed pages
 by `id`, not `occurred_at`, as for `activity_log`; `occurred_at` is for display.
 Append-only: `updated_at` never moves from `created_at`.
 **Write path:** only via `log_admin_event(...)`, in the same transaction as the change
 (design-doc §10.1). Visible to system admins, workspace owners/admins (their workspace), and
-org owners/admins (their org); never to project members.
+org owners/admins (their org), and project admins, including inherited (their project); never
+to other project members.
 
 ---
 

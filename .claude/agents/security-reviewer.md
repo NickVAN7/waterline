@@ -38,7 +38,9 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    - cookie is `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`;
    - a fresh token at every sign-in; password change replaces the current token and deletes the
      user's other sessions; deactivation, admin password reset, and "sign out everywhere" delete
-     all the user's sessions (all run in the `auth` area); removing a membership leaves sessions
+     all the user's sessions (all run in the `auth` area); so does an admin changing the user's
+     email, which runs in the `user` service and deletes them through the `on_email_changed`
+     handler `auth` registers, in the same transaction (check that path too); removing a membership leaves sessions
      alone, so every request must re-check memberships in `authorize()`;
    - idle and absolute expiry enforced server-side on every request;
    - `must_change_password` blocks everything except `GET /api/auth/me`, change-password, and
