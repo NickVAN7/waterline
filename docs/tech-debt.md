@@ -210,11 +210,11 @@ Entry format:
 
 ### TD-15: No branch protection on `main`
 - **Added:** S0-C8
-- **What:** Before the owner's S0-C8 decision, the build plan (S0-C8 row) and testing strategy
-  called for branch protection, so nothing merges to `main` without green CI. GitHub offers
-  branch protection and rulesets on a private repository only with a paid plan (the API answers
-  "Upgrade to GitHub Pro or make this repository public"), so `main` is unprotected: CI runs on
-  every push and PR, but a red PR can still be merged, and `main` can be pushed to directly.
+- **What:** `main` has no branch protection, so nothing enforces that only a green slice PR
+  merges into it (build plan, "Pull requests": one branch and draft PR per slice, merged with a
+  merge commit). GitHub offers branch protection and rulesets on a private repository only with
+  a paid plan (the API answers "Upgrade to GitHub Pro or make this repository public"): CI runs
+  on every push and PR, but a red PR can still be merged, and `main` can be pushed to directly.
 - **Why:** Owner decision (S0-C8): defer rather than upgrade or make the repository public.
   The pull-request workflow (build plan, "Pull requests") checks CI by hand before merging.
 - **Fix by:** Slice 7 (before a second contributor or the first non-local deployment,

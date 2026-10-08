@@ -5,7 +5,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
 > **Status:** S1-C4 (API conventions) done, closing the `s1-foundations` group; next is S1-C5
-> (Sessions & sign-in), on the `s1-auth` branch. The tenancy, project, and audit tables exist
+> (Sessions & sign-in), on the `s1` branch (one branch and PR for the rest of Slice 1). The tenancy, project, and audit tables exist
 > (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
 > the domain enums in `app/enums.py`, get-by-ID in the base repository, and
 > `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure
@@ -757,15 +757,18 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
 
 - Work proceeds one **checkpoint** at a time (`build-plan.md`), one commit per checkpoint,
   closed out with the `checkpoint` skill.
-- **Pull requests:** checkpoints land on `main` in groups, one PR per group (build plan, "Pull
-  requests"; each slice's section lists its groups). A group works on its own branch
-  (`s1-foundations`, …); push after every checkpoint commit (the group's first checkpoint opens
-  the PR as a draft), and once the owner approves the group's last checkpoint, merge with
-  **rebase and merge**, never squash: `main` keeps one `checkpoint(<ID>):` commit per
-  checkpoint, which the docs consistency tests read. Pushed commits are never rewritten (no
-  amend or force-push): red CI on a pushed checkpoint is fixed with a `fix(<ID>): …` commit.
-  `main` isn't protected yet (TD-15), so check CI before merging: `gh pr checks <number>`.
-  The practice starts with Slice 1.
+- **Pull requests:** each slice works on one branch, `s<n>` (e.g. `s1`), with one draft PR
+  opened at the branch's first push (build plan, "Pull requests"). Push after every checkpoint
+  commit, so CI runs on each; only finished commits are pushed. Groups (each slice's section
+  lists them) are review points, not branches. Design changes from chat are `docs:` commits on
+  the slice branch. Pushed commits are never rewritten (no amend, rebase, or force-push): red
+  CI on a pushed checkpoint is fixed with a `fix(<ID>): …` commit. At the end of the slice,
+  once the owner approves its last checkpoint and says so, mark the PR ready and merge it with
+  a **merge commit**: `gh pr merge --merge --delete-branch`, never squash or rebase. A merge
+  commit keeps every commit's hash (so review records' base commits stay valid), and `main`
+  keeps one `checkpoint(<ID>):` commit per checkpoint in its history, which the docs
+  consistency tests read. `main` isn't protected yet (TD-15), so check CI before merging:
+  `gh pr checks <number>`.
 - **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check` on every push to
   `main` and every pull request, so a green `wl check` locally means a green run there. It
   checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the

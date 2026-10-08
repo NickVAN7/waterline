@@ -62,23 +62,30 @@ minutes. The next checkpoint starts only after the current one is approved.
 6. **Review record** (`docs/reviews/<ID>.md`, e.g. `S0-C1.md`): every reviewer pass with its
    verdict, findings, and the resolution of each, plus open questions and owner decisions.
 
-### Pull requests (owner decision, S0-C8)
-Checkpoints land on `main` in **groups**, one pull request per group; each slice's section lists
-its groups. The practice starts with Slice 1; Slice 0's checkpoints, S0-C8 included, were
-committed directly to `main` (S0-C8's CI was proven on a trial PR, #1, closed unmerged).
-- A group works on one branch from `main`, named `s<slice>-<group>` (e.g. `s1-foundations`).
-  Each checkpoint is still one commit, approved by the owner before the next begins.
-- After each checkpoint's commit, the branch is pushed; the group's first checkpoint opens the
-  PR as a draft. CI runs on every push and must be green before the checkpoint goes to the
-  owner. Only finished checkpoint commits are pushed, never work in progress.
-- **Pushed history is never rewritten** (owner decision, S0-C8): no amend, rebase, or force-push
-  of a pushed commit. A checkpoint whose pushed commit turns CI red is fixed with a follow-up
-  commit, `fix(<ID>): <what>`, before it goes to the owner; it is the only exception to one
-  commit per checkpoint.
-- When the owner approves the group's last checkpoint, and only on their say-so, the PR is
-  merged with **rebase and merge**, never squash, so `main` keeps one `checkpoint(<ID>):`
-  commit per checkpoint (the docs consistency tests read them). The branch is then deleted.
-- Changes made outside a checkpoint (e.g. `docs:` design changes) go through a PR too.
+### Pull requests
+Each slice works on **one branch and one draft pull request** (DL-9). Slice 0's checkpoints
+were committed directly to `main`; Slice 1's group 1 (S1-C1 to S1-C4) landed through its own
+PR (`s1-foundations`); the slice branch starts with S1-C5.
+- **One branch per slice**, named `s<n>` (e.g. `s1`), from `main`. Each checkpoint is still one
+  commit.
+- **One draft PR per slice**, opened right after the branch's first push, so CI runs on every
+  push. The branch is pushed after every checkpoint commit, and CI must be green before the
+  checkpoint goes to the owner. Only finished commits are pushed, never work in progress.
+- **Groups** (each slice's section lists them) are review points and the boundaries where
+  design changes apply ("Design changes outside a checkpoint" below). They don't get their own
+  branch or PR.
+- **Design changes** from chat are `docs:` commits on the slice branch, in the slice's PR (the
+  `design-change` skill).
+- **Pushed history is never rewritten:** no amend, rebase, or force-push of a pushed commit. A
+  checkpoint whose pushed commit turns CI red is fixed with a follow-up commit,
+  `fix(<ID>): <what>`, before it goes to the owner; it is the only exception to one commit per
+  checkpoint.
+- **Merge at the end of the slice only:** after the owner approves the slice's last
+  checkpoint, and only on their say-so, the PR is marked ready and merged with a **merge
+  commit** (`gh pr merge --merge --delete-branch`), never squash or rebase. A merge commit keeps
+  every commit's hash, so the base commits in the review records stay valid, and `main` keeps
+  one `checkpoint(<ID>):` commit per checkpoint in its history (the docs consistency tests read
+  them).
 - GitHub doesn't enforce this yet: branch protection needs a paid plan for a private
   repository (TD-15). Until then, check CI by hand before merging (`gh pr checks`).
 
@@ -94,10 +101,32 @@ committed directly to `main` (S0-C8's CI was proven on a trial PR, #1, closed un
 3. **Owner approval:** the review note, the reviewer's findings, and their resolution go to
    the project owner, who signs off before the next checkpoint.
 
+**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10)** (DL-10). A trial, not yet the
+rule; every other checkpoint keeps the full stop for approval.
+- **S1-C8 and S1-C9 auto-continue:** after its report, the session goes straight on to the next
+  checkpoint, without stopping for approval, only if **all** of these hold:
+  - `wl check` and CI are green;
+  - every reviewer that ran returned no findings, or only findings that were **fixed** (none
+    logged as tech debt, none rejected);
+  - there are no open questions, no `docs-consistency` Decisions, and no deviations from the
+    docs in the review note.
+
+  If any of them fails, the checkpoint stops as usual.
+- **S1-C10 is a full stop for the whole group:** its report covers S1-C8 to S1-C10, with links
+  to the three review records and the group's diff range, and the owner reviews all three.
+- **What counts as failure:** the trial fails if the owner finds at the group review anything
+  in S1-C8 or S1-C9 that should have stopped it (a defect, a scope miss, or doc drift the
+  reviewers didn't flag), or if a later checkpoint has to rework their output. The owner
+  records the verdict at the group review and again in the slice retro (S1-C17); either way it
+  gets a decision-log entry.
+
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
 the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
-`CLAUDE.md` file, and `.claude/` file against the others.
+`CLAUDE.md` file, and `.claude/` file against the others. The slice's last checkpoint ends with
+a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
+skills and agents never triggered, and the verdict of any process trial. The owner decides what
+changes; each change gets a decision-log entry.
 
 **Design changes outside a checkpoint** (decisions from a chat session, or code that must differ
 from the docs) go through the `design-change` skill (DL-8). They apply at group boundaries
@@ -131,11 +160,8 @@ Everything lives in the repository, version-controlled and present on every work
     section names the checkpoint for it or the diff touches security-relevant code, and at the
     end of a slice `fresh-clone-verifier`, plus `docs-consistency` after `checkpoint-reviewer`;
   - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
-  - one commit with the review note;
-  - the list of changed docs and Claude files for the owner to upload to the Project, copied
-    into the owner's `waterline-project-upload` folder on their desktop, outside the
-    repository (Claude never writes to the Project);
-  - stopping for approval.
+  - one commit with the review note, pushed to the slice branch;
+  - the report, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   alongside `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
   when a checkpoint touches auth, sessions, authorization, routers, rendered markdown, or
@@ -166,6 +192,19 @@ Everything lives in the repository, version-controlled and present on every work
   generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`) and committed
   migrations; format each file after Claude edits it (ruff for the backend, Prettier for the
   frontend).
+
+### Workflow items scheduled
+Workflow items decided but not built yet, each built through the `design-change` skill or the
+named checkpoint when its trigger arrives.
+
+| Trigger | Item |
+|---|---|
+| After S1-C7 is approved (end of the `s1-auth` group) | The owner decides whether to pull sign-in and the app shell (part of S1-C14) forward, so a real screen uses the API conventions sooner |
+| Before S1-C14 | A short UI design guide (`frontend/CLAUDE.md` or a new doc; decided then); demo seed data (`wl seed --demo`), added right before the checkpoint; the `ui-reviewer` agent (read-only: accessibility and frontend conventions axe can't catch, run on S1-C14 to S1-C16) |
+| After S1-C14 | The `vue-screen` skill, distilled from S1-C14's hand-built screens |
+| S1-C17 | The `user-guide-verifier` agent (follows `docs/user-guide.md` literally in a browser against a seeded stack, and walks the "Done when" list) |
+| Start of Slice 2 planning | A slice-planning procedure: the format used for Slice 1's plan (fixes, decisions, conventions), plus a short threat-model pass |
+| Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
 
 ### Where the work happens
 Code is written and run on the owner's workstation(s) in the `waterline` repository (the
@@ -207,7 +246,7 @@ slices only add features.
 
 | # | Checkpoint | Includes |
 |---|---|---|
-| 1 | Foundation & guardrails | Repo root, `docs/` (design, schema, build plan, testing strategy, empty developer/user guides, tech-debt log), `CLAUDE.md` files (root, backend, frontend), `checkpoint-reviewer` agent and `checkpoint` skill in `.claude/` (from the Project's `repo-seed/` drafts), uv project and Python version check, ruff/pyright, pre-commit hooks, FastAPI skeleton with `/api/health`, layer folders, import-linter contracts (enforced from the start), developer CLI (`waterline` / `wl`) with its first commands and `doctor`, workstation toolchain check |
+| 1 | Foundation & guardrails | Repo root, `docs/` (design, schema, build plan, testing strategy, empty developer/user guides, tech-debt log), `CLAUDE.md` files (root, backend, frontend), `checkpoint-reviewer` agent and `checkpoint` skill in `.claude/`, uv project and Python version check, ruff/pyright, pre-commit hooks, FastAPI skeleton with `/api/health`, layer folders, import-linter contracts (enforced from the start), developer CLI (`waterline` / `wl`) with its first commands and `doctor`, workstation toolchain check |
 | 2 | Database core & test harness | `docker-compose.yml` with the `postgres` service only (dev and test databases, named volume, `.env.example`), `wl up`/`wl down`, Async engine and session, per-request transaction dependency, base model (UUIDv7, timestamps), constraint naming convention, Alembic (async), pytest + anyio harness with savepoint rollback, polyfactory with fixed seed, `/api/health` checks the database, API docs setting (on in dev/test, off in production) |
 | 3 | procrastinate spike | Decision point: can jobs be queued inside the request's `AsyncSession` transaction? Result and consequences written into the design doc |
 | 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 (design-doc §13, "Transactional enqueue": enqueue on the caller's session, by task name) |
@@ -284,8 +323,7 @@ The sections below describe the content; the table above is the order of work.
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
 │                                 tech-debt.md, decision-log.md, screen-inventory.md, reviews/
 │                                 (one record per checkpoint), spikes/ (spike code kept as
-│                                 evidence)
-│                                 (source of truth; the owner uploads changed files to the Project)
+│                                 evidence); the source of truth (DL-14)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
 ├── docker/postgres/initdb/       first-start scripts for postgres (creates the test database)
@@ -713,15 +751,17 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; My work as the home page, with its projects section (design-doc §11); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
 | 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners); the per-person access review; org settings; org members page (email-first add-person form with a generated temporary password shown once, role changes, account actions, the D2 removal dialog) |
 | 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, description, module selection with guidance, and a first-admin picker shown only when the org's entry in `/me` includes `project.assign_first_admin`); project settings (description, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged); the per-project access review; classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
-| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision) |
+| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
 
-**Pull requests** ("Development process"): five groups, each one PR.
+**Groups** ("Pull requests"): five review points. Group 1 landed as its own PR
+(`s1-foundations`); from Checkpoint 5 the slice works on the `s1` branch, with one PR for the
+rest of the slice.
 
-| PR | Branch | Checkpoints |
+| Group | Name | Checkpoints |
 |---|---|---|
 | 1 | `s1-foundations` | 1–4 (models, numbering, pure rules, API conventions) |
 | 2 | `s1-auth` | 5–7 (sessions, passwords and CLI, authorization core) |
-| 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions) |
+| 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
 | 4 | `s1-projects` | 11–13 (projects, project members, classification) |
 | 5 | `s1-web` | 14–17 (web screens and slice verification) |
 

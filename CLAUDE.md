@@ -50,17 +50,20 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - Do only the current checkpoint's scope. Anything else goes in `docs/tech-debt.md` or is raised
   with the owner.
 - Never start work while anything is red, and never start the next checkpoint without the
-  owner's explicit approval.
+  owner's explicit approval. One exception, a trial: S1-C8 and S1-C9 go straight on to the next
+  checkpoint when every condition in the build plan's review-tier trial holds ("Verification";
+  the `checkpoint` skill, "Report and stop").
 - Finish every checkpoint with the `checkpoint` skill (gates → docs → independent review by the
   `checkpoint-reviewer` agent, plus the other reviewers when they apply → review record in
-  `docs/reviews/<ID>.md` → commit → upload list for the owner → report → stop).
+  `docs/reviews/<ID>.md` → commit → push → report → stop).
 - One commit per checkpoint. The docs, tests, and tech-debt log change in the same commit as the
   code they describe.
-- Checkpoints land in groups, one PR per group, on the group's branch (build plan, "Pull
-  requests"). Push after every checkpoint commit (never work in progress, and never rewrite a
-  pushed commit: fix red CI with a `fix(<ID>):` commit); CI must be green before review is
-  reported.
-  Merge (rebase and merge, never squash) only when the owner says so.
+- Each slice works on one branch, `s<n>`, with one draft PR (build plan, "Pull requests");
+  groups are review points. Push after every checkpoint commit (never work in progress, and
+  never rewrite a pushed commit: fix red CI with a `fix(<ID>):` commit); CI must be green
+  before review is reported. Design changes are `docs:` commits on the slice branch. The PR is
+  merged at the end of the slice, with a merge commit (never squash or rebase), only when the
+  owner says so.
 - A shortcut is allowed only if it's logged in `docs/tech-debt.md` with its reason and target.
 
 ## Always

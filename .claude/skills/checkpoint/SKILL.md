@@ -77,7 +77,7 @@ For each finding from every reviewer that ran, exactly one of:
 - **Rejected:** only when the finding is factually wrong; record the evidence.
 
 `docs-consistency` **Fixes** are resolved the same way. Its **Decisions** are not yours to
-resolve: leave them undecided and put them in the report (step 8) for the owner.
+resolve: leave them undecided and put them in the report (step 7) for the owner.
 
 If fixes changed behavior (not just docs or tests), run the reviewer again on the fixes.
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
@@ -98,9 +98,8 @@ may be left open past its Fix by: the docs consistency tests fail on it after th
 
 ## 6. Commit and push
 
-Work on the checkpoint's group branch (`docs/build-plan.md`, "Pull requests"; the slice's
-section lists the groups), never on `main` (from Slice 1; Slice 0 landed on `main`). One commit
-for the whole checkpoint, with this message:
+Work on the slice's branch, `s<n>` (`docs/build-plan.md`, "Pull requests"), never on `main`.
+One commit for the whole checkpoint, with this message:
 
 ```
 checkpoint(<ID>): <checkpoint name>
@@ -123,32 +122,17 @@ Next: <next checkpoint ID and name>
 ```
 
 Then:
-- Push the branch. At the group's first checkpoint, open the group's PR as a draft
-  (`gh pr create --draft`, titled with the group, listing its checkpoints).
+- Push the branch. At the branch's first push, open the slice's PR as a draft
+  (`gh pr create --draft`, titled with the slice, listing its groups).
 - Push only the finished checkpoint commit, never work in progress. Wait for CI on it
   (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
   report. Never report a checkpoint whose CI isn't green.
-- Never merge. At the group's last checkpoint, the owner's approval decides the merge
-  (rebase and merge, never squash); merge only when they say so.
+- Never merge. At the slice's last checkpoint, the owner's approval decides the merge: on their
+  say-so, mark the PR ready and merge it with a merge commit
+  (`gh pr merge --merge --delete-branch`), never squash or rebase.
 
-## 7. Prepare the Project upload
-
-Claude Code can't write to the claude.ai Project, so the owner uploads changed files by hand.
-
-- List every file this commit changed or added that the Project keeps a copy of:
-  `git diff --name-only <base>..HEAD -- docs CLAUDE.md backend/CLAUDE.md frontend/CLAUDE.md .claude`.
-  Files under `docs/` go to the Project under the same path; `CLAUDE.md` files and `.claude/`
-  go under `repo-seed/` (same relative path).
-- Copy them into the owner's upload folder, `waterline-project-upload` on their Windows desktop
-  (from WSL: `/mnt/c/Users/Nick/Desktop/waterline-project-upload`), laid out as they go in the Project (`docs/…`,
-  `repo-seed/…`), so the owner can upload them together. It's outside the repository, so
-  nothing in it is ever committed. If the folder doesn't exist, ask the owner; don't create it
-  elsewhere. Overwrite files already there but don't delete others: the owner may not have
-  uploaded them yet. The owner empties the folder after uploading.
-- Never say the Project was updated: it wasn't.
-
-## 8. Report and stop
+## 7. Report and stop
 
 Send the owner:
 - the review note (the commit message body);
@@ -156,10 +140,21 @@ Send the owner:
   the resolution of each finding (as recorded in `docs/reviews/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review;
-- the Project upload list from step 7 (each file, whether it's new or changed, and the folder
-  it was copied to);
-- the PR link and its CI result, and whether this checkpoint ends the group (so the PR is
-  ready to merge on approval);
+- the PR link and its CI result, and whether this checkpoint ends its group (a review point)
+  or the slice (so the PR is ready to merge on approval);
+- **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
+  the owner, which skills and agents never triggered, and the verdict of any process trial.
+  The owner decides what changes; each change gets a decision-log entry;
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.
+
+**Review-tier trial** (`docs/build-plan.md`, "Verification"; S1-C8 to S1-C10 only):
+- **S1-C8 and S1-C9:** after sending the report, go straight on to the next checkpoint without
+  stopping, only if **all** of these hold: `wl check` and CI are green; every reviewer that ran
+  returned no findings, or only findings that were **fixed** (none logged, none rejected); and
+  there are no open questions, no `docs-consistency` Decisions, and no deviations from the docs
+  in the review note. Say in the report that it auto-continued and why. If any condition
+  fails, stop as usual.
+- **S1-C10:** a full stop for the whole group. The report covers S1-C8 to S1-C10, with links to
+  the three review records and the group's diff range (`<S1-C7 commit>..<S1-C10 commit>`).
