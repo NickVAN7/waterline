@@ -15,7 +15,7 @@ MIN_NODE = (22, 18)  # frontend/package.json "engines"
 MIN_GIT = (2, 31)  # rev-parse --path-format
 MIN_DOCKER = (20, 10)
 MIN_COMPOSE = (2, 20)
-MIN_UV = (0, 8)
+MIN_UV = (0, 12)  # `uv audit` (wl audit); experimental, so the version it was tested on
 
 
 class Status(StrEnum):

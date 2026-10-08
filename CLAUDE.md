@@ -33,7 +33,11 @@ Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <
 - `wl up` / `wl down` — the Docker Compose stack (`wl up` also applies migrations);
   `wl logs [service]`
 - `wl check` — everything CI runs (lint, types, tests, coverage, import rules, migrations,
-  client freshness, mutation testing). Must pass before any checkpoint goes to review.
+  client freshness, mutation testing, and `wl audit`). Must pass before any checkpoint goes to
+  review.
+- `wl audit` — supply-chain gates: known vulnerabilities in the Python and npm dependencies,
+  and secrets in the git history (needs the network). A red audit is fixed before any
+  checkpoint starts, with a `chore(deps):` commit on the slice branch.
 - `wl test`, `wl lint`, `wl fmt` — both halves; scope with `wl backend <cmd>` or
   `wl frontend <cmd>`; `wl backend mutate` runs mutation testing on `app/rules/` and `app/authz/`
 - `wl migrate`, `wl backend migration "<message>"` — Alembic

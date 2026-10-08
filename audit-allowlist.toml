@@ -1,0 +1,15 @@
+# Advisories `wl audit` ignores (docs/developer-guide.md, section 3; DL-13). Any known
+# vulnerability fails the audit unless an entry here names it, says why, and points to a
+# tech-debt entry whose Fix by is the deadline (the docs consistency tests fail an overdue or
+# resolved one). Remove the entry when the fix lands.
+#
+# [[python]]  (uv audit; an alias such as a CVE or PYSEC ID also matches)
+# [[npm]]     (npm audit; the GitHub advisory ID, GHSA-...)
+# id = "<advisory ID>"
+# reason = "<why it can't be fixed yet, and why it's acceptable meanwhile>"
+# tech_debt = "TD-<n>"
+
+[[npm]]
+id = "GHSA-vfj7-8cjw-p6xm"
+reason = "braces (via @vue/eslint-config-typescript, a dev dependency) has no fixed release; it only expands the repo's own ESLint globs"
+tech_debt = "TD-19"

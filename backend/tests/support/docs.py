@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import tomllib
 from dataclasses import dataclass, field
 from functools import total_ordering
 from pathlib import Path
@@ -535,6 +536,46 @@ def overdue_tech_debt(
             problems.append(
                 f"{TECH_DEBT} TD-{entry.number} is open, but its Fix by (Slice {slice_number}) "
                 f"is finished (latest checkpoint commit: {latest})"
+            )
+    return problems
+
+
+# --- Audit allowlist ----------------------------------------------------------------------------
+
+AUDIT_ALLOWLIST = "audit-allowlist.toml"
+
+
+def audit_allowlist_tech_debt() -> dict[str, str]:
+    """Advisory ID -> the `tech_debt` its `audit-allowlist.toml` entry names (`wl audit`)."""
+    try:
+        data = tomllib.loads(read(AUDIT_ALLOWLIST))
+    except tomllib.TOMLDecodeError as exc:
+        raise DocsStructureError(f"{AUDIT_ALLOWLIST}: {exc}") from exc
+    entries: dict[str, str] = {}
+    for section in ("python", "npm"):
+        for entry in data.get(section, []):
+            if not isinstance(entry, dict) or "id" not in entry or "tech_debt" not in entry:
+                raise DocsStructureError(f"{AUDIT_ALLOWLIST} [[{section}]]: entry {entry!r}")
+            entries[str(entry["id"])] = str(entry["tech_debt"])  # pyright: ignore[reportUnknownArgumentType] -- TOML data
+    return entries
+
+
+def allowlist_problems(allowlisted: dict[str, str], entries: list[TechDebt]) -> list[str]:
+    """Every ignored advisory points to an open tech-debt entry (whose Fix by is checked by
+    `overdue_tech_debt`)."""
+    open_entries = {f"TD-{entry.number}" for entry in entries if entry.is_open}
+    known = {f"TD-{entry.number}" for entry in entries}
+    problems: list[str] = []
+    for advisory, tech_debt in sorted(allowlisted.items()):
+        if tech_debt not in known:
+            problems.append(
+                f"{AUDIT_ALLOWLIST}: {advisory} names {tech_debt}, which has no entry in "
+                f"{TECH_DEBT}"
+            )
+        elif tech_debt not in open_entries:
+            problems.append(
+                f"{AUDIT_ALLOWLIST}: {advisory} names {tech_debt}, which is resolved; fix the "
+                f"advisory's entry (remove it once the dependency is fixed)"
             )
     return problems
 

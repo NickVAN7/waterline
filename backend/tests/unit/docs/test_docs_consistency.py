@@ -334,6 +334,55 @@ def test_no_open_tech_debt_is_overdue() -> None:
     assert problems == [], _report(problems)
 
 
+# --- Audit allowlist ---------------------------------------------------------------------------
+
+
+def test_every_allowlisted_advisory_names_an_open_tech_debt_entry() -> None:
+    problems = docs.allowlist_problems(docs.audit_allowlist_tech_debt(), docs.tech_debt_entries())
+
+    assert problems == [], _report(problems)
+
+
+def test_allowlist_entries_naming_missing_or_resolved_tech_debt_are_reported() -> None:
+    entries = [
+        docs.TechDebt(1, {"Status": "open"}),
+        docs.TechDebt(2, {"Status": "resolved in S1-C3"}),
+    ]
+
+    problems = docs.allowlist_problems(
+        {"GHSA-a": "TD-1", "GHSA-b": "TD-2", "GHSA-c": "TD-9"}, entries
+    )
+
+    assert problems == [
+        "audit-allowlist.toml: GHSA-b names TD-2, which is resolved; fix the advisory's entry "
+        "(remove it once the dependency is fixed)",
+        "audit-allowlist.toml: GHSA-c names TD-9, which has no entry in docs/tech-debt.md",
+    ]
+
+
+def test_allowlist_entries_are_read_from_both_sections(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        docs,
+        "read",
+        _reading(
+            '[[python]]\nid = "PYSEC-1"\nreason = "r"\ntech_debt = "TD-3"\n'
+            '[[npm]]\nid = "GHSA-2"\nreason = "r"\ntech_debt = "TD-4"\n'
+        ),
+    )
+
+    assert docs.audit_allowlist_tech_debt() == {"PYSEC-1": "TD-3", "GHSA-2": "TD-4"}
+
+
+@pytest.mark.parametrize("text", ["[[npm]\n", '[[npm]]\nid = "GHSA-2"\n'])
+def test_a_malformed_allowlist_is_a_structure_error(
+    monkeypatch: pytest.MonkeyPatch, text: str
+) -> None:
+    monkeypatch.setattr(docs, "read", _reading(text))
+
+    with pytest.raises(docs.DocsStructureError, match=r"audit-allowlist\.toml"):
+        docs.audit_allowlist_tech_debt()
+
+
 # --- Decision log ----------------------------------------------------------------------------
 
 

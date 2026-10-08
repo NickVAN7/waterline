@@ -81,5 +81,7 @@ jobs:
           uv sync --directory backend --locked
           npm ci --prefix frontend
 
+      # Includes `wl audit`: uv audit (both lockfiles), npm audit, and gitleaks over the full
+      # history (the version pinned in .pre-commit-config.yaml, as locally). It needs the network.
       - name: wl check
         run: uv run wl check

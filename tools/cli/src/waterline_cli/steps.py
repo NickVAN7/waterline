@@ -157,3 +157,28 @@ def cli_test() -> list[Step]:
 
 def cli_check() -> list[Step]:
     return [step("uv", "lock", "--check"), *cli_lint(), *cli_test()]
+
+
+def audit(uv_ignores: Sequence[str] = ()) -> list[Step]:
+    """Supply-chain gates (DL-13): known vulnerabilities in both Python lockfiles and the npm
+    lockfile, dev dependencies included, and secrets anywhere in the git history. Needs the
+    network. `uv_ignores` are the allowlisted Python advisories (`--ignore <id>` pairs); the npm
+    gate reads the allowlist itself (waterline_cli/audit.py)."""
+    uv_audit = ("uv", "audit", "--frozen", "--preview-features", "audit-command", *uv_ignores)
+    helper = ("uv", "run", "python", "-m", "waterline_cli.audit")
+    return [
+        step(*helper, "network"),
+        step(*uv_audit),
+        step(*uv_audit, cwd=BACKEND),
+        step(*helper, "npm"),
+        step(
+            "uv",
+            "run",
+            "pre-commit",
+            "run",
+            "gitleaks-history",
+            "--hook-stage",
+            "manual",
+            "--all-files",
+        ),
+    ]

@@ -234,7 +234,7 @@ named checkpoint when its trigger arrives.
 ### Where the work happens
 Code is written and run on the owner's workstation(s) in the `waterline` repository (the
 working name is decided, design-doc §1), which is pushed to GitHub. Workstations need Git,
-Docker, uv, and Node 22 (verified by `wl doctor`), and the GitHub CLI (`gh`, signed in) for the
+Docker, uv 0.12 or later, and Node 22 (verified by `wl doctor`), and the GitHub CLI (`gh`, signed in) for the
 pull-request workflow (not checked by `wl doctor`).
 
 ---
@@ -389,10 +389,12 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
   | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
   | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
-  | Cross-cutting | `wl gen-client`, `wl doctor` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version) |
+  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history) |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
-  on any surviving mutant; `wl check` includes it.
+  on any surviving mutant; `wl check` includes it. `wl audit` (DL-13) fails on any known
+  vulnerability in either Python lockfile or the npm lockfile (dev dependencies included), and
+  on any secret in the git history; it needs the network, and `wl check` includes it.
 
 - **Rules:**
   1. **Thin orchestrator only:** each command runs existing tools (docker compose, uv, npm,
@@ -721,7 +723,13 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 - **Migration checks:** `alembic upgrade head` on an empty database, then autogenerate reports
   no drift.
 - GitHub Actions: lint, type check, API tests, web tests, migration checks, generated-client
-  freshness.
+  freshness, and the supply-chain audit (`wl audit`: dependency advisories and secrets).
+- **Supply-chain policy** (DL-13): any known vulnerability fails. An advisory is ignored only
+  through an entry in `audit-allowlist.toml` naming it and the reason, with a matching open
+  tech-debt entry whose Fix by is the deadline (the docs consistency tests check both). A red
+  audit is fixed before any checkpoint starts, with a `chore(deps):` commit on the slice
+  branch. Secrets are scanned by gitleaks: staged changes in a pre-commit hook, the whole
+  history in `wl audit`; the version is pinned in `.pre-commit-config.yaml`.
 
 ### Web shell
 - App layout (header, nav area, content), router with a 404 page, API client wrapper

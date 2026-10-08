@@ -59,6 +59,14 @@ CLI_FMT = [
 ]
 CLI_TEST = ["(cd tools/cli && uv run pytest)"]
 CLI_CHECK = ["uv lock --check", *CLI_LINT, *CLI_TEST]
+# The repository's audit-allowlist.toml names no Python advisory, so uv audit ignores nothing.
+AUDIT = [
+    "uv run python -m waterline_cli.audit network",
+    "uv audit --frozen --preview-features audit-command",
+    "(cd backend && uv audit --frozen --preview-features audit-command)",
+    "uv run python -m waterline_cli.audit npm",
+    "uv run pre-commit run gitleaks-history --hook-stage manual --all-files",
+]
 
 
 def command_tree() -> dict[tuple[str, ...], bool]:
@@ -88,7 +96,8 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
-        pytest.param(["check"], [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK], id="check"),
+        pytest.param(["check"], [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK, *AUDIT], id="check"),
+        pytest.param(["audit"], AUDIT, id="audit"),
         pytest.param(["test"], [*BACKEND_TEST, *FRONTEND_TEST, *CLI_TEST], id="test"),
         pytest.param(["lint"], [*BACKEND_LINT, *FRONTEND_LINT, *CLI_LINT], id="lint"),
         pytest.param(["fmt"], [*BACKEND_FMT, *FRONTEND_FMT, *CLI_FMT], id="fmt"),

@@ -261,14 +261,19 @@ saying why.
 
 ## Workflow and gates
 
-- **Pre-commit hooks** (local, fast): ruff format and lint, Prettier and ESLint, and a check
-  that no generated file is hand-edited.
+- **Pre-commit hooks** (local, fast): ruff format and lint, Prettier and ESLint, a check
+  that no generated file is hand-edited, and gitleaks on the staged changes.
 - **`wl check`** (the developer CLI; `waterline check` in full) runs everything CI runs, locally.
   CI calls the same command, so local and CI can't diverge.
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
   tests with coverage, mutation testing on `rules/` and `authz/` (from Slice 1, S1-C3),
   import-linter contracts, migration checks, frontend tests with coverage, generated-client
-  freshness, and end-to-end tests (from Slice 1).
+  freshness, end-to-end tests (from Slice 1), and the supply-chain audit (`wl audit`).
+- **Supply-chain audit** (`wl audit`, part of `wl check`; DL-13): known vulnerabilities in both
+  Python lockfiles and the npm lockfile, dev dependencies included, and secrets anywhere in the
+  git history. Any known vulnerability fails; an advisory is ignored only through an
+  `audit-allowlist.toml` entry with a reason and an open tech-debt entry whose Fix by is the
+  deadline. A red audit is fixed before any checkpoint starts (`chore(deps):` commit).
 - **Pull requests:** each slice works on one branch with one draft PR, and CI runs on every
   push; a checkpoint goes to the owner only with green CI, and the slice's PR merges to `main`
   (a merge commit) only with green CI (build-plan, "Pull requests"). Until branch protection is

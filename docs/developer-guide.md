@@ -29,7 +29,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 |---|---|---|
 | Git | ≥ 2.31 | Source control |
 | Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.20, daemon running | The local stack: Postgres, the API, the worker, and the web dev server |
-| uv | ≥ 0.8 | Python versions, dependencies, and running everything |
+| uv | ≥ 0.12 | Python versions, dependencies, and running everything; `uv audit` (`wl audit`) |
 | Python | 3.14 | The backend (`uv` installs it: `uv python install 3.14`) |
 | Node | 22.x, ≥ 22.18 (with npm) | The frontend's tools (tests, lint, types, client generation) run on the host |
 | GitHub CLI (`gh`) | any recent, signed in (`gh auth login`) | The pull-request workflow (section 10): opening PRs and checking CI. Not checked by `wl doctor` |
@@ -100,7 +100,8 @@ underlying commands instead of running them, and stops at the first failing step
 | Command | Does |
 |---|---|
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
-| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI |
+| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI — and then `wl audit` |
+| `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc |
 | `wl test` | All tests with coverage gates |
 | `wl fmt` | ruff format and safe ruff fixes; Prettier and safe ESLint fixes |
@@ -123,6 +124,26 @@ The CLI is a **thin orchestrator**: the real tool configuration is in each proje
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
 both coverage gates included (the 100% gate on `app/authz/` and `app/rules/` is a pytest hook in
 `backend/tests/conftest.py`).
+
+**Supply-chain audit.** `wl audit` first checks that it can reach the advisory databases and
+fails with a clear message if it can't; there's no switch to skip it. Then:
+
+- **Python:** `uv audit --frozen` in the root and in `backend/` (all groups, dev included; the
+  command is experimental in uv, hence `--preview-features audit-command`).
+- **npm:** `python -m waterline_cli.audit npm` runs `npm audit --json` in `frontend/` and fails
+  on any advisory the allowlist doesn't name (npm has no ignore option).
+- **Secrets:** the manual-stage pre-commit hook `gitleaks-history` scans every commit. The
+  `gitleaks` pre-commit hook scans staged changes on every commit. Both use the gitleaks
+  version pinned in `.pre-commit-config.yaml`; pre-commit builds it the first time (installing
+  Go for that if needed, so the first run needs the network and takes a little longer).
+
+Policy: any known vulnerability fails. To ignore an advisory (only when it can't be fixed yet),
+add an entry to `audit-allowlist.toml` (`[[python]]` or `[[npm]]`, with `id`, `reason`, and
+`tech_debt`) and the matching tech-debt entry, whose Fix by is the deadline; the docs
+consistency tests fail if the entry isn't open or its Fix by has passed. Remove both once the
+fix lands. A red audit is fixed before any checkpoint starts, with a `chore(deps):` commit on
+the slice branch. A real secret is rotated at once (pushed history is never rewritten); a false
+positive goes in `.gitleaksignore` (its fingerprint) with the owner's approval.
 
 **Adding a command:** add a function returning its steps to `tools/cli/src/waterline_cli/steps.py`,
 a Typer command in `main.py` that calls `run_steps(..., dry_run=dry_run)`, and a dry-run case in
@@ -747,6 +768,7 @@ database. They check:
 | One owner per table | a schema-doc table isn't in exactly one "Owns (tables)" cell of the build plan's feature map, or the map names a table schema-doc lacks |
 | Tech-debt log | an entry lacks Added/What/Why/Fix by/Status, numbers aren't 1..n, a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
 | Decision log | an entry lacks Date/Decision/Supersedes/Superseded by/Applies to/Source, numbers aren't 1..n, a Superseded by is neither `none` nor another entry (`DL-<n>`), or a `DL-<n>` reference (same files as TD references) has no entry |
+| Audit allowlist | an `audit-allowlist.toml` entry names a tech-debt entry that doesn't exist or is resolved |
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
 | § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` always means a design-doc section, so refer to this guide's sections as "section N" |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
@@ -781,8 +803,11 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   `postgres:18` service container; the test database is created by the same init script as in
   Compose (`docker/postgres/initdb/`). There's no `.env` in CI: the workflow sets the
   `POSTGRES_*` variables. A new tool the checks need goes into the workflow's setup steps and
-  the developer guide's prerequisites together.
-- The pre-commit hooks run ruff (lint with safe fixes, and format) on the backend and CLI;
+  the developer guide's prerequisites together. `wl check` includes `wl audit`, so CI also
+  scans the dependencies and the git history for every push; it needs the network, which the
+  runners have.
+- The pre-commit hooks run gitleaks on the staged changes (secrets); ruff (lint with safe
+  fixes, and format) on the backend and CLI;
   Prettier and ESLint (safe fixes) on the frontend (they need `frontend/node_modules`); a check
   that `backend/openapi.json` and `frontend/src/api/schema.d.ts` match what `wl gen-client`
   would produce, so a generated file can't be hand-edited or left stale; and

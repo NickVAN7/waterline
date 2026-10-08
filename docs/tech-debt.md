@@ -261,3 +261,18 @@ Entry format:
   each sequence numbered 1, 2, 3, … per (project, prefix).
 - **Status:** resolved in S1-C3 (`test_any_interleaving_numbers_each_sequence_1_2_3`; an
   allocator that ignores the prefix fails it)
+
+### TD-19: npm advisory GHSA-vfj7-8cjw-p6xm (braces) is allowlisted
+- **Added:** workflow review (DL-13, Oct 8, 2026)
+- **What:** `wl audit` ignores GHSA-vfj7-8cjw-p6xm (high: stack-exhaustion denial of service
+  in `braces` through deeply nested patterns), through its entry in `audit-allowlist.toml`.
+  `braces` 3.0.3 comes only through `@vue/eslint-config-typescript` → `fast-glob` →
+  `micromatch`, a dev dependency of the linter.
+- **Why:** No fixed release exists: the advisory covers every `braces` version up to 3.0.3, the
+  latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
+  The vulnerable code only expands glob patterns from the repository's own ESLint
+  configuration, never untrusted input, and never ships in the app.
+- **Fix by:** S1-C14 (the first checkpoint that grows the frontend): update once a fixed
+  `braces` (or a `fast-glob`/`micromatch` without it) is published, and remove the allowlist
+  entry; if none is by then, re-target with the owner.
+- **Status:** open
