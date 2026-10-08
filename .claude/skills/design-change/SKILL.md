@@ -72,7 +72,9 @@ history in the docs; the log holds it.
 ## 8. Commit and push
 
 One `docs:` commit per logical change set, on the current slice branch (`docs/build-plan.md`,
-"Pull requests"). Push; CI must be green.
+"Pull requests"). Push. If the slice branch has no pull request yet, open it as a draft at this
+push (`gh pr create --draft`, as in the `checkpoint` skill, step 6): CI runs only on pull
+requests and on `main`. CI must be green.
 
 ## 9. Report and stop
 

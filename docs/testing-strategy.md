@@ -113,8 +113,9 @@ tested, what each kind of test is for, and the gates every change passes.
     milestones.
 - **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code
   and each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map
-  owner per table; the tech-debt log's format, references, and deadlines; the developer guide's
-  status line vs. `git log`; design-doc § references; the agents and skills listed vs. those in
+  owner per table; the tech-debt log's format, references, and deadlines; the decision log's
+  format and references; every `audit-allowlist.toml` entry names an open tech-debt entry; the
+  developer guide's status line vs. `git log`; design-doc § references; the agents and skills listed vs. those in
   `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
   instead of passing by finding nothing. The column check runs per column: a documented
   column whose Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is

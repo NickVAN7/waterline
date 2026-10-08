@@ -666,7 +666,9 @@ value the test depends on explicitly.
 invoke the `spec-test-writer` agent, which writes the tests from the design doc's rules and
 tables without reading the implementation and proves each fails against the stub, then
 implement until they pass. Its files and their `git hash-object` go in the review record ("Spec
-tests"); a spec test changes only with the owner's approval. So far: `identifiers.py` (project keys, slugs and
+tests"); a spec test changes only with the owner's approval. The rules built so far predate
+`spec-test-writer` (DL-11): their tests were written test-first in S1-C3 by the implementing
+session, and aren't hash-protected spec tests. So far: `identifiers.py` (project keys, slugs and
 the reserved top-level routes in `RESERVED_SLUGS`, usernames; each check returns an
 `IdentifierProblem` for the field error), `password_policy.py` (`password_problems(...)`; the
 caller checks the hash and passes `same_as_current`), and `account_rank.py`

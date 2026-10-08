@@ -65,7 +65,8 @@ minutes. The next checkpoint starts only after the current one is approved.
 ### Pull requests
 Each slice works on **one branch and one draft pull request** (DL-9). Slice 0's checkpoints
 were committed directly to `main`; Slice 1's group 1 (S1-C1 to S1-C4) landed through its own
-PR (`s1-foundations`); the slice branch starts with S1-C5.
+PR (`s1-foundations`); the `s1` branch carries the rest of the slice, from S1-C5 (it starts
+with the workflow changes of DL-7 to DL-14).
 - **One branch per slice**, named `s<n>` (e.g. `s1`), from `main`. Each checkpoint is still one
   commit.
 - **One draft PR per slice**, opened right after the branch's first push, so CI runs on every
@@ -182,7 +183,7 @@ Everything lives in the repository, version-controlled and present on every work
   - one commit with the review note, pushed to the slice branch;
   - the report, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
-  alongside `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
+  before `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
   when a checkpoint touches auth, sessions, authorization, routers, rendered markdown, or
   GitHub code.
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,

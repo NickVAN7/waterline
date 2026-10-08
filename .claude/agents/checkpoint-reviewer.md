@@ -76,9 +76,8 @@ You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff a
    - rules tested in `rules/` or `authz/` with no API or integration test showing the endpoint
      enforces them;
    - `if`, loops, or `try/except` inside tests.
-   Once mutation testing is enabled (docs/testing-strategy.md), surviving mutants in
-   `app/rules/` or `app/authz/`, or a `# pragma: no mutate` without a convincing reason, are a
-   **blocker**.
+   Surviving mutants in `app/rules/` or `app/authz/` (docs/testing-strategy.md, "Mutation
+   testing"), or a `# pragma: no mutate` without a convincing reason, are a **blocker**.
    **Spec tests** (checkpoints that add or change `app/rules/` or `app/authz/`): the review
    record (`docs/reviews/<ID>.md`, "Spec tests") lists the files `spec-test-writer` wrote, each
    with its `git hash-object`. Run `git hash-object` on each file as it is about to be

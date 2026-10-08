@@ -18,7 +18,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 2. Run the gates
 
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
-  import-linter contracts, migration checks, and generated-client freshness.
+  import-linter contracts, migration checks, generated-client freshness, mutation testing, and
+  the supply-chain audit (`wl audit`, which needs the network).
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
 - **Last checkpoint of a slice:** search `docs/schema-doc.md` for `Added in Slice <n>.` (this
   slice's number) and confirm each marked column is in its model. The docs consistency tests

@@ -17,7 +17,7 @@ Build this table first, from the docs, not from the code:
 
 | Behavior | Source | Layer | Bug it catches | Proof it fails |
 |---|---|---|---|---|
-| Member can't delete an approved requirement | design §5 deletion table | unit + API | reporter check ignores `approved_revision_id` | red first: returned True |
+| Member can't delete an approved requirement | design §5 deletion table | unit + API | reporter check ignores `approved_revision_id` | spec test: fails against the always-allow stub |
 
 Where behaviors come from:
 - every row of every table in the relevant design-doc section (roles, transitions, deletion);
@@ -106,7 +106,7 @@ showing the real endpoint or service denies the forbidden case.
   one fails. Restore the code and confirm with `git diff` that no sabotage remains (a leftover
   would also fail `wl check`). Record what you broke and which test caught it.
 - **If nothing fails, the test is shallow.** Fix the test; don't move on.
-- **Mutation testing** (when enabled per `docs/testing-strategy.md`): no surviving mutants in
+- **Mutation testing** (`docs/testing-strategy.md`): no surviving mutants in
   `app/rules/` or `app/authz/`. Kill a survivor with a new or sharper test. Only a truly
   equivalent mutant (one that can't change behavior) may be marked `# pragma: no mutate`, with a
   comment explaining why.
@@ -200,6 +200,7 @@ field errors from a 422. Never assert on internal component state.
 
 - [ ] Behavior table complete, with denied rows and a source for each behavior.
 - [ ] Each behavior tested at the cheapest layer that catches it, plus wiring tests for rules.
-- [ ] "Proof it fails" filled in for every row (red first, sabotage, or killed mutant).
+- [ ] "Proof it fails" filled in for every row (spec test failing against the stub, sabotage,
+      or killed mutant).
 - [ ] No banned patterns.
 - [ ] `uv run wl check` green.

@@ -23,7 +23,9 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 Read the relevant sections before changing anything. If the code needs to differ from the docs,
 **stop and ask** (the `design-change` skill: a proposal for the owner) — never silently
-diverge. An approved change updates the docs in the same commit.
+diverge. An approved design change goes in its own `docs:` commit, never with checkpoint work
+(DL-8); a drift fix inside the checkpoint's approved scope updates the docs in the
+checkpoint's commit.
 
 ## Commands
 
