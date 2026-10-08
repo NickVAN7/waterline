@@ -123,7 +123,8 @@ def run_npm_audit(frontend: Path) -> dict[str, Any]:
         report: dict[str, Any] = json.loads(result.stdout)
     except json.JSONDecodeError:
         report = {}
-    if "error" in report or ("vulnerabilities" not in report and result.returncode != 0):
+    # A report always has "vulnerabilities" (empty when clean): anything else isn't a pass.
+    if "error" in report or "vulnerabilities" not in report:
         raise AllowlistError(f"npm audit failed: {result.stdout.strip() or result.stderr.strip()}")
     return report
 

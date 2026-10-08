@@ -276,3 +276,21 @@ Entry format:
   `braces` (or a `fast-glob`/`micromatch` without it) is published, and remove the allowlist
   entry; if none is by then, re-target with the owner.
 - **Status:** open
+
+### TD-20: The git guard has known gaps
+- **Added:** DC-2026-10-08 (review passes 3, 6, and 7)
+- **What:** The git guard (`.claude/hooks/guard_git.py`) can't see these, and allows them:
+  (1) a `cd` inside `( … )` or after a short-circuited `&&`/`||` is assumed to take effect, so
+  a later git command is checked in the wrong directory; (2) `set -a` before a bare
+  `SKIP=…`/`GIT_CONFIG_*=…` assignment exports it without `export`; (3) `git config
+  include.path <file>` loads a file that can set `core.hooksPath`; (4) `bash <script>` and
+  `source <script>` run commands the guard never reads; (5) `GIT_DIR`/`GIT_WORK_TREE` exported,
+  or set on a nested shell (`GIT_DIR=… bash -c 'git commit'`), aren't followed (only a prefix on
+  `git` itself is); (6) a `gh api` GraphQL query or endpoint only known at run time
+  (`-f query="$(cat merge.graphql)"`, `-X PUT "$URL"`) doesn't ask.
+- **Why:** Each needs much more of a shell (or of git's config) modelled than a guard against
+  mistakes warrants; none is a likely mistake; pushes to `main` stay blocked, so nothing reaches
+  the remote; and branch protection (TD-15) is the real control.
+- **Fix by:** Slice 7, with TD-15 (once branch protection is on, the owner decides whether
+  these close as won't-fix).
+- **Status:** open

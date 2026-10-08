@@ -65,7 +65,7 @@ def main() -> int:
 
     if rel in GENERATED_FILES:
         # stderr is how a blocking hook tells Claude why.
-        print(f"Blocked: {rel} is a generated file. {GENERATED_FILES[rel]}", file=sys.stderr)  # noqa: T201
+        print(f"Blocked: {rel} is a generated file. {GENERATED_FILES[rel]}", file=sys.stderr)
         return 2
 
     if (
@@ -73,7 +73,7 @@ def main() -> int:
         and rel.endswith(".py")
         and git(root, "cat-file", "-e", f"HEAD:{rel}").returncode == 0
     ):
-        print(  # noqa: T201
+        print(
             f"Blocked: {rel} is a committed migration and must never be edited. "
             'Fix forward with a new migration: uv run wl backend migration "<message>".',
             file=sys.stderr,

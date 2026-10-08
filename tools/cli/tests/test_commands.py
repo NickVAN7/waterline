@@ -49,13 +49,13 @@ FRONTEND_TEST = ["(cd frontend && npm run test)"]
 FRONTEND_CHECK = ["(cd frontend && npm run check:client)", *FRONTEND_LINT, *FRONTEND_TEST]
 UP = "docker compose up --detach --wait --build --renew-anon-volumes"
 CLI_LINT = [
-    "(cd tools/cli && uv run ruff check .)",
-    "(cd tools/cli && uv run ruff format --check .)",
+    "(cd tools/cli && uv run ruff check . ../../.claude/hooks)",
+    "(cd tools/cli && uv run ruff format --check . ../../.claude/hooks)",
     "(cd tools/cli && uv run pyright)",
 ]
 CLI_FMT = [
-    "(cd tools/cli && uv run ruff format .)",
-    "(cd tools/cli && uv run ruff check --fix .)",
+    "(cd tools/cli && uv run ruff format . ../../.claude/hooks)",
+    "(cd tools/cli && uv run ruff check --fix . ../../.claude/hooks)",
 ]
 CLI_TEST = ["(cd tools/cli && uv run pytest)"]
 CLI_CHECK = ["uv lock --check", *CLI_LINT, *CLI_TEST]

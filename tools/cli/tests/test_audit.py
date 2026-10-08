@@ -159,6 +159,8 @@ def test_the_npm_gate_runs_npm_audit_as_json(monkeypatch: pytest.MonkeyPatch) ->
     [
         (json.dumps({"error": {"code": "ENOAUDIT"}}), 1, ""),
         ("", 1, "npm ERR! network"),
+        ("", 0, ""),  # a broken npm that prints nothing isn't a clean report
+        (json.dumps({"auditReportVersion": 2}), 0, ""),
     ],
 )
 def test_npm_audit_failing_to_run_is_an_error(
@@ -170,18 +172,22 @@ def test_npm_audit_failing_to_run_is_an_error(
         audit.run_npm_audit(Path("frontend"))
 
 
-def test_npm_audit_with_no_json_and_success_is_a_clean_report(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fake_npm(monkeypatch, "", 0)
+def test_a_clean_npm_report_has_no_problems(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_npm(monkeypatch, json.dumps({"vulnerabilities": {}}), 0)
 
-    assert audit.run_npm_audit(Path("frontend")) == {}
+    assert audit.run_npm_audit(Path("frontend")) == {"vulnerabilities": {}}
 
 
 @pytest.mark.parametrize(
     ("allowlist", "code", "stderr"),
     [
-        ("", 1, "GHSA-b (high) in braces: stack exhaustion\n"),
+        (
+            "",
+            1,
+            "GHSA-b (high) in braces: stack exhaustion\n1 npm advisories. Update the dependency, "
+            "or add an allowlist entry to audit-allowlist.toml with a tech-debt entry (developer "
+            "guide, section 3).\n",
+        ),
         (f"[[npm]]\n{ENTRY.replace('GHSA-aaaa-bbbb-cccc', 'GHSA-b')}", 0, ""),
     ],
 )
@@ -198,7 +204,7 @@ def test_the_npm_gate_fails_on_advisories_outside_the_allowlist(
     fake_npm(monkeypatch, json.dumps(only_braces), returncode=1)
 
     assert audit.main(["npm"], root=tmp_path) == code
-    assert capsys.readouterr().err.startswith(stderr)
+    assert capsys.readouterr().err == stderr
 
 
 def test_the_npm_gate_reports_a_malformed_allowlist(

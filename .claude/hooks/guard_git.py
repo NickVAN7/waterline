@@ -11,7 +11,6 @@ git or gh and can't be parsed with confidence is blocked (fail closed).
 from __future__ import annotations
 
 import json
-import os
 import re
 import shlex
 import subprocess
@@ -199,9 +198,51 @@ class _Scanner:
         self.i = end + 1
         return inner
 
+    def brace_expansion_end(self) -> int | None:
+        """At an unquoted `{`: where its brace expansion (`{a,b}`, `{1..3}`, quotes allowed
+        inside) ends; None when it isn't one (`{ cmd; }`, `{x}`, unclosed). A nested pair
+        needs no tracking: any comma makes the word unknown, wherever it is."""
+        index, expands = self.i + 1, False
+        while index < len(self.text):
+            char = self.text[index]
+            if char == "\\":
+                index += 2
+                continue
+            if char in "'\"":
+                end = self.text.find(char, index + 1)
+                if end == -1:
+                    return None
+                index = end + 1
+                continue
+            if char in " \t\n;&|<>()":
+                return None
+            if char == "}":
+                return index + 1 if expands else None
+            if char == "," or self.text.startswith("..", index):
+                expands = True
+            index += 1
+        return None
+
     def expansion(self, *, quoted: bool = False) -> bool:
-        """At `$`, `` ` ``, or (unquoted) `<(` or `>(`: records a command substitution or skips
-        a variable, returning True; False when it's a plain character."""
+        """At `$`, `` ` ``, or (unquoted) `<(`, `>(`, `$'`, `$"` or a brace expansion: records
+        a command substitution or skips what's only known at run time, returning True; False
+        when it's a plain character."""
+        if not quoted and self.peek(2) == "$'":
+            end = self.i + 2
+            while end < len(self.text) and self.text[end] != "'":
+                end += 2 if self.text[end] == "\\" else 1
+            if end >= len(self.text):
+                raise Unparseable("an unclosed $'")
+            self.i = end + 1
+            return True
+        if not quoted and self.peek(2) == '$"':
+            self.i += 1
+            self.skip_quoted('"')
+            return True
+        brace_end = None if quoted or self.peek() != "{" else self.brace_expansion_end()
+        if brace_end is not None:
+            self.i = brace_end
+            return True
         if self.peek(2) == "$(" or (not quoted and self.peek(2) in ("<(", ">(")):
             self.i += 2
             self.substitutions.append(self.read_until_close())
@@ -359,17 +400,34 @@ def mentions_git(text: str) -> bool:
     return re.search(r"\b(git|gh)\b", text) is not None
 
 
-def analyze(command: str, cwd: Path | None, repo: Repo, depth: int = 0) -> Verdict:
+@dataclass
+class Shell:
+    """The working directory as earlier commands left it, and branch switches. Order inside a
+    line can't be trusted (substitutions run first, nested shells run apart), so a branch
+    switch anywhere in the line makes the branch unknown for every check in it: `moves`
+    collects the switches (shared by nested copies), and `head_moved` is set for the second
+    pass `decide` makes when there were any."""
+
+    cwd: Path | None
+    head_moved: str | None = None
+    moves: list[str] = field(default_factory=list[str])
+
+    def nested(self, cwd: Path | None = None) -> Shell:
+        return Shell(self.cwd if cwd is None else cwd, self.head_moved, self.moves)
+
+
+def analyze_in(command: str, shell: Shell, repo: Repo, depth: int = 0) -> Verdict:
     """The verdict for a whole command line: the first block, else the first ask, else allow."""
     if not mentions_git(command):
         return ALLOW
     if depth > MAX_DEPTH:
         raise Unparseable("commands nested too deeply")
     script = tokenize(command)
-    verdicts = [analyze(inner, cwd, repo, depth + 1) for inner in script.substitutions]
+    verdicts = [
+        analyze_in(inner, shell.nested(), repo, depth + 1) for inner in script.substitutions
+    ]
     for segment in script.segments:
-        verdict, cwd = analyze_segment(segment, cwd, repo, depth)
-        verdicts.append(verdict)
+        verdicts.append(analyze_segment(segment, shell, repo, depth))
     return next(
         (v for v in verdicts if v.block),
         next((v for v in verdicts if v.ask), ALLOW),
@@ -384,51 +442,78 @@ def resolve_path(cwd: Path | None, path: str) -> Path | None:
     """A literal path relative to `cwd`; None when it can't be known before running."""
     if cwd is None or UNKNOWN in path or path == "-":
         return None
-    return (cwd / os.path.expanduser(path)).resolve()
+    return (cwd / Path(path).expanduser()).resolve()
 
 
-def analyze_segment(
-    segment: Segment, cwd: Path | None, repo: Repo, depth: int
-) -> tuple[Verdict, Path | None]:
-    """The verdict for one simple command, and the working directory after it."""
+def skips_hooks(assignment: str) -> bool:
+    """`SKIP=<hook>` (pre-commit's way to skip a hook) or a `GIT_CONFIG_*` variable (git config
+    from the environment, e.g. core.hooksPath)."""
+    name = assignment.partition("=")[0]
+    # GIT_CONFIG_NOSYSTEM only turns a config file off; it can't set anything.
+    return name == "SKIP" or (name.startswith("GIT_CONFIG") and name != "GIT_CONFIG_NOSYSTEM")
+
+
+ENV_SKIPS_HOOKS = (
+    "`SKIP=` and `GIT_CONFIG_*` variables can skip the repository's hooks (pre-commit's SKIP, "
+    "or core.hooksPath from the environment). Fix what the hook reports and run the command "
+    "again with the hooks."
+)
+
+
+def analyze_segment(segment: Segment, shell: Shell, repo: Repo, depth: int) -> Verdict:
+    """The verdict for one simple command; `shell` is updated for the commands after it."""
     words = segment.words
     index = 0
+    assignments: list[str] = []
     while index < len(words) and (ASSIGNMENT.match(words[index]) or words[index] in PREFIX_WORDS):
+        if ASSIGNMENT.match(words[index]):
+            assignments.append(words[index])
         index += 1
     if index < len(words) and words[index] in ("command", "builtin", "exec"):
         if words[index] == "command" and words[index + 1 : index + 2] in (["-v"], ["-V"]):
-            return ALLOW, cwd  # a lookup, not a run
+            return ALLOW  # a lookup, not a run
         index += 1
     if index < len(words) and words[index] == "env":
         index += 1
         while index < len(words) and (words[index] in ENV_FLAGS or ASSIGNMENT.match(words[index])):
+            if ASSIGNMENT.match(words[index]):
+                assignments.append(words[index])
             index += 1
         if index < len(words) and words[index].startswith("-"):
             raise Unparseable(f"`env {words[index]}`")
     if index >= len(words):
-        return ALLOW, cwd
+        return ALLOW
     name, args = basename(words[index]), words[index + 1 :]
+    if UNKNOWN in name:
+        raise Unparseable("a command whose name is only known at run time")
+    if name in RUNNABLE and any(skips_hooks(assignment) for assignment in assignments):
+        return blocked(ENV_SKIPS_HOOKS)  # git, or something that may run it, inherits them
     if name == "git":
-        return analyze_git(args, cwd, repo, depth), cwd
+        moved = next((a for a in assignments if a.startswith(("GIT_DIR=", "GIT_WORK_TREE="))), None)
+        return analyze_git(args, shell, repo, depth, other_repo=moved)
     if name == "gh":
-        return analyze_gh(args), cwd
+        return analyze_gh(args, shell)
     if name in SHELLS:
-        return analyze_shell(name, args, segment.heredocs, cwd, repo, depth), cwd
+        return analyze_shell(name, args, segment.heredocs, shell, repo, depth)
     if name == "eval":
-        return analyze(" ".join(args), cwd, repo, depth + 1), cwd
+        return analyze_in(" ".join(args), shell, repo, depth + 1)
+    if name in ("export", "declare", "typeset") and any(skips_hooks(arg) for arg in args):
+        return blocked(ENV_SKIPS_HOOKS)
     if name in ("cd", "pushd"):
-        return ALLOW, resolve_path(cwd, args[0] if args else "~")
+        shell.cwd = resolve_path(shell.cwd, args[0] if args else "~")
+        return ALLOW
     if name == "popd":
-        return ALLOW, None
+        shell.cwd = None
+        return ALLOW
     if name not in DATA_COMMANDS:
         runnable = next((arg for arg in args if basename(arg) in RUNNABLE), None)
         if runnable is not None:
             raise Unparseable(f"`{name}` may run `{basename(runnable)}`")
-    return ALLOW, cwd
+    return ALLOW
 
 
 def analyze_shell(
-    name: str, args: list[str], heredocs: list[str], cwd: Path | None, repo: Repo, depth: int
+    name: str, args: list[str], heredocs: list[str], shell: Shell, repo: Repo, depth: int
 ) -> Verdict:
     """`bash -c '<script>'` is checked like any command line; a shell reading a heredoc checks
     its body; a shell reading stdin can't be checked."""
@@ -445,9 +530,9 @@ def analyze_shell(
     if has_c:
         if index >= len(args):
             raise Unparseable(f"`{name} -c` without a command")
-        return analyze(args[index], cwd, repo, depth + 1)
+        return analyze_in(args[index], shell.nested(), repo, depth + 1)
     if heredocs:
-        verdicts = [analyze(body, cwd, repo, depth + 1) for body in heredocs]
+        verdicts = [analyze_in(body, shell.nested(), repo, depth + 1) for body in heredocs]
         return next((v for v in verdicts if v.block or v.ask), ALLOW)
     if index < len(args):
         return ALLOW  # runs a script file
@@ -482,22 +567,40 @@ KNOWN_COMMANDS = {
 @dataclass
 class GitContext:
     cwd: Path | None
+    head_moved: str | None = None  # an earlier command in the line that switched branches
     unknown_repo: str | None = None  # why the repository can't be known, if it can't
     configs: list[str] = field(default_factory=list[str])
 
     def where(self) -> Path:
         if self.cwd is None or self.unknown_repo:
             reason = self.unknown_repo or "the working directory isn't a literal path"
-            raise CantTell(reason)
+            raise CantTell(
+                f"which repository it runs in ({reason}). Run it from the repository, or with "
+                "`git -C <path>` and a literal path."
+            )
         return self.cwd
+
+    def head(self) -> Path:
+        """`where()`, for a question about HEAD or the current branch."""
+        where = self.where()
+        if self.head_moved:
+            raise CantTell(
+                f"which branch it runs on: `{self.head_moved}` in the same command switches "
+                "branches. Run the switch as its own command first."
+            )
+        return where
 
 
 class CantTell(Exception):  # noqa: N818 -- reads as a verdict
-    """The repository a git command runs in can't be known before it runs."""
+    """The repository or branch a git command runs on can't be known before it runs."""
 
 
-def analyze_git(args: list[str], cwd: Path | None, repo: Repo, depth: int = 0) -> Verdict:
-    context = GitContext(cwd)
+def analyze_git(
+    args: list[str], shell: Shell, repo: Repo, depth: int = 0, *, other_repo: str | None = None
+) -> Verdict:
+    context = GitContext(shell.cwd, shell.head_moved)
+    if other_repo:
+        context.unknown_repo = f"`{other_repo.partition('=')[0]}` names another repository"
     index = 0
     while index < len(args) and args[index].startswith("-"):
         option = args[index]
@@ -533,19 +636,87 @@ def analyze_git(args: list[str], cwd: Path | None, repo: Repo, depth: int = 0) -
     if index >= len(args):
         return ALLOW
     command, rest = args[index], args[index + 1 :]
+    if moves_main(command, rest):
+        return blocked(f"`git {command}` " + MOVES_MAIN.format(main=MAIN))
+    if moves_head(command, rest):
+        shell.moves.append(shlex.join(["git", command, *rest]))
     try:
         if command not in KNOWN_COMMANDS:
-            return analyze_alias(command, rest, context, repo, depth)
+            return analyze_alias(command, rest, context, shell, repo, depth)
         return check_git_command(command, rest, context, repo)
     except CantTell as exc:
-        return blocked(
-            f"can't tell which repository `git {command}` runs in ({exc}). Run it from the "
-            "repository, or with `git -C <path>` and a literal path."
-        )
+        return blocked(f"`git {command}`: can't tell {exc}")
+
+
+def moves_head(command: str, rest: list[str]) -> bool:
+    """`git switch`, and `git checkout` unless it only restores paths (`checkout -- <path>`)."""
+    if "--help" in rest or "-h" in rest:
+        return False
+    if command == "symbolic-ref":
+        return len([arg for arg in rest if not arg.startswith("-")]) >= 2  # a write
+    return command == "switch" or (command == "checkout" and "--" not in rest)
+
+
+CREATE_LONG = {"--create", "--force-create", "--orphan"}
+CREATE_SHORT = "cCbB"
+BRANCH_REWRITE_LONG = {"--force", "--move", "--copy"}
+BRANCH_REWRITE_SHORT = "fmMcC"
+
+
+def created_branches(rest: list[str]) -> list[str]:
+    """The names given to a branch-creating option, in every form git accepts: `-C main`,
+    `-Cmain`, `-qC main`, `--create main`, `--create=main`."""
+    names: list[str] = []
+    following = [*rest[1:], ""]
+    for arg, next_word in zip(rest, following, strict=True):
+        name, has_value, value = arg.partition("=")
+        if name in CREATE_LONG:
+            names.append(value if has_value else next_word)
+        elif arg.startswith("-") and not arg.startswith("--"):
+            position = next((i for i, char in enumerate(arg[1:], 1) if char in CREATE_SHORT), None)
+            if position is not None:
+                names.append(arg[position + 1 :] or next_word)
+    return names
+
+
+def short_flags(rest: list[str]) -> set[str]:
+    """Every single-letter flag, bundles included (`-fM` → f, M)."""
+    return {
+        char for arg in rest if arg.startswith("-") and not arg.startswith("--") for char in arg[1:]
+    }
+
+
+MOVES_MAIN = (
+    "would move the local `{main}` branch. `{main}` changes only when the owner merges the "
+    "slice's pull request; work on the slice branch."
+)
+
+
+def moves_main(command: str, rest: list[str]) -> bool:
+    """Rewrites the local main ref without a commit: `switch -C main`, `branch -f main`, a
+    `<src>:main` fetch or pull, `update-ref refs/heads/main`."""
+    named = any(arg in MAIN_REFS for arg in rest)
+    match command:
+        case "switch" | "checkout":
+            return any(name in MAIN_REFS for name in created_branches(rest))
+        case "worktree":
+            return rest[:1] == ["add"] and any(name in MAIN_REFS for name in created_branches(rest))
+        case "branch":
+            rewrites = set(BRANCH_REWRITE_SHORT) & short_flags(rest) or BRANCH_REWRITE_LONG & {
+                arg.partition("=")[0] for arg in rest
+            }
+            return named and bool(rewrites)
+        case "fetch" | "pull":
+            positionals = [arg for arg in rest if not arg.startswith("-")][1:]
+            return any(spec.partition(":")[2] in MAIN_REFS for spec in positionals)
+        case "update-ref":
+            return named
+        case _:
+            return False
 
 
 def analyze_alias(
-    command: str, rest: list[str], context: GitContext, repo: Repo, depth: int
+    command: str, rest: list[str], context: GitContext, shell: Shell, repo: Repo, depth: int
 ) -> Verdict:
     if UNKNOWN in command:
         raise Unparseable("a git subcommand that's only known at run time")
@@ -554,9 +725,10 @@ def analyze_alias(
         return ALLOW  # not an alias: an external git-<command>, or a typo git rejects
     if depth >= MAX_DEPTH:
         raise Unparseable("git aliases nested too deeply")
+    inner = shell.nested(context.cwd)
     if alias.startswith("!"):
-        return analyze(f"{alias[1:]} {shlex.join(rest)}", context.cwd, repo, depth + 1)
-    return analyze_git([*shlex.split(alias), *rest], context.cwd, repo, depth + 1)
+        return analyze_in(f"{alias[1:]} {shlex.join(rest)}", inner, repo, depth + 1)
+    return analyze_git([*shlex.split(alias), *rest], inner, repo, depth + 1)
 
 
 def check_git_command(command: str, rest: list[str], context: GitContext, repo: Repo) -> Verdict:
@@ -571,12 +743,91 @@ def check_git_command(command: str, rest: list[str], context: GitContext, repo: 
             return check_rebase(rest)
         case "reset":
             return check_reset(rest, context, repo)
+        case "config":
+            return check_config(rest)
+        case "cherry-pick" | "revert" | "am":
+            return check_commits_on_main(command, rest, context, repo)
+        case "pull":
+            return check_pull(rest, context, repo)
+        case "update-ref":
+            return check_update_ref(rest, context, repo)
         case _:
             return ALLOW
 
 
+CONFIG_READ_COMMANDS = {"get", "list", "unset"}
+
+
+def check_config(rest: list[str]) -> Verdict:
+    """Writes to core.hooksPath, failing closed. A read subcommand as the first word
+    (`git config get <key>`), or the key with nothing after it, is a read. Any other command
+    naming the key with a word after it is a write: in the legacy form options end at the key,
+    so even `core.hooksPath --get` sets it, and words before the key can't be told apart
+    without modelling every option (`--comment --get core.hooksPath x` is a write)."""
+    keys = [index for index, arg in enumerate(rest) if arg.lower() == "core.hookspath"]
+    if not keys or rest[0] in CONFIG_READ_COMMANDS:  # keys found, so rest has a first word
+        return ALLOW
+    key = keys[0]
+    if key == len(rest) - 1:
+        return ALLOW
+    return blocked(
+        "setting `core.hooksPath` skips the repository's hooks. Fix what the hook reports "
+        "and run the command again with the hooks."
+    )
+
+
+def check_update_ref(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
+    if "--stdin" in rest:
+        raise Unparseable("`git update-ref --stdin` reads its updates from stdin")
+    positionals = parse_options(rest, "m", set()).positionals  # -m <reason> takes a value
+    if positionals[:1] == ["HEAD"] and on_main(context, repo):
+        return blocked("`git update-ref HEAD` " + MOVES_MAIN.format(main=MAIN))
+    return ALLOW
+
+
+def check_commits_on_main(
+    command: str, rest: list[str], context: GitContext, repo: Repo
+) -> Verdict:
+    """`cherry-pick`, `revert`, and `am` make commits, so they're refused on main like
+    `git commit` (abandoning or skipping one in progress isn't; `--continue` makes a commit)."""
+    if any(long_option(f, "--no-verify", "--no-veri") for f in rest):
+        return blocked(SKIP_HOOKS)
+    if {"--abort", "--quit", "--skip"} & set(rest):
+        return ALLOW
+    if on_main(context, repo):
+        return blocked(
+            f"`git {command}` makes commits on `{MAIN}`. Work on the slice branch "
+            f"(`git switch s<n>`): `{MAIN}` changes only when the owner merges the slice's pull "
+            "request."
+        )
+    return ALLOW
+
+
+def check_pull(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
+    """On main, only a fast-forward from main itself (updating it after the owner merges)."""
+    if any(long_option(f, "--no-verify", "--no-veri") for f in rest):
+        return blocked(SKIP_HOOKS)
+    if not on_main(context, repo):
+        return ALLOW
+    fast_forward = [f for f in rest if f in ("--ff-only", "--ff", "--no-ff")]
+    sources = [w for w in rest if not w.startswith("-")][1:]
+    if fast_forward[-1:] == ["--ff-only"] and all(s in MAIN_REFS for s in sources):
+        return ALLOW
+    return blocked(
+        f"`git pull` on `{MAIN}` can merge or bring in another branch. Use `git pull --ff-only` "
+        f"(from `{MAIN}`) to update `{MAIN}` after the owner merges."
+    )
+
+
 def on_main(context: GitContext, repo: Repo) -> bool:
-    return repo.current_branch(context.where()) == MAIN
+    where = context.head()
+    branch = repo.current_branch(where)
+    if branch is None:
+        raise CantTell(
+            f"which branch it runs on: no branch is checked out at {where} (a detached HEAD, or "
+            "a directory this command creates). Switch to a branch first, in its own command."
+        )
+    return branch == MAIN
 
 
 def long_option(option: str, full: str, shortest: str) -> bool:
@@ -642,7 +893,7 @@ def check_commit(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
             f"`{MAIN}` changes only when the owner merges the slice's pull request."
         )
     amend = any(long_option(f, "--amend", "--am") for f in parsed.flags)
-    if amend and repo.head_on_remote(context.where()):
+    if amend and repo.head_on_remote(context.head()):
         return blocked(f"`git commit --amend`: HEAD is already on the remote. {FIX_FORWARD}")
     return ALLOW
 
@@ -705,7 +956,7 @@ def check_push(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
     if not refspecs:
         if on_main(context, repo):
             return blocked(TO_MAIN)
-        destination = repo.push_destination(context.where())
+        destination = repo.push_destination(context.head())
         if destination is not None and destination.split("/", 1)[-1] == MAIN:
             return blocked(TO_MAIN)
     return ALLOW
@@ -723,7 +974,7 @@ def check_refspec(refspec: str, context: GitContext, repo: Repo) -> Verdict:
         )
     source, _, destination = refspec.partition(":")
     if not destination and source in ("HEAD", "@"):
-        destination = repo.current_branch(context.where()) or ""
+        destination = repo.current_branch(context.head()) or ""
     if (destination or source) in MAIN_REFS:
         return blocked(TO_MAIN)
     return ALLOW
@@ -753,11 +1004,14 @@ def check_reset(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
             "can't tell which commit `git reset` moves to. Name it literally, so the guard can "
             "check that no pushed commit is dropped."
         )
-    if repo.drops_pushed_commits(context.where(), target):
+    if repo.drops_pushed_commits(context.head(), target):
         return blocked(
             f"`git reset {target}` would drop commits that are already on the remote. "
             f"{FIX_FORWARD} (Resetting unpushed commits is allowed.)"
         )
+    to_main = re.fullmatch(rf"HEAD|@|(refs/heads/)?{MAIN}|(refs/remotes/)?[^/]+/{MAIN}", target)
+    if not to_main and on_main(context, repo):
+        return blocked(f"`git reset {target}` on `{MAIN}` " + MOVES_MAIN.format(main=MAIN))
     return ALLOW
 
 
@@ -787,7 +1041,15 @@ def gh_words(args: list[str]) -> Iterator[str]:
         index += 1
 
 
-def analyze_gh(args: list[str]) -> Verdict:
+def field_value(word: str) -> str:
+    """A `gh api` field without its flag: `-Fquery=@x`, `--field=query=@x` → `query=@x`."""
+    for prefix in ("--raw-field=", "--field=", "-F", "-f"):
+        if word.startswith(prefix):
+            return word[len(prefix) :]
+    return word
+
+
+def analyze_gh(args: list[str], shell: Shell) -> Verdict:
     words = [w for w in gh_words(args) if not w.startswith("--repo=")]
     command = next((w for w in words if not w.startswith("-")), None)
     if command is None:
@@ -795,15 +1057,43 @@ def analyze_gh(args: list[str]) -> Verdict:
     if UNKNOWN in command or command not in GH_COMMANDS:
         raise Unparseable(f"`gh {command.replace(UNKNOWN, '$…')}` (an alias or extension?)")
     positionals = [w for w in words if not w.startswith("-")]
+    if positionals[:2] == ["pr", "checkout"] or positionals[:1] == ["co"]:
+        shell.moves.append(shlex.join(["gh", *positionals[:3]]))
     if positionals[:2] == ["pr", "merge"]:
         return Verdict(ask=OWNER_MERGES)
     if command == "api":
-        merges_endpoint = any(re.search(r"pulls/[^/]+/merge\b", w) for w in positionals[1:])
+        merges_endpoint = any(
+            re.search(r"pulls/[^/]+/merge\b|/merges\b", w) for w in positionals[1:]
+        )
         mutation = any(m in w for w in words for m in MERGE_MUTATIONS)
-        unseen = "graphql" in positionals and any(w.startswith("--input") for w in words)
+        unseen = "graphql" in positionals and any(
+            w.startswith("--input") or field_value(w).startswith("query=@") for w in words
+        )
         if merges_endpoint or mutation or unseen:
             return Verdict(ask=OWNER_MERGES)
+        if writes_main(words, positionals[1:]):
+            return Verdict(ask=OWNER_WRITES_MAIN)
     return ALLOW
+
+
+OWNER_WRITES_MAIN = (
+    f"This API call can change `{MAIN}` (its ref, or a file committed to it), which only the "
+    "owner's merge of the slice's pull request does. Allow it only if the owner said to."
+)
+
+
+def writes_main(words: list[str], endpoints: list[str]) -> bool:
+    """A `gh api` call to `main`'s ref, or one that writes a file (`contents/`, which commits to
+    the default branch unless told otherwise)."""
+    methods = [
+        words[index + 1].upper()
+        for index, word in enumerate(words[:-1])
+        if word in ("-X", "--method")
+    ] + [word.partition("=")[2].upper() for word in words if word.startswith("--method=")]
+    methods += [word[2:].upper() for word in words if word.startswith("-X") and len(word) > 2]
+    if any(re.search(rf"git/refs/heads/{MAIN}\b", endpoint) for endpoint in endpoints):
+        return True
+    return any("/contents/" in e for e in endpoints) and bool({"PUT", "DELETE"} & set(methods))
 
 
 # --- Hook entry point -------------------------------------------------------------------------
@@ -811,7 +1101,11 @@ def analyze_gh(args: list[str]) -> Verdict:
 
 def decide(command: str, cwd: Path | None, repo: Repo) -> Verdict:
     try:
-        return analyze(command, cwd, repo)
+        shell = Shell(cwd)
+        verdict = analyze_in(command, shell, repo)
+        if shell.moves:  # a branch switch somewhere in the line: check it all again without HEAD
+            verdict = analyze_in(command, Shell(cwd, head_moved=shell.moves[0]), repo)
+        return verdict
     except Unparseable as exc:
         return blocked(f"it can't check this command with confidence ({exc}). {SIMPLE}")
 
@@ -820,7 +1114,7 @@ def main(repo: Repo | None = None) -> int:
     try:
         data: dict[str, Any] = json.load(sys.stdin)
     except json.JSONDecodeError:
-        print("Blocked by the git guard: the hook input isn't JSON.", file=sys.stderr)  # noqa: T201
+        print("Blocked by the git guard: the hook input isn't JSON.", file=sys.stderr)
         return 2
     tool_input: dict[str, Any] = data.get("tool_input") or {}
     command = tool_input.get("command")
@@ -830,7 +1124,7 @@ def main(repo: Repo | None = None) -> int:
     verdict = decide(command, Path(cwd) if isinstance(cwd, str) else None, repo or GitRepo())
     if verdict.block:
         # stderr is how a blocking hook tells Claude why.
-        print(verdict.block, file=sys.stderr)  # noqa: T201
+        print(verdict.block, file=sys.stderr)
         return 2
     if verdict.ask:
         output = {
@@ -840,7 +1134,7 @@ def main(repo: Repo | None = None) -> int:
                 "permissionDecisionReason": verdict.ask,
             }
         }
-        print(json.dumps(output))  # noqa: T201
+        print(json.dumps(output))
     return 0
 
 
