@@ -80,8 +80,8 @@ docker-compose.yml   the local stack: postgres, migrate, api, worker, web (secti
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
-                design-change), agents
-                (checkpoint-reviewer, security-reviewer, fresh-clone-verifier, docs-consistency),
+                design-change), agents (checkpoint-reviewer, security-reviewer,
+                fresh-clone-verifier, docs-consistency, spec-test-writer),
                 hooks (see section 11)
 ```
 
@@ -640,9 +640,12 @@ value the test depends on explicitly.
 - A primary-key column that isn't a foreign key (e.g. `project_counter.prefix`) is only set if
   the factory sets `__set_primary_key__ = True`.
 
-**Rules** (`app/rules/`, pure: no database) are written **test-first**: the test from the
-design doc's rule or table, run red for the right reason (against a stub returning the wrong
-answer, not an `ImportError`), then the code. So far: `identifiers.py` (project keys, slugs and
+**Rules** (`app/rules/`, pure: no database) are written **test-first**, and so is
+`app/authz/`: write interface stubs (signatures and types, returning one fixed wrong answer),
+invoke the `spec-test-writer` agent, which writes the tests from the design doc's rules and
+tables without reading the implementation and proves each fails against the stub, then
+implement until they pass. Its files and their `git hash-object` go in the review record ("Spec
+tests"); a spec test changes only with the owner's approval. So far: `identifiers.py` (project keys, slugs and
 the reserved top-level routes in `RESERVED_SLUGS`, usernames; each check returns an
 `IdentifierProblem` for the field error), `password_policy.py` (`password_problems(...)`; the
 caller checks the hash and passes `same_as_current`), and `account_rank.py`
@@ -792,11 +795,14 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
   `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`, `docs-consistency`.
-- **When the agents run:** `checkpoint-reviewer` at every checkpoint, `security-reviewer` when
-  the build plan names the checkpoint for it or it touches security-relevant code,
-  `fresh-clone-verifier` and `docs-consistency` at the last checkpoint of a slice (all through
-  the `checkpoint` skill). `docs-consistency` also runs in every design change, before
+  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`.
+- **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
+  changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
+  at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
+  security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
+  two or three behaviors in a temporary copy), and `fresh-clone-verifier` and
+  `docs-consistency` at the last checkpoint of a slice. Reviewers never run tests at the same
+  time: they share the test database. `docs-consistency` also runs in every design change, before
   committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
   decisions for the owner, which are never decided for them.
 - **Design changes** outside a checkpoint's scope (decisions from a chat session, or code that

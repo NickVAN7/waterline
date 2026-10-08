@@ -47,10 +47,14 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 
 ## 4. Independent review
 
+- **Spec tests first:** if the checkpoint adds or changes `app/rules/` or `app/authz/`, start
+  `docs/reviews/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
+  behavior table and its files table, with each file's `git hash-object`), plus any change to
+  those files the owner approved (what and why). `checkpoint-reviewer` compares the files with
+  the recorded hashes.
 - Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit (the
   previous checkpoint's commit, or the root commit for the first).
-- Also invoke the `security-reviewer` agent, with the same inputs and in parallel, when
-  **either** holds:
+- Also invoke the `security-reviewer` agent, with the same inputs, when **either** holds:
   - the build plan's section for the slice says the checkpoint gets the security reviewer
     (e.g. Slice 1: "every checkpoint from 1 to 16"); or
   - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
@@ -59,11 +63,18 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
     areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
     `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
     store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
+- **One reviewer at a time:** when both run, invoke `security-reviewer` first and
+  `checkpoint-reviewer` once it has finished, never in parallel. Both can run tests against the
+  shared test database (`waterline_test`), and two runs at once collide: the concurrency tests
+  truncate tables and then require every table to be empty, and each run migrates the test
+  database at its start. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests
+  yourself while a reviewer is running.
 - Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
   and the diff.
-- **Last checkpoint of a slice:** also run `uv run wl down` (so ports are free) and invoke the
-  `fresh-clone-verifier` agent with the repository's absolute path and the checkpoint ID. Its
-  findings are fixed in `docs/developer-guide.md` like any other finding.
+- **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
+  (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
+  absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
+  any other finding. Run `uv run wl up` again afterwards.
 - **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
   agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
   (the root commit for Slice 0). It reports **Fixes** and **Decisions**.
@@ -84,12 +95,12 @@ If a finding shows a rule that would have prevented the mistake, add it to the r
 `CLAUDE.md`.
 
 **Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
-docs-consistency) in
-`docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include the base commit, the totals,
-and for each pass its verdict, its findings table with each
-resolution (fixed / logged with TD number / rejected with evidence), and the questions it
-raised. End with the questions still open for the owner and any owner decisions made during
-review. The record goes in the checkpoint's commit.
+docs-consistency) in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include the base
+commit, the totals, the "Spec tests" section (when the checkpoint has one), and for each pass
+its verdict, its findings table with each resolution (fixed / logged with TD number / rejected
+with evidence), `checkpoint-reviewer`'s "Sabotage checks" table, and the questions it raised.
+End with the questions still open for the owner and any owner decisions made during review.
+The record goes in the checkpoint's commit.
 
 **Tech debt due now:** before committing, list every open `docs/tech-debt.md` entry whose
 Fix by is this checkpoint (or this slice, at its last checkpoint). Each is resolved in this
@@ -134,6 +145,11 @@ Then:
 
 ## 7. Report and stop
 
+Nothing counts as verified because you say so. Label every verification claim in the report
+with who verified it: a gate (`wl check`, CI), an agent (e.g. "sabotage-checked by
+checkpoint-reviewer"), or the owner. Your own sabotage checks and runs are evidence for the
+reviewers, not verification.
+
 Send the owner:
 - the review note (the commit message body);
 - each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency) with
@@ -142,6 +158,11 @@ Send the owner:
 - any open questions from the review;
 - the PR link and its CI result, and whether this checkpoint ends its group (a review point)
   or the slice (so the PR is ready to merge on approval);
+- **a try-it-yourself script**, for any checkpoint with behavior visible through the API or
+  the UI: 3–6 numbered steps against the running dev stack (`curl` with a cookie jar and an
+  `Origin` header before S1-C14, screens after), each with its expected result, including at
+  least one step that should be denied. Run it once yourself to make sure the steps are right;
+  the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
   the owner, which skills and agents never triggered, and the verdict of any process trial.
   The owner decides what changes; each change gets a decision-log entry;

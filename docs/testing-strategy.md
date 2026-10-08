@@ -11,7 +11,7 @@ tested, what each kind of test is for, and the gates every change passes.
 - **Every checkpoint ships its tests.** No code lands without the tests that prove it; no step
   starts while anything is red.
 - **Every test must be able to fail.** A test exists to catch a specific bug. Test-first (for
-  `rules/` and `authz/`) and the sabotage check (everywhere else) prove each test can fail;
+  `rules/` and `authz/`, by `spec-test-writer`) and the sabotage check (everywhere else) prove each test can fail;
   mutation testing measures it. A test no plausible bug would break is fixed or removed.
 - **Deterministic.** Fake data uses a fixed seed; tests never depend on each other or on run
   order; a failure reproduces the same way every time.
@@ -221,11 +221,23 @@ saying why.
 
 ## Test-first and proving tests can fail
 
-- **Test-first (TDD)** for `rules/` and `authz/`: the test is written from the design doc's
-  table or rule before the code, and must fail for the right reason before the code is written.
+- **Test-first** for `rules/` and `authz/`, by the `spec-test-writer` agent (DL-11): the session
+  implementing the checkpoint first writes interface stubs (signatures and types, returning one
+  fixed wrong answer), then the agent writes the tests from the design doc's tables and rules
+  without reading the implementation, and proves each fails against the stub's answer or its
+  opposite. The session then implements until they pass. **Spec tests are protected:** the
+  agent's file list, with each file's `git hash-object`, goes in the review record ("Spec
+  tests"); if the implementation can't pass one, the owner decides whether the doc or the test
+  is wrong, and any change they approve is listed there. `checkpoint-reviewer` compares the
+  committed files with the recorded hashes, and an unlisted change is a blocker.
 - **Sabotage check** everywhere else: for each behavior, make the smallest change that breaks it
   (invert a condition, remove a `log_change()` call, drop an org filter), confirm a test fails,
   and restore the code.
+- **Independent sabotage spot-check:** `checkpoint-reviewer` picks two or three of the
+  checkpoint's behaviors by risk, from the docs (not from the author's list), breaks each in a
+  temporary copy of the repository, and records which test caught it. None failing is a major
+  finding (a blocker in `rules/` or `authz/`). The author's own checks are evidence, not
+  verification: nothing counts as verified because the session that did the work says so.
 - Tests are written **alongside** the code: in the same checkpoint and commit.
 - The `test-writer` skill (`.claude/skills/test-writer/`) is the working procedure: a behavior
   table with a source, layer, the bug each test catches, and the proof it fails; rules for

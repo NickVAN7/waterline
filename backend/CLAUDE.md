@@ -147,8 +147,9 @@ Calls flow **routers → services → repositories → models**. Services also u
 ## Tests
 
 - Follow the `test-writer` skill: every test names the bug it catches and is shown to fail
-  (test-first for `rules/` and `authz/`, a sabotage check elsewhere, mutation testing on
-  `rules/` and `authz/` from Slice 1).
+  (test-first for `rules/` and `authz/`, written by the `spec-test-writer` agent against your
+  stubs and never changed without the owner's approval; a sabotage check elsewhere; mutation
+  testing on `rules/` and `authz/` from Slice 1).
 - Real Postgres, never mocks or SQLite. Each test rolls back via savepoint; concurrency tests
   use the `concurrency` fixture and `@pytest.mark.concurrency("<table>", ...)`. Tests only
   ever use the test database (`waterline_test`, or a `scratch_database` created from it for one

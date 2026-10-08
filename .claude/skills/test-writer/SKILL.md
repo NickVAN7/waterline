@@ -90,9 +90,16 @@ showing the real endpoint or service denies the forbidden case.
 
 ## 4. Prove each test can fail
 
-- **`rules/` and `authz/`: test first.** Write the test, run it, and watch it fail *for the
-  right reason* (a wrong result, not an `ImportError`: create a stub that returns the wrong
-  answer if needed). Then implement until green. Record "red first" in the table.
+- **`rules/` and `authz/`: test first, by `spec-test-writer`.** The implementing session never
+  writes these tests. Write interface stubs first (signatures and types, each returning one
+  fixed wrong answer, e.g. always deny), then invoke the `spec-test-writer` agent with the
+  checkpoint ID, the design-doc sections and tables to cover, the stub paths, and the test files
+  it may create or extend. It writes the tests from the docs without reading any other app
+  code, and proves each fails against the stub's answer or its opposite. Then implement until
+  green. Its output (behavior table, files with their `git hash-object`) goes in the review
+  record's "Spec tests" section. If the implementation can't pass a spec test, stop and ask the
+  owner whether the doc or the test is wrong; list any change they approve in the record.
+  Tests you add on top (wiring, API, integration) follow the rest of this skill.
 - **Everything else: sabotage check.** For each behavior in the table, make the smallest change
   to the code that breaks it (invert a condition, remove the `log_change()` call, drop the
   access-scoping filter, skip the version check, return early), run the related tests, and confirm at least

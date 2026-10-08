@@ -68,8 +68,14 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 
 ## Always
 
-- Tests ship with the code they test (see `docs/testing-strategy.md`); test-first for
-  `backend/app/rules/` and `backend/app/authz/`.
+- Tests ship with the code they test (see `docs/testing-strategy.md`). Test-first for
+  `backend/app/rules/` and `backend/app/authz/` means the `spec-test-writer` agent: write
+  interface stubs (signatures and types, returning one fixed wrong answer), invoke the agent,
+  then implement until its tests pass. Never change a spec test without the owner's approval.
+- **Nothing counts as verified because the session that did the work says so.** A claim is
+  verified only by a gate (`wl check`, CI), an independent agent, or the owner. Reports label
+  each verification claim with who verified it (e.g. "sabotage-checked by
+  checkpoint-reviewer").
 - Never hand-edit generated files: `backend/openapi.json`, `frontend/src/api/schema.d.ts`.
 - When a review catches a mistake that a rule would have prevented, add that rule to the
   relevant `CLAUDE.md` as part of the fix.
@@ -79,12 +85,14 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 ## Skills, agents, and hooks
 
 - `test-writer` — for every test you write or change.
+- `spec-test-writer` (agent) — at the start of every checkpoint that adds or changes code in
+  `backend/app/rules/` or `backend/app/authz/`, before the implementation.
 - `migration` — for every schema change.
 - `new-area` — for a new aggregate, or a new endpoint or action in an existing one.
-- `checkpoint` — to close every checkpoint; it runs `checkpoint-reviewer`, `security-reviewer`
-  (when the build plan names the checkpoint for it, or the diff touches security-relevant
-  code), `fresh-clone-verifier` (last checkpoint of a
-  slice), and `docs-consistency` (last checkpoint of a slice).
+- `checkpoint` — to close every checkpoint; it runs `security-reviewer` (when the build plan
+  names the checkpoint for it, or the diff touches security-relevant code), then
+  `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a temporary copy), then
+  `fresh-clone-verifier` and `docs-consistency` (last checkpoint of a slice).
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).

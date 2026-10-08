@@ -90,16 +90,26 @@ PR (`s1-foundations`); the slice branch starts with S1-C5.
   repository (TD-15). Until then, check CI by hand before merging (`gh pr checks`).
 
 ### Verification (three layers)
+**Nothing counts as verified because the session that did the work says so** (DL-11). A claim is
+verified only by a gate (`wl check`, CI), an independent agent, or the owner, and reports label
+each verification claim with who verified it (e.g. "sabotage-checked by checkpoint-reviewer").
+
 1. **Automated gates:** lint, types, all tests, coverage thresholds, import-linter contracts,
    migration checks. A checkpoint doesn't go to review until these pass.
 2. **Independent review:** a separate reviewer agent that did not write the code, with fresh
    context, reads the design docs and the checkpoint's changes and reports on design and
    convention conformance, bugs, tests that couldn't fail, and whether the docs match what was
-   built. Checkpoints touching authentication, authorization, routers, rendered markdown, or
-   GitHub code also get a security-focused reviewer. Every finding is fixed or logged in the
-   tech-debt log with a reason.
+   built. It also sabotage-checks two or three of the checkpoint's riskiest behaviors in a
+   temporary copy of the repository. Checkpoints touching authentication, authorization,
+   routers, rendered markdown, or GitHub code also get a security-focused reviewer, which runs
+   first (the two never run tests at the same time). Tests for `app/rules/` and `app/authz/`
+   are written from the docs by `spec-test-writer`, before the implementation, and protected
+   by recorded hashes. Every finding is fixed or logged in the tech-debt log with a reason.
 3. **Owner approval:** the review note, the reviewer's findings, and their resolution go to
-   the project owner, who signs off before the next checkpoint.
+   the project owner, who signs off before the next checkpoint. For a checkpoint with behavior
+   visible through the API or the UI, the report includes a short try-it-yourself script
+   against the running dev stack, with at least one step that should be denied; the owner's
+   run is the check.
 
 **Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10)** (DL-10). A trial, not yet the
 rule; every other checkpoint keeps the full stop for approval.
@@ -150,15 +160,23 @@ Everything lives in the repository, version-controlled and present on every work
   checkpoint process; the backend and frontend files list the conventions that are easy to break
   silently. When a review catches a mistake a rule would have prevented, the fix adds that rule.
 - **`checkpoint-reviewer` agent** (`.claude/agents/`): verification layer 2. A fresh-context
-  reviewer that reads the docs and the diff, never edits files, and reports findings in a fixed
-  format.
+  reviewer that reads the docs and the diff, sabotage-checks two or three behaviors in a
+  temporary copy (never the repository), compares spec tests with their recorded hashes, and
+  reports findings in a fixed format.
+- **`spec-test-writer` agent** (`.claude/agents/`): writes the tests for new or changed code in
+  `app/rules/` and `app/authz/` from the design docs, before the implementation exists and
+  without reading it, at the start of every checkpoint that adds or changes such code (Slice 1:
+  S1-C7 and S1-C13; later slices as their plans name). The main session first writes interface
+  stubs (signatures and types, returning one fixed wrong answer), then invokes the agent, then
+  implements. Its file list, with each file's `git hash-object`, goes in the review record
+  ("Spec tests"); a spec test changes only with the owner's approval.
 - **`checkpoint` skill** (`.claude/skills/checkpoint/`): the close-out procedure every
   checkpoint ends with:
   - a scope check, then `wl check`;
   - docs and tech-debt updates;
-  - the reviewers: `checkpoint-reviewer` every time, `security-reviewer` when the slice's
-    section names the checkpoint for it or the diff touches security-relevant code, and at the
-    end of a slice `fresh-clone-verifier`, plus `docs-consistency` after `checkpoint-reviewer`;
+  - the reviewers, one at a time: `security-reviewer` when the slice's section names the
+    checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
+    every time, and at the end of a slice `fresh-clone-verifier` and `docs-consistency`;
   - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
   - one commit with the review note, pushed to the slice branch;
   - the report, and stopping for approval.
@@ -316,7 +334,8 @@ The sections below describe the content; the table above is the order of work.
 │   ├── settings.json                   hooks configuration
 │   ├── hooks/                          protect_files.py, format_file.py
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
-│   │                                   fresh-clone-verifier.md, docs-consistency.md
+│   │                                   fresh-clone-verifier.md, docs-consistency.md,
+│   │                                   spec-test-writer.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
 │                                       design-change/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
@@ -741,13 +760,13 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
 | 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL |
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
-| 7 | Authorization core | Action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions` (per-org actions come in Checkpoint 11); the full matrix (including personal actions) and fail-closed tests |
+| 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions` (per-org actions come in Checkpoint 11); the full matrix (including personal actions) and fail-closed tests |
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners; live slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`: owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
 | 11 | Projects | Create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin, a separate action `project.assign_first_admin` in the org's `allowed_actions`, carried on each org entry in `/me`; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
 | 12 | Project members | List (per-row `allowed_actions`); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its three cases (design-doc §4; an existing member found by email is a 422 on `email`, `already_member`); change role; remove (removing the lead's membership clears `lead_id`, recorded in the `project_member_removed` details, also in archived projects through removal with their projects); the per-project access review (design-doc §5); registers the `on_member_removed` handler with the org and workspace services, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
-| 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first and mutation-tested; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
+| 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first (`spec-test-writer`, against stubs) and mutation-tested, with the `authz/` changes' tests from `spec-test-writer` too; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
 | 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; My work as the home page, with its projects section (design-doc §11); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
 | 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners); the per-person access review; org settings; org members page (email-first add-person form with a generated temporary password shown once, role changes, account actions, the D2 removal dialog) |
 | 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, description, module selection with guidance, and a first-admin picker shown only when the org's entry in `/me` includes `project.assign_first_admin`); project settings (description, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged); the per-project access review; classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
@@ -973,7 +992,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
 ### Classification & export control (§3.1; Checkpoint 13)
 - `rules/classification.py`: effective classification (the stricter level, the union of
-  categories) and the raise and lower rules, test-first and mutation-tested.
+  categories) and the raise and lower rules, test-first (`spec-test-writer`) and
+  mutation-tested.
 - Setting a project's level and categories, at creation (recorded in `project_created`) or
   in settings: project admins (including inherited) set and raise; lowering or removing a
   category is project-admin only; removing `export_controlled`, and on an export-controlled
