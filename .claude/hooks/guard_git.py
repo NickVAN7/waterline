@@ -1,42 +1,39 @@
-"""PreToolUse hook (Bash): stop git and gh commands that would land work on `main`, rewrite
-pushed history, skip hooks, or merge a pull request without the owner.
+"""PreToolUse hook (Bash): the git guard, an allow-list (DL-26).
 
-A guard against mistakes, not a security boundary: branch protection (TD-15) is the real
+A call that involves git or gh must be one command in an allowed form, so that Claude never
+commits or merges on `main` (DL-21), pushes to `main` (DL-22), rewrites pushed history (DL-23),
+or skips hooks (DL-24); merging a pull request or writing through the GitHub API asks the owner
+(DL-25). Anything else that mentions git or gh is blocked: the owner runs it (`! <command>`).
+Every allowed git form's effect is verified against real git by the tests (the gh forms are
+tested against this guard only).
+
+A guard against mistakes, not a security boundary: GitHub's rulesets (DL-27) are the real
 control. Reads the hook input (JSON) on stdin. Exit code 2 blocks the command and shows stderr
 to Claude; a PreToolUse `permissionDecision` of "ask" on stdout makes Claude Code ask the user;
-exit code 0 with no output lets the normal permission flow continue. A command that mentions
-git or gh and can't be parsed with confidence is blocked (fail closed).
+exit code 0 with no output lets the normal permission flow continue.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import shlex
 import subprocess
 import sys
-from collections.abc import Iterator
 from dataclasses import dataclass, field
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Protocol
 
 MAIN = "main"
-MAIN_REFS = {MAIN, f"heads/{MAIN}", f"refs/heads/{MAIN}"}
-# Stands in for anything expanded at run time ($VAR, $(...), `...`): its value is unknown.
+# Stands in for anything expanded at run time ($VAR, $(...), `...`, braces): its value is unknown.
 UNKNOWN = "\x00"
-MAX_DEPTH = 5
-
-SIMPLE = (
-    "Run git and gh as simple commands (one per call, or joined with && or ;), with literal "
-    "arguments, not through aliases, wrappers like xargs, or a shell reading stdin."
-)
-FIX_FORWARD = (
-    "Make a follow-up commit instead (`fix(<ID>): <what>`); pushed history is never rewritten."
-)
+# An unquoted `*`, `?`, or `[` in a redirect target: bash expands it to an existing file
+# (verified, bash 5.3), so `>> .gi?/config` writes `.git/config` without naming it.
+GLOB = "\x01"
 
 
 class Unparseable(Exception):  # noqa: N818 -- reads as a verdict: "Unparseable(reason)"
-    """The command mentions git or gh but can't be analyzed with confidence."""
+    """The command can't be analyzed with confidence."""
 
 
 @dataclass(frozen=True)
@@ -62,7 +59,8 @@ class Repo(Protocol):
     def push_destination(self, cwd: Path) -> str | None: ...
     def head_on_remote(self, cwd: Path) -> bool: ...
     def drops_pushed_commits(self, cwd: Path, target: str) -> bool | None: ...
-    def alias(self, cwd: Path, name: str) -> str | None: ...
+    def full_ref(self, cwd: Path, name: str) -> str | None: ...
+    def remotes(self, cwd: Path) -> list[str]: ...
 
 
 class GitRepo:
@@ -76,7 +74,7 @@ class GitRepo:
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=10,
+                timeout=2,  # 5 calls at most per command: under the hook's 15 s
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise Unparseable(f"couldn't ask git about the repository: {exc}") from exc
@@ -105,8 +103,17 @@ class GitRepo:
         unpushed = self._out(cwd, "rev-list", "--count", f"{target}..HEAD", "--not", "--remotes")
         return dropped != unpushed
 
-    def alias(self, cwd: Path, name: str) -> str | None:
-        return self._out(cwd, "config", "--get", f"alias.{name}")
+    def remotes(self, cwd: Path) -> list[str]:
+        """The configured remotes' names (verified: `git remote` prints one per line)."""
+        names = self._out(cwd, "remote")
+        return names.splitlines() if names else []
+
+    def full_ref(self, cwd: Path, name: str) -> str | None:
+        """The ref `name` names (`main` → `refs/heads/main`, `origin/main` →
+        `refs/remotes/origin/main`); empty for a commit expression such as `HEAD~1`; None when
+        it names nothing. Verified with real git: a branch called `fix/main` is
+        `refs/heads/fix/main`, a tag `refs/tags/…`."""
+        return self._out(cwd, "rev-parse", "--symbolic-full-name", name)
 
 
 # --- Tokenizing -------------------------------------------------------------------------------
@@ -137,6 +144,11 @@ class Segment:
 class Script:
     segments: list[Segment]
     substitutions: list[str]  # the commands inside $(...), `...`, <(...), >(...)
+    operators: list[str]
+    redirect_targets: list[str] = field(default_factory=list[str])  # files read or written
+    # One per heredoc: whether its delimiter was quoted (`<<'EOF'`), so bash leaves the body as
+    # text; an unquoted body runs its `$(...)` and backticks.
+    heredocs_quoted: list[bool] = field(default_factory=list[bool])
 
 
 class _Scanner:
@@ -223,6 +235,29 @@ class _Scanner:
             index += 1
         return None
 
+    def read_parameter(self) -> None:
+        """At the `{` of `${…}`: past its matching `}`, recording the `$(...)` and backticks
+        inside (bash runs them: `${x:-$(cmd)}`, verified), and stepping over quotes."""
+        self.i += 1
+        depth = 1
+        while self.i < len(self.text):
+            char = self.text[self.i]
+            if char == "\\":
+                self.i += 2
+            elif char == "'":
+                self.skip_quoted("'")
+            elif self.peek(2) == "$(":
+                self.i += 2
+                self.substitutions.append(self.read_until_close())
+            elif char == "`":
+                self.substitutions.append(self.read_backticks())
+            else:
+                self.i += 1
+                depth += {"{": 1, "}": -1}.get(char, 0)
+                if depth == 0:
+                    return
+        raise Unparseable("an unclosed ${")
+
     def expansion(self, *, quoted: bool = False) -> bool:
         """At `$`, `` ` ``, or (unquoted) `<(`, `>(`, `$'`, `$"` or a brace expansion: records
         a command substitution or skips what's only known at run time, returning True; False
@@ -236,8 +271,9 @@ class _Scanner:
             self.i = end + 1
             return True
         if not quoted and self.peek(2) == '$"':
+            # A translated string is a double-quoted one (bash runs its `$(...)`), so only the
+            # `$` is consumed: the string is then read like any double-quoted text.
             self.i += 1
-            self.skip_quoted('"')
             return True
         brace_end = None if quoted or self.peek() != "{" else self.brace_expansion_end()
         if brace_end is not None:
@@ -253,10 +289,7 @@ class _Scanner:
         if self.peek() == "$" and VARIABLE_START.match(self.peek(2)[1:] or " "):
             self.i += 1
             if self.peek() == "{":
-                end = self.text.find("}", self.i)
-                if end == -1:
-                    raise Unparseable("an unclosed ${")
-                self.i = end + 1
+                self.read_parameter()
             else:
                 match = re.match(r"[A-Za-z_][A-Za-z_0-9]*|.", self.text[self.i :])
                 self.i += len(match.group(0)) if match else 0
@@ -275,21 +308,27 @@ def tokenize(text: str) -> Script:
     pending_heredocs: list[tuple[str, bool, Segment]] = []  # delimiter, strip tabs, reader
     drop_next_word = False
     heredoc_next_word: bool | None = None  # strip-tabs flag while awaiting a delimiter
+    operators: list[str] = []  # control operators (`&&`, `;`, `|`, `(`, …), not redirections
+    redirect_targets: list[str] = []
+    heredocs_quoted: list[bool] = []
+    quoted = False  # whether the current word has any quoting (so a heredoc delimiter is quoted)
 
     def end_word() -> None:
-        nonlocal word, in_word, drop_next_word, heredoc_next_word
+        nonlocal word, in_word, drop_next_word, heredoc_next_word, quoted
         if in_word:
             value = "".join(word)
             if heredoc_next_word is not None:
                 pending_heredocs.append(
                     (value.replace(UNKNOWN, ""), heredoc_next_word, segments[-1])
                 )
+                heredocs_quoted.append(quoted)
                 heredoc_next_word = None
             elif drop_next_word:
+                redirect_targets.append(value)
                 drop_next_word = False
             else:
                 segments[-1].words.append(value)
-        word, in_word = [], False
+        word, in_word, quoted = [], False, False
 
     def new_segment() -> None:
         if segments[-1].words or segments[-1].heredocs:
@@ -317,15 +356,15 @@ def tokenize(text: str) -> Script:
                 scanner.i += 2
                 continue
             word.append(text[scanner.i + 1 : scanner.i + 2])
-            in_word = True
+            in_word = quoted = True
             scanner.i += 2
         elif char == "'":
             start = scanner.i
             scanner.skip_quoted("'")
             word.append(text[start + 1 : scanner.i - 1])
-            in_word = True
+            in_word = quoted = True
         elif char == '"':
-            in_word = True
+            in_word = quoted = True
             scanner.i += 1
             while True:
                 if scanner.i >= len(text):
@@ -369,745 +408,856 @@ def tokenize(text: str) -> Script:
             else:
                 end_word()
                 new_segment()
+                operators.append(operator)
             scanner.i += len(operator)
         else:
-            word.append(char)
+            word.append(GLOB if drop_next_word and char in "*?[" else char)
             in_word = True
             scanner.i += 1
     end_word()
     if pending_heredocs:
         read_heredoc_bodies()
-    return Script([s for s in segments if s.words], scanner.substitutions)
+    return Script(
+        [s for s in segments if s.words],
+        scanner.substitutions,
+        operators,
+        redirect_targets,
+        heredocs_quoted,
+    )
 
 
-# --- Analysis ---------------------------------------------------------------------------------
+# --- What a call may do -----------------------------------------------------------------------
 
-ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*=")
-PREFIX_WORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "{", "time", "nohup"}
-SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
-# Commands whose arguments are only data, so `which git` or `grep gh docs` runs nothing.
+# Commands that only read and print, with no option that runs a program or writes a file, so
+# `grep -rn "git push" docs` or `cat .git/config` changes nothing. (Not `sort -o`, `uniq <out>`,
+# `rg --pre`, `file -C`, pagers, or `test`/`[`/`[[`/`printf -v`, which evaluate an array
+# subscript, and so a `$(...)` in it, even in a single-quoted operand: verified.) Where their
+# output goes is checked separately.
 DATA_COMMANDS = {
-    "echo", "printf", "which", "type", "whereis", "man", "grep", "egrep", "fgrep", "rg", "ls",
-    "cat", "head", "tail", "wc", "test", "[", "[[", "true", "false", "cut", "sort", "uniq", "tr",
-    "diff", "jq", "basename", "dirname", "realpath", "readlink",
+    "echo", "which", "type", "whereis", "grep", "egrep", "fgrep", "ls", "cat", "head", "tail",
+    "wc", "true", "false", "cut", "tr", "diff", "jq", "basename", "dirname", "realpath",
+    "readlink", "stat",
 }  # fmt: skip
-# Names that, as an argument to some other command, may be run by it (xargs git, find -exec git).
-RUNNABLE = {"git", "gh", "eval", "xargs", "env", *SHELLS}
-ENV_FLAGS = {"-i", "--ignore-environment", "-0", "--null", "-v", "--debug", "--"}
+ONE_COMMAND = (
+    "a call that involves git or gh must be that one command and nothing else: no `&&`, `;`, "
+    "`|`, `cd`, variables, `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` "
+    "for another directory, and `git commit -F - <<'EOF'` for a message. Anything the "
+    "allow-list doesn't cover, ask the owner to run (`! <command>`)."
+)
 
 
 def mentions_git(text: str) -> bool:
-    return re.search(r"\b(git|gh)\b", text) is not None
-
-
-@dataclass
-class Shell:
-    """The working directory as earlier commands left it, and branch switches. Order inside a
-    line can't be trusted (substitutions run first, nested shells run apart), so a branch
-    switch anywhere in the line makes the branch unknown for every check in it: `moves`
-    collects the switches (shared by nested copies), and `head_moved` is set for the second
-    pass `decide` makes when there were any."""
-
-    cwd: Path | None
-    head_moved: str | None = None
-    moves: list[str] = field(default_factory=list[str])
-
-    def nested(self, cwd: Path | None = None) -> Shell:
-        return Shell(self.cwd if cwd is None else cwd, self.head_moved, self.moves)
-
-
-def analyze_in(command: str, shell: Shell, repo: Repo, depth: int = 0) -> Verdict:
-    """The verdict for a whole command line: the first block, else the first ask, else allow."""
-    if not mentions_git(command):
-        return ALLOW
-    if depth > MAX_DEPTH:
-        raise Unparseable("commands nested too deeply")
-    script = tokenize(command)
-    verdicts = [
-        analyze_in(inner, shell.nested(), repo, depth + 1) for inner in script.substitutions
-    ]
-    for segment in script.segments:
-        verdicts.append(analyze_segment(segment, shell, repo, depth))
-    return next(
-        (v for v in verdicts if v.block),
-        next((v for v in verdicts if v.ask), ALLOW),
-    )
+    """git, gh, or a git config file (`.gitconfig`, `~/.config/git/config`)."""
+    return re.search(r"\b(git|gh)\b|gitconfig", text) is not None
 
 
 def basename(word: str) -> str:
     return word.rsplit("/", 1)[-1]
 
 
-def resolve_path(cwd: Path | None, path: str) -> Path | None:
-    """A literal path relative to `cwd`; None when it can't be known before running."""
-    if cwd is None or UNKNOWN in path or path == "-":
-        return None
-    return (cwd / Path(path).expanduser()).resolve()
+def script_mentions_git(script: Script) -> bool:
+    """Git or gh in any word, redirect target, or heredoc body, after quoting is removed (so
+    `.g''it/config` counts as `.git/config`), or in any substitution, read the same way."""
+    texts = [
+        *(word for segment in script.segments for word in segment.words),
+        *(body for segment in script.segments for body in segment.heredocs),
+        *script.redirect_targets,
+    ]
+    return any(mentions_git(text) for text in texts) or any(
+        substitution_mentions_git(inner) for inner in script.substitutions
+    )
 
 
-def skips_hooks(assignment: str) -> bool:
-    """`SKIP=<hook>` (pre-commit's way to skip a hook) or a `GIT_CONFIG_*` variable (git config
-    from the environment, e.g. core.hooksPath)."""
-    name = assignment.partition("=")[0]
-    # GIT_CONFIG_NOSYSTEM only turns a config file off; it can't set anything.
-    return name == "SKIP" or (name.startswith("GIT_CONFIG") and name != "GIT_CONFIG_NOSYSTEM")
+def substitution_mentions_git(inner: str) -> bool:
+    try:
+        return script_mentions_git(tokenize(inner))
+    except Unparseable:
+        return mentions_git(inner)
 
 
-ENV_SKIPS_HOOKS = (
-    "`SKIP=` and `GIT_CONFIG_*` variables can skip the repository's hooks (pre-commit's SKIP, "
-    "or core.hooksPath from the environment). Fix what the hook reports and run the command "
-    "again with the hooks."
-)
+def is_git_config_or_hooks(target: str) -> bool:
+    """A path inside a `.git` directory (its config or hooks), or a git config file outside it:
+    `~/.gitconfig`, or one under a `.config/git` directory."""
+    parts = Path(target).parts
+    under_config_git = any(a == ".config" and b == "git" for a, b in pairwise(parts))
+    return ".git" in parts or ".gitconfig" in parts or under_config_git
 
 
-def analyze_segment(segment: Segment, shell: Shell, repo: Repo, depth: int) -> Verdict:
-    """The verdict for one simple command; `shell` is updated for the commands after it."""
-    words = segment.words
-    index = 0
-    assignments: list[str] = []
-    while index < len(words) and (ASSIGNMENT.match(words[index]) or words[index] in PREFIX_WORDS):
-        if ASSIGNMENT.match(words[index]):
-            assignments.append(words[index])
-        index += 1
-    if index < len(words) and words[index] in ("command", "builtin", "exec"):
-        if words[index] == "command" and words[index + 1 : index + 2] in (["-v"], ["-V"]):
-            return ALLOW  # a lookup, not a run
-        index += 1
-    if index < len(words) and words[index] == "env":
-        index += 1
-        while index < len(words) and (words[index] in ENV_FLAGS or ASSIGNMENT.match(words[index])):
-            if ASSIGNMENT.match(words[index]):
-                assignments.append(words[index])
-            index += 1
-        if index < len(words) and words[index].startswith("-"):
-            raise Unparseable(f"`env {words[index]}`")
-    if index >= len(words):
+def writes_into_git_dir(script: Script) -> bool:
+    """A redirect to a git config or hooks file, or to a file whose name is only known at run
+    time."""
+    return any(
+        UNKNOWN in target or is_git_config_or_hooks(target) for target in script.redirect_targets
+    )
+
+
+def decide(command: str, cwd: Path | None, repo: Repo) -> Verdict:
+    """The verdict for one Bash call (DL-26): one git or gh command in an allowed form, or a
+    call where git and gh appear only as data; anything else that mentions them is blocked."""
+    try:
+        script = tokenize(command)
+    except Unparseable as exc:
+        if not mentions_git(command):
+            return ALLOW  # not about git; bash will report its own syntax error
+        return blocked(f"it can't parse this command ({exc}). {ONE_COMMAND}")
+    if any(GLOB in target for target in script.redirect_targets):
+        return blocked(
+            "a glob (`*`, `?`, `[`) in a redirect target can name `.git/` without saying so "
+            "(DL-24). Name the file."
+        )
+    if not mentions_git(command) and not script_mentions_git(script):
         return ALLOW
-    name, args = basename(words[index]), words[index + 1 :]
-    if UNKNOWN in name:
-        raise Unparseable("a command whose name is only known at run time")
-    if name in RUNNABLE and any(skips_hooks(assignment) for assignment in assignments):
-        return blocked(ENV_SKIPS_HOOKS)  # git, or something that may run it, inherits them
-    if name == "git":
-        moved = next((a for a in assignments if a.startswith(("GIT_DIR=", "GIT_WORK_TREE="))), None)
-        return analyze_git(args, shell, repo, depth, other_repo=moved)
-    if name == "gh":
-        return analyze_gh(args, shell)
-    if name in SHELLS:
-        return analyze_shell(name, args, segment.heredocs, shell, repo, depth)
-    if name == "eval":
-        return analyze_in(" ".join(args), shell, repo, depth + 1)
-    if name in ("export", "declare", "typeset") and any(skips_hooks(arg) for arg in args):
-        return blocked(ENV_SKIPS_HOOKS)
-    if name in ("cd", "pushd"):
-        shell.cwd = resolve_path(shell.cwd, args[0] if args else "~")
+    if writes_into_git_dir(script):
+        return blocked(
+            "a redirect into `.git/` (its config or hooks) or a git config file, or to a file "
+            "named only at run time, can turn the repository's hooks off (DL-24). Write "
+            "somewhere else."
+        )
+    words = script.segments[0].words if len(script.segments) == 1 else []
+    if words and basename(words[0]) in ("git", "gh"):
+        # A substitution always leaves an unknown word or redirect target (both blocked), so
+        # operators and unknown words are all that's left to check.
+        if script.operators or any(UNKNOWN in word for word in words):
+            return blocked(ONE_COMMAND)
+        if not all(script.heredocs_quoted):
+            return blocked(
+                "an unquoted heredoc runs the `$(...)` and backticks in its body. Quote the "
+                "delimiter: `git commit -F - <<'EOF'`."
+            )
+        try:
+            if basename(words[0]) == "gh":
+                return check_gh(words[1:], script.segments[0].heredocs)
+            return check_git(words[1:], script.segments[0].heredocs, cwd, repo)
+        except Unparseable as exc:
+            return blocked(f"{exc}. {ONE_COMMAND}")
+    # Git appears only as data: every command only reads and prints, and nothing is expanded
+    # (an expansion can hide a command: `${x:-$(cmd)}`).
+    only_data = all(segment.words[0] in DATA_COMMANDS for segment in script.segments)
+    has_heredoc = any(segment.heredocs for segment in script.segments)
+    expands = any(UNKNOWN in word for segment in script.segments for word in segment.words) or bool(
+        script.substitutions
+    )
+    if only_data and not expands and not has_heredoc:
         return ALLOW
-    if name == "popd":
-        shell.cwd = None
-        return ALLOW
-    if name not in DATA_COMMANDS:
-        runnable = next((arg for arg in args if basename(arg) in RUNNABLE), None)
-        if runnable is not None:
-            raise Unparseable(f"`{name}` may run `{basename(runnable)}`")
-    return ALLOW
-
-
-def analyze_shell(
-    name: str, args: list[str], heredocs: list[str], shell: Shell, repo: Repo, depth: int
-) -> Verdict:
-    """`bash -c '<script>'` is checked like any command line; a shell reading a heredoc checks
-    its body; a shell reading stdin can't be checked."""
-    index, has_c = 0, False
-    while index < len(args) and args[index].startswith(("-", "+")) and args[index] != "--":
-        option = args[index]
-        index += 1
-        if option[0] == "-" and not option.startswith("--") and "c" in option:
-            has_c = True
-        if option in ("-o", "+o"):
-            index += 1
-    if index < len(args) and args[index] == "--":
-        index += 1
-    if has_c:
-        if index >= len(args):
-            raise Unparseable(f"`{name} -c` without a command")
-        return analyze_in(args[index], shell.nested(), repo, depth + 1)
-    if heredocs:
-        verdicts = [analyze_in(body, shell.nested(), repo, depth + 1) for body in heredocs]
-        return next((v for v in verdicts if v.block or v.ask), ALLOW)
-    if index < len(args):
-        return ALLOW  # runs a script file
-    raise Unparseable(f"`{name}` reading its commands from stdin")
+    return blocked(ONE_COMMAND)
 
 
 # --- git --------------------------------------------------------------------------------------
 
-GLOBAL_FLAGS = {
-    "-p", "--paginate", "-P", "--no-pager", "--no-replace-objects", "--bare",
-    "--literal-pathspecs", "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs",
-    "--no-optional-locks", "--no-advice", "--html-path", "--man-path", "--info-path",
-    "--version", "--help", "-v", "-h", "--exec-path",
-}  # fmt: skip
-GLOBAL_WITH_VALUE = {"--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env"}
-# Builtins and common commands, so a name outside this list is checked for being an alias.
-KNOWN_COMMANDS = {
-    "add", "am", "annotate", "apply", "archive", "bisect", "blame", "branch", "bundle",
-    "cat-file", "check-ignore", "checkout", "cherry", "cherry-pick", "citool", "clean", "clone",
-    "commit", "config", "count-objects", "describe", "diff", "diff-files", "diff-index",
-    "diff-tree", "difftool", "fetch", "for-each-ref", "format-patch", "fsck", "gc", "grep",
-    "hash-object", "help", "init", "log", "ls-files", "ls-remote", "ls-tree", "merge",
-    "merge-base", "mergetool", "mv", "name-rev", "notes", "pull", "push", "range-diff",
-    "rebase", "reflog", "remote", "repack", "replace", "reset", "restore", "rev-list",
-    "rev-parse", "revert", "rm", "shortlog", "show", "show-branch", "show-ref", "sparse-checkout",
-    "stash", "status", "submodule", "switch", "symbolic-ref", "tag", "update-index",
-    "update-ref", "var", "verify-commit", "verify-tag", "version", "whatchanged", "worktree",
-    "write-tree", "maintenance", "lfs",
-}  # fmt: skip
+
+@dataclass(frozen=True)
+class ReadFlags:
+    """A read command's allowed options: exact flags; long options that take a value
+    (`--format=…` or `--format …`); short options that take one attached (`-n5`, `-U3`); and
+    whether a bare count (`-5`) is allowed. Positionals (revisions, paths) are free. Anything
+    else is blocked: some options of read commands run a program (`grep -O<cmd>`) or write a
+    file (`log --output=<file>`)."""
+
+    flags: frozenset[str]
+    valued: frozenset[str] = frozenset()
+    short_valued: frozenset[str] = frozenset()
+    count: bool = False
 
 
-@dataclass
-class GitContext:
-    cwd: Path | None
-    head_moved: str | None = None  # an earlier command in the line that switched branches
-    unknown_repo: str | None = None  # why the repository can't be known, if it can't
-    configs: list[str] = field(default_factory=list[str])
+FORMAT = frozenset({
+    "--oneline", "--stat", "--shortstat", "--numstat", "--name-only", "--name-status", "--graph",
+    "--decorate", "--no-decorate", "--abbrev-commit", "--patch", "-p", "--no-patch", "-s",
+    "--color", "--no-color", "--relative-date", "-z", "--raw", "--summary", "--reverse",
+})  # fmt: skip
+FORMAT_VALUED = frozenset({"--format", "--pretty", "--color", "--date", "--abbrev", "--decorate"})
+HISTORY = frozenset({
+    "--all", "--branches", "--remotes", "--tags", "--first-parent", "--merges", "--no-merges",
+    "--follow", "--left-right", "--topo-order", "--date-order", "--ancestry-path", "-i",
+    "--regexp-ignore-case", "-E", "-F",
+})  # fmt: skip
+HISTORY_VALUED = frozenset({
+    "--max-count", "--since", "--after", "--until", "--before", "--author", "--committer",
+    "--grep", "--skip", "--branches", "--remotes", "--tags",
+})  # fmt: skip
+READ_ONLY = {
+    "status": ReadFlags(
+        frozenset(
+            {
+                "--short",
+                "-s",
+                "--branch",
+                "-b",
+                "--porcelain",
+                "--long",
+                "-z",
+                "--ignored",
+                "--untracked-files",
+                "-u",
+                "-uno",
+                "-unormal",
+                "-uall",
+            }
+        ),
+        frozenset({"--porcelain", "--untracked-files", "--ignored"}),
+    ),
+    "log": ReadFlags(FORMAT | HISTORY, FORMAT_VALUED | HISTORY_VALUED, frozenset({"-n"}), True),
+    "show": ReadFlags(FORMAT | {"--quiet", "-q"}, FORMAT_VALUED),
+    "diff": ReadFlags(
+        FORMAT
+        | {
+            "--cached",
+            "--staged",
+            "--exit-code",
+            "--quiet",
+            "-w",
+            "--ignore-all-space",
+            "-b",
+            "--ignore-space-change",
+            "--check",
+            "-M",
+            "--find-renames",
+            "--no-renames",
+            "-R",
+            "--word-diff",
+            "--relative",
+            "--minimal",
+            "--histogram",
+        },
+        FORMAT_VALUED | {"--unified", "--word-diff", "--diff-filter", "--relative", "--stat"},
+        frozenset({"-U"}),
+    ),
+    "rev-parse": ReadFlags(
+        frozenset(
+            {
+                "--abbrev-ref",
+                "--symbolic-full-name",
+                "--symbolic",
+                "--verify",
+                "--quiet",
+                "-q",
+                "--short",
+                "--show-toplevel",
+                "--git-dir",
+                "--git-common-dir",
+                "--absolute-git-dir",
+                "--is-inside-work-tree",
+                "--is-inside-git-dir",
+                "--is-bare-repository",
+                "--is-shallow-repository",
+                "--show-prefix",
+                "--show-cdup",
+                "--all",
+                "--branches",
+                "--tags",
+                "--remotes",
+            }
+        ),
+        frozenset({"--short", "--abbrev-ref"}),
+    ),
+    "ls-files": ReadFlags(
+        frozenset(
+            {
+                "--others",
+                "-o",
+                "--cached",
+                "-c",
+                "--deleted",
+                "-d",
+                "--modified",
+                "-m",
+                "--exclude-standard",
+                "--ignored",
+                "-i",
+                "-z",
+                "--stage",
+                "-s",
+                "--error-unmatch",
+                "--full-name",
+                "--directory",
+                "--unmerged",
+                "-u",
+            }
+        )
+    ),
+    "ls-tree": ReadFlags(
+        frozenset(
+            {
+                "-r",
+                "-t",
+                "-d",
+                "--name-only",
+                "--name-status",
+                "-z",
+                "-l",
+                "--long",
+                "--full-name",
+                "--full-tree",
+                "--abbrev",
+            }
+        )
+    ),
+    "blame": ReadFlags(
+        frozenset(
+            {
+                "-w",
+                "-M",
+                "-C",
+                "-s",
+                "-e",
+                "--line-porcelain",
+                "--porcelain",
+                "-l",
+                "-t",
+                "--show-email",
+                "-c",
+                "-L",
+            }
+        ),
+        frozenset({"--date"}),
+        frozenset({"-L"}),
+    ),
+    "grep": ReadFlags(
+        frozenset(
+            {
+                "-n",
+                "--line-number",
+                "-i",
+                "--ignore-case",
+                "-w",
+                "--word-regexp",
+                "-l",
+                "--files-with-matches",
+                "-L",
+                "--files-without-match",
+                "-c",
+                "--count",
+                "-e",
+                "-E",
+                "--extended-regexp",
+                "-F",
+                "--fixed-strings",
+                "-P",
+                "--perl-regexp",
+                "-v",
+                "--invert-match",
+                "-h",
+                "-H",
+                "--cached",
+                "-I",
+                "--untracked",
+                "-q",
+                "--quiet",
+                "--heading",
+                "--break",
+                "-o",
+                "--only-matching",
+                "--full-name",
+                "--all-match",
+                "--and",
+                "--or",
+                "--not",
+                "-r",
+                "--recursive",
+                "-A",
+                "-B",
+                "-C",
+            }
+        ),
+        frozenset({"--max-depth", "--context", "--after-context", "--before-context"}),
+        frozenset({"-A", "-B", "-C"}),
+    ),
+    "merge-base": ReadFlags(
+        frozenset({"--is-ancestor", "--all", "--fork-point", "--octopus", "--independent"})
+    ),
+    "rev-list": ReadFlags(
+        frozenset(
+            {
+                "--count",
+                "--all",
+                "--reverse",
+                "--first-parent",
+                "--merges",
+                "--no-merges",
+                "--left-right",
+                "--not",
+                "--remotes",
+                "--branches",
+                "--tags",
+                "--oneline",
+            }
+        ),
+        frozenset({"--max-count", "--since", "--until", "--remotes", "--branches", "--tags"}),
+        frozenset({"-n"}),
+        True,
+    ),
+    "cat-file": ReadFlags(frozenset({"-t", "-s", "-p", "-e"})),
+    # Without -w it only prints the hash (verified: no object written).
+    "hash-object": ReadFlags(frozenset()),
+    "describe": ReadFlags(
+        frozenset(
+            {
+                "--tags",
+                "--always",
+                "--long",
+                "--exact-match",
+                "--all",
+                "--contains",
+                "--first-parent",
+                "--dirty",
+            }
+        ),
+        frozenset({"--abbrev", "--match", "--exclude", "--dirty"}),
+    ),
+    "shortlog": ReadFlags(
+        frozenset(
+            {
+                "-s",
+                "-n",
+                "-e",
+                "-sn",
+                "-ns",
+                "-sne",
+                "--summary",
+                "--numbered",
+                "--email",
+                "--all",
+                "--no-merges",
+                "--merges",
+            }
+        ),
+        frozenset({"--since", "--until", "--format", "--group"}),
+    ),
+}
+
+
+def read_flag_allowed(word: str, allowed: ReadFlags) -> bool:
+    name, has_value, _ = word.partition("=")
+    if has_value:
+        return name in allowed.valued
+    if word in allowed.flags or word in allowed.valued:
+        return True
+    if allowed.count and re.fullmatch(r"-\d+", word):
+        return True
+    return any(
+        word.startswith(prefix) and len(word) > len(prefix) for prefix in allowed.short_valued
+    )
+
+
+def check_read(command: str, rest: list[str]) -> Verdict:
+    """A read command with only its listed options; positionals and anything after `--` are
+    free (revisions and paths)."""
+    allowed = READ_ONLY[command]
+    options = rest[: rest.index("--")] if "--" in rest else rest
+    bad = [
+        word for word in options if word.startswith("-") and not read_flag_allowed(word, allowed)
+    ]
+    if not bad:
+        return ALLOW
+    return not_allowed(
+        command,
+        f"its listed read options (developer guide, section 11); not `{bad[0]}`, which isn't one",
+    )
+
+
+PATHS_ONLY = {
+    "add": {"-A", "--all", "-u", "--update", "-N", "--intent-to-add"},
+    "rm": {"-r", "--cached", "-q", "--quiet"},
+    "mv": set[str](),
+    "restore": {"--staged", "-S", "--worktree", "-W"},
+}
+BRANCH_READ_FLAGS = {"-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "-l"}
+FIX_FORWARD = (
+    "Make a follow-up commit instead (`fix(<ID>): <what>`); pushed history is never rewritten."
+)
+TO_THE_OWNER = "`main` changes only when the owner merges the slice's pull request."
+# A branch or remote name written out literally: no refspec syntax (`:`, `+`, `*`, `^`, `~`).
+LITERAL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
+
+
+def not_allowed(command: str, forms: str) -> Verdict:
+    return blocked(
+        f"this `git {command}` isn't in the git guard's allow-list. Allowed: {forms}. Anything "
+        "else, ask the owner to run (`! <command>`)."
+    )
+
+
+class GitCall:
+    """The repository a git command runs in: the hook's working directory, or `git -C <path>`."""
+
+    def __init__(self, cwd: Path | None, repo: Repo) -> None:
+        self.cwd = cwd
+        self.repo = repo
 
     def where(self) -> Path:
-        if self.cwd is None or self.unknown_repo:
-            reason = self.unknown_repo or "the working directory isn't a literal path"
-            raise CantTell(
-                f"which repository it runs in ({reason}). Run it from the repository, or with "
-                "`git -C <path>` and a literal path."
-            )
+        if self.cwd is None:
+            raise Unparseable("it can't tell which repository the command runs in")
         return self.cwd
 
-    def head(self) -> Path:
-        """`where()`, for a question about HEAD or the current branch."""
-        where = self.where()
-        if self.head_moved:
-            raise CantTell(
-                f"which branch it runs on: `{self.head_moved}` in the same command switches "
-                "branches. Run the switch as its own command first."
+    def branch(self) -> str:
+        """The checked-out branch; there must be one, so a branch rule can be checked."""
+        branch = self.repo.current_branch(self.where())
+        if branch is None:
+            raise Unparseable(
+                f"no branch is checked out at {self.where()}, so its branch rules can't be checked"
             )
-        return where
+        return branch
 
 
-class CantTell(Exception):  # noqa: N818 -- reads as a verdict
-    """The repository or branch a git command runs on can't be known before it runs."""
-
-
-def analyze_git(
-    args: list[str], shell: Shell, repo: Repo, depth: int = 0, *, other_repo: str | None = None
-) -> Verdict:
-    context = GitContext(shell.cwd, shell.head_moved)
-    if other_repo:
-        context.unknown_repo = f"`{other_repo.partition('=')[0]}` names another repository"
+def check_git(args: list[str], heredocs: list[str], cwd: Path | None, repo: Repo) -> Verdict:
+    """`git [-C <path>] [--no-pager] <subcommand> <arguments>`, in an allowed form."""
     index = 0
-    while index < len(args) and args[index].startswith("-"):
-        option = args[index]
-        name, has_value, _ = option.partition("=")
-        if option == "-C":
-            path = args[index + 1] if index + 1 < len(args) else UNKNOWN
-            context.cwd = resolve_path(context.cwd, path)
+    while index < len(args) and args[index] in ("-C", "--no-pager"):
+        if args[index] == "-C":
+            if index + 1 >= len(args):
+                return not_allowed("-C", "`git -C <path> <subcommand> …`")
+            cwd = resolve_path(cwd, args[index + 1])
             index += 2
-        elif option == "-c" or (option.startswith("-c") and not option.startswith("--")):
-            value = option[2:] or (args[index + 1] if index + 1 < len(args) else "")
-            context.configs.append(value)
-            index += 1 if option[2:] else 2
-        elif name in GLOBAL_WITH_VALUE:
-            value = option.partition("=")[2] if has_value else ""
-            if name == "--config-env":
-                context.configs.append(value or (args[index + 1] if index + 1 < len(args) else ""))
-            elif name in ("--git-dir", "--work-tree"):
-                context.unknown_repo = f"`{name}` names another repository"
-            index += 1 if has_value else 2
-        elif option in GLOBAL_FLAGS or name in ("--exec-path", "--list-cmds"):
-            index += 1
         else:
-            raise Unparseable(f"the git option `{option}`")
-    for config in context.configs:
-        key = config.partition("=")[0].lower()
-        if key.startswith("alias."):
-            raise Unparseable("an alias defined with `git -c`")
-        if key == "core.hookspath":
-            return blocked(
-                "`-c core.hooksPath` skips the repository's hooks. Fix what the hook reports "
-                "and run the command again with the hooks."
-            )
+            index += 1
     if index >= len(args):
-        return ALLOW
+        return ALLOW  # plain `git` prints its usage
     command, rest = args[index], args[index + 1 :]
-    if moves_main(command, rest):
-        return blocked(f"`git {command}` " + MOVES_MAIN.format(main=MAIN))
-    if moves_head(command, rest):
-        shell.moves.append(shlex.join(["git", command, *rest]))
-    try:
-        if command not in KNOWN_COMMANDS:
-            return analyze_alias(command, rest, context, shell, repo, depth)
-        return check_git_command(command, rest, context, repo)
-    except CantTell as exc:
-        return blocked(f"`git {command}`: can't tell {exc}")
-
-
-def moves_head(command: str, rest: list[str]) -> bool:
-    """`git switch`, and `git checkout` unless it only restores paths (`checkout -- <path>`)."""
-    if "--help" in rest or "-h" in rest:
-        return False
-    if command == "symbolic-ref":
-        return len([arg for arg in rest if not arg.startswith("-")]) >= 2  # a write
-    return command == "switch" or (command == "checkout" and "--" not in rest)
-
-
-CREATE_LONG = {"--create", "--force-create", "--orphan"}
-CREATE_SHORT = "cCbB"
-BRANCH_REWRITE_LONG = {"--force", "--move", "--copy"}
-BRANCH_REWRITE_SHORT = "fmMcC"
-
-
-def created_branches(rest: list[str]) -> list[str]:
-    """The names given to a branch-creating option, in every form git accepts: `-C main`,
-    `-Cmain`, `-qC main`, `--create main`, `--create=main`."""
-    names: list[str] = []
-    following = [*rest[1:], ""]
-    for arg, next_word in zip(rest, following, strict=True):
-        name, has_value, value = arg.partition("=")
-        if name in CREATE_LONG:
-            names.append(value if has_value else next_word)
-        elif arg.startswith("-") and not arg.startswith("--"):
-            position = next((i for i, char in enumerate(arg[1:], 1) if char in CREATE_SHORT), None)
-            if position is not None:
-                names.append(arg[position + 1 :] or next_word)
-    return names
-
-
-def short_flags(rest: list[str]) -> set[str]:
-    """Every single-letter flag, bundles included (`-fM` → f, M)."""
-    return {
-        char for arg in rest if arg.startswith("-") and not arg.startswith("--") for char in arg[1:]
-    }
-
-
-MOVES_MAIN = (
-    "would move the local `{main}` branch. `{main}` changes only when the owner merges the "
-    "slice's pull request; work on the slice branch."
-)
-
-
-def moves_main(command: str, rest: list[str]) -> bool:
-    """Rewrites the local main ref without a commit: `switch -C main`, `branch -f main`, a
-    `<src>:main` fetch or pull, `update-ref refs/heads/main`."""
-    named = any(arg in MAIN_REFS for arg in rest)
+    if heredocs and not (command == "commit" and rest_reads_stdin(rest)):
+        return blocked(f"a heredoc is allowed only for `git commit -F -`. {ONE_COMMAND}")
+    call = GitCall(cwd, repo)
     match command:
-        case "switch" | "checkout":
-            return any(name in MAIN_REFS for name in created_branches(rest))
-        case "worktree":
-            return rest[:1] == ["add"] and any(name in MAIN_REFS for name in created_branches(rest))
+        case _ if command in READ_ONLY:
+            return check_read(command, rest)
+        case "add" | "rm" | "mv" | "restore":
+            return check_paths(command, rest)
         case "branch":
-            rewrites = set(BRANCH_REWRITE_SHORT) & short_flags(rest) or BRANCH_REWRITE_LONG & {
-                arg.partition("=")[0] for arg in rest
-            }
-            return named and bool(rewrites)
-        case "fetch" | "pull":
-            positionals = [arg for arg in rest if not arg.startswith("-")][1:]
-            return any(spec.partition(":")[2] in MAIN_REFS for spec in positionals)
-        case "update-ref":
-            return named
-        case _:
-            return False
-
-
-def analyze_alias(
-    command: str, rest: list[str], context: GitContext, shell: Shell, repo: Repo, depth: int
-) -> Verdict:
-    if UNKNOWN in command:
-        raise Unparseable("a git subcommand that's only known at run time")
-    alias = repo.alias(context.where(), command)
-    if alias is None:
-        return ALLOW  # not an alias: an external git-<command>, or a typo git rejects
-    if depth >= MAX_DEPTH:
-        raise Unparseable("git aliases nested too deeply")
-    inner = shell.nested(context.cwd)
-    if alias.startswith("!"):
-        return analyze_in(f"{alias[1:]} {shlex.join(rest)}", inner, repo, depth + 1)
-    return analyze_git([*shlex.split(alias), *rest], inner, repo, depth + 1)
-
-
-def check_git_command(command: str, rest: list[str], context: GitContext, repo: Repo) -> Verdict:
-    match command:
-        case "commit":
-            return check_commit(rest, context, repo)
-        case "merge":
-            return check_merge(rest, context, repo)
-        case "push":
-            return check_push(rest, context, repo)
-        case "rebase":
-            return check_rebase(rest)
-        case "reset":
-            return check_reset(rest, context, repo)
+            return check_branch(rest)
+        case "remote":
+            return (
+                ALLOW
+                if rest in ([], ["-v"], ["--verbose"])
+                else not_allowed("remote", "`git remote [-v]`")
+            )
         case "config":
             return check_config(rest)
-        case "cherry-pick" | "revert" | "am":
-            return check_commits_on_main(command, rest, context, repo)
+        case "fetch":
+            return check_fetch(rest)
+        case "stash":
+            return check_stash(rest)
+        case "commit":
+            return check_commit(rest, call)
+        case "push":
+            return check_push(rest, call)
+        case "switch":
+            return check_switch(rest)
+        case "checkout":
+            return check_checkout(rest)
+        case "reset":
+            return check_reset(rest, call)
         case "pull":
-            return check_pull(rest, context, repo)
-        case "update-ref":
-            return check_update_ref(rest, context, repo)
+            return check_pull(rest, call)
+        case "merge" | "rebase" | "cherry-pick" | "revert" | "am":
+            if rest == ["--abort"]:
+                return ALLOW
+            return not_allowed(command, f"`git {command} --abort` ({TO_THE_OWNER})")
         case _:
-            return ALLOW
+            return not_allowed(command, "see the developer guide, section 11")
 
 
-CONFIG_READ_COMMANDS = {"get", "list", "unset"}
+def resolve_path(cwd: Path | None, path: str) -> Path | None:
+    """A `-C` path: absolute or `~`, or relative to the working directory when it's known."""
+    expanded = Path(path).expanduser()
+    if expanded.is_absolute():
+        return expanded.resolve()
+    return (cwd / expanded).resolve() if cwd is not None else None
+
+
+def rest_reads_stdin(rest: list[str]) -> bool:
+    return any(word in ("-F", "--file") and value == "-" for word, value in pairwise(rest))
+
+
+def check_paths(command: str, rest: list[str]) -> Verdict:
+    """Paths, after the command's few allowed flags (and `--`)."""
+    flags = [word for word in rest if word.startswith("-") and word != "--"]
+    if "--" in rest:
+        flags = [word for word in rest[: rest.index("--")] if word.startswith("-")]
+    if all(flag in PATHS_ONLY[command] for flag in flags):
+        return ALLOW
+    allowed = ", ".join(f"`{flag}`" for flag in sorted(PATHS_ONLY[command])) or "no flags"
+    return not_allowed(command, f"paths, with {allowed}")
+
+
+def check_branch(rest: list[str]) -> Verdict:
+    """Listing branches: `--show-current`, or read flags (with a pattern after `--list`)."""
+    if rest == ["--show-current"]:
+        return ALLOW
+    flags = [word for word in rest if word.startswith("-")]
+    patterns = [word for word in rest if not word.startswith("-")]
+    if all(flag in BRANCH_READ_FLAGS for flag in flags) and (
+        not patterns or {"--list", "-l"} & set(flags)
+    ):
+        return ALLOW
+    return not_allowed(
+        "branch", "`git branch --show-current`, `git branch [-a|-r|-v|-vv] [--list <pattern>]`"
+    )
 
 
 def check_config(rest: list[str]) -> Verdict:
-    """Writes to core.hooksPath, failing closed. A read subcommand as the first word
-    (`git config get <key>`), or the key with nothing after it, is a read. Any other command
-    naming the key with a word after it is a write: in the legacy form options end at the key,
-    so even `core.hooksPath --get` sets it, and words before the key can't be told apart
-    without modelling every option (`--comment --get core.hooksPath x` is a write)."""
-    keys = [index for index, arg in enumerate(rest) if arg.lower() == "core.hookspath"]
-    if not keys or rest[0] in CONFIG_READ_COMMANDS:  # keys found, so rest has a first word
+    """Reads only, verified with real git to leave the config unchanged: `--get <key>`,
+    `get <key>`, `--list`, `-l`, `list`."""
+    if rest in (["--list"], ["-l"], ["list"]) or (
+        len(rest) == 2 and rest[0] in ("--get", "get") and not rest[1].startswith("-")
+    ):
         return ALLOW
-    key = keys[0]
-    if key == len(rest) - 1:
-        return ALLOW
-    return blocked(
-        "setting `core.hooksPath` skips the repository's hooks. Fix what the hook reports "
-        "and run the command again with the hooks."
+    return not_allowed(
+        "config", "`git config --get <key>`, `git config get <key>`, `git config --list`"
     )
 
 
-def check_update_ref(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
-    if "--stdin" in rest:
-        raise Unparseable("`git update-ref --stdin` reads its updates from stdin")
-    positionals = parse_options(rest, "m", set()).positionals  # -m <reason> takes a value
-    if positionals[:1] == ["HEAD"] and on_main(context, repo):
-        return blocked("`git update-ref HEAD` " + MOVES_MAIN.format(main=MAIN))
-    return ALLOW
-
-
-def check_commits_on_main(
-    command: str, rest: list[str], context: GitContext, repo: Repo
-) -> Verdict:
-    """`cherry-pick`, `revert`, and `am` make commits, so they're refused on main like
-    `git commit` (abandoning or skipping one in progress isn't; `--continue` makes a commit)."""
-    if any(long_option(f, "--no-verify", "--no-veri") for f in rest):
-        return blocked(SKIP_HOOKS)
-    if {"--abort", "--quit", "--skip"} & set(rest):
+def check_fetch(rest: list[str]) -> Verdict:
+    """`git fetch [--prune] [<remote> [<branch>]]`: with the default fetch refspec, it writes
+    remote-tracking refs only (verified). A refspec that writes `refs/heads/` isn't checked
+    (DL-28)."""
+    flags = [word for word in rest if word.startswith("-")]
+    names = [word for word in rest if not word.startswith("-")]
+    if (
+        set(flags) <= {"--prune", "-p", "-q", "--quiet"}
+        and len(names) <= 2
+        and all(LITERAL_NAME.fullmatch(name) for name in names)
+    ):
         return ALLOW
-    if on_main(context, repo):
-        return blocked(
-            f"`git {command}` makes commits on `{MAIN}`. Work on the slice branch "
-            f"(`git switch s<n>`): `{MAIN}` changes only when the owner merges the slice's pull "
-            "request."
-        )
-    return ALLOW
-
-
-def check_pull(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
-    """On main, only a fast-forward from main itself (updating it after the owner merges)."""
-    if any(long_option(f, "--no-verify", "--no-veri") for f in rest):
-        return blocked(SKIP_HOOKS)
-    if not on_main(context, repo):
-        return ALLOW
-    fast_forward = [f for f in rest if f in ("--ff-only", "--ff", "--no-ff")]
-    sources = [w for w in rest if not w.startswith("-")][1:]
-    if fast_forward[-1:] == ["--ff-only"] and all(s in MAIN_REFS for s in sources):
-        return ALLOW
-    return blocked(
-        f"`git pull` on `{MAIN}` can merge or bring in another branch. Use `git pull --ff-only` "
-        f"(from `{MAIN}`) to update `{MAIN}` after the owner merges."
+    return not_allowed(
+        "fetch", "`git fetch [--prune] [<remote> [<branch>]]` (no `src:dst` refspecs)"
     )
 
 
-def on_main(context: GitContext, repo: Repo) -> bool:
-    where = context.head()
-    branch = repo.current_branch(where)
-    if branch is None:
-        raise CantTell(
-            f"which branch it runs on: no branch is checked out at {where} (a detached HEAD, or "
-            "a directory this command creates). Switch to a branch first, in its own command."
-        )
-    return branch == MAIN
+def check_stash(rest: list[str]) -> Verdict:
+    """`git stash [push [-u] [-m <msg>]] | pop | drop | list | show`: the stash only (verified)."""
+    head, tail = (rest[0], rest[1:]) if rest else ("push", [])
+    if head in ("list", "show", "pop", "drop", "apply") and not tail:
+        return ALLOW
+    if head == "push" and stash_push_options(tail):
+        return ALLOW
+    return not_allowed(
+        "stash", "`git stash [push [-u] [-m <message>]]`, `pop`, `drop`, `list`, `show`"
+    )
 
 
-def long_option(option: str, full: str, shortest: str) -> bool:
-    """Whether `option` (before any `=`) is `full` or an abbreviation git accepts for it."""
-    name = option.partition("=")[0]
-    return full.startswith(name) and len(name) >= len(shortest)
+def stash_push_options(tail: list[str]) -> bool:
+    index = 0
+    while index < len(tail):
+        if tail[index] in ("-u", "--include-untracked", "-q", "--quiet"):
+            index += 1
+        elif tail[index] in ("-m", "--message") and index + 1 < len(tail):
+            index += 2
+        else:
+            return False
+    return True
 
 
-@dataclass
-class Parsed:
-    flags: list[str]
-    positionals: list[str]
-    after_dashdash: list[str]
+COMMIT_FLAGS = {"-a", "--all", "-q", "--quiet", "--allow-empty", "--no-edit", "--amend"}
+COMMIT_WITH_VALUE = {"-m", "--message", "-F", "--file", "-am"}
 
 
-def parse_options(
-    rest: list[str], short_with_value: str, long_with_value: set[str], *, bundle_value: str = ""
-) -> Parsed:
-    """Options and positionals, git style: short flags bundle (`-am msg`), a short option in
-    `short_with_value` takes the rest of its bundle or the next word, and `--` ends options."""
-    flags: list[str] = []
-    positionals: list[str] = []
+def check_commit(rest: list[str], call: GitCall) -> Verdict:
+    """Off `main` (DL-21), with only these options (no hook-skipping, DL-24); `--amend` only
+    while HEAD is unpushed (DL-23)."""
     index = 0
     while index < len(rest):
         word = rest[index]
-        index += 1
-        if word == "--":
-            return Parsed(flags, positionals, rest[index:])
-        if word.startswith("--"):
-            flags.append(word)
-            if "=" not in word and word in long_with_value:
-                index += 1
-        elif word.startswith("-") and len(word) > 1:
-            for position, char in enumerate(word[1:], start=1):
-                flags.append(f"-{char}")
-                if char in short_with_value or char in bundle_value:
-                    if position == len(word) - 1 and char in short_with_value:
-                        index += 1
-                    break
+        if word in COMMIT_WITH_VALUE and index + 1 < len(rest):
+            index += 2
+        elif word in COMMIT_FLAGS:
+            index += 1
         else:
-            positionals.append(word)
-    return Parsed(flags, positionals, [])
-
-
-COMMIT_SHORT_VALUE = "mFCct"
-COMMIT_LONG_VALUE = {
-    "--message", "--file", "--author", "--date", "--template", "--reuse-message",
-    "--reedit-message", "--fixup", "--squash", "--cleanup", "--trailer", "--pathspec-from-file",
-}  # fmt: skip
-SKIP_HOOKS = (
-    "skipping the hooks (`--no-verify`, or `-n` on commit) isn't allowed. Fix what the hook "
-    "reports and run the command again with the hooks."
-)
-
-
-def check_commit(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
-    parsed = parse_options(rest, COMMIT_SHORT_VALUE, COMMIT_LONG_VALUE, bundle_value="Su")
-    if any(f == "-n" or long_option(f, "--no-verify", "--no-veri") for f in parsed.flags):
-        return blocked(SKIP_HOOKS)
-    if on_main(context, repo):
-        return blocked(
-            f"`git commit` on `{MAIN}`. Commit on the slice branch (`git switch s<n>`): "
-            f"`{MAIN}` changes only when the owner merges the slice's pull request."
-        )
-    amend = any(long_option(f, "--amend", "--am") for f in parsed.flags)
-    if amend and repo.head_on_remote(context.head()):
+            return not_allowed(
+                "commit",
+                "`git commit [-a] [-q] [--allow-empty] [--no-edit] [--amend] (-m <message> | -F "
+                "<file> | -F - <<'EOF')` (no `--no-verify`, `-n`, or paths)",
+            )
+    if call.branch() == MAIN:
+        return blocked(f"`git commit` on `{MAIN}`. Commit on the slice branch. {TO_THE_OWNER}")
+    if "--amend" in rest and call.repo.head_on_remote(call.where()):
         return blocked(f"`git commit --amend`: HEAD is already on the remote. {FIX_FORWARD}")
     return ALLOW
 
 
-def check_merge(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
-    if "--abort" in rest or "--quit" in rest:
-        return ALLOW
-    if any(long_option(f, "--no-verify", "--no-veri") for f in rest):
-        return blocked(SKIP_HOOKS)
-    if on_main(context, repo):
-        return blocked(
-            f"`git merge` on `{MAIN}`. Only the owner merges into `{MAIN}`, through the slice's "
-            "pull request."
-        )
-    return ALLOW
-
-
-PUSH_DANGEROUS = {
-    "--force": "a force push rewrites pushed history. " + FIX_FORWARD,
-    "--force-with-lease": "a force push rewrites pushed history. " + FIX_FORWARD,
-    "--force-if-includes": "a force push rewrites pushed history. " + FIX_FORWARD,
-    "--mirror": "`--mirror` overwrites and deletes remote refs. Push the slice branch by name.",
-    "--delete": "deleting a remote branch is the owner's call. Ask them.",
-    "--prune": "`--prune` deletes remote branches. Push the slice branch by name.",
-    "--all": f"`--all` pushes every branch, `{MAIN}` included. Push the slice branch by name.",
-    "--branches": f"`--branches` pushes every branch, `{MAIN}` included. Push the slice branch.",
-    "--no-verify": SKIP_HOOKS,
-}
-PUSH_KNOWN = {
-    "--follow-tags", "--no-follow-tags", "--dry-run", "--porcelain", "--tags", "--signed",
-    "--no-signed", "--atomic", "--no-atomic", "--push-option", "--receive-pack", "--exec",
-    "--repo", "--set-upstream", "--thin", "--no-thin", "--quiet", "--verbose", "--progress",
-    "--no-progress", "--recurse-submodules", "--no-recurse-submodules", "--verify", "--ipv4",
-    "--ipv6", "--no-force-with-lease", "--no-force-if-includes",
-}  # fmt: skip
-PUSH_LONG_VALUE = {"--push-option", "--receive-pack", "--exec", "--repo"}
-TO_MAIN = (
-    f"this push would update `{MAIN}`. Push the slice branch (`git push origin s<n>`): `{MAIN}` "
-    "changes only when the owner merges the slice's pull request."
-)
-
-
-def check_push(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
-    parsed = parse_options(rest, "o", PUSH_LONG_VALUE)
-    for flag in parsed.flags:
-        if flag in ("-f", "-d"):
-            return blocked(PUSH_DANGEROUS["--force" if flag == "-f" else "--delete"])
-        name = flag.partition("=")[0]
-        if name.startswith("--") and name not in PUSH_KNOWN:
-            danger = [full for full in PUSH_DANGEROUS if full.startswith(name)]
-            if danger:
-                return blocked(PUSH_DANGEROUS[danger[0]])
-    # The first positional is the repository, unless `--repo=<repo>` named it.
-    named_repo = any(flag.startswith("--repo=") for flag in parsed.flags)
-    refspecs = (parsed.positionals + parsed.after_dashdash)[0 if named_repo else 1 :]
-    for refspec in refspecs:
-        verdict = check_refspec(refspec, context, repo)
-        if verdict.block:
-            return verdict
-    if not refspecs:
-        if on_main(context, repo):
-            return blocked(TO_MAIN)
-        destination = repo.push_destination(context.head())
-        if destination is not None and destination.split("/", 1)[-1] == MAIN:
-            return blocked(TO_MAIN)
-    return ALLOW
-
-
-def check_refspec(refspec: str, context: GitContext, repo: Repo) -> Verdict:
-    if refspec.startswith("+"):
-        return blocked(PUSH_DANGEROUS["--force"])
-    if refspec.startswith(":"):
-        return blocked(PUSH_DANGEROUS["--delete"])
-    if UNKNOWN in refspec or "*" in refspec:
-        return blocked(
-            f"can't tell where `{refspec.replace(UNKNOWN, '$…')}` pushes. Name the slice branch "
-            "literally (`git push origin s<n>`)."
-        )
-    source, _, destination = refspec.partition(":")
-    if not destination and source in ("HEAD", "@"):
-        destination = repo.current_branch(context.head()) or ""
-    if (destination or source) in MAIN_REFS:
-        return blocked(TO_MAIN)
-    return ALLOW
-
-
-def check_rebase(rest: list[str]) -> Verdict:
-    if "--abort" in rest or "--quit" in rest:
-        return ALLOW
-    return blocked(
-        "`git rebase` rewrites history, and nothing on a slice branch needs one. "
-        f"{FIX_FORWARD} (`git rebase --abort` and `--quit` are allowed.)"
+def is_main_ref(full: str | None) -> bool:
+    """`refs/heads/main`, or a remote's `main` (`refs/remotes/<remote>/main`)."""
+    return (
+        full is not None
+        and re.fullmatch(rf"refs/heads/{MAIN}|refs/remotes/[^/]+/{MAIN}", full) is not None
     )
 
 
-RESET_LONG_VALUE = {"--pathspec-from-file"}
+def check_push(rest: list[str], call: GitCall) -> Verdict:
+    """`git push [-u] <remote> <branch>` with a literal non-main branch, or a bare `git push`
+    off main whose upstream isn't main (DL-22). No other option: nothing forces, deletes, or
+    skips hooks (DL-23, DL-24). Configuration that redirects a push (`push.default`,
+    `remote.<name>.push`, a mirror remote) isn't checked: GitHub's rulesets refuse any push to
+    main, force-push, or deletion it could cause (DL-27)."""
+    names = rest[1:] if rest[:1] in (["-u"], ["--set-upstream"]) else rest
+    forms = "`git push`, `git push [-u] <remote> <branch>` (a literal branch, not `main`)"
+    if not names and len(rest) == 0:
+        if call.branch() == MAIN:
+            return blocked(f"this push would update `{MAIN}`. {TO_THE_OWNER}")
+        destination = call.repo.push_destination(call.where())
+        if destination is None or destination.split("/", 1)[-1] == MAIN:
+            return blocked(
+                f"a bare `git push` needs a push destination that isn't `{MAIN}` (it has "
+                f"{destination or 'none'}). Push with `git push -u origin <branch>`."
+            )
+        return ALLOW
+    if len(names) != 2 or not all(LITERAL_NAME.fullmatch(name) for name in names):
+        return not_allowed("push", forms)
+    branch = names[1]
+    if branch in (MAIN, "HEAD") or branch.endswith(f"/{MAIN}") or branch.startswith("refs/"):
+        return blocked(
+            f"this push would update `{MAIN}` (or can't be told apart from it). {TO_THE_OWNER}"
+        )
+    return ALLOW
 
 
-def check_reset(rest: list[str], context: GitContext, repo: Repo) -> Verdict:
-    parsed = parse_options(rest, "", RESET_LONG_VALUE)
-    paths = parsed.after_dashdash or len(parsed.positionals) > 1
-    patch = any(f in ("-p", "--patch") or f.startswith("--pathspec") for f in parsed.flags)
-    if paths or patch or not parsed.positionals:
-        return ALLOW  # resets paths in the index, or HEAD to itself: HEAD doesn't move
-    target = parsed.positionals[0]
-    if UNKNOWN in target:
-        return blocked(
-            "can't tell which commit `git reset` moves to. Name it literally, so the guard can "
-            "check that no pushed commit is dropped."
+def check_switch(rest: list[str]) -> Verdict:
+    """`git switch <branch>`, or `git switch -c <new branch>` other than main."""
+    if len(rest) == 1 and LITERAL_NAME.fullmatch(rest[0]):
+        return ALLOW
+    if len(rest) == 2 and rest[0] in ("-c", "--create") and LITERAL_NAME.fullmatch(rest[1]):
+        if rest[1] == MAIN:
+            return blocked(f"`git switch -c {MAIN}` would create or reset `{MAIN}`. {TO_THE_OWNER}")
+        return ALLOW
+    return not_allowed("switch", "`git switch <branch>`, `git switch -c <new branch>`")
+
+
+def check_checkout(rest: list[str]) -> Verdict:
+    if len(rest) >= 2 and rest[0] == "--":
+        return ALLOW
+    return not_allowed("checkout", "`git checkout -- <paths>` (use `git switch` for branches)")
+
+
+RESET_MODES = {"--soft", "--mixed", "--hard"}
+
+
+def check_reset(rest: list[str], call: GitCall) -> Verdict:
+    """Paths (`git reset [HEAD] -- <paths>`, `git reset <paths>`), or `git reset [<mode>]
+    [<commit>]` that drops no pushed commit (DL-23) and, on main, only to main itself (DL-21)."""
+    forms = "`git reset [HEAD] -- <paths>`, `git reset [--soft|--mixed|--hard] [<commit>]`"
+    words = [word for word in rest if word not in ("-q", "--quiet")]
+    if "--" in words:
+        before = words[: words.index("--")]
+        return (
+            ALLOW
+            if before in ([], ["HEAD"]) and len(words) > len(before) + 1
+            else not_allowed("reset", forms)
         )
-    if repo.drops_pushed_commits(context.head(), target):
+    modes = [word for word in words if word in RESET_MODES]
+    targets = [word for word in words if word not in RESET_MODES]
+    if len(modes) > 1 or any(target.startswith("-") for target in targets):
+        return not_allowed("reset", forms)
+    if not targets:
+        return ALLOW  # HEAD to itself: unstages, or with --hard discards changes; HEAD doesn't move
+    if len(targets) > 1:
+        return ALLOW if not modes else not_allowed("reset", forms)  # several paths
+    target = targets[0]
+    drops = call.repo.drops_pushed_commits(call.where(), target)
+    if drops is None:
+        return ALLOW if not modes else not_allowed("reset", forms)  # a path, not a commit
+    if drops:
         return blocked(
-            f"`git reset {target}` would drop commits that are already on the remote. "
-            f"{FIX_FORWARD} (Resetting unpushed commits is allowed.)"
+            f"`git reset {target}` would drop commits that are already on the remote. {FIX_FORWARD}"
         )
-    to_main = re.fullmatch(rf"HEAD|@|(refs/heads/)?{MAIN}|(refs/remotes/)?[^/]+/{MAIN}", target)
-    if not to_main and on_main(context, repo):
-        return blocked(f"`git reset {target}` on `{MAIN}` " + MOVES_MAIN.format(main=MAIN))
+    if call.branch() == MAIN and not is_main_ref(call.repo.full_ref(call.where(), target)):
+        return blocked(
+            f"`git reset {target}` on `{MAIN}` would move it to another commit. {TO_THE_OWNER}"
+        )
+    return ALLOW
+
+
+def check_pull(rest: list[str], call: GitCall) -> Verdict:
+    """`git pull --ff-only [<remote> <branch>]` (verified: refuses rather than merge); on main,
+    only from main (DL-21)."""
+    names = rest[1:] if rest[:1] == ["--ff-only"] else None
+    if (
+        names is None
+        or len(names) not in (0, 2)
+        or not all(LITERAL_NAME.fullmatch(n) for n in names)
+    ):
+        return not_allowed("pull", "`git pull --ff-only [<remote> <branch>]`")
+    if call.branch() == MAIN:
+        from_main = (
+            names[1] == MAIN and names[0] in call.repo.remotes(call.where())
+            if names
+            else is_main_ref(call.repo.full_ref(call.where(), "@{upstream}"))
+        )  # verified: `@{upstream}` resolves to the branch `branch.main.merge` names
+        if not from_main:
+            return blocked(f"on `{MAIN}`, `git pull --ff-only` only from `{MAIN}`. {TO_THE_OWNER}")
     return ALLOW
 
 
 # --- gh ---------------------------------------------------------------------------------------
 
-GH_COMMANDS = {
-    "accessibility", "agent-task", "alias", "api", "attestation", "auth", "browse", "cache",
-    "co", "codespace", "completion", "config", "copilot", "extension", "gist", "gpg-key", "help",
-    "issue", "label", "org", "pr", "preview", "project", "release", "repo", "ruleset", "run",
-    "search", "secret", "ssh-key", "status", "variable", "version", "workflow",
+GH_ALLOWED = {
+    ("pr", "create"), ("pr", "view"), ("pr", "list"), ("pr", "checks"), ("pr", "diff"),
+    ("pr", "status"), ("pr", "ready"), ("pr", "edit"), ("run", "list"), ("run", "view"),
+    ("run", "watch"), ("auth", "status"), ("repo", "view"), ("issue", "list"), ("issue", "view"),
 }  # fmt: skip
-OWNER_MERGES = (
-    'Merging a pull request is the owner\'s call (build plan, "Pull requests"). Allow this only '
-    "if the owner said to merge."
+OWNER_DECIDES = (
+    "Merging a pull request, or writing to GitHub through the API, is the owner's call (DL-25). "
+    "Allow it only if the owner said to."
 )
-MERGE_MUTATIONS = ("mergePullRequest", "enablePullRequestAutoMerge", "mergeBranch")
+GH_API_READ_FLAGS = {"--paginate", "--jq", "-q", "--silent", "-i", "--include", "--verbose"}
 
 
-def gh_words(args: list[str]) -> Iterator[str]:
-    """The words of a gh command without `-R`/`--repo <repo>`, which may appear anywhere."""
+def gh_words(args: list[str]) -> list[str]:
+    """The words of a gh command without `-R <repo>` / `--repo <repo>` / `--repo=<repo>`."""
+    words: list[str] = []
     index = 0
     while index < len(args):
         if args[index] in ("-R", "--repo"):
             index += 2
             continue
-        yield args[index]
+        if not args[index].startswith("--repo="):
+            words.append(args[index])
         index += 1
+    return words
 
 
-def field_value(word: str) -> str:
-    """A `gh api` field without its flag: `-Fquery=@x`, `--field=query=@x` → `query=@x`."""
-    for prefix in ("--raw-field=", "--field=", "-F", "-f"):
-        if word.startswith(prefix):
-            return word[len(prefix) :]
-    return word
-
-
-def analyze_gh(args: list[str], shell: Shell) -> Verdict:
-    words = [w for w in gh_words(args) if not w.startswith("--repo=")]
-    command = next((w for w in words if not w.startswith("-")), None)
-    if command is None:
+def check_gh(args: list[str], heredocs: list[str]) -> Verdict:
+    """Listed read and pull-request commands; `gh pr merge` and every gh api call that isn't a
+    plain read ask the owner (DL-25); anything else is blocked."""
+    words = gh_words(args)
+    if heredocs:
+        return blocked(f"no heredoc with gh. {ONE_COMMAND}")
+    if not words or words == ["--version"]:
         return ALLOW
-    if UNKNOWN in command or command not in GH_COMMANDS:
-        raise Unparseable(f"`gh {command.replace(UNKNOWN, '$…')}` (an alias or extension?)")
-    positionals = [w for w in words if not w.startswith("-")]
-    if positionals[:2] == ["pr", "checkout"] or positionals[:1] == ["co"]:
-        shell.moves.append(shlex.join(["gh", *positionals[:3]]))
-    if positionals[:2] == ["pr", "merge"]:
-        return Verdict(ask=OWNER_MERGES)
-    if command == "api":
-        merges_endpoint = any(
-            re.search(r"pulls/[^/]+/merge\b|/merges\b", w) for w in positionals[1:]
+    if words[:2] == ["auth", "status"] and len(words) > 2:
+        return blocked(
+            "`gh auth status` is allowed only with no options (`--show-token` prints the token)."
         )
-        mutation = any(m in w for w in words for m in MERGE_MUTATIONS)
-        unseen = "graphql" in positionals and any(
-            w.startswith("--input") or field_value(w).startswith("query=@") for w in words
-        )
-        if merges_endpoint or mutation or unseen:
-            return Verdict(ask=OWNER_MERGES)
-        if writes_main(words, positionals[1:]):
-            return Verdict(ask=OWNER_WRITES_MAIN)
+    if tuple(words[:2]) in GH_ALLOWED:
+        return ALLOW
+    if words[:2] == ["pr", "merge"]:
+        return Verdict(ask=OWNER_DECIDES)
+    if words[0] == "api":
+        return check_gh_api(words[1:])
+    return blocked(
+        f"this `gh {' '.join(words[:2])}` isn't in the git guard's allow-list. Allowed: "
+        f"{', '.join(' '.join(pair) for pair in sorted(GH_ALLOWED))}, `gh api` reads. Anything "
+        "else, ask the owner to run (`! <command>`)."
+    )
+
+
+def check_gh_api(rest: list[str]) -> Verdict:
+    """A plain read: one endpoint (not graphql), only output flags (a `--jq <filter>` value
+    allowed). Anything else (a method, a field, an input file, GraphQL) asks."""
+    endpoints: list[str] = []
+    index = 0
+    while index < len(rest):
+        word = rest[index]
+        if word in ("--jq", "-q"):
+            index += 2
+            continue
+        if word.startswith("-") and word not in GH_API_READ_FLAGS:
+            return Verdict(ask=OWNER_DECIDES)
+        if not word.startswith("-"):
+            endpoints.append(word)
+        index += 1
+    if len(endpoints) != 1 or endpoints[0] == "graphql":
+        return Verdict(ask=OWNER_DECIDES)
     return ALLOW
 
 
-OWNER_WRITES_MAIN = (
-    f"This API call can change `{MAIN}` (its ref, or a file committed to it), which only the "
-    "owner's merge of the slice's pull request does. Allow it only if the owner said to."
-)
-
-
-def writes_main(words: list[str], endpoints: list[str]) -> bool:
-    """A `gh api` call to `main`'s ref, or one that writes a file (`contents/`, which commits to
-    the default branch unless told otherwise)."""
-    methods = [
-        words[index + 1].upper()
-        for index, word in enumerate(words[:-1])
-        if word in ("-X", "--method")
-    ] + [word.partition("=")[2].upper() for word in words if word.startswith("--method=")]
-    methods += [word[2:].upper() for word in words if word.startswith("-X") and len(word) > 2]
-    if any(re.search(rf"git/refs/heads/{MAIN}\b", endpoint) for endpoint in endpoints):
-        return True
-    return any("/contents/" in e for e in endpoints) and bool({"PUT", "DELETE"} & set(methods))
-
-
 # --- Hook entry point -------------------------------------------------------------------------
-
-
-def decide(command: str, cwd: Path | None, repo: Repo) -> Verdict:
-    try:
-        shell = Shell(cwd)
-        verdict = analyze_in(command, shell, repo)
-        if shell.moves:  # a branch switch somewhere in the line: check it all again without HEAD
-            verdict = analyze_in(command, Shell(cwd, head_moved=shell.moves[0]), repo)
-        return verdict
-    except Unparseable as exc:
-        return blocked(f"it can't check this command with confidence ({exc}). {SIMPLE}")
 
 
 def main(repo: Repo | None = None) -> int:

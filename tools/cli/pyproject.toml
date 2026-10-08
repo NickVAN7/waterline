@@ -37,6 +37,8 @@ select = [
 "src/waterline_cli/**" = ["S603", "S607"]
 "tests/**" = ["S101"]
 "tests/hooks/**" = ["S101", "S603", "S607"]
+# Builds real git repositories to copy from.
+"tests/test_review_copy.py" = ["S101", "S603", "S607"]
 
 [tool.pyright]
 # The Claude Code hooks (.claude/hooks/) are tested here too, under the same gates.
