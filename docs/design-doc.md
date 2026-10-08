@@ -12,7 +12,7 @@
 >    parent-referenced IDs (`PMT-TA-45.2`).
 > 4. Sets the v1 scope to software projects, with ERP implementations in v2 (§1), and replaces
 >    the tenancy model: a workspace above organizations, workspace/org/project roles, and
->    explicit project membership instead of `project.is_restricted` (§4, §5). Source:
+>    explicit project membership (§4, §5; DL-2). Source:
 >    `screen-inventory.md` (Sept 28, 2026).
 > 5. Slice 1 readiness review (Sept 30, 2026): admin audit events (§10.1), sign-in behavior and
 >    password policy (§4), identifiers (§3), reserved slugs (§3), system-admin CLI (§4),

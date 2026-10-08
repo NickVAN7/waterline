@@ -23,6 +23,7 @@ BUILD_PLAN = "docs/build-plan.md"
 DESIGN_DOC = "docs/design-doc.md"
 DEVELOPER_GUIDE = "docs/developer-guide.md"
 TECH_DEBT = "docs/tech-debt.md"
+DECISION_LOG = "docs/decision-log.md"
 
 
 class DocsStructureError(AssertionError):
@@ -226,14 +227,14 @@ def column_checks(metadata: MetaData, documented: dict[str, DocTable]) -> list[C
     return checks
 
 
-def column_verdict(check: ColumnCheck, latest: Checkpoint, counts: dict[int, int]) -> ColumnVerdict:
+def column_verdict(check: ColumnCheck, latest: Checkpoint, order: CheckpointOrder) -> ColumnVerdict:
     """A model column must be documented. A documented column must be in the model, unless
     its marker names a slice that isn't finished yet (`slice_finished`)."""
     if not check.documented:
         return ColumnVerdict(problem=f"`{check}` is in the model but not in {SCHEMA_DOC}")
     if check.in_model:
         return ColumnVerdict()
-    if check.added_in is not None and not slice_finished(check.added_in, latest, counts):
+    if check.added_in is not None and not slice_finished(check.added_in, latest, order):
         return ColumnVerdict(skip_reason=f"added in Slice {check.added_in} (schema-doc)")
     finished = (
         f" (marked `Added in Slice {check.added_in}.`, and that slice is finished)"
@@ -323,24 +324,39 @@ def ownership_problems(owners: dict[str, list[str]], documented: frozenset[str])
 # --- Checkpoints and git history --------------------------------------------------------------
 
 
+# A checkpoint ID: `S<slice>-C<n>`, with an optional lowercase letter for a checkpoint inserted
+# after the plan was written (`S1-C13a` runs between `S1-C13` and `S1-C14`; design-change skill).
+_CHECKPOINT_ID = re.compile(r"S(\d+)-C(\d+)([a-z]?)")
+# Anything shaped like a checkpoint ID, well-formed or not, so a malformed one fails loudly.
+_CHECKPOINT_LIKE = r"\bS\d+-C\w*"
+
+
 @total_ordering
 @dataclass(frozen=True)
 class Checkpoint:
     slice: int
     number: int
+    suffix: str = ""
 
     @classmethod
     def parse(cls, value: str) -> Checkpoint:
-        match = re.fullmatch(r"S(\d+)-C(\d+)", value)
+        match = _CHECKPOINT_ID.fullmatch(value)
         if match is None:
-            raise DocsStructureError(f"{value!r} is not a checkpoint ID (S<slice>-C<n>)")
-        return cls(int(match.group(1)), int(match.group(2)))
+            raise DocsStructureError(
+                f"{value!r} is not a checkpoint ID (S<slice>-C<n>, optionally with one lowercase "
+                f"letter: S1-C13a)"
+            )
+        return cls(int(match.group(1)), int(match.group(2)), match.group(3))
 
     def __lt__(self, other: Checkpoint) -> bool:
-        return (self.slice, self.number) < (other.slice, other.number)
+        return (self.slice, self.number, self.suffix) < (other.slice, other.number, other.suffix)
 
     def __str__(self) -> str:
-        return f"S{self.slice}-C{self.number}"
+        return f"S{self.slice}-C{self.number}{self.suffix}"
+
+
+# Slice number -> its checkpoints in the order of its build-plan "### Checkpoints" table.
+type CheckpointOrder = dict[int, tuple[Checkpoint, ...]]
 
 
 def latest_checkpoint() -> Checkpoint:
@@ -352,7 +368,7 @@ def latest_checkpoint() -> Checkpoint:
             "history (in CI, actions/checkout with fetch-depth: 0)"
         )
     for subject in _git("log", "--format=%s").splitlines():
-        match = re.match(r"^checkpoint\((S\d+-C\d+)\):", subject)
+        match = re.match(r"^checkpoint\(([^)]*)\):", subject)
         if match:
             return Checkpoint.parse(match.group(1))
     raise DocsStructureError("git log has no `checkpoint(<ID>): ...` commit")
@@ -370,45 +386,66 @@ def _git(*args: str) -> str:
     return result.stdout.strip()
 
 
-def slice_finished(slice_number: int, latest: Checkpoint, counts: dict[int, int]) -> bool:
+def slice_finished(slice_number: int, latest: Checkpoint, order: CheckpointOrder) -> bool:
     """Whether `slice_number` is done, given the latest `checkpoint(...)` commit: a later slice
-    has started, or the latest commit is the slice's last checkpoint (`counts`, from its
-    "### Checkpoints" table; a slice without one is finished only once a later slice starts)."""
-    return latest.slice > slice_number or latest == Checkpoint(
-        slice_number, counts.get(slice_number, -1)
-    )
+    has started, or the latest commit is the last row of the slice's "### Checkpoints" table (a
+    slice without one is finished only once a later slice starts)."""
+    if latest.slice > slice_number:
+        return True
+    rows = order.get(slice_number)
+    return rows is not None and latest == rows[-1]
 
 
-def checkpoints_per_slice() -> dict[int, int]:
-    """Slice number -> its checkpoint count, for slices whose build-plan section already has a
-    "### Checkpoints" table."""
+def checkpoint_order() -> CheckpointOrder:
+    """Each slice's checkpoints, in the order of its build-plan "### Checkpoints" table (the
+    `#` column: `13`, or `13a` for an inserted checkpoint), for slices that have the table."""
     text = read(BUILD_PLAN)
-    counts: dict[int, int] = {}
+    order: CheckpointOrder = {}
     for match in re.finditer(r"^## Slice (\d+) ", text, re.MULTILINE):
         slice_number = int(match.group(1))
         body = section(text, text[match.start() : text.index("\n", match.start())], BUILD_PLAN)
         if "### Checkpoints" not in body.splitlines():
             continue
+        source = f"{BUILD_PLAN} Slice {slice_number} checkpoints"
         rows = table_rows(
-            section(body, "### Checkpoints", BUILD_PLAN),
-            "| # | Checkpoint | Includes |",
-            f"{BUILD_PLAN} Slice {slice_number} checkpoints",
+            section(body, "### Checkpoints", BUILD_PLAN), "| # | Checkpoint | Includes |", source
         )
-        counts[slice_number] = len(rows)
-    if not counts:
+        order[slice_number] = checkpoint_rows(slice_number, [cells[0] for cells in rows], source)
+    if not order:
         raise DocsStructureError(f"{BUILD_PLAN}: no slice has a ### Checkpoints table")
-    return counts
+    return order
 
 
-def next_checkpoints(latest: Checkpoint, counts: dict[int, int]) -> frozenset[Checkpoint]:
-    """The checkpoint(s) that can follow `latest`: the next in its slice, or the first of the
-    next slice once the slice is done. Both, if the slice has no checkpoint table yet."""
-    following = Checkpoint(latest.slice, latest.number + 1)
-    next_slice = Checkpoint(latest.slice + 1, 1)
-    count = counts.get(latest.slice)
-    if count is None:
-        return frozenset({following, next_slice})
-    return frozenset({following if latest.number < count else next_slice})
+def checkpoint_rows(slice_number: int, cells: list[str], source: str) -> tuple[Checkpoint, ...]:
+    """The checkpoints named by a table's `#` cells, which must start at 1 and run in order."""
+    checkpoints: list[Checkpoint] = []
+    for cell in cells:
+        if not re.fullmatch(r"\d+[a-z]?", cell):
+            raise DocsStructureError(
+                f"{source}: {cell!r} in the # column is not a checkpoint number (13, or 13a)"
+            )
+        checkpoints.append(Checkpoint.parse(f"S{slice_number}-C{cell}"))
+    if checkpoints[0] != Checkpoint(slice_number, 1) or checkpoints != sorted(set(checkpoints)):
+        raise DocsStructureError(
+            f"{source}: the # column must start at 1 and run in order, each once; got {cells}"
+        )
+    return tuple(checkpoints)
+
+
+def next_checkpoints(latest: Checkpoint, order: CheckpointOrder) -> frozenset[Checkpoint]:
+    """The checkpoint(s) that can follow `latest`: the next row of its slice's table, or the
+    first of the next slice after the last row. Both, if the slice has no table yet."""
+    next_slice = order.get(latest.slice + 1, (Checkpoint(latest.slice + 1, 1),))[0]
+    rows = order.get(latest.slice)
+    if rows is None:
+        return frozenset({Checkpoint(latest.slice, latest.number + 1), next_slice})
+    if latest not in rows:
+        raise DocsStructureError(
+            f"the latest checkpoint commit, {latest}, is not a row of the {BUILD_PLAN} Slice "
+            f"{latest.slice} checkpoints table"
+        )
+    index = rows.index(latest)
+    return frozenset({rows[index + 1] if index + 1 < len(rows) else next_slice})
 
 
 def status_line_checkpoint() -> Checkpoint:
@@ -417,7 +454,7 @@ def status_line_checkpoint() -> Checkpoint:
     match = re.search(r"^> \*\*Status:\*\*(.*(?:\n>.*)*)", text, re.MULTILINE)
     if match is None:
         raise DocsStructureError(f"{DEVELOPER_GUIDE}: no `> **Status:**` line")
-    checkpoint = re.search(r"S\d+-C\d+", match.group(1))
+    checkpoint = re.search(_CHECKPOINT_LIKE, match.group(1))
     if checkpoint is None:
         raise DocsStructureError(
             f"{DEVELOPER_GUIDE}: the Status line names no checkpoint ID (S<slice>-C<n>)"
@@ -449,28 +486,7 @@ class TechDebt:
 
 
 def tech_debt_entries() -> list[TechDebt]:
-    # The entry-format template sits in a fenced code block; it isn't an entry.
-    text = re.sub(r"^```.*?^```", "", read(TECH_DEBT), flags=re.MULTILINE | re.DOTALL)
-    malformed = [
-        line
-        for line in re.findall(r"^### TD.*$", text, re.MULTILINE)
-        if not re.match(r"^### TD-\d+: ", line)
-    ]
-    if malformed:
-        raise DocsStructureError(f"{TECH_DEBT}: headings not in `### TD-<n>: ` form: {malformed}")
-    headings = list(re.finditer(r"^### TD-(\d+): ", text, re.MULTILINE))
-    if not headings:
-        raise DocsStructureError(f"{TECH_DEBT}: no `### TD-<n>: ` entries")
-    entries: list[TechDebt] = []
-    for index, heading in enumerate(headings):
-        end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
-        body = text[heading.end() : end]
-        fields = {
-            match.group(1): " ".join(match.group(2).split())
-            for match in re.finditer(r"^- \*\*([^*]+):\*\* (.*(?:\n  .*)*)", body, re.MULTILINE)
-        }
-        entries.append(TechDebt(int(heading.group(1)), fields))
-    return entries
+    return [TechDebt(number, fields) for number, fields in _log_entries(TECH_DEBT, "TD")]
 
 
 def tech_debt_format_problems(entries: list[TechDebt]) -> list[str]:
@@ -488,9 +504,9 @@ def tech_debt_format_problems(entries: list[TechDebt]) -> list[str]:
 def fix_by_deadline(entry: TechDebt) -> tuple[Checkpoint | None, int | None]:
     """(checkpoint, None) for `S0-C7 ...`, (None, slice) for `Slice 1 ...`."""
     fix_by = entry.fields["Fix by"]
-    checkpoint = re.match(r"^(S\d+-C\d+)\b", fix_by)
+    checkpoint = re.match(_CHECKPOINT_LIKE, fix_by)
     if checkpoint:
-        return Checkpoint.parse(checkpoint.group(1)), None
+        return Checkpoint.parse(checkpoint.group(0)), None
     slice_match = re.match(r"^Slice (\d+)\b", fix_by)
     if slice_match:
         return None, int(slice_match.group(1))
@@ -501,7 +517,7 @@ def fix_by_deadline(entry: TechDebt) -> tuple[Checkpoint | None, int | None]:
 
 
 def overdue_tech_debt(
-    entries: list[TechDebt], latest: Checkpoint, counts: dict[int, int]
+    entries: list[TechDebt], latest: Checkpoint, order: CheckpointOrder
 ) -> list[str]:
     """Open entries whose Fix by is already done: a checkpoint at or before the latest
     `checkpoint(...)` commit, or a slice that is finished."""
@@ -515,7 +531,7 @@ def overdue_tech_debt(
                 f"{TECH_DEBT} TD-{entry.number} is open, but its Fix by ({checkpoint}) is done "
                 f"(latest checkpoint commit: {latest})"
             )
-        if slice_number is not None and slice_finished(slice_number, latest, counts):
+        if slice_number is not None and slice_finished(slice_number, latest, order):
             problems.append(
                 f"{TECH_DEBT} TD-{entry.number} is open, but its Fix by (Slice {slice_number}) "
                 f"is finished (latest checkpoint commit: {latest})"
@@ -523,11 +539,90 @@ def overdue_tech_debt(
     return problems
 
 
+# --- Decision log -----------------------------------------------------------------------------
+
+DL_FIELDS = ("Date", "Decision", "Supersedes", "Superseded by", "Applies to", "Source")
+
+
+@dataclass(frozen=True)
+class Decision:
+    number: int
+    fields: dict[str, str]
+
+
+def decision_log_entries() -> list[Decision]:
+    return [Decision(number, fields) for number, fields in _log_entries(DECISION_LOG, "DL")]
+
+
+def decision_log_format_problems(entries: list[Decision]) -> list[str]:
+    problems: list[str] = []
+    for entry in entries:
+        missing = [field for field in DL_FIELDS if field not in entry.fields]
+        if missing:
+            problems.append(f"{DECISION_LOG} DL-{entry.number} is missing: {', '.join(missing)}")
+    numbers = [entry.number for entry in entries]
+    if numbers != list(range(1, len(numbers) + 1)):
+        problems.append(f"{DECISION_LOG}: DL numbers must be 1..n in order, unique; got {numbers}")
+    return problems
+
+
+def superseded_by_problems(entries: list[Decision]) -> list[str]:
+    """Each "Superseded by" is "none" or names other entries (`DL-<n>`) that exist."""
+    known = {entry.number for entry in entries}
+    problems: list[str] = []
+    for entry in entries:
+        value = entry.fields.get("Superseded by")
+        if value is None or value == "none":
+            continue  # a missing field is reported by decision_log_format_problems
+        names = re.findall(r"\bDL-(\d+)\b", value)
+        if not names:
+            problems.append(
+                f'{DECISION_LOG} DL-{entry.number}: Superseded by must be "none" or name an '
+                f"entry (DL-<n>), got {value!r}"
+            )
+        for name in names:
+            if int(name) not in known or int(name) == entry.number:
+                problems.append(
+                    f"{DECISION_LOG} DL-{entry.number}: Superseded by names DL-{name}, which "
+                    f"isn't another entry in the log"
+                )
+    return problems
+
+
+def _log_entries(relative_path: str, prefix: str) -> list[tuple[int, dict[str, str]]]:
+    """`### <prefix>-<n>: ` entries, each with its `- **Field:** value` lines (a value may wrap
+    onto lines indented by two spaces). The entry-format template sits in a fenced code block;
+    it isn't an entry."""
+    text = re.sub(r"^```.*?^```", "", read(relative_path), flags=re.MULTILINE | re.DOTALL)
+    malformed = [
+        line
+        for line in re.findall(rf"^### {prefix}.*$", text, re.MULTILINE)
+        if not re.match(rf"^### {prefix}-\d+: ", line)
+    ]
+    if malformed:
+        raise DocsStructureError(
+            f"{relative_path}: headings not in `### {prefix}-<n>: ` form: {malformed}"
+        )
+    headings = list(re.finditer(rf"^### {prefix}-(\d+): ", text, re.MULTILINE))
+    if not headings:
+        raise DocsStructureError(f"{relative_path}: no `### {prefix}-<n>: ` entries")
+    entries: list[tuple[int, dict[str, str]]] = []
+    for index, heading in enumerate(headings):
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
+        body = text[heading.end() : end]
+        fields = {
+            match.group(1): " ".join(match.group(2).split())
+            for match in re.finditer(r"^- \*\*([^*]+):\*\* (.*(?:\n  .*)*)", body, re.MULTILINE)
+        }
+        entries.append((int(heading.group(1)), fields))
+    return entries
+
+
 # --- Cross-file references --------------------------------------------------------------------
 
 
 def reference_files() -> list[Path]:
-    """Files whose TD-n and § references must resolve: docs/ (except the historical review
+    """Files whose TD-n, DL-n, and § references must resolve: docs/ (except the historical review
     records in docs/reviews/), the CLAUDE.md files, and .claude/. Listed through git (tracked
     plus untracked-but-not-ignored), so caches, editor backups, and local settings are never
     scanned."""

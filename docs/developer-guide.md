@@ -72,14 +72,15 @@ failing) if the pre-commit hooks aren't installed.
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
 docs/           design, schema, build plan, testing strategy, screen inventory, these guides,
-                tech-debt log, reviews/ (one record per checkpoint), spikes/
+                tech-debt log, decision log, reviews/ (one record per checkpoint), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
 .github/workflows/ci.yml   CI: `wl check` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
-.claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area), agents
+.claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
+                design-change), agents
                 (checkpoint-reviewer, security-reviewer, fresh-clone-verifier, docs-consistency),
                 hooks (see section 11)
 ```
@@ -740,7 +741,8 @@ database. They check:
 | Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table. The column check runs per column (`table.column`). A documented column whose Notes cell starts with `Added in Slice <n>.` is **skipped** (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished (its last checkpoint, or a later slice's, has a `checkpoint(<ID>):` commit), and required from then on; a malformed marker is a `DocsStructureError`. A model column with no documented row always fails |
 | One owner per table | a schema-doc table isn't in exactly one "Owns (tables)" cell of the build plan's feature map, or the map names a table schema-doc lacks |
 | Tech-debt log | an entry lacks Added/What/Why/Fix by/Status, numbers aren't 1..n, a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
-| Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it |
+| Decision log | an entry lacks Date/Decision/Supersedes/Superseded by/Applies to/Source, numbers aren't 1..n, a Superseded by is neither `none` nor another entry (`DL-<n>`), or a `DL-<n>` reference (same files as TD references) has no entry |
+| Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
 | § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` always means a design-doc section, so refer to this guide's sections as "section N" |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
 
@@ -784,15 +786,21 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
 
 The repository's Claude Code setup lives in `.claude/` and is version-controlled.
 
-- **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`.
+- **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
+  `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
   `fresh-clone-verifier`, `docs-consistency`.
 - **When the agents run:** `checkpoint-reviewer` at every checkpoint, `security-reviewer` when
   the build plan names the checkpoint for it or it touches security-relevant code,
   `fresh-clone-verifier` and `docs-consistency` at the last checkpoint of a slice (all through
-  the `checkpoint` skill). `docs-consistency` also runs on its own after a design change applied
-  outside a checkpoint, before committing. It is read-only: it reports clear-cut fixes (citing
-  the recorded decision) and decisions for the owner, which are never decided for them.
+  the `checkpoint` skill). `docs-consistency` also runs in every design change, before
+  committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
+  decisions for the owner, which are never decided for them.
+- **Design changes** outside a checkpoint's scope (decisions from a chat session, or code that
+  must differ from the docs) use the `design-change` skill: one decision-log entry per decision
+  (`docs/decision-log.md`), every affected doc updated, `docs-consistency`, then a `docs:`
+  commit. A change to code already built becomes a new checkpoint with a letter suffix
+  (`S1-C13a`); checkpoints are never renumbered.
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
   - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or

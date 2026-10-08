@@ -99,13 +99,20 @@ by following `docs/developer-guide.md` exactly as written; any wrong or missing 
 the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
 `CLAUDE.md` file, and `.claude/` file against the others.
 
-**Design changes outside a checkpoint** (e.g. applied from a chat session): run
-`docs-consistency` before committing, and bring its decisions to the owner.
+**Design changes outside a checkpoint** (decisions from a chat session, or code that must differ
+from the docs) go through the `design-change` skill (DL-8). They apply at group boundaries
+(mid-group only when the owner says one blocks the group), never in a commit with checkpoint
+work. Each decision gets a decision-log entry (`docs/decision-log.md`), every doc stating the
+old rule is updated, and `docs-consistency` runs (trigger `design-change`) before committing;
+its decisions go to the owner. A change to code already built becomes a new checkpoint,
+inserted with a letter suffix where it runs (`S1-C13a` between `S1-C13` and `S1-C14`);
+existing checkpoints are never renumbered.
 
 **Docs consistency tests** (`backend/tests/unit/docs/`, part of `wl check`) check the mechanical
 part on every run: models vs. schema doc (tables, columns, enum values), one feature-map owner
-per table, the tech-debt log's format, references, and deadlines, the developer guide's status
-line, design-doc § references, and the lists of agents and skills.
+per table, the tech-debt log's format, references, and deadlines, the decision log's format and
+references, the developer guide's status line, design-doc § references, and the lists of agents
+and skills.
 
 ### Claude configuration (in the repo)
 Everything lives in the repository, version-controlled and present on every workstation.
@@ -140,13 +147,18 @@ Everything lives in the repository, version-controlled and present on every work
   `CLAUDE.md` files, and `.claude/` against each other (contradictions, superseded rules, stale
   status, broken references, gaps). It reports clear-cut **fixes** (citing the recorded
   decision) and **decisions** for the owner, and never edits files. Runs at the last checkpoint
-  of each slice and after any design change applied outside a checkpoint.
+  of each slice and in every design change (the `design-change` skill).
 - **`test-writer` skill** (`.claude/skills/test-writer/`): the procedure for every test —
   behavior table from the docs, layer choice, assertions that can fail, banned patterns, and
   proof that each test fails (test-first, sabotage check, mutation testing).
 - **`migration` skill** (`.claude/skills/migration/`): schema changes — model changes, Alembic
   generation, hand review of what autogenerate misses, downgrade, constraint tests, schema-doc
   sync.
+- **`design-change` skill** (`.claude/skills/design-change/`): applying a design change outside
+  a checkpoint's scope ("Design changes outside a checkpoint" above): timing, checking the
+  repository, classifying each decision (docs only, future checkpoints, or a new inserted
+  checkpoint for built code), the decision-log entries, every affected doc, `docs-consistency`,
+  and the report.
 - **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
   verified and corrected against the hand-built `project` area at the start of Slice 2.
@@ -172,7 +184,7 @@ Choices the design docs left open.
 | 1 | **Plain SQLAlchemy 2.x (2.0-style typed ORM), not SQLModel.** The conventions lean on SQLAlchemy-native features (`version_id_col`, `with_loader_criteria`, `Enum(native_enum=False)`, direct `UPDATE`s that bypass versioning); SQLModel adds a layer over exactly those. API shapes are separate Pydantic models. | Confirmed |
 | 2 | **Async throughout:** SQLAlchemy 2.x asyncio (`AsyncSession`) with the psycopg 3 async driver, `async def` endpoints, services, and repositories. Chosen over sync because the team is comfortable with async and it avoids a later migration if streaming (v2 AI) or live updates arrive. Rules in "Async rules" below. | Confirmed |
 | 3 | **Typed API client generated from the backend's OpenAPI schema:** `openapi-typescript` (generates TypeScript types) + `openapi-fetch` (typed fetch client). CI fails if the generated client is stale. | Confirmed |
-| 4 | **Organizations are created by system admins and workspace owners/admins** (design-doc §5, "Workspace roles"); the creator assigns the org's first owner. Workspaces are created only by the seed CLI in v1. | Confirmed (revised with the workspace tenancy model) |
+| 4 | **Organizations are created by system admins and workspace owners/admins** (design-doc §5, "Workspace roles"); the creator assigns the org's first owner. Workspaces are created only by the seed CLI in v1. | Confirmed (DL-2) |
 | 5 | **Monorepo** with `backend/`, `frontend/`, and `docs/` at the root, laid out as in "Repository layout" below. | Confirmed |
 | 6 | **Python 3.14** (built-in `uuid.uuid7()`); fallback to 3.13, then 3.12, with the `uuid-utils` package for UUIDv7 if a dependency lags. | Confirmed |
 | 7 | **Layered backend** (routers → services → repositories → models), organized layer-first, as in "Backend architecture" below. Includes a repository layer (the app is database-operation-heavy); SQLAlchemy models serve as the domain entities (no separate domain layer). | Confirmed |
@@ -266,11 +278,13 @@ The sections below describe the content; the table above is the order of work.
 │   ├── hooks/                          protect_files.py, format_file.py
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md, docs-consistency.md
-│   └── skills/                         checkpoint/, test-writer/, migration/, new-area/
+│   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
+│                                       design-change/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
-│                                 tech-debt.md, screen-inventory.md, reviews/ (one record per
-│                                 checkpoint), spikes/ (spike code kept as evidence)
+│                                 tech-debt.md, decision-log.md, screen-inventory.md, reviews/
+│                                 (one record per checkpoint), spikes/ (spike code kept as
+│                                 evidence)
 │                                 (source of truth; the owner uploads changed files to the Project)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
@@ -715,12 +729,9 @@ Checkpoints touching authentication, sessions, authorization, or routers get the
 `security-reviewer` as well: every checkpoint from 1 to 16. The `checkpoint` skill runs it for
 every checkpoint this paragraph names, and also whenever a diff touches security-relevant code.
 The sections below describe the content; the table above is the order of work. The decisions
-behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/S1-plan.md`. That record
-predates Checkpoint 13 (Classification & export control, added Oct 5, 2026): its Checkpoints
-13–16 are now 14–17. Its D4 ("no email-change feature in v1"; a manual database edit) and the
-Checkpoint 1 developer-guide note on changing email by hand are superseded by the journey
-decisions (Oct 6–7, 2026): admins change a user's email in Checkpoint 10 (design-doc §4), so
-Checkpoint 1 adds no manual-edit how-to.
+behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/S1-plan.md`; its
+Checkpoints 13–16 are this table's 14–17 (DL-3). Admins change a user's email in Checkpoint 10
+(design-doc §4; DL-6 supersedes the record's D4).
 
 ### Migration (Checkpoint 1)
 Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, `membership`,
@@ -1046,7 +1057,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
 What's decided so far. This is not the slice's plan, which is written when Slice 2 is next.
 
-- **Rank moves to Slice 2.** Requirements are ordered by `rank` among siblings, so the rank
+- **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the rank
   helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual
   ordering") and its Hypothesis tests come with the requirement tree. Slice 3 keeps rank for
   tasks, the backlog, and the board.

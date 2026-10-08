@@ -90,7 +90,7 @@ Workspace (the firm: tenant boundary)
 - **Project roles move into v1** (`project_membership`): different projects have different
   teams and needs. Project access is explicit membership; org, workspace, and system admins get
   admin access by inheritance (on an export-controlled project, management only: content needs
-  an explicit membership, design-doc §3.1). This replaces the `project.is_restricted` flag.
+  an explicit membership, design-doc §3.1). (DL-2)
 - **Client admins manage their own org's users; internal admins can add client users too.**
   Account actions (deactivate, reactivate, reset password, sign out everywhere) follow rank
   (design-doc §4, "Account actions follow rank"): an org admin can't take them against a user
