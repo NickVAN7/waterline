@@ -53,8 +53,10 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   behavior table and its files table, with each file's `git hash-object`), plus any change to
   those files the owner approved (what and why). `checkpoint-reviewer` compares the files with
   the recorded hashes.
-- Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit (the
-  previous checkpoint's commit, or the root commit for the first).
+- Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit: the last
+  commit before this checkpoint's work started (DL-17), so design-change commits between
+  checkpoints stay out of its review. For a checkpoint parked for a design change, that's the
+  design change's last commit.
 - Also invoke the `security-reviewer` agent, with the same inputs, when **either** holds:
   - the build plan's section for the slice says the checkpoint gets the security reviewer
     (e.g. Slice 1: "every checkpoint from 1 to 16"); or
@@ -140,8 +142,9 @@ Then:
   (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
   report. Never report a checkpoint whose CI isn't green.
-- Never merge. At the slice's last checkpoint, the owner's approval decides the merge: on their
-  say-so, mark the PR ready and merge it with a merge commit
+- Never merge. At the slice's last checkpoint, the owner's approval decides the merge. Any
+  changes the owner decides in the slice retro are applied first, on the slice branch, with the
+  `design-change` skill and green CI (DL-19). Then, on their say-so, mark the PR ready and merge it with a merge commit
   (`gh pr merge --merge --delete-branch`), never squash or rebase. The git guard hook asks the
   owner to confirm the merge command; it also blocks commits on `main`, pushes to `main`, force
   pushes, rebases, and skipped hooks. When it blocks a command, do what its message says.
@@ -168,7 +171,8 @@ Send the owner:
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
   the owner, which skills and agents never triggered, and the verdict of any process trial.
-  The owner decides what changes; each change gets a decision-log entry;
+  The owner decides what changes; each change gets a decision-log entry and is applied on the
+  slice branch before the merge (DL-19);
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.
@@ -181,4 +185,5 @@ Then **stop**. Do not begin the next checkpoint until the owner explicitly appro
   in the review note. Say in the report that it auto-continued and why. If any condition
   fails, stop as usual.
 - **S1-C10:** a full stop for the whole group. The report covers S1-C8 to S1-C10, with links to
-  the three review records and the group's diff range (`<S1-C7 commit>..<S1-C10 commit>`).
+  the three review records and the group's diff range (from S1-C8's base, the last commit
+  before its work started, to the S1-C10 commit).

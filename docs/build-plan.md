@@ -76,13 +76,14 @@ with the workflow changes of DL-7 to DL-14).
   design changes apply ("Design changes outside a checkpoint" below). They don't get their own
   branch or PR.
 - **Design changes** from chat are `docs:` commits on the slice branch, in the slice's PR (the
-  `design-change` skill).
+  `design-change` skill); tooling code in them is in `chore:` or `ci:` commits (DL-18).
 - **Pushed history is never rewritten:** no amend, rebase, or force-push of a pushed commit. A
   checkpoint whose pushed commit turns CI red is fixed with a follow-up commit,
   `fix(<ID>): <what>`, before it goes to the owner; it is the only exception to one commit per
   checkpoint.
 - **Merge at the end of the slice only:** after the owner approves the slice's last
-  checkpoint, and only on their say-so, the PR is marked ready and merged with a **merge
+  checkpoint and the slice retro's changes are applied on the branch with green CI (DL-19), and
+  only on their say-so, the PR is marked ready and merged with a **merge
   commit** (`gh pr merge --merge --delete-branch`), never squash or rebase. A merge commit keeps
   every commit's hash, so the base commits in the review records stay valid, and `main` keeps
   one `checkpoint(<ID>):` commit per checkpoint in its history (the docs consistency tests read
@@ -138,7 +139,8 @@ the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews eve
 `CLAUDE.md` file, and `.claude/` file against the others. The slice's last checkpoint ends with
 a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
 skills and agents never triggered, and the verdict of any process trial. The owner decides what
-changes; each change gets a decision-log entry.
+changes; each change gets a decision-log entry and is applied as a design change on the slice
+branch before the slice's PR is merged (DL-19).
 
 **Design changes outside a checkpoint** (decisions from a chat session, or code that must differ
 from the docs) go through the `design-change` skill (DL-8). They apply at group boundaries
@@ -147,7 +149,12 @@ work. Each decision gets a decision-log entry (`docs/decision-log.md`), every do
 old rule is updated, and `docs-consistency` runs (trigger `design-change`) before committing;
 its decisions go to the owner. A change to code already built becomes a new checkpoint,
 inserted with a letter suffix where it runs (`S1-C13a` between `S1-C13` and `S1-C14`);
-existing checkpoints are never renumbered.
+existing checkpoints are never renumbered. Developer-tooling and process code (hooks, the `wl`
+CLI, CI, the docs consistency tests) is built in the design change itself, as `chore:` or `ci:`
+commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
+(DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+and its review base becomes the design change's last commit (DL-20). Each checkpoint's review
+diffs from the last commit before its work started, so design changes stay out of it (DL-17).
 
 **Docs consistency tests** (`backend/tests/unit/docs/`, part of `wl check`) check the mechanical
 part on every run: models vs. schema doc (tables, columns, enum values), one feature-map owner
@@ -164,14 +171,18 @@ Everything lives in the repository, version-controlled and present on every work
 - **`checkpoint-reviewer` agent** (`.claude/agents/`): verification layer 2. A fresh-context
   reviewer that reads the docs and the diff, sabotage-checks two or three behaviors in a
   temporary copy (never the repository), compares spec tests with their recorded hashes, and
-  reports findings in a fixed format.
+  reports findings in a fixed format. It also reviews a design change's tooling code, under a
+  `DC-<YYYY-MM-DD>` review ID (DL-18).
 - **`spec-test-writer` agent** (`.claude/agents/`): writes the tests for new or changed code in
-  `app/rules/` and `app/authz/` from the design docs, before the implementation exists and
-  without reading it, at the start of every checkpoint that adds or changes such code (Slice 1:
-  S1-C7 and S1-C13; later slices as their plans name). The main session first writes interface
-  stubs (signatures and types, returning one fixed wrong answer), then invokes the agent, then
-  implements. Its file list, with each file's `git hash-object`, goes in the review record
-  ("Spec tests"); a spec test changes only with the owner's approval.
+  `app/rules/` and `app/authz/` from the design docs, before the implementation exists and without
+  reading it, at the start of every checkpoint that adds or changes such code, each area's policy
+  included (DL-15; Slice 1: S1-C7 to S1-C13). For `app/authz/` it also writes the integration and
+  API tests (404 for unseen entities, access scoping, module gating, the endpoint wiring) and the
+  test-only routers they need (DL-16); under `backend/app/` it reads only the stubs and the built
+  modules the main session lists. The main session first writes interface stubs (signatures and
+  types, returning one fixed wrong answer), then invokes the agent, then implements. Its file list,
+  with each file's `git hash-object`, goes in the review record ("Spec tests"); a spec test changes
+  only with the owner's approval.
 - **`checkpoint` skill** (`.claude/skills/checkpoint/`): the close-out procedure every
   checkpoint ends with:
   - a scope check, then `wl check`;
@@ -202,9 +213,10 @@ Everything lives in the repository, version-controlled and present on every work
   sync.
 - **`design-change` skill** (`.claude/skills/design-change/`): applying a design change outside
   a checkpoint's scope ("Design changes outside a checkpoint" above): timing, checking the
-  repository, classifying each decision (docs only, future checkpoints, or a new inserted
-  checkpoint for built code), the decision-log entries, every affected doc, `docs-consistency`,
-  and the report.
+  repository, parking a checkpoint in progress (DL-20), classifying each decision (docs only,
+  future checkpoints, a new inserted checkpoint for built product code, or developer-tooling
+  code built in the change and reviewed by `checkpoint-reviewer`, DL-18), the decision-log
+  entries, every affected doc, `docs-consistency`, and the report.
 - **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
   verified and corrected against the hand-built `project` area at the start of Slice 2.
@@ -216,8 +228,9 @@ Everything lives in the repository, version-controlled and present on every work
   history (rebase, amending a pushed commit, a reset that drops pushed commits), or skip hooks,
   and asks the owner before a pull request is merged. It's a guard against mistakes, not a
   security boundary: branch protection (TD-15) is the real control. A command that mentions git
-  or gh and can't be parsed with confidence is blocked. The guard and `protect_files.py` are
-  tested with the developer CLI's tests, under its 100% coverage gate.
+  or gh and can't be parsed with confidence is blocked. The hooks are linted with the developer
+  CLI's ruff; the guard and `protect_files.py` are also type-checked (pyright strict) and tested
+  under its 100% coverage gate.
 
 ### Workflow items scheduled
 Workflow items decided but not built yet, each built through the `design-change` skill or the
@@ -349,8 +362,9 @@ The sections below describe the content; the table above is the order of work.
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
 │                                 tech-debt.md, decision-log.md, screen-inventory.md, reviews/
-│                                 (one record per checkpoint), spikes/ (spike code kept as
-│                                 evidence); the source of truth (DL-14)
+│                                 (one record per checkpoint, and per design-change tooling
+│                                 review, DC-<date>.md), spikes/ (spike code kept as evidence);
+│                                 the source of truth (DL-14)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
 ├── docker/postgres/initdb/       first-start scripts for postgres (creates the test database)
@@ -799,6 +813,9 @@ rest of the slice.
 | 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
 | 4 | `s1-projects` | 11–13 (projects, project members, classification) |
 | 5 | `s1-web` | 14–17 (web screens and slice verification) |
+
+Checkpoints 7 to 13 add or change `app/authz/` code (the authorization core, then each area's
+policy) or `app/rules/` code, so each starts with `spec-test-writer` (DL-15).
 
 Checkpoints touching authentication, sessions, authorization, or routers get the
 `security-reviewer` as well: every checkpoint from 1 to 16. The `checkpoint` skill runs it for

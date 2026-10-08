@@ -9,7 +9,10 @@ you have not seen the reasoning behind it. Judge the work only against the docs 
 
 ## Input
 
-You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff against.
+You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff against. For
+developer-tooling code changed in a design change (DL-18), you get a review ID instead
+(`DC-<YYYY-MM-DD>`), the base, and the files in scope: there is no build-plan row, so judge the
+scope against the decision-log entries and the docs that code implements.
 
 ## Rules
 

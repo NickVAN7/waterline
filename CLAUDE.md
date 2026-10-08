@@ -18,14 +18,14 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
 | `docs/decision-log.md` | Every owner decision that changed or superseded a recorded rule, or set a process (`DL-<n>`) |
-| `docs/reviews/<ID>.md` | Each checkpoint's independent review: every pass, finding, and resolution |
+| `docs/reviews/<ID>.md` | Each checkpoint's independent review, and each design change's tooling review (`DC-<YYYY-MM-DD>.md`, DL-18): every pass, finding, and resolution |
 | `docs/spikes/` | Spike code kept as evidence for a recorded decision (e.g. design-doc §13) |
 
 Read the relevant sections before changing anything. If the code needs to differ from the docs,
-**stop and ask** (the `design-change` skill: a proposal for the owner) — never silently
-diverge. An approved design change goes in its own `docs:` commit, never with checkpoint work
-(DL-8); a drift fix inside the checkpoint's approved scope updates the docs in the
-checkpoint's commit.
+**stop and ask** (the `design-change` skill: a proposal for the owner) — never silently diverge. An
+approved design change goes in its own `docs:` commits (tooling code in `chore:`/`ci:` commits,
+DL-18), never with checkpoint work (DL-8); a drift fix inside the checkpoint's approved scope
+updates the docs in the checkpoint's commit.
 
 ## Commands
 
@@ -67,9 +67,10 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - Each slice works on one branch, `s<n>`, with one draft PR (build plan, "Pull requests");
   groups are review points. Push after every checkpoint commit (never work in progress, and
   never rewrite a pushed commit: fix red CI with a `fix(<ID>):` commit); CI must be green
-  before review is reported. Design changes are `docs:` commits on the slice branch. The PR is
-  merged at the end of the slice, with a merge commit (never squash or rebase), only when the
-  owner says so.
+  before review is reported. Design changes are `docs:` commits on the slice branch (tooling
+  code in `chore:`/`ci:` commits, reviewed by `checkpoint-reviewer`). The PR is merged at the
+  end of the slice, after the slice retro's changes are applied, with a merge commit (never
+  squash or rebase), only when the owner says so.
 - A shortcut is allowed only if it's logged in `docs/tech-debt.md` with its reason and target.
 
 ## Always
@@ -102,9 +103,9 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).
-- Hooks block edits to generated files and committed migrations, format files after edits, and
-  guard git (no commits or pushes to `main`, no force pushes or history rewrites, no skipped
-  hooks; merging a PR asks the owner). When a hook blocks you, do what its message says. Never work around a hook with shell
-  commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
+- Hooks block edits to generated files and committed migrations, format files after edits, and guard
+  git (no commits or pushes to `main`, no force pushes or history rewrites, no skipped hooks;
+  merging a PR asks the owner). When a hook blocks you, do what its message says. Never work around
+  a hook with shell commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
 
 See `backend/CLAUDE.md` and `frontend/CLAUDE.md` for the rules specific to each half.

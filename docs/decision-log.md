@@ -197,3 +197,71 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** `checkpoint` skill; root `CLAUDE.md`; build plan ("Claude configuration",
   repository layout)
 - **Source:** chat session (workflow review)
+
+### DL-15: Spec tests for every rule or policy checkpoint
+- **Date:** 2026-10-08
+- **Decision:** `spec-test-writer` runs at the start of every checkpoint that adds or changes
+  code in `app/rules/` or `app/authz/`, each area's policy included; in Slice 1 that is S1-C7 to
+  S1-C13.
+- **Supersedes:** the build plan's list of Slice 1 spec-test checkpoints (S1-C7 and S1-C13
+  only, from DL-11)
+- **Superseded by:** none
+- **Applies to:** build plan ("Claude configuration", Slice 1 checkpoints)
+- **Source:** chat session (docs-consistency decisions, workflow review)
+
+### DL-16: Spec tests cover authorization through the database and HTTP
+- **Date:** 2026-10-08
+- **Decision:** For `app/authz/`, `spec-test-writer` also writes the integration and API tests
+  (404 for unseen entities, access scoping, module gating, the endpoint wiring) and the
+  test-only routers in `tests/support/` they need. Under `backend/app/` it reads only the stubs
+  and the already-built modules the caller lists, never the code being implemented.
+- **Supersedes:** `spec-test-writer`'s scope as first recorded (unit tests under
+  `tests/unit/rules/` and `tests/unit/authz/` only)
+- **Superseded by:** none
+- **Applies to:** `spec-test-writer` agent; `test-writer` skill; testing strategy; build plan
+  ("Claude configuration"); developer guide section 9
+- **Source:** chat session (docs-consistency decisions, workflow review)
+
+### DL-17: A review's base is the commit its work started from
+- **Date:** 2026-10-08
+- **Decision:** Reviewers diff a checkpoint against the last commit before its work started
+  (not the previous checkpoint's commit), so design-change commits between checkpoints stay out
+  of its review; a group's range starts at its first checkpoint's base.
+- **Supersedes:** the `checkpoint` skill's base, "the previous checkpoint's commit"
+- **Superseded by:** none
+- **Applies to:** `checkpoint` skill (independent review, the review-tier trial's group range)
+- **Source:** chat session (docs-consistency decisions, workflow review)
+
+### DL-18: Tooling code in a design change gets an independent review
+- **Date:** 2026-10-08
+- **Decision:** Developer-tooling and process code changed outside a checkpoint (hooks, the
+  developer CLI, CI, the docs consistency tests) lands as `chore:` or `ci:` commits in the
+  design change, after a `checkpoint-reviewer` pass (with its sabotage spot-check) recorded in
+  `docs/reviews/DC-<YYYY-MM-DD>.md`. Product code still goes through an inserted checkpoint.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `design-change` skill; `checkpoint-reviewer` agent; build plan ("Design
+  changes outside a checkpoint"); root `CLAUDE.md`
+- **Source:** chat session (docs-consistency decisions, workflow review)
+
+### DL-19: The slice retro lands on the slice branch before the merge
+- **Date:** 2026-10-08
+- **Decision:** Changes the owner decides in a slice retro are applied as a design change on the
+  slice branch after the last checkpoint's report, before the slice's pull request is merged;
+  the merge waits for them and green CI.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Verification", "Pull requests"); `checkpoint` and
+  `design-change` skills
+- **Source:** chat session (docs-consistency decisions, workflow review)
+
+### DL-20: A checkpoint is parked with `git stash`
+- **Date:** 2026-10-08
+- **Decision:** To apply a design change mid-checkpoint, the work is stashed (untracked files
+  included), the design change is committed and pushed with green CI, and the work is restored;
+  the checkpoint's review base becomes the design change's last commit, and the parked work is
+  checked against the changed docs before it continues.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `design-change` skill
+- **Source:** chat session (docs-consistency decisions, workflow review)

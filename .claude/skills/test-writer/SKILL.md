@@ -91,15 +91,17 @@ showing the real endpoint or service denies the forbidden case.
 ## 4. Prove each test can fail
 
 - **`rules/` and `authz/`: test first, by `spec-test-writer`.** The implementing session never
-  writes these tests. Write interface stubs first (signatures and types, each returning one
-  fixed wrong answer, e.g. always deny), then invoke the `spec-test-writer` agent with the
-  checkpoint ID, the design-doc sections and tables to cover, the stub paths, and the test files
-  it may create or extend. It writes the tests from the docs without reading any other app
-  code, and proves each fails against the stub's answer or its opposite. Then implement until
-  green. Its output (behavior table, files with their `git hash-object`) goes in the review
-  record's "Spec tests" section. If the implementation can't pass a spec test, stop and ask the
-  owner whether the doc or the test is wrong; list any change they approve in the record.
-  Tests you add on top (wiring, API, integration) follow the rest of this skill.
+  writes these tests. Write interface stubs first (signatures and types, each returning one fixed
+  wrong answer, e.g. always deny), then invoke the `spec-test-writer` agent with the checkpoint ID,
+  the design-doc sections and tables to cover, the stub paths, the built modules it may read, and
+  the test files it may create or extend. It writes the tests from the docs without reading any app
+  code beyond the stubs and the built modules you list, and proves each fails against the stub's
+  answer or its opposite. Then implement until green. Its output (behavior table, files with their
+  `git hash-object`) goes in the review record's "Spec tests" section. If the implementation can't
+  pass a spec test, stop and ask the owner whether the doc or the test is wrong; list any change
+  they approve in the record. For `authz/`, the agent also writes the integration and API tests and
+  the test-only routers (DL-16); list the already-built modules it may read (the app factory, error
+  and auth helpers). Tests you add on top for other code follow the rest of this skill.
 - **Everything else: sabotage check.** For each behavior in the table, make the smallest change
   to the code that breaks it (invert a condition, remove the `log_change()` call, drop the
   access-scoping filter, skip the version check, return early), run the related tests, and confirm at least
