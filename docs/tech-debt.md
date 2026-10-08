@@ -215,6 +215,9 @@ Entry format:
   merge commit). GitHub offers branch protection and rulesets on a private repository only with
   a paid plan (the API answers "Upgrade to GitHub Pro or make this repository public"): CI runs
   on every push and PR, but a red PR can still be merged, and `main` can be pushed to directly.
+  Until protection is enabled, the git guard hook (`.claude/hooks/guard_git.py`, DL-12) covers
+  Claude's own commands: no commits or pushes to `main`, no force pushes, and the merge asks
+  the owner. It doesn't cover anyone's commands outside Claude Code.
 - **Why:** Owner decision (S0-C8): defer rather than upgrade or make the repository public.
   The pull-request workflow (build plan, "Pull requests") checks CI by hand before merging.
 - **Fix by:** Slice 7 (before a second contributor or the first non-local deployment,

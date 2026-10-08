@@ -732,7 +732,9 @@ afterwards (see `tests/integration/test_migrations.py`).
   `--dry-run`, dry-run output matches the expected commands, and the doctor checks are tested
   with fake probes. The CLI is held to **100% line + branch coverage** (in
   `tools/cli/pyproject.toml`), so a test that claims to cover an error path but never reaches
-  it fails the gate.
+  it fails the gate. The Claude Code hooks `guard_git.py` and `protect_files.py` are tested
+  here too (`tools/cli/tests/hooks/`, importing them from `.claude/hooks/` through pytest's
+  `pythonpath`), under the same gate and pyright's strict mode.
 
 **Docs consistency tests** (`tests/unit/docs/test_docs_consistency.py`, parsers in
 `tests/support/docs.py`) read the docs, `.claude/`, `Base.metadata`, and `git log`; no
@@ -816,6 +818,19 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
     a committed migration. Regenerate the client with `uv run wl gen-client`; fix a
     committed migration with a new one.
   - After Claude edits a file, it is formatted with ruff (backend) or Prettier (frontend).
+  - The **git guard** (`guard_git.py`) checks every shell command Claude runs. It blocks
+    `git commit` or `git merge` on `main`; any push to `main` (an explicit `main` or
+    `HEAD:main`, or a bare push while on `main`); force and destructive pushes (`-f`,
+    `--force`, `--force-with-lease`, `--force-if-includes`, a `+` refspec, `--mirror`,
+    `--delete`/`-d`, a `:` refspec, `--prune`, `--all`); `git rebase` (except `--abort` and
+    `--quit`); `git commit --amend` once HEAD is on the remote, and a `git reset <commit>` that
+    drops pushed commits (both stay allowed for unpushed commits); and skipping hooks
+    (`--no-verify`, `-n` on commit, `-c core.hooksPath`). It asks you before `gh pr merge` or a
+    `gh api` call that merges a pull request. It follows `&&`, `;`, pipes, subshells,
+    `bash -c`, `$(...)`, environment prefixes, `git -C`, and git aliases; a command that
+    mentions git or gh but that it can't follow (e.g. `xargs git …`, or a shell reading stdin)
+    is blocked, with a message asking for simple commands. Its tests, and `protect_files.py`'s,
+    are in `tools/cli/tests/hooks/`.
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 

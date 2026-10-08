@@ -8,6 +8,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 GENERATED_FILES = {
     "backend/openapi.json": "Change the backend API and run `uv run wl gen-client` instead.",
@@ -40,11 +41,12 @@ def repo_root(path: Path) -> Path | None:
 
 def main() -> int:
     try:
-        data = json.load(sys.stdin)
+        data: dict[str, Any] = json.load(sys.stdin)
     except json.JSONDecodeError:
         return 0
 
-    file_path = (data.get("tool_input") or {}).get("file_path")
+    tool_input: dict[str, Any] = data.get("tool_input") or {}
+    file_path = tool_input.get("file_path")
     if not file_path:
         return 0
 

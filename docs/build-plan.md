@@ -87,7 +87,8 @@ PR (`s1-foundations`); the slice branch starts with S1-C5.
   one `checkpoint(<ID>):` commit per checkpoint in its history (the docs consistency tests read
   them).
 - GitHub doesn't enforce this yet: branch protection needs a paid plan for a private
-  repository (TD-15). Until then, check CI by hand before merging (`gh pr checks`).
+  repository (TD-15). Until then, check CI by hand before merging (`gh pr checks`); the git
+  guard hook covers Claude's own commands ("Claude configuration").
 
 ### Verification (three layers)
 **Nothing counts as verified because the session that did the work says so** (DL-11). A claim is
@@ -209,7 +210,13 @@ Everything lives in the repository, version-controlled and present on every work
 - **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
   generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`) and committed
   migrations; format each file after Claude edits it (ruff for the backend, Prettier for the
-  frontend).
+  frontend); and the **git guard** (`guard_git.py`, DL-12), which blocks Claude's git commands
+  that commit or merge on `main`, push to `main`, force-push or delete on push, rewrite pushed
+  history (rebase, amending a pushed commit, a reset that drops pushed commits), or skip hooks,
+  and asks the owner before a pull request is merged. It's a guard against mistakes, not a
+  security boundary: branch protection (TD-15) is the real control. A command that mentions git
+  or gh and can't be parsed with confidence is blocked. The guard and `protect_files.py` are
+  tested with the developer CLI's tests, under its 100% coverage gate.
 
 ### Workflow items scheduled
 Workflow items decided but not built yet, each built through the `design-change` skill or the
@@ -332,7 +339,7 @@ The sections below describe the content; the table above is the order of work.
 │                                 each have their own CLAUDE.md too)
 ├── .claude/
 │   ├── settings.json                   hooks configuration
-│   ├── hooks/                          protect_files.py, format_file.py
+│   ├── hooks/                          protect_files.py, format_file.py, guard_git.py
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md, docs-consistency.md,
 │   │                                   spec-test-writer.md

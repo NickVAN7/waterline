@@ -96,8 +96,9 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).
-- Hooks block edits to generated files and committed migrations, and format files after edits.
-  When a hook blocks you, do what its message says. Never work around a hook with shell
+- Hooks block edits to generated files and committed migrations, format files after edits, and
+  guard git (no commits or pushes to `main`, no force pushes or history rewrites, no skipped
+  hooks; merging a PR asks the owner). When a hook blocks you, do what its message says. Never work around a hook with shell
   commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
 
 See `backend/CLAUDE.md` and `frontend/CLAUDE.md` for the rules specific to each half.

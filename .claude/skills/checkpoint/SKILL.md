@@ -141,7 +141,9 @@ Then:
   report. Never report a checkpoint whose CI isn't green.
 - Never merge. At the slice's last checkpoint, the owner's approval decides the merge: on their
   say-so, mark the PR ready and merge it with a merge commit
-  (`gh pr merge --merge --delete-branch`), never squash or rebase.
+  (`gh pr merge --merge --delete-branch`), never squash or rebase. The git guard hook asks the
+  owner to confirm the merge command; it also blocks commits on `main`, pushes to `main`, force
+  pushes, rebases, and skipped hooks. When it blocks a command, do what its message says.
 
 ## 7. Report and stop
 
