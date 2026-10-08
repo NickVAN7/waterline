@@ -88,9 +88,11 @@ history in the docs; the log holds it.
 ## 8. Commit and push
 
 One `docs:` commit per logical change set (tooling code in `chore:` or `ci:` commits, with its
-review record), on the current slice branch (`docs/build-plan.md`, "Pull requests"). Push. If the slice branch has no pull request yet, open it as a draft at this
-push (`gh pr create --draft`, as in the `checkpoint` skill, step 6): CI runs only on pull
-requests and on `main`. CI must be green.
+review record), on the current slice branch (`docs/build-plan.md`, "Pull requests"). Push
+(`git push -u origin s<n>` at the branch's first push, `git push` after; each git or gh
+command its own Bash call, DL-26). If the slice branch has no pull request yet, open it as a
+draft at this push (`gh pr create --draft`, as in the `checkpoint` skill, step 6): CI runs
+only on pull requests and on `main`. CI must be green.
 
 ## 9. Report and stop
 

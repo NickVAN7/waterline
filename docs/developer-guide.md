@@ -104,6 +104,7 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI — and then `wl audit` |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
+| `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
 | `wl test` | All tests with coverage gates |
 | `wl fmt` | ruff format and safe ruff fixes (backend, CLI, and `.claude/hooks/`); Prettier and safe ESLint fixes |
 | `wl backend check\|lint\|test\|fmt` | The same, backend only |
@@ -798,11 +799,12 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   CI on a pushed checkpoint is fixed with a `fix(<ID>): …` commit. At the end of the slice,
   once the owner approves its last checkpoint, the slice retro's changes are applied on the
   branch with green CI (DL-19), and the owner says so, mark the PR ready and merge it with
-  a **merge commit**: `gh pr merge --merge --delete-branch`, never squash or rebase. A merge
-  commit keeps every commit's hash (so review records' base commits stay valid), and `main`
-  keeps one `checkpoint(<ID>):` commit per checkpoint in its history, which the docs
-  consistency tests read. `main` isn't protected yet (TD-15), so check CI before merging:
-  `gh pr checks <number>`.
+  a **merge commit**: `gh pr merge --merge`, never squash or rebase (the branch stays: no
+  branch can be deleted). A merge commit keeps every commit's hash (so review records' base
+  commits stay valid), and `main` keeps one `checkpoint(<ID>):` commit per checkpoint in its
+  history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
+  branch, no force-push or deletion; on `main`, changes only through a pull request with the
+  `wl check` status check green, merged with a merge commit.
 - **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check` on every push to
   `main` and every pull request, so a green `wl check` locally means a green run there. It
   checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the
@@ -855,35 +857,60 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
     a committed migration. Regenerate the client with `uv run wl gen-client`; fix a
     committed migration with a new one.
   - After Claude edits a file, it is formatted with ruff (backend) or Prettier (frontend).
-  - The **git guard** (`guard_git.py`) checks every shell command Claude runs. It blocks commits and
-    merges on `main` (`git commit`, `git merge`, `git cherry-pick`, `git revert`, `git am`, and any
-    `git pull` except a fast-forward from `main`, `git pull --ff-only`); any push to `main` (an
-    explicit `main` or `HEAD:main`, or a bare push while on `main`); force and destructive pushes
-    (`-f`, `--force`, `--force-with-lease`, `--force-if-includes`, a `+` refspec, `--mirror`,
-    `--delete`/`-d`, a `:` refspec, `--prune`, `--all`, `--branches`); `git rebase` (except
-    `--abort` and `--quit`); `git commit --amend` once HEAD is on the remote, and a `git reset
-    <commit>` that drops pushed commits (both stay allowed for unpushed commits); and skipping hooks
-    (`--no-verify` on commit, push, merge, pull, and am; `-n` on commit; `-c core.hooksPath` or
-    setting it with `git config`; a `SKIP=` or `GIT_CONFIG_*` variable on git or anything that may
-    run it). It also blocks moving the local `main` without a commit (`git switch -C main`, `git
-    branch -f main`, `git worktree add -B main`, a `<src>:main` fetch or pull, `git update-ref
-    refs/heads/main`, and on `main`, `git reset` to anything but `main` itself or `git update-ref
-    HEAD`), in any form git accepts for the option; and `git update-ref --stdin`, whose updates it
-    can't see. It asks you before `gh pr merge`, a `gh api` call that merges a pull request or a
-    branch, any `gh api` call to `main`'s ref, and a file write through `contents/`. A command that
-    depends on the branch, where no branch is checked out (a detached HEAD, or a worktree the same
-    command creates) is blocked, since its branch is unknown.
-  - It follows `&&`, `;`, pipes, subshells, `bash -c`, `$(...)`, heredocs, environment prefixes,
-    `cd`, `git -C`, and git aliases. A branch switch anywhere in a command (`git switch`, `git
-    checkout <branch>`, `git symbolic-ref HEAD <ref>`, `gh pr checkout`) makes the branch unknown
-    for the whole command, so anything that depends on it is blocked: run the switch as its own
-    command. A command that mentions git or gh but that it can't follow (e.g. `xargs git …`, a shell
-    reading stdin, a refspec built by brace expansion or `$'…'`) is blocked, with a message asking
-    for simple commands.
-  - Its known gaps are logged in TD-20. Its tests, and `protect_files.py`'s, are in
-    `tools/cli/tests/hooks/`. All three hooks are linted and formatted with the developer CLI (`wl
-    lint`); `guard_git.py` and `protect_files.py` are also type-checked and tested with it (`wl
-    test`).
+  - The **git guard** (`guard_git.py`) is an allow-list (DL-26). A Bash call that involves git or
+    gh must be **one command in a listed form, and nothing else**: no `&&`, `;`, `|`, `cd`,
+    variables, `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` for another
+    directory, and `git commit -F - <<'EOF'` for a commit message: the delimiter must be quoted,
+    since an unquoted heredoc runs the `$(...)` and backticks in its body. Anything else that
+    mentions git or gh is blocked; ask the owner to run it (`! <command>` in the prompt). Git or gh
+    appearing only as data is fine, in a command that only reads and prints (`grep`, `cat`, `ls`,
+    `head`, `tail`, `wc`, `echo`, `diff`, `jq`, …; not `sort -o`, `uniq`, `rg --pre`, a pager, or
+    `test`/`[`/`[[`/`printf`, which can evaluate a `$(...)` in an array subscript) and with no
+    expansion anywhere (`$VAR`, `${…}`, `$(...)`, backticks), since an expansion can hide a
+    command (`${x:-$(cmd)}`). A call that mentions git may not redirect into `.git/` (its config
+    or hooks), into a git config file (`~/.gitconfig`, `~/.config/git/`), or to a file named
+    only at run time (DL-24); no call, git or not, may redirect to a target with an unquoted
+    glob (`*`, `?`, `[`), which bash expands to an existing file such as `.git/config`. A call
+    that doesn't mention git may still build a target with an expansion (TD-20). Aliases aren't followed: only the listed subcommands run. Allowed:
+    - Reads, each with only its listed options (`tools/cli`'s tests and `READ_ONLY` in the hook
+      list them; e.g. `log --oneline -5 --format=… --since=…`, `diff --stat --cached -U3`,
+      `grep -n -i -A3`): `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `ls-tree`,
+      `blame`, `grep`, `merge-base`, `rev-list`, `cat-file`, `describe`, `shortlog`, and
+      `hash-object <file>` with no options (DL-29; `-w` would write an object). An option
+      that runs a program or writes a file (`grep -O<cmd>`, `--output=<file>`, `--ext-diff`,
+      `--textconv`) isn't listed. Also `branch` (`--show-current`, or `-a`/`-r`/`-v`/`-vv` with
+      `--list <pattern>`), `remote [-v]`, and `config --get <key>`, `config get <key>`,
+      `config --list`/`-l`/`list`.
+    - Local changes: `add` (`-A`, `-u`, `-N`, paths), `rm` (`-r`, `--cached`, paths), `mv`,
+      `restore` (`--staged`, `--worktree`, paths), `checkout -- <paths>`, `stash`
+      (`push [-u] [-m <message>]`, `pop`, `drop`, `apply`, `list`, `show`), `fetch [--prune]
+      [<remote> [<branch>]]`.
+    - Branches: `switch <branch>`, `switch -c <new branch>` (not `main`).
+    - `commit` with `-m <message>`, `-F <file>`, `-F -` (a heredoc), `-a`, `-q`, `--allow-empty`,
+      `--no-edit`, `--amend`: off `main` only (DL-21); `--amend` only while HEAD is unpushed
+      (DL-23).
+    - `push [-u] <remote> <branch>` with a literal branch other than `main`, or a bare `push` off
+      `main` whose push destination (`@{push}`) isn't `main` (DL-22). No other push option, so nothing forces,
+      deletes, or skips hooks (DL-23, DL-24). Configuration that redirects a push isn't checked:
+      GitHub refuses any push to `main`, force-push, or deletion it could cause (DL-27, DL-28).
+    - `reset`: paths (`[HEAD] -- <paths>`), or `[--soft|--mixed|--hard] [<commit>]` that drops
+      no pushed commit (DL-23) and, on `main`, only to `main` itself: a target that git resolves
+      to `refs/heads/main` or a remote's `main` (DL-21).
+    - `pull --ff-only [<remote> <branch>]`; on `main`, only from a configured remote's `main` (a
+      path to another repository isn't a remote; a bare pull needs `main`'s upstream to be a
+      remote's `main`) (DL-21).
+    - `merge`, `rebase`, `cherry-pick`, `revert`, `am`: `--abort` only.
+    - gh: `pr create`/`view`/`list`/`checks`/`diff`/`status`/`ready`/`edit`, `run
+      list`/`view`/`watch`, `auth status` (no options: `--show-token` prints the token), `repo view`, `issue list`/`view`, and `gh api` reads.
+      `gh pr merge`, and any other `gh api` call (a method, a field, an input file, GraphQL), asks
+      you first (DL-25).
+  - Every allowed git form, reads included, is run against real git by its tests: each runs in a
+    throwaway clone with a bare remote, and the test asserts exactly which refs and config lines it
+    changes. (The gh forms are tested against the guard only.) What it can't see is logged in TD-20:
+    a script or program that runs git itself, and Claude's file tools editing `.git/`. Its tests,
+    and `protect_files.py`'s, are in `tools/cli/tests/hooks/`. All three hooks are linted and
+    formatted with the developer CLI (`wl lint`); `guard_git.py` and `protect_files.py` are also
+    type-checked and tested with it (`wl test`).
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 

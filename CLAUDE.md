@@ -103,9 +103,13 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).
-- Hooks block edits to generated files and committed migrations, format files after edits, and guard
-  git (no commits or pushes to `main`, no force pushes or history rewrites, no skipped hooks;
-  merging a PR asks the owner). When a hook blocks you, do what its message says. Never work around
-  a hook with shell commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
+- Hooks block edits to generated files and committed migrations, format files after edits, and
+  guard git. The git guard is an allow-list (DL-26; developer guide, section 11): **each git or
+  gh command is its own Bash call, with nothing else in it** (no `&&`, `;`, `|`, `cd`,
+  variables, or `$(...)`); use `git -C <path>` for another directory and
+  `git commit -F - <<'EOF'` for a commit message. Commits and pushes to `main`, history
+  rewrites, and skipped hooks are blocked; merging a PR asks the owner. Anything the allow-list
+  doesn't cover, ask the owner to run. When a hook blocks you, do what its message says. Never
+  work around a hook with shell commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
 
 See `backend/CLAUDE.md` and `frontend/CLAUDE.md` for the rules specific to each half.

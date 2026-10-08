@@ -156,7 +156,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   checkpoint report with visible behavior includes a try-it-yourself script for the owner.
 - **Supersedes:** testing strategy, "Test-first and proving tests can fail" (test-first by the
   implementing session)
-- **Superseded by:** none
+- **Superseded by:** DL-15, DL-16 (in part: which checkpoints get spec tests, and their scope;
+  the principle stands)
 - **Applies to:** root `CLAUDE.md`; build plan ("Verification", "Claude configuration", S1-C7,
   S1-C13); testing strategy; `test-writer` and `checkpoint` skills; `checkpoint-reviewer` and
   `spec-test-writer` agents; the review-record format
@@ -169,7 +170,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   owner before a pull request is merged. It guards against mistakes; branch protection (TD-15)
   stays the real control.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-21, DL-22, DL-23, DL-24, DL-25, DL-26
 - **Applies to:** `.claude/hooks/guard_git.py`, `.claude/settings.json`; build plan ("Claude
   configuration"); developer guide section 11; `checkpoint` skill; TD-15
 - **Source:** chat session (workflow review)
@@ -265,3 +266,110 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** `design-change` skill
 - **Source:** chat session (docs-consistency decisions, workflow review)
+
+### DL-21: Guarded outcome — no commits or merges on `main`
+- **Date:** 2026-10-08
+- **Decision:** Claude never makes a commit on the local `main` or moves it to another commit;
+  `main` changes only when the owner merges a slice's pull request. The git guard allows
+  `git commit` only off `main` and blocks every merge except `--abort`; on `main` it allows only
+  `git pull --ff-only` from `main` and a reset to `main` itself.
+- **Supersedes:** DL-12 (in part)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
+- **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
+
+### DL-22: Guarded outcome — no pushes to `main`
+- **Date:** 2026-10-08
+- **Decision:** Claude never pushes to `main`. The git guard allows only `git push [-u] <remote>
+  <branch>` with a literal branch other than `main`, or a bare `git push` off `main` whose
+  push destination (`@{push}`) isn't `main`.
+- **Supersedes:** DL-12 (in part)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
+- **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
+
+### DL-23: Guarded outcome — pushed history is never rewritten
+- **Date:** 2026-10-08
+- **Decision:** Claude never force-pushes, deletes a remote branch, rebases, amends a commit
+  that is on the remote, or resets past one. The git guard allows `--amend` only while HEAD is
+  unpushed and a reset only when it drops no pushed commit; no push option is allowed beyond
+  `-u`.
+- **Supersedes:** DL-12 (in part)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
+- **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
+
+### DL-24: Guarded outcome — hooks are never skipped
+- **Date:** 2026-10-08
+- **Decision:** Claude never skips the repository's hooks. The git guard allows no option or
+  environment that skips them: no `--no-verify` or `-n`, no `-c`, no variable prefixes, and no
+  `git config` writes.
+- **Supersedes:** DL-12 (in part)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
+- **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
+
+### DL-25: Guarded outcome — merging, and writing through the API, asks the owner
+- **Date:** 2026-10-08
+- **Decision:** `gh pr merge`, and any `gh api` call other than a plain read (a write method, a
+  field, an input file, or GraphQL), asks the owner before it runs.
+- **Supersedes:** DL-12 (in part)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11; `checkpoint` skill
+- **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
+
+### DL-26: The git guard is an allow-list, verified against real git
+- **Date:** 2026-10-08
+- **Decision:** The git guard allows one git or gh command per call, as the whole command, in a
+  listed form (developer guide section 11); anything else that involves git or gh is blocked,
+  and the owner runs it with `! <command>`. Every allowed form's effect is verified by tests
+  that run real git. The guard's reviews judge it against DL-21 to DL-25.
+- **Supersedes:** DL-12 (a deny-list guard that followed compound and wrapped commands)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py` and its tests; root `CLAUDE.md`; build plan
+  ("Claude configuration"); developer guide section 11; `checkpoint` and `design-change`
+  skills; TD-20
+- **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
+
+### DL-27: GitHub rulesets enforce the branch rules
+- **Date:** 2026-10-08
+- **Decision:** The repository is public, which makes GitHub rulesets available, and two are
+  active with no bypass: on every branch, no force-push or deletion; on `main`, changes only
+  through a pull request with the `wl check` status check green, merged with a merge commit.
+  Because no branch can be deleted, the slice PR is merged without deleting its branch.
+- **Supersedes:** the S0-C8 decision to defer branch protection (TD-15)
+- **Superseded by:** none
+- **Applies to:** GitHub repository settings (rulesets "All branches: no force-push or
+  deletion" and "main: pull request with green CI, merge commits only"); build plan ("Pull
+  requests", "Claude configuration"); developer guide sections 10 and 11; testing strategy
+  ("Workflow and gates"); `checkpoint` skill; TD-15, TD-20
+- **Source:** chat session (owner, Oct 8, 2026)
+
+### DL-28: The git guard leaves push and fetch configuration to the rulesets
+- **Date:** 2026-10-08
+- **Decision:** The git guard no longer checks repository configuration that redirects a push
+  (`push.default`, `remote.<name>.push`, a mirror remote) or a fetch (refspecs that write
+  `refs/heads/`): GitHub's rulesets (DL-27) refuse any push to `main`, force-push, or deletion
+  such configuration could cause. A fetch refspec that writes `refs/heads/` can still move a
+  local branch, `main` included; the guard accepts that, since it never creates such
+  configuration and the rulesets keep it from reaching GitHub's `main`.
+- **Supersedes:** none (those checks were added during review DC-2026-10-08b, not by DL-21 to
+  DL-26)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py` and its tests; developer guide section 11
+- **Source:** chat session (owner: "simplify if able", after DL-27)
+
+### DL-29: `wl review-copy` builds the reviewers' throwaway copy
+- **Date:** 2026-10-08
+- **Decision:** The reviewers' sabotage copy and `fresh-clone-verifier`'s fresh copy are made
+  with `wl review-copy <dir> [--with-env]`: the committed state, the uncommitted changes, and
+  the untracked, non-ignored files (`.env` only with `--with-env`), without changing the
+  repository. The git guard (DL-26) allows one plain git command per call, so the
+  clone-and-apply steps live in the developer CLI instead of the agents' instructions. `git
+  hash-object <file>` (no options) is an allowed read, for the spec-test hashes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `tools/cli/` (`wl review-copy`), `.claude/hooks/guard_git.py`;
+  `checkpoint-reviewer` and `fresh-clone-verifier` agents; build plan (developer CLI);
+  developer guide sections 3 and 11
+- **Source:** chat session (review DC-2026-10-08b, pass 3, finding 2)

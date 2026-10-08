@@ -84,13 +84,15 @@ with the workflow changes of DL-7 to DL-14).
 - **Merge at the end of the slice only:** after the owner approves the slice's last
   checkpoint and the slice retro's changes are applied on the branch with green CI (DL-19), and
   only on their say-so, the PR is marked ready and merged with a **merge
-  commit** (`gh pr merge --merge --delete-branch`), never squash or rebase. A merge commit keeps
+  commit** (`gh pr merge --merge`; the branch stays, since no branch can be deleted), never
+  squash or rebase. A merge commit keeps
   every commit's hash, so the base commits in the review records stay valid, and `main` keeps
   one `checkpoint(<ID>):` commit per checkpoint in its history (the docs consistency tests read
   them).
-- GitHub doesn't enforce this yet: branch protection needs a paid plan for a private
-  repository (TD-15). Until then, check CI by hand before merging (`gh pr checks`); the git
-  guard hook covers Claude's own commands ("Claude configuration").
+- **GitHub enforces it** (DL-27), with two rulesets and no bypass: on every branch, no
+  force-push or deletion; on `main`, changes only through a pull request with the `wl check`
+  status check green, merged with a merge commit. The git guard hook catches Claude's own
+  mistakes before they reach GitHub ("Claude configuration").
 
 ### Verification (three layers)
 **Nothing counts as verified because the session that did the work says so** (DL-11). A claim is
@@ -221,16 +223,17 @@ Everything lives in the repository, version-controlled and present on every work
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
   verified and corrected against the hand-built `project` area at the start of Slice 2.
 - **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
-  generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`) and committed
-  migrations; format each file after Claude edits it (ruff for the backend, Prettier for the
-  frontend); and the **git guard** (`guard_git.py`, DL-12), which blocks Claude's git commands
-  that commit or merge on `main`, push to `main`, force-push or delete on push, rewrite pushed
-  history (rebase, amending a pushed commit, a reset that drops pushed commits), or skip hooks,
-  and asks the owner before a pull request is merged. It's a guard against mistakes, not a
-  security boundary: branch protection (TD-15) is the real control. A command that mentions git
-  or gh and can't be parsed with confidence is blocked. The hooks are linted with the developer
-  CLI's ruff; the guard and `protect_files.py` are also type-checked (pyright strict) and tested
-  under its 100% coverage gate.
+  generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`) and committed migrations;
+  format each file after Claude edits it (ruff for the backend, Prettier for the frontend); and the
+  **git guard** (`guard_git.py`), an allow-list (DL-26): a call that involves git or gh must be one
+  command in a listed form, so Claude never commits or merges on `main` (DL-21), pushes to `main`
+  (DL-22), rewrites pushed history (DL-23), or skips hooks (DL-24), and merging a pull request or
+  writing through the GitHub API asks the owner (DL-25). Anything else that involves git or gh is
+  blocked, and the owner runs it. Every allowed git form is verified against real git by its tests
+  (the gh forms against the guard only). It's a guard against mistakes, not a security boundary:
+  branch protection (DL-27, the GitHub rulesets) is the real control. The hooks are linted with the
+  developer CLI's ruff; the guard and `protect_files.py` are also type-checked (pyright strict) and
+  tested under its 100% coverage gate.
 
 ### Workflow items scheduled
 Workflow items decided but not built yet, each built through the `design-change` skill or the
@@ -246,9 +249,9 @@ named checkpoint when its trigger arrives.
 | Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
 
 ### Where the work happens
-Code is written and run on the owner's workstation(s) in the `waterline` repository (the
-working name is decided, design-doc §1), which is pushed to GitHub. Workstations need Git,
-Docker, uv 0.12 or later, and Node 22 (verified by `wl doctor`), and the GitHub CLI (`gh`, signed in) for the
+Code is written and run on the owner's workstation(s) in the `waterline` repository (the working
+name is decided, design-doc §1), which is pushed to GitHub. Workstations need Git, Docker, uv 0.12
+or later, and Node 22 (verified by `wl doctor`), and the GitHub CLI (`gh`, signed in) for the
 pull-request workflow (not checked by `wl doctor`).
 
 ---
@@ -292,7 +295,7 @@ slices only add features.
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a save to a row that's gone, e.g. hard-deleted meanwhile, is 404: always for a non-versioned entity, and, after a check, for a versioned one deleted or soft-deleted since it was loaded), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (migrate, api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
-| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests); the pull-request workflow ("Pull requests" above; branch protection deferred, TD-15), fresh-clone setup by following the developer guide, slice wrap-up |
+| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests); the pull-request workflow ("Pull requests" above; branch protection deferred at the time, TD-15, and since enforced by GitHub rulesets, DL-27), fresh-clone setup by following the developer guide, slice wrap-up |
 
 The sections below describe the content; the table above is the order of work.
 
@@ -404,7 +407,7 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
   | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
   | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
-  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history) |
+  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29) |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
   on any surviving mutant; `wl check` includes it. `wl audit` (DL-13) fails on any known
@@ -1150,10 +1153,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
 What's decided so far. This is not the slice's plan, which is written when Slice 2 is next.
 
-- **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the rank
-  helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual
-  ordering") and its Hypothesis tests come with the requirement tree. Slice 3 keeps rank for
-  tasks, the backlog, and the board.
+- **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the
+  rank helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual
+  ordering") and its Hypothesis tests come with the requirement tree. Slice 3 keeps rank for tasks,
+  the backlog, and the board.
 - **The requirement delete dialog grows by slice** (design-doc §9):
   - Slice 2: child requirements (promote or delete), and cancelling a pending approval request;
   - Slice 3: linked tasks;

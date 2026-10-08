@@ -11,8 +11,9 @@ tested, what each kind of test is for, and the gates every change passes.
 - **Every checkpoint ships its tests.** No code lands without the tests that prove it; no step
   starts while anything is red.
 - **Every test must be able to fail.** A test exists to catch a specific bug. Test-first (for
-  `rules/` and `authz/`, by `spec-test-writer`) and the sabotage check (everywhere else) prove each test can fail;
-  mutation testing measures it. A test no plausible bug would break is fixed or removed.
+  `rules/` and `authz/`, by `spec-test-writer`) and the sabotage check (everywhere else) prove each
+  test can fail; mutation testing measures it. A test no plausible bug would break is fixed or
+  removed.
 - **Deterministic.** Fake data uses a fixed seed; tests never depend on each other or on run
   order; a failure reproduces the same way every time.
 - **Strictest where mistakes are most expensive.** Authorization and business rules are held to
@@ -111,18 +112,18 @@ tested, what each kind of test is for, and the gates every change passes.
     entity's `on_approved` effect applied);
   - a gate with any approval request can't be deleted; `approved` is refused on non-gate
     milestones.
-- **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code
-  and each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map
-  owner per table; the tech-debt log's format, references, and deadlines; the decision log's
-  format and references; every `audit-allowlist.toml` entry names an open tech-debt entry; the
-  developer guide's status line vs. `git log`; design-doc § references; the agents and skills listed vs. those in
-  `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
-  instead of passing by finding nothing. The column check runs per column: a documented
-  column whose Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is
-  reported as **skipped** (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished
-  (its last checkpoint, or any later slice's, has a `checkpoint(<ID>):` commit), and required
-  like any other column from then on; a malformed marker is a `DocsStructureError`. Judgment calls
-  (contradictions in prose, superseded rules) are the `docs-consistency` agent's job.
+- **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code and
+  each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map owner
+  per table; the tech-debt log's format, references, and deadlines; the decision log's format and
+  references; every `audit-allowlist.toml` entry names an open tech-debt entry; the developer
+  guide's status line vs. `git log`; design-doc § references; the agents and skills listed vs. those
+  in `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
+  instead of passing by finding nothing. The column check runs per column: a documented column whose
+  Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is reported as **skipped**
+  (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished (its last checkpoint, or any
+  later slice's, has a `checkpoint(<ID>):` commit), and required like any other column from then on;
+  a malformed marker is a `DocsStructureError`. Judgment calls (contradictions in prose, superseded
+  rules) are the `docs-consistency` agent's job.
 - **Accessibility** (WCAG 2.2 AA, design-doc §1; from Slice 1, Checkpoint 14):
   - automated checks with axe-core in component tests (`vitest-axe`) and end-to-end tests
     (`@axe-core/playwright`), failing on any violation;
@@ -281,8 +282,8 @@ saying why.
   deadline. A red audit is fixed before any checkpoint starts (`chore(deps):` commit).
 - **Pull requests:** each slice works on one branch with one draft PR, and CI runs on every
   push; a checkpoint goes to the owner only with green CI, and the slice's PR merges to `main`
-  (a merge commit) only with green CI (build-plan, "Pull requests"). Until branch protection is
-  enabled (TD-15), that is checked by hand before merging.
+  (a merge commit) only with green CI (build-plan, "Pull requests"). GitHub enforces it: the
+  `wl check` status check is required on `main` (DL-27).
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
   tech-debt entry the same day, never retried until green.
 
