@@ -142,7 +142,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   verdict at the group review and in the slice retro (S1-C17).
 - **Supersedes:** none (an exception to the owner's approval before each checkpoint, for these
   two checkpoints only)
-- **Superseded by:** none
+- **Superseded by:** DL-60 (in part: the group report's records)
 - **Applies to:** build plan ("Verification"); `checkpoint` skill ("Report and stop"); root
   `CLAUDE.md`; S1-C8 to S1-C10
 - **Source:** chat session (workflow review)
@@ -700,7 +700,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   version conflicts), the org guard in S1-C9 alike. `create_app` adds a `ReservedSlug` enum to
   the OpenAPI components.
 - **Supersedes:** none (the docs gave the URL patterns, not the endpoints)
-- **Superseded by:** none
+- **Superseded by:** DL-59 (in part)
 - **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C8 row)
 - **Source:** chat session (owner, before S1-C8; the details settled after the docs-consistency
   check)
@@ -712,6 +712,59 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   carried in `/me` like every workspace-level action), `org.view` (anyone who sees the org), and
   `org.update` (org owners, workspace owners/admins, system admins).
 - **Supersedes:** DL-45 in part (its "a targeted rule in S1-C8": the rule is this action)
-- **Superseded by:** none
+- **Superseded by:** DL-59 (in part)
 - **Applies to:** build plan ("Authorization (§5)")
 - **Source:** chat session (owner, before S1-C8)
+
+### DL-57: Uniqueness checks may reveal other orgs' slugs and projects' keys
+- **Date:** 2026-10-09
+- **Decision:** Org slugs and project keys stay unique across the workspace, so a client's org
+  owner checking or setting one can learn that another org or project uses it. Accepted: the
+  scope is small for the foreseeable future.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Errors from constraints")
+- **Source:** chat session (owner, after S1-C8; security review question)
+
+### DL-58: The visible step in `authorize()`'s order
+- **Date:** 2026-10-09
+- **Decision:** An action marked `visible` is granted to anyone who can see the target, as a step
+  after the archived project, the export-control gate, and personal actions, and before the admin
+  levels; it is never used for a project content action, so it can't take an inherited admin past
+  the export-control gate.
+- **Supersedes:** none (design-doc §5's list didn't have the step)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("The choke point"); build plan ("Authorization (§5)");
+  `backend/CLAUDE.md`; the `security-reviewer` agent
+- **Source:** chat session (owner, after S1-C8; security review question)
+
+### DL-59: Stepping down, and the last owner's handover
+- **Date:** 2026-10-09
+- **Decision:** A workspace or org admin may demote or remove themselves without the owner-only
+  right those roles otherwise need, and their own row carries the action. The last owner of a
+  workspace or an org may step down or leave only when a replacement owner is named
+  (`new_owner_id`, an existing member there) in the same request, who becomes owner in the same
+  transaction; without one, still a 422 `last_owner`. Whoever may demote or remove an owner
+  (owners, system admins) may name one; 422 on `new_owner_id` for someone not a member, a
+  deactivated account, the target themselves, or a target that isn't an owner. The UI offers it
+  (S1-C15's replacement-owner picker). The workspace's part changes S1-C8's code, so it's a new
+  checkpoint, S1-C8a; S1-C9 builds the org's.
+- **Supersedes:** design-doc §5's "the last owner … cannot leave or be demoted" (now: without
+  naming a replacement); DL-55 in part (the last-owner 422); DL-56 in part (`manage_admins` for
+  one's own admin role)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("Other targeted rules"); schema-doc (`workspace_membership`,
+  `membership`); build plan ("Authorization (§5)", "The workspace and org API", the guards, UI
+  notes, the S1-C8a, S1-C9, and S1-C15 rows, the groups, the review-tier trial); the
+  `security-reviewer` agent
+- **Source:** chat session (owner, after S1-C8; checkpoint review question)
+
+### DL-60: S1-C8a and the review-tier trial
+- **Date:** 2026-10-09
+- **Decision:** A checkpoint inserted for a new owner requirement (S1-C8a) isn't "rework" for the
+  trial's failure clause, and S1-C10's group report covers all four records in the range (S1-C8,
+  S1-C8a, S1-C9, S1-C10).
+- **Supersedes:** DL-10 in part (the group report's "three review records")
+- **Superseded by:** none
+- **Applies to:** build plan ("Verification", the review-tier trial); `checkpoint` skill
+- **Source:** chat session (owner, after S1-C8; docs-consistency decisions)

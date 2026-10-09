@@ -7,29 +7,29 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > **Status:** S1-C8 (Workspace & organizations) done, the first checkpoint of the review-tier trial,
 > after S1-C7a and S1-C7b (the sign-in and change-password caps, the old session at sign-in); S1-C7
 > (Authorization core) closed the `s1-auth` group, on the `s1` branch (one branch and PR for the
-> rest of Slice 1); next is S1-C9 (Org members & user creation). The workspace and org API is built:
-> the workspace, its staff (email-first add, create, roles with the owner-only rule, removal), and
-> orgs with their first owner (build plan, "The workspace and org API"). Every check goes through
-> `authorize()` ("Authorization" below); `/me` carries each workspace's `allowed_actions`. Sign-in,
-> sign-out, change password, and `GET /api/auth/me` work over a server-side session in the
-> `__Host-session` cookie, a forced password change blocks every other endpoint, and every mutating
-> request passes the `Origin` and JSON-only checks first ("Authentication" below). `wl seed` creates
-> the workspace and its first system admin, and `wl admin` grants and revokes the system-admin flag.
-> The tenancy, project, and audit tables exist (models, migrations, constraint tests, a factory per
-> model; `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the
-> base repository, and `NumberingService.allocate_number`. Race tests have a harness
-> (`run_in_parallel`). The pure rules (identifiers, password policy, account rank) are in
-> `app/rules/`, held to 100% coverage and mutation-tested (`wl backend mutate`). The API conventions
-> are in place: list helpers (`app/core/lists.py`), constraint errors as field errors
-> (`app/core/constraint_errors.py`), and `log_admin_event()`. The backend has its database core
-> (Postgres, async SQLAlchemy, Alembic, the base model and its mixins), a test harness with a
-> `concurrency` fixture, background jobs on procrastinate, the model conventions (enums, soft
-> delete, optimistic locking with 409, `direct_update`), the standard error format (including a
-> catch-all 500), and the password and token helpers; `GET /api/health` checks the database. Docker
-> Compose runs the whole stack (postgres, migrate, api, worker, web). The frontend is a Vue shell:
-> layout, router with a 404 page, Pinia, the generated API client, and a home page showing the
-> health check through the Vite proxy. CI runs `wl check` on every push to `main` and every pull
-> request.
+> rest of Slice 1); next is S1-C8a (Owner handover & stepping down). The workspace and org API is
+> built: the workspace, its staff (email-first add, create, roles with the owner-only rule,
+> removal), and orgs with their first owner (build plan, "The workspace and org API"). Every check
+> goes through `authorize()` ("Authorization" below); `/me` carries each workspace's
+> `allowed_actions`. Sign-in, sign-out, change password, and `GET /api/auth/me` work over a
+> server-side session in the `__Host-session` cookie, a forced password change blocks every other
+> endpoint, and every mutating request passes the `Origin` and JSON-only checks first
+> ("Authentication" below). `wl seed` creates the workspace and its first system admin, and `wl
+> admin` grants and revokes the system-admin flag. The tenancy, project, and audit tables exist
+> (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
+> the domain enums in `app/enums.py`, get-by-ID in the base repository, and
+> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure rules
+> (identifiers, password policy, account rank) are in `app/rules/`, held to 100% coverage and
+> mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
+> (`app/core/lists.py`), constraint errors as field errors (`app/core/constraint_errors.py`), and
+> `log_admin_event()`. The backend has its database core (Postgres, async SQLAlchemy, Alembic, the
+> base model and its mixins), a test harness with a `concurrency` fixture, background jobs on
+> procrastinate, the model conventions (enums, soft delete, optimistic locking with 409,
+> `direct_update`), the standard error format (including a catch-all 500), and the password and
+> token helpers; `GET /api/health` checks the database. Docker Compose runs the whole stack
+> (postgres, migrate, api, worker, web). The frontend is a Vue shell: layout, router with a 404
+> page, Pinia, the generated API client, and a home page showing the health check through the Vite
+> proxy. CI runs `wl check` on every push to `main` and every pull request.
 
 ## 1. Workstation setup
 

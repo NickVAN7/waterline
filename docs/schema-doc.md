@@ -492,7 +492,7 @@ workspace pages.
 `UNIQUE(workspace_id, user_id)`; index on `user_id` (access scoping looks memberships up by
 user). Members see only the orgs and projects they are assigned to;
 owners/admins see everything in the workspace. The last owner of a workspace cannot leave or be
-demoted (service-layer check).
+demoted unless a replacement owner is named in the same request (service-layer check, DL-59).
 
 ### `organization`
 | Field | Type | Notes |
@@ -563,8 +563,8 @@ ends sessions through the handler `auth` registers with it (build plan, "Feature
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(user_id, organization_id)`; index on `organization_id` (an org's members list; the
-unique constraint serves only lookups by user, DL-34). Last owner of an org cannot leave or be demoted
-(service-layer check).
+unique constraint serves only lookups by user, DL-34). Last owner of an org cannot leave or be
+demoted unless a replacement owner is named in the same request (service-layer check, DL-59).
 
 ### `project`
 | Field | Type | Notes |

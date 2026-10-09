@@ -631,13 +631,17 @@ Workspace (the firm: tenant boundary)
      denied (404) whatever the user's admin level (§3.1). Management actions pass through.
   3. **Personal actions** (below): the relationship rule decides, for a user with content
      access to the project.
-  4. `user.is_system_admin`.
-  5. A workspace owner/admin role in the entity's workspace.
-  6. A role in the entity's org (the project's org for a project or anything in it): owner
+  4. **Visible actions:** an action marked `visible` (e.g. `org.view`) is granted to anyone
+     who can see the target (§4, "Visibility"). It comes after the export-control gate and is
+     never used for a project content action, so it can't take an inherited admin past the
+     gate (DL-58).
+  5. `user.is_system_admin`.
+  6. A workspace owner/admin role in the entity's workspace.
+  7. A role in the entity's org (the project's org for a project or anything in it): owner
      or admin grants inherited project admin; member grants only creating a project in the
      org (`project.create`, "Org roles" below).
-  7. The user's project role.
-  8. The targeted field-based rules below.
+  8. The user's project role.
+  9. The targeted field-based rules below.
 
   Anything not granted along the way is denied. The action registry marks every action as
   **content** or **management** (§3.1; from Slice 1, Checkpoint 13), and marks the personal
@@ -741,7 +745,11 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   approver** can decide their own approval row. This is a personal action (see "The choke
   point"): nobody, including project, org, or workspace admins, or system admins, decides on
   another approver's behalf. A project admin can cancel the request instead.
-- The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted.
+- The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted,
+  unless they name a replacement owner (an existing member there) in the same request: that
+  person becomes owner as they step down or leave (DL-59).
+- **Stepping down:** a workspace or org admin may demote or remove themselves (taking access
+  away is always allowed) without the owner-only right those roles otherwise need (DL-59).
 
 ### Access review
 

@@ -210,5 +210,5 @@ Then **stop**. Do not begin the next checkpoint until the owner explicitly appro
   in the review note. Say in the report that it auto-continued and why. If any condition
   fails, stop as usual.
 - **S1-C10:** a full stop for the whole group. The report covers S1-C8 to S1-C10, with links to
-  the three review records and the group's diff range (from S1-C8's base, the last commit
+  the four review records (S1-C8, S1-C8a, S1-C9, S1-C10; DL-60) and the group's diff range (from S1-C8's base, the last commit
   before its work started, to the S1-C10 commit).

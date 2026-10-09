@@ -71,12 +71,13 @@ Calls flow **routers → services → repositories → models**. Services also u
   the database-free unit tests against `app/authz/`, so a query there leaves mutants no test can
   kill.
 - **`authorize()` order** (design-doc §5): archived project → export-control gate → personal actions
-  → system admin → workspace owner/admin → org role (owner/admin; member only for `project.create`)
-  → project role → targeted rules. From S1-C13, every registered action is marked content or
-  management; the export-control gate that uses the marking is built in Slice 2 (design-doc §3.1).
-  **Personal actions** (e.g. `approval.decide`) are checked before the admin levels and never
-  granted by them: only the relationship rule (e.g. the named approver) allows one, and only for a
-  user with content access to the project.
+  → visible actions (anyone who sees the target; never a project content action, DL-58) → system
+  admin → workspace owner/admin → org role (owner/admin; member only for `project.create`) → project
+  role → targeted rules. From S1-C13, every registered action is marked content or management; the
+  export-control gate that uses the marking is built in Slice 2 (design-doc §3.1). **Personal
+  actions** (e.g. `approval.decide`) are checked before the admin levels and never granted by them:
+  only the relationship rule (e.g. the named approver) allows one, and only for a user with content
+  access to the project.
 - **`log_change()` is the only writer to `activity_log`**, and never commits.
 - **`log_admin_event()` is the only writer to `audit_event`**, and never commits (design-doc
   §10.1). Never put a password, hash, or token in `details`, under any key: the guard only
