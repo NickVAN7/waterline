@@ -669,18 +669,20 @@ write interface stubs (signatures and types, returning one fixed wrong answer), 
 reading the implementation and proves each fails against the stub, then implement until they pass.
 For `app/authz/` it also writes the integration and API tests and their test-only routers in
 `tests/support/`; tell it which built modules it may read (the app factory, `app/core/errors.py`,
-the auth dependencies), never the ones being implemented. Its files and their `git hash-object` go
-in the review record ("Spec tests"); a spec test changes only with the owner's approval. The rules
-built so far predate `spec-test-writer` (DL-11): their tests were written test-first in S1-C3 by the
-implementing session, and aren't hash-protected spec tests. So far: `identifiers.py` (project keys,
-slugs and the reserved top-level routes in `RESERVED_SLUGS`, usernames; each check returns an
-`IdentifierProblem` for the field error), `password_policy.py` (`password_problems(...)`; the caller
-checks the hash and passes `same_as_current`), and `account_rank.py` (`can_manage_account(actor,
-target)`, from both users' memberships). `app/rules/` and `app/authz/` are held to 100% line and
-branch coverage by a hook in `tests/conftest.py`, so a plain `uv run pytest` fails below it. A
-`match` that covers every type of its subject (pyright checks: the function's return type would
-otherwise allow `None`) marks its last `case` with `# pragma: no branch`, since that case can't fail
-to match.
+the auth dependencies), never the ones being implemented. It tests a real endpoint only when the
+docs specify it (method, path, error responses) and you've stubbed its route; for any other
+endpoint, write the denial test yourself once it's built, under the sabotage check (DL-32). Its
+files and their `git hash-object` go in the review record ("Spec tests"); a spec test changes only
+with the owner's approval. The rules built so far predate `spec-test-writer` (DL-11): their tests
+were written test-first in S1-C3 by the implementing session, and aren't hash-protected spec tests.
+So far: `identifiers.py` (project keys, slugs and the reserved top-level routes in `RESERVED_SLUGS`,
+usernames; each check returns an `IdentifierProblem` for the field error), `password_policy.py`
+(`password_problems(...)`; the caller checks the hash and passes `same_as_current`), and
+`account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships). `app/rules/`
+and `app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
+plain `uv run pytest` fails below it. A `match` that covers every type of its subject (pyright
+checks: the function's return type would otherwise allow `None`) marks its last `case` with `#
+pragma: no branch`, since that case can't fail to match.
 
 **Property tests** (Hypothesis) cover rules with a large input space: generate inputs, check an
 invariant against an independent oracle (e.g. "accepted exactly when 3-6 uppercase letters or
@@ -800,7 +802,9 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   once the owner approves its last checkpoint, the slice retro's changes are applied on the
   branch with green CI (DL-19), and the owner says so, mark the PR ready and merge it with
   a **merge commit**: `gh pr merge --merge`, never squash or rebase (the branch stays: no
-  branch can be deleted). A merge commit keeps every commit's hash (so review records' base
+  branch can be deleted). Claude first checks the merge state and that every commit is linked
+  to a GitHub account: a commit GitHub can't attribute needs an extra approval, which you can't
+  give on your own PR (DL-33). A merge commit keeps every commit's hash (so review records' base
   commits stay valid), and `main` keeps one `checkpoint(<ID>):` commit per checkpoint in its
   history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
   branch, no force-push or deletion; on `main`, changes only through a pull request with the
@@ -855,23 +859,27 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   on your `PATH`:
   - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or
     a committed migration. Regenerate the client with `uv run wl gen-client`; fix a
-    committed migration with a new one.
+    committed migration with a new one. They also can't change `.pre-commit-config.yaml`, which
+    is yours to edit (DL-30; the git guard blocks any redirect naming it too), or git's own files:
+    anything in `.git/`, `~/.gitconfig`, or `.config/git/` (DL-31).
   - After Claude edits a file, it is formatted with ruff (backend) or Prettier (frontend).
-  - The **git guard** (`guard_git.py`) is an allow-list (DL-26). A Bash call that involves git or
-    gh must be **one command in a listed form, and nothing else**: no `&&`, `;`, `|`, `cd`,
-    variables, `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` for another
-    directory, and `git commit -F - <<'EOF'` for a commit message: the delimiter must be quoted,
-    since an unquoted heredoc runs the `$(...)` and backticks in its body. Anything else that
-    mentions git or gh is blocked; ask the owner to run it (`! <command>` in the prompt). Git or gh
-    appearing only as data is fine, in a command that only reads and prints (`grep`, `cat`, `ls`,
-    `head`, `tail`, `wc`, `echo`, `diff`, `jq`, …; not `sort -o`, `uniq`, `rg --pre`, a pager, or
+  - The **git guard** (`guard_git.py`) is an allow-list (DL-26). A Bash call that involves git or gh
+    must be **one command in a listed form, and nothing else**: no `&&`, `;`, `|`, `cd`, variables,
+    `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` for another directory, and
+    `git commit -F - <<'EOF'` for a commit message: the delimiter must be quoted, since an unquoted
+    heredoc runs the `$(...)` and backticks in its body. Anything else that mentions git or gh is
+    blocked; ask the owner to run it (`! <command>` in the prompt). Git or gh appearing only as data
+    is fine, in a command that only reads and prints (`grep`, `cat`, `ls`, `head`, `tail`, `wc`,
+    `echo`, `diff`, `jq`, …; not `sort -o`, `uniq`, `rg --pre`, a pager, or
     `test`/`[`/`[[`/`printf`, which can evaluate a `$(...)` in an array subscript) and with no
-    expansion anywhere (`$VAR`, `${…}`, `$(...)`, backticks), since an expansion can hide a
-    command (`${x:-$(cmd)}`). A call that mentions git may not redirect into `.git/` (its config
-    or hooks), into a git config file (`~/.gitconfig`, `~/.config/git/`), or to a file named
-    only at run time (DL-24); no call, git or not, may redirect to a target with an unquoted
-    glob (`*`, `?`, `[`), which bash expands to an existing file such as `.git/config`. A call
-    that doesn't mention git may still build a target with an expansion (TD-20). Aliases aren't followed: only the listed subcommands run. Allowed:
+    expansion anywhere (`$VAR`, `${…}`, `$(...)`, backticks), since an expansion can hide a command
+    (`${x:-$(cmd)}`). A call that mentions git may not redirect into `.git/` (its config or hooks),
+    into a git config file (`~/.gitconfig`, `~/.config/git/`), or to a file named only at run time
+    (DL-24); no call, git or not, may redirect to a target with an unquoted glob (`*`, `?`, `[`),
+    which bash expands to an existing file such as `.git/config`, or naming
+    `.pre-commit-config.yaml`, an input redirect too (DL-30). A call that doesn't mention git may
+    still build a target with an expansion (TD-20). Aliases aren't followed: only the listed
+    subcommands run. Allowed:
     - Reads, each with only its listed options (`tools/cli`'s tests and `READ_ONLY` in the hook
       list them; e.g. `log --oneline -5 --format=… --since=…`, `diff --stat --cached -U3`,
       `grep -n -i -A3`): `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `ls-tree`,
@@ -890,9 +898,10 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
       `--no-edit`, `--amend`: off `main` only (DL-21); `--amend` only while HEAD is unpushed
       (DL-23).
     - `push [-u] <remote> <branch>` with a literal branch other than `main`, or a bare `push` off
-      `main` whose push destination (`@{push}`) isn't `main` (DL-22). No other push option, so nothing forces,
-      deletes, or skips hooks (DL-23, DL-24). Configuration that redirects a push isn't checked:
-      GitHub refuses any push to `main`, force-push, or deletion it could cause (DL-27, DL-28).
+      `main` whose push destination (`@{push}`) isn't `main` (DL-22). No other push option, so
+      nothing forces, deletes, or skips hooks (DL-23, DL-24). Configuration that redirects a push
+      isn't checked: GitHub refuses any push to `main`, force-push, or deletion it could cause
+      (DL-27, DL-28).
     - `reset`: paths (`[HEAD] -- <paths>`), or `[--soft|--mixed|--hard] [<commit>]` that drops
       no pushed commit (DL-23) and, on `main`, only to `main` itself: a target that git resolves
       to `refs/heads/main` or a remote's `main` (DL-21).
@@ -901,13 +910,14 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
       remote's `main`) (DL-21).
     - `merge`, `rebase`, `cherry-pick`, `revert`, `am`: `--abort` only.
     - gh: `pr create`/`view`/`list`/`checks`/`diff`/`status`/`ready`/`edit`, `run
-      list`/`view`/`watch`, `auth status` (no options: `--show-token` prints the token), `repo view`, `issue list`/`view`, and `gh api` reads.
-      `gh pr merge`, and any other `gh api` call (a method, a field, an input file, GraphQL), asks
-      you first (DL-25).
+      list`/`view`/`watch`, `auth status` (no options: `--show-token` prints the token), `repo
+      view`, `issue list`/`view`, and `gh api` reads. `gh pr merge`, and any other `gh api` call (a
+      method, a field, an input file, GraphQL), asks you first (DL-25).
   - Every allowed git form, reads included, is run against real git by its tests: each runs in a
     throwaway clone with a bare remote, and the test asserts exactly which refs and config lines it
     changes. (The gh forms are tested against the guard only.) What it can't see is logged in TD-20:
-    a script or program that runs git itself, and Claude's file tools editing `.git/`. Its tests,
+    a script or program that runs git itself, a write to a shell startup file, and a non-git
+    redirect target built by an expansion. Its tests,
     and `protect_files.py`'s, are in `tools/cli/tests/hooks/`. All three hooks are linted and
     formatted with the developer CLI (`wl lint`); `guard_git.py` and `protect_files.py` are also
     type-checked and tested with it (`wl test`).

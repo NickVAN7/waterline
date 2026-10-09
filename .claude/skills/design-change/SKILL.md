@@ -45,7 +45,7 @@ changed, a rule the prompt didn't know about), stop and report it to the owner.
 | Docs only (a rule not yet built) | Update the docs in this change. |
 | Changes future checkpoints | Update their build-plan rows ("Includes"), the "Done when" list, and the slice notes. |
 | Changes code already built | The code change becomes a **new checkpoint**, with its own tests and full review. This change records it in the build plan; it doesn't touch the code. |
-| Changes developer tooling or process code (`.claude/hooks/`, the `wl` CLI, CI, pre-commit, the docs consistency tests) | Built in this change, with its tests (`test-writer`), in `chore:` or `ci:` commits, and reviewed by `checkpoint-reviewer` before it's pushed (step 7; DL-18). |
+| Changes developer tooling or process code (`.claude/hooks/`, the `wl` CLI, CI, the docs consistency tests) | Built in this change, with its tests (`test-writer`), in `chore:` or `ci:` commits, and reviewed by `checkpoint-reviewer` before it's pushed (step 7; DL-18). A change to `.pre-commit-config.yaml` is proposed to the owner, who makes it (DL-30). |
 
 A new checkpoint is inserted with a letter suffix where it runs, e.g. `S1-C13a` between
 `S1-C13` and `S1-C14`. Existing checkpoints are never renumbered, so every reference to them

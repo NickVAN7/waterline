@@ -218,7 +218,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   and the already-built modules the caller lists, never the code being implemented.
 - **Supersedes:** `spec-test-writer`'s scope as first recorded (unit tests under
   `tests/unit/rules/` and `tests/unit/authz/` only)
-- **Superseded by:** none
+- **Superseded by:** DL-32 (in part)
 - **Applies to:** `spec-test-writer` agent; `test-writer` skill; testing strategy; build plan
   ("Claude configuration"); developer guide section 9
 - **Source:** chat session (docs-consistency decisions, workflow review)
@@ -373,3 +373,60 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `checkpoint-reviewer` and `fresh-clone-verifier` agents; build plan (developer CLI);
   developer guide sections 3 and 11
 - **Source:** chat session (review DC-2026-10-08b, pass 3, finding 2)
+
+### DL-30: The pre-commit configuration is the owner's to edit
+- **Date:** 2026-10-08
+- **Decision:** Claude never changes `.pre-commit-config.yaml`, which decides which checks run
+  before each commit: the protected-files hook blocks its file tools, and the git guard blocks a
+  redirect naming it (by file name, in any call). Claude proposes a change to it to the owner, who
+  makes it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/protect_files.py`, `.claude/hooks/guard_git.py` and their
+  tests; root `CLAUDE.md`; `design-change` skill; build plan ("Claude configuration"); developer
+  guide section 11
+- **Source:** chat session (owner, after review DC-2026-10-08b)
+
+### DL-31: Claude's file tools never edit git's own files
+- **Date:** 2026-10-08
+- **Decision:** The protected-files hook blocks Claude's file tools (Write, Edit) from anything
+  inside a `.git` directory (config, hooks, refs) and from git config files outside it
+  (`~/.gitconfig`, a `.config/git` directory), as the git guard already does for redirects
+  (DL-24). Done now rather than in Slice 7, since it is a few lines in the same hook as DL-30.
+- **Supersedes:** none (TD-20, item 2, deferred it to Slice 7)
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/protect_files.py` and its tests; root `CLAUDE.md`; build plan
+  ("Claude configuration"); developer guide section 11; TD-20
+- **Source:** chat session (owner, after review DC-2026-10-08b)
+
+### DL-32: Spec tests reach a real endpoint only once the docs specify it
+- **Date:** 2026-10-08
+- **Decision:** `spec-test-writer` writes tests against a real endpoint only when the docs
+  specify it: its method, path, and error responses (the checkpoint's build-plan row, "API
+  conventions", the design doc). The main session then stubs that route too (its path and
+  request and response schemas, calling the authorization stub) and lists it with the other
+  stubs. Until an endpoint is specified, the agent tests authorization through test-only
+  routers only, and the main session writes the real endpoint's denial test once it is built,
+  under the sabotage check; `checkpoint-reviewer` accepts that.
+- **Supersedes:** DL-16 (in part: endpoint wiring tests for every endpoint, before the
+  implementation)
+- **Superseded by:** none
+- **Applies to:** `spec-test-writer` and `checkpoint-reviewer` agents; `test-writer` skill;
+  root `CLAUDE.md`; testing strategy; build plan ("Claude configuration"); developer guide
+  section 9
+- **Source:** chat session (owner, after review DC-2026-10-08b) (the docs-consistency question on
+  endpoint tests before the endpoints exist)
+
+### DL-33: The merge step checks the merge state and commit attribution first
+- **Date:** 2026-10-08
+- **Decision:** The `main` ruleset keeps GitHub's extra approval for unattributed changes (one
+  more approving review when a pull request has a commit GitHub can't link to an account; on by
+  default). The owner can't approve their own pull request, so before asking the owner to merge,
+  the session checks the merge state (`gh pr view <n> --json mergeStateStatus,reviewDecision`)
+  and that every commit is linked to a GitHub account (`gh api
+  repos/<owner>/<repo>/pulls/<n>/commits --paginate`, every page), and reports a block or an
+  unlinked commit first.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint` skill; build plan ("Pull requests"); developer guide section 10
+- **Source:** chat session (owner, after review DC-2026-10-08b)

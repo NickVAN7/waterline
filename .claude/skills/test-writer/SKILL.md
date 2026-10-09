@@ -91,7 +91,8 @@ showing the real endpoint or service denies the forbidden case.
 ## 4. Prove each test can fail
 
 - **`rules/` and `authz/`: test first, by `spec-test-writer`.** The implementing session never
-  writes these tests. Write interface stubs first (signatures and types, each returning one fixed
+  writes these tests, except a real endpoint's denial test the docs don't yet specify (below;
+  DL-32). Write interface stubs first (signatures and types, each returning one fixed
   wrong answer, e.g. always deny), then invoke the `spec-test-writer` agent with the checkpoint ID,
   the design-doc sections and tables to cover, the stub paths, the built modules it may read, and
   the test files it may create or extend. It writes the tests from the docs without reading any app
@@ -101,12 +102,15 @@ showing the real endpoint or service denies the forbidden case.
   pass a spec test, stop and ask the owner whether the doc or the test is wrong; list any change
   they approve in the record. For `authz/`, the agent also writes the integration and API tests and
   the test-only routers (DL-16); list the already-built modules it may read (the app factory, error
-  and auth helpers). Tests you add on top for other code follow the rest of this skill.
-- **Everything else: sabotage check.** For each behavior in the table, make the smallest change
-  to the code that breaks it (invert a condition, remove the `log_change()` call, drop the
-  access-scoping filter, skip the version check, return early), run the related tests, and confirm at least
-  one fails. Restore the code and confirm with `git diff` that no sabotage remains (a leftover
-  would also fail `wl check`). Record what you broke and which test caught it.
+  and auth helpers). It tests a real endpoint only when the docs specify it (method, path, error
+  responses): stub that route too (its schemas, calling the authorization stub) and list it. For
+  an endpoint the docs don't specify, write its denial test yourself once it's built, under the
+  sabotage check (DL-32). Tests you add on top for other code follow the rest of this skill.
+- **Everything else: sabotage check.** For each behavior in the table, make the smallest change to
+  the code that breaks it (invert a condition, remove the `log_change()` call, drop the
+  access-scoping filter, skip the version check, return early), run the related tests, and confirm
+  at least one fails. Restore the code and confirm with `git diff` that no sabotage remains (a
+  leftover would also fail `wl check`). Record what you broke and which test caught it.
 - **If nothing fails, the test is shallow.** Fix the test; don't move on.
 - **Mutation testing** (`docs/testing-strategy.md`): no surviving mutants in
   `app/rules/` or `app/authz/`. Kill a survivor with a new or sharper test. Only a truly

@@ -72,7 +72,8 @@ scope against the decision-log entries and the docs that code implements.
    - expected values computed by the code under test;
    - allowed cases with no denied counterpart;
    - rules tested in `rules/` or `authz/` with no API or integration test showing the endpoint
-     enforces them;
+     enforces them (by `spec-test-writer` for an endpoint the docs specify, otherwise by the main
+     session with a sabotage check, DL-32);
    - `if`, loops, or `try/except` inside tests.
    Surviving mutants in `app/rules/` or `app/authz/` (docs/testing-strategy.md, "Mutation
    testing"), or a `# pragma: no mutate` without a convincing reason, are a **blocker**.

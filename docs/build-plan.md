@@ -81,14 +81,14 @@ with the workflow changes of DL-7 to DL-14).
   checkpoint whose pushed commit turns CI red is fixed with a follow-up commit,
   `fix(<ID>): <what>`, before it goes to the owner; it is the only exception to one commit per
   checkpoint.
-- **Merge at the end of the slice only:** after the owner approves the slice's last
-  checkpoint and the slice retro's changes are applied on the branch with green CI (DL-19), and
-  only on their say-so, the PR is marked ready and merged with a **merge
-  commit** (`gh pr merge --merge`; the branch stays, since no branch can be deleted), never
-  squash or rebase. A merge commit keeps
-  every commit's hash, so the base commits in the review records stay valid, and `main` keeps
-  one `checkpoint(<ID>):` commit per checkpoint in its history (the docs consistency tests read
-  them).
+- **Merge at the end of the slice only:** after the owner approves the slice's last checkpoint and
+  the slice retro's changes are applied on the branch with green CI (DL-19), and only on their
+  say-so, the PR is marked ready and merged with a **merge commit** (`gh pr merge --merge`; the
+  branch stays, since no branch can be deleted), never squash or rebase. Before asking, the session
+  checks the merge state and that every commit is linked to a GitHub account, since the ruleset
+  requires an extra approval otherwise (DL-33). A merge commit keeps every commit's hash, so the
+  base commits in the review records stay valid, and `main` keeps one `checkpoint(<ID>):` commit per
+  checkpoint in its history (the docs consistency tests read them).
 - **GitHub enforces it** (DL-27), with two rulesets and no bypass: on every branch, no
   force-push or deletion; on `main`, changes only through a pull request with the `wl check`
   status check green, merged with a merge commit. The git guard hook catches Claude's own
@@ -180,11 +180,13 @@ Everything lives in the repository, version-controlled and present on every work
   reading it, at the start of every checkpoint that adds or changes such code, each area's policy
   included (DL-15; Slice 1: S1-C7 to S1-C13). For `app/authz/` it also writes the integration and
   API tests (404 for unseen entities, access scoping, module gating, the endpoint wiring) and the
-  test-only routers they need (DL-16); under `backend/app/` it reads only the stubs and the built
-  modules the main session lists. The main session first writes interface stubs (signatures and
-  types, returning one fixed wrong answer), then invokes the agent, then implements. Its file list,
-  with each file's `git hash-object`, goes in the review record ("Spec tests"); a spec test changes
-  only with the owner's approval.
+  test-only routers they need (DL-16), reaching a real endpoint only once the docs specify it
+  (method, path, error responses) and the main session has stubbed its route (otherwise the main
+  session writes that denial test, under the sabotage check, DL-32); under `backend/app/` it reads
+  only the stubs and the built modules the main session lists. The main session first writes
+  interface stubs (signatures and types, returning one fixed wrong answer), then invokes the agent,
+  then implements. Its file list, with each file's `git hash-object`, goes in the review record
+  ("Spec tests"); a spec test changes only with the owner's approval.
 - **`checkpoint` skill** (`.claude/skills/checkpoint/`): the close-out procedure every
   checkpoint ends with:
   - a scope check, then `wl check`;
@@ -223,7 +225,9 @@ Everything lives in the repository, version-controlled and present on every work
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
   verified and corrected against the hand-built `project` area at the start of Slice 2.
 - **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
-  generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`) and committed migrations;
+  generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`), committed migrations,
+  `.pre-commit-config.yaml` (the owner's to edit, DL-30), and git's own files (anything in `.git/`,
+  `~/.gitconfig`, `.config/git/`; DL-31);
   format each file after Claude edits it (ruff for the backend, Prettier for the frontend); and the
   **git guard** (`guard_git.py`), an allow-list (DL-26): a call that involves git or gh must be one
   command in a listed form, so Claude never commits or merges on `main` (DL-21), pushes to `main`

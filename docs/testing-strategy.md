@@ -228,13 +228,15 @@ saying why.
   fixed wrong answer), then the agent writes the tests from the design doc's tables and rules
   without reading the implementation, and proves each fails against the stub's answer or its
   opposite. For `authz/` that includes the integration and API tests (404 for unseen entities,
-  access scoping, module gating, endpoints denying the forbidden case) and their test-only
-  routers (DL-16); under `backend/app/` the agent reads only the stubs and the built modules
-  it's given. It runs for every checkpoint that adds or changes a rule or a policy (DL-15). The
-  session then implements until they pass. **Spec tests are protected:** the
-  agent's file list, with each file's `git hash-object`, goes in the review record ("Spec
-  tests"); if the implementation can't pass one, the owner decides whether the doc or the test
-  is wrong, and any change they approve is listed there. `checkpoint-reviewer` compares the
+  access scoping, module gating, endpoints denying the forbidden case) and their test-only routers
+  (DL-16); under `backend/app/` the agent reads only the stubs and the built modules it's given. A
+  real endpoint is tested by the agent only once the docs specify it (method, path, error responses)
+  and the session has stubbed its route; otherwise the session writes the endpoint's denial test
+  once it's built, under the sabotage check (DL-32). It runs for every checkpoint that adds or
+  changes a rule or a policy (DL-15). The session then implements until they pass. **Spec tests are
+  protected:** the agent's file list, with each file's `git hash-object`, goes in the review record
+  ("Spec tests"); if the implementation can't pass one, the owner decides whether the doc or the
+  test is wrong, and any change they approve is listed there. `checkpoint-reviewer` compares the
   committed files with the recorded hashes, and an unlisted change is a blocker.
 - **Sabotage check** everywhere else: for each behavior, make the smallest change that breaks it
   (invert a condition, remove a `log_change()` call, drop an org filter), confirm a test fails,

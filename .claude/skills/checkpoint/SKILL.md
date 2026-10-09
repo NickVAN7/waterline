@@ -146,7 +146,12 @@ Then:
   report. Never report a checkpoint whose CI isn't green.
 - Never merge. At the slice's last checkpoint, the owner's approval decides the merge. Any
   changes the owner decides in the slice retro are applied first, on the slice branch, with the
-  `design-change` skill and green CI (DL-19). Then, on their say-so, mark the PR ready
+  `design-change` skill and green CI (DL-19). Before asking, check that every commit is linked
+  to a GitHub account (`gh api repos/<owner>/<repo>/pulls/<n>/commits --paginate --jq '.[] |
+  [.sha[0:7], .author.login] | @tsv'`: no empty login) and, once the PR is marked ready, its
+  merge state (`gh pr view <n> --json mergeStateStatus,reviewDecision`), and report a block or
+  an unlinked commit: the ruleset then requires an approval the owner can't give on their own
+  PR (DL-33). Then, on their say-so, mark the PR ready
   (`gh pr ready`) and merge it with a merge commit (`gh pr merge --merge`; the branch stays,
   since GitHub blocks deleting any branch, DL-27),
   never squash or rebase. The git guard asks the owner to confirm the merge (DL-25).

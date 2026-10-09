@@ -11,10 +11,11 @@ approval.
 
 ## Input
 
-The checkpoint ID; the behaviors to cover (the design-doc sections and tables); the stub
-modules to test against (their paths); the already-built modules you may read (e.g. the app
-factory, `app/core/errors.py`, the auth dependencies), if the tests need any; and the test
-files you may create or extend.
+The checkpoint ID; the behaviors to cover (the design-doc sections and tables); the stub modules to
+test against (their paths), including, for each endpoint the docs specify, its route stub (path and
+schemas, calling the authorization stub; DL-32); the already-built modules you may read (e.g. the
+app factory, `app/core/errors.py`, the auth dependencies), if the tests need any; and the test files
+you may create or extend.
 
 ## Rules
 
@@ -28,7 +29,10 @@ files you may create or extend.
   database and HTTP (404 for unseen entities, access scoping, module gating, an endpoint
   denying the forbidden case), integration and API tests (`backend/tests/integration/`,
   `backend/tests/api/`) and the test-only routers and helpers they need (new files in
-  `backend/tests/support/`) (DL-16). Never edit app code, conftest, factories, or other tests;
+  `backend/tests/support/`) (DL-16). Test a real endpoint only when the docs specify it (its
+  method, path, and error responses) and the caller gave you its route stub; otherwise test
+  through a test-only router, and list the real endpoint's denial test under Questions as left
+  to the main session (DL-32). Never edit app code, conftest, factories, or other tests;
   the stubs only as in step 3.
 - Expected values are literals from the docs, never computed (the `test-writer` rules apply in
   full).

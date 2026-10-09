@@ -76,9 +76,10 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 ## Always
 
 - Tests ship with the code they test (see `docs/testing-strategy.md`). Test-first for
-  `backend/app/rules/` and `backend/app/authz/` means the `spec-test-writer` agent: write
-  interface stubs (signatures and types, returning one fixed wrong answer), invoke the agent,
-  then implement until its tests pass. Never change a spec test without the owner's approval.
+  `backend/app/rules/` and `backend/app/authz/` means the `spec-test-writer` agent: write interface
+  stubs (signatures and types, returning one fixed wrong answer; a route only for an endpoint the
+  docs specify, DL-32), invoke the agent, then implement until its tests pass. Never change a spec
+  test without the owner's approval.
 - **Nothing counts as verified because the session that did the work says so.** A claim is
   verified only by a gate (`wl check`, CI), an independent agent, or the owner. Reports label
   each verification claim with who verified it (e.g. "sabotage-checked by
@@ -103,7 +104,8 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).
-- Hooks block edits to generated files and committed migrations, format files after edits, and
+- Hooks block edits to generated files, committed migrations, `.pre-commit-config.yaml` (the
+  owner's, DL-30), and git's own files (`.git/`, git config; DL-31), format files after edits, and
   guard git. The git guard is an allow-list (DL-26; developer guide, section 11): **each git or
   gh command is its own Bash call, with nothing else in it** (no `&&`, `;`, `|`, `cd`,
   variables, or `$(...)`); use `git -C <path>` for another directory and
