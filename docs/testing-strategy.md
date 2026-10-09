@@ -11,8 +11,9 @@ tested, what each kind of test is for, and the gates every change passes.
 - **Every checkpoint ships its tests.** No code lands without the tests that prove it; no step
   starts while anything is red.
 - **Every test must be able to fail.** A test exists to catch a specific bug. Test-first (for
-  `rules/` and `authz/`) and the sabotage check (everywhere else) prove each test can fail;
-  mutation testing measures it. A test no plausible bug would break is fixed or removed.
+  `rules/` and `authz/`, by `spec-test-writer`) and the sabotage check (everywhere else) prove each
+  test can fail; mutation testing measures it. A test no plausible bug would break is fixed or
+  removed.
 - **Deterministic.** Fake data uses a fixed seed; tests never depend on each other or on run
   order; a failure reproduces the same way every time.
 - **Strictest where mistakes are most expensive.** Authorization and business rules are held to
@@ -111,17 +112,18 @@ tested, what each kind of test is for, and the gates every change passes.
     entity's `on_approved` effect applied);
   - a gate with any approval request can't be deleted; `approved` is refused on non-gate
     milestones.
-- **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code
-  and each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map
-  owner per table; the tech-debt log's format, references, and deadlines; the developer guide's
-  status line vs. `git log`; design-doc § references; the agents and skills listed vs. those in
-  `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
-  instead of passing by finding nothing. The column check runs per column: a documented
-  column whose Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is
-  reported as **skipped** (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished
-  (its last checkpoint, or any later slice's, has a `checkpoint(<ID>):` commit), and required
-  like any other column from then on; a malformed marker is a `DocsStructureError`. Judgment calls
-  (contradictions in prose, superseded rules) are the `docs-consistency` agent's job.
+- **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code and
+  each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map owner
+  per table; the tech-debt log's format, references, and deadlines; the decision log's format and
+  references; every `audit-allowlist.toml` entry names an open tech-debt entry; the developer
+  guide's status line vs. `git log`; design-doc § references; the agents and skills listed vs. those
+  in `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
+  instead of passing by finding nothing. The column check runs per column: a documented column whose
+  Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is reported as **skipped**
+  (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished (its last checkpoint, or any
+  later slice's, has a `checkpoint(<ID>):` commit), and required like any other column from then on;
+  a malformed marker is a `DocsStructureError`. Judgment calls (contradictions in prose, superseded
+  rules) are the `docs-consistency` agent's job.
 - **Accessibility** (WCAG 2.2 AA, design-doc §1; from Slice 1, Checkpoint 14):
   - automated checks with axe-core in component tests (`vitest-axe`) and end-to-end tests
     (`@axe-core/playwright`), failing on any violation;
@@ -221,11 +223,29 @@ saying why.
 
 ## Test-first and proving tests can fail
 
-- **Test-first (TDD)** for `rules/` and `authz/`: the test is written from the design doc's
-  table or rule before the code, and must fail for the right reason before the code is written.
+- **Test-first** for `rules/` and `authz/`, by the `spec-test-writer` agent (DL-11): the session
+  implementing the checkpoint first writes interface stubs (signatures and types, returning one
+  fixed wrong answer), then the agent writes the tests from the design doc's tables and rules
+  without reading the implementation, and proves each fails against the stub's answer or its
+  opposite. For `authz/` that includes the integration and API tests (404 for unseen entities,
+  access scoping, module gating, endpoints denying the forbidden case) and their test-only routers
+  (DL-16); under `backend/app/` the agent reads only the stubs and the built modules it's given. A
+  real endpoint is tested by the agent only once the docs specify it (method, path, error responses)
+  and the session has stubbed its route; otherwise the session writes the endpoint's denial test
+  once it's built, under the sabotage check (DL-32). It runs for every checkpoint that adds or
+  changes a rule or a policy (DL-15). The session then implements until they pass. **Spec tests are
+  protected:** the agent's file list, with each file's `git hash-object`, goes in the review record
+  ("Spec tests"); if the implementation can't pass one, the owner decides whether the doc or the
+  test is wrong, and any change they approve is listed there. `checkpoint-reviewer` compares the
+  committed files with the recorded hashes, and an unlisted change is a blocker.
 - **Sabotage check** everywhere else: for each behavior, make the smallest change that breaks it
   (invert a condition, remove a `log_change()` call, drop an org filter), confirm a test fails,
   and restore the code.
+- **Independent sabotage spot-check:** `checkpoint-reviewer` picks two or three of the
+  checkpoint's behaviors by risk, from the docs (not from the author's list), breaks each in a
+  temporary copy of the repository, and records which test caught it. None failing is a major
+  finding (a blocker in `rules/` or `authz/`). The author's own checks are evidence, not
+  verification: nothing counts as verified because the session that did the work says so.
 - Tests are written **alongside** the code: in the same checkpoint and commit.
 - The `test-writer` skill (`.claude/skills/test-writer/`) is the working procedure: a behavior
   table with a source, layer, the bug each test catches, and the proof it fails; rules for
@@ -249,17 +269,23 @@ saying why.
 
 ## Workflow and gates
 
-- **Pre-commit hooks** (local, fast): ruff format and lint, Prettier and ESLint, and a check
-  that no generated file is hand-edited.
+- **Pre-commit hooks** (local, fast): ruff format and lint, Prettier and ESLint, a check
+  that no generated file is hand-edited, and gitleaks on the staged changes.
 - **`wl check`** (the developer CLI; `waterline check` in full) runs everything CI runs, locally.
   CI calls the same command, so local and CI can't diverge.
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
   tests with coverage, mutation testing on `rules/` and `authz/` (from Slice 1, S1-C3),
   import-linter contracts, migration checks, frontend tests with coverage, generated-client
-  freshness, and end-to-end tests (from Slice 1).
-- **Pull requests:** checkpoints merge to `main` in groups, one PR each, only with green CI
-  (build-plan, "Pull requests"). Until branch protection is enabled (TD-15), that is checked
-  by hand before merging.
+  freshness, end-to-end tests (from Slice 1), and the supply-chain audit (`wl audit`).
+- **Supply-chain audit** (`wl audit`, part of `wl check`; DL-13): known vulnerabilities in both
+  Python lockfiles and the npm lockfile, dev dependencies included, and secrets anywhere in the
+  git history. Any known vulnerability fails; an advisory is ignored only through an
+  `audit-allowlist.toml` entry with a reason and an open tech-debt entry whose Fix by is the
+  deadline. A red audit is fixed before any checkpoint starts (`chore(deps):` commit).
+- **Pull requests:** each slice works on one branch with one draft PR, and CI runs on every
+  push; a checkpoint goes to the owner only with green CI, and the slice's PR merges to `main`
+  (a merge commit) only with green CI (build-plan, "Pull requests"). GitHub enforces it: the
+  `wl check` status check is required on `main` (DL-27).
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
   tech-debt entry the same day, never retried until green.
 

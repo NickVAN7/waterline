@@ -27,15 +27,11 @@ The absolute path of the repository and the checkpoint ID.
 
 1. **Make a fresh copy of what is about to be committed** (committed state plus the
    checkpoint's uncommitted changes, without ignored files such as `.env`, `.venv`, or
-   `node_modules`):
-   ```
-   TMP=$(mktemp -d)
-   git clone --quiet <repo> "$TMP/waterline"
-   git -C <repo> diff HEAD --binary > "$TMP/changes.patch"
-   git -C "$TMP/waterline" apply --allow-empty "$TMP/changes.patch"
-   ```
-   Then copy each untracked, non-ignored file listed by
-   `git -C <repo> ls-files --others --exclude-standard` to the same path in the copy.
+   `node_modules`): run `mktemp -d`, then, from `<repo>`,
+   `uv run wl review-copy <that directory>/waterline` (DL-29; without `--with-env`, so no
+   `.env` is copied). It clones the repository, applies `git diff HEAD --binary`, and copies
+   each untracked, non-ignored file; the git guard allows only one plain git command per call,
+   so these steps live in `wl`.
 2. **Confirm isolation.** In the copy, run
    `COMPOSE_PROJECT_NAME=waterline-verify docker compose config` and confirm that the project
    name is `waterline-verify` and that no volume or container has a fixed `name:` or
@@ -55,7 +51,7 @@ The absolute path of the repository and the checkpoint ID.
    gives no way to check that setup worked, that's a finding.
 6. **Clean up:** first confirm with `docker compose ls` that the project being removed is
    `waterline-verify`, then run `COMPOSE_PROJECT_NAME=waterline-verify docker compose down -v`
-   in the copy, then delete `$TMP`.
+   in the copy, then delete the `mktemp -d` directory.
 
 ## Output format
 

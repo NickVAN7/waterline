@@ -5,13 +5,16 @@ A thin orchestrator: every command runs existing tools as subprocesses in the ri
 """
 
 import shlex
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from waterline_cli import steps
+from waterline_cli.audit import ALLOWLIST, AllowlistError, load_allowlist, uv_ignores
 from waterline_cli.doctor import CHECKS, Status, run_checks
-from waterline_cli.runner import run_steps
+from waterline_cli.review_copy import CopyError, describe, make_copy
+from waterline_cli.runner import Step, find_repo_root, run_steps
 
 app = typer.Typer(
     help="Waterline developer CLI. Every command accepts --dry-run to print what it would run.",
@@ -53,13 +56,53 @@ def doctor(dry_run: DryRun = False) -> None:
     typer.secho("\nToolchain OK.", fg=typer.colors.GREEN)
 
 
+def _audit_steps() -> list[Step]:
+    try:
+        allowlist = load_allowlist(find_repo_root() / ALLOWLIST)
+    except AllowlistError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+    return steps.audit(uv_ignores(allowlist))
+
+
 @app.command()
 def check(dry_run: DryRun = False) -> None:
     """Everything CI runs: lockfiles, client freshness, lint, types, import rules, tests,
-    coverage gates."""
+    coverage gates, mutation testing, and the supply-chain audit."""
     run_steps(
-        [*steps.backend_check(), *steps.frontend_check(), *steps.cli_check()], dry_run=dry_run
+        [*steps.backend_check(), *steps.frontend_check(), *steps.cli_check(), *_audit_steps()],
+        dry_run=dry_run,
     )
+
+
+@app.command("review-copy")
+def review_copy(
+    dest: Annotated[Path, typer.Argument(help="A new or empty directory for the copy.")],
+    with_env: Annotated[
+        bool, typer.Option("--with-env", help="Also copy .env (for running the tests).")
+    ] = False,
+    dry_run: DryRun = False,
+) -> None:
+    """A throwaway copy of the repository as it is about to be committed: the committed state,
+    the uncommitted changes, and the untracked files. Never changes the repository."""
+    root = find_repo_root()
+    if dry_run:
+        for line in describe(root, dest, with_env=with_env):
+            typer.echo(line)
+        return
+    try:
+        untracked = make_copy(root, dest, with_env=with_env)
+    except CopyError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"Copy ready at {dest} ({len(untracked)} untracked files copied).")
+
+
+@app.command()
+def audit(dry_run: DryRun = False) -> None:
+    """Known vulnerabilities in the Python and npm dependencies, and secrets in the git
+    history. Needs the network."""
+    run_steps(_audit_steps(), dry_run=dry_run)
 
 
 @app.command("test")

@@ -18,7 +18,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 2. Run the gates
 
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
-  import-linter contracts, migration checks, and generated-client freshness.
+  import-linter contracts, migration checks, generated-client freshness, mutation testing, and
+  the supply-chain audit (`wl audit`, which needs the network).
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
 - **Last checkpoint of a slice:** search `docs/schema-doc.md` for `Added in Slice <n>.` (this
   slice's number) and confirm each marked column is in its model. The docs consistency tests
@@ -47,10 +48,16 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 
 ## 4. Independent review
 
-- Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit (the
-  previous checkpoint's commit, or the root commit for the first).
-- Also invoke the `security-reviewer` agent, with the same inputs and in parallel, when
-  **either** holds:
+- **Spec tests first:** if the checkpoint adds or changes `app/rules/` or `app/authz/`, start
+  `docs/reviews/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
+  behavior table and its files table, with each file's `git hash-object`), plus any change to
+  those files the owner approved (what and why). `checkpoint-reviewer` compares the files with
+  the recorded hashes.
+- Invoke the `checkpoint-reviewer` agent with the checkpoint ID and the base commit: the last
+  commit before this checkpoint's work started (DL-17), so design-change commits between
+  checkpoints stay out of its review. For a checkpoint parked for a design change, that's the
+  design change's last commit.
+- Also invoke the `security-reviewer` agent, with the same inputs, when **either** holds:
   - the build plan's section for the slice says the checkpoint gets the security reviewer
     (e.g. Slice 1: "every checkpoint from 1 to 16"); or
   - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
@@ -59,11 +66,18 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
     areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
     `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
     store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
+- **One reviewer at a time:** when both run, invoke `security-reviewer` first and
+  `checkpoint-reviewer` once it has finished, never in parallel. Both can run tests against the
+  shared test database (`waterline_test`), and two runs at once collide: the concurrency tests
+  truncate tables and then require every table to be empty, and each run migrates the test
+  database at its start. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests
+  yourself while a reviewer is running.
 - Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
   and the diff.
-- **Last checkpoint of a slice:** also run `uv run wl down` (so ports are free) and invoke the
-  `fresh-clone-verifier` agent with the repository's absolute path and the checkpoint ID. Its
-  findings are fixed in `docs/developer-guide.md` like any other finding.
+- **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
+  (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
+  absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
+  any other finding. Run `uv run wl up` again afterwards.
 - **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
   agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
   (the root commit for Slice 0). It reports **Fixes** and **Decisions**.
@@ -77,19 +91,19 @@ For each finding from every reviewer that ran, exactly one of:
 - **Rejected:** only when the finding is factually wrong; record the evidence.
 
 `docs-consistency` **Fixes** are resolved the same way. Its **Decisions** are not yours to
-resolve: leave them undecided and put them in the report (step 8) for the owner.
+resolve: leave them undecided and put them in the report (step 7) for the owner.
 
 If fixes changed behavior (not just docs or tests), run the reviewer again on the fixes.
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
 **Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
-docs-consistency) in
-`docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include the base commit, the totals,
-and for each pass its verdict, its findings table with each
-resolution (fixed / logged with TD number / rejected with evidence), and the questions it
-raised. End with the questions still open for the owner and any owner decisions made during
-review. The record goes in the checkpoint's commit.
+docs-consistency) in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include the base
+commit, the totals, the "Spec tests" section (when the checkpoint has one), and for each pass
+its verdict, its findings table with each resolution (fixed / logged with TD number / rejected
+with evidence), `checkpoint-reviewer`'s "Sabotage checks" table, and the questions it raised.
+End with the questions still open for the owner and any owner decisions made during review.
+The record goes in the checkpoint's commit.
 
 **Tech debt due now:** before committing, list every open `docs/tech-debt.md` entry whose
 Fix by is this checkpoint (or this slice, at its last checkpoint). Each is resolved in this
@@ -98,9 +112,8 @@ may be left open past its Fix by: the docs consistency tests fail on it after th
 
 ## 6. Commit and push
 
-Work on the checkpoint's group branch (`docs/build-plan.md`, "Pull requests"; the slice's
-section lists the groups), never on `main` (from Slice 1; Slice 0 landed on `main`). One commit
-for the whole checkpoint, with this message:
+Work on the slice's branch, `s<n>` (`docs/build-plan.md`, "Pull requests"), never on `main`.
+One commit for the whole checkpoint, with this message:
 
 ```
 checkpoint(<ID>): <checkpoint name>
@@ -123,32 +136,35 @@ Next: <next checkpoint ID and name>
 ```
 
 Then:
-- Push the branch. At the group's first checkpoint, open the group's PR as a draft
-  (`gh pr create --draft`, titled with the group, listing its checkpoints).
+- Push the branch: `git push -u origin s<n>` at its first push, `git push` after. At the
+  first push, open the slice's PR as a draft (`gh pr create --draft`, titled with the slice,
+  listing its groups), with a literal `--title '…'` and `--body '…'` or `--body-file <file>`:
+  the git guard allows no heredoc or `$(...)` with gh (DL-26).
 - Push only the finished checkpoint commit, never work in progress. Wait for CI on it
   (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
   report. Never report a checkpoint whose CI isn't green.
-- Never merge. At the group's last checkpoint, the owner's approval decides the merge
-  (rebase and merge, never squash); merge only when they say so.
+- Never merge. At the slice's last checkpoint, the owner's approval decides the merge. Any
+  changes the owner decides in the slice retro are applied first, on the slice branch, with the
+  `design-change` skill and green CI (DL-19). Before asking, check that every commit is linked
+  to a GitHub account (`gh api repos/<owner>/<repo>/pulls/<n>/commits --paginate --jq '.[] |
+  [.sha[0:7], .author.login] | @tsv'`: no empty login) and, once the PR is marked ready, its
+  merge state (`gh pr view <n> --json mergeStateStatus,reviewDecision`), and report a block or
+  an unlinked commit: the ruleset then requires an approval the owner can't give on their own
+  PR (DL-33). Then, on their say-so, mark the PR ready
+  (`gh pr ready`) and merge it with a merge commit (`gh pr merge --merge`; the branch stays,
+  since GitHub blocks deleting any branch, DL-27),
+  never squash or rebase. The git guard asks the owner to confirm the merge (DL-25).
+- Under the git guard (DL-26), run each git or gh command as its own Bash call: `git add …`,
+  then `git commit -F - <<'EOF'` with the message, then the push above. When it blocks a command,
+  do what its message says.
 
-## 7. Prepare the Project upload
+## 7. Report and stop
 
-Claude Code can't write to the claude.ai Project, so the owner uploads changed files by hand.
-
-- List every file this commit changed or added that the Project keeps a copy of:
-  `git diff --name-only <base>..HEAD -- docs CLAUDE.md backend/CLAUDE.md frontend/CLAUDE.md .claude`.
-  Files under `docs/` go to the Project under the same path; `CLAUDE.md` files and `.claude/`
-  go under `repo-seed/` (same relative path).
-- Copy them into the owner's upload folder, `waterline-project-upload` on their Windows desktop
-  (from WSL: `/mnt/c/Users/Nick/Desktop/waterline-project-upload`), laid out as they go in the Project (`docs/…`,
-  `repo-seed/…`), so the owner can upload them together. It's outside the repository, so
-  nothing in it is ever committed. If the folder doesn't exist, ask the owner; don't create it
-  elsewhere. Overwrite files already there but don't delete others: the owner may not have
-  uploaded them yet. The owner empties the folder after uploading.
-- Never say the Project was updated: it wasn't.
-
-## 8. Report and stop
+Nothing counts as verified because you say so. Label every verification claim in the report
+with who verified it: a gate (`wl check`, CI), an agent (e.g. "sabotage-checked by
+checkpoint-reviewer"), or the owner. Your own sabotage checks and runs are evidence for the
+reviewers, not verification.
 
 Send the owner:
 - the review note (the commit message body);
@@ -156,10 +172,28 @@ Send the owner:
   the resolution of each finding (as recorded in `docs/reviews/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review;
-- the Project upload list from step 7 (each file, whether it's new or changed, and the folder
-  it was copied to);
-- the PR link and its CI result, and whether this checkpoint ends the group (so the PR is
-  ready to merge on approval);
+- the PR link and its CI result, and whether this checkpoint ends its group (a review point)
+  or the slice (so the PR is ready to merge on approval);
+- **a try-it-yourself script**, for any checkpoint with behavior visible through the API or
+  the UI: 3–6 numbered steps against the running dev stack (`curl` with a cookie jar and an
+  `Origin` header before S1-C14, screens after), each with its expected result, including at
+  least one step that should be denied. Run it once yourself to make sure the steps are right;
+  the owner's run is the check. A checkpoint with no visible behavior says so instead;
+- **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
+  the owner, which skills and agents never triggered, and the verdict of any process trial.
+  The owner decides what changes; each change gets a decision-log entry and is applied on the
+  slice branch before the merge (DL-19);
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.
+
+**Review-tier trial** (`docs/build-plan.md`, "Verification"; S1-C8 to S1-C10 only):
+- **S1-C8 and S1-C9:** after sending the report, go straight on to the next checkpoint without
+  stopping, only if **all** of these hold: `wl check` and CI are green; every reviewer that ran
+  returned no findings, or only findings that were **fixed** (none logged, none rejected); and
+  there are no open questions, no `docs-consistency` Decisions, and no deviations from the docs
+  in the review note. Say in the report that it auto-continued and why. If any condition
+  fails, stop as usual.
+- **S1-C10:** a full stop for the whole group. The report covers S1-C8 to S1-C10, with links to
+  the three review records and the group's diff range (from S1-C8's base, the last commit
+  before its work started, to the S1-C10 commit).

@@ -25,7 +25,8 @@ in scope: drift usually sits in files the change didn't touch.
 ## Scope
 
 - `docs/*.md` (design doc, schema doc, build plan, testing strategy, developer guide, user guide,
-  tech-debt log, screen inventory), `docs/spikes/`, and `docs/reviews/` for context only
+  tech-debt log, decision log, screen inventory), `docs/spikes/`, and `docs/reviews/` for
+  context only
 - `CLAUDE.md`, `backend/CLAUDE.md`, `frontend/CLAUDE.md`
 - `.claude/agents/*.md`, `.claude/skills/*/SKILL.md`, `.claude/settings.json`
 - `backend/pyproject.toml` `[tool.importlinter]` contracts, where docs describe them
@@ -58,10 +59,11 @@ session into doing the wrong thing.
 ## Where the answer is already recorded
 
 When sources disagree, one may already be authoritative. Order of precedence:
-1. The build plan's "Implementation decisions" table and resolved tech-debt entries
-2. The design doc
-3. The schema doc (for table-level detail)
-4. Everything else (guides, CLAUDE.md files, skills, agents)
+1. The decision log (`docs/decision-log.md`): on any subject, its newest entry wins
+2. The build plan's "Implementation decisions" table and resolved tech-debt entries
+3. The design doc
+4. The schema doc (for table-level detail)
+5. Everything else (guides, CLAUDE.md files, skills, agents)
 
 If a higher source clearly records the decision, the finding is a **fix** (update the lower
 source). If they're at the same level, or the higher source is itself ambiguous, it's a

@@ -1,6 +1,6 @@
 ---
 name: checkpoint-reviewer
-description: Independent reviewer for a Waterline checkpoint. Use at the end of every checkpoint (via the checkpoint skill) to review the checkpoint's changes against the design docs, conventions, tests, and documentation. Reports findings only; never edits files.
+description: Independent reviewer for a Waterline checkpoint. Use at the end of every checkpoint (via the checkpoint skill) to review the checkpoint's changes against the design docs, conventions, tests, and documentation, and to sabotage-check a few of its behaviors in a temporary copy. Reports findings only; never modifies the repository.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -9,13 +9,17 @@ you have not seen the reasoning behind it. Judge the work only against the docs 
 
 ## Input
 
-You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff against.
+You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff against. For
+developer-tooling code changed in a design change (DL-18), you get a review ID instead
+(`DC-<YYYY-MM-DD>`), the base, and the files in scope: there is no build-plan row, so judge the
+scope against the decision-log entries and the docs that code implements.
 
 ## Rules
 
-- **Do not modify any file.** Use Bash only for read-only commands (`git diff`, `git log`,
-  `git show`, listing files, and running `uv run wl check` or specific tests to confirm a
-  suspicion).
+- **Never modify the repository; sabotage happens only in a temporary copy** (step 5). In the
+  repository, use Bash only for read-only commands (`git diff`, `git log`, `git show`,
+  `git hash-object`, listing files, and running `uv run wl check` or specific tests to confirm
+  a suspicion). Never touch its working tree, index, or branches.
 - Report what is actually wrong or missing, with evidence (file and line). Do not pad the report
   with style preferences the linters already enforce.
 - If something is ambiguous in the docs, report it as a question, not a defect.
@@ -28,6 +32,23 @@ You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff a
 3. Read the full diff: `git diff <base>...HEAD` plus uncommitted changes (`git diff`,
    `git status`).
 4. Check each area below.
+5. **Sabotage spot-check.** Pick **two or three** behaviors the checkpoint added, chosen from the
+   docs by risk (a denial, a side effect such as an audit event or a deleted session, an
+   access-scoping filter), not from the author's sabotage list. For each:
+   - Make a throwaway copy of what is about to be committed (the committed state, the
+     uncommitted changes, the untracked files, and `.env`, which the tests read the database
+     settings from): run `mktemp -d`, then, from `<repo>`,
+     `uv run wl review-copy <that directory>/waterline --with-env` (DL-29; the git guard
+     allows only one plain git command per call, so the clone-and-apply steps live in `wl`).
+     The copy's tests use the running stack's Postgres and the test database; the
+     `checkpoint` skill runs you only when no other reviewer is running tests.
+   - Make the smallest change in the copy that should break the behavior, run the related tests
+     there (`uv run --directory backend pytest --no-cov <tests>`), and record which test
+     failed. If none fails, that's a **major** finding (a **blocker** in `app/rules/` or
+     `app/authz/`).
+   - Delete the copy (`rm -rf <that directory>`), even if you stop early.
+   If the checkpoint added no behavior a test could catch (docs or configuration only), say so
+   instead.
 
 ## What to check
 
@@ -51,11 +72,17 @@ You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff a
    - expected values computed by the code under test;
    - allowed cases with no denied counterpart;
    - rules tested in `rules/` or `authz/` with no API or integration test showing the endpoint
-     enforces them;
+     enforces them (by `spec-test-writer` for an endpoint the docs specify, otherwise by the main
+     session with a sabotage check, DL-32);
    - `if`, loops, or `try/except` inside tests.
-   Once mutation testing is enabled (docs/testing-strategy.md), surviving mutants in
-   `app/rules/` or `app/authz/`, or a `# pragma: no mutate` without a convincing reason, are a
-   **blocker**.
+   Surviving mutants in `app/rules/` or `app/authz/` (docs/testing-strategy.md, "Mutation
+   testing"), or a `# pragma: no mutate` without a convincing reason, are a **blocker**.
+   **Spec tests** (checkpoints that add or change `app/rules/` or `app/authz/`): the review
+   record (`docs/reviews/<ID>.md`, "Spec tests") lists the files `spec-test-writer` wrote, each
+   with its `git hash-object`. Run `git hash-object` on each file as it is about to be
+   committed and compare. A file that differs, and isn't listed in the record as an
+   owner-approved change, is a **blocker**; so is a checkpoint that changes `app/rules/` or
+   `app/authz/` with no "Spec tests" section.
 6. **Migrations:** match the schema doc; downgrade works; no edits to committed migrations.
 7. **Documentation:** `docs/developer-guide.md` and `docs/user-guide.md` accurately describe
    what was built; design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`
@@ -73,6 +100,10 @@ You will be given the checkpoint ID (e.g. `S0-C2`) and the base commit to diff a
 | # | Severity | Area | Location | Finding | Suggested resolution |
 |---|---|---|---|---|---|
 | 1 | blocker / major / minor | scope / design / conventions / correctness / tests / migrations / docs | path:line | ... | ... |
+
+### Sabotage checks
+| Behavior | Source | Change made (in the copy) | Tests run | Caught by |
+|---|---|---|---|---|
 
 ### Questions (doc ambiguities)
 - ...

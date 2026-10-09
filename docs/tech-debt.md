@@ -210,17 +210,23 @@ Entry format:
 
 ### TD-15: No branch protection on `main`
 - **Added:** S0-C8
-- **What:** Before the owner's S0-C8 decision, the build plan (S0-C8 row) and testing strategy
-  called for branch protection, so nothing merges to `main` without green CI. GitHub offers
-  branch protection and rulesets on a private repository only with a paid plan (the API answers
-  "Upgrade to GitHub Pro or make this repository public"), so `main` is unprotected: CI runs on
-  every push and PR, but a red PR can still be merged, and `main` can be pushed to directly.
+- **What:** `main` has no branch protection, so nothing enforces that only a green slice PR
+  merges into it (build plan, "Pull requests": one branch and draft PR per slice, merged with a
+  merge commit). GitHub offers branch protection and rulesets on a private repository only with
+  a paid plan (the API answers "Upgrade to GitHub Pro or make this repository public"): CI runs
+  on every push and PR, but a red PR can still be merged, and `main` can be pushed to directly.
+  Until protection is enabled, the git guard hook (`.claude/hooks/guard_git.py`, DL-21 to DL-26)
+  covers Claude's own commands: no commits or pushes to `main`, no rewriting pushed history, no
+  skipped hooks, and the merge asks the owner. It doesn't cover anyone's commands outside Claude
+  Code.
 - **Why:** Owner decision (S0-C8): defer rather than upgrade or make the repository public.
   The pull-request workflow (build plan, "Pull requests") checks CI by hand before merging.
 - **Fix by:** Slice 7 (before a second contributor or the first non-local deployment,
   whichever comes first; re-target if both move later): upgrade the plan (or make the
   repository public) and require the CI check (`wl check`) on `main`, with no direct pushes.
-- **Status:** open
+- **Status:** resolved in DC-2026-10-08b (the repository is public; GitHub rulesets require a
+  pull request with a green `wl check` on `main`, and block force-pushes and deletion on every
+  branch, DL-27)
 
 ### TD-16: The service-layer contract doesn't list `my_work`
 - **Added:** journey decisions (Oct 7, 2026)
@@ -258,3 +264,41 @@ Entry format:
   each sequence numbered 1, 2, 3, … per (project, prefix).
 - **Status:** resolved in S1-C3 (`test_any_interleaving_numbers_each_sequence_1_2_3`; an
   allocator that ignores the prefix fails it)
+
+### TD-19: npm advisory GHSA-vfj7-8cjw-p6xm (braces) is allowlisted
+- **Added:** workflow review (DL-13, Oct 8, 2026)
+- **What:** `wl audit` ignores GHSA-vfj7-8cjw-p6xm (high: stack-exhaustion denial of service
+  in `braces` through deeply nested patterns), through its entry in `audit-allowlist.toml`.
+  `braces` 3.0.3 comes only through `@vue/eslint-config-typescript` → `fast-glob` →
+  `micromatch`, a dev dependency of the linter.
+- **Why:** No fixed release exists: the advisory covers every `braces` version up to 3.0.3, the
+  latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
+  The vulnerable code only expands glob patterns from the repository's own ESLint
+  configuration, never untrusted input, and never ships in the app.
+- **Fix by:** S1-C14 (the first checkpoint that grows the frontend): update once a fixed
+  `braces` (or a `fast-glob`/`micromatch` without it) is published, and remove the allowlist
+  entry; if none is by then, re-target with the owner.
+- **Status:** open
+
+### TD-20: What the git guard can't see
+- **Added:** DC-2026-10-08 (review passes 3, 6, and 7; narrowed by DC-2026-10-08b and DL-31)
+- **What:** The git guard (`.claude/hooks/guard_git.py`) checks the shell commands Claude runs. It
+  doesn't see (1) a script or program that runs git itself or changes `.git/hooks/` (`bash
+  <script>`, `python <file>`, a tool that commits, `uv run pre-commit uninstall`), (2) a write to a
+  shell startup file (`~/.bashrc`: an exported `SKIP`, a `git` function) that changes later shells,
+  or (3) a call that doesn't mention git redirecting to a target built by an expansion (`>>
+  .gi$'t'/config`); blocking every expansion in a target would also block the common `>
+  "$TMP/x"`. The deny-list guard's gaps (a `cd` in a subshell, exported variables, `include.path`,
+  nested shells, run-time `gh api` arguments) are closed by the allow-list (DL-26), and so are
+  review DC-2026-10-08b's (redirects into `.git/` or a git config file from a call that mentions
+  git, read options that run or write, unquoted heredocs, expansions that hide a command, a glob
+  in a redirect target). Claude's file tools editing `.git/` or a git config file are blocked by
+  the protected-files hook (DL-31), and `.pre-commit-config.yaml` is the owner's (DL-30). Push and
+  fetch configuration is left to the rulesets (DL-28). A program that writes a git config file
+  without naming it is part of (1).
+- **Why:** No command guard can read what another program does. GitHub's rulesets (DL-27) refuse
+  pushes to `main`, force-pushes, and deletions whatever runs them; a skipped local hook is
+  caught by CI's `wl check`.
+- **Fix by:** Slice 7 (the owner decides whether this closes as won't-fix now that the
+  rulesets are on).
+- **Status:** open

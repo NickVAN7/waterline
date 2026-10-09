@@ -36,9 +36,14 @@ select = [
 # The CLI's job is running fixed developer tools as subprocesses (never through a shell).
 "src/waterline_cli/**" = ["S603", "S607"]
 "tests/**" = ["S101"]
+"tests/hooks/**" = ["S101", "S603", "S607"]
+# Builds real git repositories to copy from.
+"tests/test_review_copy.py" = ["S101", "S603", "S607"]
 
 [tool.pyright]
-include = ["src", "tests"]
+# The Claude Code hooks (.claude/hooks/) are tested here too, under the same gates.
+include = ["src", "tests", "../../.claude/hooks/guard_git.py", "../../.claude/hooks/protect_files.py"]
+extraPaths = ["src", "../../.claude/hooks"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 venvPath = "../.."
@@ -46,11 +51,15 @@ venv = ".venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The Claude Code hooks are stand-alone scripts; their tests import them from here.
+pythonpath = ["../../.claude/hooks"]
 addopts = [
     "--strict-markers",
     "--strict-config",
     "--import-mode=importlib",
     "--cov=waterline_cli",
+    "--cov=guard_git",
+    "--cov=protect_files",
     "--cov-report=term-missing:skip-covered",
 ]
 filterwarnings = ["error"]

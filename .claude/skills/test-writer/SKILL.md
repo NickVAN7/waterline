@@ -17,7 +17,7 @@ Build this table first, from the docs, not from the code:
 
 | Behavior | Source | Layer | Bug it catches | Proof it fails |
 |---|---|---|---|---|
-| Member can't delete an approved requirement | design §5 deletion table | unit + API | reporter check ignores `approved_revision_id` | red first: returned True |
+| Member can't delete an approved requirement | design §5 deletion table | unit + API | reporter check ignores `approved_revision_id` | spec test: fails against the always-allow stub |
 
 Where behaviors come from:
 - every row of every table in the relevant design-doc section (roles, transitions, deletion);
@@ -90,16 +90,29 @@ showing the real endpoint or service denies the forbidden case.
 
 ## 4. Prove each test can fail
 
-- **`rules/` and `authz/`: test first.** Write the test, run it, and watch it fail *for the
-  right reason* (a wrong result, not an `ImportError`: create a stub that returns the wrong
-  answer if needed). Then implement until green. Record "red first" in the table.
-- **Everything else: sabotage check.** For each behavior in the table, make the smallest change
-  to the code that breaks it (invert a condition, remove the `log_change()` call, drop the
-  access-scoping filter, skip the version check, return early), run the related tests, and confirm at least
-  one fails. Restore the code and confirm with `git diff` that no sabotage remains (a leftover
-  would also fail `wl check`). Record what you broke and which test caught it.
+- **`rules/` and `authz/`: test first, by `spec-test-writer`.** The implementing session never
+  writes these tests, except a real endpoint's denial test the docs don't yet specify (below;
+  DL-32). Write interface stubs first (signatures and types, each returning one fixed
+  wrong answer, e.g. always deny), then invoke the `spec-test-writer` agent with the checkpoint ID,
+  the design-doc sections and tables to cover, the stub paths, the built modules it may read, and
+  the test files it may create or extend. It writes the tests from the docs without reading any app
+  code beyond the stubs and the built modules you list, and proves each fails against the stub's
+  answer or its opposite. Then implement until green. Its output (behavior table, files with their
+  `git hash-object`) goes in the review record's "Spec tests" section. If the implementation can't
+  pass a spec test, stop and ask the owner whether the doc or the test is wrong; list any change
+  they approve in the record. For `authz/`, the agent also writes the integration and API tests and
+  the test-only routers (DL-16); list the already-built modules it may read (the app factory, error
+  and auth helpers). It tests a real endpoint only when the docs specify it (method, path, error
+  responses): stub that route too (its schemas, calling the authorization stub) and list it. For
+  an endpoint the docs don't specify, write its denial test yourself once it's built, under the
+  sabotage check (DL-32). Tests you add on top for other code follow the rest of this skill.
+- **Everything else: sabotage check.** For each behavior in the table, make the smallest change to
+  the code that breaks it (invert a condition, remove the `log_change()` call, drop the
+  access-scoping filter, skip the version check, return early), run the related tests, and confirm
+  at least one fails. Restore the code and confirm with `git diff` that no sabotage remains (a
+  leftover would also fail `wl check`). Record what you broke and which test caught it.
 - **If nothing fails, the test is shallow.** Fix the test; don't move on.
-- **Mutation testing** (when enabled per `docs/testing-strategy.md`): no surviving mutants in
+- **Mutation testing** (`docs/testing-strategy.md`): no surviving mutants in
   `app/rules/` or `app/authz/`. Kill a survivor with a new or sharper test. Only a truly
   equivalent mutant (one that can't change behavior) may be marked `# pragma: no mutate`, with a
   comment explaining why.
@@ -193,6 +206,7 @@ field errors from a 422. Never assert on internal component state.
 
 - [ ] Behavior table complete, with denied rows and a source for each behavior.
 - [ ] Each behavior tested at the cheapest layer that catches it, plus wiring tests for rules.
-- [ ] "Proof it fails" filled in for every row (red first, sabotage, or killed mutant).
+- [ ] "Proof it fails" filled in for every row (spec test failing against the stub, sabotage,
+      or killed mutant).
 - [ ] No banned patterns.
 - [ ] `uv run wl check` green.

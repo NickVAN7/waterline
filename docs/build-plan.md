@@ -62,50 +62,107 @@ minutes. The next checkpoint starts only after the current one is approved.
 6. **Review record** (`docs/reviews/<ID>.md`, e.g. `S0-C1.md`): every reviewer pass with its
    verdict, findings, and the resolution of each, plus open questions and owner decisions.
 
-### Pull requests (owner decision, S0-C8)
-Checkpoints land on `main` in **groups**, one pull request per group; each slice's section lists
-its groups. The practice starts with Slice 1; Slice 0's checkpoints, S0-C8 included, were
-committed directly to `main` (S0-C8's CI was proven on a trial PR, #1, closed unmerged).
-- A group works on one branch from `main`, named `s<slice>-<group>` (e.g. `s1-foundations`).
-  Each checkpoint is still one commit, approved by the owner before the next begins.
-- After each checkpoint's commit, the branch is pushed; the group's first checkpoint opens the
-  PR as a draft. CI runs on every push and must be green before the checkpoint goes to the
-  owner. Only finished checkpoint commits are pushed, never work in progress.
-- **Pushed history is never rewritten** (owner decision, S0-C8): no amend, rebase, or force-push
-  of a pushed commit. A checkpoint whose pushed commit turns CI red is fixed with a follow-up
-  commit, `fix(<ID>): <what>`, before it goes to the owner; it is the only exception to one
-  commit per checkpoint.
-- When the owner approves the group's last checkpoint, and only on their say-so, the PR is
-  merged with **rebase and merge**, never squash, so `main` keeps one `checkpoint(<ID>):`
-  commit per checkpoint (the docs consistency tests read them). The branch is then deleted.
-- Changes made outside a checkpoint (e.g. `docs:` design changes) go through a PR too.
-- GitHub doesn't enforce this yet: branch protection needs a paid plan for a private
-  repository (TD-15). Until then, check CI by hand before merging (`gh pr checks`).
+### Pull requests
+Each slice works on **one branch and one draft pull request** (DL-9). Slice 0's checkpoints
+were committed directly to `main`; Slice 1's group 1 (S1-C1 to S1-C4) landed through its own
+PR (`s1-foundations`); the `s1` branch carries the rest of the slice, from S1-C5 (it starts
+with the workflow changes of DL-7 to DL-14).
+- **One branch per slice**, named `s<n>` (e.g. `s1`), from `main`. Each checkpoint is still one
+  commit.
+- **One draft PR per slice**, opened right after the branch's first push, so CI runs on every
+  push. The branch is pushed after every checkpoint commit, and CI must be green before the
+  checkpoint goes to the owner. Only finished commits are pushed, never work in progress.
+- **Groups** (each slice's section lists them) are review points and the boundaries where
+  design changes apply ("Design changes outside a checkpoint" below). They don't get their own
+  branch or PR.
+- **Design changes** from chat are `docs:` commits on the slice branch, in the slice's PR (the
+  `design-change` skill); tooling code in them is in `chore:` or `ci:` commits (DL-18).
+- **Pushed history is never rewritten:** no amend, rebase, or force-push of a pushed commit. A
+  checkpoint whose pushed commit turns CI red is fixed with a follow-up commit,
+  `fix(<ID>): <what>`, before it goes to the owner; it is the only exception to one commit per
+  checkpoint.
+- **Merge at the end of the slice only:** after the owner approves the slice's last checkpoint and
+  the slice retro's changes are applied on the branch with green CI (DL-19), and only on their
+  say-so, the PR is marked ready and merged with a **merge commit** (`gh pr merge --merge`; the
+  branch stays, since no branch can be deleted), never squash or rebase. Before asking, the session
+  checks the merge state and that every commit is linked to a GitHub account, since the ruleset
+  requires an extra approval otherwise (DL-33). A merge commit keeps every commit's hash, so the
+  base commits in the review records stay valid, and `main` keeps one `checkpoint(<ID>):` commit per
+  checkpoint in its history (the docs consistency tests read them).
+- **GitHub enforces it** (DL-27), with two rulesets and no bypass: on every branch, no
+  force-push or deletion; on `main`, changes only through a pull request with the `wl check`
+  status check green, merged with a merge commit. The git guard hook catches Claude's own
+  mistakes before they reach GitHub ("Claude configuration").
 
 ### Verification (three layers)
+**Nothing counts as verified because the session that did the work says so** (DL-11). A claim is
+verified only by a gate (`wl check`, CI), an independent agent, or the owner, and reports label
+each verification claim with who verified it (e.g. "sabotage-checked by checkpoint-reviewer").
+
 1. **Automated gates:** lint, types, all tests, coverage thresholds, import-linter contracts,
    migration checks. A checkpoint doesn't go to review until these pass.
 2. **Independent review:** a separate reviewer agent that did not write the code, with fresh
    context, reads the design docs and the checkpoint's changes and reports on design and
    convention conformance, bugs, tests that couldn't fail, and whether the docs match what was
-   built. Checkpoints touching authentication, authorization, routers, rendered markdown, or
-   GitHub code also get a security-focused reviewer. Every finding is fixed or logged in the
-   tech-debt log with a reason.
+   built. It also sabotage-checks two or three of the checkpoint's riskiest behaviors in a
+   temporary copy of the repository. Checkpoints touching authentication, authorization,
+   routers, rendered markdown, or GitHub code also get a security-focused reviewer, which runs
+   first (the two never run tests at the same time). Tests for `app/rules/` and `app/authz/`
+   are written from the docs by `spec-test-writer`, before the implementation, and protected
+   by recorded hashes. Every finding is fixed or logged in the tech-debt log with a reason.
 3. **Owner approval:** the review note, the reviewer's findings, and their resolution go to
-   the project owner, who signs off before the next checkpoint.
+   the project owner, who signs off before the next checkpoint. For a checkpoint with behavior
+   visible through the API or the UI, the report includes a short try-it-yourself script
+   against the running dev stack, with at least one step that should be denied; the owner's
+   run is the check.
+
+**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10)** (DL-10). A trial, not yet the
+rule; every other checkpoint keeps the full stop for approval.
+- **S1-C8 and S1-C9 auto-continue:** after its report, the session goes straight on to the next
+  checkpoint, without stopping for approval, only if **all** of these hold:
+  - `wl check` and CI are green;
+  - every reviewer that ran returned no findings, or only findings that were **fixed** (none
+    logged as tech debt, none rejected);
+  - there are no open questions, no `docs-consistency` Decisions, and no deviations from the
+    docs in the review note.
+
+  If any of them fails, the checkpoint stops as usual.
+- **S1-C10 is a full stop for the whole group:** its report covers S1-C8 to S1-C10, with links
+  to the three review records and the group's diff range, and the owner reviews all three.
+- **What counts as failure:** the trial fails if the owner finds at the group review anything
+  in S1-C8 or S1-C9 that should have stopped it (a defect, a scope miss, or doc drift the
+  reviewers didn't flag), or if a later checkpoint has to rework their output. The owner
+  records the verdict at the group review and again in the slice retro (S1-C17); either way it
+  gets a decision-log entry.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
 the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
-`CLAUDE.md` file, and `.claude/` file against the others.
+`CLAUDE.md` file, and `.claude/` file against the others. The slice's last checkpoint ends with
+a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
+skills and agents never triggered, and the verdict of any process trial. The owner decides what
+changes; each change gets a decision-log entry and is applied as a design change on the slice
+branch before the slice's PR is merged (DL-19).
 
-**Design changes outside a checkpoint** (e.g. applied from a chat session): run
-`docs-consistency` before committing, and bring its decisions to the owner.
+**Design changes outside a checkpoint** (decisions from a chat session, or code that must differ
+from the docs) go through the `design-change` skill (DL-8). They apply at group boundaries
+(mid-group only when the owner says one blocks the group), never in a commit with checkpoint
+work. Each decision gets a decision-log entry (`docs/decision-log.md`), every doc stating the
+old rule is updated, and `docs-consistency` runs (trigger `design-change`) before committing;
+its decisions go to the owner. A change to code already built becomes a new checkpoint,
+inserted with a letter suffix where it runs (`S1-C13a` between `S1-C13` and `S1-C14`);
+existing checkpoints are never renumbered. Developer-tooling and process code (hooks, the `wl`
+CLI, CI, the docs consistency tests) is built in the design change itself, as `chore:` or `ci:`
+commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
+(DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+and its review base becomes the design change's last commit (DL-20). Each checkpoint's review
+diffs from the last commit before its work started, so design changes stay out of it (DL-17).
 
 **Docs consistency tests** (`backend/tests/unit/docs/`, part of `wl check`) check the mechanical
 part on every run: models vs. schema doc (tables, columns, enum values), one feature-map owner
-per table, the tech-debt log's format, references, and deadlines, the developer guide's status
-line, design-doc § references, and the lists of agents and skills.
+per table, the tech-debt log's format, references, and deadlines, the decision log's format and
+references, the developer guide's status line, design-doc § references, and the lists of agents
+and skills.
 
 ### Claude configuration (in the repo)
 Everything lives in the repository, version-controlled and present on every workstation.
@@ -114,23 +171,34 @@ Everything lives in the repository, version-controlled and present on every work
   checkpoint process; the backend and frontend files list the conventions that are easy to break
   silently. When a review catches a mistake a rule would have prevented, the fix adds that rule.
 - **`checkpoint-reviewer` agent** (`.claude/agents/`): verification layer 2. A fresh-context
-  reviewer that reads the docs and the diff, never edits files, and reports findings in a fixed
-  format.
+  reviewer that reads the docs and the diff, sabotage-checks two or three behaviors in a
+  temporary copy (never the repository), compares spec tests with their recorded hashes, and
+  reports findings in a fixed format. It also reviews a design change's tooling code, under a
+  `DC-<YYYY-MM-DD>` review ID (DL-18).
+- **`spec-test-writer` agent** (`.claude/agents/`): writes the tests for new or changed code in
+  `app/rules/` and `app/authz/` from the design docs, before the implementation exists and without
+  reading it, at the start of every checkpoint that adds or changes such code, each area's policy
+  included (DL-15; Slice 1: S1-C7 to S1-C13). For `app/authz/` it also writes the integration and
+  API tests (404 for unseen entities, access scoping, module gating, the endpoint wiring) and the
+  test-only routers they need (DL-16), reaching a real endpoint only once the docs specify it
+  (method, path, error responses) and the main session has stubbed its route (otherwise the main
+  session writes that denial test, under the sabotage check, DL-32); under `backend/app/` it reads
+  only the stubs and the built modules the main session lists. The main session first writes
+  interface stubs (signatures and types, returning one fixed wrong answer), then invokes the agent,
+  then implements. Its file list, with each file's `git hash-object`, goes in the review record
+  ("Spec tests"); a spec test changes only with the owner's approval.
 - **`checkpoint` skill** (`.claude/skills/checkpoint/`): the close-out procedure every
   checkpoint ends with:
   - a scope check, then `wl check`;
   - docs and tech-debt updates;
-  - the reviewers: `checkpoint-reviewer` every time, `security-reviewer` when the slice's
-    section names the checkpoint for it or the diff touches security-relevant code, and at the
-    end of a slice `fresh-clone-verifier`, plus `docs-consistency` after `checkpoint-reviewer`;
+  - the reviewers, one at a time: `security-reviewer` when the slice's section names the
+    checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
+    every time, and at the end of a slice `fresh-clone-verifier` and `docs-consistency`;
   - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
-  - one commit with the review note;
-  - the list of changed docs and Claude files for the owner to upload to the Project, copied
-    into the owner's `waterline-project-upload` folder on their desktop, outside the
-    repository (Claude never writes to the Project);
-  - stopping for approval.
+  - one commit with the review note, pushed to the slice branch;
+  - the report, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
-  alongside `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
+  before `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
   when a checkpoint touches auth, sessions, authorization, routers, rendered markdown, or
   GitHub code.
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
@@ -140,25 +208,54 @@ Everything lives in the repository, version-controlled and present on every work
   `CLAUDE.md` files, and `.claude/` against each other (contradictions, superseded rules, stale
   status, broken references, gaps). It reports clear-cut **fixes** (citing the recorded
   decision) and **decisions** for the owner, and never edits files. Runs at the last checkpoint
-  of each slice and after any design change applied outside a checkpoint.
+  of each slice and in every design change (the `design-change` skill).
 - **`test-writer` skill** (`.claude/skills/test-writer/`): the procedure for every test —
   behavior table from the docs, layer choice, assertions that can fail, banned patterns, and
   proof that each test fails (test-first, sabotage check, mutation testing).
 - **`migration` skill** (`.claude/skills/migration/`): schema changes — model changes, Alembic
   generation, hand review of what autogenerate misses, downgrade, constraint tests, schema-doc
   sync.
+- **`design-change` skill** (`.claude/skills/design-change/`): applying a design change outside
+  a checkpoint's scope ("Design changes outside a checkpoint" above): timing, checking the
+  repository, parking a checkpoint in progress (DL-20), classifying each decision (docs only,
+  future checkpoints, a new inserted checkpoint for built product code, or developer-tooling
+  code built in the change and reviewed by `checkpoint-reviewer`, DL-18), the decision-log
+  entries, every affected doc, `docs-consistency`, and the report.
 - **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
   verified and corrected against the hand-built `project` area at the start of Slice 2.
 - **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
-  generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`) and committed
-  migrations; format each file after Claude edits it (ruff for the backend, Prettier for the
-  frontend).
+  generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`), committed migrations,
+  `.pre-commit-config.yaml` (the owner's to edit, DL-30), and git's own files (anything in `.git/`,
+  `~/.gitconfig`, `.config/git/`; DL-31);
+  format each file after Claude edits it (ruff for the backend, Prettier for the frontend); and the
+  **git guard** (`guard_git.py`), an allow-list (DL-26): a call that involves git or gh must be one
+  command in a listed form, so Claude never commits or merges on `main` (DL-21), pushes to `main`
+  (DL-22), rewrites pushed history (DL-23), or skips hooks (DL-24), and merging a pull request or
+  writing through the GitHub API asks the owner (DL-25). Anything else that involves git or gh is
+  blocked, and the owner runs it. Every allowed git form is verified against real git by its tests
+  (the gh forms against the guard only). It's a guard against mistakes, not a security boundary:
+  branch protection (DL-27, the GitHub rulesets) is the real control. The hooks are linted with the
+  developer CLI's ruff; the guard and `protect_files.py` are also type-checked (pyright strict) and
+  tested under its 100% coverage gate.
+
+### Workflow items scheduled
+Workflow items decided but not built yet, each built through the `design-change` skill or the
+named checkpoint when its trigger arrives.
+
+| Trigger | Item |
+|---|---|
+| After S1-C7 is approved (end of the `s1-auth` group) | The owner decides whether to pull sign-in and the app shell (part of S1-C14) forward, so a real screen uses the API conventions sooner |
+| Before S1-C14 | A short UI design guide (`frontend/CLAUDE.md` or a new doc; decided then); demo seed data (`wl seed --demo`), added right before the checkpoint; the `ui-reviewer` agent (read-only: accessibility and frontend conventions axe can't catch, run on S1-C14 to S1-C16) |
+| After S1-C14 | The `vue-screen` skill, distilled from S1-C14's hand-built screens |
+| S1-C17 | The `user-guide-verifier` agent (follows `docs/user-guide.md` literally in a browser against a seeded stack, and walks the "Done when" list) |
+| Start of Slice 2 planning | A slice-planning procedure: the format used for Slice 1's plan (fixes, decisions, conventions), plus a short threat-model pass |
+| Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
 
 ### Where the work happens
-Code is written and run on the owner's workstation(s) in the `waterline` repository (the
-working name is decided, design-doc §1), which is pushed to GitHub. Workstations need Git,
-Docker, uv, and Node 22 (verified by `wl doctor`), and the GitHub CLI (`gh`, signed in) for the
+Code is written and run on the owner's workstation(s) in the `waterline` repository (the working
+name is decided, design-doc §1), which is pushed to GitHub. Workstations need Git, Docker, uv 0.12
+or later, and Node 22 (verified by `wl doctor`), and the GitHub CLI (`gh`, signed in) for the
 pull-request workflow (not checked by `wl doctor`).
 
 ---
@@ -172,7 +269,7 @@ Choices the design docs left open.
 | 1 | **Plain SQLAlchemy 2.x (2.0-style typed ORM), not SQLModel.** The conventions lean on SQLAlchemy-native features (`version_id_col`, `with_loader_criteria`, `Enum(native_enum=False)`, direct `UPDATE`s that bypass versioning); SQLModel adds a layer over exactly those. API shapes are separate Pydantic models. | Confirmed |
 | 2 | **Async throughout:** SQLAlchemy 2.x asyncio (`AsyncSession`) with the psycopg 3 async driver, `async def` endpoints, services, and repositories. Chosen over sync because the team is comfortable with async and it avoids a later migration if streaming (v2 AI) or live updates arrive. Rules in "Async rules" below. | Confirmed |
 | 3 | **Typed API client generated from the backend's OpenAPI schema:** `openapi-typescript` (generates TypeScript types) + `openapi-fetch` (typed fetch client). CI fails if the generated client is stale. | Confirmed |
-| 4 | **Organizations are created by system admins and workspace owners/admins** (design-doc §5, "Workspace roles"); the creator assigns the org's first owner. Workspaces are created only by the seed CLI in v1. | Confirmed (revised with the workspace tenancy model) |
+| 4 | **Organizations are created by system admins and workspace owners/admins** (design-doc §5, "Workspace roles"); the creator assigns the org's first owner. Workspaces are created only by the seed CLI in v1. | Confirmed (DL-2) |
 | 5 | **Monorepo** with `backend/`, `frontend/`, and `docs/` at the root, laid out as in "Repository layout" below. | Confirmed |
 | 6 | **Python 3.14** (built-in `uuid.uuid7()`); fallback to 3.13, then 3.12, with the `uuid-utils` package for UUIDv7 if a dependency lags. | Confirmed |
 | 7 | **Layered backend** (routers → services → repositories → models), organized layer-first, as in "Backend architecture" below. Includes a repository layer (the app is database-operation-heavy); SQLAlchemy models serve as the domain entities (no separate domain layer). | Confirmed |
@@ -195,14 +292,14 @@ slices only add features.
 
 | # | Checkpoint | Includes |
 |---|---|---|
-| 1 | Foundation & guardrails | Repo root, `docs/` (design, schema, build plan, testing strategy, empty developer/user guides, tech-debt log), `CLAUDE.md` files (root, backend, frontend), `checkpoint-reviewer` agent and `checkpoint` skill in `.claude/` (from the Project's `repo-seed/` drafts), uv project and Python version check, ruff/pyright, pre-commit hooks, FastAPI skeleton with `/api/health`, layer folders, import-linter contracts (enforced from the start), developer CLI (`waterline` / `wl`) with its first commands and `doctor`, workstation toolchain check |
+| 1 | Foundation & guardrails | Repo root, `docs/` (design, schema, build plan, testing strategy, empty developer/user guides, tech-debt log), `CLAUDE.md` files (root, backend, frontend), `checkpoint-reviewer` agent and `checkpoint` skill in `.claude/`, uv project and Python version check, ruff/pyright, pre-commit hooks, FastAPI skeleton with `/api/health`, layer folders, import-linter contracts (enforced from the start), developer CLI (`waterline` / `wl`) with its first commands and `doctor`, workstation toolchain check |
 | 2 | Database core & test harness | `docker-compose.yml` with the `postgres` service only (dev and test databases, named volume, `.env.example`), `wl up`/`wl down`, Async engine and session, per-request transaction dependency, base model (UUIDv7, timestamps), constraint naming convention, Alembic (async), pytest + anyio harness with savepoint rollback, polyfactory with fixed seed, `/api/health` checks the database, API docs setting (on in dev/test, off in production) |
 | 3 | procrastinate spike | Decision point: can jobs be queued inside the request's `AsyncSession` transaction? Result and consequences written into the design doc |
 | 4 | Background jobs | procrastinate app and schema, `jobs/enqueue.py`, worker entry point, a test job processed end to end; shaped by Checkpoint 3 (design-doc §13, "Transactional enqueue": enqueue on the caller's session, by task name) |
 | 5 | Model conventions | Enum helper, soft delete, optimistic locking (409), direct-update helper, explicit loading (`lazy="raise"`), each with its tests; migration round-trip and drift checks |
 | 6 | API conventions & security helpers | Error format and handlers (404/403/409/422; the health check's 503 switches to this format too; 409 only for version conflicts, while a save to a row that's gone, e.g. hard-deleted meanwhile, is 404: always for a non-versioned entity, and, after a check, for a versioned one deleted or soft-deleted since it was loaded), `direct_update` leaves `updated_at` alone for rank writes (TD-7), password hashing off the event loop, token generation and hashing helpers |
 | 7 | Compose & frontend shell | Rest of Docker Compose (migrate, api, worker, web; postgres exists since Checkpoint 2), Vite proxy, Vue shell (router, layout, Pinia, 404), OpenAPI export and generated `openapi-fetch` client, health page, Vitest set up |
-| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests); the pull-request workflow ("Pull requests" above; branch protection deferred, TD-15), fresh-clone setup by following the developer guide, slice wrap-up |
+| 8 | CI & slice verification | GitHub Actions workflow (all gates, coverage thresholds, client freshness; checkout with full history, `fetch-depth: 0`, for the docs consistency tests); the pull-request workflow ("Pull requests" above; branch protection deferred at the time, TD-15, and since enforced by GitHub rulesets, DL-27), fresh-clone setup by following the developer guide, slice wrap-up |
 
 The sections below describe the content; the table above is the order of work.
 
@@ -263,15 +360,18 @@ The sections below describe the content; the table above is the order of work.
 │                                 each have their own CLAUDE.md too)
 ├── .claude/
 │   ├── settings.json                   hooks configuration
-│   ├── hooks/                          protect_files.py, format_file.py
+│   ├── hooks/                          protect_files.py, format_file.py, guard_git.py
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
-│   │                                   fresh-clone-verifier.md, docs-consistency.md
-│   └── skills/                         checkpoint/, test-writer/, migration/, new-area/
+│   │                                   fresh-clone-verifier.md, docs-consistency.md,
+│   │                                   spec-test-writer.md
+│   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
+│                                       design-change/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
-│                                 tech-debt.md, screen-inventory.md, reviews/ (one record per
-│                                 checkpoint), spikes/ (spike code kept as evidence)
-│                                 (source of truth; the owner uploads changed files to the Project)
+│                                 tech-debt.md, decision-log.md, screen-inventory.md, reviews/
+│                                 (one record per checkpoint, and per design-change tooling
+│                                 review, DC-<date>.md), spikes/ (spike code kept as evidence);
+│                                 the source of truth (DL-14)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
 ├── docker/postgres/initdb/       first-start scripts for postgres (creates the test database)
@@ -311,10 +411,12 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
   | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
   | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
-  | Cross-cutting | `wl gen-client`, `wl doctor` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version) |
+  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29) |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
-  on any surviving mutant; `wl check` includes it.
+  on any surviving mutant; `wl check` includes it. `wl audit` (DL-13) fails on any known
+  vulnerability in either Python lockfile or the npm lockfile (dev dependencies included), and
+  on any secret in the git history; it needs the network, and `wl check` includes it.
 
 - **Rules:**
   1. **Thin orchestrator only:** each command runs existing tools (docker compose, uv, npm,
@@ -643,7 +745,13 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 - **Migration checks:** `alembic upgrade head` on an empty database, then autogenerate reports
   no drift.
 - GitHub Actions: lint, type check, API tests, web tests, migration checks, generated-client
-  freshness.
+  freshness, and the supply-chain audit (`wl audit`: dependency advisories and secrets).
+- **Supply-chain policy** (DL-13): any known vulnerability fails. An advisory is ignored only
+  through an entry in `audit-allowlist.toml` naming it and the reason, with a matching open
+  tech-debt entry whose Fix by is the deadline (the docs consistency tests check both). A red
+  audit is fixed before any checkpoint starts, with a `chore(deps):` commit on the slice
+  branch. Secrets are scanned by gitleaks: staged changes in a pre-commit hook, the whole
+  history in `wl audit`; the version is pinned in `.pre-commit-config.yaml`.
 
 ### Web shell
 - App layout (header, nav area, content), router with a 404 page, API client wrapper
@@ -689,38 +797,40 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
 | 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL |
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
-| 7 | Authorization core | Action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions` (per-org actions come in Checkpoint 11); the full matrix (including personal actions) and fail-closed tests |
+| 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions` (per-org actions come in Checkpoint 11); the full matrix (including personal actions) and fail-closed tests |
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners; live slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`: owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
 | 11 | Projects | Create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin, a separate action `project.assign_first_admin` in the org's `allowed_actions`, carried on each org entry in `/me`; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
 | 12 | Project members | List (per-row `allowed_actions`); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its three cases (design-doc §4; an existing member found by email is a 422 on `email`, `already_member`); change role; remove (removing the lead's membership clears `lead_id`, recorded in the `project_member_removed` details, also in archived projects through removal with their projects); the per-project access review (design-doc §5); registers the `on_member_removed` handler with the org and workspace services, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
-| 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first and mutation-tested; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
+| 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first (`spec-test-writer`, against stubs) and mutation-tested, with the `authz/` changes' tests from `spec-test-writer` too; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
 | 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; My work as the home page, with its projects section (design-doc §11); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
 | 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners); the per-person access review; org settings; org members page (email-first add-person form with a generated temporary password shown once, role changes, account actions, the D2 removal dialog) |
 | 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, description, module selection with guidance, and a first-admin picker shown only when the org's entry in `/me` includes `project.assign_first_admin`); project settings (description, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged); the per-project access review; classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
-| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision) |
+| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
 
-**Pull requests** ("Development process"): five groups, each one PR.
+**Groups** ("Pull requests"): five review points. Group 1 landed as its own PR
+(`s1-foundations`); from Checkpoint 5 the slice works on the `s1` branch, with one PR for the
+rest of the slice.
 
-| PR | Branch | Checkpoints |
+| Group | Name | Checkpoints |
 |---|---|---|
 | 1 | `s1-foundations` | 1–4 (models, numbering, pure rules, API conventions) |
 | 2 | `s1-auth` | 5–7 (sessions, passwords and CLI, authorization core) |
-| 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions) |
+| 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
 | 4 | `s1-projects` | 11–13 (projects, project members, classification) |
 | 5 | `s1-web` | 14–17 (web screens and slice verification) |
+
+Checkpoints 7 to 13 add or change `app/authz/` code (the authorization core, then each area's
+policy) or `app/rules/` code, so each starts with `spec-test-writer` (DL-15).
 
 Checkpoints touching authentication, sessions, authorization, or routers get the
 `security-reviewer` as well: every checkpoint from 1 to 16. The `checkpoint` skill runs it for
 every checkpoint this paragraph names, and also whenever a diff touches security-relevant code.
 The sections below describe the content; the table above is the order of work. The decisions
-behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/S1-plan.md`. That record
-predates Checkpoint 13 (Classification & export control, added Oct 5, 2026): its Checkpoints
-13–16 are now 14–17. Its D4 ("no email-change feature in v1"; a manual database edit) and the
-Checkpoint 1 developer-guide note on changing email by hand are superseded by the journey
-decisions (Oct 6–7, 2026): admins change a user's email in Checkpoint 10 (design-doc §4), so
-Checkpoint 1 adds no manual-edit how-to.
+behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/S1-plan.md`; its
+Checkpoints 13–16 are this table's 14–17 (DL-3). Admins change a user's email in Checkpoint 10
+(design-doc §4; DL-6 supersedes the record's D4).
 
 ### Migration (Checkpoint 1)
 Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, `membership`,
@@ -922,7 +1032,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
 ### Classification & export control (§3.1; Checkpoint 13)
 - `rules/classification.py`: effective classification (the stricter level, the union of
-  categories) and the raise and lower rules, test-first and mutation-tested.
+  categories) and the raise and lower rules, test-first (`spec-test-writer`) and
+  mutation-tested.
 - Setting a project's level and categories, at creation (recorded in `project_created`) or
   in settings: project admins (including inherited) set and raise; lowering or removing a
   category is project-admin only; removing `export_controlled`, and on an export-controlled
@@ -1046,10 +1157,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
 What's decided so far. This is not the slice's plan, which is written when Slice 2 is next.
 
-- **Rank moves to Slice 2.** Requirements are ordered by `rank` among siblings, so the rank
-  helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual
-  ordering") and its Hypothesis tests come with the requirement tree. Slice 3 keeps rank for
-  tasks, the backlog, and the board.
+- **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the
+  rank helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual
+  ordering") and its Hypothesis tests come with the requirement tree. Slice 3 keeps rank for tasks,
+  the backlog, and the board.
 - **The requirement delete dialog grows by slice** (design-doc §9):
   - Slice 2: child requirements (promote or delete), and cancelling a pending approval request;
   - Slice 3: linked tasks;

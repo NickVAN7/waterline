@@ -136,18 +136,23 @@ def frontend_check() -> list[Step]:
     ]
 
 
+# The Claude Code hooks are linted and formatted with the CLI (guard_git.py and protect_files.py
+# are also type-checked and tested with it; tools/cli/pyproject.toml).
+HOOKS = "../../.claude/hooks"
+
+
 def cli_lint() -> list[Step]:
     return [
-        step("uv", "run", "ruff", "check", ".", cwd=CLI),
-        step("uv", "run", "ruff", "format", "--check", ".", cwd=CLI),
+        step("uv", "run", "ruff", "check", ".", HOOKS, cwd=CLI),
+        step("uv", "run", "ruff", "format", "--check", ".", HOOKS, cwd=CLI),
         step("uv", "run", "pyright", cwd=CLI),
     ]
 
 
 def cli_fmt() -> list[Step]:
     return [
-        step("uv", "run", "ruff", "format", ".", cwd=CLI),
-        step("uv", "run", "ruff", "check", "--fix", ".", cwd=CLI),
+        step("uv", "run", "ruff", "format", ".", HOOKS, cwd=CLI),
+        step("uv", "run", "ruff", "check", "--fix", ".", HOOKS, cwd=CLI),
     ]
 
 
@@ -157,3 +162,28 @@ def cli_test() -> list[Step]:
 
 def cli_check() -> list[Step]:
     return [step("uv", "lock", "--check"), *cli_lint(), *cli_test()]
+
+
+def audit(uv_ignores: Sequence[str] = ()) -> list[Step]:
+    """Supply-chain gates (DL-13): known vulnerabilities in both Python lockfiles and the npm
+    lockfile, dev dependencies included, and secrets anywhere in the git history. Needs the
+    network. `uv_ignores` are the allowlisted Python advisories (`--ignore <id>` pairs); the npm
+    gate reads the allowlist itself (waterline_cli/audit.py)."""
+    uv_audit = ("uv", "audit", "--frozen", "--preview-features", "audit-command", *uv_ignores)
+    helper = ("uv", "run", "python", "-m", "waterline_cli.audit")
+    return [
+        step(*helper, "network"),
+        step(*uv_audit),
+        step(*uv_audit, cwd=BACKEND),
+        step(*helper, "npm"),
+        step(
+            "uv",
+            "run",
+            "pre-commit",
+            "run",
+            "gitleaks-history",
+            "--hook-stage",
+            "manual",
+            "--all-files",
+        ),
+    ]

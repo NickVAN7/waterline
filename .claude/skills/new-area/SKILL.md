@@ -67,7 +67,8 @@ Follow the `migration` skill.
 - Register every action explicitly in the policy, marked content or management (design-doc
   §3.1, §5), and marked personal where the right comes from the user's relationship to the item
   (e.g. `approval.decide`); unknown actions are denied.
-- **Test first** (`test-writer` skill): the full action × role matrix from the design doc,
+- **Test first**, written by the `spec-test-writer` agent against your stubs (`test-writer`
+  skill, section 4): the full action × role matrix from the design doc,
   across project, org, and workspace roles (including inherited project admin), users with no
   access, and system admins, allowed and denied rows, and the targeted rules (reporter,
   assignee, reviewer, approval-state conditions); personal-action rows (every admin level

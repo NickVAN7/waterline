@@ -100,7 +100,7 @@ def test_healthy_toolchain_has_no_failures() -> None:
             "Docker Compose",
             "1.29.2 (need ≥ 2.20)",
         ),
-        ("uv --version", Probe(0, "uv 0.4.0"), "uv", "0.4.0 (need ≥ 0.8)"),
+        ("uv --version", Probe(0, "uv 0.11.9"), "uv", "0.11.9 (need ≥ 0.12)"),
         ("uv python find 3.14", Probe(2, "not found"), "Python 3.14", "not found by uv"),
         ("uv python find 3.14", Probe(None), "Python 3.14", "uv not installed"),
         ("node --version", Probe(0, "v20.11.0"), "Node", "20.11.0 (need 22.x, ≥ 22.18)"),

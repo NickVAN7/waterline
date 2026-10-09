@@ -5,12 +5,12 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
 > **Status:** S1-C4 (API conventions) done, closing the `s1-foundations` group; next is S1-C5
-> (Sessions & sign-in), on the `s1-auth` branch. The tenancy, project, and audit tables exist
-> (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
-> the domain enums in `app/enums.py`, get-by-ID in the base repository, and
-> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure
-> rules (identifiers, password policy, account rank) are in `app/rules/`, held to 100% coverage
-> and mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
+> (Sessions & sign-in), on the `s1` branch (one branch and PR for the rest of Slice 1). The tenancy,
+> project, and audit tables exist (models, migrations, constraint tests, a factory per model;
+> `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the base
+> repository, and `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`).
+> The pure rules (identifiers, password policy, account rank) are in `app/rules/`, held to 100%
+> coverage and mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
 > (`app/core/lists.py`), constraint errors as field errors (`app/core/constraint_errors.py`), and
 > `log_admin_event()`. The backend has its database core (Postgres, async SQLAlchemy, Alembic, the
 > base model and its mixins), a test harness with a `concurrency` fixture, background jobs on
@@ -29,7 +29,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 |---|---|---|
 | Git | ≥ 2.31 | Source control |
 | Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.20, daemon running | The local stack: Postgres, the API, the worker, and the web dev server |
-| uv | ≥ 0.8 | Python versions, dependencies, and running everything |
+| uv | ≥ 0.12 | Python versions, dependencies, and running everything; `uv audit` (`wl audit`) |
 | Python | 3.14 | The backend (`uv` installs it: `uv python install 3.14`) |
 | Node | 22.x, ≥ 22.18 (with npm) | The frontend's tools (tests, lint, types, client generation) run on the host |
 | GitHub CLI (`gh`) | any recent, signed in (`gh auth login`) | The pull-request workflow (section 10): opening PRs and checking CI. Not checked by `wl doctor` |
@@ -72,15 +72,17 @@ failing) if the pre-commit hooks aren't installed.
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
 docs/           design, schema, build plan, testing strategy, screen inventory, these guides,
-                tech-debt log, reviews/ (one record per checkpoint), spikes/
+                tech-debt log, decision log, reviews/ (one record per checkpoint, and per
+                design-change tooling review, DC-<date>.md), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
 .github/workflows/ci.yml   CI: `wl check` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
-.claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area), agents
-                (checkpoint-reviewer, security-reviewer, fresh-clone-verifier, docs-consistency),
+.claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
+                design-change), agents (checkpoint-reviewer, security-reviewer,
+                fresh-clone-verifier, docs-consistency, spec-test-writer),
                 hooks (see section 11)
 ```
 
@@ -99,10 +101,12 @@ underlying commands instead of running them, and stops at the first failing step
 | Command | Does |
 |---|---|
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
-| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI |
-| `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc |
+| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI — and then `wl audit` |
+| `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
+| `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
+| `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
 | `wl test` | All tests with coverage gates |
-| `wl fmt` | ruff format and safe ruff fixes; Prettier and safe ESLint fixes |
+| `wl fmt` | ruff format and safe ruff fixes (backend, CLI, and `.claude/hooks/`); Prettier and safe ESLint fixes |
 | `wl backend check\|lint\|test\|fmt` | The same, backend only |
 | `wl backend mutate` | Mutation testing (mutmut) over `app/rules/` and `app/authz/`, from a clean slate; fails on any mutant not killed (section 9) |
 | `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate |
@@ -122,6 +126,26 @@ The CLI is a **thin orchestrator**: the real tool configuration is in each proje
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
 both coverage gates included (the 100% gate on `app/authz/` and `app/rules/` is a pytest hook in
 `backend/tests/conftest.py`).
+
+**Supply-chain audit.** `wl audit` first checks that it can reach the advisory databases and
+fails with a clear message if it can't; there's no switch to skip it. Then:
+
+- **Python:** `uv audit --frozen` in the root and in `backend/` (all groups, dev included; the
+  command is experimental in uv, hence `--preview-features audit-command`).
+- **npm:** `python -m waterline_cli.audit npm` runs `npm audit --json` in `frontend/` and fails
+  on any advisory the allowlist doesn't name (npm has no ignore option).
+- **Secrets:** the manual-stage pre-commit hook `gitleaks-history` scans every commit. The
+  `gitleaks` pre-commit hook scans staged changes on every commit. Both use the gitleaks
+  version pinned in `.pre-commit-config.yaml`; pre-commit builds it the first time (installing
+  Go for that if needed, so the first run needs the network and takes a little longer).
+
+Policy: any known vulnerability fails. To ignore an advisory (only when it can't be fixed yet),
+add an entry to `audit-allowlist.toml` (`[[python]]` or `[[npm]]`, with `id`, `reason`, and
+`tech_debt`) and the matching tech-debt entry, whose Fix by is the deadline; the docs
+consistency tests fail if the entry isn't open or its Fix by has passed. Remove both once the
+fix lands. A red audit is fixed before any checkpoint starts, with a `chore(deps):` commit on
+the slice branch. A real secret is rotated at once (pushed history is never rewritten); a false
+positive goes in `.gitleaksignore` (its fingerprint) with the owner's approval.
 
 **Adding a command:** add a function returning its steps to `tools/cli/src/waterline_cli/steps.py`,
 a Typer command in `main.py` that calls `run_steps(..., dry_run=dry_run)`, and a dry-run case in
@@ -639,17 +663,26 @@ value the test depends on explicitly.
 - A primary-key column that isn't a foreign key (e.g. `project_counter.prefix`) is only set if
   the factory sets `__set_primary_key__ = True`.
 
-**Rules** (`app/rules/`, pure: no database) are written **test-first**: the test from the
-design doc's rule or table, run red for the right reason (against a stub returning the wrong
-answer, not an `ImportError`), then the code. So far: `identifiers.py` (project keys, slugs and
-the reserved top-level routes in `RESERVED_SLUGS`, usernames; each check returns an
-`IdentifierProblem` for the field error), `password_policy.py` (`password_problems(...)`; the
-caller checks the hash and passes `same_as_current`), and `account_rank.py`
-(`can_manage_account(actor, target)`, from both users' memberships). `app/rules/` and
-`app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
+**Rules** (`app/rules/`, pure: no database) are written **test-first**, and so is `app/authz/`:
+write interface stubs (signatures and types, returning one fixed wrong answer), invoke the
+`spec-test-writer` agent, which writes the tests from the design doc's rules and tables without
+reading the implementation and proves each fails against the stub, then implement until they pass.
+For `app/authz/` it also writes the integration and API tests and their test-only routers in
+`tests/support/`; tell it which built modules it may read (the app factory, `app/core/errors.py`,
+the auth dependencies), never the ones being implemented. It tests a real endpoint only when the
+docs specify it (method, path, error responses) and you've stubbed its route; for any other
+endpoint, write the denial test yourself once it's built, under the sabotage check (DL-32). Its
+files and their `git hash-object` go in the review record ("Spec tests"); a spec test changes only
+with the owner's approval. The rules built so far predate `spec-test-writer` (DL-11): their tests
+were written test-first in S1-C3 by the implementing session, and aren't hash-protected spec tests.
+So far: `identifiers.py` (project keys, slugs and the reserved top-level routes in `RESERVED_SLUGS`,
+usernames; each check returns an `IdentifierProblem` for the field error), `password_policy.py`
+(`password_problems(...)`; the caller checks the hash and passes `same_as_current`), and
+`account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships). `app/rules/`
+and `app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
 plain `uv run pytest` fails below it. A `match` that covers every type of its subject (pyright
-checks: the function's return type would otherwise allow `None`) marks its last `case` with
-`# pragma: no branch`, since that case can't fail to match.
+checks: the function's return type would otherwise allow `None`) marks its last `case` with `#
+pragma: no branch`, since that case can't fail to match.
 
 **Property tests** (Hypothesis) cover rules with a large input space: generate inputs, check an
 invariant against an independent oracle (e.g. "accepted exactly when 3-6 uppercase letters or
@@ -728,7 +761,9 @@ afterwards (see `tests/integration/test_migrations.py`).
   `--dry-run`, dry-run output matches the expected commands, and the doctor checks are tested
   with fake probes. The CLI is held to **100% line + branch coverage** (in
   `tools/cli/pyproject.toml`), so a test that claims to cover an error path but never reaches
-  it fails the gate.
+  it fails the gate. The Claude Code hooks `guard_git.py` and `protect_files.py` are tested
+  here too (`tools/cli/tests/hooks/`, importing them from `.claude/hooks/` through pytest's
+  `pythonpath`), under the same gate and pyright's strict mode.
 
 **Docs consistency tests** (`tests/unit/docs/test_docs_consistency.py`, parsers in
 `tests/support/docs.py`) read the docs, `.claude/`, `Base.metadata`, and `git log`; no
@@ -740,7 +775,9 @@ database. They check:
 | Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table. The column check runs per column (`table.column`). A documented column whose Notes cell starts with `Added in Slice <n>.` is **skipped** (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished (its last checkpoint, or a later slice's, has a `checkpoint(<ID>):` commit), and required from then on; a malformed marker is a `DocsStructureError`. A model column with no documented row always fails |
 | One owner per table | a schema-doc table isn't in exactly one "Owns (tables)" cell of the build plan's feature map, or the map names a table schema-doc lacks |
 | Tech-debt log | an entry lacks Added/What/Why/Fix by/Status, numbers aren't 1..n, a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
-| Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it |
+| Decision log | an entry lacks Date/Decision/Supersedes/Superseded by/Applies to/Source, numbers aren't 1..n, a Superseded by is neither `none` nor another entry (`DL-<n>`), or a `DL-<n>` reference (same files as TD references) has no entry |
+| Audit allowlist | an `audit-allowlist.toml` entry names a tech-debt entry that doesn't exist or is resolved |
+| Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
 | § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` always means a design-doc section, so refer to this guide's sections as "section N" |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
 
@@ -755,15 +792,23 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
 
 - Work proceeds one **checkpoint** at a time (`build-plan.md`), one commit per checkpoint,
   closed out with the `checkpoint` skill.
-- **Pull requests:** checkpoints land on `main` in groups, one PR per group (build plan, "Pull
-  requests"; each slice's section lists its groups). A group works on its own branch
-  (`s1-foundations`, …); push after every checkpoint commit (the group's first checkpoint opens
-  the PR as a draft), and once the owner approves the group's last checkpoint, merge with
-  **rebase and merge**, never squash: `main` keeps one `checkpoint(<ID>):` commit per
-  checkpoint, which the docs consistency tests read. Pushed commits are never rewritten (no
-  amend or force-push): red CI on a pushed checkpoint is fixed with a `fix(<ID>): …` commit.
-  `main` isn't protected yet (TD-15), so check CI before merging: `gh pr checks <number>`.
-  The practice starts with Slice 1.
+- **Pull requests:** each slice works on one branch, `s<n>` (e.g. `s1`), with one draft PR
+  opened at the branch's first push (build plan, "Pull requests"). Push after every checkpoint
+  commit, so CI runs on each; only finished commits are pushed. Groups (each slice's section
+  lists them) are review points, not branches. Design changes from chat are `docs:` commits on
+  the slice branch (tooling code in `chore:` or `ci:` commits, reviewed by `checkpoint-reviewer`;
+  DL-18). Pushed commits are never rewritten (no amend, rebase, or force-push): red
+  CI on a pushed checkpoint is fixed with a `fix(<ID>): …` commit. At the end of the slice,
+  once the owner approves its last checkpoint, the slice retro's changes are applied on the
+  branch with green CI (DL-19), and the owner says so, mark the PR ready and merge it with
+  a **merge commit**: `gh pr merge --merge`, never squash or rebase (the branch stays: no
+  branch can be deleted). Claude first checks the merge state and that every commit is linked
+  to a GitHub account: a commit GitHub can't attribute needs an extra approval, which you can't
+  give on your own PR (DL-33). A merge commit keeps every commit's hash (so review records' base
+  commits stay valid), and `main` keeps one `checkpoint(<ID>):` commit per checkpoint in its
+  history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
+  branch, no force-push or deletion; on `main`, changes only through a pull request with the
+  `wl check` status check green, merged with a merge commit.
 - **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check` on every push to
   `main` and every pull request, so a green `wl check` locally means a green run there. It
   checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the
@@ -771,8 +816,11 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   `postgres:18` service container; the test database is created by the same init script as in
   Compose (`docker/postgres/initdb/`). There's no `.env` in CI: the workflow sets the
   `POSTGRES_*` variables. A new tool the checks need goes into the workflow's setup steps and
-  the developer guide's prerequisites together.
-- The pre-commit hooks run ruff (lint with safe fixes, and format) on the backend and CLI;
+  the developer guide's prerequisites together. `wl check` includes `wl audit`, so CI also
+  scans the dependencies and the git history for every push; it needs the network, which the
+  runners have.
+- The pre-commit hooks run gitleaks on the staged changes (secrets); ruff (lint with safe
+  fixes, and format) on the backend and CLI;
   Prettier and ESLint (safe fixes) on the frontend (they need `frontend/node_modules`); a check
   that `backend/openapi.json` and `frontend/src/api/schema.d.ts` match what `wl gen-client`
   would produce, so a generated file can't be hand-edited or left stale; and
@@ -784,21 +832,95 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
 
 The repository's Claude Code setup lives in `.claude/` and is version-controlled.
 
-- **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`.
+- **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
+  `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`, `docs-consistency`.
-- **When the agents run:** `checkpoint-reviewer` at every checkpoint, `security-reviewer` when
-  the build plan names the checkpoint for it or it touches security-relevant code,
-  `fresh-clone-verifier` and `docs-consistency` at the last checkpoint of a slice (all through
-  the `checkpoint` skill). `docs-consistency` also runs on its own after a design change applied
-  outside a checkpoint, before committing. It is read-only: it reports clear-cut fixes (citing
-  the recorded decision) and decisions for the owner, which are never decided for them.
+  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`.
+- **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
+  changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
+  at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
+  security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
+  two or three behaviors in a temporary copy, and reviews a design change's tooling code under
+  a `DC-<YYYY-MM-DD>` review ID), and `fresh-clone-verifier` and
+  `docs-consistency` at the last checkpoint of a slice. Reviewers never run tests at the same
+  time: they share the test database. `docs-consistency` also runs in every design change, before
+  committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
+  decisions for the owner, which are never decided for them.
+- **Design changes** outside a checkpoint's scope (decisions from a chat session, or code that
+  must differ from the docs) use the `design-change` skill: one decision-log entry per decision
+  (`docs/decision-log.md`), every affected doc updated, `docs-consistency`, then a `docs:`
+  commit. A change to code already built becomes a new checkpoint with a letter suffix
+  (`S1-C13a`); checkpoints are never renumbered. Developer-tooling and process code (hooks, the
+  `wl` CLI, CI, the docs consistency tests) is built in the change itself, in `chore:` or `ci:`
+  commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
+  (DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+  and its review base becomes the design change's last commit (DL-20).
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
   - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or
     a committed migration. Regenerate the client with `uv run wl gen-client`; fix a
-    committed migration with a new one.
+    committed migration with a new one. They also can't change `.pre-commit-config.yaml`, which
+    is yours to edit (DL-30; the git guard blocks any redirect naming it too), or git's own files:
+    anything in `.git/`, `~/.gitconfig`, or `.config/git/` (DL-31).
   - After Claude edits a file, it is formatted with ruff (backend) or Prettier (frontend).
+  - The **git guard** (`guard_git.py`) is an allow-list (DL-26). A Bash call that involves git or gh
+    must be **one command in a listed form, and nothing else**: no `&&`, `;`, `|`, `cd`, variables,
+    `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` for another directory, and
+    `git commit -F - <<'EOF'` for a commit message: the delimiter must be quoted, since an unquoted
+    heredoc runs the `$(...)` and backticks in its body. Anything else that mentions git or gh is
+    blocked; ask the owner to run it (`! <command>` in the prompt). Git or gh appearing only as data
+    is fine, in a command that only reads and prints (`grep`, `cat`, `ls`, `head`, `tail`, `wc`,
+    `echo`, `diff`, `jq`, …; not `sort -o`, `uniq`, `rg --pre`, a pager, or
+    `test`/`[`/`[[`/`printf`, which can evaluate a `$(...)` in an array subscript) and with no
+    expansion anywhere (`$VAR`, `${…}`, `$(...)`, backticks), since an expansion can hide a command
+    (`${x:-$(cmd)}`). A call that mentions git may not redirect into `.git/` (its config or hooks),
+    into a git config file (`~/.gitconfig`, `~/.config/git/`), or to a file named only at run time
+    (DL-24); no call, git or not, may redirect to a target with an unquoted glob (`*`, `?`, `[`),
+    which bash expands to an existing file such as `.git/config`, or naming
+    `.pre-commit-config.yaml`, an input redirect too (DL-30). A call that doesn't mention git may
+    still build a target with an expansion (TD-20). Aliases aren't followed: only the listed
+    subcommands run. Allowed:
+    - Reads, each with only its listed options (`tools/cli`'s tests and `READ_ONLY` in the hook
+      list them; e.g. `log --oneline -5 --format=… --since=…`, `diff --stat --cached -U3`,
+      `grep -n -i -A3`): `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `ls-tree`,
+      `blame`, `grep`, `merge-base`, `rev-list`, `cat-file`, `describe`, `shortlog`, and
+      `hash-object <file>` with no options (DL-29; `-w` would write an object). An option
+      that runs a program or writes a file (`grep -O<cmd>`, `--output=<file>`, `--ext-diff`,
+      `--textconv`) isn't listed. Also `branch` (`--show-current`, or `-a`/`-r`/`-v`/`-vv` with
+      `--list <pattern>`), `remote [-v]`, and `config --get <key>`, `config get <key>`,
+      `config --list`/`-l`/`list`.
+    - Local changes: `add` (`-A`, `-u`, `-N`, paths), `rm` (`-r`, `--cached`, paths), `mv`,
+      `restore` (`--staged`, `--worktree`, paths), `checkout -- <paths>`, `stash`
+      (`push [-u] [-m <message>]`, `pop`, `drop`, `apply`, `list`, `show`), `fetch [--prune]
+      [<remote> [<branch>]]`.
+    - Branches: `switch <branch>`, `switch -c <new branch>` (not `main`).
+    - `commit` with `-m <message>`, `-F <file>`, `-F -` (a heredoc), `-a`, `-q`, `--allow-empty`,
+      `--no-edit`, `--amend`: off `main` only (DL-21); `--amend` only while HEAD is unpushed
+      (DL-23).
+    - `push [-u] <remote> <branch>` with a literal branch other than `main`, or a bare `push` off
+      `main` whose push destination (`@{push}`) isn't `main` (DL-22). No other push option, so
+      nothing forces, deletes, or skips hooks (DL-23, DL-24). Configuration that redirects a push
+      isn't checked: GitHub refuses any push to `main`, force-push, or deletion it could cause
+      (DL-27, DL-28).
+    - `reset`: paths (`[HEAD] -- <paths>`), or `[--soft|--mixed|--hard] [<commit>]` that drops
+      no pushed commit (DL-23) and, on `main`, only to `main` itself: a target that git resolves
+      to `refs/heads/main` or a remote's `main` (DL-21).
+    - `pull --ff-only [<remote> <branch>]`; on `main`, only from a configured remote's `main` (a
+      path to another repository isn't a remote; a bare pull needs `main`'s upstream to be a
+      remote's `main`) (DL-21).
+    - `merge`, `rebase`, `cherry-pick`, `revert`, `am`: `--abort` only.
+    - gh: `pr create`/`view`/`list`/`checks`/`diff`/`status`/`ready`/`edit`, `run
+      list`/`view`/`watch`, `auth status` (no options: `--show-token` prints the token), `repo
+      view`, `issue list`/`view`, and `gh api` reads. `gh pr merge`, and any other `gh api` call (a
+      method, a field, an input file, GraphQL), asks you first (DL-25).
+  - Every allowed git form, reads included, is run against real git by its tests: each runs in a
+    throwaway clone with a bare remote, and the test asserts exactly which refs and config lines it
+    changes. (The gh forms are tested against the guard only.) What it can't see is logged in TD-20:
+    a script or program that runs git itself, a write to a shell startup file, and a non-git
+    redirect target built by an expansion. Its tests,
+    and `protect_files.py`'s, are in `tools/cli/tests/hooks/`. All three hooks are linted and
+    formatted with the developer CLI (`wl lint`); `guard_git.py` and `protect_files.py` are also
+    type-checked and tested with it (`wl test`).
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 
