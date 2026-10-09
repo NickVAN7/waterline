@@ -50,7 +50,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      sign-out, with 403 `password_change_required`;
    - Argon2id, run off the event loop; sign-in doesn't reveal whether an email exists (same
      error; the unknown-user path still does comparable hashing work); `account_inactive` is
-     returned only after the password is verified.
+     returned only after the password is verified; a password over 256 characters is refused
+     with 422 before any lookup or hash (DL-49).
 2. **CSRF:** every mutating method (`POST`, `PUT`, `PATCH`, `DELETE`) checks `Origin`: its
    host and port must equal the request's `Host` (a missing port is the default for the
    `Origin`'s scheme; the request's own scheme is never used; hostnames compared ignoring

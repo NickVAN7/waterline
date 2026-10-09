@@ -259,7 +259,7 @@ named checkpoint when its trigger arrives.
 
 | Trigger | Item |
 |---|---|
-| After S1-C7 is approved (end of the `s1-auth` group) | The owner decides whether to pull sign-in and the app shell (part of S1-C14) forward, so a real screen uses the API conventions sooner |
+| When the owner chooses | Pulling sign-in and the app shell (part of S1-C14) forward, so a real screen uses the API conventions sooner. Not now (DL-50): they stay in S1-C14 until the owner pulls them forward, once the UI design guide and the `ui-reviewer` agent exist |
 | Before S1-C14 | A short UI design guide (`frontend/CLAUDE.md` or a new doc; decided then); demo seed data (`wl seed --demo`), added right before the checkpoint; the `ui-reviewer` agent (read-only: accessibility and frontend conventions axe can't catch, run on S1-C14 to S1-C16) |
 | After S1-C14 | The `vue-screen` skill, distilled from S1-C14's hand-built screens |
 | S1-C17 | The `user-guide-verifier` agent (follows `docs/user-guide.md` literally in a browser against a seeded stack, and walks the "Done when" list) |
@@ -815,7 +815,8 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
 | 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL; one migration adding the indexes on `session.user_id`, `membership.organization_id`, and `project.organization_id` (schema-doc; DL-34); the `CustomFilter` docstring (`app/core/lists.py`) brought in line with DL-35 |
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
-| 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum) with the workspace-level actions (DL-45), the core's rules proven with test-only actions at org and project level (DL-44); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; each workspace entry in `/me` gains its workspace-level `allowed_actions` (DL-45), and `/me` lists every workspace for a system admin, with a null role where they hold no membership (DL-46); per-org actions come in Checkpoint 11; the full matrix (including personal actions) and fail-closed tests |
+| 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum) with the workspace-level actions (DL-45), the core's rules proven with test-only actions at org and project level (DL-44); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module gating (the `module` option of the load-and-authorize dependency, DL-47), tested through a test-only gated router (F7); `allowed_actions` helper; each workspace entry in `/me` gains its workspace-level `allowed_actions` (DL-45), and `/me` lists every workspace for a system admin, with a null role where they hold no membership (DL-46); per-org actions come in Checkpoint 11; the full matrix (including personal actions) and fail-closed tests |
+| 7a | Sign-in password cap | Sign-in refuses a password longer than the policy's 256 characters with a 422 (`validation_error` on `password`) before any verification, so an oversized one costs no hash and reveals nothing about the account (DL-49; design-doc §4, "Sign-in responses") |
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners and system admins, DL-45; live slug availability); grants of owner/admin roles only by owners (and system admins, DL-45); last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`: owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
@@ -835,7 +836,7 @@ rest of the slice.
 |---|---|---|
 | 1 | `s1-foundations` | 1–4 (models, numbering, pure rules, API conventions) |
 | 2 | `s1-auth` | 5–7 (sessions, passwords and CLI, authorization core) |
-| 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
+| 3 | `s1-workspace` | 7a–10 (the sign-in password cap, workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
 | 4 | `s1-projects` | 11–13 (projects, project members, classification) |
 | 5 | `s1-web` | 14–17 (web screens and slice verification) |
 
@@ -873,8 +874,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   `invalid_credentials`, and an unknown email still runs a password verification against a
   dummy hash, so timing doesn't reveal which emails have accounts; a deactivated account returns
   `account_inactive` only after the password is verified; emails are lowercased before lookup;
-  a hash made with older Argon2 parameters is upgraded after a successful sign-in. The sign-in
-  response has the same shape as `/me`.
+  a hash made with older Argon2 parameters is upgraded after a successful sign-in; a password over
+  256 characters is a 422 before any verification (DL-49, Checkpoint 7a). The sign-in response
+  has the same shape as `/me`.
 - **`/me`**: the user, `is_system_admin`, their workspaces and roles (for a system admin, every
   workspace, with a null role where they hold no membership; DL-46), their orgs (for the switcher),
   and `must_change_password`; each workspace entry carries that workspace's `allowed_actions` (from
@@ -939,8 +941,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - **`allowed_actions`** (build plan, "API conventions"): single-entity reads return the actions
   the user may take, evaluated through `authorize()`. Action names come from the registry and are
   exported as an OpenAPI enum.
-- **Module gating dependency:** a request to a module disabled for the project returns 404,
-  tested through a test-only gated router in `tests/support/` (`sprints` and `github` have no
+- **Module gating** (DL-47: the `module` option of the load-and-authorize dependency): a request
+  to a module disabled for the project returns 404 before `authorize()`, tested through a
+  test-only gated router in `tests/support/` (`sprints` and `github` have no
   endpoints yet). Both are allowed values from Slice 1 and seeded from the project type
   (design-doc §1.1).
 - **Test matrix:** one parametrized test per action × role, covering project roles (viewer,

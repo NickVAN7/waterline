@@ -76,8 +76,9 @@ Follow the `migration` skill.
   export-controlled project, without an explicit membership) and, from Slice 2 (when the gate
   exists), export-control rows (inherited admins denied content on an export-controlled
   project). Then implement.
-- Archived projects are read-only; module-gated areas are checked by the module dependency
-  before `authorize()`.
+- Archived projects are read-only; module-gated areas pass `module=` to the load-and-authorize
+  dependency (`authorized(loader, action, module=...)`), which returns 404 for a disabled module
+  before `authorize()` (DL-47).
 
 ## 6. Service — `services/<area>.py`
 
@@ -106,7 +107,7 @@ Follow the `migration` skill.
 - Single-entity endpoints use the load-and-authorize dependency, so there is no way to get the
   entity without the check; list endpoints use the access-scoping helper. Invisible entities
   return **404**, never 403.
-- Module-gated areas add the module dependency.
+- Module-gated areas pass `module=` to `authorized(...)` (DL-47).
 - Register the router in `main.py`.
 
 ## 8. Factory — `tests/factories/<area>.py`

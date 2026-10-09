@@ -313,7 +313,8 @@ Entry format:
   v1 deploys one (the seed refuses a second), so the case can't happen yet.
 - **Fix by:** S1-C17 (the slice retro: the owner decides the rule, or that it waits for a
   second workspace; then the schema doc or the code changes to match).
-- **Status:** open
+- **Status:** resolved in DL-48: left as it is until a second workspace is needed (the owner,
+  after S1-C7), when the rules for several workspaces are decided (design-doc §4)
 
 ### TD-22: The spec tests check list scoping through their own copy of `scope_clause`
 - **Added:** S1-C7

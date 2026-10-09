@@ -596,3 +596,46 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Authentication" `/me`); built in S1-C7
 - **Source:** chat session (owner, before S1-C7)
+
+### DL-47: Module gating is an option of the load-and-authorize dependency
+- **Date:** 2026-10-09
+- **Decision:** Module gating is the `module` option of the load-and-authorize dependency
+  (`authorized(loader, action, module=...)`), not a dependency of its own: one dependency loads
+  the entity once and checks in a fixed order (404 for a disabled module, then `authorize()`).
+  If authorization becomes a bottleneck, it's the first place to look.
+- **Supersedes:** design-doc §5's "Module gating is a separate dependency"
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("The choke point"); build plan ("Authorization (§5)")
+- **Source:** chat session (owner, after S1-C7; review question)
+
+### DL-48: Two edge cases left until they're a problem
+- **Date:** 2026-10-09
+- **Decision:** A user-level audit event whose workspace is ambiguous (only possible with a
+  second workspace) keeps a null `workspace_id` until several workspaces are needed (TD-21
+  closed); and the seed takes no lock against two runs at the same moment ("run it once" is
+  enough for a one-time setup command).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** tech-debt TD-21
+- **Source:** chat session (owner, after S1-C7; questions from S1-C6)
+
+### DL-49: Sign-in refuses an oversized password
+- **Date:** 2026-10-09
+- **Decision:** Sign-in refuses a password longer than the policy's 256 characters with a 422
+  before any verification, so an oversized password costs no Argon2 hash. Built in a new
+  checkpoint, S1-C7a, since sign-in is built.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sign-in responses"); build plan (the S1-C7a row,
+  "Authentication (§4)", the groups)
+- **Source:** chat session (owner, after S1-C7; S1-C5 security review question)
+
+### DL-50: Sign-in and the app shell stay in S1-C14 for now
+- **Date:** 2026-10-09
+- **Decision:** Sign-in and the app shell aren't pulled forward now; they stay in S1-C14 until
+  the owner chooses to pull them forward, once the "Before S1-C14" items (the UI design guide,
+  the `ui-reviewer` agent) exist.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Workflow items scheduled")
+- **Source:** chat session (owner, after S1-C7)

@@ -513,7 +513,9 @@ Workspace (the firm: tenant boundary)
   `invalid_credentials` error in the same time (an unknown email still verifies against a
   dummy hash). A deactivated account gets `account_inactive`, but only after its password is
   verified. Emails are lowercased before lookup. After a successful sign-in, a hash made with
-  older Argon2 parameters is re-hashed with the current ones.
+  older Argon2 parameters is re-hashed with the current ones. A password longer than the
+  policy's 256 characters is refused (422) before any verification, so an oversized one never
+  costs a hash (DL-49).
 - **Password policy:** 8–256 characters, no composition rules, not equal to the account's
   email or username (ignoring case). The same rule applies to changes, admin resets, and new
   accounts. When users change their own password, the new one must also differ from the
@@ -654,8 +656,8 @@ Workspace (the firm: tenant boundary)
   - Both are enforced through a FastAPI dependency so an endpoint can't obtain an entity without
     the check.
   - Failures on entities the user can't see return **404, not 403**, so existence isn't leaked.
-- **Module gating** is a separate dependency: a request to a module that is disabled for the
-  project returns 404 before `authorize()` runs.
+- **Module gating** is part of the load-and-authorize dependency (an option on it, DL-47): a
+  request to a module that is disabled for the project returns 404 before `authorize()` runs.
 - **The UI asks the server.** Single-entity responses include `allowed_actions`, evaluated through
   `authorize()` (`/me` carries the workspace-level actions and each org's), so the frontend never
   re-implements role rules; it hides what the user can't do (build plan, "API conventions").

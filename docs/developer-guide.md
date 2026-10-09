@@ -5,7 +5,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
 > **Status:** S1-C7 (Authorization core) done, closing the `s1-auth` group, on the `s1` branch (one
-> branch and PR for the rest of Slice 1); next is S1-C8 (Workspace & organizations). Every check
+> branch and PR for the rest of Slice 1); next is S1-C7a (Sign-in password cap). Every check
 > goes through `authorize()` ("Authorization" below); `/me` carries each workspace's
 > `allowed_actions`. Sign-in, sign-out, change password, and `GET /api/auth/me` work over a
 > server-side session in the `__Host-session` cookie, a forced password change blocks every other
