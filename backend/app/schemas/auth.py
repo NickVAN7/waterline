@@ -1,14 +1,17 @@
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import OrgRole, WorkspaceRole
+from app.rules.password_policy import MAX_LENGTH
 
 
 class SignInRequest(BaseModel):
     email: str
-    password: str
+    # No password is longer than the policy allows, so a longer one is refused (422) before any
+    # verification: an oversized password never costs an Argon2 hash (DL-49).
+    password: str = Field(max_length=MAX_LENGTH)
 
 
 class ChangePasswordRequest(BaseModel):

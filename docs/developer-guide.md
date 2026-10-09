@@ -4,12 +4,12 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C7 (Authorization core) done, closing the `s1-auth` group, on the `s1` branch (one
-> branch and PR for the rest of Slice 1); next is S1-C7a (Sign-in password cap). Every check
-> goes through `authorize()` ("Authorization" below); `/me` carries each workspace's
-> `allowed_actions`. Sign-in, sign-out, change password, and `GET /api/auth/me` work over a
-> server-side session in the `__Host-session` cookie, a forced password change blocks every other
-> endpoint, and every mutating request passes the `Origin` and JSON-only checks first
+> **Status:** S1-C7a (Sign-in password cap) done; S1-C7 (Authorization core) closed the `s1-auth`
+> group, on the `s1` branch (one branch and PR for the rest of Slice 1); next is S1-C8 (Workspace &
+> organizations). Every check goes through `authorize()` ("Authorization" below); `/me` carries each
+> workspace's `allowed_actions`. Sign-in, sign-out, change password, and `GET /api/auth/me` work
+> over a server-side session in the `__Host-session` cookie, a forced password change blocks every
+> other endpoint, and every mutating request passes the `Origin` and JSON-only checks first
 > ("Authentication" below). `wl seed` creates the workspace and its first system admin, and `wl
 > admin` grants and revokes the system-admin flag. The tenancy, project, and audit tables exist
 > (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
@@ -294,8 +294,9 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   (`app/services/user.py`) turn the `rules/` problems into field errors; use them wherever a
   password, username, or slug is set.
 - **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
-  password (the same body either way) and 403 `account_inactive` for a deactivated account with
-  its correct password. Sign-out is always 204, with or without a session, and clears the cookie.
+  password (the same body either way) and 403 `account_inactive` for a deactivated account with its
+  correct password; a password over 256 characters is a 422 on `password` (`string_too_long`) before
+  any hashing (DL-49). Sign-out is always 204, with or without a session, and clears the cookie.
 - **Session lengths:** `SESSION_IDLE_TIMEOUT` and `SESSION_LIFETIME` in `.env` (ISO 8601
   durations such as `P7D`; defaults 7 and 30 days; Compose passes them to the backend
   services). The idle timeout must be over 5 minutes, the gap between `last_seen_at` writes;

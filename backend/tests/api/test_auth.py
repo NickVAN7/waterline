@@ -214,6 +214,54 @@ async def test_a_deactivated_account_with_a_wrong_password_reveals_nothing(
     assert response.json()["code"] == "invalid_credentials"
 
 
+@pytest.fixture
+def hashing(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Every password sign-in verifies, against an account's hash or the dummy one."""
+    calls: list[str] = []
+    real_verify = auth_service.verify_password
+    real_unknown = auth_service.verify_password_for_unknown_user
+
+    async def verify(password_hash: str, password: str) -> bool:
+        calls.append(password)
+        return await real_verify(password_hash, password)
+
+    async def unknown(password: str) -> bool:
+        calls.append(password)
+        return await real_unknown(password)
+
+    monkeypatch.setattr(auth_service, "verify_password", verify)
+    monkeypatch.setattr(auth_service, "verify_password_for_unknown_user", unknown)
+    return calls
+
+
+@pytest.mark.parametrize("email", ["ann@example.com", "nobody@example.com"])
+async def test_a_password_over_256_characters_is_refused_before_any_hash(
+    client: AsyncClient, hashing: list[str], email: str
+) -> None:
+    """DL-49: an oversized password costs nothing, for a real account and an unknown email
+    alike, so the refusal reveals nothing either."""
+    await UserFactory.create_async(email="ann@example.com")
+
+    response = await sign_in(client, email, "x" * 257)
+
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+    assert [(f["loc"], f["type"]) for f in response.json()["details"]["fields"]] == [
+        (["body", "password"], "string_too_long")
+    ]
+    assert hashing == []
+
+
+async def test_a_256_character_password_is_still_checked(
+    client: AsyncClient, hashing: list[str]
+) -> None:
+    await UserFactory.create_async(email="ann@example.com")
+
+    response = await sign_in(client, "ann@example.com", "x" * 256)
+
+    assert (response.status_code, response.json()["code"]) == (401, "invalid_credentials")
+    assert hashing == ["x" * 256]
+
+
 async def test_a_hash_with_older_parameters_is_upgraded_on_sign_in(
     client: AsyncClient, session: AsyncSession
 ) -> None:
