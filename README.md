@@ -31,4 +31,4 @@ Full setup, commands, and conventions: [docs/developer-guide.md](docs/developer-
 | [developer-guide.md](docs/developer-guide.md) | Setup, commands, how-tos |
 | [user-guide.md](docs/user-guide.md) | Using the app |
 | [tech-debt.md](docs/tech-debt.md) | Known shortcuts and when they get fixed |
-| [reviews/](docs/reviews/) | Each checkpoint's independent review record |
+| [reviews/](docs/reviews/) | Review records: `s<n>/` per slice, `design-changes/` for design-change tooling reviews |

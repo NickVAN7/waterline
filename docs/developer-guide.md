@@ -72,8 +72,8 @@ failing) if the pre-commit hooks aren't installed.
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
 docs/           design, schema, build plan, testing strategy, screen inventory, these guides,
-                tech-debt log, decision log, reviews/ (one record per checkpoint, and per
-                design-change tooling review, DC-<date>.md), spikes/
+                tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
+                design-changes/: one per tooling review), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
@@ -857,8 +857,8 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   commit. A change to code already built becomes a new checkpoint with a letter suffix
   (`S1-C13a`); checkpoints are never renumbered. Developer-tooling and process code (hooks, the
   `wl` CLI, CI, the docs consistency tests) is built in the change itself, in `chore:` or `ci:`
-  commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
-  (DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+  commits, after a `checkpoint-reviewer` pass recorded in
+  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). A checkpoint in progress is parked with `git stash` while a design change is applied,
   and its review base becomes the design change's last commit (DL-20).
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:

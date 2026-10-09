@@ -78,8 +78,9 @@ history in the docs; the log holds it.
 - **Tooling code** (step 4): invoke `checkpoint-reviewer` with the review ID
   `DC-<YYYY-MM-DD>` (add a letter for a second one that day: `DC-2026-10-08b`), the base
   (the commit before this change), and the files in scope. Resolve every finding as the
-  `checkpoint` skill's step 5 says, and record every pass in `docs/reviews/DC-<YYYY-MM-DD>.md`
-  (format: `docs/reviews/S0-C1.md`), with its "Sabotage checks" table. Don't run tests while it
+  `checkpoint` skill's step 5 says, and record every pass in
+  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming what the
+  change covers (`DC-2026-10-08b-git-guard-allow-list.md`; format: `docs/reviews/s0/S0-C1.md`), with its "Sabotage checks" table. Don't run tests while it
   runs.
 - Invoke the `docs-consistency` agent with trigger `design-change` and, as the base, the
   commit before this change. Fix its clear-cut **Fixes**. Its **Decisions** go to the owner

@@ -13,7 +13,7 @@ Entry format:
 - **Supersedes:** <DL-<n>, a doc section, or a recorded decision such as S1-plan D4; or "none">
 - **Superseded by:** <DL-<n>, or "none">
 - **Applies to:** <the doc sections, files, or checkpoints it changed>
-- **Source:** <chat session, a checkpoint review ID, or docs/reviews/S1-plan.md>
+- **Source:** <chat session, a checkpoint review ID, or docs/reviews/s1/S1-plan.md>
 ```
 
 Design changes are applied with the `design-change` skill, which adds the entries.
@@ -55,7 +55,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Date:** 2026-10-05
 - **Decision:** Classification & export control (design-doc §3.1) is built in Slice 1 as
   Checkpoint 13, so the plan's Checkpoints 13–16 run as 14–17.
-- **Supersedes:** the Slice 1 checkpoint numbering in `docs/reviews/S1-plan.md` (its
+- **Supersedes:** the Slice 1 checkpoint numbering in `docs/reviews/s1/S1-plan.md` (its
   Checkpoints 13–16)
 - **Superseded by:** none
 - **Applies to:** build plan (Slice 1 checkpoints, "Classification & export control"); every
@@ -81,7 +81,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** DL-9
 - **Applies to:** build plan ("Pull requests", Slice 1's groups); `checkpoint` skill; developer
   guide section 10; testing strategy ("Workflow and gates")
-- **Source:** S0-C8 (`docs/reviews/S0-C8.md`, owner decisions 2 and 3)
+- **Source:** S0-C8 (`docs/reviews/s0/S0-C8.md`, owner decisions 2 and 3)
 
 ### DL-6: Admins change a user's email in v1
 - **Date:** 2026-10-07
@@ -131,7 +131,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Pull requests", Slice 1's groups); `checkpoint` skill; root
   `CLAUDE.md`; developer guide (Status line, section 10); testing strategy ("Workflow and
-  gates"); TD-15; the base commits in `docs/reviews/S1-C1.md` to `S1-C4.md`
+  gates"); TD-15; the base commits in `docs/reviews/s1/S1-C1.md` to `S1-C4.md`
 - **Source:** chat session (workflow review)
 
 ### DL-10: Review-tier trial on the `s1-workspace` group
@@ -544,3 +544,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` agents;
   `checkpoint` skill (step 5); build plan ("Claude configuration"); developer guide section 11
 - **Source:** chat session (owner, as DL-36)
+
+### DL-43: Review records live in a folder per slice, design changes named by content
+- **Date:** 2026-10-09
+- **Decision:** Checkpoint review records go in `docs/reviews/s<n>/` (one folder per slice; a
+  slice plan's record too, e.g. `s1/S1-plan.md`), and design-change tooling reviews in
+  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming what the
+  change covers. The review ID stays `DC-<YYYY-MM-DD>` (with its letter); existing records were
+  moved and renamed without changing their contents.
+- **Supersedes:** DL-18's record path, `docs/reviews/DC-<YYYY-MM-DD>.md`
+- **Superseded by:** none
+- **Applies to:** `checkpoint` and `design-change` skills; `checkpoint-reviewer` agent; build
+  plan ("What every checkpoint delivers", "Design changes outside a checkpoint", "Claude
+  configuration", the Slice 0 repository layout, Slice 1's plan reference); developer guide
+  sections 2 and 11; root `CLAUDE.md`; `README.md`
+- **Source:** chat session (owner)

@@ -59,8 +59,8 @@ minutes. The next checkpoint starts only after the current one is approved.
    - Design, schema, and build-plan docs, if anything drifted.
 5. **Tech-debt log** (`docs/tech-debt.md`): any shortcut is recorded with its reason and the
    checkpoint or slice that will fix it. The goal is an empty log; nothing is left unrecorded.
-6. **Review record** (`docs/reviews/<ID>.md`, e.g. `S0-C1.md`): every reviewer pass with its
-   verdict, findings, and the resolution of each, plus open questions and owner decisions.
+6. **Review record** (`docs/reviews/s<n>/<ID>.md`, e.g. `s0/S0-C1.md`): every reviewer pass
+   with its verdict, findings, and the resolution of each, plus open questions and owner decisions.
 
 ### Pull requests
 Each slice works on **one branch and one draft pull request** (DL-9). Slice 0's checkpoints
@@ -156,8 +156,8 @@ its decisions go to the owner. A change to code already built becomes a new chec
 inserted with a letter suffix where it runs (`S1-C13a` between `S1-C13` and `S1-C14`);
 existing checkpoints are never renumbered. Developer-tooling and process code (hooks, the `wl`
 CLI, CI, the docs consistency tests) is built in the design change itself, as `chore:` or `ci:`
-commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
-(DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+commits, after a `checkpoint-reviewer` pass recorded in
+`docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). A checkpoint in progress is parked with `git stash` while a design change is applied,
 and its review base becomes the design change's last commit (DL-20). Each checkpoint's review
 diffs from the last commit before its work started, so design changes stay out of it (DL-17).
 
@@ -201,7 +201,7 @@ Everything lives in the repository, version-controlled and present on every work
     checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
     every time, and at the end of a slice `fresh-clone-verifier`, `docs-consistency`, and
     `repo-auditor`;
-  - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
+  - resolving every finding, and the review record in `docs/reviews/s<n>/<ID>.md`;
   - one commit with the review note, pushed to the slice branch;
   - the report, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
@@ -384,8 +384,8 @@ The sections below describe the content; the table above is the order of work.
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
 │                                 tech-debt.md, decision-log.md, screen-inventory.md, reviews/
-│                                 (one record per checkpoint, and per design-change tooling
-│                                 review, DC-<date>.md), spikes/ (spike code kept as evidence);
+│                                 (s<n>/: one record per checkpoint; design-changes/: one
+│                                 per tooling review), spikes/ (spike code kept as evidence);
 │                                 the source of truth (DL-14)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
@@ -845,7 +845,7 @@ Checkpoints touching authentication, sessions, authorization, or routers get the
 `security-reviewer` as well: every checkpoint from 1 to 16. The `checkpoint` skill runs it for
 every checkpoint this paragraph names, and also whenever a diff touches security-relevant code.
 The sections below describe the content; the table above is the order of work. The decisions
-behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/S1-plan.md`; its
+behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/s1/S1-plan.md`; its
 Checkpoints 13–16 are this table's 14–17 (DL-3). Admins change a user's email in Checkpoint 10
 (design-doc §4; DL-6 supersedes the record's D4).
 

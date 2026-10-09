@@ -49,7 +49,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 4. Independent review
 
 - **Spec tests first:** if the checkpoint adds or changes `app/rules/` or `app/authz/`, start
-  `docs/reviews/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
+  `docs/reviews/s<n>/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
   behavior table and its files table, with each file's `git hash-object`), plus any change to
   those files the owner approved (what and why). `checkpoint-reviewer` compares the files with
   the recorded hashes.
@@ -108,7 +108,7 @@ If a finding shows a rule that would have prevented the mistake, add it to the r
 `CLAUDE.md`.
 
 **Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
-docs-consistency, repo-auditor) in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`).
+docs-consistency, repo-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
 Include the base commit, the totals, the "Spec tests" section (when the checkpoint has one), and
 for each pass its verdict, its findings table in the `S0-C1.md` columns, one row per finding with
 its resolution (fixed / logged with TD number / rejected with evidence / proposed to the owner;
@@ -139,7 +139,7 @@ Tests:
 Decisions / deviations:
 - ... (or "None")
 
-Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/<ID>.md)
+Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/s<n>/<ID>.md)
 Security review: <n> findings — … (or "not required")
 Fresh-clone verification: <result> (last checkpoint of a slice only)
 Docs consistency: <n> fixes — …; <m> decisions for the owner (last checkpoint of a slice only)
@@ -183,7 +183,7 @@ Send the owner:
 - the review note (the commit message body);
 - each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency,
   repo-auditor) with
-  the resolution of each finding (as recorded in `docs/reviews/<ID>.md`);
+  the resolution of each finding (as recorded in `docs/reviews/s<n>/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review;
 - the PR link and its CI result, and whether this checkpoint ends its group (a review point)
