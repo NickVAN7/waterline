@@ -559,3 +559,40 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   configuration", the Slice 0 repository layout, Slice 1's plan reference); developer guide
   sections 2 and 11; root `CLAUDE.md`; `README.md`
 - **Source:** chat session (owner)
+
+### DL-44: The authorization core registers only the workspace-level actions
+- **Date:** 2026-10-09
+- **Decision:** S1-C7 registers only the workspace-level actions (DL-45) in the action
+  registry. The core's rules are proven with test-only actions at org and project level, and
+  each later checkpoint (S1-C8 to S1-C13) registers its own area's actions with their spec
+  tests.
+- **Supersedes:** none (the build plan didn't say which actions S1-C7 registers)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C7 row; "Authorization (§5)")
+- **Source:** chat session (owner, before S1-C7)
+
+### DL-45: The workspace-level actions
+- **Date:** 2026-10-09
+- **Decision:** Four workspace-level actions: `workspace.view` (the workspace pages, and
+  reading them: staff, orgs, users), `workspace.update` (rename the workspace, change its
+  slug), `workspace_staff.manage` (add and create staff, change roles, remove; changes only),
+  and `org.create` (create an org and assign its first owner). All are allowed to workspace
+  owners/admins and system admins, except `workspace.update`: workspace owners and system
+  admins. Granting, changing, or removing the owner and admin roles is for workspace owners and
+  system admins only (not workspace admins), a targeted rule in S1-C8; system admins keep it,
+  as design-doc §5 says.
+- **Supersedes:** none (the docs named no workspace-level action)
+- **Superseded by:** none
+- **Applies to:** build plan ("Authorization (§5)", "Authentication" `/me`, the S1-C8 row)
+- **Source:** chat session (owner, before S1-C7; the role and staff-list wording settled after
+  the docs-consistency check)
+
+### DL-46: `/me` lists every workspace for a system admin
+- **Date:** 2026-10-09
+- **Decision:** For a system admin, `/me` lists every workspace, with a null role where they
+  hold no workspace membership (as its orgs already do), so each entry's workspace-level
+  `allowed_actions` reach them. Other users see their workspace memberships.
+- **Supersedes:** none (the build plan said "their workspaces and roles")
+- **Superseded by:** none
+- **Applies to:** build plan ("Authentication" `/me`); built in S1-C7
+- **Source:** chat session (owner, before S1-C7)
