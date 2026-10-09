@@ -162,6 +162,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   object that should hold the old value); otherwise the assertion can't fail.
 - Data from polyfactory factories in `tests/factories/` (fixed seed). Set explicitly any value
   the test depends on.
+- Every setting that changes behavior has a test with a non-default value
+  (`settings.model_copy(update=...)`): a test that only sees the default can't tell reading the
+  setting from hard-coding it (S1-C5 review).
 - Layout: `tests/unit/` (no DB), `tests/integration/` (repositories, services), `tests/api/`
   (HTTP). Files mirror `app/`.
 - Coverage: 90% overall; 100% for `app/authz/` and `app/rules/` (a hook in `tests/conftest.py`

@@ -4,9 +4,11 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C4 (API conventions) done, closing the `s1-foundations` group; next is S1-C5
-> (Sessions & sign-in), on the `s1` branch (one branch and PR for the rest of Slice 1). The tenancy,
-> project, and audit tables exist (models, migrations, constraint tests, a factory per model;
+> **Status:** S1-C5 (Sessions & sign-in) done, on the `s1` branch (one branch and PR for the rest
+> of Slice 1); next is S1-C6 (Passwords, seed & system-admin CLI). Sign-in, sign-out, and
+> `GET /api/auth/me` work over a server-side session in the `__Host-session` cookie, and every
+> mutating request passes the `Origin` and JSON-only checks first ("Authentication" below). The
+> tenancy, project, and audit tables exist (models, migrations, constraint tests, a factory per model;
 > `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the base
 > repository, and `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`).
 > The pure rules (identifiers, password policy, account rank) are in `app/rules/`, held to 100%
@@ -168,9 +170,11 @@ backend/app/
                        SoftDeleteMixin, VersionMixin, check_version
   core/enums.py        enum_type (VARCHAR + CHECK enum columns)
   core/errors.py       error format: AppError and its subclasses, ErrorBody, the handlers
+  core/request_guard.py   the Origin and JSON-only checks (middleware, before everything else)
   core/migration_filters.py   what Alembic autogenerate ignores (procrastinate's objects)
   core/security.py     password hashing (Argon2id, off the event loop), session tokens
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
+  routers/deps.py      shared router dependencies: SettingsDep, AuthServiceDep, SignedInUserDep
   rules/          pure business rules, no database
   authz/          authorize() and friends (Slice 1)
   audit/          log_admin_event() (Slice 1, S1-C4) and log_change() (Slice 2)
@@ -256,6 +260,35 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   cookie; `hash_token(token)` → its SHA-256 hex digest, the only form ever stored.
 - Mark tests of security behavior `@pytest.mark.security` (run just those with
   `wl backend test -m security`).
+
+### Authentication
+
+Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `services/auth.py`,
+`repositories/auth.py`); design-doc §4 has the rules.
+
+- **The signed-in user:** an endpoint that needs one takes `user: SignedInUserDep`
+  (`app/routers/deps.py`). It reads the `__Host-session` cookie, finds a live session (within
+  its lifetime and idle timeout, its user active), brings `last_seen_at` up to date at most
+  every 5 minutes, and returns the user; otherwise it raises 401 `not_authenticated`.
+- **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
+  password (the same body either way) and 403 `account_inactive` for a deactivated account with
+  its correct password. Sign-out is always 204, with or without a session, and clears the cookie.
+- **Session lengths:** `SESSION_IDLE_TIMEOUT` and `SESSION_LIFETIME` in `.env` (ISO 8601
+  durations such as `P7D`; defaults 7 and 30 days; Compose passes them to the backend
+  services). The idle timeout must be over 5 minutes, the gap between `last_seen_at` writes;
+  the app refuses to start otherwise. The test `settings` fixture pins both to the defaults;
+  a test of other lengths builds its app from `settings.model_copy(update=...)`. Both are
+  checked against the database clock, so tests backdate `last_seen_at` or `expires_at` with
+  `func.now() - timedelta(...)`. Expired rows aren't deleted
+  yet (the nightly cleanup is TD-14); they're ignored.
+- **The `Origin` and JSON-only checks** run in `RequestGuardMiddleware`
+  (`app/core/request_guard.py`), before routing: a `POST`, `PUT`, `PATCH`, or `DELETE` whose
+  `Origin` doesn't name the request's own `Host` is 403 `origin_rejected`; then any request with
+  a body that isn't `application/json` is 415 `unsupported_media_type`. `ORIGIN_EXEMPT_PATHS`
+  is empty; adding a path needs the owner's approval (design-doc §4).
+- **The cookie** is set with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/` in every
+  environment. Reach the dev server at `localhost`: browsers accept a `Secure` cookie over plain
+  http only there.
 
 ### Import rules (enforced)
 
@@ -633,8 +666,8 @@ inside an outer transaction that is always rolled back, so tests never see each 
 | `session` | An `AsyncSession` for arranging and asserting; factories persist through it |
 | `sessionmaker` | Sessions that join the test transaction (`join_transaction_mode="create_savepoint"`): their commits only release savepoints |
 | `connection` / `engine` | The raw connection and the session-scoped test engine |
-| `client` (api/) | An `httpx.AsyncClient` on the real app, whose per-request sessions join the test transaction |
-| `settings` | `Settings` from the environment, with API docs on |
+| `client` (api/) | An `httpx.AsyncClient` on the real app, whose per-request sessions join the test transaction; built by `api_client(app)` (`tests/support/api.py`) on `https://testserver`, sending `Origin: https://testserver` by default. Build any other client with `api_client` too: httpx won't send the `Secure` session cookie over `http://`, and a mutation without the `Origin` is a 403 |
+| `settings` | `Settings` from the environment, with API docs on and the session lengths pinned to their defaults |
 
 ```python
 pytestmark = pytest.mark.anyio

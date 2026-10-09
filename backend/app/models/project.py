@@ -38,6 +38,8 @@ class Project(ClassificationMixin, BaseModel):
         ),
         CheckConstraint(f"enabled_modules <@ ARRAY[{_MODULES}]::text[]", name="enabled_modules"),
         classification_categories_check(PROJECT_CATEGORIES),
+        # An org's projects; Postgres doesn't index a foreign key's columns (DL-34).
+        Index(None, "organization_id"),
     )
 
     organization_id: Mapped[uuid.UUID]

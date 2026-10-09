@@ -11,8 +11,9 @@ from app.core.base_model import Base
 from app.core.constraint_errors import constraint_registry
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.errors import register_error_handlers
+from app.core.request_guard import RequestGuardMiddleware
 from app.core.settings import Settings, get_settings
-from app.routers import health
+from app.routers import auth, health
 
 API_PREFIX = "/api"
 
@@ -47,6 +48,10 @@ def create_app(
     app.state.sessionmaker = sessionmaker
     # Every model is imported (app.models), so the registry sees every table's constraints.
     app.state.constraint_errors = constraint_registry(Base.metadata)
+    # Added before the error handlers' middleware, so it runs inside it: a crash in the guard
+    # still gets the standard 500 body.
+    app.add_middleware(RequestGuardMiddleware)
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(auth.router, prefix=API_PREFIX)
     return app

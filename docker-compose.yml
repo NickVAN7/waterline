@@ -18,6 +18,8 @@ x-backend: &backend
     POSTGRES_HOST: postgres
     POSTGRES_PORT: "5432"
     API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
+    SESSION_IDLE_TIMEOUT: ${SESSION_IDLE_TIMEOUT:-P7D}
+    SESSION_LIFETIME: ${SESSION_LIFETIME:-P30D}
   volumes:
     - ./backend:/app
 

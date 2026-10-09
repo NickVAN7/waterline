@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from app.core.db import SessionDep, SessionMaker
 from app.core.settings import Settings
 from app.main import create_app
 from app.models.user import User
+from tests.support.api import api_client
 from tests.support.models import Record, SupportBase, Widget
 
 pytestmark = [pytest.mark.anyio, pytest.mark.usefixtures("support_tables")]
@@ -52,7 +53,7 @@ def build_app(settings: Settings, sessionmaker: SessionMaker) -> FastAPI:
 @pytest.fixture
 async def client(settings: Settings, sessionmaker: SessionMaker) -> AsyncIterator[AsyncClient]:
     app = build_app(settings, sessionmaker)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         yield c
 
 
@@ -130,7 +131,7 @@ async def test_the_real_app_maps_its_own_constraints(
         session.add(User(email=email, username=username, name="Ann", hashed_password="x"))
         await session.flush()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         await c.post("/users?email=ann@example.com&username=ann")
         response = await c.post("/users?email=ann@example.com&username=ann-2")
 
@@ -155,7 +156,7 @@ async def test_an_unhandled_database_error_never_logs_bound_values(
     async def broken(session: SessionDep) -> None:
         await session.execute(text("SELECT length(:value) / :zero"), {"value": sentinel, "zero": 0})
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         with caplog.at_level(logging.ERROR):
             response = await c.get("/broken")
 
