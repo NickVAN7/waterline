@@ -30,6 +30,7 @@ UNKNOWN = "\x00"
 # An unquoted `*`, `?`, or `[` in a redirect target: bash expands it to an existing file
 # (verified, bash 5.3), so `>> .gi?/config` writes `.git/config` without naming it.
 GLOB = "\x01"
+PRE_COMMIT_CONFIG = ".pre-commit-config.yaml"  # the owner's to edit (DL-30)
 
 
 class Unparseable(Exception):  # noqa: N818 -- reads as a verdict: "Unparseable(reason)"
@@ -504,6 +505,11 @@ def decide(command: str, cwd: Path | None, repo: Repo) -> Verdict:
         return blocked(
             "a glob (`*`, `?`, `[`) in a redirect target can name `.git/` without saying so "
             "(DL-24). Name the file."
+        )
+    if any(Path(target).name == PRE_COMMIT_CONFIG for target in script.redirect_targets):
+        return blocked(
+            f"`{PRE_COMMIT_CONFIG}` decides which checks run before each commit, so only the "
+            "owner edits it (DL-30). Propose the change to the owner."
         )
     if not mentions_git(command) and not script_mentions_git(script):
         return ALLOW

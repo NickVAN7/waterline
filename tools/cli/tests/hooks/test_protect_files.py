@@ -1,5 +1,6 @@
 """The protected-files hook (.claude/hooks/protect_files.py): Claude's file tools can't edit
-generated files or committed migrations (build plan, "Claude configuration": Hooks)."""
+generated files, committed migrations, the pre-commit configuration (DL-30), or git's own files
+(DL-31) (build plan, "Claude configuration": Hooks)."""
 
 import io
 import json
@@ -74,6 +75,47 @@ def test_a_committed_migration_is_blocked(
     assert f"Blocked: {MIGRATION} is a committed migration" in err
 
 
+def test_the_pre_commit_config_is_the_owners_to_edit(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, err = run_hook(monkeypatch, capsys, edit(str(repo / ".pre-commit-config.yaml")))
+
+    assert code == 2
+    assert "Blocked: .pre-commit-config.yaml is the owner's to edit." in err
+    assert "(DL-30)" in err
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".git/config",
+        ".git/hooks/pre-commit",
+        ".git/refs/heads/main",
+        ".git/HEAD",
+        "backend/.git/config",  # a nested repository's
+        ".git",  # a worktree's or submodule's `.git` file (pass 1, finding 1)
+        "backend/.git",
+    ],
+)
+def test_git_internal_files_are_blocked(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], path: str
+) -> None:
+    code, err = run_hook(monkeypatch, capsys, edit(str(repo / path)))
+
+    assert code == 2
+    assert "is git's own configuration, hooks, or data, which Claude never edits (DL-31)" in err
+
+
+@pytest.mark.parametrize("path", [".gitconfig", ".config/git/config", ".config/git/ignore"])
+def test_global_git_config_files_are_blocked_outside_any_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], path: str
+) -> None:
+    code, err = run_hook(monkeypatch, capsys, edit(str(tmp_path / "home" / path)))
+
+    assert code == 2
+    assert "(DL-31)" in err
+
+
 def test_a_relative_path_is_resolved_against_the_cwd(
     repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -89,6 +131,10 @@ def test_a_relative_path_is_resolved_against_the_cwd(
         "backend/migrations/versions/README",  # not a migration module
         "backend/app/main.py",
         "docs/openapi.json",  # same name, not the generated file
+        "docs/.pre-commit-config.yaml",  # same name, not the repository's
+        ".gitignore",  # not git's own file
+        ".github/workflows/ci.yml",
+        ".config/gitleaks.toml",
     ],
 )
 def test_other_files_are_allowed(

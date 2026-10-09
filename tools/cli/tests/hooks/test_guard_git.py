@@ -645,6 +645,31 @@ def test_a_glob_in_a_redirect_target_is_blocked(command: str) -> None:
 @pytest.mark.parametrize(
     "command",
     [
+        ": > .pre-commit-config.yaml",
+        "echo 'repos: []' > .pre-commit-config.yaml",
+        "cat x >> tools/../.pre-commit-config.yaml",
+        "printf x >| '.pre-commit-config.yaml'",
+        # any redirect naming it, by file name, an input redirect too (pass 1, finding 4):
+        # reading it needs no redirect
+        "wc -l < .pre-commit-config.yaml",
+        "echo x > docs/.pre-commit-config.yaml",
+    ],
+)
+def test_a_redirect_into_the_pre_commit_config_is_blocked(command: str) -> None:
+    assert "only the owner edits it (DL-30)" in block_message(command)
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["cat .pre-commit-config.yaml", "grep -n gitleaks .pre-commit-config.yaml > /tmp/hooks.txt"],
+)
+def test_reading_the_pre_commit_config_is_allowed(command: str) -> None:
+    assert verdict(command) == guard_git.ALLOW
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
         "echo x > '.gi?/config'",  # quoted: a literal name (verified)
         "ls *.py > files.txt",  # a glob outside the redirect target
     ],
