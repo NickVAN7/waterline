@@ -116,9 +116,9 @@ each verification claim with who verified it (e.g. "sabotage-checked by checkpoi
    against the running dev stack, with at least one step that should be denied; the owner's
    run is the check.
 
-**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10; S1-C7a, also in the group, stops
-for approval as usual and is outside the trial, DL-51)** (DL-10). A trial, not yet the
-rule; every other checkpoint keeps the full stop for approval.
+**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10; S1-C7a (DL-51) and S1-C7b,
+also in the group, stop for approval as usual: the trial is S1-C8 to S1-C10)** (DL-10). A trial,
+not yet the rule; every other checkpoint keeps the full stop for approval.
 - **S1-C8 and S1-C9 auto-continue:** after its report, the session goes straight on to the next
   checkpoint, without stopping for approval, only if **all** of these hold:
   - `wl check` and CI are green;
@@ -818,6 +818,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
 | 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum) with the workspace-level actions (DL-45), the core's rules proven with test-only actions at org and project level (DL-44); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module gating (the `module` option of the load-and-authorize dependency, DL-47), tested through a test-only gated router (F7); `allowed_actions` helper; each workspace entry in `/me` gains its workspace-level `allowed_actions` (DL-45), and `/me` lists every workspace for a system admin, with a null role where they hold no membership (DL-46); per-org actions come in Checkpoint 11; the full matrix (including personal actions) and fail-closed tests |
 | 7a | Sign-in password cap | Sign-in refuses a password longer than the policy's 256 characters with a 422 (`validation_error` on `password`) before any verification, so an oversized one costs no hash and reveals nothing about the account (DL-49; design-doc §4, "Sign-in responses") |
+| 7b | Change-password cap & old session at sign-in | Change password refuses a `current_password` longer than 256 characters with a 422 before any verification (DL-52); a successful sign-in deletes the session the request carried, if any, whoever it belongs to (a failed one leaves it; DL-53; one session by its token, not a sweep of the user's sessions, so no row lock is needed); the developer guide documents the middleware's 403 `origin_rejected` and 415 `unsupported_media_type` on every mutating route (DL-54) |
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners and system admins, DL-45; live slug availability); grants of owner/admin roles only by owners (and system admins, DL-45); last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
 | 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`: owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
@@ -837,7 +838,7 @@ rest of the slice.
 |---|---|---|
 | 1 | `s1-foundations` | 1–4 (models, numbering, pure rules, API conventions) |
 | 2 | `s1-auth` | 5–7 (sessions, passwords and CLI, authorization core) |
-| 3 | `s1-workspace` | 7a–10 (the sign-in password cap, workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
+| 3 | `s1-workspace` | 7a–10 (the sign-in password cap, the change-password cap and old session, workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
 | 4 | `s1-projects` | 11–13 (projects, project members, classification) |
 | 5 | `s1-web` | 14–17 (web screens and slice verification) |
 
@@ -890,8 +891,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - `must_change_password`: while set, every endpoint except `GET /api/auth/me`, change-password,
   and sign-out returns 403 with the error code `password_change_required`; the web app redirects
   to the change-password screen.
-- `POST /api/auth/change-password` (requires the current password; replaces the current
-  session's token and deletes the user's other sessions).
+- `POST /api/auth/change-password` (requires the current password, a 422 over 256 characters
+  before any verification, DL-52; replaces the current session's token and deletes the user's
+  other sessions).
 - **Seed command:** an app admin command (`app/cli.py`, run as `wl seed`) that creates the
   workspace (name and slug) and the first system admin (email, username, name, password), and
   makes that admin the workspace's owner (`workspace_membership`, role owner). It prompts by

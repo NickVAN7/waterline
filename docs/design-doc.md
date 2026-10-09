@@ -515,7 +515,8 @@ Workspace (the firm: tenant boundary)
   verified. Emails are lowercased before lookup. After a successful sign-in, a hash made with
   older Argon2 parameters is re-hashed with the current ones. A password longer than the
   policy's 256 characters is refused (422) before any verification, so an oversized one never
-  costs a hash (DL-49).
+  costs a hash (DL-49). Change password refuses a current password over 256 characters the
+  same way (DL-52).
 - **Password policy:** 8–256 characters, no composition rules, not equal to the account's
   email or username (ignoring case). The same rule applies to changes, admin resets, and new
   accounts. When users change their own password, the new one must also differ from the
@@ -534,8 +535,10 @@ Workspace (the firm: tenant boundary)
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
-  - A fresh token at every sign-in (never reuse an existing session); a password change
-    replaces the current session's token and deletes the user's other sessions.
+  - A fresh token at every sign-in (never reuse an existing session), and on a successful
+    sign-in the session the browser signed in with, if it sent one, is deleted, so signing in
+    again cuts off a copy of the old token (DL-53); a password change replaces the current session's token and deletes
+    the user's other sessions.
   - CSRF: `SameSite=Lax`, plus an `Origin` check on every mutating request, plus JSON-only
     request bodies, plus no `GET` ever changing state (so links from other sites, which only
     ever `GET`, are always safe to follow). Owner decisions after S0-C7:

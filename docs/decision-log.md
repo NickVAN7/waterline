@@ -649,3 +649,36 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Verification", the review-tier trial)
 - **Source:** chat session (owner, after the DL-49 docs-consistency check)
+
+### DL-52: Change password refuses an oversized current password
+- **Date:** 2026-10-09
+- **Decision:** Change password refuses a `current_password` longer than the policy's 256
+  characters with a 422 before any verification, as sign-in does (DL-49). Built in S1-C7b.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sign-in responses"); build plan ("Authentication (§4)", the
+  S1-C7b row)
+- **Source:** chat session (owner, after S1-C7a; security review question)
+
+### DL-53: Sign-in deletes the session the browser signed in with
+- **Date:** 2026-10-09
+- **Decision:** When a sign-in succeeds and the request carried a session cookie, that session
+  is deleted (whoever it belongs to), so signing in again cuts off a copy of the old token. A
+  failed sign-in (401, 403, or the 422 cap) leaves it alone, so a mistyped password doesn't sign
+  the user out. It removes one
+  session by its token, not a sweep of a user's sessions, so it takes no user-row lock. Built in
+  S1-C7b.
+- **Supersedes:** none (design-doc §4 said only "never reuse an existing session")
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Slice 1 security checklist"); build plan (the S1-C7b row)
+- **Source:** chat session (owner, after S1-C7a; S1-C5 security review question)
+
+### DL-54: The middleware's 403 and 415 are documented, not declared per route
+- **Date:** 2026-10-09
+- **Decision:** The `Origin` check's 403 `origin_rejected` and the JSON-only check's 415
+  `unsupported_media_type` stay out of each route's OpenAPI responses; the developer guide says
+  every mutating route can return them.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** developer guide ("Authentication")
+- **Source:** chat session (owner, after S1-C7a; S1-C5 review question)
