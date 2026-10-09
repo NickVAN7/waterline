@@ -494,16 +494,22 @@ def test_ensure_is_403_for_what_the_user_sees_but_may_not_do(
         ensure(PERSONAS[persona], action, target)
 
 
-# --- allowed_actions (build plan, "API conventions"; DL-45) -------------------------------------
+# --- allowed_actions (build plan, "API conventions"; DL-45, DL-56) -------------------------------
 
-ALL_FOUR = ["org.create", "workspace.update", "workspace.view", "workspace_staff.manage"]
+ALL_FIVE = [
+    "org.create",
+    "workspace.update",
+    "workspace.view",
+    "workspace_staff.manage",
+    "workspace_staff.manage_admins",
+]
 
 
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", ALL_FOUR),
-        ("workspace_owner", ALL_FOUR),
+        ("system_admin", ALL_FIVE),
+        ("workspace_owner", ALL_FIVE),
         ("workspace_admin", ["org.create", "workspace.view", "workspace_staff.manage"]),
         # A test-only member-level workspace action is registered too: never listed.
         ("workspace_member", []),
@@ -519,11 +525,16 @@ def test_allowed_actions_on_a_workspace_are_the_real_ones_allowed_sorted_by_name
     assert allowed_actions(PERSONAS[persona], WORKSPACE_TARGET) == expected
 
 
-@pytest.mark.parametrize("target", [ORG_TARGET, PROJECT_TARGET])
-def test_allowed_actions_lists_only_actions_at_the_targets_level(target: Target) -> None:
-    """No real org- or project-level action exists yet (DL-44), and test-only ones are never
-    listed, so even a system admin gets none."""
-    assert allowed_actions(PERSONAS["system_admin"], target) == []
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [(ORG_TARGET, ["org.update", "org.view"]), (PROJECT_TARGET, [])],
+)
+def test_allowed_actions_lists_only_actions_at_the_targets_level(
+    target: Target, expected: list[str]
+) -> None:
+    """The real org-level actions are DL-56's two; no real project-level action exists yet
+    (DL-44), and test-only ones are never listed."""
+    assert allowed_actions(PERSONAS["system_admin"], target) == expected
 
 
 # --- Module gating (design-doc §5, "Module gating") ---------------------------------------------

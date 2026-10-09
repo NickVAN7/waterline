@@ -1,10 +1,11 @@
 """Test-only helpers for the authorization core (S1-C7; DL-16, DL-44).
 
 - A fixed tenancy layout and one `AuthzContext` per persona, for the pure unit tests.
-- Test-only actions at org and project level (DL-44: the only real actions are the four
-  workspace-level ones), registered in `REGISTRY` by each test that needs them.
+- Test-only actions at org and project level (DL-44: each area registers its own real
+  actions), registered in `REGISTRY` by each test that needs them.
 - A test-only router over real projects, orgs, and workspaces, using the load-and-authorize
   dependency (`authorized`) and module gating, and a helper to sign a user in.
+- Real tenancy rows and a user per persona, for the API tests of the real endpoints (S1-C8).
 """
 
 import uuid
@@ -15,12 +16,9 @@ import pytest
 from fastapi import APIRouter, Depends
 from httpx import AsyncClient
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, or_, true
-from sqlalchemy.orm import QueryableAttribute
 
 from app.authz.actions import REGISTRY, Action, ActionSpec, Level
 from app.authz.context import AuthzContext, ProjectAccess
-from app.authz.scoping import Scope
 from app.authz.target import Target, org_target, project_target, workspace_target
 from app.core.db import SessionDep
 from app.core.security import generate_token, hash_token
@@ -31,6 +29,10 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.routers.deps import authorized
 from tests.factories.auth import UserSessionFactory
+from tests.factories.org import MembershipFactory, OrganizationFactory
+from tests.factories.project import ProjectFactory, ProjectMembershipFactory
+from tests.factories.user import UserFactory
+from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
 
 # --- A fixed layout (unit tests) ----------------------------------------------------------------
 # Workspace WS holds orgs ORG and ORG2; WS2 holds ORG3. Projects PROJ and PROJ2 are in ORG,
@@ -280,16 +282,58 @@ async def sign_in_as(client: AsyncClient, user: User) -> None:
     client.cookies.set(SESSION_COOKIE, token)
 
 
-def scope_filter(
-    scope: Scope,
-    id_column: QueryableAttribute[uuid.UUID],
-    workspace_column: QueryableAttribute[uuid.UUID],
-    organization_column: QueryableAttribute[uuid.UUID] | None = None,
-) -> ColumnElement[bool]:
-    """`Scope`'s documented meaning as a WHERE clause (what a repository builds from it)."""
-    if scope.everything:
-        return true()
-    clauses = [id_column.in_(scope.ids), workspace_column.in_(scope.workspace_ids)]
-    if organization_column is not None:
-        clauses.append(organization_column.in_(scope.organization_ids))
-    return or_(*clauses)
+# --- Real rows per persona (API tests of the real endpoints) -----------------------------------
+
+
+@dataclass
+class Tenancy:
+    """Workspace "Acme Consulting" (acme), its org "Bolt Foods" (bolt-foods), and that org's
+    project "Payments" (PMT)."""
+
+    workspace: Workspace
+    org: Organization
+    project: Project
+
+
+async def tenancy() -> Tenancy:
+    workspace = await WorkspaceFactory.create_async(name="Acme Consulting", slug="acme")
+    org = await OrganizationFactory.create_async(
+        workspace=workspace, name="Bolt Foods", slug="bolt-foods"
+    )
+    project = await ProjectFactory.create_async(organization=org, key="PMT", name="Payments")
+    return Tenancy(workspace, org, project)
+
+
+async def persona_user(t: Tenancy, who: str) -> User:
+    """A new user who is `who` relative to `t` (the persona names of `PERSONAS`)."""
+    user = await UserFactory.create_async(is_system_admin=who == "system_admin")
+    match who:
+        case "workspace_owner" | "workspace_admin" | "workspace_member":
+            role = WorkspaceRole(who.removeprefix("workspace_"))
+            await WorkspaceMembershipFactory.create_async(
+                workspace=t.workspace, user=user, role=role
+            )
+        case "org_owner" | "org_admin" | "org_member":
+            role = OrgRole(who.removeprefix("org_"))
+            await MembershipFactory.create_async(organization=t.org, user=user, role=role)
+        case "project_admin" | "project_member" | "project_viewer":
+            role = ProjectRole(who.removeprefix("project_"))
+            await ProjectMembershipFactory.create_async(project=t.project, user=user, role=role)
+        case "other_project_admin":
+            other = await ProjectFactory.create_async(organization=t.org, key="LDG", name="Ledger")
+            await ProjectMembershipFactory.create_async(
+                project=other, user=user, role=ProjectRole.ADMIN
+            )
+        case "other_org_owner":
+            other = await OrganizationFactory.create_async(
+                workspace=t.workspace, name="Cove Retail", slug="cove-retail"
+            )
+            await MembershipFactory.create_async(organization=other, user=user, role=OrgRole.OWNER)
+        case "other_workspace_owner":
+            other = await WorkspaceFactory.create_async(name="Delta Partners", slug="delta")
+            await WorkspaceMembershipFactory.create_async(
+                workspace=other, user=user, role=WorkspaceRole.OWNER
+            )
+        case _:  # "system_admin", "nobody"
+            pass
+    return user

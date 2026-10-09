@@ -35,6 +35,8 @@ class ActionSpec:
       a member with their projects).
     - `relationship`: set only for a personal action: `relationship(user_id, target.entity)`
       says whether the user has the relationship that grants it; no role does.
+    - `visible`: granted to anyone who can see the target (design-doc §4, "Visibility"), on top
+      of the roles above: e.g. `org.view`, for a project member who has no org role.
     """
 
     level: Level
@@ -44,15 +46,19 @@ class ActionSpec:
     mutation: bool = True
     archive_exempt: bool = False
     relationship: Callable[[uuid.UUID, object], bool] | None = None
+    visible: bool = False
 
 
 class Action(StrEnum):
-    """The real actions (DL-44, DL-45: the workspace-level ones; each area adds its own)."""
+    """The real actions (DL-44, DL-45, DL-56; each area adds its own)."""
 
     WORKSPACE_VIEW = "workspace.view"
     WORKSPACE_UPDATE = "workspace.update"
     WORKSPACE_STAFF_MANAGE = "workspace_staff.manage"
+    WORKSPACE_STAFF_MANAGE_ADMINS = "workspace_staff.manage_admins"
     ORG_CREATE = "org.create"
+    ORG_VIEW = "org.view"
+    ORG_UPDATE = "org.update"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -65,4 +71,14 @@ REGISTRY: dict[str, ActionSpec] = {
     Action.WORKSPACE_UPDATE: ActionSpec(Level.WORKSPACE, workspace_role=WorkspaceRole.OWNER),
     Action.WORKSPACE_STAFF_MANAGE: _WORKSPACE_ADMINS,
     Action.ORG_CREATE: _WORKSPACE_ADMINS,
+    # Granting, changing, or removing an owner or admin role: workspace owners (DL-56).
+    Action.WORKSPACE_STAFF_MANAGE_ADMINS: ActionSpec(
+        Level.WORKSPACE, workspace_role=WorkspaceRole.OWNER
+    ),
+    # Anyone who sees the org, a project member with no org role included (DL-56).
+    Action.ORG_VIEW: ActionSpec(Level.ORGANIZATION, mutation=False, visible=True),
+    # Org owners, and workspace admins' "org owner capabilities in every org" (§5).
+    Action.ORG_UPDATE: ActionSpec(
+        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.OWNER
+    ),
 }

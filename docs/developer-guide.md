@@ -4,29 +4,32 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C7b (Change-password cap & old session at sign-in) done, after S1-C7a (Sign-in
-> password cap); S1-C7 (Authorization core) closed the `s1-auth` group, on the `s1` branch (one
-> branch and PR for the rest of Slice 1); next is S1-C8 (Workspace & organizations). Every check
-> goes through `authorize()` ("Authorization" below); `/me` carries each workspace's
-> `allowed_actions`. Sign-in, sign-out, change password, and `GET /api/auth/me` work over a
-> server-side session in the `__Host-session` cookie, a forced password change blocks every other
-> endpoint, and every mutating request passes the `Origin` and JSON-only checks first
-> ("Authentication" below). `wl seed` creates the workspace and its first system admin, and `wl
-> admin` grants and revokes the system-admin flag. The tenancy, project, and audit tables exist
-> (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
-> the domain enums in `app/enums.py`, get-by-ID in the base repository, and
-> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure rules
-> (identifiers, password policy, account rank) are in `app/rules/`, held to 100% coverage and
-> mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
-> (`app/core/lists.py`), constraint errors as field errors (`app/core/constraint_errors.py`), and
-> `log_admin_event()`. The backend has its database core (Postgres, async SQLAlchemy, Alembic, the
-> base model and its mixins), a test harness with a `concurrency` fixture, background jobs on
-> procrastinate, the model conventions (enums, soft delete, optimistic locking with 409,
-> `direct_update`), the standard error format (including a catch-all 500), and the password and
-> token helpers; `GET /api/health` checks the database. Docker Compose runs the whole stack
-> (postgres, migrate, api, worker, web). The frontend is a Vue shell: layout, router with a 404
-> page, Pinia, the generated API client, and a home page showing the health check through the Vite
-> proxy. CI runs `wl check` on every push to `main` and every pull request.
+> **Status:** S1-C8 (Workspace & organizations) done, the first checkpoint of the review-tier trial,
+> after S1-C7a and S1-C7b (the sign-in and change-password caps, the old session at sign-in); S1-C7
+> (Authorization core) closed the `s1-auth` group, on the `s1` branch (one branch and PR for the
+> rest of Slice 1); next is S1-C9 (Org members & user creation). The workspace and org API is built:
+> the workspace, its staff (email-first add, create, roles with the owner-only rule, removal), and
+> orgs with their first owner (build plan, "The workspace and org API"). Every check goes through
+> `authorize()` ("Authorization" below); `/me` carries each workspace's `allowed_actions`. Sign-in,
+> sign-out, change password, and `GET /api/auth/me` work over a server-side session in the
+> `__Host-session` cookie, a forced password change blocks every other endpoint, and every mutating
+> request passes the `Origin` and JSON-only checks first ("Authentication" below). `wl seed` creates
+> the workspace and its first system admin, and `wl admin` grants and revokes the system-admin flag.
+> The tenancy, project, and audit tables exist (models, migrations, constraint tests, a factory per
+> model; `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the
+> base repository, and `NumberingService.allocate_number`. Race tests have a harness
+> (`run_in_parallel`). The pure rules (identifiers, password policy, account rank) are in
+> `app/rules/`, held to 100% coverage and mutation-tested (`wl backend mutate`). The API conventions
+> are in place: list helpers (`app/core/lists.py`), constraint errors as field errors
+> (`app/core/constraint_errors.py`), and `log_admin_event()`. The backend has its database core
+> (Postgres, async SQLAlchemy, Alembic, the base model and its mixins), a test harness with a
+> `concurrency` fixture, background jobs on procrastinate, the model conventions (enums, soft
+> delete, optimistic locking with 409, `direct_update`), the standard error format (including a
+> catch-all 500), and the password and token helpers; `GET /api/health` checks the database. Docker
+> Compose runs the whole stack (postgres, migrate, api, worker, web). The frontend is a Vue shell:
+> layout, router with a 404 page, Pinia, the generated API client, and a home page showing the
+> health check through the Vite proxy. CI runs `wl check` on every push to `main` and every pull
+> request.
 
 ## 1. Workstation setup
 
@@ -291,9 +294,20 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   policy's problems, each its own `type`); on success the session keeps its row but gets a new
   token (a new cookie), the user's other sessions are deleted, `must_change_password` is cleared,
   and `password_changed` is recorded.
-- **Password and identifier messages:** `password_errors()` and `identifier_error()`
-  (`app/services/user.py`) turn the `rules/` problems into field errors; use them wherever a
-  password, username, or slug is set.
+- **Password and identifier messages:** `password_errors()`, `identifier_error()`,
+  `required_error()`, `email_error()`, and `new_user_errors()` (`app/services/user.py`) turn the
+  problems into field errors (`under=` for a nested object, e.g. `("body", "new_owner")`); use
+  them wherever a password, username, slug, or new account is set.
+- **Accounts an admin creates** (staff, an org's first owner; later org and project members)
+  go through `UserService.create_account(actor_id, workspace_id, new)`: validated,
+  `must_change_password` set, `user_created` recorded.
+- **Removing a member "with their projects"** calls the handlers registered with
+  `register_on_member_removed()` (`app/services/workspace.py`; the project area registers its own
+  in S1-C12), each given a `MemberRemoval`.
+- **Update events** record `change_details(changed_fields(entity, values))`
+  (`app/audit/admin_event.py`): `{"old": {...}, "new": {...}}`, the changed fields only.
+- **`ReservedSlug`** isn't returned by any route: `create_app` adds it to the OpenAPI schema's
+  components (`_add_schema_components`, `app/main.py`).
 - **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
   password (the same body either way) and 403 `account_inactive` for a deactivated account with its
   correct password; a password over 256 characters is a 422 on `password` (`string_too_long`) before
@@ -329,7 +343,8 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
 
 - **Actions** are registered in `REGISTRY` (`app/authz/actions.py`), one `ActionSpec` each: its
   level, the lowest workspace, org, and project role that grants it, whether it's a mutation,
-  `archive_exempt`, and, for a personal action, its `relationship`. Real actions are members of
+  `archive_exempt`, for a personal action its `relationship`, and `visible` (granted to anyone
+  who can see the target, e.g. `org.view` for a project member with no org role). Real actions are members of
   `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
   (DL-44); an unregistered action is denied. A project-level action normally sets
   `workspace_role=ADMIN, org_role=ADMIN` (inherited project admin).

@@ -1,6 +1,6 @@
 """`/me`'s workspace entries (build plan, "Authentication (§4)", `/me`; DL-45: each entry's
-workspace-level `allowed_actions`; DL-46: a system admin sees every workspace, with a null role
-where they aren't staff)."""
+workspace-level `allowed_actions`, with DL-56's `workspace_staff.manage_admins`; DL-46: a system
+admin sees every workspace, with a null role where they aren't staff)."""
 
 from typing import Any
 
@@ -15,7 +15,13 @@ from tests.support.authz import sign_in_as
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
 
-ALL_FOUR = ["org.create", "workspace.update", "workspace.view", "workspace_staff.manage"]
+ALL_FIVE = [
+    "org.create",
+    "workspace.update",
+    "workspace.view",
+    "workspace_staff.manage",
+    "workspace_staff.manage_admins",
+]
 
 
 async def my_workspaces(client: AsyncClient) -> list[dict[str, Any]]:
@@ -27,7 +33,7 @@ async def my_workspaces(client: AsyncClient) -> list[dict[str, Any]]:
 @pytest.mark.parametrize(
     ("role", "expected"),
     [
-        (WorkspaceRole.OWNER, ALL_FOUR),
+        (WorkspaceRole.OWNER, ALL_FIVE),
         (WorkspaceRole.ADMIN, ["org.create", "workspace.view", "workspace_staff.manage"]),
         (WorkspaceRole.MEMBER, []),
     ],
@@ -65,14 +71,14 @@ async def test_a_system_admin_sees_every_workspace_with_a_null_role_and_every_ac
             "name": "Acme Consulting",
             "slug": "acme",
             "role": None,
-            "allowed_actions": ALL_FOUR,
+            "allowed_actions": ALL_FIVE,
         },
         {
             "id": str(bolt.id),
             "name": "Bolt Partners",
             "slug": "bolt",
             "role": None,
-            "allowed_actions": ALL_FOUR,
+            "allowed_actions": ALL_FIVE,
         },
     ]
 
@@ -87,8 +93,8 @@ async def test_a_system_admin_who_is_staff_keeps_their_role_there(client: AsyncC
     await sign_in_as(client, admin)
 
     assert [(w["id"], w["role"], w["allowed_actions"]) for w in await my_workspaces(client)] == [
-        (str(acme.id), "member", ALL_FOUR),
-        (str(bolt.id), None, ALL_FOUR),
+        (str(acme.id), "member", ALL_FIVE),
+        (str(bolt.id), None, ALL_FIVE),
     ]
 
 

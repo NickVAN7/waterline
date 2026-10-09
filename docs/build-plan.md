@@ -1025,7 +1025,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | `GET /api/orgs/{org_id}/slug-availability?slug=` | the same shape; the org's own slug counts as available | `org.update` |
 
   Granting, changing, or removing an owner or admin role also needs
-  `workspace_staff.manage_admins` (403 otherwise). Demoting or removing the workspace's last
+  `workspace_staff.manage_admins` (403 otherwise; checked before the email on an add). A staff
+  row's `allowed_actions` are the caller's `workspace_staff.*` actions, and none on an owner's or
+  admin's row unless the caller holds `manage_admins`, so the UI never offers what the API would
+  refuse with a 403 (the last owner's own row still offers changes the guard refuses). A role change to the role already held changes and records nothing. Demoting or removing the workspace's last
   owner is a 422 `validation_error` of type `last_owner`, on `role` (a demotion) or on the path's
   `user_id` (a removal); S1-C9's org guard does the same. `create_app` adds a `ReservedSlug` enum
   (`RESERVED_SLUGS`) to the OpenAPI schema's components, with a test that it's there, for the

@@ -326,4 +326,32 @@ Entry format:
 - **Why:** both are spec-test files, which change only with the owner's approval.
 - **Fix by:** S1-C8 (the owner decides: switch the spec test to `scope_clause` and delete the
   copy, or keep both and change them together).
+- **Status:** resolved in S1-C8 (the spec test uses `scope_clause`, and `scope_filter` is gone;
+  owner-approved)
+
+### TD-23: A race on the staff add reports its error on `user_id`
+- **Added:** S1-C8
+- **What:** the staff add checks for an existing membership, then inserts. Two admins adding the
+  same person at the same moment both pass the check, and the second hits the unique constraint
+  on `workspace_membership (workspace_id, user_id)`, whose field error is on `user_id`, a field the
+  email-first add doesn't have. The same holds for an account created inside a nested object (an
+  org's `new_owner`, and S1-C9's creates): `create_account` reports a taken email or username
+  under the nested field, but two requests taking the same one at once leave the second to the
+  `user` table's constraints, which report on `body.email` or `body.username`.
+- **Why:** only a race reaches it (the check reports `already_member` on `email` otherwise), and
+  S1-C12's add by user ID may want `user_id` from the same constraint, so the field is better
+  decided with that path.
+- **Fix by:** S1-C12 (the owner decides the constraint's field with the project member add).
+- **Status:** open
+
+### TD-24: An intermittent Hypothesis error in an identifier property test
+- **Added:** S1-C8
+- **What:** `tests/unit/rules/test_identifiers.py::test_every_key_in_the_format_is_valid` failed
+  twice in S1-C8 (once in mutmut's statistics run, once in a reviewer's full run) with a
+  `TypeError: 'int' object is not callable` raised inside Hypothesis's own character-set code
+  (`hypothesis/internal/intervalsets.py`), not in the test or the app; every rerun passed.
+- **Why:** it doesn't reproduce on demand, the test file and the rule are unchanged since S1-C3,
+  and the error is in the library; chasing it would hold up the checkpoint without a lead.
+- **Fix by:** S1-C10 (if it recurs: pin or bump Hypothesis, or report it upstream; if it hasn't
+  recurred by then, close it with that note).
 - **Status:** open

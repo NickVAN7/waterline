@@ -1,6 +1,7 @@
 """Dependencies shared by routers: settings, the auth service, the signed-in user, the
 authorization context, and load-and-authorize (`authorized`)."""
 
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -8,12 +9,14 @@ from fastapi import Cookie, Depends, Request
 
 from app.authz.authorize import ensure, module_enabled
 from app.authz.context import AuthzContext
-from app.authz.target import Target
+from app.authz.target import Target, org_target, workspace_target
 from app.core.db import SessionDep
 from app.core.errors import NotFoundError
 from app.core.settings import Settings
 from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
+from app.services.org import OrgEntity, OrgService
+from app.services.workspace import WorkspaceEntity, WorkspaceService
 
 # `__Host-`: the browser only accepts it with `Secure`, `Path=/`, and no `Domain` (design-doc
 # §4, "Slice 1 security checklist").
@@ -97,3 +100,18 @@ def authorized[E](
         return entity
 
     return dependency
+
+
+# --- Loaders for `authorized` -------------------------------------------------------------
+
+
+async def load_workspace(
+    workspace_id: uuid.UUID, session: SessionDep
+) -> tuple[WorkspaceEntity, Target] | None:
+    workspace = await WorkspaceService(session).get(workspace_id)
+    return None if workspace is None else (workspace, workspace_target(workspace))
+
+
+async def load_org(org_id: uuid.UUID, session: SessionDep) -> tuple[OrgEntity, Target] | None:
+    org = await OrgService(session).get(org_id)
+    return None if org is None else (org, org_target(org))

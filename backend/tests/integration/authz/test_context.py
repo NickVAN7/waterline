@@ -13,12 +13,12 @@ from app.models.org import Organization
 from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
+from app.repositories.base import scope_clause
 from app.repositories.user import UserRepository
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
-from tests.support.authz import scope_filter
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security]
 
@@ -84,13 +84,13 @@ async def test_a_user_with_no_membership_has_an_empty_context(session: AsyncSess
 
 async def visible_project_keys(session: AsyncSession, user: User) -> set[str]:
     scope = project_scope(await UserRepository(session).authz_context(user))
-    where = scope_filter(scope, Project.id, Project.workspace_id, Project.organization_id)
+    where = scope_clause(scope, Project.id, Project.workspace_id, Project.organization_id)
     return set(await session.scalars(select(Project.key).where(where)))
 
 
 async def visible_org_slugs(session: AsyncSession, user: User) -> set[str]:
     scope = org_scope(await UserRepository(session).authz_context(user))
-    where = scope_filter(scope, Organization.id, Organization.workspace_id)
+    where = scope_clause(scope, Organization.id, Organization.workspace_id)
     return set(await session.scalars(select(Organization.slug).where(where)))
 
 

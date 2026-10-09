@@ -10,11 +10,15 @@ from app.models.org import Membership, Organization
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
 from app.models.workspace import WorkspaceMembership
+from app.repositories.base import get_by_id
 
 
 class UserRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def get(self, user_id: uuid.UUID) -> User | None:
+        return await get_by_id(self.session, User, user_id)
 
     async def get_by_email(self, email: str) -> User | None:
         """The user with exactly this email; callers lowercase it first (emails are stored
@@ -25,6 +29,9 @@ class UserRepository:
         """Re-read the user's row and hold it (`FOR NO KEY UPDATE`) until the transaction ends;
         anything that changes the row (a password change) waits for this transaction."""
         await self.session.refresh(user, with_for_update={"key_share": True})
+
+    async def get_by_username(self, username: str) -> User | None:
+        return await self.session.scalar(select(User).where(User.username == username))
 
     async def lock_active_system_admins(self) -> list[uuid.UUID]:
         """The active system admins' IDs, their rows locked until the transaction ends: two

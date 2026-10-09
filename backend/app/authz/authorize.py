@@ -55,6 +55,8 @@ def authorize(ctx: AuthzContext, action: str, target: Target) -> bool:
     if spec.relationship is not None:
         # Only the relationship grants a personal action, and only with access to the project.
         return spec.relationship(ctx.user_id, target.entity) and _project_access(ctx, target)
+    if spec.visible and can_see(ctx, target):
+        return True
     # A None ID (a target above that level) finds nothing: no membership is keyed by None.
     project = ctx.projects.get(target.project_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
     org_role = ctx.org_roles.get(target.organization_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
