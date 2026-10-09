@@ -762,9 +762,10 @@ afterwards (see `tests/integration/test_migrations.py`).
   `--dry-run`, dry-run output matches the expected commands, and the doctor checks are tested
   with fake probes. The CLI is held to **100% line + branch coverage** (in
   `tools/cli/pyproject.toml`), so a test that claims to cover an error path but never reaches
-  it fails the gate. The Claude Code hooks `guard_git.py` and `protect_files.py` are tested
-  here too (`tools/cli/tests/hooks/`, importing them from `.claude/hooks/` through pytest's
-  `pythonpath`), under the same gate and pyright's strict mode.
+  it fails the gate. The Claude Code hooks (`.claude/hooks/`, with their shared
+  `hook_paths.py`) are tested here too (`tools/cli/tests/hooks/`, importing them from
+  `.claude/hooks/` through pytest's `pythonpath`), under the same gate and pyright's strict
+  mode.
 
 **Docs consistency tests** (`tests/unit/docs/test_docs_consistency.py`, parsers in
 `tests/support/docs.py`) read the docs, `.claude/`, `Base.metadata`, and `git log`; no
@@ -863,7 +864,9 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
     committed migration with a new one. They also can't change `.pre-commit-config.yaml`, which
     is yours to edit (DL-30; the git guard blocks any redirect naming it too), or git's own files:
     anything in `.git/`, `~/.gitconfig`, or `.config/git/` (DL-31).
-  - After Claude edits a file, it is formatted with ruff (backend) or Prettier (frontend).
+  - After Claude edits a file, it is formatted with the backend's ruff (backend), the developer
+    CLI's ruff (`tools/cli/` and `.claude/hooks/`, as `wl lint` checks them), or Prettier
+    (frontend).
   - The **git guard** (`guard_git.py`) is an allow-list (DL-26). A Bash call that involves git or gh
     must be **one command in a listed form, and nothing else**: no `&&`, `;`, `|`, `cd`, variables,
     `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` for another directory, and
@@ -919,9 +922,9 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
     changes. (The gh forms are tested against the guard only.) What it can't see is logged in TD-20:
     a script or program that runs git itself, a write to a shell startup file, and a non-git
     redirect target built by an expansion. Its tests,
-    and `protect_files.py`'s, are in `tools/cli/tests/hooks/`. All three hooks are linted and
-    formatted with the developer CLI (`wl lint`); `guard_git.py` and `protect_files.py` are also
-    type-checked and tested with it (`wl test`).
+    and the other hooks', are in `tools/cli/tests/hooks/`. All three hooks, and the
+    `hook_paths.py` helpers they share, are linted, formatted, type-checked, and tested with the
+    developer CLI (`wl lint`, `wl test`).
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 

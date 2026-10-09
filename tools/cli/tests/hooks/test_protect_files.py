@@ -4,8 +4,10 @@ generated files, committed migrations, the pre-commit configuration (DL-30), or 
 
 import io
 import json
+import os
 import runpy
 import subprocess
+import sys
 from pathlib import Path
 
 import protect_files
@@ -193,3 +195,22 @@ def test_the_script_runs_main(
         runpy.run_path(protect_files.__file__, run_name="__main__")
 
     assert exit_info.value.code == 2
+
+
+def test_the_hook_runs_as_claude_code_runs_it(repo: Path, tmp_path: Path) -> None:
+    # A separate interpreter with no PYTHONPATH, from another directory: `hook_paths` imports only
+    # because Python puts the script's own directory on the path. If that import broke, the hook
+    # would exit 1, which Claude Code treats as a non-blocking error: protection would fail open.
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    result = subprocess.run(
+        [sys.executable, protect_files.__file__],
+        input=edit(str(repo / "backend/openapi.json")),
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "is a generated file" in result.stderr

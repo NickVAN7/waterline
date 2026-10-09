@@ -228,7 +228,8 @@ Everything lives in the repository, version-controlled and present on every work
   generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`), committed migrations,
   `.pre-commit-config.yaml` (the owner's to edit, DL-30), and git's own files (anything in `.git/`,
   `~/.gitconfig`, `.config/git/`; DL-31);
-  format each file after Claude edits it (ruff for the backend, Prettier for the frontend); and the
+  format each file after Claude edits it (the backend's ruff for the backend, the developer CLI's
+  ruff for the CLI and the hooks, Prettier for the frontend); and the
   **git guard** (`guard_git.py`), an allow-list (DL-26): a call that involves git or gh must be one
   command in a listed form, so Claude never commits or merges on `main` (DL-21), pushes to `main`
   (DL-22), rewrites pushed history (DL-23), or skips hooks (DL-24), and merging a pull request or
@@ -236,8 +237,8 @@ Everything lives in the repository, version-controlled and present on every work
   blocked, and the owner runs it. Every allowed git form is verified against real git by its tests
   (the gh forms against the guard only). It's a guard against mistakes, not a security boundary:
   branch protection (DL-27, the GitHub rulesets) is the real control. The hooks are linted with the
-  developer CLI's ruff; the guard and `protect_files.py` are also type-checked (pyright strict) and
-  tested under its 100% coverage gate.
+  developer CLI's ruff, and type-checked (pyright strict) and tested under its 100% coverage gate;
+  `hook_paths.py` holds the helpers they share.
 
 ### Workflow items scheduled
 Workflow items decided but not built yet, each built through the `design-change` skill or the
@@ -360,7 +361,8 @@ The sections below describe the content; the table above is the order of work.
 │                                 each have their own CLAUDE.md too)
 ├── .claude/
 │   ├── settings.json                   hooks configuration
-│   ├── hooks/                          protect_files.py, format_file.py, guard_git.py
+│   ├── hooks/                          protect_files.py, format_file.py, guard_git.py,
+│   │                                   hook_paths.py (shared helpers)
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md, docs-consistency.md,
 │   │                                   spec-test-writer.md

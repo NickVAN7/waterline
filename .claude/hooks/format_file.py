@@ -1,13 +1,18 @@
 """PostToolUse hook: format a file after Claude edits it.
 
-Backend Python files are formatted with the backend's ruff; frontend files with the frontend's
-Prettier. Formatting problems never block work: the pre-commit hooks and `wl check` are the gate.
+Backend Python files are formatted with the backend's ruff; the developer CLI's and the hooks'
+Python with the CLI's ruff, from `tools/cli` (as `wl lint` checks them); frontend files with the
+frontend's Prettier. Formatting problems never block work: the pre-commit hooks and `wl check`
+are the gate.
 """
 
 import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
+
+from hook_paths import repo_root
 
 PRETTIER_SUFFIXES = {
     ".ts",
@@ -22,20 +27,7 @@ PRETTIER_SUFFIXES = {
     ".html",
 }
 SKIP = {"backend/openapi.json", "frontend/src/api/schema.d.ts"}
-
-
-def repo_root(path: Path) -> Path | None:
-    directory = path.parent
-    while not directory.exists() and directory != directory.parent:
-        directory = directory.parent
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],  # noqa: S607 -- fixed command, no shell
-        cwd=directory,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return Path(result.stdout.strip()) if result.returncode == 0 else None
+CLI_PYTHON = ("tools/cli/", ".claude/hooks/")
 
 
 def run(cmd: list[str], cwd: Path) -> None:
@@ -45,11 +37,12 @@ def run(cmd: list[str], cwd: Path) -> None:
 
 def main() -> int:
     try:
-        data = json.load(sys.stdin)
+        data: dict[str, Any] = json.load(sys.stdin)
     except json.JSONDecodeError:
         return 0
 
-    file_path = (data.get("tool_input") or {}).get("file_path")
+    tool_input: dict[str, Any] = data.get("tool_input") or {}
+    file_path = tool_input.get("file_path")
     if not file_path:
         return 0
     path = Path(file_path)
@@ -72,6 +65,8 @@ def main() -> int:
     try:
         if rel.startswith("backend/") and path.suffix == ".py":
             run(["uv", "run", "--quiet", "ruff", "format", str(path)], cwd=root / "backend")
+        elif rel.startswith(CLI_PYTHON) and path.suffix == ".py":
+            run(["uv", "run", "--quiet", "ruff", "format", str(path)], cwd=root / "tools/cli")
         elif (
             rel.startswith("frontend/")
             and path.suffix in PRETTIER_SUFFIXES
