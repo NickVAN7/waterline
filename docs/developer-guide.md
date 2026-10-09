@@ -409,7 +409,8 @@ object if the session has it loaded, so it stays readable without a lazy load.
 **List endpoints** (`app/core/lists.py`; build plan, "API conventions", "Lists"). Declare a
 `ListSpec` per list: sortable fields (an allowlist; `id` is always the last tiebreaker), the
 default sort, filters (`Filter(name, column, FilterType.ENUM, enum=...)`, or `CustomFilter` for
-a join), `search` columns for `?q=`, `archived_column`, `soft_deleted`, and `paging="cursor"`
+a filter on another table, written with `EXISTS`, never a join, so no item repeats: DL-35),
+`search` columns for `?q=`, `archived_column`, `soft_deleted`, and `paging="cursor"`
 for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
 parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
 the service; the **repository** builds a statement already scoped to what the user may see and

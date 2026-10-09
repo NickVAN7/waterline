@@ -546,6 +546,7 @@ Last active system admin cannot be deactivated or have the flag revoked (service
 | expires_at | timestamptz | |
 | created_at / updated_at | timestamptz | |
 
+Index on `user_id`: the account actions below delete all of a user's sessions (DL-34).
 Deleted on sign-out, deactivation, admin password reset, "sign out everywhere", an admin changing
 the user's email, and (other sessions) on password change. Removing a membership leaves sessions
 alone: every request re-checks memberships (design-doc §4, "Sessions"). Session-ending account
@@ -561,7 +562,8 @@ ends sessions through the handler `auth` registers with it (build plan, "Feature
 | role | enum: owner / admin / member | owners/admins inherit project admin on the org's projects; members get project access only through `project_membership` |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(user_id, organization_id)`. Last owner of an org cannot leave or be demoted
+`UNIQUE(user_id, organization_id)`; index on `organization_id` (an org's members list; the
+unique constraint serves only lookups by user, DL-34). Last owner of an org cannot leave or be demoted
 (service-layer check).
 
 ### `project`
@@ -584,7 +586,8 @@ ends sessions through the handler `auth` registers with it (build plan, "Feature
 
 Composite FK `(organization_id, workspace_id)` → `organization(id, workspace_id)`: keeps
 `workspace_id` consistent with the org, and replaces a plain FK on `organization_id` (both would
-get the same conventional name, `fk_project_organization_id_organization`).
+get the same conventional name, `fk_project_organization_id_organization`). Index on
+`organization_id` (an org's projects; Postgres doesn't index a foreign key's columns, DL-34).
 `UNIQUE(workspace_id, key)` (design-doc §3: an ID like `ERP-TA-45` is unambiguous across the
 firm's clients).
 `CHECK (enabled_modules <@ ARRAY[...allowed modules])` — `sprints` and `github` are allowed from

@@ -430,3 +430,26 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** `checkpoint` skill; build plan ("Pull requests"); developer guide section 10
 - **Source:** chat session (owner, after review DC-2026-10-08b)
+
+### DL-34: Indexes on `session.user_id`, `membership.organization_id`, `project.organization_id`
+- **Date:** 2026-10-08
+- **Decision:** The three columns get an index each. Deleting all of a user's sessions (sign out
+  everywhere, deactivation, password reset or change) and listing an org's members or projects
+  would otherwise read the whole table: no unique constraint starts with these columns, and
+  Postgres doesn't index a foreign key's columns. The migration lands in S1-C5.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** schema-doc (`session`, `membership`, `project`); build plan (Checkpoint 5)
+- **Source:** chat session (owner, after a whole-repo audit)
+
+### DL-35: Custom list filters use `EXISTS`, never a join
+- **Date:** 2026-10-08
+- **Decision:** A `CustomFilter` on another table (e.g. tasks by tag) filters with `EXISTS`. A
+  join returns an item once per matching row, so the item would repeat in `items` and `total`
+  would count it twice. Each such filter has a test with an item that matches two values.
+- **Supersedes:** build plan ("Lists": "Filters that need a join ... are declared as custom
+  filters")
+- **Superseded by:** none
+- **Applies to:** build plan ("Lists", Checkpoint 5 for the docstring); developer guide section 5
+  ("Models", list endpoints); `app/core/lists.py` (`CustomFilter` docstring, in S1-C5)
+- **Source:** chat session (owner, after a whole-repo audit)
