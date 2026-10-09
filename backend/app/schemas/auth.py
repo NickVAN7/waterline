@@ -15,7 +15,8 @@ class SignInRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str
+    # As at sign-in (DL-49, DL-52): no current password is longer, so a longer one costs no hash.
+    current_password: str = Field(max_length=MAX_LENGTH)
     new_password: str
 
 

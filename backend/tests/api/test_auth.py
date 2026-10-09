@@ -133,14 +133,55 @@ async def test_every_sign_in_starts_a_new_session_with_a_new_token(
     user = await UserFactory.create_async(email="ann@example.com")
 
     first, _ = set_cookie(await sign_in(client, "ann@example.com"))
-    # The client now sends the first session's cookie; it isn't reused.
+    # The client now sends the first session's cookie: it isn't reused, and it ends (DL-53).
     second, _ = set_cookie(await sign_in(client, "ann@example.com"))
 
     assert first != second
-    assert {row.token_hash for row in await session_rows(session, user)} == {
-        hash_token(first),
-        hash_token(second),
-    }
+    assert [row.token_hash for row in await session_rows(session, user)] == [hash_token(second)]
+
+
+async def test_signing_in_ends_the_session_the_browser_sent_whoever_its_is(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-53: a browser signed in as Bob that signs in as Ann ends Bob's session there; Bob's
+    other sessions stay."""
+    await UserFactory.create_async(email="ann@example.com")
+    bob = await UserFactory.create_async()
+    bobs_here = await session_for(bob, session)
+    bobs_elsewhere = await session_for(bob, session)
+    client.cookies.set(COOKIE, bobs_here)
+
+    response = await sign_in(client, "ann@example.com")
+
+    assert response.status_code == 200
+    assert [row.token_hash for row in await session_rows(session, bob)] == [
+        hash_token(bobs_elsewhere)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("email", "password", "status"),
+    [
+        ("ann@example.com", "not the password", 401),
+        ("nobody@example.com", FACTORY_PASSWORD, 401),
+        ("inactive@example.com", FACTORY_PASSWORD, 403),
+        ("ann@example.com", "x" * 257, 422),
+    ],
+    ids=["wrong-password", "unknown-email", "inactive", "oversized"],
+)
+async def test_a_failed_sign_in_leaves_the_browsers_session_alone(
+    client: AsyncClient, session: AsyncSession, email: str, password: str, status: int
+) -> None:
+    """DL-53: a mistyped password doesn't sign the user out."""
+    ann = await UserFactory.create_async(email="ann@example.com")
+    await UserFactory.create_async(email="inactive@example.com", is_active=False)
+    token = await session_for(ann, session)
+    client.cookies.set(COOKIE, token)
+
+    response = await sign_in(client, email, password)
+
+    assert response.status_code == status
+    assert [row.token_hash for row in await session_rows(session, ann)] == [hash_token(token)]
 
 
 async def test_the_email_is_lowercased_before_lookup(client: AsyncClient) -> None:
@@ -737,6 +778,36 @@ async def test_a_new_password_at_the_length_limits_is_accepted(
     response = await change_password(client, new)
 
     assert response.status_code == 204
+
+
+async def test_a_current_password_over_256_characters_is_refused_before_any_hash(
+    client: AsyncClient, hashing: list[str]
+) -> None:
+    """DL-52: as at sign-in, an oversized current password costs no verification."""
+    await UserFactory.create_async(email="ann@example.com")
+    await sign_in(client, "ann@example.com")
+    hashing.clear()  # the sign-in itself verified a password
+
+    response = await change_password(client, current="x" * 257)
+
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+    assert [(f["loc"], f["type"]) for f in response.json()["details"]["fields"]] == [
+        (["body", "current_password"], "string_too_long")
+    ]
+    assert hashing == []
+
+
+async def test_a_256_character_current_password_is_still_checked(
+    client: AsyncClient, hashing: list[str]
+) -> None:
+    await UserFactory.create_async(email="ann@example.com")
+    await sign_in(client, "ann@example.com")
+    hashing.clear()
+
+    response = await change_password(client, current="x" * 256)
+
+    assert [f["type"] for f in response.json()["details"]["fields"]] == ["incorrect"]
+    assert hashing == ["x" * 256]
 
 
 async def test_change_password_without_a_session_is_401(client: AsyncClient) -> None:

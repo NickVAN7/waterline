@@ -59,11 +59,13 @@ class AuthService:
         self.settings = settings
         self.repository = AuthRepository(session)
 
-    async def sign_in(self, email: str, password: str) -> SignedIn:
+    async def sign_in(self, email: str, password: str, old_token: str | None = None) -> SignedIn:
         """A new session for the account with this email and password. 401
         `invalid_credentials` for an unknown email or a wrong password (an unknown email still
         costs a password verification, so timing doesn't tell them apart); 403
-        `account_inactive` for a deactivated account, only once its password is verified."""
+        `account_inactive` for a deactivated account, only once its password is verified. Once it
+        succeeds, the session the browser signed in with (`old_token`), if any, is deleted, so
+        signing in again cuts off a copy of the old token (DL-53); a failed sign-in leaves it."""
         users = UserRepository(self.session)
         user = await users.get_by_email(email.lower())
         if user is None:
@@ -89,6 +91,9 @@ class AuthService:
         await self.repository.add_session(
             user.id, hash_token(token), self.settings.session_lifetime
         )
+        if old_token:
+            # One session by its token, whoever's it is: no user-row lock needed (DL-53).
+            await self.repository.delete_by_token_hash(hash_token(old_token))
         return SignedIn(token=token, me=await self.me(user))
 
     async def authenticate(

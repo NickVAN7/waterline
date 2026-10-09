@@ -36,8 +36,9 @@ export interface paths {
         put?: never;
         /**
          * Sign In
-         * @description Start a new session and set its cookie. 401 `invalid_credentials` for an unknown email
-         *     or a wrong password; 403 `account_inactive` for a deactivated account.
+         * @description Start a new session and set its cookie, ending the session the browser sent, if any. 401
+         *     `invalid_credentials` for an unknown email or a wrong password; 403 `account_inactive` for a
+         *     deactivated account.
          */
         post: operations["sign_in_api_auth_sign_in_post"];
         delete?: never;

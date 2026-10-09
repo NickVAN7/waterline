@@ -25,11 +25,16 @@ _UNAUTHENTICATED: dict[int | str, dict[str, Any]] = {
     responses={**_UNAUTHENTICATED, status.HTTP_403_FORBIDDEN: {"model": ErrorBody}},
 )
 async def sign_in(
-    body: SignInRequest, response: Response, auth: AuthServiceDep, settings: SettingsDep
+    body: SignInRequest,
+    response: Response,
+    auth: AuthServiceDep,
+    settings: SettingsDep,
+    token: SessionTokenDep = None,
 ) -> MeRead:
-    """Start a new session and set its cookie. 401 `invalid_credentials` for an unknown email
-    or a wrong password; 403 `account_inactive` for a deactivated account."""
-    signed_in = await auth.sign_in(body.email, body.password)
+    """Start a new session and set its cookie, ending the session the browser sent, if any. 401
+    `invalid_credentials` for an unknown email or a wrong password; 403 `account_inactive` for a
+    deactivated account."""
+    signed_in = await auth.sign_in(body.email, body.password, old_token=token)
     _set_session_cookie(response, signed_in.token, settings)
     return signed_in.me
 
