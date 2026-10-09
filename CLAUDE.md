@@ -84,6 +84,12 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   verified only by a gate (`wl check`, CI), an independent agent, or the owner. Reports label
   each verification claim with who verified it (e.g. "sabotage-checked by
   checkpoint-reviewer").
+- **The smallest complete change** (DL-40): finish everything the scope needs (callers, tests,
+  fixtures, docs) and add nothing it doesn't. Before writing new code, take the first option that
+  works: not needed (name what you skipped in the report), a helper or pattern already in the
+  repo, the standard library, an installed dependency, then the minimum new code. No speculative
+  options, config, or abstractions; keep the layers the docs require. For a bug fix, grep every
+  caller of the function you change and fix the root cause once, in the shared code.
 - Never hand-edit generated files: `backend/openapi.json`, `frontend/src/api/schema.d.ts`.
 - When a review catches a mistake that a rule would have prevented, add that rule to the
   relevant `CLAUDE.md` as part of the fix.
@@ -100,7 +106,7 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `checkpoint` — to close every checkpoint; it runs `security-reviewer` (when the build plan
   names the checkpoint for it, or the diff touches security-relevant code), then
   `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a temporary copy), then
-  `fresh-clone-verifier` and `docs-consistency` (last checkpoint of a slice).
+  `fresh-clone-verifier`, `docs-consistency`, and `repo-auditor` (last checkpoint of a slice).
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).

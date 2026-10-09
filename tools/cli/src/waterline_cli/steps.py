@@ -136,8 +136,8 @@ def frontend_check() -> list[Step]:
     ]
 
 
-# The Claude Code hooks are linted and formatted with the CLI (guard_git.py and protect_files.py
-# are also type-checked and tested with it; tools/cli/pyproject.toml).
+# The Claude Code hooks are linted, formatted, type-checked, and tested with the CLI
+# (tools/cli/pyproject.toml).
 HOOKS = "../../.claude/hooks"
 
 

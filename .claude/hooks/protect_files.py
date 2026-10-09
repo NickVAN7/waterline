@@ -6,11 +6,12 @@ exit code 0 lets the normal permission flow continue.
 """
 
 import json
-import subprocess
 import sys
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
+
+from hook_paths import git, repo_root
 
 GENERATED_FILES = {
     "backend/openapi.json": "Change the backend API and run `uv run wl gen-client` instead.",
@@ -33,26 +34,6 @@ def is_git_internal(path: Path) -> bool:
     parts = path.parts
     under_config_git = any(a == ".config" and b == "git" for a, b in pairwise(parts))
     return ".git" in parts or ".gitconfig" in parts or under_config_git
-
-
-def git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    # Fixed executable and arguments, no shell.
-    return subprocess.run(  # noqa: S603
-        ["git", *args],  # noqa: S607
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-def repo_root(path: Path) -> Path | None:
-    """Root of the git repository containing path (works in worktrees and for new files)."""
-    directory = path.parent
-    while not directory.exists() and directory != directory.parent:
-        directory = directory.parent
-    result = git(directory, "rev-parse", "--show-toplevel")
-    return Path(result.stdout.strip()) if result.returncode == 0 else None
 
 
 def main() -> int:

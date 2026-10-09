@@ -138,9 +138,12 @@ rule; every other checkpoint keeps the full stop for approval.
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
 the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
-`CLAUDE.md` file, and `.claude/` file against the others. The slice's last checkpoint ends with
+`CLAUDE.md` file, and `.claude/` file against the others, and then the `repo-auditor` agent
+audits the whole repository, not one diff: bugs, security, scale against the expected load,
+risky code without a test, slowness, and lean (DL-41). The slice's last checkpoint ends with
 a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
-skills and agents never triggered, and the verdict of any process trial. The owner decides what
+skills and agents never triggered, the verdict of any process trial, and the auditor's findings
+left for the owner. The owner decides what
 changes; each change gets a decision-log entry and is applied as a design change on the slice
 branch before the slice's PR is merged (DL-19).
 
@@ -171,9 +174,12 @@ Everything lives in the repository, version-controlled and present on every work
   checkpoint process; the backend and frontend files list the conventions that are easy to break
   silently. When a review catches a mistake a rule would have prevented, the fix adds that rule.
 - **`checkpoint-reviewer` agent** (`.claude/agents/`): verification layer 2. A fresh-context
-  reviewer that reads the docs and the diff, sabotage-checks two or three behaviors in a
-  temporary copy (never the repository), compares spec tests with their recorded hashes, and
-  reports findings in a fixed format. It also reviews a design change's tooling code, under a
+  reviewer that reads the docs, the diff, and the code the diff connects to (every caller of a
+  changed function, DL-36), checks scale against the expected load (DL-37) and lean (DL-38)
+  along with design, conventions, correctness, tests, and docs, sabotage-checks two or three
+  behaviors in a temporary copy (never the repository), compares spec tests with their recorded
+  hashes, and reports findings in a fixed format: each with a concrete case (DL-39), in plain
+  English (DL-42). It also reviews a design change's tooling code, under a
   `DC-<YYYY-MM-DD>` review ID (DL-18).
 - **`spec-test-writer` agent** (`.claude/agents/`): writes the tests for new or changed code in
   `app/rules/` and `app/authz/` from the design docs, before the implementation exists and without
@@ -193,14 +199,21 @@ Everything lives in the repository, version-controlled and present on every work
   - docs and tech-debt updates;
   - the reviewers, one at a time: `security-reviewer` when the slice's section names the
     checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
-    every time, and at the end of a slice `fresh-clone-verifier` and `docs-consistency`;
+    every time, and at the end of a slice `fresh-clone-verifier`, `docs-consistency`, and
+    `repo-auditor`;
   - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
   - one commit with the review note, pushed to the slice branch;
   - the report, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   before `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
   when a checkpoint touches auth, sessions, authorization, routers, rendered markdown, or
-  GitHub code.
+  GitHub code. Each finding has a confirmed path to harm (DL-39), in plain English (DL-42).
+- **`repo-auditor` agent** (`.claude/agents/`): at the last checkpoint of each slice, after
+  `docs-consistency`, a read-only audit of the whole repository (DL-41): bugs, security, scale
+  against the expected load, risky code without a test, slowness, and lean, each finding with a
+  concrete case and a smallest fix. It runs no tests. Findings within the slice's scope are
+  fixed; the rest are logged or go to the owner as proposed design changes, and all feed the
+  slice retro.
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
   sets up a temporary copy of the repository by following the developer guide literally and
   reports every wrong or missing step.
@@ -213,8 +226,8 @@ Everything lives in the repository, version-controlled and present on every work
   behavior table from the docs, layer choice, assertions that can fail, banned patterns, and
   proof that each test fails (test-first, sabotage check, mutation testing).
 - **`migration` skill** (`.claude/skills/migration/`): schema changes — model changes, Alembic
-  generation, hand review of what autogenerate misses, downgrade, constraint tests, schema-doc
-  sync.
+  generation, hand review of what autogenerate misses (foreign-key columns indexed when rows
+  are looked up or deleted by them, DL-37), downgrade, constraint tests, schema-doc sync.
 - **`design-change` skill** (`.claude/skills/design-change/`): applying a design change outside
   a checkpoint's scope ("Design changes outside a checkpoint" above): timing, checking the
   repository, parking a checkpoint in progress (DL-20), classifying each decision (docs only,
@@ -228,7 +241,8 @@ Everything lives in the repository, version-controlled and present on every work
   generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`), committed migrations,
   `.pre-commit-config.yaml` (the owner's to edit, DL-30), and git's own files (anything in `.git/`,
   `~/.gitconfig`, `.config/git/`; DL-31);
-  format each file after Claude edits it (ruff for the backend, Prettier for the frontend); and the
+  format each file after Claude edits it (the backend's ruff for the backend, the developer CLI's
+  ruff for the CLI and the hooks, Prettier for the frontend); and the
   **git guard** (`guard_git.py`), an allow-list (DL-26): a call that involves git or gh must be one
   command in a listed form, so Claude never commits or merges on `main` (DL-21), pushes to `main`
   (DL-22), rewrites pushed history (DL-23), or skips hooks (DL-24), and merging a pull request or
@@ -236,8 +250,8 @@ Everything lives in the repository, version-controlled and present on every work
   blocked, and the owner runs it. Every allowed git form is verified against real git by its tests
   (the gh forms against the guard only). It's a guard against mistakes, not a security boundary:
   branch protection (DL-27, the GitHub rulesets) is the real control. The hooks are linted with the
-  developer CLI's ruff; the guard and `protect_files.py` are also type-checked (pyright strict) and
-  tested under its 100% coverage gate.
+  developer CLI's ruff, and type-checked (pyright strict) and tested under its 100% coverage gate;
+  `hook_paths.py` holds the helpers they share.
 
 ### Workflow items scheduled
 Workflow items decided but not built yet, each built through the `design-change` skill or the
@@ -360,10 +374,11 @@ The sections below describe the content; the table above is the order of work.
 │                                 each have their own CLAUDE.md too)
 ├── .claude/
 │   ├── settings.json                   hooks configuration
-│   ├── hooks/                          protect_files.py, format_file.py, guard_git.py
+│   ├── hooks/                          protect_files.py, format_file.py, guard_git.py,
+│   │                                   hook_paths.py (shared helpers)
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md, docs-consistency.md,
-│   │                                   spec-test-writer.md
+│   │                                   spec-test-writer.md, repo-auditor.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
 │                                       design-change/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
@@ -662,8 +677,10 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   an action (`restricted=True`, applied only when the endpoint passes it in `permitted`, decided
   through `authorize()`; otherwise a 422 `not_permitted`), and `include_deleted` always does. A
   restricted field is never sortable or searchable (that would reveal what the restriction hides);
-  `ListSpec` refuses it. Filters that need a join (e.g. tasks by tag) are declared as custom filters
-  backed by a function.
+  `ListSpec` refuses it. Filters that need another table (e.g. tasks by tag) are declared as
+  custom filters backed by a function, which filters with `EXISTS`, never a join: a join returns
+  an item once per matching row, so it would repeat in `items` and inflate `total` (DL-35). Each
+  such filter has a test with an item that matches two values.
 - **Operators by type:** enum and references: any of (repeat the parameter), none of (`__not`; it
   keeps empty values), is empty (`__is_null`), and `me` for user references; dates: `__lt`, `__gt`,
   `__is_null`; text: `__contains` (case-insensitive, `%` and `_` escaped); booleans: equals;
@@ -795,7 +812,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 2 | Number allocation & race harness | `allocate_number(project, prefix)` (numbering service and repository); the concurrency harness finished (TD-4): `run_in_parallel(n, fn)` with a start barrier, a test pool sized for 20 parallel transactions (plus spare connections for setup and checks), factories usable in concurrency tests, an automatic empty-tables check after each test, a time limit plus `lock_timeout`; the allocation tests, sabotage-checked against a non-atomic allocator |
 | 3 | Pure rules & mutation testing | `rules/identifiers.py` (project key, slug with the reserved list, username), `rules/password_policy.py`, `rules/account_rank.py`, all test-first, with Hypothesis where the input space is large; `wl backend mutate` (mutmut over `app/rules/` and `app/authz/`) in `wl check` and CI; TD-2 resolved |
 | 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
-| 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL |
+| 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL; one migration adding the indexes on `session.user_id`, `membership.organization_id`, and `project.organization_id` (schema-doc; DL-34); the `CustomFilter` docstring (`app/core/lists.py`) brought in line with DL-35 |
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
 | 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions` (per-org actions come in Checkpoint 11); the full matrix (including personal actions) and fail-closed tests |
 | 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners; live slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
@@ -807,7 +824,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; My work as the home page, with its projects section (design-doc §11); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
 | 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners); the per-person access review; org settings; org members page (email-first add-person form with a generated temporary password shown once, role changes, account actions, the D2 removal dialog) |
 | 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, description, module selection with guidance, and a first-admin picker shown only when the org's entry in `/me` includes `project.assign_first_admin`); project settings (description, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged); the per-project access review; classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
-| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
+| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; `repo-auditor` (DL-41); tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
 
 **Groups** ("Pull requests"): five review points. Group 1 landed as its own PR
 (`s1-foundations`); from Checkpoint 5 the slice works on the `s1` branch, with one PR for the

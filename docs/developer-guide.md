@@ -82,7 +82,8 @@ docker/postgres/initdb/   first-start scripts for the postgres container (test d
 .env.example    local settings template; copy to .env (gitignored)
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
                 design-change), agents (checkpoint-reviewer, security-reviewer,
-                fresh-clone-verifier, docs-consistency, spec-test-writer),
+                fresh-clone-verifier, docs-consistency, spec-test-writer,
+                repo-auditor),
                 hooks (see section 11)
 ```
 
@@ -409,7 +410,8 @@ object if the session has it loaded, so it stays readable without a lazy load.
 **List endpoints** (`app/core/lists.py`; build plan, "API conventions", "Lists"). Declare a
 `ListSpec` per list: sortable fields (an allowlist; `id` is always the last tiebreaker), the
 default sort, filters (`Filter(name, column, FilterType.ENUM, enum=...)`, or `CustomFilter` for
-a join), `search` columns for `?q=`, `archived_column`, `soft_deleted`, and `paging="cursor"`
+a filter on another table, written with `EXISTS`, never a join, so no item repeats: DL-35),
+`search` columns for `?q=`, `archived_column`, `soft_deleted`, and `paging="cursor"`
 for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
 parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
 the service; the **repository** builds a statement already scoped to what the user may see and
@@ -761,9 +763,10 @@ afterwards (see `tests/integration/test_migrations.py`).
   `--dry-run`, dry-run output matches the expected commands, and the doctor checks are tested
   with fake probes. The CLI is held to **100% line + branch coverage** (in
   `tools/cli/pyproject.toml`), so a test that claims to cover an error path but never reaches
-  it fails the gate. The Claude Code hooks `guard_git.py` and `protect_files.py` are tested
-  here too (`tools/cli/tests/hooks/`, importing them from `.claude/hooks/` through pytest's
-  `pythonpath`), under the same gate and pyright's strict mode.
+  it fails the gate. The Claude Code hooks (`.claude/hooks/`, with their shared
+  `hook_paths.py`) are tested here too (`tools/cli/tests/hooks/`, importing them from
+  `.claude/hooks/` through pytest's `pythonpath`), under the same gate and pyright's strict
+  mode.
 
 **Docs consistency tests** (`tests/unit/docs/test_docs_consistency.py`, parsers in
 `tests/support/docs.py`) read the docs, `.claude/`, `Base.metadata`, and `git log`; no
@@ -835,14 +838,16 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
   `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`.
+  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
   changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
   at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
   security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
   two or three behaviors in a temporary copy, and reviews a design change's tooling code under
-  a `DC-<YYYY-MM-DD>` review ID), and `fresh-clone-verifier` and
-  `docs-consistency` at the last checkpoint of a slice. Reviewers never run tests at the same
+  a `DC-<YYYY-MM-DD>` review ID), and `fresh-clone-verifier`, `docs-consistency`, and
+  `repo-auditor` (a whole-repository audit that runs no tests, DL-41) at the last checkpoint of
+  a slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
+  concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same
   time: they share the test database. `docs-consistency` also runs in every design change, before
   committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
   decisions for the owner, which are never decided for them.
@@ -862,7 +867,9 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
     committed migration with a new one. They also can't change `.pre-commit-config.yaml`, which
     is yours to edit (DL-30; the git guard blocks any redirect naming it too), or git's own files:
     anything in `.git/`, `~/.gitconfig`, or `.config/git/` (DL-31).
-  - After Claude edits a file, it is formatted with ruff (backend) or Prettier (frontend).
+  - After Claude edits a file, it is formatted with the backend's ruff (backend), the developer
+    CLI's ruff (`tools/cli/` and `.claude/hooks/`, as `wl lint` checks them), or Prettier
+    (frontend).
   - The **git guard** (`guard_git.py`) is an allow-list (DL-26). A Bash call that involves git or gh
     must be **one command in a listed form, and nothing else**: no `&&`, `;`, `|`, `cd`, variables,
     `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` for another directory, and
@@ -918,9 +925,9 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
     changes. (The gh forms are tested against the guard only.) What it can't see is logged in TD-20:
     a script or program that runs git itself, a write to a shell startup file, and a non-git
     redirect target built by an expansion. Its tests,
-    and `protect_files.py`'s, are in `tools/cli/tests/hooks/`. All three hooks are linted and
-    formatted with the developer CLI (`wl lint`); `guard_git.py` and `protect_files.py` are also
-    type-checked and tested with it (`wl test`).
+    and the other hooks', are in `tools/cli/tests/hooks/`. All three hooks, and the
+    `hook_paths.py` helpers they share, are linted, formatted, type-checked, and tested with the
+    developer CLI (`wl lint`, `wl test`).
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 
