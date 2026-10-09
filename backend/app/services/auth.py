@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.admin_event import log_admin_event
+from app.authz.authorize import allowed_actions
+from app.authz.context import AuthzContext
+from app.authz.scoping import org_scope
+from app.authz.target import workspace_target
 from app.core.errors import (
     FieldError,
     ForbiddenError,
@@ -210,15 +214,29 @@ class AuthService:
         if token:
             await self.repository.delete_by_token_hash(hash_token(token))
 
+    async def authz_context(self, user: SignedInUser) -> AuthzContext:
+        """The user's authorization context for this request."""
+        return await UserRepository(self.session).authz_context(user)
+
     async def me(self, user: SignedInUser) -> MeRead:
-        workspaces = await WorkspaceRepository(self.session).memberships_of(user.id)
-        orgs = await OrgRepository(self.session).visible_to(user)
+        ctx = await self.authz_context(user)
+        workspaces = await WorkspaceRepository(self.session).for_me(
+            user.id, every=user.is_system_admin
+        )
+        orgs = await OrgRepository(self.session).visible(org_scope(ctx), user.id)
         return MeRead(
             user=MeUser(id=user.id, email=user.email, username=user.username, name=user.name),
             is_system_admin=user.is_system_admin,
             must_change_password=user.must_change_password,
             workspaces=[
-                MeWorkspace(id=w.id, name=w.name, slug=w.slug, role=role) for w, role in workspaces
+                MeWorkspace(
+                    id=w.id,
+                    name=w.name,
+                    slug=w.slug,
+                    role=role,
+                    allowed_actions=allowed_actions(ctx, workspace_target(w)),
+                )
+                for w, role in workspaces
             ],
             orgs=[MeOrg(id=o.id, name=o.name, slug=o.slug, role=role) for o, role in orgs],
         )

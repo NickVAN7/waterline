@@ -1,14 +1,16 @@
-"""`OrgRepository.visible_to`: the orgs `/me` lists for the org switcher (design-doc §4,
-"Visibility")."""
+"""`OrgRepository.visible` with the user's `org_scope`: the orgs `/me` lists for the org
+switcher (design-doc §4, "Visibility")."""
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.authz.scoping import org_scope
 from app.enums import OrgRole, WorkspaceRole
 from app.models.org import Organization
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.org import OrgRepository
+from app.repositories.user import UserRepository
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
@@ -18,7 +20,10 @@ pytestmark = [pytest.mark.anyio, pytest.mark.security]
 
 
 async def visible(session: AsyncSession, user: User) -> list[tuple[str, OrgRole | None]]:
-    return [(org.name, role) for org, role in await OrgRepository(session).visible_to(user)]
+    """The orgs listed for `user`, through the user's real authorization context and org scope."""
+    ctx = await UserRepository(session).authz_context(user)
+    rows = await OrgRepository(session).visible(org_scope(ctx), user.id)
+    return [(org.name, role) for org, role in rows]
 
 
 async def org_in(workspace: Workspace, name: str) -> Organization:

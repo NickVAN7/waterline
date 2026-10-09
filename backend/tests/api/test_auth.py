@@ -274,7 +274,13 @@ async def test_me_lists_workspaces_and_orgs_with_roles(
 
     body = response.json()
     assert body["workspaces"] == [
-        {"id": str(workspace.id), "name": "Acme Consulting", "slug": "acme", "role": "member"}
+        {
+            "id": str(workspace.id),
+            "name": "Acme Consulting",
+            "slug": "acme",
+            "role": "member",
+            "allowed_actions": [],  # a workspace member has no workspace-level action (DL-45)
+        }
     ]
     assert body["orgs"] == [
         {"id": str(org.id), "name": "Bolt Foods", "slug": "bolt", "role": "admin"}

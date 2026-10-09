@@ -314,3 +314,15 @@ Entry format:
 - **Fix by:** S1-C17 (the slice retro: the owner decides the rule, or that it waits for a
   second workspace; then the schema doc or the code changes to match).
 - **Status:** open
+
+### TD-22: The spec tests check list scoping through their own copy of `scope_clause`
+- **Added:** S1-C7
+- **What:** `tests/integration/authz/test_context.py` builds its `WHERE` with `scope_filter`
+  (`tests/support/authz.py`), the spec writer's model of a `Scope`, written before the code;
+  `scope_clause` (`app/repositories/base.py`) is the same code. A later change to `Scope` (e.g.
+  the export-control gate) must change both, or the spec test keeps checking the old meaning.
+  `tests/integration/repositories/test_scope_clause.py` tests the real one on real rows.
+- **Why:** both are spec-test files, which change only with the owner's approval.
+- **Fix by:** S1-C8 (the owner decides: switch the spec test to `scope_clause` and delete the
+  copy, or keep both and change them together).
+- **Status:** open

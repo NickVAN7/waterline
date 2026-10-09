@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.authz.context import AuthzContext, ProjectAccess
 from app.models.org import Membership, Organization
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
@@ -54,3 +55,35 @@ class UserRepository:
             )
         )
         return sorted(rows)
+
+    async def authz_context(self, user: User) -> AuthzContext:
+        """The user's authorization context: the system-admin flag and every workspace, org, and
+        project membership, each project's org and workspace taken from the project row."""
+        workspaces = await self.session.execute(
+            select(WorkspaceMembership.workspace_id, WorkspaceMembership.role).where(
+                WorkspaceMembership.user_id == user.id
+            )
+        )
+        orgs = await self.session.execute(
+            select(Membership.organization_id, Membership.role).where(Membership.user_id == user.id)
+        )
+        projects = await self.session.execute(
+            select(
+                ProjectMembership.project_id,
+                ProjectMembership.role,
+                Project.organization_id,
+                Project.workspace_id,
+            )
+            .join(Project, ProjectMembership.project_id == Project.id)
+            .where(ProjectMembership.user_id == user.id)
+        )
+        return AuthzContext(
+            user_id=user.id,
+            is_system_admin=user.is_system_admin,
+            workspace_roles=dict(workspaces.all()),
+            org_roles=dict(orgs.all()),
+            projects={
+                project_id: ProjectAccess(role, organization_id, workspace_id)
+                for project_id, role, organization_id, workspace_id in projects
+            },
+        )

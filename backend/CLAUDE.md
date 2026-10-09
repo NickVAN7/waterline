@@ -65,6 +65,11 @@ Calls flow **routers → services → repositories → models**. Services also u
   `test_a_password_change_ends_a_sign_in_still_in_flight` (S1-C6 security review).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
+- **`app/authz/` never queries.** It decides from the `AuthzContext` and the `Target`; loading
+  (`UserRepository.authz_context`) and the `WHERE` built from a `Scope` (`scope_clause`) live in
+  repositories, and the FastAPI dependencies in `app/routers/deps.py`. Mutation testing runs only
+  the database-free unit tests against `app/authz/`, so a query there leaves mutants no test can
+  kill.
 - **`authorize()` order** (design-doc §5): archived project → export-control gate → personal actions
   → system admin → workspace owner/admin → org role (owner/admin; member only for `project.create`)
   → project role → targeted rules. From S1-C13, every registered action is marked content or

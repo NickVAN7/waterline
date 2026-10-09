@@ -2,6 +2,7 @@ import uuid
 
 from pydantic import BaseModel
 
+from app.authz.actions import Action
 from app.enums import OrgRole, WorkspaceRole
 
 
@@ -23,12 +24,14 @@ class MeUser(BaseModel):
 
 
 class MeWorkspace(BaseModel):
-    """A workspace the user is staff of."""
+    """A workspace the user is staff of, or, for a system admin, any workspace (`role` null where
+    they aren't staff; DL-46), with the workspace-level actions they may take there (DL-45)."""
 
     id: uuid.UUID
     name: str
     slug: str
-    role: WorkspaceRole
+    role: WorkspaceRole | None
+    allowed_actions: list[Action]
 
 
 class MeOrg(BaseModel):

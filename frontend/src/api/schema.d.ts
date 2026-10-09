@@ -113,6 +113,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * Action
+         * @description The real actions (DL-44, DL-45: the workspace-level ones; each area adds its own).
+         * @enum {string}
+         */
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "org.create";
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -206,7 +212,8 @@ export interface components {
         };
         /**
          * MeWorkspace
-         * @description A workspace the user is staff of.
+         * @description A workspace the user is staff of, or, for a system admin, any workspace (`role` null where
+         *     they aren't staff; DL-46), with the workspace-level actions they may take there (DL-45).
          */
         MeWorkspace: {
             /**
@@ -218,7 +225,9 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
-            role: components["schemas"]["WorkspaceRole"];
+            role: components["schemas"]["WorkspaceRole"] | null;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
         };
         /**
          * OrgRole

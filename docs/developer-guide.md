@@ -4,14 +4,16 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C6 (Passwords, seed & system-admin CLI) done, on the `s1` branch (one branch and PR
-> for the rest of Slice 1); next is S1-C7 (Authorization core). Sign-in, sign-out, change password,
-> and `GET /api/auth/me` work over a server-side session in the `__Host-session` cookie, a forced
-> password change blocks every other endpoint, and every mutating request passes the `Origin` and
-> JSON-only checks first ("Authentication" below). `wl seed` creates the workspace and its first
-> system admin, and `wl admin` grants and revokes the system-admin flag. The tenancy, project, and
-> audit tables exist (models, migrations, constraint tests, a factory per model; `audit_event` is
-> append-only), with the domain enums in `app/enums.py`, get-by-ID in the base repository, and
+> **Status:** S1-C7 (Authorization core) done, closing the `s1-auth` group, on the `s1` branch (one
+> branch and PR for the rest of Slice 1); next is S1-C8 (Workspace & organizations). Every check
+> goes through `authorize()` ("Authorization" below); `/me` carries each workspace's
+> `allowed_actions`. Sign-in, sign-out, change password, and `GET /api/auth/me` work over a
+> server-side session in the `__Host-session` cookie, a forced password change blocks every other
+> endpoint, and every mutating request passes the `Origin` and JSON-only checks first
+> ("Authentication" below). `wl seed` creates the workspace and its first system admin, and `wl
+> admin` grants and revokes the system-admin flag. The tenancy, project, and audit tables exist
+> (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
+> the domain enums in `app/enums.py`, get-by-ID in the base repository, and
 > `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure rules
 > (identifiers, password policy, account rank) are in `app/rules/`, held to 100% coverage and
 > mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
@@ -183,9 +185,10 @@ backend/app/
   core/migration_filters.py   what Alembic autogenerate ignores (procrastinate's objects)
   core/security.py     password hashing (Argon2id, off the event loop), session tokens
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
-  routers/deps.py      shared router dependencies: SettingsDep, AuthServiceDep, SignedInUserDep
+  routers/deps.py      shared router dependencies: SettingsDep, AuthServiceDep, SignedInUserDep,
+                       AuthzContextDep, authorized()
   rules/          pure business rules, no database
-  authz/          authorize() and friends (Slice 1)
+  authz/          authorize(), the action registry, targets, list scoping (pure: no queries)
   audit/          log_admin_event() (Slice 1, S1-C4) and log_change() (Slice 2)
   jobs/           background jobs: app.py (jobs_app), enqueue.py, task_names.py, tasks/, worker.py
 ```
@@ -309,6 +312,33 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
 - **The cookie** is set with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/` in every
   environment. Reach the dev server at `localhost`: browsers accept a `Secure` cookie over plain
   http only there.
+
+### Authorization
+
+`app/authz/` decides; it never queries (mutation testing runs only database-free unit tests
+against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)" the actions.
+
+- **Actions** are registered in `REGISTRY` (`app/authz/actions.py`), one `ActionSpec` each: its
+  level, the lowest workspace, org, and project role that grants it, whether it's a mutation,
+  `archive_exempt`, and, for a personal action, its `relationship`. Real actions are members of
+  `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
+  (DL-44); an unregistered action is denied. A project-level action normally sets
+  `workspace_role=ADMIN, org_role=ADMIN` (inherited project admin).
+- **The context** (`AuthzContext`): the user's system-admin flag and memberships, loaded once
+  per request (`UserRepository.authz_context`; an endpoint takes `ctx: AuthzContextDep`).
+- **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)`.
+- **Checks:** `authorize(ctx, action, target)` → bool; `ensure(...)` raises 404 when the user
+  can't see the target, 403 when they can but may not act; `allowed_actions(ctx, target)` for a
+  single-entity read; `module_enabled(target, module)`.
+- **Endpoints on one entity** take `authorized(loader, action, module=...)`
+  (`app/routers/deps.py`): `loader` is a dependency returning `(entity, target)` or None; the
+  endpoint gets the entity only once the check passes (404 for missing or unseen, then the
+  module, then 403).
+- **Lists** scope their query: `project_scope(ctx)` / `org_scope(ctx)` give the `Scope`, and
+  `scope_clause(scope, id_column, workspace_column, org_column)` (`app/repositories/base.py`)
+  the `WHERE`.
+- **Tests:** `tests/support/authz.py` has the personas, test-only actions
+  (`register_test_actions(monkeypatch)`), a test-only router, and `sign_in_as`.
 
 ### Import rules (enforced)
 

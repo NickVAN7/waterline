@@ -343,7 +343,8 @@ The sections below describe the content; the table above is the order of work.
 │   │   ├── rules/                pure business rules, no database: identifiers.py,
 │   │   │                         password_policy.py, account_rank.py, task_transitions.py,
 │   │   │                         approval_policy.py, …
-│   │   ├── authz/                authorize(), action registry, module gating dependency
+│   │   ├── authz/                authorize(), action registry, targets, list scoping, module check
+│   │   │                         (pure; the FastAPI dependencies are in routers/deps.py)
 │   │   ├── audit/                log_change(), log_admin_event()
 │   │   └── jobs/                 procrastinate app, enqueue.py (only entry point), job functions
 │   ├── migrations/               Alembic

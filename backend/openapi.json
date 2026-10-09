@@ -214,6 +214,17 @@
   },
   "components": {
     "schemas": {
+      "Action": {
+        "type": "string",
+        "enum": [
+          "workspace.view",
+          "workspace.update",
+          "workspace_staff.manage",
+          "org.create"
+        ],
+        "title": "Action",
+        "description": "The real actions (DL-44, DL-45: the workspace-level ones; each area adds its own)."
+      },
       "ChangePasswordRequest": {
         "properties": {
           "current_password": {
@@ -411,7 +422,21 @@
             "title": "Slug"
           },
           "role": {
-            "$ref": "#/components/schemas/WorkspaceRole"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
           }
         },
         "type": "object",
@@ -419,10 +444,11 @@
           "id",
           "name",
           "slug",
-          "role"
+          "role",
+          "allowed_actions"
         ],
         "title": "MeWorkspace",
-        "description": "A workspace the user is staff of."
+        "description": "A workspace the user is staff of, or, for a system admin, any workspace (`role` null where\nthey aren't staff; DL-46), with the workspace-level actions they may take there (DL-45)."
       },
       "OrgRole": {
         "type": "string",
