@@ -116,7 +116,8 @@ each verification claim with who verified it (e.g. "sabotage-checked by checkpoi
    against the running dev stack, with at least one step that should be denied; the owner's
    run is the check.
 
-**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10)** (DL-10). A trial, not yet the
+**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10; S1-C7a, also in the group, stops
+for approval as usual and is outside the trial, DL-51)** (DL-10). A trial, not yet the
 rule; every other checkpoint keeps the full stop for approval.
 - **S1-C8 and S1-C9 auto-continue:** after its report, the session goes straight on to the next
   checkpoint, without stopping for approval, only if **all** of these hold:

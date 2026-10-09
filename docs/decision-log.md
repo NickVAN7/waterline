@@ -639,3 +639,13 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Workflow items scheduled")
 - **Source:** chat session (owner, after S1-C7)
+
+### DL-51: S1-C7a is outside the review-tier trial
+- **Date:** 2026-10-09
+- **Decision:** S1-C7a sits in the `s1-workspace` group but outside the review-tier trial: it
+  stops for the owner's approval as usual, and the trial stays S1-C8 to S1-C10, its group report
+  covering those three (DL-10).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Verification", the review-tier trial)
+- **Source:** chat session (owner, after the DL-49 docs-consistency check)
