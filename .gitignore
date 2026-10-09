@@ -20,6 +20,9 @@ coverage/
 .env.*
 !.env.example
 
+# Claude Code: each developer's own settings (developer guide, section 11)
+.claude/settings.local.json
+
 # Editors / OS
 .idea/
 .vscode/
