@@ -138,9 +138,12 @@ rule; every other checkpoint keeps the full stop for approval.
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
 the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
-`CLAUDE.md` file, and `.claude/` file against the others. The slice's last checkpoint ends with
+`CLAUDE.md` file, and `.claude/` file against the others, and then the `repo-auditor` agent
+audits the whole repository, not one diff: bugs, security, scale against the expected load,
+risky code without a test, slowness, and lean (DL-41). The slice's last checkpoint ends with
 a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
-skills and agents never triggered, and the verdict of any process trial. The owner decides what
+skills and agents never triggered, the verdict of any process trial, and the auditor's findings
+left for the owner. The owner decides what
 changes; each change gets a decision-log entry and is applied as a design change on the slice
 branch before the slice's PR is merged (DL-19).
 
@@ -171,9 +174,12 @@ Everything lives in the repository, version-controlled and present on every work
   checkpoint process; the backend and frontend files list the conventions that are easy to break
   silently. When a review catches a mistake a rule would have prevented, the fix adds that rule.
 - **`checkpoint-reviewer` agent** (`.claude/agents/`): verification layer 2. A fresh-context
-  reviewer that reads the docs and the diff, sabotage-checks two or three behaviors in a
-  temporary copy (never the repository), compares spec tests with their recorded hashes, and
-  reports findings in a fixed format. It also reviews a design change's tooling code, under a
+  reviewer that reads the docs, the diff, and the code the diff connects to (every caller of a
+  changed function, DL-36), checks scale against the expected load (DL-37) and lean (DL-38)
+  along with design, conventions, correctness, tests, and docs, sabotage-checks two or three
+  behaviors in a temporary copy (never the repository), compares spec tests with their recorded
+  hashes, and reports findings in a fixed format: each with a concrete case (DL-39), in plain
+  English (DL-42). It also reviews a design change's tooling code, under a
   `DC-<YYYY-MM-DD>` review ID (DL-18).
 - **`spec-test-writer` agent** (`.claude/agents/`): writes the tests for new or changed code in
   `app/rules/` and `app/authz/` from the design docs, before the implementation exists and without
@@ -193,14 +199,21 @@ Everything lives in the repository, version-controlled and present on every work
   - docs and tech-debt updates;
   - the reviewers, one at a time: `security-reviewer` when the slice's section names the
     checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
-    every time, and at the end of a slice `fresh-clone-verifier` and `docs-consistency`;
+    every time, and at the end of a slice `fresh-clone-verifier`, `docs-consistency`, and
+    `repo-auditor`;
   - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
   - one commit with the review note, pushed to the slice branch;
   - the report, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   before `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
   when a checkpoint touches auth, sessions, authorization, routers, rendered markdown, or
-  GitHub code.
+  GitHub code. Each finding has a confirmed path to harm (DL-39), in plain English (DL-42).
+- **`repo-auditor` agent** (`.claude/agents/`): at the last checkpoint of each slice, after
+  `docs-consistency`, a read-only audit of the whole repository (DL-41): bugs, security, scale
+  against the expected load, risky code without a test, slowness, and lean, each finding with a
+  concrete case and a smallest fix. It runs no tests. Findings within the slice's scope are
+  fixed; the rest are logged or go to the owner as proposed design changes, and all feed the
+  slice retro.
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
   sets up a temporary copy of the repository by following the developer guide literally and
   reports every wrong or missing step.
@@ -213,8 +226,8 @@ Everything lives in the repository, version-controlled and present on every work
   behavior table from the docs, layer choice, assertions that can fail, banned patterns, and
   proof that each test fails (test-first, sabotage check, mutation testing).
 - **`migration` skill** (`.claude/skills/migration/`): schema changes — model changes, Alembic
-  generation, hand review of what autogenerate misses, downgrade, constraint tests, schema-doc
-  sync.
+  generation, hand review of what autogenerate misses (foreign-key columns indexed when rows
+  are looked up or deleted by them, DL-37), downgrade, constraint tests, schema-doc sync.
 - **`design-change` skill** (`.claude/skills/design-change/`): applying a design change outside
   a checkpoint's scope ("Design changes outside a checkpoint" above): timing, checking the
   repository, parking a checkpoint in progress (DL-20), classifying each decision (docs only,
@@ -365,7 +378,7 @@ The sections below describe the content; the table above is the order of work.
 │   │                                   hook_paths.py (shared helpers)
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md, docs-consistency.md,
-│   │                                   spec-test-writer.md
+│   │                                   spec-test-writer.md, repo-auditor.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
 │                                       design-change/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
@@ -811,7 +824,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; My work as the home page, with its projects section (design-doc §11); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
 | 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners); the per-person access review; org settings; org members page (email-first add-person form with a generated temporary password shown once, role changes, account actions, the D2 removal dialog) |
 | 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, description, module selection with guidance, and a first-admin picker shown only when the org's entry in `/me` includes `project.assign_first_admin`); project settings (description, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged); the per-project access review; classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
-| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
+| 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; `repo-auditor` (DL-41); tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
 
 **Groups** ("Pull requests"): five review points. Group 1 landed as its own PR
 (`s1-foundations`); from Checkpoint 5 the slice works on the `s1` branch, with one PR for the

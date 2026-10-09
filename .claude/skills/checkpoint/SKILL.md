@@ -81,6 +81,9 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
   agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
   (the root commit for Slice 0). It reports **Fixes** and **Decisions**.
+- **Last checkpoint of a slice:** after `docs-consistency`, invoke the `repo-auditor` agent with
+  the slice ID and the checkpoint ID (DL-41). It audits the whole repository, not this diff, and
+  runs no tests.
 
 ## 5. Resolve every finding
 
@@ -89,20 +92,29 @@ For each finding from every reviewer that ran, exactly one of:
 - **Logged:** add a tech-debt entry (reason and target) — only for minor findings, or others
   the owner has agreed to defer.
 - **Rejected:** only when the finding is factually wrong; record the evidence.
+- **Proposed to the owner:** (`repo-auditor` only) a major or blocker finding outside the
+  slice's scope, put in the report as a proposed design change (DL-41).
 
 `docs-consistency` **Fixes** are resolved the same way. Its **Decisions** are not yours to
 resolve: leave them undecided and put them in the report (step 7) for the owner.
+
+`repo-auditor` findings are resolved the same way too, but many fall outside the slice's
+scope: fix one only when the fix is within it. Otherwise log it (minor), or put it in the report
+for the owner as a proposed design change (major or blocker). Its questions go to the owner,
+and its findings feed the slice retro.
 
 If fixes changed behavior (not just docs or tests), run the reviewer again on the fixes.
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
 **Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
-docs-consistency) in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`). Include the base
-commit, the totals, the "Spec tests" section (when the checkpoint has one), and for each pass
-its verdict, its findings table with each resolution (fixed / logged with TD number / rejected
-with evidence), `checkpoint-reviewer`'s "Sabotage checks" table, and the questions it raised.
-End with the questions still open for the owner and any owner decisions made during review.
+docs-consistency, repo-auditor) in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`).
+Include the base commit, the totals, the "Spec tests" section (when the checkpoint has one), and
+for each pass its verdict, its findings table in the `S0-C1.md` columns, one row per finding with
+its resolution (fixed / logged with TD number / rejected with evidence / proposed to the owner;
+for `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor`, the four parts condensed
+into the Finding cell, DL-42), `checkpoint-reviewer`'s "Sabotage checks" table, and the
+questions it raised. End with the questions still open for the owner and any owner decisions made during review.
 The record goes in the checkpoint's commit.
 
 **Tech debt due now:** before committing, list every open `docs/tech-debt.md` entry whose
@@ -131,6 +143,7 @@ Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/revi
 Security review: <n> findings — … (or "not required")
 Fresh-clone verification: <result> (last checkpoint of a slice only)
 Docs consistency: <n> fixes — …; <m> decisions for the owner (last checkpoint of a slice only)
+Repository audit: <n> findings — <x> fixed, <y> logged (TD-…), <z> proposed to the owner (last checkpoint of a slice only)
 Tech debt: <added / resolved entries, or "no change">
 Next: <next checkpoint ID and name>
 ```
@@ -168,7 +181,8 @@ reviewers, not verification.
 
 Send the owner:
 - the review note (the commit message body);
-- each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency) with
+- each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency,
+  repo-auditor) with
   the resolution of each finding (as recorded in `docs/reviews/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review;
@@ -180,7 +194,8 @@ Send the owner:
   least one step that should be denied. Run it once yourself to make sure the steps are right;
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
-  the owner, which skills and agents never triggered, and the verdict of any process trial.
+  the owner, which skills and agents never triggered, the verdict of any process trial, and the
+  `repo-auditor` findings left for the owner (with the design changes they propose).
   The owner decides what changes; each change gets a decision-log entry and is applied on the
   slice branch before the merge (DL-19);
 - what the next checkpoint will cover.

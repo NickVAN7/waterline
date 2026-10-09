@@ -19,6 +19,9 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
   suspicion).
 - Every finding needs evidence (file and line) and a concrete way it could be exploited or
   cause harm. No theoretical findings without a path to harm.
+- Before reporting, re-read the lines and confirm the path to harm is real: the input reaches
+  that code, the check is really missing on that path (DL-39). Suggest the smallest fix that
+  closes it.
 - If the docs are ambiguous or silent on a security question, report it as a question.
 
 ## Procedure
@@ -141,9 +144,11 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
 **Verdict:** ready | ready after fixes | not ready
 
 ### Findings
-| # | Severity | Area | Location | Finding | How it could be exploited | Suggested resolution |
-|---|---|---|---|---|---|---|
-| 1 | blocker / major / minor | authn / csrf / authz / isolation / input-output / webhooks / config / tests | path:line | ... | ... | ... |
+1. **<short title>** — <blocker | major | minor> · <authn | csrf | authz | isolation | input-output | webhooks | config | tests> · `path:line`
+   - **What this is:** what the code does, for a reader who has never seen it.
+   - **Problem:** how it could be exploited or cause harm: who does what, and what they get.
+   - **Fix:** the smallest fix that closes it.
+   - **If we skip it:** what happens.
 
 ### Questions (doc ambiguities)
 - ...
@@ -151,6 +156,9 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
 ### Checked and fine
 - one line per area above with nothing to report (or "not touched by this checkpoint")
 ```
+
+Write findings in plain English (DL-42): short sentences, everyday words, and each technical
+term explained the first time it's used. Number them across the report, most severe first.
 
 Severity: **blocker** — exploitable now (data from another org, privilege escalation, auth
 bypass, stored XSS); **major** — missing security test, weakened defense in depth, or doc

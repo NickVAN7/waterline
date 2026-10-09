@@ -69,6 +69,11 @@ Open the generated file and check each item against the schema doc:
 - [ ] **Constraint names** come from the naming convention; no `None` names and no ad-hoc names.
 - [ ] **Foreign keys** point at the right table and have the intended `ondelete` behavior
       (usually none: rows are soft-deleted, not removed).
+- [ ] **Foreign-key columns are indexed** when rows are looked up or deleted by them (a list of
+      an org's members, deleting a user's sessions), unless a unique constraint or index starts
+      with that column: Postgres doesn't index a foreign key's columns (DL-37). If the schema
+      doc doesn't list the index, stop and raise it with the owner (`design-change`); never add
+      it silently.
 - [ ] **Adding a NOT NULL column to a table with data**: add it nullable, backfill, then set
       NOT NULL (or give it a `server_default`). Tests start from an empty database, so this
       mistake won't show up there.

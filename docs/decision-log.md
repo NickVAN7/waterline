@@ -453,3 +453,94 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan ("Lists", Checkpoint 5 for the docstring); developer guide section 5
   ("Models", list endpoints); `app/core/lists.py` (`CustomFilter` docstring, in S1-C5)
 - **Source:** chat session (owner, after a whole-repo audit)
+
+### DL-36: Reviewers read the code a change connects to
+- **Date:** 2026-10-08
+- **Decision:** `checkpoint-reviewer` reads beyond the diff: for every function, method, or
+  schema whose signature, return value, or behavior changed, it greps every caller, and reads
+  the functions the change calls and their tests. A change can break code it doesn't touch.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint-reviewer` agent (procedure); build plan ("Claude configuration")
+- **Source:** chat session (owner, adopting checks from the ponytail plugin's review and audit
+  skills after a whole-repo audit)
+
+### DL-37: A scale check against the expected load, and indexed foreign keys
+- **Date:** 2026-10-08
+- **Decision:** `checkpoint-reviewer` checks scale against the load design-doc §1 states
+  (personal use first, then a firm): a query per item, a lookup or delete by an unindexed
+  column, tables or lists that only grow, check-then-write races, per-process state that must be
+  shared, work every process repeats. The `migration` skill adds the rule DL-34 came from: a
+  foreign-key column that rows are looked up or deleted by gets an index unless a unique
+  constraint or index starts with it, and a missing one in the schema doc is raised with the
+  owner, never added silently.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint-reviewer` agent; `migration` skill; build plan ("Claude
+  configuration")
+- **Source:** chat session (owner, as DL-36); docs-consistency question 2 of the DL-34/DL-35
+  change
+
+### DL-38: A lean check in every checkpoint review
+- **Date:** 2026-10-08
+- **Decision:** `checkpoint-reviewer` reports code that shouldn't exist or should be smaller:
+  dead code and unused options, a helper the repo already has, what the standard library or an
+  installed dependency already does, a one-implementation abstraction, near-copies that must
+  change together, a function doing several unrelated jobs. The layering the docs require is
+  never a lean finding, even where a layer only passes a call through.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint-reviewer` agent; build plan ("Claude configuration")
+- **Source:** chat session (owner, as DL-36)
+
+### DL-39: Every finding names a concrete case
+- **Date:** 2026-10-08
+- **Decision:** `checkpoint-reviewer` and `security-reviewer` report a finding only with a
+  concrete case (this input or situation leads to this wrong result), after re-reading the
+  lines to confirm it, and suggest the smallest fix that works, preferring one that deletes
+  code. A doc ambiguity stays a question.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint-reviewer` and `security-reviewer` agents; build plan ("Claude
+  configuration"); developer guide section 11
+- **Source:** chat session (owner, as DL-36)
+
+### DL-40: The smallest complete change
+- **Date:** 2026-10-08
+- **Decision:** The implementing session finishes everything the scope needs and adds nothing
+  it doesn't: before new code, the first option that works out of "not needed", an existing
+  helper or pattern, the standard library, an installed dependency, the minimum new code; no
+  speculative options, config, or abstractions; the layers the docs require are kept. A bug fix
+  greps every caller and fixes the root cause once, in the shared code. The plugin's other
+  rules stay out: shortcuts are still logged in `docs/tech-debt.md`, and every change ships
+  with its tests.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** root `CLAUDE.md` ("Always")
+- **Source:** chat session (owner, as DL-36)
+
+### DL-41: A whole-repo audit at the end of each slice
+- **Date:** 2026-10-08
+- **Decision:** A read-only `repo-auditor` agent audits the whole repository at the last
+  checkpoint of each slice, after `docs-consistency`: bugs, security, scale against the
+  expected load, risky code without a test, slowness, and lean, each with a concrete case. It
+  runs no tests. Its findings are resolved like any reviewer's (fixed within the slice's scope,
+  otherwise logged as tech debt or raised as a design change) and feed the slice retro.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** new `repo-auditor` agent; `checkpoint` skill; root `CLAUDE.md`; build plan
+  ("Verification", "Claude configuration", the layout, Checkpoint 17); developer guide sections
+  2 and 11
+- **Source:** chat session (owner, as DL-36)
+
+### DL-42: Reviewers write findings in plain English
+- **Date:** 2026-10-08
+- **Decision:** `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` write each finding
+  as a numbered item with its severity, area, and location, and four short parts: what the code
+  is, the problem (the concrete case), the fix, and what happens if it's skipped. Review records
+  keep their findings tables, one row per finding with its resolution.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` agents;
+  `checkpoint` skill (step 5); build plan ("Claude configuration"); developer guide section 11
+- **Source:** chat session (owner, as DL-36)

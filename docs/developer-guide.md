@@ -82,7 +82,8 @@ docker/postgres/initdb/   first-start scripts for the postgres container (test d
 .env.example    local settings template; copy to .env (gitignored)
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
                 design-change), agents (checkpoint-reviewer, security-reviewer,
-                fresh-clone-verifier, docs-consistency, spec-test-writer),
+                fresh-clone-verifier, docs-consistency, spec-test-writer,
+                repo-auditor),
                 hooks (see section 11)
 ```
 
@@ -837,14 +838,16 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
   `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`.
+  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
   changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
   at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
   security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
   two or three behaviors in a temporary copy, and reviews a design change's tooling code under
-  a `DC-<YYYY-MM-DD>` review ID), and `fresh-clone-verifier` and
-  `docs-consistency` at the last checkpoint of a slice. Reviewers never run tests at the same
+  a `DC-<YYYY-MM-DD>` review ID), and `fresh-clone-verifier`, `docs-consistency`, and
+  `repo-auditor` (a whole-repository audit that runs no tests, DL-41) at the last checkpoint of
+  a slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
+  concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same
   time: they share the test database. `docs-consistency` also runs in every design change, before
   committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
   decisions for the owner, which are never decided for them.
