@@ -147,6 +147,20 @@ def migrate(dry_run: DryRun = False) -> None:
     run_steps(steps.migrate(), dry_run=dry_run)
 
 
+@app.command(context_settings=PASS_THROUGH)
+def seed(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """Create the workspace and its first system admin (its owner). Prompts for each value, or
+    takes it from a flag (`wl seed --email ...`) or a SEED_* variable (developer guide)."""
+    run_steps(steps.seed(ctx.args), dry_run=dry_run)
+
+
+@app.command(context_settings=PASS_THROUGH)
+def admin(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """Run an app admin command, e.g. `wl admin grant-system-admin <email>` or
+    `wl admin revoke-system-admin <email>`."""
+    run_steps(steps.admin(ctx.args), dry_run=dry_run)
+
+
 @app.command("gen-client")
 def gen_client(dry_run: DryRun = False) -> None:
     """Regenerate the frontend's API types: export backend/openapi.json, then schema.d.ts."""

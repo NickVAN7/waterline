@@ -10,6 +10,11 @@ class SignInRequest(BaseModel):
     password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class MeUser(BaseModel):
     id: uuid.UUID
     email: str

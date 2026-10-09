@@ -302,3 +302,15 @@ Entry format:
 - **Fix by:** Slice 7 (the owner decides whether this closes as won't-fix now that the
   rulesets are on).
 - **Status:** open
+
+### TD-21: A user-level audit event's workspace is null when it's ambiguous
+- **Added:** S1-C6
+- **What:** `password_changed` (and the user-level events after it) take the workspace the user
+  belongs to, or, with no memberships, the only workspace there is (`AuthService._workspace_of`).
+  With a second workspace, a user in both (or a user with no memberships) gets `workspace_id`
+  null, which schema-doc `audit_event.workspace_id` allows only for instance-level events.
+- **Why:** design-doc §4 ("One workspace") leaves the rules for several workspaces undecided, and
+  v1 deploys one (the seed refuses a second), so the case can't happen yet.
+- **Fix by:** S1-C17 (the slice retro: the owner decides the rule, or that it waits for a
+  second workspace; then the schema doc or the code changes to match).
+- **Status:** open

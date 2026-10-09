@@ -59,6 +59,10 @@ Calls flow **routers → services → repositories → models**. Services also u
   while either is stale.
 - **Passwords and tokens** only through `app/core/security.py` (`hash_password` /
   `verify_password` run off the event loop; store `hash_token(token)`, never the token).
+- **Ending a user's sessions:** update or lock the user row first, then delete the sessions.
+  Sign-in holds that row from a verified password until it commits, so the delete then sees
+  (and removes) a session from a sign-in in flight. Each such path gets a concurrency test like
+  `test_a_password_change_ends_a_sign_in_still_in_flight` (S1-C6 security review).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
 - **`authorize()` order** (design-doc §5): archived project → export-control gate → personal actions

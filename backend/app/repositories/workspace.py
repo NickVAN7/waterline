@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import WorkspaceRole
@@ -22,3 +22,12 @@ class WorkspaceRepository:
             .order_by(Workspace.name, Workspace.id)
         )
         return [(workspace, role) for workspace, role in rows]
+
+    async def any_exists(self) -> bool:
+        return bool(await self.session.scalar(select(exists().select_from(Workspace))))
+
+    async def ids(self, *, limit: int) -> list[uuid.UUID]:
+        """Up to `limit` workspace IDs (v1 deploys one workspace)."""
+        return list(
+            await self.session.scalars(select(Workspace.id).order_by(Workspace.id).limit(limit))
+        )

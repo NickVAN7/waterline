@@ -64,5 +64,21 @@ class AuthRepository:
             set_committed_value(row, "last_seen_at", written.last_seen_at)
             set_committed_value(row, "updated_at", written.updated_at)
 
+    async def get_by_token_hash(self, token_hash: str) -> UserSession | None:
+        return await self.session.scalar(
+            select(UserSession).where(UserSession.token_hash == token_hash)
+        )
+
+    async def replace_token(self, row: UserSession, token_hash: str) -> None:
+        """Give the session a new token (its times stay as they are)."""
+        row.token_hash = token_hash
+        await self.session.flush()
+
     async def delete_by_token_hash(self, token_hash: str) -> None:
         await self.session.execute(delete(UserSession).where(UserSession.token_hash == token_hash))
+
+    async def delete_others(self, user_id: uuid.UUID, keep_id: uuid.UUID) -> None:
+        """Delete every session of the user except `keep_id`."""
+        await self.session.execute(
+            delete(UserSession).where(UserSession.user_id == user_id, UserSession.id != keep_id)
+        )

@@ -71,6 +71,35 @@ def migrate() -> list[Step]:
     return [step("docker", "compose", "run", "--rm", "--build", "migrate")]
 
 
+# The seed command's environment variables (backend/app/cli.py), passed into the container
+# when they're set, so `wl seed` runs non-interactively from them (CI).
+SEED_ENV = (
+    "SEED_WORKSPACE_NAME",
+    "SEED_WORKSPACE_SLUG",
+    "SEED_EMAIL",
+    "SEED_USERNAME",
+    "SEED_NAME",
+    "SEED_PASSWORD",
+)
+
+
+def app_cli(args: Sequence[str], env: Sequence[str] = ()) -> list[Step]:
+    """Run an app admin command (`python -m app.cli`) in a one-off container from the api
+    service's image; Compose runs the migrations first (the api service depends on them)."""
+    passed = [flag for name in env for flag in ("-e", name)]
+    return [
+        step("docker", "compose", "run", "--rm", *passed, "api", "python", "-m", "app.cli", *args)
+    ]
+
+
+def seed(extra: Sequence[str] = ()) -> list[Step]:
+    return app_cli(["seed", *extra], env=SEED_ENV)
+
+
+def admin(extra: Sequence[str] = ()) -> list[Step]:
+    return app_cli(extra)
+
+
 def up(extra: Sequence[str] = ()) -> list[Step]:
     """Build the images, start the stack in the background, and wait until every service is up.
     `--renew-anon-volumes` refreshes the web container's node_modules from its image."""

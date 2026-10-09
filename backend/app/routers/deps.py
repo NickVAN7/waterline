@@ -32,8 +32,21 @@ SessionTokenDep = Annotated[str | None, Cookie(alias=SESSION_COOKIE, include_in_
 
 
 async def get_signed_in_user(auth: AuthServiceDep, token: SessionTokenDep = None) -> SignedInUser:
-    """The user of the request's session; 401 `not_authenticated` without a live one."""
+    """The user of the request's session; 401 `not_authenticated` without a live one, 403
+    `password_change_required` while they must change their password. Every endpoint that
+    needs a user takes this one."""
     return await auth.authenticate(token)
 
 
 SignedInUserDep = Annotated[SignedInUser, Depends(get_signed_in_user)]
+
+
+async def get_user_pending_password_change(
+    auth: AuthServiceDep, token: SessionTokenDep = None
+) -> SignedInUser:
+    """As `get_signed_in_user`, but lets through a user who must change their password: only
+    for `GET /api/auth/me` and change-password (design-doc §4, "Forced change")."""
+    return await auth.authenticate(token, allow_pending_password_change=True)
+
+
+UserPendingPasswordChangeDep = Annotated[SignedInUser, Depends(get_user_pending_password_change)]

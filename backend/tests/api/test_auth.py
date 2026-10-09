@@ -2,6 +2,7 @@
 "Authentication")."""
 
 import hashlib
+from collections.abc import AsyncIterator
 from datetime import timedelta
 
 import pytest
@@ -13,13 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import SessionMaker
 from app.core.security import generate_token, hash_token, password_needs_rehash, verify_password
 from app.core.settings import Settings
-from app.enums import OrgRole, WorkspaceRole
+from app.enums import AuditAction, OrgRole, WorkspaceRole
 from app.main import create_app
+from app.models.audit_event import AuditEvent
 from app.models.auth import UserSession
 from app.models.user import User
+from app.models.workspace import Workspace
+from app.routers.deps import SignedInUserDep
 from app.services import auth as auth_service
 from tests.factories.auth import UserSessionFactory
 from tests.factories.org import MembershipFactory, OrganizationFactory
+from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import FACTORY_PASSWORD, UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
 from tests.support.api import api_client
@@ -455,3 +460,321 @@ async def test_a_json_body_with_a_charset_is_accepted(client: AsyncClient) -> No
     )
 
     assert response.status_code == 200
+
+
+# --- Change password (design-doc §4, "Sign-in" and "Sessions") -------------------------------
+
+NEW_PASSWORD = "a brand new passphrase"
+
+
+async def change_password(
+    client: AsyncClient, new: str = NEW_PASSWORD, current: str = FACTORY_PASSWORD
+) -> Response:
+    return await client.post(
+        "/api/auth/change-password", json={"current_password": current, "new_password": new}
+    )
+
+
+async def stored_hash(session: AsyncSession, user: User) -> str:
+    return (
+        await session.execute(select(User.hashed_password).where(User.id == user.id))
+    ).scalar_one()
+
+
+async def test_change_password_stores_the_new_one_and_clears_the_forced_change(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    user = await UserFactory.create_async(email="ann@example.com", must_change_password=True)
+    await sign_in(client, "ann@example.com")
+
+    response = await change_password(client)
+
+    assert response.status_code == 204
+    new_hash = await stored_hash(session, user)
+    assert await verify_password(new_hash, NEW_PASSWORD) is True
+    assert await verify_password(new_hash, FACTORY_PASSWORD) is False
+    must_change = await session.scalar(select(User.must_change_password).where(User.id == user.id))
+    assert must_change is False
+
+
+async def test_change_password_replaces_this_sessions_token_and_ends_the_others(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    user = await UserFactory.create_async(email="ann@example.com")
+    old_token, _ = set_cookie(await sign_in(client, "ann@example.com"))
+    [this_session] = await session_rows(session, user)
+    await session_for(user, session)  # another browser
+    bystander = await UserFactory.create_async()
+    bystanders_token = await session_for(bystander, session)
+
+    response = await change_password(client)
+
+    new_token, attributes = set_cookie(response)
+    assert new_token != old_token
+    assert {"secure", "httponly", "path"} <= attributes.keys()
+    rows = await session_rows(session, user)
+    assert [(row.id, row.token_hash) for row in rows] == [(this_session.id, hash_token(new_token))]
+    assert [row.token_hash for row in await session_rows(session, bystander)] == [
+        hash_token(bystanders_token)
+    ]
+    assert (await client.get("/api/auth/me")).status_code == 200  # the new cookie works
+    client.cookies.set(COOKIE, old_token)
+    assert (await client.get("/api/auth/me")).status_code == 401  # the old token doesn't
+
+
+async def belong(user: User, how: str) -> Workspace:
+    """Put `user` in a new workspace as staff, an org member, or a project member."""
+    workspace = await WorkspaceFactory.create_async()
+    org = await OrganizationFactory.create_async(workspace=workspace)
+    match how:
+        case "staff":
+            await WorkspaceMembershipFactory.create_async(workspace=workspace, user=user)
+        case "org_member":
+            await MembershipFactory.create_async(organization=org, user=user)
+        case "project_member":
+            project = await ProjectFactory.create_async(organization=org, workspace_id=workspace.id)
+            await ProjectMembershipFactory.create_async(project=project, user=user)
+        case _:
+            raise AssertionError(f"unknown membership {how!r}")
+    return workspace
+
+
+@pytest.mark.parametrize("how", ["staff", "org_member", "project_member"])
+async def test_change_password_records_the_event_in_the_users_workspace(
+    client: AsyncClient, session: AsyncSession, how: str
+) -> None:
+    user = await UserFactory.create_async(email="ann@example.com")
+    workspace = await belong(user, how)
+    await sign_in(client, "ann@example.com")
+
+    await change_password(client)
+
+    events = await session.execute(
+        select(
+            AuditEvent.action,
+            AuditEvent.actor_id,
+            AuditEvent.target_user_id,
+            AuditEvent.workspace_id,
+            AuditEvent.organization_id,
+            AuditEvent.details,
+        )
+    )
+    assert events.all() == [
+        (AuditAction.PASSWORD_CHANGED, user.id, user.id, workspace.id, None, {})
+    ]
+
+
+async def test_change_password_by_staff_who_are_also_org_members_records_their_workspace(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """One workspace reached two ways (design-doc §4: staff may also hold org memberships)."""
+    user = await UserFactory.create_async(email="ann@example.com")
+    workspace = await WorkspaceFactory.create_async()
+    org = await OrganizationFactory.create_async(workspace=workspace)
+    await WorkspaceMembershipFactory.create_async(workspace=workspace, user=user)
+    await MembershipFactory.create_async(organization=org, user=user)
+    await sign_in(client, "ann@example.com")
+
+    await change_password(client)
+
+    recorded = await session.execute(select(AuditEvent.action, AuditEvent.workspace_id))
+    assert recorded.all() == [(AuditAction.PASSWORD_CHANGED, workspace.id)]
+
+
+async def test_change_password_with_no_membership_records_the_only_workspace(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """A user left with no memberships can still sign in (design-doc §4); the event is in the
+    one workspace v1 deploys."""
+    await UserFactory.create_async(email="ann@example.com")
+    workspace = await WorkspaceFactory.create_async()
+    await sign_in(client, "ann@example.com")
+
+    await change_password(client)
+
+    recorded = await session.execute(select(AuditEvent.action, AuditEvent.workspace_id))
+    assert recorded.all() == [(AuditAction.PASSWORD_CHANGED, workspace.id)]
+
+
+async def test_change_password_with_no_membership_and_two_workspaces_records_none(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    await UserFactory.create_async(email="ann@example.com")
+    await WorkspaceFactory.create_async()
+    await WorkspaceFactory.create_async()
+    await sign_in(client, "ann@example.com")
+
+    await change_password(client)
+
+    recorded = await session.execute(select(AuditEvent.action, AuditEvent.workspace_id))
+    assert recorded.all() == [(AuditAction.PASSWORD_CHANGED, None)]
+
+
+async def test_change_password_in_two_workspaces_records_no_workspace(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """Which one would be undecided while there's one workspace (design-doc §4)."""
+    user = await UserFactory.create_async(email="ann@example.com")
+    await belong(user, "staff")
+    await belong(user, "org_member")
+    await sign_in(client, "ann@example.com")
+
+    await change_password(client)
+
+    recorded = await session.execute(select(AuditEvent.action, AuditEvent.workspace_id))
+    assert recorded.all() == [(AuditAction.PASSWORD_CHANGED, None)]
+
+
+async def test_a_wrong_current_password_changes_nothing(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    user = await UserFactory.create_async(email="ann@example.com")
+    token, _ = set_cookie(await sign_in(client, "ann@example.com"))
+    before = await stored_hash(session, user)
+
+    response = await change_password(client, current="not my password")
+
+    assert response.status_code == 422
+    assert response.json()["details"]["fields"] == [
+        {
+            "loc": ["body", "current_password"],
+            "message": "This isn't your password.",
+            "type": "incorrect",
+        }
+    ]
+    assert await stored_hash(session, user) == before
+    assert [row.token_hash for row in await session_rows(session, user)] == [hash_token(token)]
+    assert (await session.execute(select(func.count()).select_from(AuditEvent))).scalar_one() == 0
+
+
+@pytest.mark.parametrize(
+    ("new", "problem"),
+    [
+        ("seven77", "too_short"),
+        ("x" * 257, "too_long"),
+        ("Ann@Example.com", "same_as_email"),
+        ("ANN-LEE-PARK", "same_as_username"),
+        (FACTORY_PASSWORD, "same_as_current"),
+    ],
+)
+async def test_a_new_password_against_the_policy_is_422(
+    client: AsyncClient, session: AsyncSession, new: str, problem: str
+) -> None:
+    user = await UserFactory.create_async(email="ann@example.com", username="ann-lee-park")
+    await sign_in(client, "ann@example.com")
+    before = await stored_hash(session, user)
+
+    response = await change_password(client, new)
+
+    assert response.status_code == 422
+    assert [(f["loc"], f["type"]) for f in response.json()["details"]["fields"]] == [
+        (["body", "new_password"], problem)
+    ]
+    assert await stored_hash(session, user) == before
+
+
+@pytest.mark.parametrize("new", ["eight888", "x" * 256], ids=["8-characters", "256-characters"])
+async def test_a_new_password_at_the_length_limits_is_accepted(
+    client: AsyncClient, new: str
+) -> None:
+    await UserFactory.create_async(email="ann@example.com")
+    await sign_in(client, "ann@example.com")
+
+    response = await change_password(client, new)
+
+    assert response.status_code == 204
+
+
+async def test_change_password_without_a_session_is_401(client: AsyncClient) -> None:
+    response = await change_password(client)
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "not_authenticated"
+
+
+# --- The forced change (design-doc §4, "Forced change"; S1-plan F1) ---------------------------
+
+
+@pytest.fixture
+async def gated_client(
+    settings: Settings, sessionmaker: SessionMaker
+) -> AsyncIterator[AsyncClient]:
+    """The real app plus a test-only endpoint that needs a signed-in user, the way every
+    endpoint but `/me` and change-password will."""
+    app = create_app(settings, sessionmaker=sessionmaker)
+
+    @app.post("/api/test/needs-a-user")
+    async def needs_a_user(user: SignedInUserDep) -> dict[str, str]:
+        return {"email": user.email}
+
+    async with api_client(app) as client:
+        yield client
+
+
+async def test_a_forced_change_blocks_every_other_endpoint(gated_client: AsyncClient) -> None:
+    await UserFactory.create_async(email="ann@example.com", must_change_password=True)
+    await sign_in(gated_client, "ann@example.com")
+
+    response = await gated_client.post("/api/test/needs-a-user")
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "code": "password_change_required",
+        "message": "Choose a new password to continue.",
+        "details": {},
+    }
+
+
+async def test_without_a_forced_change_the_endpoint_is_reachable(
+    gated_client: AsyncClient,
+) -> None:
+    await UserFactory.create_async(email="ann@example.com", must_change_password=False)
+    await sign_in(gated_client, "ann@example.com")
+
+    response = await gated_client.post("/api/test/needs-a-user")
+
+    assert (response.status_code, response.json()) == (200, {"email": "ann@example.com"})
+
+
+async def test_a_forced_change_still_allows_me_change_password_and_sign_out(
+    gated_client: AsyncClient, session: AsyncSession
+) -> None:
+    user = await UserFactory.create_async(email="ann@example.com", must_change_password=True)
+    await sign_in(gated_client, "ann@example.com")
+
+    me = await gated_client.get("/api/auth/me")
+    changed = await change_password(gated_client)
+    unblocked = await gated_client.post("/api/test/needs-a-user")
+    signed_out = await gated_client.post("/api/auth/sign-out")
+
+    assert (me.status_code, me.json()["must_change_password"]) == (200, True)
+    assert changed.status_code == 204
+    assert unblocked.status_code == 200
+    assert signed_out.status_code == 204
+    assert await session_rows(session, user) == []
+
+
+async def test_sign_out_works_during_a_forced_change(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    user = await UserFactory.create_async(email="ann@example.com", must_change_password=True)
+    await sign_in(client, "ann@example.com")
+
+    response = await client.post("/api/auth/sign-out")
+
+    assert response.status_code == 204
+    assert await session_rows(session, user) == []
+
+
+async def test_the_origin_check_runs_before_the_forced_change_check(
+    gated_client: AsyncClient,
+) -> None:
+    await UserFactory.create_async(email="ann@example.com", must_change_password=True)
+    await sign_in(gated_client, "ann@example.com")
+
+    response = await gated_client.post(
+        "/api/test/needs-a-user", headers={"Origin": "https://evil.example"}
+    )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "origin_rejected"

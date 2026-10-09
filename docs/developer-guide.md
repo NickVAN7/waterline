@@ -4,15 +4,17 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C5 (Sessions & sign-in) done, on the `s1` branch (one branch and PR for the rest
-> of Slice 1); next is S1-C6 (Passwords, seed & system-admin CLI). Sign-in, sign-out, and
-> `GET /api/auth/me` work over a server-side session in the `__Host-session` cookie, and every
-> mutating request passes the `Origin` and JSON-only checks first ("Authentication" below). The
-> tenancy, project, and audit tables exist (models, migrations, constraint tests, a factory per model;
-> `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the base
-> repository, and `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`).
-> The pure rules (identifiers, password policy, account rank) are in `app/rules/`, held to 100%
-> coverage and mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
+> **Status:** S1-C6 (Passwords, seed & system-admin CLI) done, on the `s1` branch (one branch and PR
+> for the rest of Slice 1); next is S1-C7 (Authorization core). Sign-in, sign-out, change password,
+> and `GET /api/auth/me` work over a server-side session in the `__Host-session` cookie, a forced
+> password change blocks every other endpoint, and every mutating request passes the `Origin` and
+> JSON-only checks first ("Authentication" below). `wl seed` creates the workspace and its first
+> system admin, and `wl admin` grants and revokes the system-admin flag. The tenancy, project, and
+> audit tables exist (models, migrations, constraint tests, a factory per model; `audit_event` is
+> append-only), with the domain enums in `app/enums.py`, get-by-ID in the base repository, and
+> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure rules
+> (identifiers, password policy, account rank) are in `app/rules/`, held to 100% coverage and
+> mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
 > (`app/core/lists.py`), constraint errors as field errors (`app/core/constraint_errors.py`), and
 > `log_admin_event()`. The backend has its database core (Postgres, async SQLAlchemy, Alembic, the
 > base model and its mixins), a test harness with a `concurrency` fixture, background jobs on
@@ -122,8 +124,15 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl migrate` | `docker compose run --rm --build migrate`: `alembic upgrade head` against the dev database, in the Compose `migrate` service (its image rebuilt first if dependencies changed) |
 | `wl backend migration "<message>"` | `alembic revision --autogenerate -m "<message>"` on the host; review the generated file by hand |
 
-Still to come (Slice 1): `wl seed` and `wl admin <command>` (app admin commands, e.g.
-`wl admin grant-system-admin <email>`).
+
+**App admin commands** (`backend/app/cli.py`, run as `python -m app.cli <command>` in a one-off
+container from the api service's image: `docker compose run --rm api ...`, after the migrations):
+
+| Command | Does |
+|---|---|
+| `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
+| `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
+| `wl admin revoke-system-admin <email>` | Take it away; refused for the last active system admin |
 
 The CLI is a **thin orchestrator**: the real tool configuration is in each project's
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
@@ -269,7 +278,18 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
 - **The signed-in user:** an endpoint that needs one takes `user: SignedInUserDep`
   (`app/routers/deps.py`). It reads the `__Host-session` cookie, finds a live session (within
   its lifetime and idle timeout, its user active), brings `last_seen_at` up to date at most
-  every 5 minutes, and returns the user; otherwise it raises 401 `not_authenticated`.
+  every 5 minutes, and returns the user; otherwise it raises 401 `not_authenticated`. While the
+  user must change their password it raises 403 `password_change_required` instead (the forced
+  change). Only `/me` and change-password take `UserPendingPasswordChangeDep`, which lets that
+  user through; sign-out needs no user at all. A new endpoint always takes `SignedInUserDep`.
+- **Change password** (`POST /api/auth/change-password`, `current_password` and
+  `new_password`): 422 on `current_password` (`incorrect`) or `new_password` (the password
+  policy's problems, each its own `type`); on success the session keeps its row but gets a new
+  token (a new cookie), the user's other sessions are deleted, `must_change_password` is cleared,
+  and `password_changed` is recorded.
+- **Password and identifier messages:** `password_errors()` and `identifier_error()`
+  (`app/services/user.py`) turn the `rules/` problems into field errors; use them wherever a
+  password, username, or slug is set.
 - **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
   password (the same body either way) and 403 `account_inactive` for a deactivated account with
   its correct password. Sign-out is always 204, with or without a session, and clears the cookie.
