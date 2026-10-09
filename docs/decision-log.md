@@ -582,7 +582,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   system admins only (not workspace admins), a targeted rule in S1-C8; system admins keep it,
   as design-doc §5 says.
 - **Supersedes:** none (the docs named no workspace-level action)
-- **Superseded by:** none
+- **Superseded by:** DL-56 (in part: the targeted rule is an action)
 - **Applies to:** build plan ("Authorization (§5)", "Authentication" `/me`, the S1-C8 row)
 - **Source:** chat session (owner, before S1-C7; the role and staff-list wording settled after
   the docs-consistency check)
@@ -682,3 +682,36 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** developer guide ("Authentication")
 - **Source:** chat session (owner, after S1-C7a; S1-C5 review question)
+
+### DL-55: The workspace and org API (S1-C8)
+- **Date:** 2026-10-09
+- **Decision:** S1-C8's endpoints, payloads, and errors as listed in the build plan ("The
+  workspace and org API"): the workspace read and update; slug availability for the workspace,
+  a new org, and an existing org (`{available, problem}`); the staff list, the email-first add
+  (422 `already_member`, `no_account`, or `account_inactive` on `email`), the create (a new user
+  and the membership in one step, at `/staff/new`), the role change, and the removal
+  (`with_projects`, default true); the org list, the create (with exactly one of `owner_id`, an
+  existing active user: no such user a 404, a deactivated one a 422 `account_inactive`; or
+  `new_owner`, a new user), the read, and the update. A workspace's or org's own slug counts as
+  available on its slug check. The web form checks an email (S1-C9's email availability) and
+  confirms before posting an add; S1-C9's org and S1-C12's project email-first adds use the same
+  three errors as the staff add. Demoting or
+  removing the last owner is a 422 `validation_error` of type `last_owner` (409 stays for
+  version conflicts), the org guard in S1-C9 alike. `create_app` adds a `ReservedSlug` enum to
+  the OpenAPI components.
+- **Supersedes:** none (the docs gave the URL patterns, not the endpoints)
+- **Superseded by:** none
+- **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C8 row)
+- **Source:** chat session (owner, before S1-C8; the details settled after the docs-consistency
+  check)
+
+### DL-56: Three actions for S1-C8
+- **Date:** 2026-10-09
+- **Decision:** `workspace_staff.manage_admins` (granting, changing, or removing a workspace owner
+  or admin role, needed on top of `workspace_staff.manage`: workspace owners and system admins;
+  carried in `/me` like every workspace-level action), `org.view` (anyone who sees the org), and
+  `org.update` (org owners, workspace owners/admins, system admins).
+- **Supersedes:** DL-45 in part (its "a targeted rule in S1-C8": the rule is this action)
+- **Superseded by:** none
+- **Applies to:** build plan ("Authorization (§5)")
+- **Source:** chat session (owner, before S1-C8)
