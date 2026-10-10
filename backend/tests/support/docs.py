@@ -25,6 +25,8 @@ DESIGN_DOC = "docs/design-doc.md"
 DEVELOPER_GUIDE = "docs/developer-guide.md"
 TECH_DEBT = "docs/tech-debt.md"
 DECISION_LOG = "docs/decision-log.md"
+UI_GUIDE = "docs/ui-design-guide.md"
+UI_REVIEWER = ".claude/agents/ui-reviewer.md"
 
 
 class DocsStructureError(AssertionError):
@@ -709,10 +711,10 @@ def unresolved_references(
     return problems
 
 
-def design_doc_sections() -> frozenset[str]:
-    numbers = re.findall(r"^#{2,6} (\d+(?:\.\d+)*)\.? ", read(DESIGN_DOC), re.MULTILINE)
+def numbered_sections(relative_path: str) -> frozenset[str]:
+    numbers = re.findall(r"^#{2,6} (\d+(?:\.\d+)*)\.? ", read(relative_path), re.MULTILINE)
     if not numbers:
-        raise DocsStructureError(f"{DESIGN_DOC}: no numbered headings (## 1. …, ### 1.1 …)")
+        raise DocsStructureError(f"{relative_path}: no numbered headings (## 1. …, ### 1.1 …)")
     return frozenset(numbers)
 
 

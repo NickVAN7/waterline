@@ -698,12 +698,38 @@ def test_checkpoint_commit_with_a_malformed_id_is_a_structure_error(
         docs.latest_checkpoint()
 
 
-# --- 8: design-doc § references ---------------------------------------------------------------
+# --- 8: § references ---------------------------------------------------------------------------
+
+_SECTION = r"§(\d+(?:\.\d+)*)"
+# The UI guide and its reviewer number their own sections, so a bare § there is theirs;
+# elsewhere `guide §n` names a guide section.
+_OWN_NUMBERING = [docs.REPO_ROOT / docs.UI_GUIDE, docs.REPO_ROOT / docs.UI_REVIEWER]
 
 
 def test_every_section_reference_resolves_to_a_design_doc_heading() -> None:
+    sections = docs.numbered_sections(docs.DESIGN_DOC)
+    what = f"is not a heading in {docs.DESIGN_DOC}"
+    others = [path for path in docs.reference_files() if path not in _OWN_NUMBERING]
+
     problems = docs.unresolved_references(
-        r"§(\d+(?:\.\d+)*)", docs.design_doc_sections(), f"is not a heading in {docs.DESIGN_DOC}"
+        rf"(?<!guide ){_SECTION}", sections, what, others
+    ) + docs.unresolved_references(rf"[Dd]esign-doc {_SECTION}", sections, what, _OWN_NUMBERING)
+
+    assert problems == [], _report(problems)
+
+
+def test_every_ui_guide_section_reference_resolves_to_its_heading() -> None:
+    guide = docs.numbered_sections(docs.UI_GUIDE)
+    reviewer = docs.numbered_sections(docs.UI_REVIEWER) | guide
+    in_guide = f"is not a heading in {docs.UI_GUIDE}"
+    in_reviewer = f"is not a heading in {docs.UI_REVIEWER} or {docs.UI_GUIDE}"
+    bare = rf"(?<![Dd]esign-doc ){_SECTION}"
+    guide_file, reviewer_file = _OWN_NUMBERING
+
+    problems = (
+        docs.unresolved_references(rf"guide {_SECTION}", guide, in_guide)
+        + docs.unresolved_references(bare, guide, in_guide, [guide_file])
+        + docs.unresolved_references(bare, reviewer, in_reviewer, [reviewer_file])
     )
 
     assert problems == [], _report(problems)
