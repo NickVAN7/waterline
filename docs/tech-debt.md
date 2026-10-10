@@ -355,3 +355,37 @@ Entry format:
 - **Fix by:** S1-C10 (if it recurs: pin or bump Hypothesis, or report it upstream; if it hasn't
   recurred by then, close it with that note).
 - **Status:** open
+
+### TD-25: A rare deadlock between a staff change and an owner being added
+- **Added:** S1-C8a
+- **What:** a role change or removal locks the owners' rows twice (in `_member`, then in the
+  last-owner guard); an owner added through the staff add or create between the two takes no
+  owner lock, so a third concurrent staff change can lock that new owner first and wait on the
+  first change, which then waits on the new owner: Postgres aborts one, and that request fails
+  (a 500) and is rolled back. No rule is broken and no data is wrong.
+- **Why:** it needs three concurrent staff changes in one workspace with an owner added between
+  two locks; the fix (adding an owner takes the owner lock too; never having the guard reuse
+  the list `_member` locked, which can miss an owner promoted meanwhile and let the last owner go)
+  needs a race test that's costly to make deterministic for a retryable error.
+- **Fix by:** S1-C9 (the org version uses the same locks: fix both there, with one race test).
+- **Status:** open
+
+### TD-26: A no-op role change ignores `new_owner_id`, even an invalid one
+- **Added:** S1-C8a
+- **What:** re-sending the role someone already holds returns their row unchanged and records
+  nothing, without looking at `new_owner_id`; an invalid one (not staff, deactivated) is ignored
+  rather than refused with its 422.
+- **Why:** nothing changes, so nothing is wrong; the owner accepted it for now (after S1-C8a).
+- **Fix by:** S1-C15 (with the staff page's role picker: check `new_owner_id` on a no-op too, or
+  confirm the picker never sends one without a change).
+- **Status:** open
+
+### TD-27: Deactivation must wait behind a handover
+- **Added:** S1-C8a
+- **What:** a handover checks that the replacement is active but doesn't lock the user row, so a
+  deactivation committing just after could leave the workspace's (or an org's) only owner
+  deactivated. The last-owner and last-system-admin guards on deactivation (design-doc §4) should
+  take the owners' lock first, so a deactivation queues behind a handover.
+- **Why:** deactivation isn't built yet (S1-C10); the owner chose to build it there.
+- **Fix by:** S1-C10 (deactivation takes the owners' lock, with a race test against a handover).
+- **Status:** open

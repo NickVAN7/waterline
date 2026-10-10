@@ -216,7 +216,7 @@ async def test_a_workspace_admin_sees_staff_actions_only_on_rows_they_may_change
     client: AsyncClient, workspace: Workspace
 ) -> None:
     """An owner's or admin's row needs `workspace_staff.manage_admins` (DL-56), so a workspace
-    admin is offered nothing there: the UI never shows what the API would refuse."""
+    admin is offered nothing there, except on their own row, for stepping down (DL-59)."""
     admin = await UserFactory.create_async(name="Ada Admin")
     await WorkspaceMembershipFactory.create_async(
         workspace=workspace, user=admin, role=WorkspaceRole.ADMIN
@@ -232,7 +232,7 @@ async def test_a_workspace_admin_sees_staff_actions_only_on_rows_they_may_change
     await sign_in_as(client, admin)
 
     assert await staff_row_actions(client, workspace) == {
-        "Ada Admin": [],
+        "Ada Admin": ["workspace_staff.manage"],
         "Mo Member": ["workspace_staff.manage"],
         "Olga Owner": [],
     }
@@ -637,3 +637,251 @@ async def test_a_removed_admin_loses_access_on_the_next_request_keeping_the_sess
     after = await bobs.get(f"/api/workspaces/{workspace.id}")
     assert (before.status_code, after.status_code) == (200, 404)
     assert await sessions_of(session, bob) == 1
+
+
+# --- Stepping down and the owner handover (DL-59, S1-C8a) ------------------------------------
+
+
+async def admin_of(client: AsyncClient, workspace: Workspace) -> User:
+    user = await UserFactory.create_async()
+    await WorkspaceMembershipFactory.create_async(
+        workspace=workspace, user=user, role=WorkspaceRole.ADMIN
+    )
+    await sign_in_as(client, user)
+    return user
+
+
+async def staff(workspace: Workspace, role: WorkspaceRole = WorkspaceRole.MEMBER) -> User:
+    user = await UserFactory.create_async()
+    await WorkspaceMembershipFactory.create_async(workspace=workspace, user=user, role=role)
+    return user
+
+
+@pytest.mark.security
+async def test_an_admin_may_step_down_to_member(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    admin = await admin_of(client, workspace)
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{admin.id}", json={"role": "member"}
+    )
+
+    assert response.status_code == 200
+    assert await role_of(session, workspace, admin) is WorkspaceRole.MEMBER
+
+
+@pytest.mark.security
+async def test_an_admin_may_leave(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    admin = await admin_of(client, workspace)
+
+    response = await client.delete(f"/api/workspaces/{workspace.id}/staff/{admin.id}")
+
+    assert response.status_code == 204
+    assert await role_of(session, workspace, admin) is None
+
+
+async def test_an_admin_re_sending_their_own_role_changes_nothing(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """The same no-op as on anyone else's row (a role picker may send the current role)."""
+    admin = await admin_of(client, workspace)
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{admin.id}", json={"role": "admin"}
+    )
+
+    assert (response.status_code, response.json()["role"]) == (200, "admin")
+    assert await events(session) == []
+
+
+@pytest.mark.security
+async def test_an_admin_may_not_promote_themselves_to_owner(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """Stepping down is the exception, not stepping up."""
+    admin = await admin_of(client, workspace)
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{admin.id}", json={"role": "owner"}
+    )
+
+    assert (response.status_code, response.json()["code"]) == (403, "forbidden")
+    assert await role_of(session, workspace, admin) is WorkspaceRole.ADMIN
+
+
+@pytest.mark.security
+async def test_an_admin_may_still_not_demote_another_admin(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    await admin_of(client, workspace)
+    other = await staff(workspace, WorkspaceRole.ADMIN)
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{other.id}", json={"role": "member"}
+    )
+
+    assert response.status_code == 403
+    assert await role_of(session, workspace, other) is WorkspaceRole.ADMIN
+
+
+@pytest.mark.security
+async def test_the_last_owner_steps_down_by_naming_a_replacement(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    owner = await owner_of(client, workspace)
+    bob = await staff(workspace)
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}",
+        json={"role": "admin", "new_owner_id": str(bob.id)},
+    )
+
+    assert response.status_code == 200
+    assert (await role_of(session, workspace, owner), await role_of(session, workspace, bob)) == (
+        WorkspaceRole.ADMIN,
+        WorkspaceRole.OWNER,
+    )
+    assert [(target, details) for _, _, _, target, _, details in await events(session)] == [
+        (bob.id, {"old_role": "member", "new_role": "owner"}),
+        (owner.id, {"old_role": "owner", "new_role": "admin"}),
+    ]
+
+
+@pytest.mark.security
+async def test_the_last_owner_leaves_by_naming_a_replacement(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    owner = await owner_of(client, workspace)
+    bob = await staff(workspace)
+
+    response = await client.delete(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}", params={"new_owner_id": str(bob.id)}
+    )
+
+    assert response.status_code == 204
+    assert (await role_of(session, workspace, owner), await role_of(session, workspace, bob)) == (
+        None,
+        WorkspaceRole.OWNER,
+    )
+
+
+@pytest.mark.security
+async def test_a_system_admin_may_hand_over_for_the_last_owner(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """Whoever may demote an owner may name the replacement (DL-59)."""
+    owner = await staff(workspace, WorkspaceRole.OWNER)
+    bob = await staff(workspace)
+    await sign_in_as(client, await UserFactory.create_async(is_system_admin=True))
+
+    response = await client.delete(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}", params={"new_owner_id": str(bob.id)}
+    )
+
+    assert response.status_code == 204
+    assert await role_of(session, workspace, bob) is WorkspaceRole.OWNER
+
+
+@pytest.mark.security
+@pytest.mark.parametrize(
+    ("who", "type_"),
+    [("outsider", "not_member"), ("gone", "account_inactive"), ("self", "same_user")],
+)
+async def test_a_replacement_that_cant_be_owner_is_a_422(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace, who: str, type_: str
+) -> None:
+    owner = await owner_of(client, workspace)
+    gone = await UserFactory.create_async(is_active=False)
+    await WorkspaceMembershipFactory.create_async(workspace=workspace, user=gone)
+    candidates = {"outsider": await UserFactory.create_async(), "gone": gone, "self": owner}
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}",
+        json={"role": "admin", "new_owner_id": str(candidates[who].id)},
+    )
+
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["body", "new_owner_id"], type_)],
+    )
+    assert await role_of(session, workspace, owner) is WorkspaceRole.OWNER
+
+
+@pytest.mark.security
+async def test_naming_a_replacement_for_someone_not_an_owner_is_a_422(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    await owner_of(client, workspace)
+    admin = await staff(workspace, WorkspaceRole.ADMIN)
+    bob = await staff(workspace)
+
+    response = await client.delete(
+        f"/api/workspaces/{workspace.id}/staff/{admin.id}", params={"new_owner_id": str(bob.id)}
+    )
+
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["query", "new_owner_id"], "not_owner")],
+    )
+    assert await role_of(session, workspace, bob) is WorkspaceRole.MEMBER
+
+
+@pytest.mark.security
+@pytest.mark.parametrize("successor", ["themselves", "a member"])
+async def test_a_workspace_admin_cant_name_a_replacement_owner_by_role_change(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace, successor: str
+) -> None:
+    """Naming a replacement needs the right to act on an owner's row (DL-59): an admin can't
+    use it to make themselves or a friend owner."""
+    owner = await staff(workspace, WorkspaceRole.OWNER)
+    admin = await admin_of(client, workspace)
+    member = await staff(workspace)
+    named = {"themselves": admin, "a member": member}[successor]
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}",
+        json={"role": "admin", "new_owner_id": str(named.id)},
+    )
+
+    assert (response.status_code, response.json()["code"]) == (403, "forbidden")
+    assert (await role_of(session, workspace, owner), await role_of(session, workspace, named)) == (
+        WorkspaceRole.OWNER,
+        {"themselves": WorkspaceRole.ADMIN, "a member": WorkspaceRole.MEMBER}[successor],
+    )
+    assert await events(session) == []
+
+
+@pytest.mark.security
+async def test_a_workspace_admin_cant_name_a_replacement_owner_by_removal(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    owner = await staff(workspace, WorkspaceRole.OWNER)
+    admin = await admin_of(client, workspace)
+
+    response = await client.delete(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}", params={"new_owner_id": str(admin.id)}
+    )
+
+    assert (response.status_code, response.json()["code"]) == (403, "forbidden")
+    assert await role_of(session, workspace, owner) is WorkspaceRole.OWNER
+    assert await role_of(session, workspace, admin) is WorkspaceRole.ADMIN
+    assert await events(session) == []
+
+
+async def test_naming_someone_already_an_owner_is_accepted(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """Nothing to promote: the step-down goes ahead and records only itself."""
+    owner = await owner_of(client, workspace)
+    other = await staff(workspace, WorkspaceRole.OWNER)
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}",
+        json={"role": "admin", "new_owner_id": str(other.id)},
+    )
+
+    assert response.status_code == 200
+    assert [target for _, _, _, target, *_ in await events(session)] == [owner.id]

@@ -208,14 +208,20 @@ class WorkspaceService:
         self, ctx: AuthzContext, workspace: Workspace, membership: WorkspaceMembership
     ) -> StaffRead:
         """A staff row, with what the caller may do to it: an owner's or admin's row needs
-        `workspace_staff.manage_admins` as well (DL-56)."""
+        `workspace_staff.manage_admins` as well (DL-56), except the caller's own row, where
+        stepping down needs only `workspace_staff.manage` (DL-59)."""
         target = workspace_target(workspace)
         actions = [
             action
             for action in allowed_actions(ctx, target)
             if action.startswith("workspace_staff.")
         ]
-        if membership.role in _ADMIN_ROLES and Action.WORKSPACE_STAFF_MANAGE_ADMINS not in actions:
+        own = membership.user_id == ctx.user_id
+        if (
+            membership.role in _ADMIN_ROLES
+            and Action.WORKSPACE_STAFF_MANAGE_ADMINS not in actions
+            and not own
+        ):
             actions = []
         user = membership.user
         return StaffRead(
@@ -294,7 +300,13 @@ class WorkspaceService:
         return await self._add_membership(ctx, workspace, user, payload.role)
 
     async def _member(self, workspace: Workspace, user_id: uuid.UUID) -> WorkspaceMembership:
-        membership = await WorkspaceRepository(self.session).membership(workspace.id, user_id)
+        """The membership a role change or removal acts on, locked. The owners' rows are locked
+        first, always in the same order, so concurrent changes queue instead of deadlocking, and
+        each reads the others' committed roles: a removal racing a handover to the same person
+        sees them as the owner they've become, and the last-owner guard applies (DL-59)."""
+        repository = WorkspaceRepository(self.session)
+        await repository.lock_owners(workspace.id)
+        membership = await repository.membership(workspace.id, user_id, lock=True)
         if membership is None:
             raise NotFoundError
         return membership
@@ -303,22 +315,69 @@ class WorkspaceService:
         self, workspace: Workspace, membership: WorkspaceMembership, loc: tuple[str, ...]
     ) -> None:
         """Refuse to leave the workspace with no owner: a 422 of type `last_owner` (DL-55)."""
+        # Locked again, not the list `_member` locked: a handover that committed while this
+        # request waited may have made someone an owner that the first list couldn't include.
         owners = await WorkspaceRepository(self.session).lock_owners(workspace.id)
         if owners == [membership.user_id]:
             raise ValidationFailedError(
                 [FieldError(loc, "The workspace needs another owner first.", "last_owner")]
             )
 
-    async def change_staff_role(
-        self, ctx: AuthzContext, workspace: Workspace, user_id: uuid.UUID, role: WorkspaceRole
-    ) -> StaffRead:
-        membership = await self._member(workspace, user_id)
-        self._ensure_role_change(ctx, workspace, membership.role, role)
-        if membership.role == role:
-            return self._staff_row(ctx, workspace, membership)
-        if membership.role is WorkspaceRole.OWNER:
-            await self._guard_last_owner(workspace, membership, ("body", "role"))
+    def _ensure_staff_change(
+        self,
+        ctx: AuthzContext,
+        workspace: Workspace,
+        membership: WorkspaceMembership,
+        new_role: WorkspaceRole | None,
+    ) -> None:
+        """The owner-only rule for owner and admin roles (DL-56), except on one's own row for
+        member, leaving (`new_role` None), or the role already held: each takes nothing new, and
+        needs only `workspace_staff.manage` (DL-59). Only an admin is affected: owners hold the
+        owner-only right anyway."""
+        stepping_down = membership.user_id == ctx.user_id and new_role in (
+            None,
+            WorkspaceRole.MEMBER,
+            membership.role,
+        )
+        if not stepping_down:
+            self._ensure_role_change(ctx, workspace, membership.role, new_role)
+
+    async def _hand_over(
+        self,
+        ctx: AuthzContext,
+        workspace: Workspace,
+        membership: WorkspaceMembership,
+        new_owner_id: uuid.UUID,
+        loc: tuple[str, ...],
+    ) -> None:
+        """Make `new_owner_id` an owner, as `membership`'s owner steps down or leaves (DL-59).
+        No permission check of its own: only an owner can hand over, and acting on an owner's
+        row already needs `workspace_staff.manage_admins`, which owners hold. 422 on `loc`: the
+        target isn't an owner (`not_owner`), the replacement is the target (`same_user`), isn't
+        staff (`not_member`), or is deactivated (`account_inactive`)."""
+        if membership.role is not WorkspaceRole.OWNER:
+            raise _field_error(loc, "Only an owner hands over ownership.", "not_owner")
+        if new_owner_id == membership.user_id:
+            raise _field_error(loc, "Name someone else as the new owner.", "same_user")
+        successor = await WorkspaceRepository(self.session).membership(
+            workspace.id, new_owner_id, lock=True
+        )
+        if successor is None:
+            raise _field_error(loc, "The new owner must be staff.", "not_member")
+        if not successor.user.is_active:
+            raise _field_error(loc, "This account is deactivated.", "account_inactive")
+        await self._set_role(ctx, workspace, successor, WorkspaceRole.OWNER)
+
+    async def _set_role(
+        self,
+        ctx: AuthzContext,
+        workspace: Workspace,
+        membership: WorkspaceMembership,
+        role: WorkspaceRole,
+    ) -> None:
         old = membership.role
+        if old == role:
+            return
         membership.role = role
         await self.session.flush()
         log_admin_event(
@@ -326,21 +385,55 @@ class WorkspaceService:
             action=AuditAction.WORKSPACE_MEMBER_ROLE_CHANGED,
             actor_id=ctx.user_id,
             workspace_id=workspace.id,
-            target_user_id=user_id,
+            target_user_id=membership.user_id,
             entity_type=AuditEntityType.WORKSPACE,
             entity_id=workspace.id,
             details={"old_role": old.value, "new_role": role.value},
         )
+
+    async def change_staff_role(
+        self,
+        ctx: AuthzContext,
+        workspace: Workspace,
+        user_id: uuid.UUID,
+        role: WorkspaceRole,
+        *,
+        new_owner_id: uuid.UUID | None = None,
+    ) -> StaffRead:
+        """Change a staff member's role. A last owner stepping down needs `new_owner_id`, who
+        becomes owner first (DL-59); otherwise 422 `last_owner` on `role`."""
+        membership = await self._member(workspace, user_id)
+        self._ensure_staff_change(ctx, workspace, membership, role)
+        if membership.role == role:
+            return self._staff_row(ctx, workspace, membership)
+        if new_owner_id is not None:
+            await self._hand_over(
+                ctx, workspace, membership, new_owner_id, ("body", "new_owner_id")
+            )
+        if membership.role is WorkspaceRole.OWNER:
+            await self._guard_last_owner(workspace, membership, ("body", "role"))
+        await self._set_role(ctx, workspace, membership, role)
         return self._staff_row(ctx, workspace, membership)
 
     async def remove_staff(
-        self, ctx: AuthzContext, workspace: Workspace, user_id: uuid.UUID, *, with_projects: bool
+        self,
+        ctx: AuthzContext,
+        workspace: Workspace,
+        user_id: uuid.UUID,
+        *,
+        with_projects: bool,
+        new_owner_id: uuid.UUID | None = None,
     ) -> None:
         """Remove a staff member; with their projects, the project area's registered handler
-        removes their project memberships in the workspace too. Sessions are left alone
-        (design-doc §4): access ends on the next request."""
+        removes their project memberships in the workspace too. A last owner leaving needs
+        `new_owner_id`, who becomes owner first (DL-59); otherwise 422 `last_owner`. Sessions are
+        left alone (design-doc §4): access ends on the next request."""
         membership = await self._member(workspace, user_id)
-        self._ensure_role_change(ctx, workspace, membership.role)
+        self._ensure_staff_change(ctx, workspace, membership, None)
+        if new_owner_id is not None:
+            await self._hand_over(
+                ctx, workspace, membership, new_owner_id, ("query", "new_owner_id")
+            )
         if membership.role is WorkspaceRole.OWNER:
             await self._guard_last_owner(workspace, membership, ("path", "user_id"))
         await self.session.delete(membership)
@@ -378,4 +471,8 @@ class WorkspaceService:
 
 
 def _email_error(message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(("body", "email"), message, type_)])
+    return _field_error(("body", "email"), message, type_)
+
+
+def _field_error(loc: tuple[str, ...], message: str, type_: str) -> ValidationFailedError:
+    return ValidationFailedError([FieldError(loc, message, type_)])

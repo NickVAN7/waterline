@@ -794,7 +794,7 @@
           "workspace"
         ],
         "summary": "Change Staff Role",
-        "description": "Change a staff member's role. 422 `last_owner` on `role` for the last owner.",
+        "description": "Change a staff member's role. 422 `last_owner` on `role` for the last owner, unless\n`new_owner_id` names a replacement; 422 on `new_owner_id`: `not_owner`, `same_user`,\n`not_member`, or `account_inactive`.",
         "operationId": "change_staff_role_api_workspaces__workspace_id__staff__user_id__patch",
         "parameters": [
           {
@@ -886,7 +886,7 @@
           "workspace"
         ],
         "summary": "Remove Staff",
-        "description": "Remove a staff member, by default with their project memberships in the workspace.\n422 `last_owner` on `user_id` for the last owner.",
+        "description": "Remove a staff member, by default with their project memberships in the workspace.\n422 `last_owner` on `user_id` for the last owner, unless `new_owner_id` names a\nreplacement (the same 422s on it as a role change).",
         "operationId": "remove_staff_api_workspaces__workspace_id__staff__user_id__delete",
         "parameters": [
           {
@@ -917,6 +917,23 @@
               "type": "boolean",
               "default": true,
               "title": "With Projects"
+            }
+          },
+          {
+            "name": "new_owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "New Owner Id"
             }
           }
         ],
@@ -2103,13 +2120,26 @@
         "properties": {
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
+          },
+          "new_owner_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Owner Id"
           }
         },
         "type": "object",
         "required": [
           "role"
         ],
-        "title": "StaffRoleUpdate"
+        "title": "StaffRoleUpdate",
+        "description": "`new_owner_id`: when an owner steps down, current staff to make owner in the same change\n(the last owner needs one; DL-59)."
       },
       "ValidationError": {
         "properties": {

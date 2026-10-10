@@ -213,14 +213,17 @@ export interface paths {
         /**
          * Remove Staff
          * @description Remove a staff member, by default with their project memberships in the workspace.
-         *     422 `last_owner` on `user_id` for the last owner.
+         *     422 `last_owner` on `user_id` for the last owner, unless `new_owner_id` names a
+         *     replacement (the same 422s on it as a role change).
          */
         delete: operations["remove_staff_api_workspaces__workspace_id__staff__user_id__delete"];
         options?: never;
         head?: never;
         /**
          * Change Staff Role
-         * @description Change a staff member's role. 422 `last_owner` on `role` for the last owner.
+         * @description Change a staff member's role. 422 `last_owner` on `role` for the last owner, unless
+         *     `new_owner_id` names a replacement; 422 on `new_owner_id`: `not_owner`, `same_user`,
+         *     `not_member`, or `account_inactive`.
          */
         patch: operations["change_staff_role_api_workspaces__workspace_id__staff__user_id__patch"];
         trace?: never;
@@ -590,9 +593,15 @@ export interface components {
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
-        /** StaffRoleUpdate */
+        /**
+         * StaffRoleUpdate
+         * @description `new_owner_id`: when an owner steps down, current staff to make owner in the same change
+         *     (the last owner needs one; DL-59).
+         */
         StaffRoleUpdate: {
             role: components["schemas"]["WorkspaceRole"];
+            /** New Owner Id */
+            new_owner_id?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1210,6 +1219,7 @@ export interface operations {
         parameters: {
             query?: {
                 with_projects?: boolean;
+                new_owner_id?: string | null;
             };
             header?: never;
             path: {

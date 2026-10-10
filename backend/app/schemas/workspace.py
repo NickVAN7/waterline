@@ -68,4 +68,8 @@ class StaffCreate(NewUser):
 
 
 class StaffRoleUpdate(BaseModel):
+    """`new_owner_id`: when an owner steps down, current staff to make owner in the same change
+    (the last owner needs one; DL-59)."""
+
     role: WorkspaceRole
+    new_owner_id: uuid.UUID | None = None

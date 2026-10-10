@@ -4,23 +4,22 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C8 (Workspace & organizations) done, the first checkpoint of the review-tier trial,
-> after S1-C7a and S1-C7b (the sign-in and change-password caps, the old session at sign-in); S1-C7
-> (Authorization core) closed the `s1-auth` group, on the `s1` branch (one branch and PR for the
-> rest of Slice 1); next is S1-C8a (Owner handover & stepping down). The workspace and org API is
-> built: the workspace, its staff (email-first add, create, roles with the owner-only rule,
-> removal), and orgs with their first owner (build plan, "The workspace and org API"). Every check
-> goes through `authorize()` ("Authorization" below); `/me` carries each workspace's
-> `allowed_actions`. Sign-in, sign-out, change password, and `GET /api/auth/me` work over a
-> server-side session in the `__Host-session` cookie, a forced password change blocks every other
-> endpoint, and every mutating request passes the `Origin` and JSON-only checks first
-> ("Authentication" below). `wl seed` creates the workspace and its first system admin, and `wl
-> admin` grants and revokes the system-admin flag. The tenancy, project, and audit tables exist
-> (models, migrations, constraint tests, a factory per model; `audit_event` is append-only), with
-> the domain enums in `app/enums.py`, get-by-ID in the base repository, and
-> `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`). The pure rules
-> (identifiers, password policy, account rank) are in `app/rules/`, held to 100% coverage and
-> mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
+> **Status:** S1-C8a (Owner handover & stepping down) done, after S1-C8 (Workspace & organizations),
+> the first checkpoint of the review-tier trial; next is S1-C9 (Org members & user creation). A
+> workspace admin may step down or leave on their own, and the last owner hands over by naming a
+> replacement (`new_owner_id`). The workspace and org API is built: the workspace, its staff
+> (email-first add, create, roles with the owner-only rule, removal), and orgs with their first
+> owner (build plan, "The workspace and org API"). Every check goes through `authorize()`
+> ("Authorization" below); `/me` carries each workspace's `allowed_actions`. Sign-in, sign-out,
+> change password, and `GET /api/auth/me` work over a server-side session in the `__Host-session`
+> cookie, a forced password change blocks every other endpoint, and every mutating request passes
+> the `Origin` and JSON-only checks first ("Authentication" below). `wl seed` creates the workspace
+> and its first system admin, and `wl admin` grants and revokes the system-admin flag. The tenancy,
+> project, and audit tables exist (models, migrations, constraint tests, a factory per model;
+> `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the base
+> repository, and `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`).
+> The pure rules (identifiers, password policy, account rank) are in `app/rules/`, held to 100%
+> coverage and mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
 > (`app/core/lists.py`), constraint errors as field errors (`app/core/constraint_errors.py`), and
 > `log_admin_event()`. The backend has its database core (Postgres, async SQLAlchemy, Alembic, the
 > base model and its mixins), a test harness with a `concurrency` fixture, background jobs on

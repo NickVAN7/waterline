@@ -66,12 +66,14 @@ class WorkspaceRepository:
         )
 
     async def membership(
-        self, workspace_id: uuid.UUID, user_id: uuid.UUID
+        self, workspace_id: uuid.UUID, user_id: uuid.UUID, *, lock: bool = False
     ) -> WorkspaceMembership | None:
-        """The user's staff membership, with the user loaded."""
-        return await self.session.scalar(
-            self.staff_statement(workspace_id).where(WorkspaceMembership.user_id == user_id)
-        )
+        """The user's staff membership, with the user loaded; with `lock`, its row held until the
+        transaction ends."""
+        statement = self.staff_statement(workspace_id).where(WorkspaceMembership.user_id == user_id)
+        if lock:
+            statement = statement.with_for_update(of=WorkspaceMembership)
+        return await self.session.scalar(statement)
 
     async def lock_owners(self, workspace_id: uuid.UUID) -> list[uuid.UUID]:
         """The workspace's owners' user IDs, their rows locked until the transaction ends: two

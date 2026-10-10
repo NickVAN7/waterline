@@ -1046,8 +1046,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   may pass `new_owner_id` (a body field on the role change, a query parameter on the removal),
   and that staff member becomes owner in the same transaction (`workspace_member_role_changed`
   for them too). 422 on `new_owner_id`: not staff `not_member`, deactivated `account_inactive`,
-  the target themselves `same_user`, the target not an owner `not_owner`. S1-C9's org guard and
-  self-service work the same way. `create_app` adds a `ReservedSlug` enum
+  the target themselves `same_user`, the target not an owner `not_owner`; naming someone already
+  an owner is accepted (nothing to promote). A role change or removal locks the owners' rows, then
+  the target's, then the replacement's, so concurrent changes queue in one order. S1-C9's org
+  guard and self-service work the same way. `create_app` adds a `ReservedSlug` enum
   (`RESERVED_SLUGS`) to the OpenAPI schema's components, with a test that it's there, for the
   S1-C14 router test (owner decision, Oct 7, 2026).
 

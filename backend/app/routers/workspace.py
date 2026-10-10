@@ -101,8 +101,12 @@ async def change_staff_role(
     ctx: AuthzContextDep,
     session: SessionDep,
 ) -> StaffRead:
-    """Change a staff member's role. 422 `last_owner` on `role` for the last owner."""
-    return await WorkspaceService(session).change_staff_role(ctx, workspace, user_id, body.role)
+    """Change a staff member's role. 422 `last_owner` on `role` for the last owner, unless
+    `new_owner_id` names a replacement; 422 on `new_owner_id`: `not_owner`, `same_user`,
+    `not_member`, or `account_inactive`."""
+    return await WorkspaceService(session).change_staff_role(
+        ctx, workspace, user_id, body.role, new_owner_id=body.new_owner_id
+    )
 
 
 @router.delete(
@@ -114,11 +118,13 @@ async def remove_staff(
     ctx: AuthzContextDep,
     session: SessionDep,
     with_projects: bool = True,
+    new_owner_id: uuid.UUID | None = None,
 ) -> None:
     """Remove a staff member, by default with their project memberships in the workspace.
-    422 `last_owner` on `user_id` for the last owner."""
+    422 `last_owner` on `user_id` for the last owner, unless `new_owner_id` names a
+    replacement (the same 422s on it as a role change)."""
     await WorkspaceService(session).remove_staff(
-        ctx, workspace, user_id, with_projects=with_projects
+        ctx, workspace, user_id, with_projects=with_projects, new_owner_id=new_owner_id
     )
 
 
