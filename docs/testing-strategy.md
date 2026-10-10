@@ -126,7 +126,19 @@ tested, what each kind of test is for, and the gates every change passes.
   rules) are the `docs-consistency` agent's job.
 - **Accessibility** (WCAG 2.2 AA, design-doc §1; from Slice 1, Checkpoint 14):
   - automated checks with axe-core in component tests (`vitest-axe`) and end-to-end tests
-    (`@axe-core/playwright`), failing on any violation;
+    (`@axe-core/playwright`), failing on any violation, through one shared helper each, each
+    proven able to fail by a deliberately violating fixture (ui-design-guide §9);
+  - every end-to-end flow runs its axe checks in both themes, light and dark (`colorScheme`
+    emulation), since jsdom has no layout and contrast and target size are checked only there;
+  - `expectFocusNotObscured()`, an end-to-end helper: Tab through the shell pages, a page with
+    a toast showing, and a table with rows selected, and the focused element is never covered
+    (WCAG 2.4.11);
+  - end-to-end tests run inside `wl check` (`wl e2e`, on an isolated seeded stack; DL-65), so a
+    green local `wl check` means a green CI;
+  - for each SVAR widget wrapper (from the first checkpoint that ships a board or an editable
+    grid; DL-64): a theme audit in both themes and in the interactive states that fails on any
+    color that is not one of our tokens, and keyboard and move/cancel specs that drive the
+    non-drag alternative with the server mocked to allow and to deny (ui-design-guide §7.1, §9);
   - a manual keyboard and screen-reader pass on each slice's new screens at slice
     verification, since automated checks find only part of the problems.
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):

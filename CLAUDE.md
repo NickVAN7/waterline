@@ -14,6 +14,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/build-plan.md` | Slices, checkpoints, architecture, feature map, developer CLI |
 | `docs/testing-strategy.md` | Test layers, factories, coverage gates, workflow |
 | `docs/screen-inventory.md` | People and personas, v1 scope, tenancy & access model, screens (derived step by step) |
+| `docs/ui-design-guide.md` | UI rules by ID (`UI-FRM-5`): styling approach, tokens, shell, forms, feedback, tables, SVAR widgets, how each is checked; reference copies in `docs/ui/` |
 | `docs/developer-guide.md` | Setup, commands, conventions, how-tos (kept current every checkpoint) |
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
@@ -106,6 +107,7 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `checkpoint` — to close every checkpoint; it runs `security-reviewer` (when the build plan
   names the checkpoint for it, or the diff touches security-relevant code), then
   `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a temporary copy), then
+  `ui-reviewer` (when the diff touches `frontend/src/` or `frontend/e2e/`), then
   `fresh-clone-verifier`, `docs-consistency`, and `repo-auditor` (last checkpoint of a slice).
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in

@@ -66,13 +66,16 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
     areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
     `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
     store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
+- Also invoke the `ui-reviewer` agent, with the same inputs, whenever the diff touches
+  `frontend/src/` or `frontend/e2e/` (DL-62). It is read-only and runs no tests.
 - **One reviewer at a time:** when both run, invoke `security-reviewer` first and
-  `checkpoint-reviewer` once it has finished, never in parallel. Both can run tests against the
+  `checkpoint-reviewer` once it has finished, never in parallel (then `ui-reviewer`, when it
+  runs). Both can run tests against the
   shared test database (`waterline_test`), and two runs at once collide: the concurrency tests
   truncate tables and then require every table to be empty, and each run migrates the test
   database at its start. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests
   yourself while a reviewer is running.
-- Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
+- Do not pass any reviewer your reasoning or a summary of the work; they review from the docs
   and the diff.
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
   (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
@@ -107,12 +110,12 @@ If fixes changed behavior (not just docs or tests), run the reviewer again on th
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
-**Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
+**Record every pass** of every reviewer that ran (checkpoint, security, UI, fresh-clone,
 docs-consistency, repo-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
 Include the base commit, the totals, the "Spec tests" section (when the checkpoint has one), and
 for each pass its verdict, its findings table in the `S0-C1.md` columns, one row per finding with
 its resolution (fixed / logged with TD number / rejected with evidence / proposed to the owner;
-for `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor`, the four parts condensed
+for `checkpoint-reviewer`, `security-reviewer`, `ui-reviewer`, and `repo-auditor`, the four parts condensed
 into the Finding cell, DL-42), `checkpoint-reviewer`'s "Sabotage checks" table, and the
 questions it raised. End with the questions still open for the owner and any owner decisions made during review.
 The record goes in the checkpoint's commit.
@@ -181,7 +184,7 @@ reviewers, not verification.
 
 Send the owner:
 - the review note (the commit message body);
-- each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency,
+- each reviewer's findings table (checkpoint, security, UI, fresh-clone, docs-consistency,
   repo-auditor) with
   the resolution of each finding (as recorded in `docs/reviews/s<n>/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
