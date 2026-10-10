@@ -1,7 +1,6 @@
 """The app factory's own database wiring (tests otherwise inject a sessionmaker)."""
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.pool import QueuePool
@@ -11,6 +10,7 @@ from app.core.db import SessionMaker
 from app.core.errors import NotFoundError
 from app.core.settings import TEST_DATABASE_NAME, Settings
 from app.main import create_app
+from tests.support.api import api_client
 
 pytestmark = pytest.mark.anyio
 
@@ -30,9 +30,7 @@ async def test_app_owns_an_engine_for_the_configured_database_and_disposes_it(
     engine: AsyncEngine = app.state.sessionmaker.kw["bind"]
 
     async with app.router.lifespan_context(app):
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://testserver"
-        ) as client:
+        async with api_client(app) as client:
             response = await client.get("/api/health")
         pooled_while_running = pool_size(engine)
 
@@ -62,7 +60,7 @@ async def test_app_returns_409_for_a_stale_version(
     async def stale() -> None:
         raise StaleVersionError("Document is at version 2, not 1")
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         response = await c.get("/stale")
 
     assert response.status_code == 409
@@ -88,7 +86,7 @@ async def test_app_returns_the_standard_error_body_for_every_kind_of_error(
     async def crash() -> None:
         raise RuntimeError("unhandled")
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         app_error = await c.get("/gone")
         invalid = await c.get("/count", params={"n": "x"})
         unknown = await c.get("/api/no-such-route")

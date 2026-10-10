@@ -91,12 +91,11 @@ exclude_also = ["if TYPE_CHECKING:"]
 
 # --- Mutation testing (docs/testing-strategy.md, "Mutation testing") ---------------------------
 # mutmut copies the code to mutants/ and runs the selected tests against each mutant: only the
-# unit tests of the mutated packages (pure, no database). When app/authz/ gets code (S1-C7), its
-# unit tests (tests/unit/authz) join the selection.
+# unit tests of the mutated packages (pure, no database).
 [tool.mutmut]
 source_paths = ["app"]
 only_mutate = ["app/rules/*", "app/authz/*"]
-pytest_add_cli_args_test_selection = ["tests/unit/rules"]
+pytest_add_cli_args_test_selection = ["tests/unit/rules", "tests/unit/authz"]
 pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider"]
 
 # --- Import rules (docs/build-plan.md, "Backend architecture" and "Feature map") -------------
@@ -144,7 +143,7 @@ broken_contract_guidance = "Services call authorize() and log_change(), never th
 name = "Only the worker imports job modules"
 type = "forbidden"
 source_modules = [
-    "app.main", "app.openapi_export", "app.enums", "app.routers", "app.services", "app.repositories",
+    "app.main", "app.cli", "app.openapi_export", "app.enums", "app.routers", "app.services", "app.repositories",
     "app.models", "app.schemas",
     "app.core", "app.authz", "app.audit", "app.rules", "app.jobs.enqueue", "app.jobs.app",
 ]

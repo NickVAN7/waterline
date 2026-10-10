@@ -128,6 +128,34 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
         pytest.param(["logs", "api"], ["docker compose logs --follow api"], id="logs-service"),
         pytest.param(["migrate"], ["docker compose run --rm --build migrate"], id="migrate"),
         pytest.param(
+            ["seed"],
+            [
+                "docker compose run --rm -e SEED_WORKSPACE_NAME -e SEED_WORKSPACE_SLUG"
+                " -e SEED_EMAIL -e SEED_USERNAME -e SEED_NAME -e SEED_PASSWORD"
+                " api python -m app.cli seed"
+            ],
+            id="seed",
+        ),
+        pytest.param(
+            ["seed", "--email", "ann@example.com"],
+            [
+                "docker compose run --rm -e SEED_WORKSPACE_NAME -e SEED_WORKSPACE_SLUG"
+                " -e SEED_EMAIL -e SEED_USERNAME -e SEED_NAME -e SEED_PASSWORD"
+                " api python -m app.cli seed --email ann@example.com"
+            ],
+            id="seed-flags",
+        ),
+        pytest.param(
+            ["admin", "grant-system-admin", "ann@example.com"],
+            ["docker compose run --rm api python -m app.cli grant-system-admin ann@example.com"],
+            id="admin-grant",
+        ),
+        pytest.param(
+            ["admin", "revoke-system-admin", "ann@example.com"],
+            ["docker compose run --rm api python -m app.cli revoke-system-admin ann@example.com"],
+            id="admin-revoke",
+        ),
+        pytest.param(
             ["gen-client"],
             [
                 "(cd backend && uv run python -m app.openapi_export)",

@@ -10,6 +10,7 @@ import io
 import os
 import uuid
 from collections.abc import AsyncIterator, Generator
+from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
@@ -104,7 +105,13 @@ def _seed_factories() -> None:
 
 @pytest.fixture(scope="session")
 def settings() -> Settings:
-    return Settings(api_docs_enabled=True)  # pyright: ignore[reportCallIssue]
+    # Session lengths pinned to their defaults, so a developer's .env can't change what the
+    # tests expect.
+    return Settings(  # pyright: ignore[reportCallIssue]
+        api_docs_enabled=True,
+        session_idle_timeout=timedelta(days=7),
+        session_lifetime=timedelta(days=30),
+    )
 
 
 @pytest.fixture(scope="session")

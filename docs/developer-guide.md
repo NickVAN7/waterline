@@ -4,8 +4,17 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C4 (API conventions) done, closing the `s1-foundations` group; next is S1-C5
-> (Sessions & sign-in), on the `s1` branch (one branch and PR for the rest of Slice 1). The tenancy,
+> **Status:** S1-C8a (Owner handover & stepping down) done, after S1-C8 (Workspace & organizations),
+> the first checkpoint of the review-tier trial; next is S1-C9 (Org members & user creation). A
+> workspace admin may step down or leave on their own, and the last owner hands over by naming a
+> replacement (`new_owner_id`). The workspace and org API is built: the workspace, its staff
+> (email-first add, create, roles with the owner-only rule, removal), and orgs with their first
+> owner (build plan, "The workspace and org API"). Every check goes through `authorize()`
+> ("Authorization" below); `/me` carries each workspace's `allowed_actions`. Sign-in, sign-out,
+> change password, and `GET /api/auth/me` work over a server-side session in the `__Host-session`
+> cookie, a forced password change blocks every other endpoint, and every mutating request passes
+> the `Origin` and JSON-only checks first ("Authentication" below). `wl seed` creates the workspace
+> and its first system admin, and `wl admin` grants and revokes the system-admin flag. The tenancy,
 > project, and audit tables exist (models, migrations, constraint tests, a factory per model;
 > `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the base
 > repository, and `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`).
@@ -72,8 +81,8 @@ failing) if the pre-commit hooks aren't installed.
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
 docs/           design, schema, build plan, testing strategy, screen inventory, these guides,
-                tech-debt log, decision log, reviews/ (one record per checkpoint, and per
-                design-change tooling review, DC-<date>.md), spikes/
+                tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
+                design-changes/: one per tooling review), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
@@ -120,8 +129,15 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl migrate` | `docker compose run --rm --build migrate`: `alembic upgrade head` against the dev database, in the Compose `migrate` service (its image rebuilt first if dependencies changed) |
 | `wl backend migration "<message>"` | `alembic revision --autogenerate -m "<message>"` on the host; review the generated file by hand |
 
-Still to come (Slice 1): `wl seed` and `wl admin <command>` (app admin commands, e.g.
-`wl admin grant-system-admin <email>`).
+
+**App admin commands** (`backend/app/cli.py`, run as `python -m app.cli <command>` in a one-off
+container from the api service's image: `docker compose run --rm api ...`, after the migrations):
+
+| Command | Does |
+|---|---|
+| `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
+| `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
+| `wl admin revoke-system-admin <email>` | Take it away; refused for the last active system admin |
 
 The CLI is a **thin orchestrator**: the real tool configuration is in each project's
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
@@ -168,11 +184,14 @@ backend/app/
                        SoftDeleteMixin, VersionMixin, check_version
   core/enums.py        enum_type (VARCHAR + CHECK enum columns)
   core/errors.py       error format: AppError and its subclasses, ErrorBody, the handlers
+  core/request_guard.py   the Origin and JSON-only checks (middleware, before everything else)
   core/migration_filters.py   what Alembic autogenerate ignores (procrastinate's objects)
   core/security.py     password hashing (Argon2id, off the event loop), session tokens
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
+  routers/deps.py      shared router dependencies: SettingsDep, AuthServiceDep, SignedInUserDep,
+                       AuthzContextDep, authorized()
   rules/          pure business rules, no database
-  authz/          authorize() and friends (Slice 1)
+  authz/          authorize(), the action registry, targets, list scoping (pure: no queries)
   audit/          log_admin_event() (Slice 1, S1-C4) and log_change() (Slice 2)
   jobs/           background jobs: app.py (jobs_app), enqueue.py, task_names.py, tasks/, worker.py
 ```
@@ -256,6 +275,93 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   cookie; `hash_token(token)` → its SHA-256 hex digest, the only form ever stored.
 - Mark tests of security behavior `@pytest.mark.security` (run just those with
   `wl backend test -m security`).
+
+### Authentication
+
+Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `services/auth.py`,
+`repositories/auth.py`); design-doc §4 has the rules.
+
+- **The signed-in user:** an endpoint that needs one takes `user: SignedInUserDep`
+  (`app/routers/deps.py`). It reads the `__Host-session` cookie, finds a live session (within
+  its lifetime and idle timeout, its user active), brings `last_seen_at` up to date at most
+  every 5 minutes, and returns the user; otherwise it raises 401 `not_authenticated`. While the
+  user must change their password it raises 403 `password_change_required` instead (the forced
+  change). Only `/me` and change-password take `UserPendingPasswordChangeDep`, which lets that
+  user through; sign-out needs no user at all. A new endpoint always takes `SignedInUserDep`.
+- **Change password** (`POST /api/auth/change-password`, `current_password` and
+  `new_password`): 422 on `current_password` (`incorrect`) or `new_password` (the password
+  policy's problems, each its own `type`); on success the session keeps its row but gets a new
+  token (a new cookie), the user's other sessions are deleted, `must_change_password` is cleared,
+  and `password_changed` is recorded.
+- **Password and identifier messages:** `password_errors()`, `identifier_error()`,
+  `required_error()`, `email_error()`, and `new_user_errors()` (`app/services/user.py`) turn the
+  problems into field errors (`under=` for a nested object, e.g. `("body", "new_owner")`); use
+  them wherever a password, username, slug, or new account is set.
+- **Accounts an admin creates** (staff, an org's first owner; later org and project members)
+  go through `UserService.create_account(actor_id, workspace_id, new)`: validated,
+  `must_change_password` set, `user_created` recorded.
+- **Removing a member "with their projects"** calls the handlers registered with
+  `register_on_member_removed()` (`app/services/workspace.py`; the project area registers its own
+  in S1-C12), each given a `MemberRemoval`.
+- **Update events** record `change_details(changed_fields(entity, values))`
+  (`app/audit/admin_event.py`): `{"old": {...}, "new": {...}}`, the changed fields only.
+- **`ReservedSlug`** isn't returned by any route: `create_app` adds it to the OpenAPI schema's
+  components (`_add_schema_components`, `app/main.py`).
+- **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
+  password (the same body either way) and 403 `account_inactive` for a deactivated account with its
+  correct password; a password over 256 characters is a 422 on `password` (`string_too_long`) before
+  any hashing (DL-49), as is a `current_password` over 256 on change password (DL-52). A
+  successful sign-in deletes the session the browser sent, if any (DL-53). Sign-out is always 204,
+  with or without a session, and clears the cookie.
+- **Middleware errors** (DL-54): besides its own responses, every `POST`, `PUT`, `PATCH`, or
+  `DELETE` can return 403 `origin_rejected` (no path is exempt yet), and any request whose body
+  isn't JSON can return 415 `unsupported_media_type` (`app/core/request_guard.py`). They come before
+  routing, so no route declares them in the OpenAPI schema; clients branch on `code` as for any
+  error.
+- **Session lengths:** `SESSION_IDLE_TIMEOUT` and `SESSION_LIFETIME` in `.env` (ISO 8601
+  durations such as `P7D`; defaults 7 and 30 days; Compose passes them to the backend
+  services). The idle timeout must be over 5 minutes, the gap between `last_seen_at` writes;
+  the app refuses to start otherwise. The test `settings` fixture pins both to the defaults;
+  a test of other lengths builds its app from `settings.model_copy(update=...)`. Both are
+  checked against the database clock, so tests backdate `last_seen_at` or `expires_at` with
+  `func.now() - timedelta(...)`. Expired rows aren't deleted
+  yet (the nightly cleanup is TD-14); they're ignored.
+- **The `Origin` and JSON-only checks** run in `RequestGuardMiddleware`
+  (`app/core/request_guard.py`), before routing: a `POST`, `PUT`, `PATCH`, or `DELETE` whose
+  `Origin` doesn't name the request's own `Host` is 403 `origin_rejected`; then any request with
+  a body that isn't `application/json` is 415 `unsupported_media_type`. `ORIGIN_EXEMPT_PATHS`
+  is empty; adding a path needs the owner's approval (design-doc §4).
+- **The cookie** is set with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/` in every
+  environment. Reach the dev server at `localhost`: browsers accept a `Secure` cookie over plain
+  http only there.
+
+### Authorization
+
+`app/authz/` decides; it never queries (mutation testing runs only database-free unit tests
+against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)" the actions.
+
+- **Actions** are registered in `REGISTRY` (`app/authz/actions.py`), one `ActionSpec` each: its
+  level, the lowest workspace, org, and project role that grants it, whether it's a mutation,
+  `archive_exempt`, for a personal action its `relationship`, and `visible` (granted to anyone
+  who can see the target, e.g. `org.view` for a project member with no org role). Real actions are members of
+  `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
+  (DL-44); an unregistered action is denied. A project-level action normally sets
+  `workspace_role=ADMIN, org_role=ADMIN` (inherited project admin).
+- **The context** (`AuthzContext`): the user's system-admin flag and memberships, loaded once
+  per request (`UserRepository.authz_context`; an endpoint takes `ctx: AuthzContextDep`).
+- **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)`.
+- **Checks:** `authorize(ctx, action, target)` → bool; `ensure(...)` raises 404 when the user
+  can't see the target, 403 when they can but may not act; `allowed_actions(ctx, target)` for a
+  single-entity read; `module_enabled(target, module)`.
+- **Endpoints on one entity** take `authorized(loader, action, module=...)`
+  (`app/routers/deps.py`): `loader` is a dependency returning `(entity, target)` or None; the
+  endpoint gets the entity only once the check passes (404 for missing or unseen, then the
+  module, then 403).
+- **Lists** scope their query: `project_scope(ctx)` / `org_scope(ctx)` give the `Scope`, and
+  `scope_clause(scope, id_column, workspace_column, org_column)` (`app/repositories/base.py`)
+  the `WHERE`.
+- **Tests:** `tests/support/authz.py` has the personas, test-only actions
+  (`register_test_actions(monkeypatch)`), a test-only router, and `sign_in_as`.
 
 ### Import rules (enforced)
 
@@ -633,8 +739,8 @@ inside an outer transaction that is always rolled back, so tests never see each 
 | `session` | An `AsyncSession` for arranging and asserting; factories persist through it |
 | `sessionmaker` | Sessions that join the test transaction (`join_transaction_mode="create_savepoint"`): their commits only release savepoints |
 | `connection` / `engine` | The raw connection and the session-scoped test engine |
-| `client` (api/) | An `httpx.AsyncClient` on the real app, whose per-request sessions join the test transaction |
-| `settings` | `Settings` from the environment, with API docs on |
+| `client` (api/) | An `httpx.AsyncClient` on the real app, whose per-request sessions join the test transaction; built by `api_client(app)` (`tests/support/api.py`) on `https://testserver`, sending `Origin: https://testserver` by default. Build any other client with `api_client` too: httpx won't send the `Secure` session cookie over `http://`, and a mutation without the `Origin` is a 403 |
+| `settings` | `Settings` from the environment, with API docs on and the session lengths pinned to their defaults |
 
 ```python
 pytestmark = pytest.mark.anyio
@@ -857,8 +963,8 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   commit. A change to code already built becomes a new checkpoint with a letter suffix
   (`S1-C13a`); checkpoints are never renumbered. Developer-tooling and process code (hooks, the
   `wl` CLI, CI, the docs consistency tests) is built in the change itself, in `chore:` or `ci:`
-  commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
-  (DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+  commits, after a `checkpoint-reviewer` pass recorded in
+  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). A checkpoint in progress is parked with `git stash` while a design change is applied,
   and its review base becomes the design change's last commit (DL-20).
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:

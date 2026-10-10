@@ -18,7 +18,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
 | `docs/decision-log.md` | Every owner decision that changed or superseded a recorded rule, or set a process (`DL-<n>`) |
-| `docs/reviews/<ID>.md` | Each checkpoint's independent review, and each design change's tooling review (`DC-<YYYY-MM-DD>.md`, DL-18): every pass, finding, and resolution |
+| `docs/reviews/s<n>/<ID>.md`, `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` | Each checkpoint's independent review (one folder per slice), and each design change's tooling review (DL-18, DL-43): every pass, finding, and resolution |
 | `docs/spikes/` | Spike code kept as evidence for a recorded decision (e.g. design-doc §13) |
 
 Read the relevant sections before changing anything. If the code needs to differ from the docs,
@@ -61,7 +61,7 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   the `checkpoint` skill, "Report and stop").
 - Finish every checkpoint with the `checkpoint` skill (gates → docs → independent review by the
   `checkpoint-reviewer` agent, plus the other reviewers when they apply → review record in
-  `docs/reviews/<ID>.md` → commit → push → report → stop).
+  `docs/reviews/s<n>/<ID>.md` → commit → push → report → stop).
 - One commit per checkpoint. The docs, tests, and tech-debt log change in the same commit as the
   code they describe.
 - Each slice works on one branch, `s<n>`, with one draft PR (build plan, "Pull requests");

@@ -50,7 +50,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      sign-out, with 403 `password_change_required`;
    - Argon2id, run off the event loop; sign-in doesn't reveal whether an email exists (same
      error; the unknown-user path still does comparable hashing work); `account_inactive` is
-     returned only after the password is verified.
+     returned only after the password is verified; a password over 256 characters is refused
+     with 422 before any lookup or hash (DL-49).
 2. **CSRF:** every mutating method (`POST`, `PUT`, `PATCH`, `DELETE`) checks `Origin`: its
    host and port must equal the request's `Host` (a missing port is the default for the
    `Origin`'s scheme; the request's own scheme is never used; hostnames compared ignoring
@@ -72,7 +73,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
    - every action is registered; unknown actions are denied (fail closed);
    - order: archived project (every mutation on it or inside it denied, for every role including
      system admins; unarchive and removing a member with their projects excepted) →
-     export-control gate (from Slice 2) → personal actions → system admin → workspace
+     export-control gate (from Slice 2) → personal actions → visible actions (anyone who sees
+     the target; never a project content action, DL-58) → system admin → workspace
      owner/admin → org role (owner/admin of the project's org; an org member only for
      `project.create`) → project role → targeted rules;
      personal actions (e.g. `approval.decide`) are allowed only by their relationship rule, and
@@ -87,8 +89,10 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      and every membership the target holds is covered by an actor role at an equal or higher
      rank, so no one can reset a higher-ranked user's password (a system admin's, the workspace
      owner's, or, for an org admin, a workspace member's) and take over the account;
-     last-owner (org and workspace) and last-system-admin guards; only owners grant owner/admin
-     roles at their level; the admin path refuses the actor's own account for the password reset
+     last-owner (org and workspace; it holds unless a replacement owner is named in the same
+     request, `new_owner_id`, DL-59) and last-system-admin guards; only owners grant owner/admin
+     roles at their level (at the workspace level, system admins too, DL-45), except an admin
+     demoting or removing themselves (DL-59); the admin path refuses the actor's own account for the password reset
      and the email change (they use change password, which asks for the current one);
    - adding a project member by user ID accepts only the org's members and the workspace's
      staff, enforced by the endpoint (404 otherwise), not just by the picker; the email path

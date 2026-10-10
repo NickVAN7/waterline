@@ -1,6 +1,7 @@
 """The 100% coverage gate on app/authz and app/rules (a hook in tests/conftest.py; TD-2) runs in
 plain `pytest`, not only through `wl`: proven by running pytest in a subprocess (no database:
-only rule unit tests) on a subset that can't cover app/rules, and on one that does."""
+only rule and authz unit tests) on a subset that can't cover app/rules, and on one that covers
+both packages."""
 
 import os
 import subprocess
@@ -36,8 +37,8 @@ def test_a_run_below_100_percent_on_rules_fails(tmp_path: Path) -> None:
     assert "app/rules/identifiers.py" in result.stdout
 
 
-def test_a_run_covering_rules_fully_passes_the_gate(tmp_path: Path) -> None:
-    result = run_pytest(tmp_path, "tests/unit/rules", "--cov-fail-under=0")
+def test_a_run_covering_rules_and_authz_fully_passes_the_gate(tmp_path: Path) -> None:
+    result = run_pytest(tmp_path, "tests/unit/rules", "tests/unit/authz", "--cov-fail-under=0")
 
     assert result.returncode == 0, result.stdout
     assert "must have 100% coverage" not in result.stdout

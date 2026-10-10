@@ -513,7 +513,10 @@ Workspace (the firm: tenant boundary)
   `invalid_credentials` error in the same time (an unknown email still verifies against a
   dummy hash). A deactivated account gets `account_inactive`, but only after its password is
   verified. Emails are lowercased before lookup. After a successful sign-in, a hash made with
-  older Argon2 parameters is re-hashed with the current ones.
+  older Argon2 parameters is re-hashed with the current ones. A password longer than the
+  policy's 256 characters is refused (422) before any verification, so an oversized one never
+  costs a hash (DL-49). Change password refuses a current password over 256 characters the
+  same way (DL-52).
 - **Password policy:** 8–256 characters, no composition rules, not equal to the account's
   email or username (ignoring case). The same rule applies to changes, admin resets, and new
   accounts. When users change their own password, the new one must also differ from the
@@ -532,8 +535,10 @@ Workspace (the firm: tenant boundary)
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
-  - A fresh token at every sign-in (never reuse an existing session); a password change
-    replaces the current session's token and deletes the user's other sessions.
+  - A fresh token at every sign-in (never reuse an existing session), and on a successful
+    sign-in the session the browser signed in with, if it sent one, is deleted, so signing in
+    again cuts off a copy of the old token (DL-53); a password change replaces the current session's token and deletes
+    the user's other sessions.
   - CSRF: `SameSite=Lax`, plus an `Origin` check on every mutating request, plus JSON-only
     request bodies, plus no `GET` ever changing state (so links from other sites, which only
     ever `GET`, are always safe to follow). Owner decisions after S0-C7:
@@ -626,13 +631,17 @@ Workspace (the firm: tenant boundary)
      denied (404) whatever the user's admin level (§3.1). Management actions pass through.
   3. **Personal actions** (below): the relationship rule decides, for a user with content
      access to the project.
-  4. `user.is_system_admin`.
-  5. A workspace owner/admin role in the entity's workspace.
-  6. A role in the entity's org (the project's org for a project or anything in it): owner
+  4. **Visible actions:** an action marked `visible` (e.g. `org.view`) is granted to anyone
+     who can see the target (§4, "Visibility"). It comes after the export-control gate and is
+     never used for a project content action, so it can't take an inherited admin past the
+     gate (DL-58).
+  5. `user.is_system_admin`.
+  6. A workspace owner/admin role in the entity's workspace.
+  7. A role in the entity's org (the project's org for a project or anything in it): owner
      or admin grants inherited project admin; member grants only creating a project in the
      org (`project.create`, "Org roles" below).
-  7. The user's project role.
-  8. The targeted field-based rules below.
+  8. The user's project role.
+  9. The targeted field-based rules below.
 
   Anything not granted along the way is denied. The action registry marks every action as
   **content** or **management** (§3.1; from Slice 1, Checkpoint 13), and marks the personal
@@ -654,8 +663,8 @@ Workspace (the firm: tenant boundary)
   - Both are enforced through a FastAPI dependency so an endpoint can't obtain an entity without
     the check.
   - Failures on entities the user can't see return **404, not 403**, so existence isn't leaked.
-- **Module gating** is a separate dependency: a request to a module that is disabled for the
-  project returns 404 before `authorize()` runs.
+- **Module gating** is part of the load-and-authorize dependency (an option on it, DL-47): a
+  request to a module that is disabled for the project returns 404 before `authorize()` runs.
 - **The UI asks the server.** Single-entity responses include `allowed_actions`, evaluated through
   `authorize()` (`/me` carries the workspace-level actions and each org's), so the frontend never
   re-implements role rules; it hides what the user can't do (build plan, "API conventions").
@@ -736,7 +745,11 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   approver** can decide their own approval row. This is a personal action (see "The choke
   point"): nobody, including project, org, or workspace admins, or system admins, decides on
   another approver's behalf. A project admin can cancel the request instead.
-- The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted.
+- The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted,
+  unless they name a replacement owner (an existing member there) in the same request: that
+  person becomes owner as they step down or leave (DL-59).
+- **Stepping down:** a workspace or org admin may demote or remove themselves (taking access
+  away is always allowed) without the owner-only right those roles otherwise need (DL-59).
 
 ### Access review
 

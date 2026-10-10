@@ -3,6 +3,7 @@ Run with `uvicorn --factory app.main:create_app`."""
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -11,8 +12,10 @@ from app.core.base_model import Base
 from app.core.constraint_errors import constraint_registry
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.errors import register_error_handlers
+from app.core.request_guard import RequestGuardMiddleware
 from app.core.settings import Settings, get_settings
-from app.routers import health
+from app.routers import auth, health, org, workspace
+from app.rules.identifiers import RESERVED_SLUGS
 
 API_PREFIX = "/api"
 
@@ -47,6 +50,34 @@ def create_app(
     app.state.sessionmaker = sessionmaker
     # Every model is imported (app.models), so the registry sees every table's constraints.
     app.state.constraint_errors = constraint_registry(Base.metadata)
+    # Added before the error handlers' middleware, so it runs inside it: a crash in the guard
+    # still gets the standard 500 body.
+    app.add_middleware(RequestGuardMiddleware)
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(workspace.router, prefix=API_PREFIX)
+    app.include_router(org.router, prefix=API_PREFIX)
+    _add_schema_components(app)
     return app
+
+
+def _add_schema_components(app: FastAPI) -> None:
+    """Add to the OpenAPI schema what no route returns but the generated client needs:
+    `ReservedSlug`, the top-level routes no slug may take, so the frontend's router test checks
+    its routes against them (build plan, Checkpoint 8, DL-55)."""
+    build = app.openapi
+
+    def openapi() -> dict[str, Any]:
+        if app.openapi_schema is None:
+            schema = build()
+            schema.setdefault("components", {}).setdefault("schemas", {})["ReservedSlug"] = {
+                "title": "ReservedSlug",
+                "description": "Top-level browser routes: no workspace or org slug may be one.",
+                "type": "string",
+                "enum": sorted(RESERVED_SLUGS),
+            }
+            app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = openapi

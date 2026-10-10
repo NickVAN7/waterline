@@ -76,8 +76,10 @@ class Filter:
 
 @dataclass(frozen=True)
 class CustomFilter:
-    """A filter that needs more than one column (e.g. tasks by tag, through a join): its
-    parameter's type, and a function that applies a parsed value to the statement."""
+    """A filter that needs another table (e.g. tasks by tag): its parameter's type, and a
+    function that applies a parsed value to the statement. The function filters with `EXISTS`,
+    never a join: a join returns an item once per matching row, so it would repeat in `items`
+    and inflate `total` (DL-35). Each such filter has a test with an item matching two values."""
 
     name: str
     annotation: Any

@@ -1,14 +1,18 @@
 """Application settings from environment variables (and the repo-root `.env` in local dev)."""
 
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
 # backend/app/core/settings.py -> repo root. Missing in containers, which get real env vars.
 REPO_ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+
+# `last_seen_at` is written at most this often (design-doc §4, "Sessions").
+LAST_SEEN_INTERVAL = timedelta(minutes=5)
 
 # Created by docker/postgres/initdb/ next to the dev database; tests never touch dev data.
 TEST_DATABASE_NAME = "waterline_test"
@@ -26,6 +30,13 @@ class Settings(BaseSettings):
     # Swagger UI and the OpenAPI schema under /api. Off unless enabled (on in dev and test via
     # .env; off in production) — build-plan.md, "API foundations".
     api_docs_enabled: bool = False
+
+    # Session lengths (design-doc §4, "Sessions"): a session ends after this long without a
+    # request, and in any case this long after sign-in. In env, ISO 8601 durations (`P7D`).
+    # The idle timeout must exceed the gap between `last_seen_at` writes, or an active user's
+    # session would lapse between them.
+    session_idle_timeout: timedelta = Field(timedelta(days=7), gt=LAST_SEEN_INTERVAL)
+    session_lifetime: timedelta = Field(timedelta(days=30), gt=timedelta(0))
 
     def database_url(self, *, database: str | None = None) -> URL:
         return URL.create(

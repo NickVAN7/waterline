@@ -59,15 +59,25 @@ Calls flow **routers → services → repositories → models**. Services also u
   while either is stale.
 - **Passwords and tokens** only through `app/core/security.py` (`hash_password` /
   `verify_password` run off the event loop; store `hash_token(token)`, never the token).
+- **Ending a user's sessions:** update or lock the user row first, then delete the sessions.
+  Sign-in holds that row from a verified password until it commits, so the delete then sees
+  (and removes) a session from a sign-in in flight. Each such path gets a concurrency test like
+  `test_a_password_change_ends_a_sign_in_still_in_flight` (S1-C6 security review).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
+- **`app/authz/` never queries.** It decides from the `AuthzContext` and the `Target`; loading
+  (`UserRepository.authz_context`) and the `WHERE` built from a `Scope` (`scope_clause`) live in
+  repositories, and the FastAPI dependencies in `app/routers/deps.py`. Mutation testing runs only
+  the database-free unit tests against `app/authz/`, so a query there leaves mutants no test can
+  kill.
 - **`authorize()` order** (design-doc §5): archived project → export-control gate → personal actions
-  → system admin → workspace owner/admin → org role (owner/admin; member only for `project.create`)
-  → project role → targeted rules. From S1-C13, every registered action is marked content or
-  management; the export-control gate that uses the marking is built in Slice 2 (design-doc §3.1).
-  **Personal actions** (e.g. `approval.decide`) are checked before the admin levels and never
-  granted by them: only the relationship rule (e.g. the named approver) allows one, and only for a
-  user with content access to the project.
+  → visible actions (anyone who sees the target; never a project content action, DL-58) → system
+  admin → workspace owner/admin → org role (owner/admin; member only for `project.create`) → project
+  role → targeted rules. From S1-C13, every registered action is marked content or management; the
+  export-control gate that uses the marking is built in Slice 2 (design-doc §3.1). **Personal
+  actions** (e.g. `approval.decide`) are checked before the admin levels and never granted by them:
+  only the relationship rule (e.g. the named approver) allows one, and only for a user with content
+  access to the project.
 - **`log_change()` is the only writer to `activity_log`**, and never commits.
 - **`log_admin_event()` is the only writer to `audit_event`**, and never commits (design-doc
   §10.1). Never put a password, hash, or token in `details`, under any key: the guard only
@@ -162,6 +172,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   object that should hold the old value); otherwise the assertion can't fail.
 - Data from polyfactory factories in `tests/factories/` (fixed seed). Set explicitly any value
   the test depends on.
+- Every setting that changes behavior has a test with a non-default value
+  (`settings.model_copy(update=...)`): a test that only sees the default can't tell reading the
+  setting from hard-coding it (S1-C5 review).
 - Layout: `tests/unit/` (no DB), `tests/integration/` (repositories, services), `tests/api/`
   (HTTP). Files mirror `app/`.
 - Coverage: 90% overall; 100% for `app/authz/` and `app/rules/` (a hook in `tests/conftest.py`

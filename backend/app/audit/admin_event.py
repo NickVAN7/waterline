@@ -88,3 +88,20 @@ def log_admin_event(
     )
     session.add(event)
     return event
+
+
+def changed_fields(entity: object, values: Mapping[str, str | None]) -> dict[str, tuple[str, str]]:
+    """The values sent (not None) that differ from the entity's: `{field: (old, new)}`."""
+    return {
+        key: (getattr(entity, key), value)
+        for key, value in values.items()
+        if value is not None and value != getattr(entity, key)
+    }
+
+
+def change_details(changed: Mapping[str, tuple[str, str]]) -> dict[str, JsonValue]:
+    """An update event's details: the old and new value of every field it changed."""
+    return {
+        "old": {key: old for key, (old, _) in changed.items()},
+        "new": {key: new for key, (_, new) in changed.items()},
+    }

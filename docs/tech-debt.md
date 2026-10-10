@@ -302,3 +302,90 @@ Entry format:
 - **Fix by:** Slice 7 (the owner decides whether this closes as won't-fix now that the
   rulesets are on).
 - **Status:** open
+
+### TD-21: A user-level audit event's workspace is null when it's ambiguous
+- **Added:** S1-C6
+- **What:** `password_changed` (and the user-level events after it) take the workspace the user
+  belongs to, or, with no memberships, the only workspace there is (`AuthService._workspace_of`).
+  With a second workspace, a user in both (or a user with no memberships) gets `workspace_id`
+  null, which schema-doc `audit_event.workspace_id` allows only for instance-level events.
+- **Why:** design-doc §4 ("One workspace") leaves the rules for several workspaces undecided, and
+  v1 deploys one (the seed refuses a second), so the case can't happen yet.
+- **Fix by:** S1-C17 (the slice retro: the owner decides the rule, or that it waits for a
+  second workspace; then the schema doc or the code changes to match).
+- **Status:** resolved in DL-48: left as it is until a second workspace is needed (the owner,
+  after S1-C7), when the rules for several workspaces are decided (design-doc §4)
+
+### TD-22: The spec tests check list scoping through their own copy of `scope_clause`
+- **Added:** S1-C7
+- **What:** `tests/integration/authz/test_context.py` builds its `WHERE` with `scope_filter`
+  (`tests/support/authz.py`), the spec writer's model of a `Scope`, written before the code;
+  `scope_clause` (`app/repositories/base.py`) is the same code. A later change to `Scope` (e.g.
+  the export-control gate) must change both, or the spec test keeps checking the old meaning.
+  `tests/integration/repositories/test_scope_clause.py` tests the real one on real rows.
+- **Why:** both are spec-test files, which change only with the owner's approval.
+- **Fix by:** S1-C8 (the owner decides: switch the spec test to `scope_clause` and delete the
+  copy, or keep both and change them together).
+- **Status:** resolved in S1-C8 (the spec test uses `scope_clause`, and `scope_filter` is gone;
+  owner-approved)
+
+### TD-23: A race on the staff add reports its error on `user_id`
+- **Added:** S1-C8
+- **What:** the staff add checks for an existing membership, then inserts. Two admins adding the
+  same person at the same moment both pass the check, and the second hits the unique constraint
+  on `workspace_membership (workspace_id, user_id)`, whose field error is on `user_id`, a field the
+  email-first add doesn't have. The same holds for an account created inside a nested object (an
+  org's `new_owner`, and S1-C9's creates): `create_account` reports a taken email or username
+  under the nested field, but two requests taking the same one at once leave the second to the
+  `user` table's constraints, which report on `body.email` or `body.username`.
+- **Why:** only a race reaches it (the check reports `already_member` on `email` otherwise), and
+  S1-C12's add by user ID may want `user_id` from the same constraint, so the field is better
+  decided with that path.
+- **Fix by:** S1-C12 (the owner decides the constraint's field with the project member add).
+- **Status:** open
+
+### TD-24: An intermittent Hypothesis error in an identifier property test
+- **Added:** S1-C8
+- **What:** `tests/unit/rules/test_identifiers.py::test_every_key_in_the_format_is_valid` failed
+  twice in S1-C8 (once in mutmut's statistics run, once in a reviewer's full run) with a
+  `TypeError: 'int' object is not callable` raised inside Hypothesis's own character-set code
+  (`hypothesis/internal/intervalsets.py`), not in the test or the app; every rerun passed.
+- **Why:** it doesn't reproduce on demand, the test file and the rule are unchanged since S1-C3,
+  and the error is in the library; chasing it would hold up the checkpoint without a lead.
+- **Fix by:** S1-C10 (if it recurs: pin or bump Hypothesis, or report it upstream; if it hasn't
+  recurred by then, close it with that note).
+- **Status:** open
+
+### TD-25: A rare deadlock between a staff change and an owner being added
+- **Added:** S1-C8a
+- **What:** a role change or removal locks the owners' rows twice (in `_member`, then in the
+  last-owner guard); an owner added through the staff add or create between the two takes no
+  owner lock, so a third concurrent staff change can lock that new owner first and wait on the
+  first change, which then waits on the new owner: Postgres aborts one, and that request fails
+  (a 500) and is rolled back. No rule is broken and no data is wrong.
+- **Why:** it needs three concurrent staff changes in one workspace with an owner added between
+  two locks; the fix (adding an owner takes the owner lock too; never having the guard reuse
+  the list `_member` locked, which can miss an owner promoted meanwhile and let the last owner go)
+  needs a race test that's costly to make deterministic for a retryable error.
+- **Fix by:** S1-C9 (the org version uses the same locks: fix both there, with one race test).
+- **Status:** open
+
+### TD-26: A no-op role change ignores `new_owner_id`, even an invalid one
+- **Added:** S1-C8a
+- **What:** re-sending the role someone already holds returns their row unchanged and records
+  nothing, without looking at `new_owner_id`; an invalid one (not staff, deactivated) is ignored
+  rather than refused with its 422.
+- **Why:** nothing changes, so nothing is wrong; the owner accepted it for now (after S1-C8a).
+- **Fix by:** S1-C15 (with the staff page's role picker: check `new_owner_id` on a no-op too, or
+  confirm the picker never sends one without a change).
+- **Status:** open
+
+### TD-27: Deactivation must wait behind a handover
+- **Added:** S1-C8a
+- **What:** a handover checks that the replacement is active but doesn't lock the user row, so a
+  deactivation committing just after could leave the workspace's (or an org's) only owner
+  deactivated. The last-owner and last-system-admin guards on deactivation (design-doc §4) should
+  take the owners' lock first, so a deactivation queues behind a handover.
+- **Why:** deactivation isn't built yet (S1-C10); the owner chose to build it there.
+- **Fix by:** S1-C10 (deactivation takes the owners' lock, with a race test against a handover).
+- **Status:** open
