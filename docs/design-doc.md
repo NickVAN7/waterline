@@ -84,7 +84,8 @@ in 2.1 AA except the removed 4.1.1. Consequences for the design:
 - **Focus not obscured (2.4.11):** sticky headers and toasts never cover the focused element.
 - **Accessible authentication (3.3.8):** password fields allow paste and password managers.
 
-How it's tested: `testing-strategy.md`, "Accessibility".
+How it's tested: `testing-strategy.md`, "Accessibility". How the screens meet it, rule by rule:
+`docs/ui-design-guide.md`.
 
 ### 1.1 Project types & modules
 
@@ -158,7 +159,7 @@ false.
 | ORM / Migrations | SQLAlchemy 2.x (plain, not SQLModel) + Alembic | Mature; fits the relational, traceability-heavy model. SQLModel was rejected (build-plan, implementation decision 1) |
 | Database | PostgreSQL | Also hosts the job queue and full-text search — no extra services in v1 |
 | Background jobs | procrastinate (Postgres-backed queue) | No new infrastructure; jobs enqueue in the same transaction as the data they act on |
-| Frontend | Vue 3 + TypeScript | Existing familiarity |
+| Frontend | Vue 3 + TypeScript; PrimeVue + Tailwind v4 on one token set; SVAR Vue Kanban and DataGrid for the board and editable grids, SVAR Gantt planned for v2 | Existing familiarity; accessible widgets we don't hand-build, one palette (`docs/ui-design-guide.md`) |
 | Local dev | Docker Compose: `api`, `worker`, `web`, `postgres`, plus a one-shot `migrate` | Worker and migrate run the same image as `api` with a different command; `migrate` applies migrations before `api` and `worker` start; `web` is the Vite dev server |
 | Deployment | Self-hosted/local initially | Stateless API + externalized DB keeps it cloud-portable |
 
@@ -447,10 +448,13 @@ Workspace (the firm: tenant boundary)
   users to it. Creating an account creates the user *and* their membership in that org in one
   step.
 - **The add-person form asks for the email first.** If the email already has an account, the
-  admin is asked to confirm adding that person (no name or password is asked for, and no
-  duplicate is created); otherwise the form continues to full account creation (username,
-  name, temporary password). The form therefore shows whether an email has an account, never
-  which org it belongs to; invitations (v2+) would hide even that.
+  admin is asked to confirm adding that person, by the email alone ("An account already exists
+  for jane@acme.com. Add them?"; no name or password is asked for, and no duplicate is created);
+  otherwise the form continues to full account creation (name, username, temporary password).
+  The username is pre-filled with a suggestion from the name (first and last word joined by a
+  hyphen, e.g. `jane-doe`, made available by the server), which the admin may change (DL-66).
+  The form therefore shows whether an email has an account, never which org it belongs to or
+  whose it is; invitations (v2+) would hide even that.
 - **Temporary passwords** (account creation and admin password reset): the form generates one
   that meets the policy and shows it to the admin once, to pass on; it can't be retrieved
   afterwards. The admin may replace it with their own before saving. Either way the user must
@@ -1543,7 +1547,7 @@ its own design pass.
   once email sending exists.
 
 ### v2+
-- Bulk edit of tasks
+- Bulk edit of tasks (on the bulk-selection pattern, ui-design-guide UI-TBL-6 to UI-TBL-8)
 - Configurable per-project workflows (replacing fixed statuses)
 - User-configurable display labels (beyond the per-type mapping)
 - Multi-project sprints (`sprint_project` join table)

@@ -80,7 +80,8 @@ failing) if the pre-commit hooks aren't installed.
 ```
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
-docs/           design, schema, build plan, testing strategy, screen inventory, these guides,
+docs/           design, schema, build plan, testing strategy, screen inventory, UI design
+                guide (ui-design-guide.md, with reference copies in ui/), these guides,
                 tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
                 design-changes/: one per tooling review), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
@@ -92,7 +93,7 @@ docker/postgres/initdb/   first-start scripts for the postgres container (test d
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
                 design-change), agents (checkpoint-reviewer, security-reviewer,
                 fresh-clone-verifier, docs-consistency, spec-test-writer,
-                repo-auditor),
+                repo-auditor, ui-reviewer),
                 hooks (see section 11)
 ```
 
@@ -648,7 +649,8 @@ it.
 ## 7. Frontend
 
 Vue 3 (Composition API, `<script setup lang="ts">`), TypeScript strict, Vite, Vue Router, Pinia.
-The rules are in `frontend/CLAUDE.md`; this section is the how.
+The rules are in `frontend/CLAUDE.md`, and the UI rules in full, by rule ID, in
+`docs/ui-design-guide.md`; this section is the how.
 
 ```
 frontend/src/
@@ -887,7 +889,7 @@ database. They check:
 | Decision log | an entry lacks Date/Decision/Supersedes/Superseded by/Applies to/Source, numbers aren't 1..n, a Superseded by is neither `none` nor another entry (`DL-<n>`), or a `DL-<n>` reference (same files as TD references) has no entry |
 | Audit allowlist | an `audit-allowlist.toml` entry names a tech-debt entry that doesn't exist or is resolved |
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
-| § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` always means a design-doc section, so refer to this guide's sections as "section N" |
+| § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` means a design-doc section, so refer to this guide's sections as "section N". The exceptions: `guide §N` (or `ui-design-guide §N`) names a section of `docs/ui-design-guide.md`; in that guide a bare `§N` is its own section; in `.claude/agents/ui-reviewer.md` a bare `§N` is its own section or the guide's; and in both, `design-doc §N` still means the design doc |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
 
 Fixing a failure: the message names both files and the mismatch. Update whichever side is
@@ -944,13 +946,16 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
   `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`.
+  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`,
+  `ui-reviewer`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
   changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
   at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
   security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
   two or three behaviors in a temporary copy, and reviews a design change's tooling code under
-  a `DC-<YYYY-MM-DD>` review ID), and `fresh-clone-verifier`, `docs-consistency`, and
+  a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
+  `frontend/e2e/` (read-only: accessibility and frontend conventions against
+  `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`, `docs-consistency`, and
   `repo-auditor` (a whole-repository audit that runs no tests, DL-41) at the last checkpoint of
   a slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
   concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same

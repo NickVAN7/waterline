@@ -700,7 +700,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   version conflicts), the org guard in S1-C9 alike. `create_app` adds a `ReservedSlug` enum to
   the OpenAPI components.
 - **Supersedes:** none (the docs gave the URL patterns, not the endpoints)
-- **Superseded by:** DL-59 (in part)
+- **Superseded by:** DL-59 (in part); DL-66 (in part: S1-C9's email availability is now the user
+  check)
 - **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C8 row)
 - **Source:** chat session (owner, before S1-C8; the details settled after the docs-consistency
   check)
@@ -768,3 +769,92 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Verification", the review-tier trial); `checkpoint` skill
 - **Source:** chat session (owner, after S1-C8; docs-consistency decisions)
+
+### DL-61: The UI design guide and the styling approach
+- **Date:** 2026-10-10
+- **Decision:** `docs/ui-design-guide.md` is the authoritative UI guide, with rule IDs that
+  reviewers cite (renumbering is a design change), and `frontend/CLAUDE.md` gains a short "UI"
+  section pointing at it. Styling is PrimeVue (Aura base, our preset) plus Tailwind v4, fed by one
+  token set (`src/app/styles/tokens.css`); the accent comes from the company logo; the shell,
+  form, feedback, and table patterns are those of the guide, chosen in the owner's walkthrough.
+  S1-C14 adds the libraries, the token file, the preset, and the contrast check. Reference copies
+  of the token file, its contrast check, and the SVAR mapping live in `docs/ui/`.
+- **Supersedes:** the build plan's workflow item "A short UI design guide (`frontend/CLAUDE.md` or
+  a new doc; decided then)"
+- **Superseded by:** DL-66 (in part: UI-FRM-13's email-first flow)
+- **Applies to:** `docs/ui-design-guide.md`, `docs/ui/`; `frontend/CLAUDE.md`; build plan
+  (workflow items, repository layout, S1-C14 row, "Web shell", "Web screens"); screen-inventory
+  (step 7); design-doc §1, §2; build plan ("Tooling"); root `CLAUDE.md`; developer guide
+- **Source:** chat session (owner's design walkthrough, Oct 10, 2026; UI design change note)
+
+### DL-62: The `ui-reviewer` agent
+- **Date:** 2026-10-10
+- **Decision:** A read-only `ui-reviewer` agent reviews frontend changes for accessibility and
+  frontend conventions against the guide's rule IDs. The `checkpoint` skill runs it whenever the
+  diff touches `frontend/src/` or `frontend/e2e/`, after `checkpoint-reviewer`.
+- **Supersedes:** the build plan's workflow item for the `ui-reviewer` agent ("run on S1-C14 to
+  S1-C16"; now every web checkpoint)
+- **Superseded by:** none
+- **Applies to:** `.claude/agents/ui-reviewer.md`; `checkpoint` skill (reviewers step); build plan
+  ("Claude configuration", Slice 1); root `CLAUDE.md`; developer guide (sections 2 and 11)
+- **Source:** chat session (owner, Oct 10, 2026; UI design change note)
+
+### DL-63: The skeleton appears after about 300 ms
+- **Date:** 2026-10-10
+- **Decision:** A loading skeleton appears only when loading takes more than about 300 ms (was
+  about 200 ms), chosen against a live example in the walkthrough.
+- **Supersedes:** screen-inventory step 5 ("Loading states", about 200 ms)
+- **Superseded by:** none
+- **Applies to:** screen-inventory ("Loading states"); `frontend/CLAUDE.md`; ui-design-guide
+  UI-FBK-11
+- **Source:** chat session (owner's design walkthrough, Oct 10, 2026)
+
+### DL-64: SVAR widgets for the board, editable grids, and the Gantt chart
+- **Date:** 2026-10-10
+- **Decision:** SVAR Vue Kanban and DataGrid (MIT `@svar-ui/*`) are used in v1 for the board and
+  for lists where inline editing or manual order is the point, and SVAR Gantt in v2, each only
+  through our wrapper, themed by one mapping file onto our tokens, with every move decided by the
+  server. The packages are pinned exactly and arrive in the first checkpoint that ships a board or
+  an editable grid (placed when Slices 2 and 3 are planned), not in S1-C14.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §7; build plan (Slice overview, Slice 2 notes);
+  testing-strategy ("Accessibility"); `frontend/CLAUDE.md`
+- **Source:** chat session (owner's design walkthrough and the SVAR spike, Oct 10, 2026)
+
+### DL-65: S1-C14's end-to-end runs, home route, and accessibility tooling
+- **Date:** 2026-10-10
+- **Decision:** `wl check` runs the end-to-end tests last, through a new `wl e2e` that starts an
+  isolated, seeded Compose project and always tears it down (CI calls the same `wl check`;
+  `--skip-e2e` is for quick loops only, never a checkpoint close-out). `/` is a real My work
+  route from S1-C14's first commit, and the status page moves to `/status` in that commit. The
+  axe helpers (`vitest-axe`, `@axe-core/playwright`) and `expectFocusNotObscured()` are set up
+  before the first screen, each proven able to fail, and the end-to-end checks run in both themes.
+- **Supersedes:** the S1-C14 row's "How `wl check` runs end-to-end tests … is decided here"
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C14 row, "Developer CLI"); testing-strategy ("Accessibility")
+- **Source:** chat session (owner, Oct 10, 2026; UI design change note, items 2.1 to 2.3)
+
+### DL-66: The email-first form suggests a username, and one user check
+- **Date:** 2026-10-10
+- **Decision:** The email-first add-person form keeps design-doc §4's flow: an existing account is
+  added after a confirm step that names only the email ("An account already exists for <email>. Add
+  them?"), and a new account asks for name, username, and temporary password. The username is
+  pre-filled with a server suggestion from the name (first and last word joined by a hyphen, made
+  available with a numeric suffix), which the admin may change. One user check endpoint answers for
+  an email (whether it has an account, never whose), a username (availability), or a name (the
+  suggestion), replacing S1-C9's separate email and username availability checks. It has one
+  audience for every form: those who may add or create a person (workspace and org owners and
+  admins, admins of a project that isn't archived, system admins) and takes no user ID (an edit form
+  skips the check while a field holds the user's current value); a user changing their own username
+  gets no live check (UI-FRM-9). The suggestion rule drops disallowed characters before picking the
+  first and last word, shortens its base so a suffix stays within 40 characters, strips trailing
+  hyphens, and owns the suffix cutting (test-first in `rules/`). The name stays one field for now
+  (TD-28).
+- **Supersedes:** DL-61 in part (UI-FRM-13: an existing account "added directly", and step 2
+  asking "only for the name"); DL-55 in part (the web form's "S1-C9's email availability")
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Account management"); build plan (S1-C9 row, "Workspace,
+  organizations & memberships", the staff API table); ui-design-guide UI-FRM-9, UI-FRM-13; the
+  `ui-reviewer` agent; tech-debt TD-28
+- **Source:** chat session (owner, Oct 10, 2026; docs-consistency decision on PR #10)
