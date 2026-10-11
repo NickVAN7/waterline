@@ -89,8 +89,9 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      and every membership the target holds is covered by an actor role at an equal or higher
      rank, so no one can reset a higher-ranked user's password (a system admin's, the workspace
      owner's, or, for an org admin, a workspace member's) and take over the account;
-     last-owner (org and workspace; it holds unless a replacement owner is named in the same
-     request, `new_owner_id`, DL-59) and last-system-admin guards; only owners grant owner/admin
+     last-owner (org and workspace, counting active owners only, and on deactivation too; it
+     holds unless a replacement owner is named in the same request, `new_owner_id`, DL-59,
+     DL-72, DL-74) and last-system-admin guards; only owners grant owner/admin
      roles at their level (at the workspace level, system admins too, DL-45), except an admin
      demoting or removing themselves (DL-59); the admin path refuses the actor's own account for the password reset
      and the email change (they use change password, which asks for the current one);

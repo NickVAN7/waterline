@@ -752,7 +752,9 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   another approver's behalf. A project admin can cancel the request instead.
 - The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted,
   unless they name a replacement owner (an existing member there) in the same request: that
-  person becomes owner as they step down or leave (DL-59).
+  person becomes owner as they step down or leave (DL-59). Nor can the last active owner be
+  deactivated (DL-72). Every last-owner guard counts active owners: a change is refused when it
+  would leave no active owner, so a deactivated owner never stands in for one (DL-74).
 - **Stepping down:** a workspace or org admin may demote or remove themselves (taking access
   away is always allowed) without the owner-only right those roles otherwise need (DL-59).
 
@@ -1227,7 +1229,8 @@ table, `audit_event` (schema-doc, "Audit").
   their project's events (owner decision, Oct 7, 2026). Other project members never see them.
 - **Profile edits** (owner decision, Oct 7, 2026): a change to a user's name, username, or
   email, by the user or by an admin, is one `user_updated` event per request, carrying the old
-  and new value of every field it changed.
+  and new value of every field it changed: one per org when an admin acts through the owner/admin
+  roles of several orgs, so each org's admins see it (DL-75).
 - **Content:** the actor (none for app CLI commands), the target user, the entity, and
   action-specific details (e.g. old and new role). Never passwords, hashes, or tokens.
 - **Write path:** only `log_admin_event()`, in the same transaction as the change (the same

@@ -701,7 +701,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the OpenAPI components.
 - **Supersedes:** none (the docs gave the URL patterns, not the endpoints)
 - **Superseded by:** DL-59 (in part); DL-66 (in part: S1-C9's email availability is now the user
-  check)
+  check); DL-74 (in part: the last-owner guard counts active owners)
 - **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C8 row)
 - **Source:** chat session (owner, before S1-C8; the details settled after the docs-consistency
   check)
@@ -753,7 +753,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Supersedes:** design-doc §5's "the last owner … cannot leave or be demoted" (now: without
   naming a replacement); DL-55 in part (the last-owner 422); DL-56 in part (`manage_admins` for
   one's own admin role)
-- **Superseded by:** none
+- **Superseded by:** DL-74 (in part: the last-owner guard counts active owners)
 - **Applies to:** design-doc §5 ("Other targeted rules"); schema-doc (`workspace_membership`,
   `membership`); build plan ("Authorization (§5)", "The workspace and org API", the guards, UI
   notes, the S1-C8a, S1-C9, and S1-C15 rows, the groups, the review-tier trial); the
@@ -924,3 +924,65 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (the feature map's `project` and `roster` rows, the service layer
   table, the S1-C12 row)
 - **Source:** chat session (owner, Oct 11, 2026; docs-consistency question after DL-70)
+
+### DL-72: The account API (S1-C10)
+- **Date:** 2026-10-11
+- **Decision:** S1-C10's endpoints, payloads, and errors as listed in the build plan ("The
+  account API"): the workspace users list; deactivate, reactivate, reset password, and sign out
+  everywhere as `POST`s on `/api/users/{user_id}/…`; the admin profile edit (`PATCH
+  /api/users/{user_id}`) and the user's own (`PATCH /api/me`); the per-person access review
+  (`GET /api/users/{user_id}/access`) with its reasons. A user the actor can't see is a 404, one
+  they see but may not act on a 403; the access review is a 404 on any denial. The last active
+  system admin and the last active owner of the workspace or an org can't be deactivated (422
+  `last_system_admin`, `last_owner`), the deactivation taking the owners' locks first (TD-27).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Users": the account API; the S1-C10 row)
+- **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C10, approved
+  with "go ahead"; the access-review response shape and its reasons were filled in from design-doc
+  §5, "Access review", after the proposal was cut short)
+
+### DL-73: Two account actions, on a user target (S1-C10)
+- **Date:** 2026-10-11
+- **Decision:** `user.manage` (every account action and the admin profile edit) is granted only
+  by a targeted rule, the rank rule over the target's memberships, which the target's entity
+  carries (system admins hold it as for every action); `user.view_access` (the per-person access
+  review) by workspace admins and system admins, and by a targeted rule: the user themselves, or
+  the rank rule. The proposal's separate `user.reset_password` is dropped: system admins pass
+  every role check before the targeted rules, so no action can express "not one's own account";
+  the service refuses the self-reset (403), and the UI hides it on the actor's own row.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Users": the account actions; the S1-C10 row); `app/authz/`
+- **Source:** chat session (owner, Oct 11, 2026, with DL-72)
+
+### DL-74: Every last-owner guard counts active owners
+- **Date:** 2026-10-11
+- **Decision:** A change is refused when it would leave the workspace or an org with no active
+  owner: demoting, removing, or deactivating its last active owner (unless, for a demotion or
+  removal, a replacement is named). A deactivated owner never counts as one. The roster's guard
+  (role change, removal) changes to this rule in S1-C10, with its tests.
+- **Supersedes:** the "last owner" wording of DL-55 and DL-59 (every owner counted)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 (the last owner); schema-doc (`workspace_membership`,
+  `membership`); build plan ("The account API", the S1-C10 row); `services/roster.py`;
+  `.claude/agents/security-reviewer.md`
+- **Source:** chat session (owner, Oct 11, 2026; docs-consistency decision on DL-72)
+
+### DL-75: Account-action events carry the covering org; member rows decided at S1-C15
+- **Date:** 2026-10-11
+- **Decision:** An account action's audit events (deactivate, reactivate, reset password, sign out
+  everywhere, the admin profile edit): when a system-admin or workspace role of the actor covers
+  the target under the rank rule, one event with no `organization_id`; otherwise one event per org
+  whose owner/admin role of the actor covers one of the target's memberships, each with that org,
+  so each org's admins see it (an exception to one `user_updated` per request). The endpoints
+  take no org. Whether staff and org member rows carry `is_active` (for the UI to explain the
+  last-active-owner guard, DL-74) is decided with the member-row question at S1-C15. How S1-C15's org members page learns which
+  account actions to offer on a row is decided at the start of S1-C15. The users page creates no
+  accounts (they come through the staff and org flows), and the own-profile edit stays at
+  `PATCH /api/me`.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("The account API", the S1-C13 and S1-C15 rows, the workspace admin
+  pages); design-doc §10.1 ("Profile edits"); schema-doc (`audit_event` action values)
+- **Source:** chat session (owner, Oct 11, 2026; docs-consistency decisions on DL-72)

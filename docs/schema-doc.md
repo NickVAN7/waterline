@@ -491,8 +491,9 @@ workspace pages.
 
 `UNIQUE(workspace_id, user_id)`; index on `user_id` (access scoping looks memberships up by
 user). Members see only the orgs and projects they are assigned to;
-owners/admins see everything in the workspace. The last owner of a workspace cannot leave or be
-demoted unless a replacement owner is named in the same request (service-layer check, DL-59).
+owners/admins see everything in the workspace. The last active owner of a workspace cannot leave,
+be demoted, or be deactivated unless a replacement owner is named in the same request (leaving and
+demotion only; service-layer check, DL-59, DL-72, DL-74).
 
 ### `organization`
 | Field | Type | Notes |
@@ -563,8 +564,9 @@ ends sessions through the handler `auth` registers with it (build plan, "Feature
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(user_id, organization_id)`; index on `organization_id` (an org's members list; the
-unique constraint serves only lookups by user, DL-34). Last owner of an org cannot leave or be
-demoted unless a replacement owner is named in the same request (service-layer check, DL-59).
+unique constraint serves only lookups by user, DL-34). The last active owner of an org cannot
+leave, be demoted, or be deactivated unless a replacement owner is named in the same request
+(leaving and demotion only; service-layer check, DL-59, DL-72, DL-74).
 
 ### `project`
 | Field | Type | Notes |
@@ -999,7 +1001,8 @@ for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
 
 `action` values: `workspace_created`, `user_created`, `user_deactivated`, `user_reactivated`,
 `password_reset`, `password_changed`, `signed_out_everywhere`, `user_updated` (every profile
-edit, by the user or an admin: one event per request), `system_admin_granted`,
+edit, by the user or an admin: one event per request, or per org for an admin acting through
+several orgs' roles, DL-75), `system_admin_granted`,
 `system_admin_revoked`, `workspace_updated`, `workspace_member_added`,
 `workspace_member_role_changed`, `workspace_member_removed`, `org_created`, `org_updated`,
 `org_member_added`, `org_member_role_changed`, `org_member_removed`, `project_created`,
