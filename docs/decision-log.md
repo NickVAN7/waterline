@@ -886,3 +886,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Authorization (§5)", "The org members API")
 - **Source:** chat session (owner, before S1-C9)
+
+### DL-69: An org admin may bring a membership-less account into their scope
+- **Date:** 2026-10-11
+- **Decision:** Accepted as a known risk: an org admin may add any active account to their org by
+  email, including one with no memberships left (otherwise managed only by workspace owners/admins
+  and system admins). The new membership brings it into that admin's scope under the rank rule,
+  so from S1-C10 they could reset its password. The harm is limited to impersonation inside that
+  admin's own org; no extra check is added.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Account management", the rank rule); S1-C10's account actions
+- **Source:** chat session (owner, Oct 11, 2026; S1-C9 security review question)

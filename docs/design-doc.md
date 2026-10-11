@@ -481,7 +481,8 @@ Workspace (the firm: tenant boundary)
   membership the target holds, the actor has a role covering it (the same workspace, org, or
   project, or one above it) at an equal or higher rank. The system-admin flag counts as a membership
   at the top rank. A user with no memberships left is managed by the workspace's owners/admins and
-  system admins. The ranking, highest first:
+  system admins, until an org admin adds them to their org, which brings them into that admin's
+  scope (an accepted risk, DL-69). The ranking, highest first:
 
   ```
   system admin
