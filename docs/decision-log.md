@@ -858,3 +858,31 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   organizations & memberships", the staff API table); ui-design-guide UI-FRM-9, UI-FRM-13; the
   `ui-reviewer` agent; tech-debt TD-28
 - **Source:** chat session (owner, Oct 10, 2026; docs-consistency decision on PR #10)
+
+### DL-67: The org members API (S1-C9)
+- **Date:** 2026-10-11
+- **Decision:** S1-C9's endpoints as listed in the build plan ("The org members API"), mirroring
+  S1-C8's staff API: the member list (per-row `allowed_actions`), the email-first add (the three
+  422s of DL-55), the create at `/members/new`, the role change and the removal (each with an
+  optional `new_owner_id`; `with_projects`, default true, on the removal), and the user check
+  (DL-66) at `GET /api/workspaces/{workspace_id}/user-check`. The org's last-owner guard, the
+  replacement owner, and the lock order work as for staff.
+- **Supersedes:** none (the docs gave the URL pattern, not the endpoints)
+- **Superseded by:** none
+- **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C9 row)
+- **Source:** chat session (owner, before S1-C9)
+
+### DL-68: Three actions for S1-C9
+- **Date:** 2026-10-11
+- **Decision:** `org_member.manage` (listing and managing an org's members, one action for both:
+  org owners/admins, workspace owners/admins, system admins); `org_member.manage_admins`
+  (granting, changing, or removing an org owner or admin role, on top of `org_member.manage`,
+  except an admin stepping down: org owners, workspace owners/admins, system admins); and
+  `user.check` (the user check: workspace owners/admins and system admins, plus a targeted rule
+  for org owners/admins in the workspace and explicit admins of its non-archived projects; 404
+  for anyone else, as for the workspace pages). The authorization context gains each project's
+  archived state and each org role's workspace for the rule.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Authorization (§5)", "The org members API")
+- **Source:** chat session (owner, before S1-C9)

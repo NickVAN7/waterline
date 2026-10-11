@@ -841,7 +841,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 7b | Change-password cap & old session at sign-in | Change password refuses a `current_password` longer than 256 characters with a 422 before any verification (DL-52); a successful sign-in deletes the session the request carried, if any, whoever it belongs to (a failed one leaves it; DL-53; one session by its token, not a sweep of the user's sessions, so no row lock is needed); the developer guide documents the middleware's 403 `origin_rejected` and 415 `unsupported_media_type` on every mutating route (DL-54) |
 | 8 | Workspace & organizations | The endpoints in "The workspace and org API" (DL-55) and their actions (DL-56), with their spec tests; workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners and system admins, DL-45; live slug availability); grants of owner/admin roles only by owners (and system admins, DL-45); last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
 | 8a | Owner handover & stepping down | A workspace admin may demote or remove themselves without `workspace_staff.manage_admins`, and their own staff row carries the action; the workspace's last owner may step down or leave when whoever acts (`manage_admins`) names a replacement owner (`new_owner_id`, current staff; its four 422 types) in the same request, which promotes them in the same transaction (DL-59; "The workspace and org API") |
-| 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`, as for staff (DL-55): owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); the user check (email, username, and a username suggested from a name; DL-66), with `rules/identifiers.py`'s suggestion rule test-first; last-owner guard for orgs, with the replacement-owner handover and org admins stepping down on their own (DL-59); audit events |
+| 9 | Org members & user creation | The endpoints in "The org members API" (DL-67) and their actions (DL-68), with their spec tests; org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`, as for staff (DL-55): owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); the user check (email, username, and a username suggested from a name; DL-66), with `rules/identifiers.py`'s suggestion rule test-first; last-owner guard for orgs, with the replacement-owner handover and org admins stepping down on their own (DL-59); audit events |
 | 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
 | 11 | Projects | Create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin, a separate action `project.assign_first_admin` in the org's `allowed_actions`, carried on each org entry in `/me`; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
 | 12 | Project members | List (per-row `allowed_actions`); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its three cases (design-doc §4; an existing member found by email is a 422 on `email`, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`, as for staff (DL-55)); change role; remove (removing the lead's membership clears `lead_id`, recorded in the `project_member_removed` details, also in archived projects through removal with their projects); the per-project access review (design-doc §5); registers the `on_member_removed` handler with the org and workspace services, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
@@ -965,6 +965,16 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   `/me` carries it too), and at org level `org.view` (anyone who sees
   the org, §4 "Visibility") and `org.update` (renaming the org, changing its slug: org owners,
   workspace owners/admins, system admins).
+
+  Checkpoint 9 adds (DL-68): `org_member.manage` (listing the org's members, adding and creating
+  members, changing roles, removing members: org owners/admins, workspace owners/admins, system
+  admins); `org_member.manage_admins` (granting, changing, or removing an org owner or admin role,
+  on top of `org_member.manage`, except an admin demoting or removing themselves, DL-59: org
+  owners, workspace owners/admins, system admins); and `user.check` (the user check, DL-66: a
+  workspace-level action for workspace owners/admins and system admins, with a targeted rule for
+  org owners/admins in the workspace and explicit admins of its non-archived projects, so each
+  project in the authorization context carries its archived state and each org role its org's
+  workspace; anyone else gets a 404).
 - **Authorization context:** the user's system-admin flag and their workspace, org, and project
   memberships, loaded once per request and reused by every check, by `allowed_actions`, and by
   list scoping.
@@ -1031,9 +1041,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
   One audience for every form of the check: those who may add or create a person in the
   workspace (workspace owners and admins, org owners and admins, admins of a project that isn't
-  archived, system admins).
-  The route is at workspace level but the right can come from an org or project role, so S1-C9
-  registers one action for it with a targeted rule, with its spec tests. A user changing their
+  archived, system admins). The action is `user.check` (DL-68): the route is at workspace level
+  but the right can come from an org or project role, so it has a targeted rule, with its spec
+  tests. Anyone else gets a 404, as for the workspace pages (design-doc §4, "Visibility"). A user changing their
   own username gets no live check; a taken one is the 422 `taken` on save (UI-FRM-9). An admin's
   edit form (S1-C10, S1-C15) skips the check while a field still holds the user's current value,
   so the check never takes a user ID: given one, it would tell an admin whether a chosen user has
@@ -1055,7 +1065,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Guards: the last owner of an org, and of the workspace, can't leave or be demoted without
   naming a replacement owner (`new_owner_id`, DL-59); only owners can grant, change, or remove
   the owner and admin roles at their level (§5 role tables; at the workspace level, system admins
-  too, DL-45), except that an admin may demote or remove themselves (DL-59).
+  too, DL-45; at the org level, workspace owners/admins and system admins too, DL-68), except that
+  an admin may demote or remove themselves (DL-59).
 - **The workspace and org API** (Checkpoint 8, DL-55):
 
   | Endpoint | Does | Action |
@@ -1095,6 +1106,25 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   guard and self-service work the same way. `create_app` adds a `ReservedSlug` enum
   (`RESERVED_SLUGS`) to the OpenAPI schema's components, with a test that it's there, for the
   S1-C14 router test (owner decision, Oct 7, 2026).
+- **The org members API** (Checkpoint 9, DL-67):
+
+  | Endpoint | Does | Action |
+  |---|---|---|
+  | `GET /api/orgs/{org_id}/members` | the member list (offset paging, `ListSpec`: sort by name or email, filter by role), each row with its `allowed_actions` | `org_member.manage` |
+  | `POST /api/orgs/{org_id}/members` | add an existing account, email first (design-doc §4): `email`, `role`; already a member is a 422 `already_member` on `email`, no account a 422 `no_account` on `email` (the form goes on to create one), a deactivated account a 422 `account_inactive` on `email`; the web form first checks the email (the user check, DL-66) and confirms by the email alone (`org_member_added`) | `org_member.manage` |
+  | `POST /api/orgs/{org_id}/members/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `org_member_added`) | `org_member.manage` |
+  | `PATCH /api/orgs/{org_id}/members/{user_id}` | change the role, with an optional `new_owner_id` (`org_member_role_changed`) | `org_member.manage` |
+  | `DELETE /api/orgs/{org_id}/members/{user_id}?with_projects=true` | remove, with an optional `new_owner_id` query parameter; `with_projects` (default true) calls the `on_member_removed` handler (a stub until Checkpoint 12) (`org_member_removed`) | `org_member.manage` |
+  | `GET /api/workspaces/{workspace_id}/user-check` | the user check (DL-66, above) | `user.check` |
+
+  Granting, changing, or removing an org owner or admin role also needs
+  `org_member.manage_admins` (403 otherwise; checked before the email on an add), and a member
+  row's `allowed_actions` follow the staff rows' rule: none on an owner's or admin's row unless
+  the caller holds `manage_admins`, an admin's own row carrying `org_member.manage` for stepping
+  down (DL-59). The org's last-owner guard (`last_owner`, on `role` or the path's `user_id`), the
+  replacement owner (`new_owner_id`, an org member: `not_member`, `account_inactive`,
+  `same_user`, `not_owner`), a no-op role change, and the lock order work as for staff, with
+  TD-25's fix applied to both (adding an owner takes the owner lock too; one race test).
 
 ### Users (system admin, plus workspace-admin and org-admin scope)
 - Create (through the org and project flows above), deactivate, reactivate, reset password
