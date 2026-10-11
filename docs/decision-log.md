@@ -898,3 +898,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §4 ("Account management", the rank rule); S1-C10's account actions
 - **Source:** chat session (owner, Oct 11, 2026; S1-C9 security review question)
+
+### DL-70: The roster: one set of membership rules, in its own service layer
+- **Date:** 2026-10-11
+- **Decision:** Workspace staff and org members (and, from S1-C12, project members) share one
+  module, `services/roster.py`: the email-first add, the create, the owner-only rule for owner and
+  admin roles, stepping down, the last-owner guard and handover, the lock order, and the
+  `on_member_removed` hook. It sits in its own service layer, 1b, between `auth`/`workspace`/`org`
+  (which may not import each other) and `user`; it owns no tables and writes the membership rows
+  only when the owning service calls it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Cross-area rules": the service layer table and the removal handlers;
+  the feature map; the S1-C12 row); `backend/pyproject.toml` (the layers contract); developer
+  guide
+- **Source:** chat session (owner, Oct 11, 2026; S1-C9 checkpoint review finding)
