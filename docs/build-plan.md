@@ -514,7 +514,8 @@ Calls flow one way: **routers → services → repositories → models**. Servic
 The organizing unit is the **aggregate**: one main entity plus the child rows that exist only
 through it. Each aggregate has one file name, repeated in every layer (`models/`, `schemas/`,
 `repositories/`, `services/`, `routers/`, and `authz/policies/`). That area **owns** its tables:
-it is the only place that writes them.
+it is the only place that writes them, apart from the roster, which writes the membership rows
+when the owning service calls it (DL-70).
 
 | File name | Owns (tables) | Slice | Calls into (services) |
 |---|---|---|---|
@@ -1139,7 +1140,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   holds at least one membership in the actor's scope, and every membership the target holds is
   covered by an actor role at an equal or higher rank (system admin \> workspace owner \> workspace
   admin \> workspace member \> org owner \> org admin \> org member \> project-only user). Users
-  with no memberships: workspace owners/admins and system admins. Tested both ways at each boundary:
+  with no memberships: workspace owners/admins and system admins, until an org admin adds them to
+  their org by email, which brings them into that admin's scope (an accepted risk, DL-69). Tested both ways at each boundary:
   e.g. an org admin can reset another admin of their org but not a workspace member, a user in
   another org, or a user on another org's project; a workspace admin can't reset the workspace owner
   or a system admin. The rule trusts the memberships it's given, so the loader builds them from real

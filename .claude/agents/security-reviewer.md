@@ -112,7 +112,8 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      without an explicit membership get 404 on every content action, read or mutation, and
      keep management access;
    - the rank rule requires at least one target membership in the actor's scope (a user with
-     no memberships isn't open to every org admin);
+     no memberships isn't open to every org admin; an org admin adding one to their org by
+     email, which brings it into their scope, is an accepted risk, DL-69);
 4. **Tenant isolation and existence leaks:**
    - entities the user can't see return 404, never 403, and never partial data;
    - error messages and `details` don't reveal other orgs' or projects' names, keys, or IDs;
