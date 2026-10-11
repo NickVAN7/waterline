@@ -101,7 +101,9 @@ correct; you decide whether the code does it.
 - Pending state: `aria-disabled` not `disabled`, normal colors, fixed width at least as wide as
   the longest label, double-submit ignored, outcome announced? Is the submit button disabled
   because the form is invalid? (UI-FRM-8, UI-FRM-15, UI-TOK-10)
-- Live availability checks debounced, announced politely, and non-blocking? (UI-FRM-9)
+- Live availability checks debounced, announced politely, and non-blocking? (A user changing
+  their own username in their profile gets none, by design; a taken one is the 422 on save.)
+  (UI-FRM-9)
 - Password fields: `autocomplete` values, no `@paste.prevent` or `onpaste`, no `maxlength`, no
   confirm field, length-only help from the server's number, and the show/hide toggle inside the
   field (28×28, `aria-label`, `aria-pressed`, `title`) with the browser's reveal icon hidden?
@@ -109,8 +111,10 @@ correct; you decide whether the code does it.
   (UI-FRM-10, UI-FRM-11)
 - Fieldset and legend for groups; native radios or a Select before a combobox? (UI-FRM-12)
 - Does a multi-step flow ask again for something already entered? In the email-first add-person
-  flow: does step 2 ask only for the name, with the email read-only, and does a known account
-  or an existing member get the right outcome? (UI-FRM-13)
+  flow: does an existing account get a confirm step that names only the email (never the
+  account's name or username); does step 2 show the email read-only and pre-fill the username
+  from the server's suggestion, stopping once the admin edits it; and does an existing member get
+  the right error? (UI-FRM-13)
 - Dialogs: native `<dialog>` with `showModal()`; initial focus right (Cancel when there are no
   fields); focus returns to the opener, or to the row now at that position or the `h1` if the
   opener is gone; confirm button names its action; destructive confirms use the danger button?

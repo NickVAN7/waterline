@@ -448,10 +448,13 @@ Workspace (the firm: tenant boundary)
   users to it. Creating an account creates the user *and* their membership in that org in one
   step.
 - **The add-person form asks for the email first.** If the email already has an account, the
-  admin is asked to confirm adding that person (no name or password is asked for, and no
-  duplicate is created); otherwise the form continues to full account creation (username,
-  name, temporary password). The form therefore shows whether an email has an account, never
-  which org it belongs to; invitations (v2+) would hide even that.
+  admin is asked to confirm adding that person, by the email alone ("An account already exists
+  for jane@acme.com. Add them?"; no name or password is asked for, and no duplicate is created);
+  otherwise the form continues to full account creation (name, username, temporary password).
+  The username is pre-filled with a suggestion from the name (first and last word joined by a
+  hyphen, e.g. `jane-doe`, made available by the server), which the admin may change (DL-66).
+  The form therefore shows whether an email has an account, never which org it belongs to or
+  whose it is; invitations (v2+) would hide even that.
 - **Temporary passwords** (account creation and admin password reset): the form generates one
   that meets the policy and shows it to the admin once, to pass on; it can't be retrieved
   afterwards. The admin may replace it with their own before saving. Either way the user must

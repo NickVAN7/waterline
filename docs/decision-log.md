@@ -700,7 +700,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   version conflicts), the org guard in S1-C9 alike. `create_app` adds a `ReservedSlug` enum to
   the OpenAPI components.
 - **Supersedes:** none (the docs gave the URL patterns, not the endpoints)
-- **Superseded by:** DL-59 (in part)
+- **Superseded by:** DL-59 (in part); DL-66 (in part: S1-C9's email availability is now the user
+  check)
 - **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C8 row)
 - **Source:** chat session (owner, before S1-C8; the details settled after the docs-consistency
   check)
@@ -780,7 +781,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   of the token file, its contrast check, and the SVAR mapping live in `docs/ui/`.
 - **Supersedes:** the build plan's workflow item "A short UI design guide (`frontend/CLAUDE.md` or
   a new doc; decided then)"
-- **Superseded by:** none
+- **Superseded by:** DL-66 (in part: UI-FRM-13's email-first flow)
 - **Applies to:** `docs/ui-design-guide.md`, `docs/ui/`; `frontend/CLAUDE.md`; build plan
   (workflow items, repository layout, S1-C14 row, "Web shell", "Web screens"); screen-inventory
   (step 7); design-doc §1, §2; build plan ("Tooling"); root `CLAUDE.md`; developer guide
@@ -833,3 +834,27 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S1-C14 row, "Developer CLI"); testing-strategy ("Accessibility")
 - **Source:** chat session (owner, Oct 10, 2026; UI design change note, items 2.1 to 2.3)
+
+### DL-66: The email-first form suggests a username, and one user check
+- **Date:** 2026-10-10
+- **Decision:** The email-first add-person form keeps design-doc §4's flow: an existing account is
+  added after a confirm step that names only the email ("An account already exists for <email>. Add
+  them?"), and a new account asks for name, username, and temporary password. The username is
+  pre-filled with a server suggestion from the name (first and last word joined by a hyphen, made
+  available with a numeric suffix), which the admin may change. One user check endpoint answers for
+  an email (whether it has an account, never whose), a username (availability), or a name (the
+  suggestion), replacing S1-C9's separate email and username availability checks. It has one
+  audience for every form: those who may add or create a person (workspace and org owners and
+  admins, admins of a project that isn't archived, system admins) and takes no user ID (an edit form
+  skips the check while a field holds the user's current value); a user changing their own username
+  gets no live check (UI-FRM-9). The suggestion rule drops disallowed characters before picking the
+  first and last word, shortens its base so a suffix stays within 40 characters, strips trailing
+  hyphens, and owns the suffix cutting (test-first in `rules/`). The name stays one field for now
+  (TD-28).
+- **Supersedes:** DL-61 in part (UI-FRM-13: an existing account "added directly", and step 2
+  asking "only for the name"); DL-55 in part (the web form's "S1-C9's email availability")
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Account management"); build plan (S1-C9 row, "Workspace,
+  organizations & memberships", the staff API table); ui-design-guide UI-FRM-9, UI-FRM-13; the
+  `ui-reviewer` agent; tech-debt TD-28
+- **Source:** chat session (owner, Oct 10, 2026; docs-consistency decision on PR #10)

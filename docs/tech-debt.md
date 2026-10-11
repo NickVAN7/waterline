@@ -389,3 +389,15 @@ Entry format:
 - **Why:** deactivation isn't built yet (S1-C10); the owner chose to build it there.
 - **Fix by:** S1-C10 (deactivation takes the owners' lock, with a race test against a handover).
 - **Status:** open
+
+### TD-28: A user's name is one field, so username suggestions guess first and last names
+- **Added:** design change DL-66 (Oct 10, 2026)
+- **What:** `user.name` is a single column, so the username suggestion (DL-66) takes the first and
+  last word as first and last name. That guesses wrong for names like "Mary Ann van der Berg"
+  (`mary-berg`), and gives nothing for a name with no Latin letters. Split the name into first-name
+  and last-name fields (schema, API, forms, the suggestion rule, and existing rows).
+- **Why:** the owner accepted the guess for now; the split touches the built `user` model and every
+  form that edits a name.
+- **Fix by:** Slice 7 (before the first non-local deployment, so no real accounts need their names
+  split)
+- **Status:** open

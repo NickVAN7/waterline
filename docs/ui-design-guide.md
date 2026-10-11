@@ -521,7 +521,9 @@ render inside the full shell when signed in.
 - **UI-FRM-9** **Live availability checks** (project key, slug, username, email): debounced
   about 300 ms, shown as text under the field and announced through a polite live region
   ("Key is available" or "Key is taken"). They reveal only whether a value is taken, never
-  where, and never block submitting; the server still decides.
+  where, and never block submitting; the server still decides. One exception: a user changing
+  their own username in their profile gets no live check, since the user check is for admins
+  (DL-66); a taken name comes back as the 422 on save (UI-FRM-5).
 - **UI-FRM-10** **Password fields:** correct `autocomplete` (`username` or `email` for the
   identifier, `current-password`, `new-password`); paste is never blocked; **no `maxlength`**;
   the policy is length only, shown as help text with the number taken from the server; **no
@@ -540,9 +542,13 @@ render inside the full shell when signed in.
   three or four choices and a Select for more fixed choices (type, role). Use the combobox only
   where the user must search people or orgs.
 - **UI-FRM-13** **No redundant entry (3.3.7):** a multi-step flow keeps what the user typed. The
-  **email-first** add-person flow asks for the email first; if the account exists it is added
-  directly, and if it is already a member the error says so; otherwise step 2 asks **only for the
-  name**, with the email shown read-only. The member table has separate Name and Email columns.
+  **email-first** add-person flow asks for the email first and checks it (the user check, DL-66).
+  If an account exists, a confirm step says only "An account already exists for <email>. Add
+  them?" (never the account's name or username) and adds them on confirm; if it is already a
+  member, the error says so. Otherwise step 2 shows the email read-only and asks for the name, the
+  username, and the temporary password (UI-FRM-11). The username is pre-filled with the server's
+  suggestion for the name (`jane-doe`) and follows the name until the admin edits it; it is
+  checked live (UI-FRM-9). The member table has separate Name and Email columns.
 - **UI-FRM-14** **Dialogs:** native `<dialog>` opened with `showModal()`, so Esc closes and the
   page behind is inert (focus stays in the dialog; the browser's Tab may cycle through its own
   UI, which is expected). Initial focus goes to the first field in a form dialog; a confirmation
