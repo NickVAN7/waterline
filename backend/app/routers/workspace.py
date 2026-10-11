@@ -11,6 +11,7 @@ from app.core.errors import ErrorBody
 from app.core.lists import Page
 from app.routers.deps import AuthzContextDep, authorized, load_workspace
 from app.schemas.org import OrgListItem
+from app.schemas.user import EmailCheck, UsernameSuggestion
 from app.schemas.workspace import (
     SlugAvailability,
     StaffAdd,
@@ -20,6 +21,7 @@ from app.schemas.workspace import (
     WorkspaceRead,
     WorkspaceUpdate,
 )
+from app.services.user import UserService
 from app.services.workspace import ORGS, STAFF, WorkspaceEntity, WorkspaceService
 
 router = APIRouter(prefix="/workspaces", tags=["workspace"])
@@ -39,6 +41,7 @@ Updated = Annotated[WorkspaceEntity, Depends(authorized(load_workspace, Action.W
 StaffManaged = Annotated[
     WorkspaceEntity, Depends(authorized(load_workspace, Action.WORKSPACE_STAFF_MANAGE))
 ]
+UserCheckable = Annotated[WorkspaceEntity, Depends(authorized(load_workspace, Action.USER_CHECK))]
 StaffQuery = Annotated[STAFF.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 OrgQuery = Annotated[ORGS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
@@ -132,3 +135,16 @@ async def remove_staff(
 async def list_orgs(workspace: Viewed, query: OrgQuery, session: SessionDep) -> Page[OrgListItem]:
     """The workspace's orgs."""
     return await WorkspaceService(session).list_orgs(workspace, query)
+
+
+@router.get("/{workspace_id}/user-check", responses=_ERRORS)
+async def user_check(
+    _workspace: UserCheckable,
+    session: SessionDep,
+    email: str | None = None,
+    username: str | None = None,
+    name: str | None = None,
+) -> EmailCheck | SlugAvailability | UsernameSuggestion:
+    """Exactly one of `email` (whether an account has it, never whose), `username` (whether it's
+    available), or `name` (an available username suggested from it); none or several is a 422."""
+    return await UserService(session).check(email=email, username=username, name=name)

@@ -1,6 +1,7 @@
 """The `user` area: the only writer of the `user` table (build plan, "Feature map")."""
 
 import uuid
+from typing import cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,9 +11,16 @@ from app.core.security import hash_password
 from app.enums import AuditAction
 from app.models.user import User
 from app.repositories.user import UserRepository
-from app.rules.identifiers import SLUG_MAX, SLUG_MIN, IdentifierProblem, username_problem
+from app.rules.identifiers import (
+    SLUG_MAX,
+    SLUG_MIN,
+    IdentifierProblem,
+    suggest_username,
+    username_problem,
+)
 from app.rules.password_policy import MAX_LENGTH, MIN_LENGTH, PasswordProblem, password_problems
-from app.schemas.workspace import NewUser
+from app.schemas.user import EmailCheck, UsernameSuggestion
+from app.schemas.workspace import NewUser, SlugAvailability
 
 _PASSWORD_MESSAGES = {
     PasswordProblem.TOO_SHORT: f"Use at least {MIN_LENGTH} characters.",
@@ -126,11 +134,19 @@ class UserService:
         return user
 
     async def create_account(
-        self, actor_id: uuid.UUID, workspace_id: uuid.UUID, new: NewUser, *, under: Under = BODY
+        self,
+        actor_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        new: NewUser,
+        *,
+        organization_id: uuid.UUID | None = None,
+        under: Under = BODY,
     ) -> User:
         """A new account made by an admin (staff, an org's first owner, and from S1-C9 org and
         project members): validated (problems on `under`), its temporary password hashed, and
-        `must_change_password` set; `user_created`, in the workspace it was made in."""
+        `must_change_password` set; `user_created`, in the workspace it was made in, and the org
+        when it was made through that org (design-doc §10.1, "Scope": only its owners and admins,
+        workspace admins with their "org owner capabilities", and system admins may)."""
         email = new.email.strip().lower()
         problems = new_user_errors(
             email=email, username=new.username, name=new.name, password=new.password, under=under
@@ -156,6 +172,7 @@ class UserService:
             action=AuditAction.USER_CREATED,
             actor_id=actor_id,
             workspace_id=workspace_id,
+            organization_id=organization_id,
             target_user_id=user.id,
         )
         return user
@@ -170,6 +187,37 @@ class UserService:
         if must_change_password is not None:
             user.must_change_password = must_change_password
         await self.session.flush()
+
+    async def check(
+        self, *, email: str | None, username: str | None, name: str | None
+    ) -> EmailCheck | SlugAvailability | UsernameSuggestion:
+        """The user check (DL-66): exactly one of `email` (whether an account has it, never
+        whose), `username` (whether it's free and well-formed), or `name` (an available username
+        suggested from it, with `-2`, `-3`, ... added while taken); none or several is a 422."""
+        if [email, username, name].count(None) != 2:
+            raise ValidationFailedError(
+                [
+                    FieldError(
+                        ("query",),
+                        "Send exactly one of email, username, or name.",
+                        "one_parameter",
+                    )
+                ]
+            )
+        users = UserRepository(self.session)
+        if email is not None:
+            email = email.strip().lower()
+            return EmailCheck(email=email, exists=await users.get_by_email(email) is not None)
+        if username is not None:
+            problem = username_problem(username)
+            taken = await users.get_by_username(username) is not None
+            return SlugAvailability.of(problem.value if problem else None, taken=taken)
+        suggestion = suggest_username(cast(str, name))
+        suffix = 2
+        while suggestion is not None and await users.get_by_username(suggestion):
+            suggestion = suggest_username(cast(str, name), suffix)
+            suffix += 1
+        return UsernameSuggestion(suggestion=suggestion)
 
     async def set_system_admin(self, user: User, is_system_admin: bool) -> None:
         """Grant or revoke the flag. Only the auth service calls this, after its guards."""

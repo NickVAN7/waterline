@@ -17,6 +17,7 @@ class ProjectAccess:
     role: ProjectRole
     organization_id: uuid.UUID
     workspace_id: uuid.UUID
+    archived: bool = False
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,10 @@ class AuthzContext:
         default_factory=dict[uuid.UUID, WorkspaceRole]
     )
     org_roles: Mapping[uuid.UUID, OrgRole] = field(default_factory=dict[uuid.UUID, OrgRole])
+    # Each org in `org_roles`, with its workspace (DL-68: `user.check`'s targeted rule).
+    org_workspaces: Mapping[uuid.UUID, uuid.UUID] = field(
+        default_factory=dict[uuid.UUID, uuid.UUID]
+    )
     projects: Mapping[uuid.UUID, ProjectAccess] = field(
         default_factory=dict[uuid.UUID, ProjectAccess]
     )

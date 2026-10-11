@@ -2,6 +2,8 @@
 "Authorization context"), and list scoping applied in a query (design-doc §5, "Reads are
 authorized too"; §4, "Visibility")."""
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +60,7 @@ async def test_the_context_holds_every_membership_of_the_user_and_no_one_elses(
         is_system_admin=False,
         workspace_roles={staff_of.id: WorkspaceRole.ADMIN},
         org_roles={owned_org.id: OrgRole.OWNER},
+        org_workspaces={owned_org.id: staff_of.id},
         projects={viewed.id: ProjectAccess(ProjectRole.VIEWER, far_org.id, other_workspace.id)},
     )
 
@@ -77,6 +80,52 @@ async def test_a_user_with_no_membership_has_an_empty_context(session: AsyncSess
     ctx = await UserRepository(session).authz_context(user)
 
     assert ctx == AuthzContext(user_id=user.id)
+
+
+# --- The fields for `user.check`'s targeted rule (DL-68) ---------------------------------------
+
+
+async def test_each_project_carries_its_archived_state(session: AsyncSession) -> None:
+    org = await OrganizationFactory.create_async()
+    archived = await ProjectFactory.create_async(
+        organization=org, archived_at=datetime(2026, 10, 1, tzinfo=UTC)
+    )
+    live = await ProjectFactory.create_async(organization=org, archived_at=None)
+    user = await UserFactory.create_async(is_system_admin=False)
+    await ProjectMembershipFactory.create_async(project=archived, user=user, role=ProjectRole.ADMIN)
+    await ProjectMembershipFactory.create_async(project=live, user=user, role=ProjectRole.ADMIN)
+
+    ctx = await UserRepository(session).authz_context(user)
+
+    assert ctx.projects == {
+        archived.id: ProjectAccess(ProjectRole.ADMIN, org.id, org.workspace_id, archived=True),
+        live.id: ProjectAccess(ProjectRole.ADMIN, org.id, org.workspace_id, archived=False),
+    }
+
+
+async def test_each_org_role_carries_its_orgs_workspace(session: AsyncSession) -> None:
+    """Only the orgs the user holds a role in: not one reached through a project membership,
+    and not anyone else's."""
+    one = await WorkspaceFactory.create_async()
+    two = await WorkspaceFactory.create_async()
+    admin_of = await OrganizationFactory.create_async(workspace=one)
+    member_of = await OrganizationFactory.create_async(workspace=two)
+    project_only = await OrganizationFactory.create_async(workspace=one)
+    user = await UserFactory.create_async(is_system_admin=False)
+    await MembershipFactory.create_async(organization=admin_of, user=user, role=OrgRole.ADMIN)
+    await MembershipFactory.create_async(organization=member_of, user=user, role=OrgRole.MEMBER)
+    await ProjectMembershipFactory.create_async(
+        project=await ProjectFactory.create_async(organization=project_only),
+        user=user,
+        role=ProjectRole.ADMIN,
+    )
+    await MembershipFactory.create_async(
+        organization=project_only, user=await UserFactory.create_async(), role=OrgRole.OWNER
+    )
+
+    ctx = await UserRepository(session).authz_context(user)
+
+    assert ctx.org_workspaces == {admin_of.id: one.id, member_of.id: two.id}
 
 
 # --- Scoping applied in a query -----------------------------------------------------------------

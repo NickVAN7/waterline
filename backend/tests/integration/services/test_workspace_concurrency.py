@@ -128,3 +128,56 @@ async def test_a_removal_racing_a_handover_to_the_same_person_leaves_an_owner(
         )
     assert refused == ["last_owner"]
     assert roles == {ann.id: WorkspaceRole.ADMIN, bob.id: WorkspaceRole.OWNER}
+
+
+async def test_adding_an_owner_queues_behind_a_change_holding_the_owners_lock(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """TD-25: a new owner joins the owners' lock, so a role change or removal holding it never
+    sees the owners change under it (else a third change could lock the new owner first and
+    deadlock with it). The add waits until the change commits; without the lock it wouldn't."""
+    async with committing_factories(concurrency):
+        workspace = await WorkspaceFactory.create_async()
+        ann = await UserFactory.create_async()
+        bob = await UserFactory.create_async()
+        await UserFactory.create_async(email="cy@acme.example")
+        await WorkspaceMembershipFactory.create_async(
+            workspace=workspace, user=ann, role=WorkspaceRole.OWNER
+        )
+        await WorkspaceMembershipFactory.create_async(
+            workspace=workspace, user=bob, role=WorkspaceRole.MEMBER
+        )
+    ann_ctx = AuthzContext(user_id=ann.id, workspace_roles={workspace.id: WorkspaceRole.OWNER})
+    adder_pid: list[int] = []
+    adder_connected = anyio.Event()
+
+    async def add_cy_as_owner() -> None:
+        async with concurrency() as session:
+            adder_pid.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
+            adder_connected.set()
+            loaded = await session.get_one(Workspace, workspace.id)
+            await WorkspaceService(session).add_staff(
+                ann_ctx, loaded, "cy@acme.example", WorkspaceRole.OWNER
+            )
+            await session.commit()
+
+    async with concurrency() as changing:
+        loaded = await changing.get_one(Workspace, workspace.id)
+        await WorkspaceService(changing).change_staff_role(
+            ann_ctx, loaded, bob.id, WorkspaceRole.ADMIN
+        )
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as group:
+                group.start_soon(add_cy_as_owner)
+                await adder_connected.wait()
+                await wait_until_blocked_on_a_lock(concurrency_engine, adder_pid[0])
+                await changing.commit()
+
+    async with concurrency() as check:
+        owners = await check.scalar(
+            select(func.count()).where(
+                WorkspaceMembership.workspace_id == workspace.id,
+                WorkspaceMembership.role == WorkspaceRole.OWNER,
+            )
+        )
+    assert owners == 2

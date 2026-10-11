@@ -4,12 +4,14 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C8a (Owner handover & stepping down) done, after S1-C8 (Workspace & organizations),
-> the first checkpoint of the review-tier trial; next is S1-C9 (Org members & user creation). A
-> workspace admin may step down or leave on their own, and the last owner hands over by naming a
-> replacement (`new_owner_id`). The workspace and org API is built: the workspace, its staff
-> (email-first add, create, roles with the owner-only rule, removal), and orgs with their first
-> owner (build plan, "The workspace and org API"). Every check goes through `authorize()`
+> **Status:** S1-C9 (Org members & user creation) done, in the review-tier trial; next is S1-C10
+> (Account actions & profile). An org's members work like the workspace's staff, through one shared
+> roster (`app/services/roster.py`): email-first add, create, roles with the owner-only rule,
+> stepping down, removal, and the last owner's handover (`new_owner_id`). The user check
+> (`GET /api/workspaces/{id}/user-check`) answers whether an email has an account, whether a
+> username is free, or suggests one from a name. The workspace and org API is built: the
+> workspace, its staff, and orgs with their first owner (build plan, "The workspace and org API",
+> "The org members API"). Every check goes through `authorize()`
 > ("Authorization" below); `/me` carries each workspace's `allowed_actions`. Sign-in, sign-out,
 > change password, and `GET /api/auth/me` work over a server-side session in the `__Host-session`
 > cookie, a forced password change blocks every other endpoint, and every mutating request passes
@@ -298,12 +300,23 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   `required_error()`, `email_error()`, and `new_user_errors()` (`app/services/user.py`) turn the
   problems into field errors (`under=` for a nested object, e.g. `("body", "new_owner")`); use
   them wherever a password, username, slug, or new account is set.
-- **Accounts an admin creates** (staff, an org's first owner; later org and project members)
-  go through `UserService.create_account(actor_id, workspace_id, new)`: validated,
-  `must_change_password` set, `user_created` recorded.
+- **Accounts an admin creates** (staff, an org's first owner, org members; later project members)
+  go through `UserService.create_account(actor_id, workspace_id, new, organization_id=...)`:
+  validated, `must_change_password` set, `user_created` recorded. Pass the org's ID when the
+  account is made through that org (its members, later its projects' members), so its admins see
+  the event (design-doc §10.1, "Scope"); the roster does this for org members.
+- **Staff and org members share one set of rules** (`app/services/roster.py`, DL-70): the
+  email-first add, the create, the owner-only rule for owner and admin roles, stepping down, the
+  last-owner guard and handover, and the lock order (owners' rows first; adding an owner takes
+  that lock too, TD-25). The workspace and org services each describe their roster in a
+  `RosterSpec` and call a `Roster`; a third roster (project members, S1-C12) does the same.
 - **Removing a member "with their projects"** calls the handlers registered with
-  `register_on_member_removed()` (`app/services/workspace.py`; the project area registers its own
-  in S1-C12), each given a `MemberRemoval`.
+  `register_on_member_removed()` (`app/services/roster.py`; the project area registers its own
+  in S1-C12), each given a `MemberRemoval` (`organization_id` is None for staff). Tests stand in
+  for it with the `removals` fixture (`tests/api/conftest.py`).
+- **The user check** (`GET /api/workspaces/{id}/user-check`, DL-66) answers one of `email`,
+  `username`, or `name`; `suggest_username()` (`app/rules/identifiers.py`) builds the name's
+  username, and `UserService.check` adds `-2`, `-3`, … while it's taken.
 - **Update events** record `change_details(changed_fields(entity, values))`
   (`app/audit/admin_event.py`): `{"old": {...}, "new": {...}}`, the changed fields only.
 - **`ReservedSlug`** isn't returned by any route: `create_app` adds it to the OpenAPI schema's
@@ -343,12 +356,15 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
 
 - **Actions** are registered in `REGISTRY` (`app/authz/actions.py`), one `ActionSpec` each: its
   level, the lowest workspace, org, and project role that grants it, whether it's a mutation,
-  `archive_exempt`, for a personal action its `relationship`, and `visible` (granted to anyone
-  who can see the target, e.g. `org.view` for a project member with no org role). Real actions are members of
+  `archive_exempt`, for a personal action its `relationship`, `visible` (granted to anyone
+  who can see the target, e.g. `org.view` for a project member with no org role), and a targeted
+  `rule(ctx, target)` checked after the roles (e.g. `user.check`: an admin role anywhere in the
+  target's workspace, DL-68). Real actions are members of
   `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
   (DL-44); an unregistered action is denied. A project-level action normally sets
   `workspace_role=ADMIN, org_role=ADMIN` (inherited project admin).
-- **The context** (`AuthzContext`): the user's system-admin flag and memberships, loaded once
+- **The context** (`AuthzContext`): the user's system-admin flag and memberships (each org's
+  workspace in `org_workspaces`; each project's org, workspace, and `archived` state), loaded once
   per request (`UserRepository.authz_context`; an endpoint takes `ctx: AuthzContextDep`).
 - **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)`.
 - **Checks:** `authorize(ctx, action, target)` → bool; `ensure(...)` raises 404 when the user

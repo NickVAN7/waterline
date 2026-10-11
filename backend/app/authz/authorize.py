@@ -45,8 +45,8 @@ def _project_access(ctx: AuthzContext, target: Target) -> bool:
 
 def authorize(ctx: AuthzContext, action: str, target: Target) -> bool:
     """Whether the user may take `action` on `target`, in design-doc §5's order (the archived
-    project; personal actions; system admin; workspace role; org role; project role). An action
-    not in the registry is denied."""
+    project; personal actions; system admin; workspace role; org role; project role; targeted
+    rules). An action not in the registry is denied."""
     spec = REGISTRY.get(action)
     if spec is None:
         return False
@@ -65,6 +65,8 @@ def authorize(ctx: AuthzContext, action: str, target: Target) -> bool:
         or _at_least(ctx.workspace_roles.get(target.workspace_id), spec.workspace_role)
         or _at_least(org_role, spec.org_role)
         or _at_least(project.role if project else None, spec.project_role)
+        # Targeted rules last (design-doc §5's order).
+        or (spec.rule is not None and spec.rule(ctx, target))
     )
 
 

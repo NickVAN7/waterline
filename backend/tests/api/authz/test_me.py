@@ -15,8 +15,9 @@ from tests.support.authz import sign_in_as
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
 
-ALL_FIVE = [
+ALL_SIX = [
     "org.create",
+    "user.check",
     "workspace.update",
     "workspace.view",
     "workspace_staff.manage",
@@ -33,8 +34,11 @@ async def my_workspaces(client: AsyncClient) -> list[dict[str, Any]]:
 @pytest.mark.parametrize(
     ("role", "expected"),
     [
-        (WorkspaceRole.OWNER, ALL_FIVE),
-        (WorkspaceRole.ADMIN, ["org.create", "workspace.view", "workspace_staff.manage"]),
+        (WorkspaceRole.OWNER, ALL_SIX),
+        (
+            WorkspaceRole.ADMIN,
+            ["org.create", "user.check", "workspace.view", "workspace_staff.manage"],
+        ),
         (WorkspaceRole.MEMBER, []),
     ],
 )
@@ -71,14 +75,14 @@ async def test_a_system_admin_sees_every_workspace_with_a_null_role_and_every_ac
             "name": "Acme Consulting",
             "slug": "acme",
             "role": None,
-            "allowed_actions": ALL_FIVE,
+            "allowed_actions": ALL_SIX,
         },
         {
             "id": str(bolt.id),
             "name": "Bolt Partners",
             "slug": "bolt",
             "role": None,
-            "allowed_actions": ALL_FIVE,
+            "allowed_actions": ALL_SIX,
         },
     ]
 
@@ -93,8 +97,8 @@ async def test_a_system_admin_who_is_staff_keeps_their_role_there(client: AsyncC
     await sign_in_as(client, admin)
 
     assert [(w["id"], w["role"], w["allowed_actions"]) for w in await my_workspaces(client)] == [
-        (str(acme.id), "member", ALL_FIVE),
-        (str(bolt.id), None, ALL_FIVE),
+        (str(acme.id), "member", ALL_SIX),
+        (str(bolt.id), None, ALL_SIX),
     ]
 
 

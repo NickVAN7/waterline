@@ -18,8 +18,7 @@ from app.models.audit_event import AuditEvent
 from app.models.auth import UserSession
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMembership
-from app.services import workspace as workspace_service
-from app.services.workspace import MemberRemoval
+from app.services.roster import MemberRemoval
 from tests.factories.org import OrganizationFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
@@ -506,19 +505,6 @@ async def test_removing_staff_removes_the_membership_and_records_it(
             {"role": "member", "with_projects": with_projects},
         )
     ]
-
-
-@pytest.fixture
-def removals(monkeypatch: pytest.MonkeyPatch) -> list[MemberRemoval]:
-    """What the `on_member_removed` handler receives: the project area registers the real one in
-    S1-C12; this stands in for it."""
-    calls: list[MemberRemoval] = []
-
-    async def handler(_session: AsyncSession, removal: MemberRemoval) -> None:
-        calls.append(removal)
-
-    monkeypatch.setattr(workspace_service, "_ON_MEMBER_REMOVED", [handler])
-    return calls
 
 
 async def test_removing_with_projects_calls_the_handler(

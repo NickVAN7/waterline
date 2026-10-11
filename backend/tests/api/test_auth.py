@@ -368,7 +368,9 @@ async def test_me_lists_workspaces_and_orgs_with_roles(
             "name": "Acme Consulting",
             "slug": "acme",
             "role": "member",
-            "allowed_actions": [],  # a workspace member has no workspace-level action (DL-45)
+            # A workspace member has no workspace-level action by role (DL-45); as an admin of an
+            # org in the workspace, they may use the user check (DL-68).
+            "allowed_actions": ["user.check"],
         }
     ]
     assert body["orgs"] == [

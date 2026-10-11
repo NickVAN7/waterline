@@ -97,11 +97,20 @@ def test_ensure_lets_anyone_who_sees_the_org_view_it(persona: str) -> None:
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", ["org.update", "org.view"]),
-        ("workspace_owner", ["org.update", "org.view"]),
-        ("workspace_admin", ["org.update", "org.view"]),
-        ("org_owner", ["org.update", "org.view"]),
-        ("org_admin", ["org.view"]),
+        (
+            "system_admin",
+            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
+        ),
+        (
+            "workspace_owner",
+            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
+        ),
+        (
+            "workspace_admin",
+            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
+        ),
+        ("org_owner", ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"]),
+        ("org_admin", ["org.view", "org_member.manage"]),
         ("org_member", ["org.view"]),
         ("project_viewer", ["org.view"]),
         ("other_project_admin", ["org.view"]),

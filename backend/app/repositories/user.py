@@ -65,21 +65,27 @@ class UserRepository:
 
     async def authz_context(self, user: User) -> AuthzContext:
         """The user's authorization context: the system-admin flag and every workspace, org, and
-        project membership, each project's org and workspace taken from the project row."""
+        project membership, each org's workspace and each project's org, workspace, and archived
+        state taken from the org or project row."""
         workspaces = await self.session.execute(
             select(WorkspaceMembership.workspace_id, WorkspaceMembership.role).where(
                 WorkspaceMembership.user_id == user.id
             )
         )
-        orgs = await self.session.execute(
-            select(Membership.organization_id, Membership.role).where(Membership.user_id == user.id)
-        )
+        orgs = (
+            await self.session.execute(
+                select(Membership.organization_id, Membership.role, Organization.workspace_id)
+                .join(Organization, Membership.organization_id == Organization.id)
+                .where(Membership.user_id == user.id)
+            )
+        ).all()
         projects = await self.session.execute(
             select(
                 ProjectMembership.project_id,
                 ProjectMembership.role,
                 Project.organization_id,
                 Project.workspace_id,
+                Project.archived_at,
             )
             .join(Project, ProjectMembership.project_id == Project.id)
             .where(ProjectMembership.user_id == user.id)
@@ -88,9 +94,12 @@ class UserRepository:
             user_id=user.id,
             is_system_admin=user.is_system_admin,
             workspace_roles=dict(workspaces.all()),
-            org_roles=dict(orgs.all()),
+            org_roles={org_id: role for org_id, role, _ in orgs},
+            org_workspaces={org_id: workspace_id for org_id, _, workspace_id in orgs},
             projects={
-                project_id: ProjectAccess(role, organization_id, workspace_id)
-                for project_id, role, organization_id, workspace_id in projects
+                project_id: ProjectAccess(
+                    role, organization_id, workspace_id, archived=archived_at is not None
+                )
+                for project_id, role, organization_id, workspace_id, archived_at in projects
             },
         )

@@ -368,16 +368,19 @@ Entry format:
   the list `_member` locked, which can miss an owner promoted meanwhile and let the last owner go)
   needs a race test that's costly to make deterministic for a retryable error.
 - **Fix by:** S1-C9 (the org version uses the same locks: fix both there, with one race test).
-- **Status:** open
+- **Status:** resolved in S1-C9 (staff and org members share one roster, `services/roster.py`;
+  adding an owner takes the owners' lock first, proven by
+  `test_adding_an_owner_queues_behind_a_change_holding_the_owners_lock`)
 
 ### TD-26: A no-op role change ignores `new_owner_id`, even an invalid one
 - **Added:** S1-C8a
 - **What:** re-sending the role someone already holds returns their row unchanged and records
-  nothing, without looking at `new_owner_id`; an invalid one (not staff, deactivated) is ignored
-  rather than refused with its 422.
+  nothing, without looking at `new_owner_id`; an invalid one (not on the roster, deactivated) is
+  ignored rather than refused with its 422. Staff and org members share this path (the roster,
+  DL-70).
 - **Why:** nothing changes, so nothing is wrong; the owner accepted it for now (after S1-C8a).
-- **Fix by:** S1-C15 (with the staff page's role picker: check `new_owner_id` on a no-op too, or
-  confirm the picker never sends one without a change).
+- **Fix by:** S1-C15 (with the staff and org member pages' role pickers: check `new_owner_id` on a
+  no-op too, or confirm the pickers never send one without a change).
 - **Status:** open
 
 ### TD-27: Deactivation must wait behind a handover

@@ -26,8 +26,9 @@ from tests.support.authz import Tenancy, persona_user, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
 
-ALL_FIVE = [
+ALL_SIX = [
     "org.create",
+    "user.check",
     "workspace.update",
     "workspace.view",
     "workspace_staff.manage",
@@ -77,9 +78,12 @@ def assert_forbidden(response: Response) -> None:
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
-        ("workspace_owner", ALL_FIVE),
-        ("workspace_admin", ["org.create", "workspace.view", "workspace_staff.manage"]),
-        ("system_admin", ALL_FIVE),
+        ("workspace_owner", ALL_SIX),
+        (
+            "workspace_admin",
+            ["org.create", "user.check", "workspace.view", "workspace_staff.manage"],
+        ),
+        ("system_admin", ALL_SIX),
     ],
 )
 async def test_the_workspace_is_returned_with_the_callers_actions(

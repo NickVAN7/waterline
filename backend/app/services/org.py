@@ -1,6 +1,5 @@
-"""The `org` area: `organization` and `membership` (build plan, "Feature map"). Org members
-(S1-C9) come later; this checkpoint creates an org with its first owner, and reads and updates
-it."""
+"""The `org` area: `organization` and `membership` (build plan, "Feature map"): creating an org
+with its first owner, reading and updating it, and its members (DL-67)."""
 
 import uuid
 from typing import cast
@@ -8,22 +7,41 @@ from typing import cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.admin_event import change_details, changed_fields, log_admin_event
+from app.authz.actions import Action
 from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext
 from app.authz.target import org_target
 from app.core.errors import FieldError, NotFoundError, ValidationFailedError
+from app.core.lists import Filter, FilterType, ListSpec, Page
 from app.enums import AuditAction, AuditEntityType, OrgRole
 from app.models.org import Membership, Organization
+from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.org import OrgRepository
 from app.repositories.user import UserRepository
 from app.rules.identifiers import slug_problem
-from app.schemas.org import OrgCreate, OrgRead, OrgUpdate
+from app.schemas.org import (
+    MemberCreate,
+    MemberRead,
+    MemberRoleUpdate,
+    OrgCreate,
+    OrgRead,
+    OrgUpdate,
+)
 from app.schemas.workspace import SlugAvailability
+from app.services.roster import Roster, RosterSpec
 from app.services.user import UserService, identifier_error, required_error
 
 # The entity an org endpoint loads, for routers (which never import models).
 type OrgEntity = Organization
+
+MEMBERS = ListSpec(
+    name="Member",
+    id_column=Membership.id,  # pyright: ignore[reportArgumentType]
+    sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
+    default_sort=("name",),
+    filters=(Filter("role", Membership.role, FilterType.ENUM, enum=OrgRole),),  # pyright: ignore[reportArgumentType]
+)
 
 
 def _name_and_slug_errors(name: str | None, slug: str | None) -> list[FieldError]:
@@ -146,3 +164,77 @@ class OrgService:
             workspace_id, slug, besides=org.id if org else None
         )
         return SlugAvailability.of(problem.value if problem else None, taken=taken)
+
+    # --- Members (the shared roster rules: services/roster.py) -------------------------------
+
+    def _members(self, org: Organization) -> Roster[Membership, OrgRole, MemberRead]:
+        return Roster(
+            self.session,
+            _MEMBER_ROSTER,
+            OrgRepository(self.session),
+            scope_id=org.id,
+            target=org_target(org),
+            new_membership=lambda user_id, role: Membership(
+                organization_id=org.id, user_id=user_id, role=role
+            ),
+            row_model=MemberRead,
+        )
+
+    async def list_members(
+        self, ctx: AuthzContext, org: Organization, query: object
+    ) -> Page[MemberRead]:
+        return await self._members(org).list(ctx, MEMBERS, query)
+
+    async def add_member(
+        self, ctx: AuthzContext, org: Organization, email: str, role: OrgRole
+    ) -> MemberRead:
+        """Add an existing account, found by email: 422 on `email` when it's already a member
+        (`already_member`), has no account (`no_account`), or is deactivated
+        (`account_inactive`)."""
+        return await self._members(org).add(ctx, email, role)
+
+    async def create_member(
+        self, ctx: AuthzContext, org: Organization, payload: MemberCreate
+    ) -> MemberRead:
+        """Create the account (with `must_change_password` set) and its membership in one step
+        (`user_created`, `org_member_added`)."""
+        return await self._members(org).create(ctx, payload, payload.role)
+
+    async def change_member_role(
+        self, ctx: AuthzContext, org: Organization, user_id: uuid.UUID, payload: MemberRoleUpdate
+    ) -> MemberRead:
+        """Change a member's role; the last owner needs `new_owner_id` (DL-59)."""
+        return await self._members(org).change_role(
+            ctx, user_id, payload.role, new_owner_id=payload.new_owner_id
+        )
+
+    async def remove_member(
+        self,
+        ctx: AuthzContext,
+        org: Organization,
+        user_id: uuid.UUID,
+        *,
+        with_projects: bool,
+        new_owner_id: uuid.UUID | None = None,
+    ) -> None:
+        """Remove a member, with their projects in the org unless told otherwise; the last owner
+        needs `new_owner_id` (DL-59)."""
+        await self._members(org).remove(
+            ctx, user_id, with_projects=with_projects, new_owner_id=new_owner_id
+        )
+
+
+_MEMBER_ROSTER = RosterSpec(
+    owner=OrgRole.OWNER,
+    admin=OrgRole.ADMIN,
+    member=OrgRole.MEMBER,
+    manage=Action.ORG_MEMBER_MANAGE,
+    manage_admins=Action.ORG_MEMBER_MANAGE_ADMINS,
+    added=AuditAction.ORG_MEMBER_ADDED,
+    role_changed=AuditAction.ORG_MEMBER_ROLE_CHANGED,
+    removed=AuditAction.ORG_MEMBER_REMOVED,
+    entity_type=AuditEntityType.ORGANIZATION,
+    already_member="This person is already a member.",
+    needs_owner="The organization needs another owner first.",
+    successor_not_member="The new owner must be a member.",
+)

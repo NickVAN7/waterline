@@ -10,6 +10,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.authz.context import AuthzContext
+from app.authz.target import Target
 from app.enums import OrgRole, ProjectRole, WorkspaceRole
 
 
@@ -37,6 +39,8 @@ class ActionSpec:
       says whether the user has the relationship that grants it; no role does.
     - `visible`: granted to anyone who can see the target (design-doc §4, "Visibility"), on top
       of the roles above: e.g. `org.view`, for a project member who has no org role.
+    - `rule`: a targeted rule granting it on top of the roles above, from the whole context
+      (e.g. `user.check`: an admin role anywhere in the target's workspace, DL-68).
     """
 
     level: Level
@@ -47,6 +51,7 @@ class ActionSpec:
     archive_exempt: bool = False
     relationship: Callable[[uuid.UUID, object], bool] | None = None
     visible: bool = False
+    rule: Callable[[AuthzContext, Target], bool] | None = None
 
 
 class Action(StrEnum):
@@ -59,10 +64,29 @@ class Action(StrEnum):
     ORG_CREATE = "org.create"
     ORG_VIEW = "org.view"
     ORG_UPDATE = "org.update"
+    ORG_MEMBER_MANAGE = "org_member.manage"
+    ORG_MEMBER_MANAGE_ADMINS = "org_member.manage_admins"
+    USER_CHECK = "user.check"
 
 
 # Workspace owners/admins, and system admins (DL-45).
 _WORKSPACE_ADMINS = ActionSpec(Level.WORKSPACE, workspace_role=WorkspaceRole.ADMIN)
+
+
+def _adds_people_in_workspace(ctx: AuthzContext, target: Target) -> bool:
+    """`user.check`'s targeted rule (DL-68): an org owner/admin of an org in the target's
+    workspace, or an explicit admin of one of its projects that isn't archived."""
+    return any(
+        role in (OrgRole.ADMIN, OrgRole.OWNER)
+        and ctx.org_workspaces.get(org_id) == target.workspace_id
+        for org_id, role in ctx.org_roles.items()
+    ) or any(
+        access.role is ProjectRole.ADMIN
+        and access.workspace_id == target.workspace_id
+        and not access.archived
+        for access in ctx.projects.values()
+    )
+
 
 REGISTRY: dict[str, ActionSpec] = {
     Action.WORKSPACE_VIEW: ActionSpec(
@@ -80,5 +104,20 @@ REGISTRY: dict[str, ActionSpec] = {
     # Org owners, and workspace admins' "org owner capabilities in every org" (§5).
     Action.ORG_UPDATE: ActionSpec(
         Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.OWNER
+    ),
+    # Org owners/admins, and workspace admins as org owners in every org (§5; DL-68).
+    Action.ORG_MEMBER_MANAGE: ActionSpec(
+        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.ADMIN
+    ),
+    # Granting, changing, or removing an org owner or admin role: org owners (DL-68).
+    Action.ORG_MEMBER_MANAGE_ADMINS: ActionSpec(
+        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.OWNER
+    ),
+    # Whoever may add or create a person in the workspace (DL-66, DL-68).
+    Action.USER_CHECK: ActionSpec(
+        Level.WORKSPACE,
+        workspace_role=WorkspaceRole.ADMIN,
+        mutation=False,
+        rule=_adds_people_in_workspace,
     ),
 }

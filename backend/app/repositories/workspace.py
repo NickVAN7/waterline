@@ -56,7 +56,7 @@ class WorkspaceRepository:
             )
         )
 
-    def staff_statement(self, workspace_id: uuid.UUID) -> Select[WorkspaceMembership]:
+    def members(self, workspace_id: uuid.UUID) -> Select[WorkspaceMembership]:
         """The workspace's staff memberships, each with its user loaded (for a `ListSpec`)."""
         return (
             select(WorkspaceMembership)
@@ -70,7 +70,7 @@ class WorkspaceRepository:
     ) -> WorkspaceMembership | None:
         """The user's staff membership, with the user loaded; with `lock`, its row held until the
         transaction ends."""
-        statement = self.staff_statement(workspace_id).where(WorkspaceMembership.user_id == user_id)
+        statement = self.members(workspace_id).where(WorkspaceMembership.user_id == user_id)
         if lock:
             statement = statement.with_for_update(of=WorkspaceMembership)
         return await self.session.scalar(statement)
