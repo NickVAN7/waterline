@@ -1,7 +1,6 @@
 """Sessions and sign-in (design-doc §4, "Sign-in" and "Sessions"). The `auth` area owns the
 `session` table; changes to the user go through the user service."""
 
-import uuid
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,8 +32,14 @@ from app.repositories.auth import AuthRepository
 from app.repositories.org import OrgRepository
 from app.repositories.user import UserRepository
 from app.repositories.workspace import WorkspaceRepository
+from app.rules.account_rank import OrgRoleHeld, WorkspaceRoleHeld
 from app.schemas.auth import MeOrg, MeRead, MeUser, MeWorkspace
-from app.services.user import UserService, password_errors
+from app.services.user import (
+    AccountSubject,
+    UserService,
+    password_errors,
+    register_on_email_changed,
+)
 
 # The user a request is authenticated as, for routers (which never import models).
 type SignedInUser = User
@@ -151,7 +156,7 @@ class AuthService:
             self.session,
             action=AuditAction.PASSWORD_CHANGED,
             actor_id=user.id,
-            workspace_id=await self._workspace_of(user),
+            workspace_id=await UserService(self.session).workspace_of(user.id),
             target_user_id=user.id,
         )
         return new_token
@@ -198,15 +203,6 @@ class AuthService:
         )
         return True
 
-    async def _workspace_of(self, user: User) -> uuid.UUID | None:
-        """The workspace a user-level event happened in (design-doc §10.1, "Scope"): the one the
-        user belongs to, or, with no memberships, the only workspace there is. None only when
-        that's ambiguous, which needs a second workspace (undecided, design-doc §4)."""
-        ids = await UserRepository(self.session).workspace_ids_of(user.id)
-        if not ids:
-            ids = await WorkspaceRepository(self.session).ids(limit=2)
-        return ids[0] if len(ids) == 1 else None
-
     async def _user_by_email(self, email: str) -> User:
         user = await UserRepository(self.session).get_by_email(email.lower())
         if user is None:
@@ -245,3 +241,89 @@ class AuthService:
             ],
             orgs=[MeOrg(id=o.id, name=o.name, slug=o.slug, role=role) for o, role in orgs],
         )
+
+    async def deactivate(self, ctx: AuthzContext, subject: AccountSubject) -> None:
+        """Deactivate the account and end its sessions (`user_deactivated`); already inactive
+        changes nothing. 422 on the path's `user_id`: `last_owner` for the last active owner of
+        the workspace or an org, `last_system_admin` for the last active system admin."""
+        user = subject.user
+        if not user.is_active:
+            return
+        await self._guard_last_owners(subject)
+        if user.is_system_admin:
+            # Locked like a revocation, so two deactivations can't remove the last one.
+            active = await UserRepository(self.session).lock_active_system_admins()
+            if active == [user.id]:
+                raise _on_user_id("This is the last active system admin.", "last_system_admin")
+        # The row last (owners, system admins, then the user, as a revocation takes them), and
+        # read again: a deactivation that committed meanwhile leaves nothing to do or record.
+        await UserRepository(self.session).lock(user)
+        if not user.is_active:
+            return
+        await UserService(self.session).set_active(user, False)
+        await self.repository.delete_all(user.id)
+        UserService(self.session).log_account_event(ctx, AuditAction.USER_DEACTIVATED, subject)
+
+    async def _guard_last_owners(self, subject: AccountSubject) -> None:
+        """Refuse to leave a workspace or org the user belongs to with no active owner (DL-74).
+        Each one's owners are locked first, in ID order, so the check queues behind a handover
+        or a role change there (TD-27); the roles are then read again, as they stand."""
+        held = subject.account.memberships
+        workspace_ids = sorted({m.workspace_id for m in held if isinstance(m, WorkspaceRoleHeld)})
+        org_ids = sorted({m.org_id for m in held if isinstance(m, OrgRoleHeld)})
+        workspaces = WorkspaceRepository(self.session)
+        orgs = OrgRepository(self.session)
+        for workspace_id in workspace_ids:
+            await workspaces.lock_owners(workspace_id)
+        for org_id in org_ids:
+            await orgs.lock_owners(org_id)
+        user_id = subject.user.id
+        for workspace_id in workspace_ids:
+            if await workspaces.active_owners(workspace_id) == [user_id]:
+                raise _on_user_id("The workspace needs another owner first.", "last_owner")
+        for org_id in org_ids:
+            if await orgs.active_owners(org_id) == [user_id]:
+                raise _on_user_id("The organization needs another owner first.", "last_owner")
+
+    async def reset_password(
+        self, ctx: AuthzContext, subject: AccountSubject, password: str
+    ) -> None:
+        """Set a temporary password the user must change at next sign-in, and end their
+        sessions (`password_reset`). 403 on one's own account: an admin reset asks for no current
+        password (design-doc §4), so admins use change password. 422 on `password`."""
+        user = subject.user
+        if user.id == ctx.user_id:
+            raise ForbiddenError("Use change password for your own account.")
+        problems = password_errors(
+            password,
+            email=user.email,
+            username=user.username,
+            same_as_current=False,
+            field="password",
+        )
+        if problems:
+            raise ValidationFailedError(problems)
+        await UserService(self.session).set_password_hash(
+            user, await hash_password(password), must_change_password=True
+        )
+        await self.repository.delete_all(user.id)
+        UserService(self.session).log_account_event(ctx, AuditAction.PASSWORD_RESET, subject)
+
+    async def sign_out_everywhere(self, ctx: AuthzContext, subject: AccountSubject) -> None:
+        """End every session of the user (`signed_out_everywhere`)."""
+        await UserRepository(self.session).lock(subject.user)
+        await self.repository.delete_all(subject.user.id)
+        UserService(self.session).log_account_event(ctx, AuditAction.SIGNED_OUT_EVERYWHERE, subject)
+
+
+def _on_user_id(message: str, type_: str) -> ValidationFailedError:
+    return ValidationFailedError([FieldError(("path", "user_id"), message, type_)])
+
+
+async def _end_sessions(session: AsyncSession, user: User) -> None:
+    """An email change ends the user's sessions (design-doc §4); the user service has updated
+    the row first."""
+    await AuthRepository(session).delete_all(user.id)
+
+
+register_on_email_changed(_end_sessions)

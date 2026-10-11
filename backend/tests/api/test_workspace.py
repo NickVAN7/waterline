@@ -452,6 +452,44 @@ async def test_the_last_owner_cant_be_demoted(
     assert await role_of(session, workspace, owner) is WorkspaceRole.OWNER
 
 
+async def test_a_deactivated_owner_doesnt_count_as_another_owner(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """Every last-owner guard counts active owners (DL-74)."""
+    owner = await owner_of(client, workspace)
+    inactive = await UserFactory.create_async(is_active=False)
+    await WorkspaceMembershipFactory.create_async(
+        workspace=workspace, user=inactive, role=WorkspaceRole.OWNER
+    )
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{owner.id}", json={"role": "admin"}
+    )
+
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["body", "role"], "last_owner")],
+    )
+    assert await role_of(session, workspace, owner) is WorkspaceRole.OWNER
+
+
+async def test_a_deactivated_owner_may_be_demoted_while_an_active_owner_remains(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    await owner_of(client, workspace)
+    inactive = await UserFactory.create_async(is_active=False)
+    await WorkspaceMembershipFactory.create_async(
+        workspace=workspace, user=inactive, role=WorkspaceRole.OWNER
+    )
+
+    response = await client.patch(
+        f"/api/workspaces/{workspace.id}/staff/{inactive.id}", json={"role": "member"}
+    )
+
+    assert response.status_code == 200
+    assert await role_of(session, workspace, inactive) is WorkspaceRole.MEMBER
+
+
 async def test_an_owner_can_be_demoted_while_another_owner_remains(
     client: AsyncClient, session: AsyncSession, workspace: Workspace
 ) -> None:

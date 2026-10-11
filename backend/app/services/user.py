@@ -1,16 +1,26 @@
 """The `user` area: the only writer of the `user` table (build plan, "Feature map")."""
 
 import uuid
+from collections import defaultdict
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
 from typing import cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.admin_event import log_admin_event
+from app.audit.admin_event import JsonValue, change_details, changed_fields, log_admin_event
+from app.authz.authorize import allowed_actions
+from app.authz.context import AuthzContext, rank_account
+from app.authz.target import Target, user_target
 from app.core.errors import FieldError, ValidationFailedError
+from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
 from app.core.security import hash_password
-from app.enums import AuditAction
+from app.enums import AuditAction, OrgRole, ProjectRole, WorkspaceRole
 from app.models.user import User
+from app.models.workspace import Workspace
 from app.repositories.user import UserRepository
+from app.repositories.workspace import WorkspaceRepository
+from app.rules.account_rank import Account, covering_orgs
 from app.rules.identifiers import (
     SLUG_MAX,
     SLUG_MIN,
@@ -19,7 +29,19 @@ from app.rules.identifiers import (
     username_problem,
 )
 from app.rules.password_policy import MAX_LENGTH, MIN_LENGTH, PasswordProblem, password_problems
-from app.schemas.user import EmailCheck, UsernameSuggestion
+from app.schemas.auth import MeUser
+from app.schemas.user import (
+    AccessPerson,
+    AccessReason,
+    AccessReview,
+    EmailCheck,
+    OrgReach,
+    OwnProfileUpdate,
+    ProjectReach,
+    UsernameSuggestion,
+    UserRow,
+    UserUpdate,
+)
 from app.schemas.workspace import NewUser, SlugAvailability
 
 _PASSWORD_MESSAGES = {
@@ -103,6 +125,54 @@ def new_user_errors(
             under=under,
         ),
     ]
+
+
+@dataclass(frozen=True)
+class AccountSubject:
+    """A user an account action is taken on: their workspace, and their memberships for the rank
+    rule (DL-73)."""
+
+    user: User
+    account: Account
+    workspace_id: uuid.UUID
+
+
+type EmailChangedHandler = Callable[[AsyncSession, User], Awaitable[None]]
+
+# Registered by the auth area, which ends the user's sessions (build plan, "Cross-area rules").
+_ON_EMAIL_CHANGED: list[EmailChangedHandler] = []
+
+
+def register_on_email_changed(handler: EmailChangedHandler) -> None:
+    _ON_EMAIL_CHANGED.append(handler)
+
+
+_WORKSPACE_REASONS = {
+    WorkspaceRole.OWNER: AccessReason.WORKSPACE_OWNER,
+    WorkspaceRole.ADMIN: AccessReason.WORKSPACE_ADMIN,
+}
+_ORG_REASONS = {
+    OrgRole.OWNER: AccessReason.ORG_OWNER,
+    OrgRole.ADMIN: AccessReason.ORG_ADMIN,
+    OrgRole.MEMBER: AccessReason.ORG_MEMBER,
+}
+_PROJECT_REASONS = {
+    ProjectRole.ADMIN: AccessReason.PROJECT_ADMIN,
+    ProjectRole.MEMBER: AccessReason.PROJECT_MEMBER,
+    ProjectRole.VIEWER: AccessReason.PROJECT_VIEWER,
+}
+
+
+# The entity a user endpoint loads, for routers (which never import models).
+type UserEntity = AccountSubject
+
+USERS = ListSpec(
+    name="User",
+    id_column=User.id,  # pyright: ignore[reportArgumentType]
+    sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
+    default_sort=("name",),
+    filters=(Filter("is_active", User.is_active, FilterType.BOOLEAN),),  # pyright: ignore[reportArgumentType]
+)
 
 
 class UserService:
@@ -223,3 +293,236 @@ class UserService:
         """Grant or revoke the flag. Only the auth service calls this, after its guards."""
         user.is_system_admin = is_system_admin
         await self.session.flush()
+
+    async def workspace_of(self, user_id: uuid.UUID) -> uuid.UUID | None:
+        """The workspace a user-level action happens in (design-doc §10.1, "Scope"): the one the
+        user belongs to, or, with no memberships, the only workspace there is. None only when
+        that's ambiguous, which needs a second workspace (undecided, design-doc §4)."""
+        ids = await UserRepository(self.session).workspace_ids_of(user_id)
+        if not ids:
+            ids = await WorkspaceRepository(self.session).ids(limit=2)
+        return ids[0] if len(ids) == 1 else None
+
+    async def load(self, user_id: uuid.UUID) -> tuple[AccountSubject, Target] | None:
+        """A user as an account action's target: in their workspace, with their memberships."""
+        user = await UserRepository(self.session).get(user_id)
+        workspace_id = None if user is None else await self.workspace_of(user.id)
+        if user is None or workspace_id is None:
+            return None
+        account = (await UserRepository(self.session).accounts([user]))[user.id]
+        return (
+            AccountSubject(user, account, workspace_id),
+            user_target(workspace_id, user.id, account),
+        )
+
+    def row(self, ctx: AuthzContext, subject: AccountSubject) -> UserRow:
+        """A users-list row, with the account actions the caller may take on the user."""
+        user = subject.user
+        return UserRow(
+            id=user.id,
+            email=user.email,
+            username=user.username,
+            name=user.name,
+            is_active=user.is_active,
+            is_system_admin=user.is_system_admin,
+            allowed_actions=allowed_actions(
+                ctx, user_target(subject.workspace_id, user.id, subject.account)
+            ),
+        )
+
+    async def list_users(
+        self, ctx: AuthzContext, workspace: Workspace, query: object
+    ) -> Page[UserRow]:
+        """Everyone with a membership in the workspace, and every account with none (DL-72)."""
+        users = UserRepository(self.session)
+        page = await fetch_page(
+            self.session,
+            users.in_workspace(workspace.id),
+            USERS,
+            query,  # pyright: ignore[reportArgumentType] -- USERS.query_model
+        )
+        accounts = await users.accounts(page.items)
+        return Page[UserRow](
+            items=[
+                self.row(ctx, AccountSubject(u, accounts[u.id], workspace.id)) for u in page.items
+            ],
+            total=page.total,
+            limit=page.limit,
+            offset=page.offset,
+        )
+
+    def log_account_event(
+        self,
+        ctx: AuthzContext,
+        action: AuditAction,
+        subject: AccountSubject,
+        details: Mapping[str, JsonValue] | None = None,
+    ) -> None:
+        """An account action's events (DL-75): one with no org when a system-admin or workspace
+        role covers the target, otherwise one per covering org."""
+        orgs = covering_orgs(rank_account(ctx), subject.account) or {None}
+        for organization_id in sorted(orgs, key=str):
+            log_admin_event(
+                self.session,
+                action=action,
+                actor_id=ctx.user_id,
+                workspace_id=subject.workspace_id,
+                organization_id=organization_id,
+                target_user_id=subject.user.id,
+                details=details,
+            )
+
+    async def set_active(self, user: User, is_active: bool) -> None:
+        """Deactivate or reactivate; the auth service ends the sessions of a deactivation."""
+        user.is_active = is_active
+        await self.session.flush()
+
+    async def reactivate(self, ctx: AuthzContext, subject: AccountSubject) -> None:
+        """Let the account sign in again (`user_reactivated`); already active changes nothing."""
+        # Locked and read again, so two at once record one event.
+        await UserRepository(self.session).lock(subject.user)
+        if subject.user.is_active:
+            return
+        await self.set_active(subject.user, True)
+        self.log_account_event(ctx, AuditAction.USER_REACTIVATED, subject)
+
+    async def _profile_changes(
+        self, user: User, *, email: str | None, name: str | None, username: str | None
+    ) -> dict[str, tuple[str, str]]:
+        """The changed fields, validated: the email's shape, a name, the username rule, and
+        `taken` for an email or username someone else has (the constraints decide a race)."""
+        changed = changed_fields(
+            user,
+            {
+                "email": email.strip().lower() if email is not None else None,
+                "name": name.strip() if name is not None else None,
+                "username": username,
+            },
+        )
+        problems: list[FieldError] = []
+        users = UserRepository(self.session)
+        if "email" in changed:
+            problems += email_error(changed["email"][1])
+            if await users.get_by_email(changed["email"][1]):
+                problems.append(
+                    FieldError(("body", "email"), "This email is already in use.", "taken")
+                )
+        if name is not None:
+            problems += required_error(name, field="name")
+        if "username" in changed:
+            problems += identifier_error(username_problem(changed["username"][1]), field="username")
+            if await users.get_by_username(changed["username"][1]):
+                problems.append(
+                    FieldError(("body", "username"), "This username is taken.", "taken")
+                )
+        if problems:
+            raise ValidationFailedError(problems)
+        return changed
+
+    async def _apply(self, user: User, changed: dict[str, tuple[str, str]]) -> None:
+        for key, (_, new) in changed.items():
+            setattr(user, key, new)
+        await self.session.flush()
+
+    async def update(
+        self, ctx: AuthzContext, subject: AccountSubject, values: UserUpdate
+    ) -> UserRow:
+        """An admin's change to a user's email, name, or username, under the rank rule: one
+        `user_updated` event (per covering org, DL-75); an email change ends the user's sessions
+        (`on_email_changed`). 422 `own_email` on one's own email (users can't change their own in
+        v1, design-doc §4)."""
+        user = subject.user
+        if (
+            values.email is not None
+            and user.id == ctx.user_id
+            and values.email.strip().lower() != user.email
+        ):
+            raise ValidationFailedError(
+                [FieldError(("body", "email"), "You can't change your own email.", "own_email")]
+            )
+        changed = await self._profile_changes(
+            user, email=values.email, name=values.name, username=values.username
+        )
+        if changed:
+            await self._apply(user, changed)
+            self.log_account_event(ctx, AuditAction.USER_UPDATED, subject, change_details(changed))
+            if "email" in changed:
+                for handler in _ON_EMAIL_CHANGED:
+                    await handler(self.session, user)
+        return self.row(ctx, subject)
+
+    async def update_own(self, user: User, values: OwnProfileUpdate) -> MeUser:
+        """The user's own name or username (`user_updated`)."""
+        changed = await self._profile_changes(
+            user, email=None, name=values.name, username=values.username
+        )
+        if changed:
+            await self._apply(user, changed)
+            log_admin_event(
+                self.session,
+                action=AuditAction.USER_UPDATED,
+                actor_id=user.id,
+                workspace_id=await self.workspace_of(user.id),
+                target_user_id=user.id,
+                details=change_details(changed),
+            )
+        return MeUser(id=user.id, email=user.email, username=user.username, name=user.name)
+
+    async def access_review(self, subject: AccountSubject) -> AccessReview:
+        """Every org and project the person reaches, and why (design-doc §5, "Access review"),
+        derived from their memberships as `authorize()` reads them."""
+        user = subject.user
+        seen = await UserRepository(self.session).reach(user.id, subject.workspace_id)
+        orgs: dict[uuid.UUID, set[AccessReason]] = defaultdict(set)
+        projects: dict[uuid.UUID, set[AccessReason]] = defaultdict(set)
+        workspace_reason = _WORKSPACE_REASONS.get(seen.workspace_role)  # pyright: ignore[reportArgumentType] -- None finds nothing
+        everywhere = [
+            *([AccessReason.SYSTEM_ADMIN] if user.is_system_admin else []),
+            *([workspace_reason] if workspace_reason else []),
+        ]
+        for reason in everywhere:
+            for org in seen.orgs:
+                orgs[org.id].add(reason)
+            for project in seen.projects:
+                projects[project.id].add(reason)
+        for org_id, role in seen.org_roles:
+            orgs[org_id].add(_ORG_REASONS[role])
+            if role in (OrgRole.OWNER, OrgRole.ADMIN):  # inherited project admin
+                for project in seen.projects:
+                    if project.organization_id == org_id:
+                        projects[project.id].add(_ORG_REASONS[role])
+        by_id = {project.id: project for project in seen.projects}
+        for project_id, role in seen.project_roles:
+            projects[project_id].add(_PROJECT_REASONS[role])
+            orgs[by_id[project_id].organization_id].add(AccessReason.PROJECT_MEMBERSHIP)
+        order = list(AccessReason)
+        return AccessReview(
+            user=AccessPerson(
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                name=user.name,
+                is_active=user.is_active,
+                is_system_admin=user.is_system_admin,
+                workspace_role=seen.workspace_role,
+            ),
+            orgs=[
+                OrgReach(
+                    id=o.id, name=o.name, slug=o.slug, reasons=sorted(orgs[o.id], key=order.index)
+                )
+                for o in sorted(seen.orgs, key=lambda o: o.name)
+                if o.id in orgs
+            ],
+            projects=[
+                ProjectReach(
+                    id=p.id,
+                    key=p.key,
+                    name=p.name,
+                    organization_id=p.organization_id,
+                    archived=p.archived_at is not None,
+                    reasons=sorted(projects[p.id], key=order.index),
+                )
+                for p in sorted(seen.projects, key=lambda p: p.key)
+                if p.id in projects
+            ],
+        )

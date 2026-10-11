@@ -1,5 +1,5 @@
-"""The action registry (build plan, "Authorization (§5)"; DL-44, DL-45, DL-56). No test-only
-action is registered in this module."""
+"""The action registry (build plan, "Authorization (§5)"; DL-44, DL-45, DL-56, DL-68, DL-73).
+No test-only action is registered in this module."""
 
 import pytest
 
@@ -8,9 +8,10 @@ from app.authz.actions import REGISTRY, Level
 pytestmark = pytest.mark.security
 
 
-def test_the_registry_holds_exactly_the_s1_c7_to_s1_c9_actions() -> None:
+def test_the_registry_holds_exactly_the_s1_c7_to_s1_c10_actions() -> None:
     """DL-44: each checkpoint registers its own area's actions; S1-C7 the four workspace-level
-    ones (DL-45), S1-C8 three more (DL-56), S1-C9 three more (DL-68)."""
+    ones (DL-45), S1-C8 three more (DL-56), S1-C9 three more (DL-68), S1-C10 two (DL-73; no
+    separate `user.reset_password`)."""
     assert sorted(REGISTRY) == [
         "org.create",
         "org.update",
@@ -18,6 +19,8 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c9_actions() -> None:
         "org_member.manage",
         "org_member.manage_admins",
         "user.check",
+        "user.manage",
+        "user.view_access",
         "workspace.update",
         "workspace.view",
         "workspace_staff.manage",
@@ -38,9 +41,12 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c9_actions() -> None:
         ("org_member.manage", Level.ORGANIZATION),
         ("org_member.manage_admins", Level.ORGANIZATION),
         ("user.check", Level.WORKSPACE),
+        ("user.manage", Level.USER),
+        ("user.view_access", Level.USER),
     ],
 )
 def test_each_real_action_is_registered_at_its_level(action: str, level: Level) -> None:
     """DL-45 and DL-56: `workspace_staff.manage_admins` is workspace-level (`/me` carries it);
-    `org.view` and `org.update` are at org level."""
+    `org.view` and `org.update` are at org level; DL-73: the account actions are on a user
+    target, at its own level."""
     assert REGISTRY[action].level is level

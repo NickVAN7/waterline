@@ -60,15 +60,22 @@ def _user(n: int) -> uuid.UUID:
     return uuid.UUID(int=1000 + n)
 
 
-# Who each persona is, relative to WS, ORG, and PROJ.
+# Who each persona is, relative to WS, ORG, and PROJ. Each org role carries its org's workspace
+# (`org_workspaces`), as the loaded context does (DL-68).
 PERSONAS: dict[str, AuthzContext] = {
     "system_admin": AuthzContext(user_id=_user(1), is_system_admin=True),
     "workspace_owner": AuthzContext(user_id=_user(2), workspace_roles={WS: WorkspaceRole.OWNER}),
     "workspace_admin": AuthzContext(user_id=_user(3), workspace_roles={WS: WorkspaceRole.ADMIN}),
     "workspace_member": AuthzContext(user_id=_user(4), workspace_roles={WS: WorkspaceRole.MEMBER}),
-    "org_owner": AuthzContext(user_id=_user(5), org_roles={ORG: OrgRole.OWNER}),
-    "org_admin": AuthzContext(user_id=_user(6), org_roles={ORG: OrgRole.ADMIN}),
-    "org_member": AuthzContext(user_id=_user(7), org_roles={ORG: OrgRole.MEMBER}),
+    "org_owner": AuthzContext(
+        user_id=_user(5), org_roles={ORG: OrgRole.OWNER}, org_workspaces={ORG: WS}
+    ),
+    "org_admin": AuthzContext(
+        user_id=_user(6), org_roles={ORG: OrgRole.ADMIN}, org_workspaces={ORG: WS}
+    ),
+    "org_member": AuthzContext(
+        user_id=_user(7), org_roles={ORG: OrgRole.MEMBER}, org_workspaces={ORG: WS}
+    ),
     "project_admin": AuthzContext(
         user_id=_user(8), projects={PROJ: ProjectAccess(ProjectRole.ADMIN, ORG, WS)}
     ),
@@ -83,7 +90,9 @@ PERSONAS: dict[str, AuthzContext] = {
         user_id=_user(11), projects={PROJ2: ProjectAccess(ProjectRole.ADMIN, ORG, WS)}
     ),
     # Owner of another org in the same workspace.
-    "other_org_owner": AuthzContext(user_id=_user(12), org_roles={ORG2: OrgRole.OWNER}),
+    "other_org_owner": AuthzContext(
+        user_id=_user(12), org_roles={ORG2: OrgRole.OWNER}, org_workspaces={ORG2: WS}
+    ),
     # Owner of another workspace.
     "other_workspace_owner": AuthzContext(
         user_id=_user(13), workspace_roles={WS2: WorkspaceRole.OWNER}

@@ -517,7 +517,8 @@ ALL_SIX = [
         ),
         # A test-only member-level workspace action is registered too: never listed.
         ("workspace_member", []),
-        ("org_owner", []),
+        # An owner of an org in the workspace may use the user check (DL-68's targeted rule).
+        ("org_owner", ["user.check"]),
         ("project_admin", ["user.check"]),
         ("other_workspace_owner", []),
         ("nobody", []),

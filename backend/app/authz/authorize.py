@@ -4,10 +4,11 @@ closed. Pure: it decides from the request's `AuthzContext` and the `Target`, nev
 from enum import StrEnum
 
 from app.authz.actions import REGISTRY, Action, Level
-from app.authz.context import AuthzContext
+from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target
 from app.core.errors import ForbiddenError, NotFoundError
 from app.enums import OrgRole, ProjectRole, WorkspaceRole
+from app.rules.account_rank import Account, in_scope
 
 # Each level's roles, lowest first: a role grants what every role below it does.
 _RANKS: dict[type[StrEnum], list[StrEnum]] = {
@@ -73,6 +74,14 @@ def authorize(ctx: AuthzContext, action: str, target: Target) -> bool:
 def can_see(ctx: AuthzContext, target: Target) -> bool:
     """Whether the target exists for this user (design-doc §4, "Visibility"); one they can't see
     is a 404, never a 403."""
+    if target.user_id is not None:
+        # A user: oneself, anyone for the workspace pages' audience, and otherwise a user with a
+        # membership in the actor's scope (DL-72).
+        return (
+            target.user_id == ctx.user_id
+            or _inherits_project_admin(ctx, target)
+            or (isinstance(target.entity, Account) and in_scope(rank_account(ctx), target.entity))
+        )
     if target.project_id is not None:
         return _project_access(ctx, target)
     if target.organization_id is not None:
@@ -96,6 +105,8 @@ def ensure(ctx: AuthzContext, action: str, target: Target) -> None:
 
 
 def _level(target: Target) -> Level:
+    if target.user_id is not None:
+        return Level.USER
     if target.project_id is not None:
         return Level.PROJECT
     if target.organization_id is not None:

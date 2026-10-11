@@ -45,6 +45,8 @@ class RosterRepository[M](Protocol):
 
     async def lock_owners(self, scope_id: uuid.UUID, /) -> list[uuid.UUID]: ...
 
+    async def active_owners(self, scope_id: uuid.UUID, /) -> list[uuid.UUID]: ...
+
 
 @dataclass(frozen=True)
 class RosterSpec[R: StrEnum]:
@@ -219,11 +221,12 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         return membership
 
     async def _guard_last_owner(self, membership: M, loc: tuple[str, ...]) -> None:
-        """Refuse to leave the roster with no owner: a 422 of type `last_owner` (DL-55)."""
+        """Refuse to leave the roster with no active owner: a 422 of type `last_owner` (DL-55,
+        DL-74). A deactivated owner doesn't count."""
         # Locked again, not the list `_member` locked: a handover that committed while this
         # request waited may have made someone an owner that the first list couldn't include.
-        owners = await self.repository.lock_owners(self.scope_id)
-        if owners == [membership.user_id]:
+        await self.repository.lock_owners(self.scope_id)
+        if await self.repository.active_owners(self.scope_id) == [membership.user_id]:
             raise ValidationFailedError([FieldError(loc, self.spec.needs_owner, "last_owner")])
 
     def _ensure_change(self, ctx: AuthzContext, membership: M, new_role: R | None) -> None:

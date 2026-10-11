@@ -324,6 +324,22 @@ async def test_the_last_owner_cant_be_demoted(
     assert await role_of(session, org, owner) is OrgRole.OWNER
 
 
+async def test_a_deactivated_org_owner_doesnt_count_as_another_owner(
+    client: AsyncClient, session: AsyncSession, org: Organization
+) -> None:
+    """Every last-owner guard counts active owners (DL-74)."""
+    owner = await signed_in(client, org)
+    await member(org, OrgRole.OWNER, is_active=False)
+
+    response = await client.delete(f"/api/orgs/{org.id}/members/{owner.id}")
+
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["path", "user_id"], "last_owner")],
+    )
+    assert await role_of(session, org, owner) == OrgRole.OWNER
+
+
 async def test_an_owner_can_be_demoted_while_another_owner_remains(
     client: AsyncClient, session: AsyncSession, org: Organization
 ) -> None:

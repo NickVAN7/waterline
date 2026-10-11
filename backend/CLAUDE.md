@@ -63,6 +63,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   Sign-in holds that row from a verified password until it commits, so the delete then sees
   (and removes) a session from a sign-in in flight. Each such path gets a concurrency test like
   `test_a_password_change_ends_a_sign_in_still_in_flight` (S1-C6 security review).
+- **A "nothing to change" check before a write reads the row under its lock** (lock or refresh
+  it first, then check): two requests at once otherwise both pass the check and record the change
+  twice (S1-C10 review: two deactivations, two events).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
 - **`app/authz/` never queries.** It decides from the `AuthzContext` and the `Target`; loading

@@ -1,5 +1,6 @@
 """What an action is taken on, as `authorize()` sees it: where the entity sits, and the facts
-the rules need (the project archived, its modules, the entity itself for a personal action)."""
+the rules need (the project archived, its modules, the entity itself for a personal action, a
+user's memberships for the rank rule)."""
 
 import uuid
 from dataclasses import dataclass, field
@@ -7,13 +8,15 @@ from dataclasses import dataclass, field
 from app.models.org import Organization
 from app.models.project import Project
 from app.models.workspace import Workspace
+from app.rules.account_rank import Account
 
 
 @dataclass(frozen=True)
 class Target:
     """`organization_id` is set for org- and project-level targets, `project_id` for project
     level (an entity inside a project is a project-level target). `archived` and
-    `enabled_modules` describe that project."""
+    `enabled_modules` describe that project. `user_id` is set for a user-level target (DL-73),
+    whose `entity` is the user's `Account` (their memberships, for the rank rule)."""
 
     workspace_id: uuid.UUID
     organization_id: uuid.UUID | None = None
@@ -21,6 +24,7 @@ class Target:
     archived: bool = False
     enabled_modules: frozenset[str] = field(default_factory=frozenset[str])
     entity: object = None
+    user_id: uuid.UUID | None = None
 
 
 def workspace_target(workspace: Workspace) -> Target:
@@ -44,3 +48,8 @@ def project_target(project: Project, entity: object = None) -> Target:
         enabled_modules=frozenset(project.enabled_modules),
         entity=entity,
     )
+
+
+def user_target(workspace_id: uuid.UUID, user_id: uuid.UUID, account: Account) -> Target:
+    """A user, in their workspace, with their memberships for the rank rule (DL-73)."""
+    return Target(workspace_id=workspace_id, user_id=user_id, entity=account)

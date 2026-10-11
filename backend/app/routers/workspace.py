@@ -11,7 +11,7 @@ from app.core.errors import ErrorBody
 from app.core.lists import Page
 from app.routers.deps import AuthzContextDep, authorized, load_workspace
 from app.schemas.org import OrgListItem
-from app.schemas.user import EmailCheck, UsernameSuggestion
+from app.schemas.user import EmailCheck, UsernameSuggestion, UserRow
 from app.schemas.workspace import (
     SlugAvailability,
     StaffAdd,
@@ -21,7 +21,7 @@ from app.schemas.workspace import (
     WorkspaceRead,
     WorkspaceUpdate,
 )
-from app.services.user import UserService
+from app.services.user import USERS, UserService
 from app.services.workspace import ORGS, STAFF, WorkspaceEntity, WorkspaceService
 
 router = APIRouter(prefix="/workspaces", tags=["workspace"])
@@ -44,6 +44,7 @@ StaffManaged = Annotated[
 UserCheckable = Annotated[WorkspaceEntity, Depends(authorized(load_workspace, Action.USER_CHECK))]
 StaffQuery = Annotated[STAFF.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 OrgQuery = Annotated[ORGS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+UserQuery = Annotated[USERS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
 @router.get("/{workspace_id}", responses=_ERRORS)
@@ -148,3 +149,12 @@ async def user_check(
     """Exactly one of `email` (whether an account has it, never whose), `username` (whether it's
     available), or `name` (an available username suggested from it); none or several is a 422."""
     return await UserService(session).check(email=email, username=username, name=name)
+
+
+@router.get("/{workspace_id}/users", responses=_ERRORS)
+async def list_users(
+    workspace: Viewed, query: UserQuery, ctx: AuthzContextDep, session: SessionDep
+) -> Page[UserRow]:
+    """Everyone with a membership in the workspace, and every account with none, each row with the
+    account actions the caller may take on it."""
+    return await UserService(session).list_users(ctx, workspace, query)

@@ -82,3 +82,8 @@ class AuthRepository:
         await self.session.execute(
             delete(UserSession).where(UserSession.user_id == user_id, UserSession.id != keep_id)
         )
+
+    async def delete_all(self, user_id: uuid.UUID) -> None:
+        """Delete every session of the user. The caller has updated or locked the user's row
+        first (backend/CLAUDE.md, "Ending a user's sessions")."""
+        await self.session.execute(delete(UserSession).where(UserSession.user_id == user_id))

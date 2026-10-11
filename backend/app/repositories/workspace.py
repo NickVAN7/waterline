@@ -89,3 +89,19 @@ class WorkspaceRepository:
                 .with_for_update()
             )
         )
+
+    async def active_owners(self, workspace_id: uuid.UUID) -> list[uuid.UUID]:
+        """The owners whose accounts are active (DL-74), read after `lock_owners`: every
+        last-owner guard counts these."""
+        return list(
+            await self.session.scalars(
+                select(WorkspaceMembership.user_id)
+                .join(User, WorkspaceMembership.user_id == User.id)
+                .where(
+                    WorkspaceMembership.workspace_id == workspace_id,
+                    WorkspaceMembership.role == WorkspaceRole.OWNER,
+                    User.is_active,
+                )
+                .order_by(WorkspaceMembership.user_id)
+            )
+        )

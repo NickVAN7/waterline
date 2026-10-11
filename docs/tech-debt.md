@@ -354,7 +354,7 @@ Entry format:
   and the error is in the library; chasing it would hold up the checkpoint without a lead.
 - **Fix by:** S1-C10 (if it recurs: pin or bump Hypothesis, or report it upstream; if it hasn't
   recurred by then, close it with that note).
-- **Status:** open
+- **Status:** resolved in S1-C10 (it didn't recur in S1-C8a to S1-C10: closed with that note)
 
 ### TD-25: A rare deadlock between a staff change and an owner being added
 - **Added:** S1-C8a
@@ -391,7 +391,9 @@ Entry format:
   take the owners' lock first, so a deactivation queues behind a handover.
 - **Why:** deactivation isn't built yet (S1-C10); the owner chose to build it there.
 - **Fix by:** S1-C10 (deactivation takes the owners' lock, with a race test against a handover).
-- **Status:** open
+- **Status:** resolved in S1-C10 (a deactivation locks the owners of every workspace and org the
+  user belongs to before its guard, proven by
+  `test_a_deactivation_queues_behind_a_handover_to_the_same_person`)
 
 ### TD-28: A user's name is one field, so username suggestions guess first and last names
 - **Added:** design change DL-66 (Oct 10, 2026)
@@ -403,4 +405,21 @@ Entry format:
   form that edits a name.
 - **Fix by:** Slice 7 (before the first non-local deployment, so no real accounts need their names
   split)
+- **Status:** open
+
+### TD-29: An account action's rank check reads the target's memberships without a lock
+- **Added:** S1-C10
+- **What:** `UserService.load` reads the target's memberships for the rank rule with no lock, so
+  a role grant committing between the check and the action's commit can raise the target above
+  the actor: an org admin's password reset could land on someone just made a workspace admin,
+  handing the org admin a temporary password for a higher-ranked account (S1-C10 security
+  review). The fix locks the target's user row before the memberships are read and makes every
+  workspace and org role grant (the roster's add, create, role change, and handover) lock the
+  same row, in one order with the owners' locks so a deactivation and a role change can't
+  deadlock; with a race test.
+- **Why:** the window is narrow and not attacker-controlled (the promotion is someone else's
+  action), each reset ends the target's sessions and is audited, and the lock order needs its own
+  design across the roster and the account actions.
+- **Fix by:** Slice 7 (before the first non-local deployment, with "password re-entry for
+  sensitive actions")
 - **Status:** open

@@ -4,8 +4,13 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C9 (Org members & user creation) done, in the review-tier trial; next is S1-C10
-> (Account actions & profile). An org's members work like the workspace's staff, through one shared
+> **Status:** S1-C10 (Account actions & profile) done, the last checkpoint of the `s1-workspace`
+> group; next is S1-C11 (Projects). Admins deactivate, reactivate, reset the password of, sign out
+> everywhere, and edit the email, name, and username of users under the rank rule
+> (`/api/users/{id}/…`, `user.manage`); users edit their own name and username (`PATCH /api/me`);
+> the workspace users list (`GET /api/workspaces/{id}/users`) and the per-person access review
+> (`GET /api/users/{id}/access`, `user.view_access`) are built (build plan, "The account API"). Every
+> last-owner guard counts active owners (DL-74). An org's members work like the workspace's staff, through one shared
 > roster (`app/services/roster.py`): email-first add, create, roles with the owner-only rule,
 > stepping down, removal, and the last owner's handover (`new_owner_id`). The user check
 > (`GET /api/workspaces/{id}/user-check`) answers whether an email has an account, whether a
@@ -317,6 +322,16 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
 - **The user check** (`GET /api/workspaces/{id}/user-check`, DL-66) answers one of `email`,
   `username`, or `name`; `suggest_username()` (`app/rules/identifiers.py`) builds the name's
   username, and `UserService.check` adds `-2`, `-3`, … while it's taken.
+- **Account actions** (DL-72, DL-73) take a user loaded by `load_user` (`app/routers/deps.py`):
+  an `AccountSubject` (the user, their workspace, and their memberships as the rank rule's
+  `Account`, from `UserRepository.accounts`). Deactivate, reset password, and sign out everywhere
+  are in `AuthService`; reactivate and profile edits in `UserService`. Record their events with
+  `UserService.log_account_event`, which writes one per covering org (DL-75). An email change ends
+  the user's sessions through the handler `auth` registers with `register_on_email_changed()`.
+- **Last-owner guards** count active owners (DL-74): lock the owners with `lock_owners`, then
+  compare `active_owners` (both on the workspace and org repositories). A deactivation locks the
+  owners of every workspace and org the user belongs to first, so it queues behind a handover
+  (TD-27).
 - **Update events** record `change_details(changed_fields(entity, values))`
   (`app/audit/admin_event.py`): `{"old": {...}, "new": {...}}`, the changed fields only.
 - **`ReservedSlug`** isn't returned by any route: `create_app` adds it to the OpenAPI schema's
@@ -366,14 +381,18 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
 - **The context** (`AuthzContext`): the user's system-admin flag and memberships (each org's
   workspace in `org_workspaces`; each project's org, workspace, and `archived` state), loaded once
   per request (`UserRepository.authz_context`; an endpoint takes `ctx: AuthzContextDep`).
-- **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)`.
+- **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)`, and
+  `user_target(workspace_id, user_id, account)` for a user (level `user`, DL-73), whose actions
+  apply the rank rule to `rank_account(ctx)` (`app/authz/context.py`). A user is seen by
+  themselves, the workspace's owners/admins and system admins, and anyone with a membership of
+  theirs in scope (`in_scope`, `app/rules/account_rank.py`); otherwise a 404.
 - **Checks:** `authorize(ctx, action, target)` → bool; `ensure(...)` raises 404 when the user
   can't see the target, 403 when they can but may not act; `allowed_actions(ctx, target)` for a
   single-entity read; `module_enabled(target, module)`.
 - **Endpoints on one entity** take `authorized(loader, action, module=...)`
   (`app/routers/deps.py`): `loader` is a dependency returning `(entity, target)` or None; the
   endpoint gets the entity only once the check passes (404 for missing or unseen, then the
-  module, then 403).
+  module, then 403). `hide_denial=True` makes every denial a 404 (the access review).
 - **Lists** scope their query: `project_scope(ctx)` / `org_scope(ctx)` give the `Scope`, and
   `scope_clause(scope, id_column, workspace_column, org_column)` (`app/repositories/base.py`)
   the `WHERE`.

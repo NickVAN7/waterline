@@ -86,3 +86,19 @@ class OrgRepository:
                 .with_for_update()
             )
         )
+
+    async def active_owners(self, org_id: uuid.UUID) -> list[uuid.UUID]:
+        """The owners whose accounts are active (DL-74), read after `lock_owners`: every
+        last-owner guard counts these."""
+        return list(
+            await self.session.scalars(
+                select(Membership.user_id)
+                .join(User, Membership.user_id == User.id)
+                .where(
+                    Membership.organization_id == org_id,
+                    Membership.role == OrgRole.OWNER,
+                    User.is_active,
+                )
+                .order_by(Membership.user_id)
+            )
+        )

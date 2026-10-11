@@ -10,9 +10,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from app.authz.context import AuthzContext
+from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target
 from app.enums import OrgRole, ProjectRole, WorkspaceRole
+from app.rules.account_rank import Account, can_manage_account
 
 
 class Level(StrEnum):
@@ -21,6 +22,7 @@ class Level(StrEnum):
     WORKSPACE = "workspace"
     ORGANIZATION = "organization"
     PROJECT = "project"
+    USER = "user"
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,8 @@ class Action(StrEnum):
     ORG_MEMBER_MANAGE = "org_member.manage"
     ORG_MEMBER_MANAGE_ADMINS = "org_member.manage_admins"
     USER_CHECK = "user.check"
+    USER_MANAGE = "user.manage"
+    USER_VIEW_ACCESS = "user.view_access"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -86,6 +90,18 @@ def _adds_people_in_workspace(ctx: AuthzContext, target: Target) -> bool:
         and not access.archived
         for access in ctx.projects.values()
     )
+
+
+def _outranks(ctx: AuthzContext, target: Target) -> bool:
+    """The rank rule (design-doc §4, "Account management"; DL-73) on a user target."""
+    return isinstance(target.entity, Account) and can_manage_account(
+        rank_account(ctx), target.entity
+    )
+
+
+def _self_or_outranks(ctx: AuthzContext, target: Target) -> bool:
+    """The access review's targeted rule: the user themselves, or the rank rule (DL-73)."""
+    return target.user_id == ctx.user_id or _outranks(ctx, target)
 
 
 REGISTRY: dict[str, ActionSpec] = {
@@ -119,5 +135,11 @@ REGISTRY: dict[str, ActionSpec] = {
         workspace_role=WorkspaceRole.ADMIN,
         mutation=False,
         rule=_adds_people_in_workspace,
+    ),
+    # Every account action and the admin profile edit: the rank rule only (DL-73).
+    Action.USER_MANAGE: ActionSpec(Level.USER, rule=_outranks),
+    # The per-person access review: workspace admins, and the user or the rank rule (DL-73).
+    Action.USER_VIEW_ACCESS: ActionSpec(
+        Level.USER, workspace_role=WorkspaceRole.ADMIN, mutation=False, rule=_self_or_outranks
     ),
 }

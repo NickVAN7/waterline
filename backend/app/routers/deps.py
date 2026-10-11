@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import Cookie, Depends, Request
 
-from app.authz.authorize import ensure, module_enabled
+from app.authz.authorize import authorize, ensure, module_enabled
 from app.authz.context import AuthzContext
 from app.authz.target import Target, org_target, workspace_target
 from app.core.db import SessionDep
@@ -16,6 +16,7 @@ from app.core.settings import Settings
 from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
 from app.services.org import OrgEntity, OrgService
+from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
 
 # `__Host-`: the browser only accepts it with `Secure`, `Path=/`, and no `Domain` (design-doc
@@ -76,6 +77,7 @@ def authorized[E](
     action: str,
     *,
     module: ProjectModule | None = None,
+    hide_denial: bool = False,
 ) -> Callable[..., Awaitable[E]]:
     """A dependency that loads an entity and authorizes `action` on it in one step, so an
     endpoint can't get the entity without the check (design-doc §5).
@@ -84,6 +86,8 @@ def authorized[E](
     the entity with its `Target`, or None when there's no such entity. A missing entity, or one
     the user can't see, is a 404; one they see but may not act on, a 403. With `module`, the
     target's project must have that module enabled, else 404, checked before `authorize()`.
+    With `hide_denial`, every denial is a 404, even on a target the user sees (the per-person
+    access review, DL-72).
     """
 
     # `ctx` first: FastAPI resolves dependencies in order, so the user is authenticated before
@@ -95,6 +99,8 @@ def authorized[E](
             raise NotFoundError
         entity, target = loaded
         if module is not None and not module_enabled(target, module):
+            raise NotFoundError
+        if hide_denial and not authorize(ctx, action, target):
             raise NotFoundError
         ensure(ctx, action, target)
         return entity
@@ -115,3 +121,7 @@ async def load_workspace(
 async def load_org(org_id: uuid.UUID, session: SessionDep) -> tuple[OrgEntity, Target] | None:
     org = await OrgService(session).get(org_id)
     return None if org is None else (org, org_target(org))
+
+
+async def load_user(user_id: uuid.UUID, session: SessionDep) -> tuple[UserEntity, Target] | None:
+    return await UserService(session).load(user_id)
