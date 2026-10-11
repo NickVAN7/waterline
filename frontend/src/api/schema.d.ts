@@ -577,6 +577,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Projects
+         * @description The org's projects the caller can open; archived ones only with `include_archived`.
+         */
+        get: operations["list_projects_api_orgs__org_id__projects_get"];
+        put?: never;
+        /**
+         * Create Project
+         * @description Create a project; its first admin (the caller, or `first_admin_id` with
+         *     `project.assign_first_admin`) becomes its lead. 422 on `key`: the key rule's problems or
+         *     `taken`; on `first_admin_id`: `account_inactive`.
+         */
+        post: operations["create_project_api_orgs__org_id__projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/project-key-availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Key Availability
+         * @description Whether `key`, uppercased, could be a new project's key in the workspace.
+         */
+        get: operations["project_key_availability_api_orgs__org_id__project_key_availability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Project
+         * @description The project, with the actions the caller may take on it.
+         */
+        get: operations["get_project_api_projects__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Project
+         * @description Change the project's details. 422 on `lead_id`: `not_member` or `account_inactive`.
+         */
+        patch: operations["update_project_api_projects__key__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Project
+         * @description Archive the project: read-only until unarchived.
+         */
+        post: operations["archive_project_api_projects__key__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Project
+         * @description Unarchive the project.
+         */
+        post: operations["unarchive_project_api_projects__key__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/module-guidance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Module Guidance
+         * @description Which modules each project type recommends, a note per module, and which have shipped.
+         */
+        get: operations["get_module_guidance_api_module_guidance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Work
+         * @description Every section, each with its first items and total.
+         */
+        get: operations["my_work_api_me_work_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/work/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Projects
+         * @description The projects the user can open, archived left out.
+         */
+        get: operations["my_projects_api_me_work_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -623,7 +793,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive";
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -695,6 +865,8 @@ export interface components {
             /** Slug */
             slug: string;
             role: components["schemas"]["OrgRole"] | null;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
         };
         /**
          * MeRead
@@ -794,6 +966,32 @@ export interface components {
             role: components["schemas"]["OrgRole"];
             /** New Owner Id */
             new_owner_id?: string | null;
+        };
+        /**
+         * ModuleGuidance
+         * @description Static guidance for module choice (design-doc §1.1; DL-76).
+         */
+        ModuleGuidance: {
+            /** Modules */
+            modules: components["schemas"]["ModuleNote"][];
+            /** Types */
+            types: components["schemas"]["TypeRecommendation"][];
+        };
+        /** ModuleNote */
+        ModuleNote: {
+            /** Module */
+            module: string;
+            /** Note */
+            note: string;
+            /** Available */
+            available: boolean;
+        };
+        /**
+         * MyWork
+         * @description `GET /api/me/work` (design-doc §11; DL-76): every section in one response.
+         */
+        MyWork: {
+            sections: components["schemas"]["WorkSections"];
         };
         /**
          * NewUser
@@ -917,6 +1115,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[ProjectItem] */
+        Page_ProjectItem_: {
+            /** Items */
+            items: components["schemas"]["ProjectItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[StaffRead] */
         Page_StaffRead_: {
             /** Items */
@@ -947,6 +1156,56 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * ProjectCreate
+         * @description A new project in an org (DL-76). Without `enabled_modules`, it's seeded from the type.
+         */
+        ProjectCreate: {
+            /** Name */
+            name: string;
+            /** Key */
+            key: string;
+            type: components["schemas"]["ProjectType"];
+            /** Description */
+            description?: string | null;
+            /** Enabled Modules */
+            enabled_modules?: components["schemas"]["ProjectModule"][] | null;
+            /** First Admin Id */
+            first_admin_id?: string | null;
+        };
+        /**
+         * ProjectItem
+         * @description A project in a list: the org's projects, and My work's projects section.
+         */
+        ProjectItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            type: components["schemas"]["ProjectType"];
+            status: components["schemas"]["ProjectStatus"];
+            /** Lead Id */
+            lead_id: string | null;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Organization Slug */
+            organization_slug: string;
+        };
+        /**
+         * ProjectModule
+         * @description Modules a project may enable. Only shipped-or-v1 modules are allowed values; each v2
+         *     module is added (with the `enabled_modules` CHECK) when it ships (schema-doc, `project`).
+         * @enum {string}
+         */
+        ProjectModule: "sprints" | "github";
         /** ProjectReach */
         ProjectReach: {
             /**
@@ -967,6 +1226,63 @@ export interface components {
             archived: boolean;
             /** Reasons */
             reasons: components["schemas"]["AccessReason"][];
+        };
+        /** ProjectRead */
+        ProjectRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            type: components["schemas"]["ProjectType"];
+            status: components["schemas"]["ProjectStatus"];
+            /** Lead Id */
+            lead_id: string | null;
+            /** Enabled Modules */
+            enabled_modules: components["schemas"]["ProjectModule"][];
+            /** Archived */
+            archived: boolean;
+            /** Modules Holding Data */
+            modules_holding_data: components["schemas"]["ProjectModule"][];
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * ProjectStatus
+         * @enum {string}
+         */
+        ProjectStatus: "planning" | "active" | "on_hold" | "completed" | "cancelled";
+        /**
+         * ProjectType
+         * @enum {string}
+         */
+        ProjectType: "software" | "erp" | "general";
+        /**
+         * ProjectUpdate
+         * @description Only the fields sent change; `lead_id: null` clears the lead. The key never changes.
+         */
+        ProjectUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            type?: components["schemas"]["ProjectType"] | null;
+            status?: components["schemas"]["ProjectStatus"] | null;
+            /** Lead Id */
+            lead_id?: string | null;
+            /** Enabled Modules */
+            enabled_modules?: components["schemas"]["ProjectModule"][] | null;
         };
         /** SignInRequest */
         SignInRequest: {
@@ -1037,6 +1353,12 @@ export interface components {
             /** New Owner Id */
             new_owner_id?: string | null;
         };
+        /** TypeRecommendation */
+        TypeRecommendation: {
+            type: components["schemas"]["ProjectType"];
+            /** Recommended */
+            recommended: string[];
+        };
         /**
          * UserRow
          * @description A user as the workspace users list shows them (DL-72), with the account actions the caller
@@ -1093,6 +1415,25 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkSection[ProjectItem] */
+        WorkSection_ProjectItem_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ProjectItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** WorkSections */
+        WorkSections: {
+            projects: components["schemas"]["WorkSection_ProjectItem_"];
         };
         /** WorkspaceRead */
         WorkspaceRead: {
@@ -3010,6 +3351,573 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_projects_api_orgs__org_id__projects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: key, name. Default: name */
+                sort?: string | null;
+                status?: components["schemas"]["ProjectStatus"][] | null;
+                status__not?: components["schemas"]["ProjectStatus"][] | null;
+                status__is_null?: boolean | null;
+                type?: components["schemas"]["ProjectType"][] | null;
+                type__not?: components["schemas"]["ProjectType"][] | null;
+                type__is_null?: boolean | null;
+                include_archived?: boolean;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ProjectItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_project_api_orgs__org_id__projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    project_key_availability_api_orgs__org_id__project_key_availability_get: {
+        parameters: {
+            query: {
+                key: string;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlugAvailability"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_project_api_projects__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_project_api_projects__key__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    archive_project_api_projects__key__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    unarchive_project_api_projects__key__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_module_guidance_api_module_guidance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleGuidance"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_work_api_me_work_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyWork"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_projects_api_me_work_projects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: key, name. Default: name */
+                sort?: string | null;
+                status?: components["schemas"]["ProjectStatus"][] | null;
+                status__not?: components["schemas"]["ProjectStatus"][] | null;
+                status__is_null?: boolean | null;
+                type?: components["schemas"]["ProjectType"][] | null;
+                type__not?: components["schemas"]["ProjectType"][] | null;
+                type__is_null?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ProjectItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -71,6 +71,12 @@ class Action(StrEnum):
     USER_CHECK = "user.check"
     USER_MANAGE = "user.manage"
     USER_VIEW_ACCESS = "user.view_access"
+    PROJECT_CREATE = "project.create"
+    PROJECT_ASSIGN_FIRST_ADMIN = "project.assign_first_admin"
+    PROJECT_VIEW = "project.view"
+    PROJECT_UPDATE = "project.update"
+    PROJECT_ARCHIVE = "project.archive"
+    PROJECT_UNARCHIVE = "project.unarchive"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -141,5 +147,37 @@ REGISTRY: dict[str, ActionSpec] = {
     # The per-person access review: workspace admins, and the user or the rank rule (DL-73).
     Action.USER_VIEW_ACCESS: ActionSpec(
         Level.USER, workspace_role=WorkspaceRole.ADMIN, mutation=False, rule=_self_or_outranks
+    ),
+    # Any org member, and the admins above (§5 Org roles; DL-77).
+    Action.PROJECT_CREATE: ActionSpec(
+        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.MEMBER
+    ),
+    # Naming someone else as a new project's first admin: org owners/admins and above (DL-77).
+    Action.PROJECT_ASSIGN_FIRST_ADMIN: ActionSpec(
+        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.ADMIN
+    ),
+    # Project roles, and inherited project admin (§5; DL-77).
+    Action.PROJECT_VIEW: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.VIEWER,
+        mutation=False,
+    ),
+    Action.PROJECT_UPDATE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    # The org's owners/admins and above, not a project admin by role alone (§5 Org roles).
+    Action.PROJECT_ARCHIVE: ActionSpec(
+        Level.PROJECT, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.ADMIN
+    ),
+    Action.PROJECT_UNARCHIVE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        archive_exempt=True,
     ),
 }

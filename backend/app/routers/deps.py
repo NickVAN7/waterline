@@ -16,6 +16,7 @@ from app.core.settings import Settings
 from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
 from app.services.org import OrgEntity, OrgService
+from app.services.project import ProjectEntity, ProjectService
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
 
@@ -125,3 +126,7 @@ async def load_org(org_id: uuid.UUID, session: SessionDep) -> tuple[OrgEntity, T
 
 async def load_user(user_id: uuid.UUID, session: SessionDep) -> tuple[UserEntity, Target] | None:
     return await UserService(session).load(user_id)
+
+
+async def load_project(key: str, session: SessionDep) -> tuple[ProjectEntity, Target] | None:
+    return await ProjectService(session).load(key)

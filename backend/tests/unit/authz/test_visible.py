@@ -131,7 +131,7 @@ def test_a_visible_read_in_an_archived_project_is_still_granted(
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("org_member", ["org.view"]),
+        ("org_member", ["org.view", "project.create"]),
         ("project_viewer", ["org.view"]),
         ("workspace_member", []),
         ("nobody", []),
@@ -141,7 +141,8 @@ def test_allowed_actions_includes_a_real_action_granted_only_by_visible(
     persona: str, expected: list[str]
 ) -> None:
     """`org.view` is the real visible action (DL-56); these personas hold no role granting any
-    other org-level action, and test-only actions are never listed."""
+    other org-level action but an org member's `project.create` (DL-77), and test-only actions
+    are never listed."""
     assert allowed_actions(PERSONAS[persona], ORG_TARGET) == expected
 
 

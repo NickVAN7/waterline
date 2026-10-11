@@ -236,7 +236,7 @@ Entry format:
 - **Why:** The journey-decision pass was docs-only; no code or configuration changed.
 - **Fix by:** S1-C11 (when the `my_work` area is built): add `(my_work)` to the contract's
   layer-1 entry.
-- **Status:** open
+- **Status:** resolved in S1-C11 (`(my_work)` is in the layer-1 entry)
 
 ### TD-17: The app connects as the owner of its tables
 - **Added:** S1-C1 (security review of the append-only follow-up)
@@ -422,4 +422,18 @@ Entry format:
   design across the roster and the account actions.
 - **Fix by:** Slice 7 (before the first non-local deployment, with "password re-entry for
   sensitive actions")
+- **Status:** open
+
+### TD-30: Older race tests assert inside their task group
+- **Added:** S1-C11
+- **What:** several race tests (in `tests/integration/services/`: the workspace, org, and account
+  concurrency files, e.g. `test_a_deactivation_queues_behind_a_handover_to_the_same_person`) put
+  `pytest.raises` inside the task that waits on a lock. When the code regresses, that failure
+  stops the holding transaction's commit, the `concurrency` fixture's cleanup can't run, and the
+  committed rows break dozens of unrelated tests in the next run (S1-C11 checkpoint review). The
+  fix records the outcome inside the task and asserts after the task group closes, as
+  `test_an_update_waiting_on_an_archive_is_denied` does.
+- **Why:** the tests are correct while the code is; only a regression's report is noisy, and the
+  change touches earlier checkpoints' tests.
+- **Fix by:** S1-C12 (it adds the project-member race tests; convert the older ones with them)
 - **Status:** open

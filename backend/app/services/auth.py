@@ -9,7 +9,7 @@ from app.audit.admin_event import log_admin_event
 from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext
 from app.authz.scoping import org_scope
-from app.authz.target import workspace_target
+from app.authz.target import org_target, workspace_target
 from app.core.errors import (
     FieldError,
     ForbiddenError,
@@ -239,7 +239,16 @@ class AuthService:
                 )
                 for w, role in workspaces
             ],
-            orgs=[MeOrg(id=o.id, name=o.name, slug=o.slug, role=role) for o, role in orgs],
+            orgs=[
+                MeOrg(
+                    id=o.id,
+                    name=o.name,
+                    slug=o.slug,
+                    role=role,
+                    allowed_actions=allowed_actions(ctx, org_target(o)),
+                )
+                for o, role in orgs
+            ],
         )
 
     async def deactivate(self, ctx: AuthzContext, subject: AccountSubject) -> None:

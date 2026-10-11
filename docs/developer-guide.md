@@ -4,8 +4,11 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C10 (Account actions & profile) done, the last checkpoint of the `s1-workspace`
-> group; next is S1-C11 (Projects). Admins deactivate, reactivate, reset the password of, sign out
+> **Status:** S1-C11 (Projects) done; next is S1-C12 (Project members). Projects are created in an
+> org (`POST /api/orgs/{id}/projects`, the first admin becoming the lead), listed, read and updated
+> at `/api/projects/{key}`, archived and unarchived; `GET /api/module-guidance` and My work's
+> projects section (`GET /api/me/work`) are built (build plan, "The projects API"). S1-C10 (Account
+> actions & profile) closed the `s1-workspace` group. Admins deactivate, reactivate, reset the password of, sign out
 > everywhere, and edit the email, name, and username of users under the rank rule
 > (`/api/users/{id}/…`, `user.manage`); users edit their own name and username (`PATCH /api/me`);
 > the workspace users list (`GET /api/workspaces/{id}/users`) and the per-person access review
@@ -328,6 +331,18 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   are in `AuthService`; reactivate and profile edits in `UserService`. Record their events with
   `UserService.log_account_event`, which writes one per covering org (DL-75). An email change ends
   the user's sessions through the handler `auth` registers with `register_on_email_changed()`.
+- **Projects** (`app/services/project.py`, DL-76): a key is normalized with
+  `normalize_project_key` (create, the availability check, and the by-key loader `load_project`);
+  a taken key is the unique constraint's 422. Update, archive, and unarchive lock the project row
+  first (`ProjectRepository.lock`) and check again, so an archive committing meanwhile still
+  denies an update. Modules come from `app/rules/modules.py`: the
+  type's seed (`seed_modules`), its recommendations, and which modules have shipped (`_SHIPPED`;
+  a module's slice adds itself there). The project list's `ListSpec` (`PROJECTS`) and row mapping
+  (`item`) live in `app/services/my_work.py`, the lower layer, so the project area can share them;
+  an endpoint with other query parameters besides a list's extends its query model
+  (`OrgProjectQuery`), since FastAPI reads a query model only as the sole query parameter.
+- **My work** (`app/services/my_work.py`): each section's query runs in a savepoint and a
+  database error marks it `available: false` (the one sanctioned savepoint-and-continue).
 - **Last-owner guards** count active owners (DL-74): lock the owners with `lock_owners`, then
   compare `active_owners` (both on the workspace and org repositories). A deactivation locks the
   owners of every workspace and org the user belongs to first, so it queues behind a handover

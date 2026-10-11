@@ -1,6 +1,8 @@
 """`/me`'s workspace entries (build plan, "Authentication (§4)", `/me`; DL-45: each entry's
 workspace-level `allowed_actions`, with DL-56's `workspace_staff.manage_admins`; DL-46: a system
-admin sees every workspace, with a null role where they aren't staff)."""
+admin sees every workspace, with a null role where they aren't staff). Each org entry carries
+that org's `allowed_actions` (DL-76, DL-77: `project.create` and `project.assign_first_admin`
+among them, for the create-project dialog)."""
 
 from typing import Any
 
@@ -11,7 +13,7 @@ from app.enums import OrgRole, WorkspaceRole
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
-from tests.support.authz import sign_in_as
+from tests.support.authz import persona_user, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
 
@@ -118,4 +120,54 @@ async def test_other_users_see_only_the_workspaces_they_are_staff_of(
 
     assert [(w["id"], w["role"], w["allowed_actions"]) for w in await my_workspaces(client)] == [
         (str(acme.id), "member", [])
+    ]
+
+
+# --- Each org entry's allowed_actions (DL-76, DL-77) ---------------------------------------------
+
+ALL_ORG_LEVEL = [
+    "org.update",
+    "org.view",
+    "org_member.manage",
+    "org_member.manage_admins",
+    "project.assign_first_admin",
+    "project.create",
+]
+
+
+@pytest.mark.parametrize(
+    ("who", "role", "expected"),
+    [
+        ("system_admin", None, ALL_ORG_LEVEL),
+        ("workspace_owner", None, ALL_ORG_LEVEL),
+        ("workspace_admin", None, ALL_ORG_LEVEL),
+        ("org_owner", "owner", ALL_ORG_LEVEL),
+        (
+            "org_admin",
+            "admin",
+            ["org.view", "org_member.manage", "project.assign_first_admin", "project.create"],
+        ),
+        ("org_member", "member", ["org.view", "project.create"]),
+        # A project-only link shows the org but grants no project creation in it.
+        ("project_admin", None, ["org.view"]),
+        ("project_viewer", None, ["org.view"]),
+    ],
+)
+async def test_each_org_entry_carries_that_orgs_actions(
+    client: AsyncClient, who: str, role: str | None, expected: list[str]
+) -> None:
+    t = await tenancy()
+    await sign_in_as(client, await persona_user(t, who))
+
+    response = await client.get("/api/auth/me")
+
+    assert response.status_code == 200, response.text
+    assert [o for o in response.json()["orgs"] if o["slug"] == "bolt-foods"] == [
+        {
+            "id": str(t.org.id),
+            "name": "Bolt Foods",
+            "slug": "bolt-foods",
+            "role": role,
+            "allowed_actions": expected,
+        }
     ]

@@ -58,24 +58,28 @@ def assert_forbidden(response: Response) -> None:
 # --- GET /api/orgs/{id} (org.view) --------------------------------------------------------------
 
 
+ALL_ORG_LEVEL = [
+    "org.update",
+    "org.view",
+    "org_member.manage",
+    "org_member.manage_admins",
+    "project.assign_first_admin",
+    "project.create",
+]
+
+
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
+        ("system_admin", ALL_ORG_LEVEL),
+        ("workspace_owner", ALL_ORG_LEVEL),
+        ("workspace_admin", ALL_ORG_LEVEL),
+        ("org_owner", ALL_ORG_LEVEL),
         (
-            "system_admin",
-            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
+            "org_admin",
+            ["org.view", "org_member.manage", "project.assign_first_admin", "project.create"],
         ),
-        (
-            "workspace_owner",
-            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
-        ),
-        (
-            "workspace_admin",
-            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
-        ),
-        ("org_owner", ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"]),
-        ("org_admin", ["org.view", "org_member.manage"]),
-        ("org_member", ["org.view"]),
+        ("org_member", ["org.view", "project.create"]),
         ("project_viewer", ["org.view"]),
         ("other_project_admin", ["org.view"]),
     ],

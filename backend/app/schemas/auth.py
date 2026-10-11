@@ -47,6 +47,7 @@ class MeOrg(BaseModel):
     name: str
     slug: str
     role: OrgRole | None
+    allowed_actions: list[Action]
 
 
 class MeRead(BaseModel):

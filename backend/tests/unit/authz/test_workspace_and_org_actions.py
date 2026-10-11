@@ -91,27 +91,30 @@ def test_ensure_lets_anyone_who_sees_the_org_view_it(persona: str) -> None:
     assert ensure(PERSONAS[persona], "org.view", ORG_TARGET) is None
 
 
-# --- allowed_actions on an org (build plan, "API conventions"; DL-56) ---------------------------
+# --- allowed_actions on an org (build plan, "API conventions"; DL-56, DL-68, DL-77) -------------
+
+ALL_ORG_LEVEL = [
+    "org.update",
+    "org.view",
+    "org_member.manage",
+    "org_member.manage_admins",
+    "project.assign_first_admin",
+    "project.create",
+]
 
 
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
+        ("system_admin", ALL_ORG_LEVEL),
+        ("workspace_owner", ALL_ORG_LEVEL),
+        ("workspace_admin", ALL_ORG_LEVEL),
+        ("org_owner", ALL_ORG_LEVEL),
         (
-            "system_admin",
-            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
+            "org_admin",
+            ["org.view", "org_member.manage", "project.assign_first_admin", "project.create"],
         ),
-        (
-            "workspace_owner",
-            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
-        ),
-        (
-            "workspace_admin",
-            ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"],
-        ),
-        ("org_owner", ["org.update", "org.view", "org_member.manage", "org_member.manage_admins"]),
-        ("org_admin", ["org.view", "org_member.manage"]),
-        ("org_member", ["org.view"]),
+        ("org_member", ["org.view", "project.create"]),
         ("project_viewer", ["org.view"]),
         ("other_project_admin", ["org.view"]),
         ("workspace_member", []),

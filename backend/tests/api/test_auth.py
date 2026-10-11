@@ -374,7 +374,19 @@ async def test_me_lists_workspaces_and_orgs_with_roles(
         }
     ]
     assert body["orgs"] == [
-        {"id": str(org.id), "name": "Bolt Foods", "slug": "bolt", "role": "admin"}
+        {
+            "id": str(org.id),
+            "name": "Bolt Foods",
+            "slug": "bolt",
+            "role": "admin",
+            # The org's own actions (DL-76, DL-77).
+            "allowed_actions": [
+                "org.view",
+                "org_member.manage",
+                "project.assign_first_admin",
+                "project.create",
+            ],
+        }
     ]
 
 

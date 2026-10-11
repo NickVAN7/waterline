@@ -164,7 +164,10 @@ Calls flow **routers → services → repositories → models**. Services also u
   stubs and never changed without the owner's approval; a sabotage check elsewhere; mutation
   testing on `rules/` and `authz/` from Slice 1).
 - Real Postgres, never mocks or SQLite. Each test rolls back via savepoint; concurrency tests
-  use the `concurrency` fixture and `@pytest.mark.concurrency("<table>", ...)`. Tests only
+  use the `concurrency` fixture and `@pytest.mark.concurrency("<table>", ...)`. In a race test, a task
+  running inside the task group records its outcome and the test asserts after the group closes:
+  a failure inside the group stops the other transaction's commit and leaves rows that break later
+  tests (S1-C11 review; TD-30). Tests only
   ever use the test database (`waterline_test`, or a `scratch_database` created from it for one
   test); never point a test at the dev database.
 - Every test that calls `create_app` passes `sessionmaker=` (the test transaction), or points
