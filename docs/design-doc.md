@@ -108,7 +108,8 @@ per kind of project.
     must hold a `project_membership` on the project (naming anyone else is a 422 field error),
     and defaults to the project's first admin (§5, "Org roles"). Removing the lead's project
     membership (by any path, §4, including in an archived project, as part of removal "with
-    their projects") clears `lead_id` in the same transaction, recorded in the
+    their projects") clears `lead_id` in the same transaction (a project admin may also clear it,
+    DL-76), recorded in the
     `project_member_removed` event's details and, from Slice 2, as a `lead_id` change in the
     project activity feed (§10); the UI flags a project with no lead. A
     deactivated lead stays the lead and is shown with the "deactivated" badge (§4), for a

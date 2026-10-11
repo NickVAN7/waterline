@@ -986,3 +986,30 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan ("The account API", the S1-C13 and S1-C15 rows, the workspace admin
   pages); design-doc §10.1 ("Profile edits"); schema-doc (`audit_event` action values)
 - **Source:** chat session (owner, Oct 11, 2026; docs-consistency decisions on DL-72)
+
+### DL-76: The projects API (S1-C11)
+- **Date:** 2026-10-11
+- **Decision:** S1-C11's endpoints, payloads, and errors as listed in the build plan ("The
+  projects API"): create in an org (with an optional `first_admin_id`), the org's project list,
+  key availability, the project read (with `allowed_actions` and `modules_holding_data`), the
+  update, archive and unarchive, static module guidance (`GET /api/module-guidance`), and My
+  work's projects section; `/me`'s org entries carry their `allowed_actions`. Create seeds the
+  type's v1 modules (design-doc §1.1) unless it's given `enabled_modules`; the lead may be cleared;
+  naming a deactivated first admin or lead is a 422 `account_inactive`; the key check uppercases as
+  create does; My work's shape is `{sections: {projects: {available, items, total}}}`, 10 items
+  each (docs-consistency decisions, Oct 11, 2026).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the projects API; the S1-C11 and S1-C16 rows); design-doc
+  §1.1 (the lead); schema-doc (`project.lead_id`)
+- **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C11)
+
+### DL-77: Six project actions (S1-C11)
+- **Date:** 2026-10-11
+- **Decision:** `project.create`, `project.assign_first_admin` (org level); `project.view`,
+  `project.update`, `project.archive`, `project.unarchive` (project level), granted as the build
+  plan lists ("The project actions"), from design-doc §5's role tables.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the project actions; the S1-C11 row); `app/authz/`
+- **Source:** chat session (owner, Oct 11, 2026, with DL-76)
