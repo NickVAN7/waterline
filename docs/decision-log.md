@@ -913,3 +913,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the feature map; the S1-C12 row); `backend/pyproject.toml` (the layers contract); developer
   guide
 - **Source:** chat session (owner, Oct 11, 2026; S1-C9 checkpoint review finding)
+
+### DL-71: Project members use the roster for adding and removal only
+- **Date:** 2026-10-11
+- **Decision:** From S1-C12, project members go through the roster (DL-70) for the email-first add,
+  the create, the lock order, and the `on_member_removed` hook only. Projects have no owner role,
+  so there is no last-admin guard, handover, or stepping-down rule for them.
+- **Supersedes:** none (narrows how DL-70 applies to project members)
+- **Superseded by:** none
+- **Applies to:** build plan (the feature map's `project` and `roster` rows, the service layer
+  table, the S1-C12 row)
+- **Source:** chat session (owner, Oct 11, 2026; docs-consistency question after DL-70)
