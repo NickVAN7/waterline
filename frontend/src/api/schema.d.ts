@@ -687,6 +687,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Members
+         * @description The project's explicit memberships, each row with the actions the caller may take on it.
+         */
+        get: operations["list_project_members_api_projects__key__members_get"];
+        put?: never;
+        /**
+         * Add Project Member
+         * @description Add someone by `user_id` (the picker; anyone else is a 404) or by `email` (422 on `email`:
+         *     `already_member`, `no_account`, `account_inactive`, or `outside_org` unless `join_org`).
+         */
+        post: operations["add_project_member_api_projects__key__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/member-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Member Candidates
+         * @description The picker: the org's members and the workspace's staff not yet on the project.
+         */
+        get: operations["project_member_candidates_api_projects__key__member_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/members/new": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Project Member
+         * @description Create the account, its org membership, and the project membership in one step; the
+         *     user must change the temporary password at their first sign-in.
+         */
+        post: operations["create_project_member_api_projects__key__members_new_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Project Member
+         * @description Remove a member; removing the lead clears the project's lead.
+         */
+        delete: operations["remove_project_member_api_projects__key__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Change Project Member Role
+         * @description Change a member's role.
+         */
+        patch: operations["change_project_member_role_api_projects__key__members__user_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Access Review
+         * @description Everyone who reaches the project, and why (design-doc §5, "Access review").
+         */
+        get: operations["project_access_review_api_projects__key__access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/module-guidance": {
         parameters: {
             query?: never;
@@ -793,7 +903,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access";
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -924,6 +1034,23 @@ export interface components {
             /** Email */
             email: string;
             role: components["schemas"]["OrgRole"];
+        };
+        /**
+         * MemberCandidate
+         * @description Someone the picker offers: an org member or staff member not yet on the project.
+         */
+        MemberCandidate: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Username */
+            username: string;
+            /** Name */
+            name: string;
         };
         /** MemberCreate */
         MemberCreate: {
@@ -1093,6 +1220,17 @@ export interface components {
             /** Username */
             username?: string | null;
         };
+        /** Page[MemberCandidate] */
+        Page_MemberCandidate_: {
+            /** Items */
+            items: components["schemas"]["MemberCandidate"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[MemberRead] */
         Page_MemberRead_: {
             /** Items */
@@ -1119,6 +1257,17 @@ export interface components {
         Page_ProjectItem_: {
             /** Items */
             items: components["schemas"]["ProjectItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ProjectMemberRead] */
+        Page_ProjectMemberRead_: {
+            /** Items */
+            items: components["schemas"]["ProjectMemberRead"][];
             /** Total */
             total: number;
             /** Limit */
@@ -1155,6 +1304,41 @@ export interface components {
         PasswordReset: {
             /** Password */
             password: string;
+        };
+        /**
+         * ProjectAccessEntry
+         * @description One person who reaches the project: their explicit role, if any, and why they reach it.
+         */
+        ProjectAccessEntry: {
+            user: components["schemas"]["ProjectAccessUser"];
+            role: components["schemas"]["ProjectRole"] | null;
+            /** Reasons */
+            reasons: components["schemas"]["AccessReason"][];
+        };
+        /**
+         * ProjectAccessReview
+         * @description The per-project access review (design-doc §5; DL-78): everyone who reaches the project,
+         *     sorted by name.
+         */
+        ProjectAccessReview: {
+            /** People */
+            people: components["schemas"]["ProjectAccessEntry"][];
+        };
+        /** ProjectAccessUser */
+        ProjectAccessUser: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Username */
+            username: string;
+            /** Name */
+            name: string;
+            /** Is Active */
+            is_active: boolean;
         };
         /**
          * ProjectCreate
@@ -1198,6 +1382,60 @@ export interface components {
             organization_id: string;
             /** Organization Slug */
             organization_slug: string;
+        };
+        /**
+         * ProjectMemberAdd
+         * @description Exactly one of `user_id` (from the picker) and `email` (email first, design-doc §4).
+         *     `join_org` confirms adding an account from outside the org and the staff to the org too
+         *     (DL-78).
+         */
+        ProjectMemberAdd: {
+            role: components["schemas"]["ProjectRole"];
+            /** User Id */
+            user_id?: string | null;
+            /** Email */
+            email?: string | null;
+            /**
+             * Join Org
+             * @default false
+             */
+            join_org: boolean;
+        };
+        /** ProjectMemberCreate */
+        ProjectMemberCreate: {
+            /** Email */
+            email: string;
+            /** Username */
+            username: string;
+            /** Name */
+            name: string;
+            /** Password */
+            password: string;
+            role: components["schemas"]["ProjectRole"];
+        };
+        /**
+         * ProjectMemberRead
+         * @description An explicit project membership, with the actions the caller may take on this row.
+         */
+        ProjectMemberRead: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Username */
+            username: string;
+            /** Name */
+            name: string;
+            role: components["schemas"]["ProjectRole"];
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /** ProjectMemberRoleUpdate */
+        ProjectMemberRoleUpdate: {
+            role: components["schemas"]["ProjectRole"];
         };
         /**
          * ProjectModule
@@ -1258,6 +1496,11 @@ export interface components {
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
+        /**
+         * ProjectRole
+         * @enum {string}
+         */
+        ProjectRole: "admin" | "member" | "viewer";
         /**
          * ProjectStatus
          * @enum {string}
@@ -3754,6 +3997,438 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_project_members_api_projects__key__members_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: email, name. Default: name */
+                sort?: string | null;
+                role?: components["schemas"]["ProjectRole"][] | null;
+                role__not?: components["schemas"]["ProjectRole"][] | null;
+                role__is_null?: boolean | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ProjectMemberRead_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    add_project_member_api_projects__key__members_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectMemberAdd"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMemberRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    project_member_candidates_api_projects__key__member_candidates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberCandidate_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_project_member_api_projects__key__members_new_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectMemberCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMemberRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    remove_project_member_api_projects__key__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    change_project_member_role_api_projects__key__members__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectMemberRoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMemberRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    project_access_review_api_projects__key__access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAccessReview"];
+                };
             };
             /** @description Unauthorized */
             401: {

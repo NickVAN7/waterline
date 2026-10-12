@@ -77,6 +77,8 @@ class Action(StrEnum):
     PROJECT_UPDATE = "project.update"
     PROJECT_ARCHIVE = "project.archive"
     PROJECT_UNARCHIVE = "project.unarchive"
+    PROJECT_MEMBER_MANAGE = "project_member.manage"
+    PROJECT_VIEW_ACCESS = "project.view_access"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -179,5 +181,20 @@ REGISTRY: dict[str, ActionSpec] = {
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         archive_exempt=True,
+    ),
+    # Project admins, inherited included (§5; DL-79): a mutation, so an archived project denies it.
+    Action.PROJECT_MEMBER_MANAGE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    # The per-project access review: the same people, an archived project included (DL-79).
+    Action.PROJECT_VIEW_ACCESS: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        mutation=False,
     ),
 }

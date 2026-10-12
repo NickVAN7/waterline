@@ -546,7 +546,14 @@ def test_allowed_actions_on_a_workspace_are_the_real_ones_allowed_sorted_by_name
         ),
         (
             PROJECT_TARGET,
-            ["project.archive", "project.unarchive", "project.update", "project.view"],
+            [
+                "project.archive",
+                "project.unarchive",
+                "project.update",
+                "project.view",
+                "project.view_access",
+                "project_member.manage",
+            ],
         ),
     ],
 )
@@ -554,7 +561,7 @@ def test_allowed_actions_lists_only_actions_at_the_targets_level(
     target: Target, expected: list[str]
 ) -> None:
     """The real org-level actions are DL-56's two, DL-68's two, and DL-77's two; the real
-    project-level ones DL-77's four; test-only ones are never listed."""
+    project-level ones DL-77's four and DL-79's two; test-only ones are never listed."""
     assert allowed_actions(PERSONAS["system_admin"], target) == expected
 
 

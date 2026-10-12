@@ -147,16 +147,16 @@ def register_on_email_changed(handler: EmailChangedHandler) -> None:
     _ON_EMAIL_CHANGED.append(handler)
 
 
-_WORKSPACE_REASONS = {
+WORKSPACE_REASONS = {
     WorkspaceRole.OWNER: AccessReason.WORKSPACE_OWNER,
     WorkspaceRole.ADMIN: AccessReason.WORKSPACE_ADMIN,
 }
-_ORG_REASONS = {
+ORG_REASONS = {
     OrgRole.OWNER: AccessReason.ORG_OWNER,
     OrgRole.ADMIN: AccessReason.ORG_ADMIN,
     OrgRole.MEMBER: AccessReason.ORG_MEMBER,
 }
-_PROJECT_REASONS = {
+PROJECT_REASONS = {
     ProjectRole.ADMIN: AccessReason.PROJECT_ADMIN,
     ProjectRole.MEMBER: AccessReason.PROJECT_MEMBER,
     ProjectRole.VIEWER: AccessReason.PROJECT_VIEWER,
@@ -475,7 +475,7 @@ class UserService:
         seen = await UserRepository(self.session).reach(user.id, subject.workspace_id)
         orgs: dict[uuid.UUID, set[AccessReason]] = defaultdict(set)
         projects: dict[uuid.UUID, set[AccessReason]] = defaultdict(set)
-        workspace_reason = _WORKSPACE_REASONS.get(seen.workspace_role)  # pyright: ignore[reportArgumentType] -- None finds nothing
+        workspace_reason = WORKSPACE_REASONS.get(seen.workspace_role)  # pyright: ignore[reportArgumentType] -- None finds nothing
         everywhere = [
             *([AccessReason.SYSTEM_ADMIN] if user.is_system_admin else []),
             *([workspace_reason] if workspace_reason else []),
@@ -486,14 +486,14 @@ class UserService:
             for project in seen.projects:
                 projects[project.id].add(reason)
         for org_id, role in seen.org_roles:
-            orgs[org_id].add(_ORG_REASONS[role])
+            orgs[org_id].add(ORG_REASONS[role])
             if role in (OrgRole.OWNER, OrgRole.ADMIN):  # inherited project admin
                 for project in seen.projects:
                     if project.organization_id == org_id:
-                        projects[project.id].add(_ORG_REASONS[role])
+                        projects[project.id].add(ORG_REASONS[role])
         by_id = {project.id: project for project in seen.projects}
         for project_id, role in seen.project_roles:
-            projects[project_id].add(_PROJECT_REASONS[role])
+            projects[project_id].add(PROJECT_REASONS[role])
             orgs[by_id[project_id].organization_id].add(AccessReason.PROJECT_MEMBERSHIP)
         order = list(AccessReason)
         return AccessReview(

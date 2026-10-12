@@ -8,7 +8,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.core.db import SessionMaker
-from app.core.errors import ForbiddenError, UnauthorizedError
+from app.core.errors import AppError, ForbiddenError, UnauthorizedError
 from app.core.security import generate_token, hash_token
 from app.core.settings import Settings
 from app.models.audit_event import AuditEvent
@@ -19,6 +19,7 @@ from tests.factories.auth import UserSessionFactory
 from tests.factories.user import FACTORY_PASSWORD, UserFactory
 from tests.support.concurrency import (
     committing_factories,
+    refusal,
     run_in_parallel,
     wait_until_blocked_on_a_lock,
 )
@@ -113,15 +114,17 @@ async def test_a_sign_in_with_a_password_changed_meanwhile_is_refused(
         user = await UserFactory.create_async(email="ann@acme.example")
     signer_pid: list[int] = []
     signer_connected = anyio.Event()
-    refused: list[UnauthorizedError] = []
+    refused: list[AppError | None] = []
 
     async def sign_in() -> None:
         async with concurrency() as session:
             signer_pid.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
             signer_connected.set()
-            with pytest.raises(UnauthorizedError) as error:
-                await AuthService(session, settings).sign_in("ann@acme.example", FACTORY_PASSWORD)
-            refused.append(error.value)
+            refused.append(
+                await refusal(
+                    AuthService(session, settings).sign_in("ann@acme.example", FACTORY_PASSWORD)
+                )
+            )
 
     async with concurrency() as changer:
         # An uncommitted password change: it holds the row; readers still see the old hash.
@@ -137,7 +140,9 @@ async def test_a_sign_in_with_a_password_changed_meanwhile_is_refused(
 
     async with concurrency() as check:
         sessions = (await check.execute(select(func.count()).select_from(UserSession))).scalar_one()
-    assert [error.error_code for error in refused] == ["invalid_credentials"]
+    assert [(type(error), getattr(error, "error_code", None)) for error in refused] == [
+        (UnauthorizedError, "invalid_credentials")
+    ]
     assert sessions == 0
 
 

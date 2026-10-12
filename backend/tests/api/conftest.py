@@ -22,8 +22,8 @@ async def client(settings: Settings, sessionmaker: SessionMaker) -> AsyncIterato
 
 @pytest.fixture
 def removals(monkeypatch: pytest.MonkeyPatch) -> list[MemberRemoval]:
-    """What the `on_member_removed` handler receives: the project area registers the real one in
-    S1-C12; this stands in for it."""
+    """What the `on_member_removed` handler receives, in place of the project area's real one
+    (whose effects `tests/api/test_project_members.py` covers)."""
     calls: list[MemberRemoval] = []
 
     async def handler(_session: AsyncSession, removal: MemberRemoval) -> None:

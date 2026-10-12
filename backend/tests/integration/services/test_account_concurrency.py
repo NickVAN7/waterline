@@ -5,7 +5,6 @@ sabotage-checked against the code without its lock."""
 
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import cast
 
 import anyio
 import pytest
@@ -14,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.authz.context import AuthzContext
 from app.core.db import SessionMaker
-from app.core.errors import ValidationFailedError
 from app.core.settings import Settings
 from app.enums import WorkspaceRole
 from app.models.audit_event import AuditEvent
@@ -29,6 +27,7 @@ from tests.factories.user import FACTORY_PASSWORD, UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
 from tests.support.concurrency import (
     committing_factories,
+    refusal_types,
     run_in_parallel,
     wait_until_blocked_on_a_lock,
 )
@@ -70,12 +69,13 @@ async def test_a_deactivation_queues_behind_a_handover_to_the_same_person(
             )
             deactivator_connected.set()
             subject = await subject_of(session, bob.id)
-            with pytest.raises(ValidationFailedError) as error:
-                await AuthService(session, settings).deactivate(
-                    AuthzContext(user_id=uuid.uuid4(), is_system_admin=True), subject
+            refused.extend(
+                await refusal_types(
+                    AuthService(session, settings).deactivate(
+                        AuthzContext(user_id=uuid.uuid4(), is_system_admin=True), subject
+                    )
                 )
-            fields = cast(list[dict[str, str]], error.value.details["fields"])
-            refused.extend(field["type"] for field in fields)
+            )
 
     async with concurrency() as handing_over:
         loaded = await handing_over.get_one(Workspace, workspace.id)
@@ -145,8 +145,10 @@ async def test_an_action_ending_the_sessions_ends_a_sign_in_still_in_flight(
         async with concurrency() as session:
             actor_pid.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
             actor_connected.set()
-            user = await session.scalar(select(User).where(User.email == "ann@acme.example"))
-            assert user is not None
+            # scalar_one: setup, not the outcome, and nothing is asserted in here (TD-30).
+            user = (
+                await session.execute(select(User).where(User.email == "ann@acme.example"))
+            ).scalar_one()
             await action(session, settings, ctx, await subject_of(session, user.id))
             await session.commit()
 

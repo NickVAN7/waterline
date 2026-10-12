@@ -3,7 +3,6 @@ targeted rules": the last owner can't leave or be demoted without naming a repla
 Each sabotage-checked against the code without its row locks."""
 
 import uuid
-from typing import cast
 
 import anyio
 import pytest
@@ -20,6 +19,7 @@ from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
 from tests.support.concurrency import (
     committing_factories,
+    refusal_types,
     run_in_parallel,
     wait_until_blocked_on_a_lock,
 )
@@ -97,12 +97,13 @@ async def test_a_removal_racing_a_handover_to_the_same_person_leaves_an_owner(
             remover_pid.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
             remover_connected.set()
             loaded = await session.get_one(Workspace, workspace.id)
-            with pytest.raises(ValidationFailedError) as error:
-                await WorkspaceService(session).remove_staff(
-                    system_admin, loaded, bob.id, with_projects=False
+            refused.extend(
+                await refusal_types(
+                    WorkspaceService(session).remove_staff(
+                        system_admin, loaded, bob.id, with_projects=False
+                    )
                 )
-            fields = cast(list[dict[str, str]], error.value.details["fields"])
-            refused.extend(field["type"] for field in fields)
+            )
 
     async with concurrency() as handing_over:
         loaded = await handing_over.get_one(Workspace, workspace.id)

@@ -1,16 +1,19 @@
-"""Rosters: a workspace's staff and an org's members (build plan, "The workspace and org API",
-"The org members API"; DL-55, DL-59, DL-67). Both follow the same rules, kept here once: the
-email-first add, the create, the owner-only rule for owner and admin roles, admins stepping down,
-the last-owner guard and the replacement owner, and one lock order. The workspace and org
-services each describe their roster (`RosterSpec`) and call a `Roster`."""
+"""Rosters: a workspace's staff, an org's members, and a project's members (build plan, "The
+workspace and org API", "The org members API", "The project members API"; DL-55, DL-59, DL-67,
+DL-71). They follow the same rules, kept here once: the email-first add, the create, the
+owner-only rule for owner and admin roles, admins stepping down, the last-owner guard and the
+replacement owner, and one lock order. A project has no owner, so only the add, the list, and the
+lock order apply to it (DL-71). Each area describes its roster (`RosterSpec`) and calls a
+`Roster`."""
 
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from sqlalchemy import Select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped
 
@@ -19,7 +22,9 @@ from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target
-from app.core.errors import FieldError, NotFoundError, ValidationFailedError
+from app.core.base_model import Base
+from app.core.constraint_errors import constraint_registry
+from app.core.errors import FieldError, NotFoundError, ValidationFailedError, violated_constraint
 from app.core.lists import ListSpec, Page, fetch_page
 from app.enums import AuditAction, AuditEntityType
 from app.models.user import User
@@ -29,7 +34,7 @@ from app.services.user import UserService
 
 
 class Member[R: StrEnum](Protocol):
-    """A staff membership or an org membership."""
+    """A staff membership, an org membership, or a project membership."""
 
     user_id: Mapped[uuid.UUID]
     role: Mapped[R]
@@ -43,6 +48,10 @@ class RosterRepository[M](Protocol):
         self, scope_id: uuid.UUID, user_id: uuid.UUID, /, *, lock: bool = False
     ) -> M | None: ...
 
+
+class OwnersRepository[M](RosterRepository[M], Protocol):
+    """A roster with an owner role (staff, org members)."""
+
     async def lock_owners(self, scope_id: uuid.UUID, /) -> list[uuid.UUID]: ...
 
     async def active_owners(self, scope_id: uuid.UUID, /) -> list[uuid.UUID]: ...
@@ -50,20 +59,22 @@ class RosterRepository[M](Protocol):
 
 @dataclass(frozen=True)
 class RosterSpec[R: StrEnum]:
-    """What differs between the two rosters: their roles, actions, audit events, and wording."""
+    """What differs between the rosters: their roles, actions, audit events, and wording.
+    `owner` and `manage_admins` are None for a roster with no owner role (a project, DL-71): its
+    admins grant any role, and the owner rules never apply."""
 
-    owner: R
+    owner: R | None
     admin: R
     member: R
     manage: Action
-    manage_admins: Action
+    manage_admins: Action | None
     added: AuditAction
     role_changed: AuditAction
     removed: AuditAction
     entity_type: AuditEntityType
     already_member: str  # an add of someone already on the roster
-    needs_owner: str  # the last-owner guard
-    successor_not_member: str  # a replacement owner not on the roster
+    needs_owner: str = ""  # the last-owner guard (rosters with an owner)
+    successor_not_member: str = ""  # a replacement owner not on the roster (the same)
 
 
 @dataclass(frozen=True)
@@ -88,8 +99,9 @@ def register_on_member_removed(handler: MemberRemovedHandler) -> None:
 
 
 class Roster[M: Member[Any], R: StrEnum, Row]:
-    """One workspace's staff or one org's members. `scope_id` is the workspace's or org's ID;
-    `target`, where the roster's actions are checked (its `organization_id` is None for staff);
+    """One workspace's staff, one org's members, or one project's members. `scope_id` is the
+    workspace's, org's, or project's ID; `target`, where the roster's actions are checked (its
+    `organization_id` is None for staff);
     `new_membership(user_id, role)` builds a row of `M`; `row_model` is the response for one
     (`StaffRead`, `MemberRead`)."""
 
@@ -111,7 +123,13 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         self.target = target
         self.new_membership = new_membership
         self.row_model = row_model
-        self.admin_roles = (spec.owner, spec.admin)
+        # The roles whose grant or change needs `manage_admins`; none without an owner role.
+        self.admin_roles = () if spec.owner is None else (spec.owner, spec.admin)
+
+    @property
+    def _owners(self) -> OwnersRepository[M]:
+        # Only a roster with an owner role reaches the owner rules (`spec.owner` is set).
+        return cast(OwnersRepository[M], self.repository)
 
     def row(self, ctx: AuthzContext, membership: M) -> Row:
         """A roster row, with what the caller may do to it: an owner's or admin's row needs the
@@ -152,8 +170,8 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
 
     def _ensure_role_change(self, ctx: AuthzContext, *roles: object) -> None:
         """Granting, changing, or removing an owner or admin role also needs `manage_admins`
-        (DL-56, DL-68); 403 otherwise."""
-        if any(role in self.admin_roles for role in roles):
+        (DL-56, DL-68); 403 otherwise. A roster with no owner role has no such rule."""
+        if self.spec.manage_admins is not None and any(r in self.admin_roles for r in roles):
             ensure(ctx, self.spec.manage_admins, self.target)
 
     def _log(
@@ -165,37 +183,58 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             actor_id=ctx.user_id,
             workspace_id=self.target.workspace_id,
             organization_id=self.target.organization_id,
+            project_id=self.target.project_id,
             target_user_id=user_id,
             entity_type=self.spec.entity_type,
             entity_id=self.scope_id,
             details=details,
         )
 
-    async def _add_membership(self, ctx: AuthzContext, user: User, role: R) -> Row:
+    async def add_user(
+        self, ctx: AuthzContext, user: User, role: R, *, loc: tuple[str, ...] = ("body", "email")
+    ) -> Row:
+        """Add `user`, already checked, with `role`. Two adds of the same person racing: the
+        loser's unique violation is `already_member` on `loc`, the field its request used
+        (DL-80)."""
         if role == self.spec.owner:
             # A new owner joins the owners' lock (TD-25): a role change or removal holding it
             # finishes first, so the owners it locks never change under it.
-            await self.repository.lock_owners(self.scope_id)
+            await self._owners.lock_owners(self.scope_id)
         membership = self.new_membership(user.id, role)
         self.session.add(membership)
-        await self.session.flush()
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            if not _already_member(exc):
+                raise
+            raise _field_error(loc, self.spec.already_member, "already_member") from exc
         self._log(self.spec.added, ctx, user.id, role=role.value)
         membership.user = user
         return self.row(ctx, membership)
 
-    async def add(self, ctx: AuthzContext, email: str, role: R) -> Row:
-        """Add an existing account, found by email: 422 on `email` when it's already on the
-        roster (`already_member`), has no account (`no_account`; the form goes on to create
-        one), or is deactivated (`account_inactive`)."""
+    async def add(
+        self,
+        ctx: AuthzContext,
+        email: str,
+        role: R,
+        *,
+        admit: Callable[[User], Awaitable[None]] | None = None,
+    ) -> Row:
+        """Add an existing account, found by email: 422 on `email`, in this order, when it's
+        already on the roster (`already_member`), has no account (`no_account`; the form goes on
+        to create one), or is deactivated (`account_inactive`). `admit`, last, may refuse the
+        account or prepare its add (a project's `outside_org` and `join_org`, DL-78)."""
         self._ensure_role_change(ctx, role)
         user = await UserRepository(self.session).get_by_email(email.strip().lower())
+        if user is not None and await self.repository.membership(self.scope_id, user.id):
+            raise _email_error(self.spec.already_member, "already_member")
         if user is None:
             raise _email_error("No account has this email.", "no_account")
         if not user.is_active:
             raise _email_error("This account is deactivated.", "account_inactive")
-        if await self.repository.membership(self.scope_id, user.id):
-            raise _email_error(self.spec.already_member, "already_member")
-        return await self._add_membership(ctx, user, role)
+        if admit is not None:
+            await admit(user)
+        return await self.add_user(ctx, user, role)
 
     async def create(self, ctx: AuthzContext, payload: NewUser, role: R) -> Row:
         """Create the account (with `must_change_password` set) and its membership in one step
@@ -207,14 +246,14 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             payload,
             organization_id=self.target.organization_id,
         )
-        return await self._add_membership(ctx, user, role)
+        return await self.add_user(ctx, user, role)
 
     async def _member(self, user_id: uuid.UUID) -> M:
         """The membership a role change or removal acts on, locked. The owners' rows are locked
         first, always in the same order, so concurrent changes queue instead of deadlocking, and
         each reads the others' committed roles: a removal racing a handover to the same person
         sees them as the owner they've become, and the last-owner guard applies (DL-59)."""
-        await self.repository.lock_owners(self.scope_id)
+        await self._owners.lock_owners(self.scope_id)
         membership = await self.repository.membership(self.scope_id, user_id, lock=True)
         if membership is None:
             raise NotFoundError
@@ -225,8 +264,8 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         DL-74). A deactivated owner doesn't count."""
         # Locked again, not the list `_member` locked: a handover that committed while this
         # request waited may have made someone an owner that the first list couldn't include.
-        await self.repository.lock_owners(self.scope_id)
-        if await self.repository.active_owners(self.scope_id) == [membership.user_id]:
+        await self._owners.lock_owners(self.scope_id)
+        if await self._owners.active_owners(self.scope_id) == [membership.user_id]:
             raise ValidationFailedError([FieldError(loc, self.spec.needs_owner, "last_owner")])
 
     def _ensure_change(self, ctx: AuthzContext, membership: M, new_role: R | None) -> None:
@@ -259,7 +298,8 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             raise _field_error(loc, self.spec.successor_not_member, "not_member")
         if not successor.user.is_active:
             raise _field_error(loc, "This account is deactivated.", "account_inactive")
-        await self._set_role(ctx, successor, self.spec.owner)
+        # Only a roster with an owner role hands over (the caller acts on an owner's row).
+        await self._set_role(ctx, successor, cast(R, self.spec.owner))
 
     async def _set_role(self, ctx: AuthzContext, membership: M, role: R) -> None:
         old = membership.role
@@ -320,6 +360,13 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             )
             for handler in _ON_MEMBER_REMOVED:
                 await handler(self.session, removal)
+
+
+def _already_member(exc: IntegrityError) -> bool:
+    """Whether `exc` violates a constraint declared as `already_member` (each roster's
+    one-membership-per-person constraint)."""
+    error = constraint_registry(Base.metadata).get(violated_constraint(exc) or "")
+    return error is not None and error.type == "already_member"
 
 
 def _email_error(message: str, type_: str) -> ValidationFailedError:

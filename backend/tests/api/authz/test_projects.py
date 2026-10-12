@@ -342,6 +342,8 @@ INHERITED_ON_A_LIVE_PROJECT = [
     "project.unarchive",
     "project.update",
     "project.view",
+    "project.view_access",
+    "project_member.manage",
 ]
 
 
@@ -353,7 +355,10 @@ INHERITED_ON_A_LIVE_PROJECT = [
         ("workspace_admin", INHERITED_ON_A_LIVE_PROJECT),
         ("org_owner", INHERITED_ON_A_LIVE_PROJECT),
         ("org_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("project_admin", ["project.update", "project.view"]),
+        (
+            "project_admin",
+            ["project.update", "project.view", "project.view_access", "project_member.manage"],
+        ),
         ("project_member", ["project.view"]),
         ("project_viewer", ["project.view"]),
     ],
@@ -388,10 +393,10 @@ async def test_the_project_is_404_to_whoever_cannot_see_it(client: AsyncClient, 
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
-        ("system_admin", ["project.unarchive", "project.view"]),
-        ("workspace_admin", ["project.unarchive", "project.view"]),
-        ("org_admin", ["project.unarchive", "project.view"]),
-        ("project_admin", ["project.view"]),
+        ("system_admin", ["project.unarchive", "project.view", "project.view_access"]),
+        ("workspace_admin", ["project.unarchive", "project.view", "project.view_access"]),
+        ("org_admin", ["project.unarchive", "project.view", "project.view_access"]),
+        ("project_admin", ["project.view", "project.view_access"]),
         ("project_viewer", ["project.view"]),
     ],
 )

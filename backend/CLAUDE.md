@@ -66,6 +66,10 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **A "nothing to change" check before a write reads the row under its lock** (lock or refresh
   it first, then check): two requests at once otherwise both pass the check and record the change
   twice (S1-C10 review: two deactivations, two events).
+- **A check that *another* row exists before a write that depends on it** (only an org member
+  or staff may join a project) holds that row `FOR SHARE` until commit, taken before the
+  target's lock, with a race test against the change that removes it (S1-C12 review: three
+  passes found an add slipping past a removal "with their projects").
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
 - **`app/authz/` never queries.** It decides from the `AuthzContext` and the `Target`; loading

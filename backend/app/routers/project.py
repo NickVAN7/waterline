@@ -1,5 +1,6 @@
 """Projects (build plan, "The projects API", DL-76)."""
 
+import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
@@ -16,15 +17,28 @@ from app.routers.deps import (
     load_project,
 )
 from app.schemas.project import (
+    MemberCandidate,
     ModuleGuidance,
+    ProjectAccessReview,
     ProjectCreate,
     ProjectItem,
+    ProjectMemberAdd,
+    ProjectMemberCreate,
+    ProjectMemberRead,
+    ProjectMemberRoleUpdate,
     ProjectRead,
     ProjectUpdate,
 )
 from app.schemas.workspace import SlugAvailability
 from app.services.org import OrgEntity
-from app.services.project import OrgProjectQuery, ProjectEntity, ProjectService, module_guidance
+from app.services.project import (
+    MEMBER_CANDIDATES,
+    PROJECT_MEMBERS,
+    OrgProjectQuery,
+    ProjectEntity,
+    ProjectService,
+    module_guidance,
+)
 
 router = APIRouter(tags=["project"])
 
@@ -44,7 +58,16 @@ Viewed = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJEC
 Updated = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_UPDATE))]
 Archived = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_ARCHIVE))]
 Unarchived = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_UNARCHIVE))]
+MembersManaged = Annotated[
+    ProjectEntity, Depends(authorized(load_project, Action.PROJECT_MEMBER_MANAGE))
+]
+AccessViewed = Annotated[
+    ProjectEntity,
+    Depends(authorized(load_project, Action.PROJECT_VIEW_ACCESS, hide_denial=True)),
+]
 ProjectQuery = Annotated[OrgProjectQuery, Query()]  # pyright: ignore[reportInvalidTypeForm]
+MemberQuery = Annotated[PROJECT_MEMBERS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+CandidateQuery = Annotated[MEMBER_CANDIDATES.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
 @router.post("/orgs/{org_id}/projects", status_code=status.HTTP_201_CREATED, responses=_ERRORS)
@@ -100,6 +123,70 @@ async def archive_project(project: Archived, ctx: AuthzContextDep, session: Sess
 async def unarchive_project(project: Unarchived, ctx: AuthzContextDep, session: SessionDep) -> None:
     """Unarchive the project."""
     await ProjectService(session).unarchive(ctx, project)
+
+
+@router.get("/projects/{key}/members", responses=_ERRORS)
+async def list_project_members(
+    project: Viewed, query: MemberQuery, ctx: AuthzContextDep, session: SessionDep
+) -> Page[ProjectMemberRead]:
+    """The project's explicit memberships, each row with the actions the caller may take on it."""
+    return await ProjectService(session).list_members(ctx, project, query)
+
+
+@router.get("/projects/{key}/member-candidates", responses=_ERRORS)
+async def project_member_candidates(
+    project: MembersManaged, query: CandidateQuery, session: SessionDep
+) -> Page[MemberCandidate]:
+    """The picker: the org's members and the workspace's staff not yet on the project."""
+    return await ProjectService(session).member_candidates(project, query)
+
+
+@router.post("/projects/{key}/members", status_code=status.HTTP_201_CREATED, responses=_ERRORS)
+async def add_project_member(
+    project: MembersManaged, body: ProjectMemberAdd, ctx: AuthzContextDep, session: SessionDep
+) -> ProjectMemberRead:
+    """Add someone by `user_id` (the picker; anyone else is a 404) or by `email` (422 on `email`:
+    `already_member`, `no_account`, `account_inactive`, or `outside_org` unless `join_org`)."""
+    return await ProjectService(session).add_member(ctx, project, body)
+
+
+@router.post("/projects/{key}/members/new", status_code=status.HTTP_201_CREATED, responses=_ERRORS)
+async def create_project_member(
+    project: MembersManaged, body: ProjectMemberCreate, ctx: AuthzContextDep, session: SessionDep
+) -> ProjectMemberRead:
+    """Create the account, its org membership, and the project membership in one step; the
+    user must change the temporary password at their first sign-in."""
+    return await ProjectService(session).create_member(ctx, project, body)
+
+
+@router.patch("/projects/{key}/members/{user_id}", responses=_ERRORS)
+async def change_project_member_role(
+    project: MembersManaged,
+    user_id: uuid.UUID,
+    body: ProjectMemberRoleUpdate,
+    ctx: AuthzContextDep,
+    session: SessionDep,
+) -> ProjectMemberRead:
+    """Change a member's role."""
+    return await ProjectService(session).change_member_role(ctx, project, user_id, body.role)
+
+
+@router.delete(
+    "/projects/{key}/members/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=_ERRORS,
+)
+async def remove_project_member(
+    project: MembersManaged, user_id: uuid.UUID, ctx: AuthzContextDep, session: SessionDep
+) -> None:
+    """Remove a member; removing the lead clears the project's lead."""
+    await ProjectService(session).remove_member(ctx, project, user_id)
+
+
+@router.get("/projects/{key}/access", responses=_ERRORS)
+async def project_access_review(project: AccessViewed, session: SessionDep) -> ProjectAccessReview:
+    """Everyone who reaches the project, and why (design-doc §5, "Access review")."""
+    return await ProjectService(session).access_review(project)
 
 
 @router.get("/module-guidance", responses=_ERRORS)

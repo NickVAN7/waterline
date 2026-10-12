@@ -3,6 +3,7 @@
 
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
+from typing import cast
 
 import anyio
 import pytest
@@ -10,6 +11,7 @@ from sqlalchemy import URL, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from app.core.db import SessionMaker
+from app.core.errors import AppError, ValidationFailedError
 from tests.factories import BaseFactory
 
 # Fixtures that hold the rolled-back per-test transaction; truncating a table while it's open
@@ -169,3 +171,22 @@ async def wait_until_blocked_on_a_lock(engine: AsyncEngine, backend_pid: int) ->
         # Polling is the only option: the state lives in Postgres, not in this process.
         while await connection.scalar(query, {"pid": backend_pid}) != "Lock":  # noqa: ASYNC110
             await anyio.sleep(0.02)
+
+
+async def refusal(work: Awaitable[object]) -> AppError | None:
+    """The error `work` is refused with, or None when it succeeds. For a task inside a race's
+    task group: it records the outcome instead of asserting, so a regression can't stop the other
+    transaction's commit and leave rows behind (TD-30); the test asserts after the group closes."""
+    try:
+        await work
+    except AppError as error:
+        return error
+    return None
+
+
+async def refusal_types(work: Awaitable[object]) -> list[str]:
+    """The field-error types of a 422 refusal (`refusal`), or [] for any other outcome."""
+    error = await refusal(work)
+    if not isinstance(error, ValidationFailedError):
+        return []
+    return [field["type"] for field in cast(list[dict[str, str]], error.details["fields"])]

@@ -8,10 +8,10 @@ from app.authz.actions import REGISTRY, Level
 pytestmark = pytest.mark.security
 
 
-def test_the_registry_holds_exactly_the_s1_c7_to_s1_c11_actions() -> None:
+def test_the_registry_holds_exactly_the_s1_c7_to_s1_c12_actions() -> None:
     """DL-44: each checkpoint registers its own area's actions; S1-C7 the four workspace-level
     ones (DL-45), S1-C8 three more (DL-56), S1-C9 three more (DL-68), S1-C10 two (DL-73; no
-    separate `user.reset_password`), S1-C11 six (DL-77)."""
+    separate `user.reset_password`), S1-C11 six (DL-77), S1-C12 two (DL-79)."""
     assert sorted(REGISTRY) == [
         "org.create",
         "org.update",
@@ -24,6 +24,8 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c11_actions() -> None:
         "project.unarchive",
         "project.update",
         "project.view",
+        "project.view_access",
+        "project_member.manage",
         "user.check",
         "user.manage",
         "user.view_access",
@@ -55,11 +57,14 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c11_actions() -> None:
         ("project.update", Level.PROJECT),
         ("project.archive", Level.PROJECT),
         ("project.unarchive", Level.PROJECT),
+        ("project_member.manage", Level.PROJECT),
+        ("project.view_access", Level.PROJECT),
     ],
 )
 def test_each_real_action_is_registered_at_its_level(action: str, level: Level) -> None:
     """DL-45 and DL-56: `workspace_staff.manage_admins` is workspace-level (`/me` carries it);
     `org.view` and `org.update` are at org level; DL-73: the account actions are on a user
     target, at its own level; DL-77: the two creation actions at org level (so `/me`'s org
-    entries carry them), the other four on the project."""
+    entries carry them), the other four on the project; DL-79: both member actions on the
+    project."""
     assert REGISTRY[action].level is level

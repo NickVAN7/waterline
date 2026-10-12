@@ -4,7 +4,11 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C11 (Projects) done; next is S1-C12 (Project members). Projects are created in an
+> **Status:** S1-C12 (Project members) done; next is S1-C13 (Classification & export control).
+> Project members are listed, picked, added by user ID or email (with `join_org` for someone from
+> outside the org), created, re-roled, and removed at `/api/projects/{key}/members`, and the
+> per-project access review is at `/api/projects/{key}/access` (build plan, "The project members
+> API"). S1-C11 (Projects) built the projects themselves. Projects are created in an
 > org (`POST /api/orgs/{id}/projects`, the first admin becoming the lead), listed, read and updated
 > at `/api/projects/{key}`, archived and unarchived; `GET /api/module-guidance` and My work's
 > projects section (`GET /api/me/work`) are built (build plan, "The projects API"). S1-C10 (Account
@@ -308,7 +312,7 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   `required_error()`, `email_error()`, and `new_user_errors()` (`app/services/user.py`) turn the
   problems into field errors (`under=` for a nested object, e.g. `("body", "new_owner")`); use
   them wherever a password, username, slug, or new account is set.
-- **Accounts an admin creates** (staff, an org's first owner, org members; later project members)
+- **Accounts an admin creates** (staff, an org's first owner, org members, project members)
   go through `UserService.create_account(actor_id, workspace_id, new, organization_id=...)`:
   validated, `must_change_password` set, `user_created` recorded. Pass the org's ID when the
   account is made through that org (its members, later its projects' members), so its admins see
@@ -317,11 +321,18 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   email-first add, the create, the owner-only rule for owner and admin roles, stepping down, the
   last-owner guard and handover, and the lock order (owners' rows first; adding an owner takes
   that lock too, TD-25). The workspace and org services each describe their roster in a
-  `RosterSpec` and call a `Roster`; a third roster (project members, S1-C12) does the same.
+  `RosterSpec` and call a `Roster`. Project members are a third roster with no owner role
+  (`owner=None`, `manage_admins=None`; DL-71): it uses the list, the email-first add (whose
+  `admit` hook adds the project's `outside_org` and `join_org` step, DL-78), and `add_user`; the
+  project service changes roles and removes members itself. Two adds of one person racing: the
+  roster turns the loser's unique violation into `already_member` on the field it used (`loc`,
+  DL-80). Project member changes lock the project row first, then the membership.
 - **Removing a member "with their projects"** calls the handlers registered with
-  `register_on_member_removed()` (`app/services/roster.py`; the project area registers its own
-  in S1-C12), each given a `MemberRemoval` (`organization_id` is None for staff). Tests stand in
-  for it with the `removals` fixture (`tests/api/conftest.py`).
+  `register_on_member_removed()` (`app/services/roster.py`), each given a `MemberRemoval`
+  (`organization_id` is None for staff). The project area registers one
+  (`ProjectService.remove_with_projects`): it removes the person's memberships on the org's (or
+  workspace's) projects, archived ones included, clearing a lead, with `via` in each event. Tests
+  of what the roster passes stand in for it with the `removals` fixture (`tests/api/conftest.py`).
 - **The user check** (`GET /api/workspaces/{id}/user-check`, DL-66) answers one of `email`,
   `username`, or `name`; `suggest_username()` (`app/rules/identifiers.py`) builds the name's
   username, and `UserService.check` adds `-2`, `-3`, … while it's taken.

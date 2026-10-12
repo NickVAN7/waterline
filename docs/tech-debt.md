@@ -341,10 +341,10 @@ Entry format:
 - **Why:** only a race reaches it (the check reports `already_member` on `email` otherwise), and
   S1-C12's add by user ID may want `user_id` from the same constraint, so the field is better
   decided with that path.
-- **Fix by:** S1-C12 for the add race (`already_member` on the field the request used, `email` or
-  `user_id`, DL-80); S1-C15 for the nested create's race, when the web forms consume those errors
+- **Fix by:** S1-C15 for the nested create's race, when the web forms consume those errors
   (DL-80).
-- **Status:** open
+- **Status:** open (the add race resolved in S1-C12: `already_member` on the field the request
+  used, `email` or `user_id`, through `Roster.add_user`'s `loc`, DL-80)
 
 ### TD-24: An intermittent Hypothesis error in an identifier property test
 - **Added:** S1-C8
@@ -438,4 +438,7 @@ Entry format:
 - **Why:** the tests are correct while the code is; only a regression's report is noisy, and the
   change touches earlier checkpoints' tests.
 - **Fix by:** S1-C12 (it adds the project-member race tests; convert the older ones with them)
-- **Status:** open
+- **Status:** resolved in S1-C12 (`refusal()` and `refusal_types()` in
+  `tests/support/concurrency.py` record a task's refusal as a value; the account, workspace, and
+  auth race tests use them, and the versioning race test records its outcome with `suppress`; each
+  asserts after its task group closes)

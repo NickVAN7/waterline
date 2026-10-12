@@ -235,6 +235,8 @@ INHERITED_ON_A_LIVE_PROJECT = [
     "project.unarchive",
     "project.update",
     "project.view",
+    "project.view_access",
+    "project_member.manage",
 ]
 
 
@@ -246,7 +248,10 @@ INHERITED_ON_A_LIVE_PROJECT = [
         ("workspace_admin", INHERITED_ON_A_LIVE_PROJECT),
         ("org_owner", INHERITED_ON_A_LIVE_PROJECT),
         ("org_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("project_admin", ["project.update", "project.view"]),
+        (
+            "project_admin",
+            ["project.update", "project.view", "project.view_access", "project_member.manage"],
+        ),
         ("project_member", ["project.view"]),
         ("project_viewer", ["project.view"]),
         ("org_member", []),
@@ -261,10 +266,10 @@ def test_allowed_actions_on_a_project(persona: str, expected: list[str]) -> None
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", ["project.unarchive", "project.view"]),
-        ("workspace_admin", ["project.unarchive", "project.view"]),
-        ("org_admin", ["project.unarchive", "project.view"]),
-        ("project_admin", ["project.view"]),
+        ("system_admin", ["project.unarchive", "project.view", "project.view_access"]),
+        ("workspace_admin", ["project.unarchive", "project.view", "project.view_access"]),
+        ("org_admin", ["project.unarchive", "project.view", "project.view_access"]),
+        ("project_admin", ["project.view", "project.view_access"]),
         ("project_viewer", ["project.view"]),
         ("org_member", []),
     ],
