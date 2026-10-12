@@ -469,7 +469,8 @@ Workspace (the firm: tenant boundary)
   - an org member's or workspace staff member's email adds only the project membership (staff
     never get an org membership this way);
   - any **other** existing account (e.g. a user in another client org) is added to the project's
-    org as a member and to the project, after the admin confirms. The rank rule then keeps
+    org as a member and to the project, after the admin confirms (`join_org`; without it the
+    add is refused with `outside_org`, DL-78). The rank rule then keeps
     both orgs' admins from deactivating or resetting them.
 - **Removing a member with their projects.** Removing someone from an org offers to also
   remove their project memberships on that org's projects; removing staff from the

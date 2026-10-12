@@ -341,7 +341,9 @@ Entry format:
 - **Why:** only a race reaches it (the check reports `already_member` on `email` otherwise), and
   S1-C12's add by user ID may want `user_id` from the same constraint, so the field is better
   decided with that path.
-- **Fix by:** S1-C12 (the owner decides the constraint's field with the project member add).
+- **Fix by:** S1-C12 for the add race (`already_member` on the field the request used, `email` or
+  `user_id`, DL-80); S1-C15 for the nested create's race, when the web forms consume those errors
+  (DL-80).
 - **Status:** open
 
 ### TD-24: An intermittent Hypothesis error in an identifier property test

@@ -1013,3 +1013,50 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Projects": the project actions; the S1-C11 row); `app/authz/`
 - **Source:** chat session (owner, Oct 11, 2026, with DL-76)
+
+### DL-78: The project members API (S1-C12)
+- **Date:** 2026-10-12
+- **Decision:** S1-C12's endpoints, payloads, and errors as listed in the build plan ("The project
+  members API"): the member list (any project member can read it, through `project.view`), the
+  picker's candidates, the add by `user_id` or `email`, the create, the role change, the removal,
+  and the per-project access review. The email-first add has four outcomes: `already_member`,
+  `no_account`, `account_inactive`, and, for an account outside the project's org and the
+  workspace's staff, a 422 `outside_org` unless the request confirms with `join_org: true`, which
+  adds them to the org as a member and to the project (design-doc §4). A deactivated account is
+  refused before `outside_org`, so `join_org` never adds one; the picker hides deactivated users,
+  and adding one by `user_id` is a 422 `account_inactive` on `user_id` (as staff and org adds,
+  DL-55). Both paths check in the same order: by `user_id`, a 404 for anyone outside the org's
+  members and the staff, then `already_member`, then `account_inactive`; by `email`,
+  `already_member`, `no_account`, `account_inactive`, then `outside_org`. Removing a lead clears
+  `lead_id`; the `on_member_removed` handler removes the person's roles on the org's (or the
+  workspace's) projects, archived ones included, one `project_member_removed` per project with
+  `via`.
+- **Supersedes:** the S1-C12 row's "three cases ... as for staff (DL-55)" (build plan)
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the project members API; the S1-C12 row); design-doc §4
+  ("Project admins" add people)
+- **Source:** chat session (owner, Oct 12, 2026: the proposal at the start of S1-C12)
+
+### DL-79: Two project member actions (S1-C12)
+- **Date:** 2026-10-12
+- **Decision:** `project_member.manage` (project admins, inherited included; a mutation, so an
+  archived project denies it) and `project.view_access` (the same people; not a mutation), both
+  project level. Any project admin grants, changes, or removes any project role, their own
+  included; there is no last-admin guard (DL-71).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the project member actions; the S1-C12 row); `app/authz/`
+- **Source:** chat session (owner, Oct 12, 2026, with DL-78)
+
+### DL-80: A membership race reports `already_member` on the field the request used (TD-23)
+- **Date:** 2026-10-12
+- **Decision:** When two adds of the same person race, the roster turns the losing request's
+  unique-constraint violation into `already_member` on the field that request used: `email` for
+  an email add (staff, org members, project members), `user_id` for a project picker add. Built in
+  the shared roster in S1-C12. A race on a new account's email or username inside a nested object
+  (TD-23's second half) stays open, retargeted to S1-C15, when the web forms consume those errors.
+- **Supersedes:** TD-23's "Fix by: S1-C12" for the add race
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C12 row; "The project members API"); `docs/tech-debt.md` (TD-23);
+  `app/services/roster.py`
+- **Source:** chat session (owner, Oct 12, 2026: docs-consistency decision on DL-78)
