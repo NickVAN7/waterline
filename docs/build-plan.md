@@ -919,8 +919,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   False). Used by change password, admin reset, and account creation.
 - `GET /api/auth/password-policy` (from S1-C14a, DL-91): open to anyone, signed in or not, and
   during a forced change. Returns `requirements`, in order, each with a `code`, a `label` written
-  for users, and the number it needs where it has one: `min_length` ("At least 8 characters",
-  `value` 8), `not_email`, `not_username`, `not_current` (for a user choosing their own). The
+  for users, and the number it needs where it has one. Each `code` is the 422 field error `type`
+  that requirement prevents (DL-94): `too_short` ("At least 8 characters", `value` 8),
+  `same_as_email`, `same_as_username`, `same_as_current` (for a user choosing their own). The
   labels live in the `auth` area; the number is `rules/password_policy.py`'s `MIN_LENGTH`, read,
   not changed (no `rules/` change, so no spec tests), so raising the minimum (TD-12) changes the
   list with no frontend change. The 256-character cap is not listed; the server refuses it.

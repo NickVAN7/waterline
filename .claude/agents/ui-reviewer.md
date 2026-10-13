@@ -116,7 +116,8 @@ correct; you decide whether the code does it.
   `title`) with the browser's reveal icon hidden? Where users choose their own new password, is
   the `PasswordRequirements` list under the field, built from `GET /api/auth/password-policy`
   with no number in the code, icon and text per line, tied by `aria-describedby`, and not
-  announced per keystroke?
+  announced per keystroke? Does a 422 on a listed requirement mark that line (not a second
+  message under the field), with the field still invalid, counted, and focused (DL-94)?
   Temporary password shown as UI-FRM-11 says, including an honest copy-failure message?
   (UI-FRM-10, UI-FRM-11)
 - Fieldset and legend for groups; native radios or a Select before a combobox? (UI-FRM-12)

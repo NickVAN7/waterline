@@ -1228,3 +1228,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   (UI)
 - **Source:** chat session (owner, Oct 13, 2026: the ui-reviewer's proposed rules in
   docs/reviews/s1/S1-C14.md)
+
+### DL-94: A 422 on a listed password requirement shows on its line of the list
+- **Date:** 2026-10-13
+- **Decision:** Under a new-password field with the requirements list (DL-91), a 422 whose field
+  error `type` matches a listed requirement marks that line as the error, with no separate
+  message under the field; the field is still invalid, counted in the announcement, and focused.
+  The policy endpoint's requirement codes are the 422 `type`s they prevent (`too_short`,
+  `same_as_email`, `same_as_username`, `same_as_current`). An unlisted error, such as the
+  256-character cap, shows under the field as usual.
+- **Supersedes:** none (an exception to ui-design-guide UI-FRM-5's placement)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-5, UI-FRM-10); build plan ("Authentication", the
+  password-policy endpoint); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-91 to DL-93,
+  option c)

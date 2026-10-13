@@ -504,7 +504,9 @@ render inside the full shell when signed in.
   `--color-tone-danger-edge` border, set `aria-invalid="true"`, and add the message's id to the
   control's `aria-describedby`. The border is extra: the icon and message carry the meaning.
   Errors appear only after a failed submit, never as the user types (the password requirements
-  list, UI-FRM-10, is guidance, not errors).
+  list, UI-FRM-10, is guidance, not errors). One exception: a 422 on a requirement the password
+  requirements list names is shown on that line of the list, not as a separate message
+  (UI-FRM-10, DL-94).
 - **UI-FRM-6** **No error summary box.** The inline errors are the errors. When a submit fails,
   move focus to the **first invalid field**, and announce through a visually hidden polite live
   region "N fields need attention: Name, Key" (or "1 field needs attention: Name"). An error whose
@@ -544,7 +546,12 @@ render inside the full shell when signed in.
   `aria-describedby`, so it is read when the field gets focus, and is not a live region: nothing
   is announced per keystroke. A requirement the screen can't check (one it doesn't know, or "not
   your current password" with no current-password field) is shown as plain text. No number is
-  written into the screen (DL-91). The show/hide toggle is a small icon button **inside** the field
+  written into the screen (DL-91). **A 422 on a listed requirement** (its field error's `type` is
+  the requirement's `code`) shows on that line of the list instead of as a separate message
+  under the field: the line turns to the error state (error icon and text in
+  `--color-tone-danger-fg`), the field gets the 2 px danger border and `aria-invalid`, and it
+  counts in UI-FRM-6's announcement and takes focus like any invalid field. An error the list
+  doesn't name (the 256-character cap) is shown under the field as UI-FRM-5 says (DL-94). The show/hide toggle is a small icon button **inside** the field
   (28×28, `type="button"`, `aria-label` "Show password" / "Hide password", `aria-pressed`, and a
   `title`), and the browser's own reveal icon is hidden (`::-ms-reveal`). Whether a password
   manager's icon collides with the toggle on the real sign-in page is still to check (§10).
