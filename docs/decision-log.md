@@ -1060,3 +1060,39 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (the S1-C12 row; "The project members API"); `docs/tech-debt.md` (TD-23);
   `app/services/roster.py`
 - **Source:** chat session (owner, Oct 12, 2026: docs-consistency decision on DL-78)
+
+### DL-81: The classification API (S1-C13)
+- **Date:** 2026-10-12
+- **Decision:** S1-C13's endpoint, fields, and errors as listed in the build plan ("The
+  classification API"): a separate `PUT /api/projects/{key}/classification` (`level`,
+  `categories`; `project_classification_changed`), the classification fields on project create and
+  the project read, `export_control_confirmed: true` on every member add to an export-controlled
+  project and whenever a create or change adds `export_controlled` (else a 422
+  `confirmation_required`), and, when marking a project export-controlled, `confirmed_member_ids`
+  that must be exactly its current explicit members (else a 422 `members_changed`), checked under
+  the project's row lock; either field sent where it isn't needed is a 422
+  `confirmation_not_needed`. Each row of the per-project review, and each project of the per-person
+  review, gains `access` (`content` or `management`).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Classification & export control": the classification API and access
+  reviews; "The account API"; "The project members API"; the S1-C13 row)
+- **Source:** chat session (owner, Oct 12, 2026: the proposal at the start of S1-C13; the owner
+  noted `export_controlled` will rarely be used for the foreseeable future;
+  `confirmation_not_needed`: a docs-consistency decision on DL-81)
+
+### DL-82: Two classification actions; every action content or management (S1-C13)
+- **Date:** 2026-10-12
+- **Decision:** `project.raise_classification` (project admins, inherited included) and
+  `project.lower_classification` (the same, but on an export-controlled project an explicit
+  project admin only, which also covers removing `export_controlled`), both project-level
+  mutations. A classification change that neither raises nor lowers, including one to the
+  classification already held, needs either action; unclassified ranks as Internal for the raise
+  and lower rules (design-doc §3.1). The registry marks every action content or management; every action so far is
+  management.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Classification & export control": the classification actions; the
+  S1-C13 row); `app/authz/`
+- **Source:** chat session (owner, Oct 12, 2026, with DL-81; the no-op and unclassified rules:
+  docs-consistency decisions on DL-81 and DL-82)
