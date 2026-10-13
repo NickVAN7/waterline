@@ -375,9 +375,10 @@ The sections below describe the content; the table above is the order of work.
 │       ├── composables/          shared logic (auth state, permissions, forms)
 │       ├── stores/               Pinia stores (current user, current org)
 │       └── views/                screens, grouped by area (singular, as in the backend): auth/,
-│                                 org/, project/, my_work/, …; plus status/ and errors/ (until
-│                                 S1-C14, home/ holds what becomes status/)
-│   └── e2e/                      Playwright end-to-end tests (from Slice 1)
+│                                 org/, project/, my_work/, …; plus status/ and errors/
+│       └── test/                 shared test helpers (axe, API responses, router)
+│   └── e2e/                      Playwright end-to-end tests (from S1-C14; support/ holds
+│                                 their helpers)
 │
 ├── CLAUDE.md                     project rules for Claude sessions (backend/ and frontend/
 │                                 each have their own CLAUDE.md too)

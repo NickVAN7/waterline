@@ -44,6 +44,13 @@ export default defineConfigWithVueTs(
     },
   },
 
+  // The shared components keep the design guide's names (`Button`, `Alert`, `Icon`; §8).
+  {
+    name: 'app/component-names',
+    files: ['src/components/**/*.vue'],
+    rules: { 'vue/multi-word-component-names': 'off' },
+  },
+
   {
     ...pluginVitest.configs.recommended,
     files: ['src/**/*.spec.ts'],

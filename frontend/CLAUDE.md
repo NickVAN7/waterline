@@ -7,16 +7,19 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 
 - `src/api/` — `schema.d.ts` (generated) and `client.ts`: the configured `openapi-fetch`
   `client`, `api()`, and `ApiError`
-- `src/app/` — layout, router, styles; route guards in `src/app/guards/`
+- `src/app/` — `createApp.ts` (the app the tests and `main.ts` both build), layouts, router,
+  route focus, the session hook; route guards in `src/app/guards/`
 - `src/app/styles/` (`tokens.css`, `base.css`), `src/app/theme/` (`preset.ts`, and, once a board
   or grid ships, `svar-theme.css`)
 - `src/components/` — shared UI components
 - `src/composables/` — shared logic (auth state, permissions, forms)
 - `src/stores/` — Pinia stores (current user, current org)
 - `src/views/<area>/` — screens, grouped by the same area names as the backend, singular
-  (`project/`, `task/`, …); `home/` and `errors/` aren't backend areas; `src/views/my_work/`
-  and `src/views/status/` (S1-C14; `home/` becomes `status/`)
-- `e2e/` — Playwright tests
+  (`project/`, `task/`, …); `status/` and `errors/` aren't backend areas
+- `src/test/` — shared test helpers: `a11y.ts` (`expectNoA11yViolations`), `api.ts` (typed
+  responses), `router.ts`
+- `e2e/` — Playwright tests; `e2e/support/` holds their helpers (`a11y.ts`: axe and
+  `expectFocusNotObscured`; `demo.ts`: the demo users)
 
 ## Rules
 
@@ -30,8 +33,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   it's enforcing permissions. Don't duplicate business rules; e.g. rank is computed by the
   server (send neighbor IDs, not rank values), and transitions are validated by the server.
 - **Handle the error format** (`{code, message, details}`) consistently: 409 → prompt to
-  reload; 404 → not-found view; 422 → field errors from `details.fields`
-  (`loc`, `message`, `type` per field).
+  reload; 404 → not-found view (TD-32); 422 → field errors from `details.fields`
+  (`loc`, `message`, `type` per field). Forms use `useFormErrors` for all of this. A 401 and a
+  403 `password_change_required` are handled once, by the API client's session hook
+  (`src/app/session.ts`); a view never handles them itself.
 - **Requests:** same origin through the Vite proxy (`/api`), `credentials: 'include'`, JSON
   bodies only.
 - **Rendered markdown** is sanitized before display.
@@ -96,4 +101,11 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   API client (`vi.spyOn(client, 'GET')`), with results typed from the generated schema. Assert
   what the user sees, not component internals.
 - Coverage: 80% overall; 90% for composables, stores, and route guards.
-- Playwright covers each slice's critical flows against the full stack.
+- Whatever `createApp.ts` wires up (a plugin, the client's middleware, the session handler) has a
+  test through `createWaterlineApp()` in `src/app/router.spec.ts`: unit tests of each piece don't
+  show they're connected. Wait for a navigation to a lazy-loaded route with `vi.waitFor`, not
+  `flushPromises`.
+- Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
+  `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
+  not `getByLabel`: the label's text includes the required asterisk, the accessible name
+  doesn't.

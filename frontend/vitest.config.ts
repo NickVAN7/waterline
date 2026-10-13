@@ -21,6 +21,8 @@ export default mergeConfig(
         include: ['src/**/*.{ts,vue}'],
         exclude: [
           '**/*.spec.ts',
+          // Test support (the shared axe helper), exercised by every spec that uses it.
+          'src/test/**',
           // Generated types only: no runtime code to cover.
           'src/api/schema.d.ts',
           // Bootstrap that mounts the app into index.html; everything it wires up is tested

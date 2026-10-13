@@ -153,7 +153,9 @@ Entry format:
   is enough for now; verify the installation in Slice 1.
 - **Fix by:** Slice 1, with the first store (the current user): a test that the running app
   resolves that store through the Pinia instance `main.ts` installs.
-- **Status:** open
+- **Status:** resolved in S1-C14 (`main.ts` mounts `createWaterlineApp()`, and
+  `src/app/router.spec.ts` "resolves the current-user store through the Pinia instance it
+  installs (TD-10)" signs in through that app and reads the store from its Pinia)
 
 ### TD-11: Dev containers run as root
 - **Added:** S0-C7
@@ -456,4 +458,59 @@ Entry format:
   later.
 - **Fix by:** Slice 1 (the owner decides at the slice retro whether the other locked mutations
   re-read the caller's role too)
+- **Status:** open
+
+### TD-32: No page handles a 404 yet
+- **Added:** S1-C14
+- **What:** S1-C14's error handling covers 401 (session ended), 403, 409, and 422 with field
+  errors, and unknown URLs show the not-found page, but no screen loads a record by key yet, so
+  nothing turns an API 404 into the not-found page.
+- **Why:** owner decision (S1-C14): build it with the first page that loads a record, rather
+  than with nothing to use it.
+- **Fix by:** S1-C16 (the project pages, whose row already includes the stale-slug redirect and
+  404)
+- **Status:** open
+
+### TD-33: A failed sign-out from the header says nothing
+- **Added:** S1-C14
+- **What:** the temporary header's **Sign out** (`src/app/AppLayout.vue`) doesn't catch a
+  failed sign-out (the server can't be reached), so nothing happens and no message shows
+  (UI-FBK-1). The change-password screen's **Sign out** does report it, in its form alert.
+- **Why:** checkpoint-reviewer finding (S1-C14 review, 1.3). S1-C14a replaces the header with
+  the shell's user menu, so the handling is built there rather than in a header about to go.
+- **Fix by:** S1-C14a (the user menu's sign-out reports a failure)
+- **Status:** open
+
+### TD-34: The new-password help can't show the minimum length
+- **Added:** S1-C14
+- **What:** UI-FRM-10 wants the password help to be the length, with the number taken from the
+  server (UI-FRM-3: never hard-coded; TD-12 will change it). No endpoint exposes the policy, so
+  `ChangePasswordView` shows only "It can't be your email, your username, or your current
+  password." The minimum is learned from a 422. Those three rules are written into the view,
+  which drifts if `rules/password_policy.py` changes.
+- **Why:** ui-reviewer finding (S1-C14 review). Exposing the policy is an API change outside
+  S1-C14's scope, and whether the help names the non-length rules is the owner's call.
+- **Fix by:** S1-C14a (its change-password form in account settings is the second password
+  form; the owner decides at its start how the number reaches the client)
+- **Status:** open
+
+### TD-35: The pending spinner's speed isn't a token
+- **Added:** S1-C14
+- **What:** `Button`'s spinner uses Tailwind's `animate-spin` (1 s per turn). UI-TOK-7 wants
+  motion from the tokens, which have only `--duration-fast` and `--duration-base` (120 and
+  200 ms, for transitions; too fast for a spinner). The pending label carries the meaning, and
+  the reduced-motion rule stops the spin.
+- **Why:** ui-reviewer finding (S1-C14 review, pass 2). A new motion token, or an exception for
+  the spinner, changes the UI design guide, so it's the owner's call.
+- **Fix by:** S1-C14a (the owner chooses a token in `tokens.css` and the guide, or a guide
+  exception)
+- **Status:** open
+
+### TD-36: Route focus also moves on a query-only navigation
+- **Added:** S1-C14
+- **What:** `src/app/routeFocus.ts` sets the title and focuses the `h1` after every navigation,
+  including one that changes only the query. Once `useListQuery` keeps a list's sort, filters,
+  and page in the URL, each of those would pull focus to the heading (UI-SHL-9).
+- **Why:** ui-reviewer note (S1-C14 review, pass 3). No screen changes only the query yet.
+- **Fix by:** S1-C14a (with `useListQuery`: skip the focus move when only the query changed)
 - **Status:** open

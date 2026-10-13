@@ -4,9 +4,12 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C13a (Demo seed data) done: `wl seed --demo` builds the demo dataset (section 5,
-> "Demo data"); next is S1-C14 (Web: foundations & sign-in), then S1-C14a (Web: app shell; DL-84).
-> S1-C13 (Classification & export control) built classification. A project's classification is set at creation or with `PUT
+> **Status:** S1-C14 (Web: foundations & sign-in) done: the styling foundation (Tailwind, PrimeVue
+> with our preset, the tokens), the shared components, the current-user store, route guards, the
+> session hook, form error handling, sign-in, the forced password change, My work at `/`, the
+> status page at `/status`, the accessibility helpers, and `wl e2e` (section 7); next is S1-C14a
+> (Web: app shell; DL-84). S1-C13a (Demo seed data) built `wl seed --demo` (section 5, "Demo
+> data"). S1-C13 (Classification & export control) built classification. A project's classification is set at creation or with `PUT
 > /api/projects/{key}/classification` (`project.raise_classification`,
 > `project.lower_classification`), export control needs a confirmation on every member add and
 > when it's added, and both access reviews show `access` (`content` or `management`; build plan,
@@ -45,9 +48,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > procrastinate, the model conventions (enums, soft delete, optimistic locking with 409,
 > `direct_update`), the standard error format (including a catch-all 500), and the password and
 > token helpers; `GET /api/health` checks the database. Docker Compose runs the whole stack
-> (postgres, migrate, api, worker, web). The frontend is a Vue shell: layout, router with a 404
-> page, Pinia, the generated API client, and a home page showing the health check through the Vite
-> proxy. CI runs `wl check` on every push to `main` and every pull request.
+> (postgres, migrate, api, worker, web). CI runs `wl check` on every push to `main` and every pull request.
 
 ## 1. Workstation setup
 
@@ -56,7 +57,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 | Tool | Version | Why |
 |---|---|---|
 | Git | ≥ 2.31 | Source control |
-| Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.20, daemon running | The local stack: Postgres, the API, the worker, and the web dev server |
+| Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.24.4 (`wl e2e`'s override uses `!reset` and `!override`), daemon running | The local stack: Postgres, the API, the worker, and the web dev server |
 | uv | ≥ 0.12 | Python versions, dependencies, and running everything; `uv audit` (`wl audit`) |
 | Python | 3.14 | The backend (`uv` installs it: `uv python install 3.14`) |
 | Node | 22.x, ≥ 22.18 (with npm) | The frontend's tools (tests, lint, types, client generation) run on the host |
@@ -75,13 +76,19 @@ uv run wl doctor                 # check the toolchain; fix anything marked ✗ 
                                  # warning clears after `pre-commit install` below)
 uv sync --directory backend      # backend env (backend/.venv)
 npm ci --prefix frontend         # frontend tools (frontend/node_modules); before `wl up`
+(cd frontend && npx playwright install chromium)    # the end-to-end tests' browser
+(cd frontend && sudo env "PATH=$PATH" npx playwright install-deps chromium)
+                                 # its system libraries (apt; `env PATH` because sudo resets
+                                 # PATH and won't find an npx installed by fnm or nvm)
 uv run pre-commit install        # git hooks: ruff, Prettier, ESLint, generated files
 cp .env.example .env             # local settings (never committed); edit if needed
 uv run wl up                     # build and start the stack; applies migrations
 uv run wl check                  # everything CI runs; should be green on a fresh clone
 ```
 
-Then open <http://localhost:5173>: the home page shows whether the API and database are up.
+Then open <http://localhost:5173>: it sends you to sign in. Build the demo data first ("Demo
+data" in section 5) to have someone to sign in as; <http://localhost:5173/status> shows whether
+the API and database are up without signing in.
 
 Nothing is installed on the workstation beyond the tools above: Postgres, the API, the worker,
 and the Vite dev server run in Docker. Tests and the other `wl` tools run on the host and reach
@@ -131,7 +138,8 @@ underlying commands instead of running them, and stops at the first failing step
 | Command | Does |
 |---|---|
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
-| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI — and then `wl audit` |
+| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI — then `wl audit`, then `wl e2e`. `--skip-e2e` leaves the end-to-end tests out, with a warning (CI never skips them) |
+| `wl e2e [args]` | The Playwright end-to-end tests on their own stack: the Compose project `waterline-e2e` (`docker-compose.e2e.yml`: no published database or API port, the web server on `127.0.0.1:5174`, `DEMO_SEED_ENABLED=true`), built, seeded with `seed --demo`, tested in the `light` and `dark` projects, and always torn down with its volume. Runs beside the dev stack, but only one `wl e2e` at a time: a second run shares the project and the first to finish tears it down. Extra args go to `playwright test` (e.g. `wl e2e sign-in --project light`) |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
 | `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
@@ -769,18 +777,25 @@ The rules are in `frontend/CLAUDE.md`, and the UI rules in full, by rule ID, in
 
 ```
 frontend/src/
-  main.ts            mounts App with Pinia and the router
-  App.vue            AppLayout around the router view
-  api/client.ts      the configured openapi-fetch `client`, `api()`, `ApiError`
+  main.ts            imports the styles and mounts createWaterlineApp()
+  App.vue            AuthLayout or AppLayout (the route's `meta.layout`) around the router view
+  api/client.ts      the configured openapi-fetch `client`, `api()`, `ApiError`, the session hook
   api/schema.d.ts    generated by `wl gen-client`; never edit
-  app/               AppLayout.vue (header, nav, content), router.ts, styles.css; route guards
-                     go in app/guards/
-  components/        shared UI components
-  composables/       shared logic
-  stores/            Pinia stores
-  views/<area>/      screens by backend area name, singular (views/project/, views/task/, …);
-                     plus views/home/ (health) and views/errors/ (404)
+  app/               createApp.ts (Pinia, router, PrimeVue, session hook), router.ts, the two
+                     layouts, routeFocus.ts, session.ts; guards/auth.ts; styles/ (main.css,
+                     tokens.css, base.css); theme/preset.ts (PrimeVue's colors)
+  components/        shared UI components: Button, Alert, FormAlert, FormField, TextField,
+                     PasswordField, EmptyState, Icon
+  composables/       shared logic: useFormErrors
+  stores/            Pinia stores: currentUser
+  views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
+                     my_work/; plus status/ and errors/ (404)
+  test/              helpers for the specs: a11y.ts, api.ts (typed responses), router.ts
+frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
 ```
+
+**Routes:** `/` My work; `/sign-in` (signed out only); `/account/change-password`; `/status`
+(open to anyone); anything else, the not-found page.
 
 - **Running it:** `wl up` serves it at <http://localhost:5173> (the `web` service, hot reload on
   the mounted source). To run Vite on the host instead: `docker compose stop web`, then
@@ -811,8 +826,27 @@ frontend/src/
   `src/api/lint-rules.spec.ts` proves the rules fire.
 - **After an API change:** `uv run wl gen-client`, then use the new types; commit both
   generated files.
+- **Signing in and route guards:** `src/app/guards/auth.ts` loads the current user once
+  (`GET /api/auth/me`; a 401 means signed out) and sends a signed-out visitor to `/sign-in`
+  with `next` (the page they asked for), and a user who must change their password to
+  `/account/change-password`. `meta.public` opens a route to anyone, `meta.guest` only to the
+  signed out. `next` is used only when it's a path on this site (`safeNext`: one leading `/`,
+  never `//` or `/\`). A 401 on any later request (the session ended) or a 403
+  `password_change_required` goes through the client's session hook (`onSessionProblem`,
+  wired in `src/app/session.ts`), so views never handle either.
+- **Forms:** `useFormErrors(labels)` maps a 422's `details.fields` to each field (by the last
+  part of `loc`), moves the rest into the form's alert, and builds the screen-reader
+  announcement; other failures get our own wording (`FORM_MESSAGES`: retry for a network error,
+  reload for a 409). See `src/views/auth/SignInView.vue`.
+- **Styles:** Tailwind v4 utilities from the tokens (`src/app/styles/tokens.css`, a copy of
+  `docs/ui/tokens.css`; a new color pair goes in `docs/ui/check_contrast.py`, run as
+  `python3 docs/ui/check_contrast.py frontend/src/app/styles/tokens.css`). PrimeVue reads the
+  same tokens through `src/app/theme/preset.ts`. Dark mode follows the system;
+  `data-theme="light"`/`"dark"` on `<html>` overrides it (the user menu sets it from S1-C14a).
 - **Adding a screen:** a view in `src/views/<area>/`, a route in `src/app/router.ts` (above the
-  not-found route, which must stay last), and a `*.spec.ts` next to it.
+  not-found route, which must stay last), and a `*.spec.ts` next to it that calls
+  `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`: navigation sets the title
+  to `<h1> · Waterline` and moves focus to it.
 
 ## 8. Conventions
 
@@ -972,7 +1006,8 @@ afterwards (see `tests/integration/test_migrations.py`).
   `app/authz/` and `app/rules/` (run by `wl backend test`).
 - **Frontend tests** are Vitest specs next to the code they test (`src/**/*.spec.ts`), run in
   jsdom with Vue Test Utils. Mock only the API client: spy on the method the component calls,
-  with results typed from the generated schema (see `src/views/home/HomeView.spec.ts`):
+  with results typed from the generated schema (see `src/views/status/StatusView.spec.ts`, and
+  the helpers in `src/test/api.ts`):
 
   ```ts
   vi.spyOn(client, 'GET').mockResolvedValue({ data: healthy, response: new Response() })
@@ -981,7 +1016,14 @@ afterwards (see `tests/integration/test_migrations.py`).
   Assert what the user sees (text, roles, links), not component internals. Spies are restored
   after each test (`restoreMocks`). The client itself is tested against a fake `fetch`
   (`src/api/client.spec.ts`). **Coverage gates** (`vitest.config.ts`): 80% of lines overall,
-  90% in `src/composables/`, `src/stores/`, and `src/app/guards/`.
+  90% in `src/composables/`, `src/stores/`, and `src/app/guards/`. Every view and component
+  spec runs axe (`expectNoA11yViolations`, WCAG 2.2 AA tags plus `target-size`; contrast is
+  left to the browser runs, since jsdom can't compute it).
+- **End-to-end tests** (`frontend/e2e/`, Playwright, Chromium) run through `wl e2e` against
+  the demo data, each spec in the `light` and `dark` projects. Each page is checked with axe
+  (`expectNoA11yViolations(page)`, contrast included) and, on pages with sticky headers,
+  `expectFocusNotObscured(page)` (`e2e/support/a11y.ts`). A flow that changes data uses its
+  own user or keys per run (`forcedChangeUser`: `fiona` in light, `felix` in dark).
 - **CLI tests** live in `tools/cli/tests/`: every command's `--help` works, every command has
   `--dry-run`, dry-run output matches the expected commands, and the doctor checks are tested
   with fake probes. The CLI is held to **100% line + branch coverage** (in
@@ -1161,6 +1203,7 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 
 | Symptom | Fix |
 |---|---|
+| `wl e2e` fails with Chromium exiting 127, or `error while loading shared libraries: libnspr4.so` | Chromium's system libraries are missing: `cd frontend && sudo env "PATH=$PATH" npx playwright install-deps chromium`. Plain `sudo npx …` says `npx: command not found`, because sudo resets `PATH`. |
 | `warning: VIRTUAL_ENV=… does not match the project environment path` | Harmless when running `uv run` inside `backend/` from an activated root venv; `wl` strips `VIRTUAL_ENV` for its subprocesses. Deactivate the root venv or use `wl`. |
 | `wl doctor`: Docker daemon not reachable | Start Docker Desktop (with WSL integration on Windows) or `sudo service docker start`. |
 | `wl doctor`: Python 3.14 not found by uv | `uv python install 3.14` |

@@ -127,6 +127,35 @@ def logs(extra: Sequence[str] = ()) -> list[Step]:
     return [step("docker", "compose", "logs", "--follow", *extra)]
 
 
+# The isolated end-to-end stack (docker-compose.e2e.yml), under its own Compose project.
+E2E_COMPOSE = (
+    "docker",
+    "compose",
+    "--project-name",
+    "waterline-e2e",
+    "--file",
+    "docker-compose.yml",
+    "--file",
+    "docker-compose.e2e.yml",
+)
+
+
+def e2e(extra: Sequence[str] = ()) -> list[Step]:
+    """Start the end-to-end stack, seed it with the demo data, and run Playwright (extra
+    arguments go to Playwright). `e2e_down` always follows, pass or fail (DL-65)."""
+    return [
+        step(*E2E_COMPOSE, "up", "--detach", "--wait", "--build"),
+        step(*E2E_COMPOSE, "run", "--rm", "api", "python", "-m", "app.cli", "seed", "--demo"),
+        step("npx", "playwright", "test", *extra, cwd=FRONTEND),
+    ]
+
+
+def e2e_down() -> list[Step]:
+    """Remove the end-to-end stack and its volumes, so the next run starts from an empty
+    database."""
+    return [step(*E2E_COMPOSE, "down", "--volumes")]
+
+
 def gen_client() -> list[Step]:
     """Export the OpenAPI schema from the backend's code, then generate the frontend's types."""
     return [

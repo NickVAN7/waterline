@@ -81,6 +81,12 @@ jobs:
           uv sync --directory backend --locked
           npm ci --prefix frontend
 
+      # The browser `wl e2e` drives (Chromium only in v1), with the system libraries it needs.
+      # Docker, which the end-to-end stack runs in, is already on the runner.
+      - name: Install Playwright's Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
       # Includes `wl audit`: uv audit (both lockfiles), npm audit, and gitleaks over the full
       # history (the version pinned in .pre-commit-config.yaml, as locally). It needs the network.
       - name: wl check

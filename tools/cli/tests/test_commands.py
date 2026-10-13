@@ -1,4 +1,5 @@
 import re
+import subprocess
 
 import pytest
 import typer
@@ -59,6 +60,17 @@ CLI_FMT = [
 ]
 CLI_TEST = ["(cd tools/cli && uv run pytest)"]
 CLI_CHECK = ["uv lock --check", *CLI_LINT, *CLI_TEST]
+E2E_COMPOSE = (
+    "docker compose --project-name waterline-e2e --file docker-compose.yml"
+    " --file docker-compose.e2e.yml"
+)
+E2E_RUN = [
+    f"{E2E_COMPOSE} up --detach --wait --build",
+    f"{E2E_COMPOSE} run --rm api python -m app.cli seed --demo",
+    "(cd frontend && npx playwright test)",
+]
+E2E_DOWN = [f"{E2E_COMPOSE} down --volumes"]
+E2E = [*E2E_RUN, *E2E_DOWN]
 # The repository's audit-allowlist.toml names no Python advisory, so uv audit ignores nothing.
 AUDIT = [
     "uv run python -m waterline_cli.audit network",
@@ -96,7 +108,15 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
-        pytest.param(["check"], [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK, *AUDIT], id="check"),
+        pytest.param(
+            ["check"], [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK, *AUDIT, *E2E], id="check"
+        ),
+        pytest.param(["e2e"], E2E, id="e2e"),
+        pytest.param(
+            ["e2e", "--project", "light"],
+            [*E2E_RUN[:-1], "(cd frontend && npx playwright test --project light)", *E2E_DOWN],
+            id="e2e-pass-through",
+        ),
         pytest.param(["audit"], AUDIT, id="audit"),
         pytest.param(["test"], [*BACKEND_TEST, *FRONTEND_TEST, *CLI_TEST], id="test"),
         pytest.param(["lint"], [*BACKEND_LINT, *FRONTEND_LINT, *CLI_LINT], id="lint"),
@@ -190,3 +210,32 @@ def test_dry_run_prints_underlying_commands(args: list[str], expected: list[str]
 
     assert result.exit_code == 0, result.output
     assert result.output.splitlines() == expected
+
+
+def test_check_skip_e2e_leaves_out_the_end_to_end_tests_and_warns() -> None:
+    result = runner.invoke(app, ["check", "--skip-e2e", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines() == [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK, *AUDIT]
+    assert "End-to-end tests skipped: CI runs them." in result.stderr
+
+
+def test_e2e_tears_the_stack_down_when_a_step_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stack and its volume go even when Playwright (or anything before it) fails."""
+    ran: list[list[str]] = []
+
+    def fake_run(cmd: tuple[str, ...], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        ran.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 1 if "playwright" in cmd else 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = runner.invoke(app, ["e2e"])
+
+    assert result.exit_code == 1
+    assert [" ".join(cmd) for cmd in ran] == [
+        f"{E2E_COMPOSE} up --detach --wait --build",
+        f"{E2E_COMPOSE} run --rm api python -m app.cli seed --demo",
+        "npx playwright test",
+        *E2E_DOWN,
+    ]

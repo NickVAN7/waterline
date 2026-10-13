@@ -65,14 +65,42 @@ def _audit_steps() -> list[Step]:
     return steps.audit(uv_ignores(allowlist))
 
 
+def _run_e2e(extra: list[str], *, dry_run: bool) -> None:
+    try:
+        run_steps(steps.e2e(extra), dry_run=dry_run)
+    finally:
+        run_steps(steps.e2e_down(), dry_run=dry_run)
+
+
 @app.command()
-def check(dry_run: DryRun = False) -> None:
+def check(
+    dry_run: DryRun = False,
+    skip_e2e: Annotated[
+        bool,
+        typer.Option("--skip-e2e", help="Leave out the end-to-end tests (quick loops only)."),
+    ] = False,
+) -> None:
     """Everything CI runs: lockfiles, client freshness, lint, types, import rules, tests,
-    coverage gates, mutation testing, and the supply-chain audit."""
+    coverage gates, mutation testing, the supply-chain audit, and, last, the end-to-end tests."""
     run_steps(
         [*steps.backend_check(), *steps.frontend_check(), *steps.cli_check(), *_audit_steps()],
         dry_run=dry_run,
     )
+    if skip_e2e:
+        typer.secho(
+            "End-to-end tests skipped: CI runs them. Never close a checkpoint with --skip-e2e.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+        return
+    _run_e2e([], dry_run=dry_run)
+
+
+@app.command(context_settings=PASS_THROUGH)
+def e2e(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """End-to-end tests: start an isolated stack seeded with the demo data, run Playwright
+    (extra arguments go to it), and always tear the stack down."""
+    _run_e2e(ctx.args, dry_run=dry_run)
 
 
 @app.command("review-copy")

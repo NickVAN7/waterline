@@ -1,0 +1,8 @@
+/* The app's one stylesheet (docs/ui-design-guide.md §1, §3.5). The layer order lets Tailwind's
+   utilities override PrimeVue without !important; PrimeVue's own CSS lands in `primevue`. */
+@layer theme, base, primevue, components, utilities;
+
+@import 'tailwindcss';
+@import 'tailwindcss-primeui';
+@import './tokens.css';
+@import './base.css';
