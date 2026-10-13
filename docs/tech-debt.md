@@ -275,9 +275,9 @@ Entry format:
   latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
   The vulnerable code only expands glob patterns from the repository's own ESLint
   configuration, never untrusted input, and never ships in the app.
-- **Fix by:** S1-C14 (the first checkpoint that grows the frontend): update once a fixed
-  `braces` (or a `fast-glob`/`micromatch` without it) is published, and remove the allowlist
-  entry; if none is by then, re-target with the owner.
+- **Fix by:** S1-C17 (its tech-debt review; DL-86, still no fixed `braces` on Oct 13, 2026):
+  update once a fixed `braces` (or a `fast-glob`/`micromatch` without it) is published, and
+  remove the allowlist entry; if none is by then, re-target with the owner.
 - **Status:** open
 
 ### TD-20: What the git guard can't see

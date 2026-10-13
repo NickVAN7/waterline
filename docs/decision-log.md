@@ -1096,3 +1096,54 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   S1-C13 row); `app/authz/`
 - **Source:** chat session (owner, Oct 12, 2026, with DL-81; the no-op and unclassified rules:
   docs-consistency decisions on DL-81 and DL-82)
+
+### DL-83: Demo seed data, `wl seed --demo` (S1-C13a)
+- **Date:** 2026-10-13
+- **Decision:** `wl seed --demo` builds a fixed demo dataset in an empty database, through the
+  services so every audit event is recorded, and refuses a database that already holds a
+  workspace; it creates the workspace and its system admin itself. It is also the data `wl e2e`
+  seeds its stack with. Every demo user shares one known password, documented in the developer
+  guide. The contents are listed in the build plan (S1-C13a row). It is built as a new
+  checkpoint, S1-C13a, since it changes app code (`app/cli.py`).
+- **Supersedes:** the build plan's workflow item "Before S1-C14: demo seed data"; "`wl e2e` …
+  seeds it with the non-interactive `wl seed`" (build plan, "Developer CLI"; testing-strategy)
+- **Superseded by:** none
+- **Applies to:** build plan (checkpoint table, S1-C13a row; "Workflow items scheduled";
+  "Developer CLI"; "Authentication", seed command; groups; "Done when"); testing-strategy
+  ("Test layers"); developer guide (status)
+- **Source:** chat session (owner, Oct 13, 2026: one workspace, two orgs, two projects each, a
+  workspace admin, an org admin per org, a lead per project, five users per project with one in
+  each org on both its projects; the extra users and projects proposed by Claude and accepted)
+
+### DL-84: S1-C14 split into S1-C14 and S1-C14a
+- **Date:** 2026-10-13
+- **Decision:** S1-C14 (Web: foundations & sign-in) builds the styling foundation, the accessibility
+  tooling, Playwright and `wl e2e`, the current-user store, route guards, error handling,
+  sign-in, the forced password change, and `/` as My work with its `h1` and empty state (the
+  status page moving to `/status`); S1-C14a (Web: app shell) builds the shell, My work's
+  projects section, account settings, the theme choice, the no-access page, the reserved-route
+  test, `useListQuery`, the `allowed_actions` pattern, and the first skeleton loaders. So the
+  foundation every screen depends on is reviewed before the screens are built on it.
+- **Supersedes:** the single S1-C14 row ("Web: auth & app shell")
+- **Superseded by:** none
+- **Applies to:** build plan (checkpoint table; groups; "Workflow items scheduled"; "Web shell";
+  "Workspace, organizations & memberships"; "Web screens"); screen-inventory (step 5)
+- **Source:** chat session (owner, Oct 13, 2026)
+
+### DL-85: The theme choice ships with the app shell (S1-C14a)
+- **Date:** 2026-10-13
+- **Decision:** The System / Light / Dark choice in the account menu (ui-design-guide UI-TOK-2)
+  is built in S1-C14a with the user menu, not deferred.
+- **Supersedes:** ui-design-guide §10 open item 7 ("recommended to ship with S1-C14")
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C14a row; "Web screens"); ui-design-guide (§10, item 7)
+- **Source:** chat session (owner, Oct 13, 2026)
+
+### DL-86: TD-19 re-targeted to the S1-C17 tech-debt review
+- **Date:** 2026-10-13
+- **Decision:** The `braces` advisory stays allowlisted; no fixed `braces` is published (3.0.3 is
+  still the latest), and the S1-C17 tech-debt review revisits it.
+- **Supersedes:** TD-19's "Fix by: S1-C14"
+- **Superseded by:** none
+- **Applies to:** tech-debt (TD-19)
+- **Source:** chat session (owner, Oct 13, 2026)

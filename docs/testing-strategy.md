@@ -30,8 +30,8 @@ tested, what each kind of test is for, and the gates every change passes.
 | End-to-end | Critical user flows through the browser against the full stack | Real Postgres (seeded) | Playwright (Chromium only in v1) | `frontend/e2e/` |
 
 - **End-to-end tests start in Slice 1** (sign-in and project creation) and cover each slice's
-  critical flows, not every screen. Most behavior is proven at the cheaper layers. CI seeds
-  the stack with the non-interactive `wl seed` before running them.
+  critical flows, not every screen. Most behavior is proven at the cheaper layers. `wl e2e`
+  seeds the stack with the demo dataset (`wl seed --demo`, DL-83) before running them.
 - Frontend component tests mock only the API client, using the generated types, so mocks can't
   drift from the real API shapes.
 

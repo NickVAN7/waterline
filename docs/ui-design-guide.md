@@ -941,14 +941,14 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    (Slice 2).
 6. **My work styling** (UI-SHL-5) and the **admin entry point** (UI-SHL-10): revisit once pages
    are populated; both are defaults the owner accepted for now.
-7. **Theme override** (UI-TOK-2): recommended to ship with S1-C14 since both themes' tokens
-   exist; if deferred, the system default still works.
+7. **Theme override** (UI-TOK-2): ships with S1-C14a, in the user menu (DL-85).
 8. **Enum mappings:** tone and icon for requirement, task, test, and approval statuses and for
    priority and severity are decided as each first appears (UI-FBK-5).
 9. **Custom error page:** a more distinctive 404/403 design is planned (UI-FBK-14); content
    only.
-10. **Reconcile with S0-C7:** I could not see the repo, so check the existing shell, router,
-   404 page, and health page against §4 and §6.1 when S1-C14 starts.
+10. **Reconcile with S0-C7:** I could not see the repo, so check the existing router, 404
+   page, and health page against §4 and §6.1 when S1-C14 starts, and the shell when S1-C14a
+   starts (DL-84).
 
 ---
 

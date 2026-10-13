@@ -124,7 +124,7 @@ Workspace (the firm: tenant boundary)
   - Any shimmer animation is off under `prefers-reduced-motion`.
   - Actions such as saving a form show a pending state on the control itself, not a skeleton.
 
-  The first skeletons are built in Slice 1 (build plan, Checkpoint 14).
+  The first skeletons are built in Slice 1 (build plan, Checkpoint 14a).
 - **Design guide (step 7; done as a draft, `docs/ui-design-guide.md`):** the styling approach
   (PrimeVue plus Tailwind, one token set; SVAR for the board and editable grids); the brand
   accent from the logo; the skeleton-loader rules above; WCAG 2.2 AA (design-doc §1): never
