@@ -141,9 +141,11 @@ E2E_COMPOSE = (
 
 
 def e2e(extra: Sequence[str] = ()) -> list[Step]:
-    """Start the end-to-end stack, seed it with the demo data, and run Playwright (extra
-    arguments go to Playwright). `e2e_down` always follows, pass or fail (DL-65)."""
+    """Clear any stack an earlier run left behind (its database would refuse the demo seed),
+    start the end-to-end stack, seed it with the demo data, and run Playwright (extra arguments
+    go to Playwright). `e2e_down` always follows, pass or fail (DL-65)."""
     return [
+        *e2e_down(),
         step(*E2E_COMPOSE, "up", "--detach", "--wait", "--build"),
         step(*E2E_COMPOSE, "run", "--rm", "api", "python", "-m", "app.cli", "seed", "--demo"),
         step("npx", "playwright", "test", *extra, cwd=FRONTEND),

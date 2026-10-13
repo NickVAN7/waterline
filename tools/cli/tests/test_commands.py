@@ -64,12 +64,14 @@ E2E_COMPOSE = (
     "docker compose --project-name waterline-e2e --file docker-compose.yml"
     " --file docker-compose.e2e.yml"
 )
+E2E_DOWN = [f"{E2E_COMPOSE} down --volumes"]
+# A leftover stack is cleared first, so the demo seed always meets an empty database.
 E2E_RUN = [
+    *E2E_DOWN,
     f"{E2E_COMPOSE} up --detach --wait --build",
     f"{E2E_COMPOSE} run --rm api python -m app.cli seed --demo",
     "(cd frontend && npx playwright test)",
 ]
-E2E_DOWN = [f"{E2E_COMPOSE} down --volumes"]
 E2E = [*E2E_RUN, *E2E_DOWN]
 # The repository's audit-allowlist.toml names no Python advisory, so uv audit ignores nothing.
 AUDIT = [
@@ -234,6 +236,7 @@ def test_e2e_tears_the_stack_down_when_a_step_fails(monkeypatch: pytest.MonkeyPa
 
     assert result.exit_code == 1
     assert [" ".join(cmd) for cmd in ran] == [
+        *E2E_DOWN,
         f"{E2E_COMPOSE} up --detach --wait --build",
         f"{E2E_COMPOSE} run --rm api python -m app.cli seed --demo",
         "npx playwright test",
