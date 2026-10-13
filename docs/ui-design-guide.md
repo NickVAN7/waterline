@@ -543,7 +543,9 @@ render inside the full shell when signed in.
   generated temporary password, UI-FRM-11), a **requirements list** sits under the field
   (`PasswordRequirements`): each requirement the server publishes (`GET
   /api/auth/password-policy`, its label included) is a line with an icon and text that turns
-  from unmet to met as the user types, never color alone. The list is tied to the field with
+  from unmet to met as the user types, never color alone; the icon's state is also visually
+  hidden text ("Met" / "Not met"), read with the label; a 422-marked line's visible "Not met:"
+  takes its place (DL-96). The list is tied to the field with
   `aria-describedby`, so it is read when the field gets focus, and is not a live region: nothing
   is announced per keystroke. A requirement the screen can't check (one it doesn't know, or "not
   your current password" with no current-password field) is shown as plain text. No number is

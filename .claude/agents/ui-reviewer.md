@@ -116,7 +116,8 @@ correct; you decide whether the code does it.
   confirm field, and the show/hide toggle inside the field (28×28, `aria-label`, `aria-pressed`,
   `title`) with the browser's reveal icon hidden? Where users choose their own new password, is
   the `PasswordRequirements` list under the field, built from `GET /api/auth/password-policy`
-  with no number in the code, icon and text per line, tied by `aria-describedby`, and not
+  with no number in the code, icon and text per line, each line's state as hidden "Met" / "Not
+  met" text read with its label, replaced by the visible cue on a 422-marked line (DL-96), tied by `aria-describedby`, and not
   announced per keystroke? Does a 422 on a listed requirement mark that line (not a second
   message under the field), with the field still invalid, counted, and focused (DL-94), the line
   keeping its label prefixed "Not met:" (DL-95)?

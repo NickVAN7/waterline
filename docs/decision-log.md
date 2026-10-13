@@ -1254,3 +1254,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide (UI-FRM-4, UI-FRM-10); `.claude/agents/ui-reviewer.md`
 - **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-94, option a)
+
+### DL-96: A requirement line's icon names its state for screen readers
+- **Date:** 2026-10-13
+- **Decision:** Each line of the password requirements list (DL-91) carries its met or unmet
+  state as visually hidden text with its icon ("Met" / "Not met"), read with the line's label
+  wherever the list is read (when the field gets focus, or browsing the list); there is still no
+  live announcement (DL-91). On a line a 422 marked, the visible "Not met:" cue (DL-95) takes
+  the hidden text's place, so it is read once. A line the screen can't check has no state.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-10); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-95, option b)
