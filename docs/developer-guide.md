@@ -4,9 +4,8 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C13 (Classification & export control) done; next is S1-C13a (Demo seed data,
-> `wl seed --demo`), then S1-C14 (Web: foundations & sign-in) and S1-C14a (Web: app shell; DL-83,
-> DL-84). A project's classification is set at creation or with `PUT
+> **Status:** S1-C13 (Classification & export control) done; S1-C13a (Demo seed data) built `wl seed --demo` (section 5, "Demo
+> data"); next is S1-C14 (Web: foundations & sign-in), then S1-C14a (Web: app shell; DL-84). A project's classification is set at creation or with `PUT
 > /api/projects/{key}/classification` (`project.raise_classification`,
 > `project.lower_classification`), export control needs a confirmation on every member add and
 > when it's added, and both access reviews show `access` (`content` or `management`; build plan,
@@ -156,6 +155,7 @@ container from the api service's image: `docker compose run --rm api ...`, after
 | Command | Does |
 |---|---|
 | `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
+| `wl seed --demo` | Build the demo dataset instead, workspace and system admin included ("Demo data" in section 5): refused once a workspace exists, and unless `DEMO_SEED_ENABLED=true` (the `.env.example` default; off otherwise, and never on in production, since every demo account has the same public password). Takes no other values |
 | `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
 | `wl admin revoke-system-admin <email>` | Take it away; refused for the last active system admin |
 
@@ -484,6 +484,38 @@ case there — including an indirect path (A → B → forbidden) wherever indir
   main stack first (`wl down`) or change the ports in its `.env`.
 - Ports are published on `127.0.0.1` only, so nothing in the stack (the dev database, with its
   public default password, included) is reachable from other machines on your network.
+
+### Demo data
+
+`uv run wl seed --demo` fills an empty dev database with a fixed workspace to look at in the
+browser (`backend/app/demo.py`; build plan, S1-C13a). The end-to-end tests run on the same data.
+To start over: `uv run wl down -v && uv run wl up && uv run wl seed --demo`. It runs only where
+`DEMO_SEED_ENABLED=true` (in `.env.example`; an `.env` copied before S1-C13a needs the line
+added).
+
+Every account's email is `<username>@harbor.example`, and every password is `harbor-demo`.
+The workspace is Harbor Consulting (`harbor`), with two orgs, Acme Manufacturing (`acme`) and
+Globex Retail (`globex`). Each step is recorded in the audit log as the person who would take it:
+the system admin creates the orgs, each org's owner adds its members, creates its projects, and
+archives `LEGACY`, and each lead adds the project's members. Each step is checked against the
+permission its endpoint checks, so a step the app would refuse fails the seed.
+
+| Username | Role |
+|---|---|
+| `admin` | System admin, workspace owner |
+| `wendy` | Workspace admin |
+| `olivia`, `oscar` | Owner of `acme`, of `globex` |
+| `liam`, `lena`, `luke` | Leads (project admins) of `ERP`, `PORTAL`, and the archived `LEGACY` (`acme`) |
+| `leo`, `lucy` | Leads of `INV` and `FIN` (`globex`; `FIN` is Confidential, `financial`) |
+| `amara`, `ella`, `ivan`, `noah` | Project admin of `ERP`, `PORTAL`, `INV`, `FIN` |
+| `ben`, `chloe` | Members of `ERP` and the archived `LEGACY` |
+| `finn`, `jade`, `omar`, `priya` | Members of `PORTAL`, `INV`, `FIN`, `FIN` |
+| `sam` | Member of both `acme` projects (`ERP`, `PORTAL`) |
+| `max` | Member of both `globex` projects (`INV`, `FIN`) |
+| `casey` | In both orgs: member of `PORTAL` and `INV` |
+| `dev`, `hana`, `kira`, `quinn` | Viewers of `ERP`, `PORTAL`, `INV`, `FIN` |
+| `fiona`, `felix` | Members of `ERP` who must change their password at sign-in (one per theme run of the end-to-end flow) |
+| `nora` | No memberships: the no-access page |
 
 ### Local Postgres
 

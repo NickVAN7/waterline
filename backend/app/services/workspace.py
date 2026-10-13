@@ -11,7 +11,6 @@ from app.authz.context import AuthzContext
 from app.authz.target import workspace_target
 from app.core.errors import ForbiddenError, ValidationFailedError
 from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
-from app.core.security import hash_password
 from app.enums import AuditAction, AuditEntityType, WorkspaceRole
 from app.models.org import Organization
 from app.models.user import User
@@ -97,20 +96,6 @@ class WorkspaceService:
         workspace = Workspace(name=workspace_name.strip(), slug=workspace_slug)
         self.session.add(workspace)
         await self.session.flush()
-        user = await UserService(self.session).create(
-            email=email,
-            username=username,
-            name=name.strip(),
-            password_hash=await hash_password(password),
-            is_system_admin=True,
-        )
-        self.session.add(
-            WorkspaceMembership(
-                workspace_id=workspace.id, user_id=user.id, role=WorkspaceRole.OWNER
-            )
-        )
-        await self.session.flush()
-
         log_admin_event(
             self.session,
             action=AuditAction.WORKSPACE_CREATED,
@@ -120,13 +105,20 @@ class WorkspaceService:
             entity_id=workspace.id,
             details={"name": workspace.name, "slug": workspace.slug},
         )
-        log_admin_event(
-            self.session,
-            action=AuditAction.USER_CREATED,
-            actor_id=None,
-            workspace_id=workspace.id,
-            target_user_id=user.id,
+        user = await UserService(self.session).create_seeded(
+            workspace.id,
+            email=email,
+            username=username,
+            name=name,
+            password=password,
+            is_system_admin=True,
         )
+        self.session.add(
+            WorkspaceMembership(
+                workspace_id=workspace.id, user_id=user.id, role=WorkspaceRole.OWNER
+            )
+        )
+        await self.session.flush()
         log_admin_event(
             self.session,
             action=AuditAction.SYSTEM_ADMIN_GRANTED,

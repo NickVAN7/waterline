@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # .env; off in production) — build-plan.md, "API foundations".
     api_docs_enabled: bool = False
 
+    # `wl seed --demo`, whose accounts share one known password: off unless enabled (on in dev
+    # through .env.example and on the `wl e2e` stack; never in production) — DL-90.
+    demo_seed_enabled: bool = False
+
     # Session lengths (design-doc §4, "Sessions"): a session ends after this long without a
     # request, and in any case this long after sign-in. In env, ISO 8601 durations (`P7D`).
     # The idle timeout must exceed the gap between `last_seen_at` writes, or an active user's

@@ -216,6 +216,35 @@ class UserService:
         await self.session.flush()
         return user
 
+    async def create_seeded(
+        self,
+        workspace_id: uuid.UUID,
+        *,
+        email: str,
+        username: str,
+        name: str,
+        password: str,
+        is_system_admin: bool = False,
+    ) -> User:
+        """A user made by the seed command, not by an admin (`wl seed`'s first system admin and
+        the demo's users, DL-88): no `must_change_password`, and `user_created` with no actor. The
+        caller has validated the values."""
+        user = await self.create(
+            email=email,
+            username=username,
+            name=name.strip(),
+            password_hash=await hash_password(password),
+            is_system_admin=is_system_admin,
+        )
+        log_admin_event(
+            self.session,
+            action=AuditAction.USER_CREATED,
+            actor_id=None,
+            workspace_id=workspace_id,
+            target_user_id=user.id,
+        )
+        return user
+
     async def create_account(
         self,
         actor_id: uuid.UUID,
