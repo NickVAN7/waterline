@@ -130,9 +130,10 @@ tested, what each kind of test is for, and the gates every change passes.
     proven able to fail by a deliberately violating fixture (ui-design-guide §9);
   - every end-to-end flow runs its axe checks in both themes, light and dark (`colorScheme`
     emulation), since jsdom has no layout and contrast and target size are checked only there;
+    a flow that creates data uses keys and users unique to the run (DL-87);
   - `expectFocusNotObscured()`, an end-to-end helper: Tab through the shell pages, a page with
     a toast showing, and a table with rows selected, and the focused element is never covered
-    (WCAG 2.4.11);
+    (WCAG 2.4.11); proven able to fail on a sticky-header fixture (S1-C14, DL-89);
   - end-to-end tests run inside `wl check` (`wl e2e`, on an isolated seeded stack; DL-65), so a
     green local `wl check` means a green CI;
   - for each SVAR widget wrapper (from the first checkpoint that ships a board or an editable

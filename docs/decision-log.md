@@ -1107,7 +1107,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   checkpoint, S1-C13a, since it changes app code (`app/cli.py`).
 - **Supersedes:** the build plan's workflow item "Before S1-C14: demo seed data"; "`wl e2e` …
   seeds it with the non-interactive `wl seed`" (build plan, "Developer CLI"; testing-strategy)
-- **Superseded by:** none
+- **Superseded by:** DL-87 (in part: two forced-change users, not one)
 - **Applies to:** build plan (checkpoint table, S1-C13a row; "Workflow items scheduled";
   "Developer CLI"; "Authentication", seed command; groups; "Done when"); testing-strategy
   ("Test layers"); developer guide (status)
@@ -1147,3 +1147,45 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** tech-debt (TD-19)
 - **Source:** chat session (owner, Oct 13, 2026)
+
+### DL-87: One forced-change demo user per theme run
+- **Date:** 2026-10-13
+- **Decision:** The demo data has two users who must change their password, one for each theme's
+  run of the forced-change flow, since the flow clears the flag. End-to-end flows that create
+  data use keys and users unique to the run, so each flow can run in both themes on one stack.
+- **Supersedes:** DL-83's "one user who must change their password"
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C13a, S1-C14, and S1-C16 rows); testing-strategy
+  ("Accessibility")
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 1 on DL-83 to DL-86)
+
+### DL-88: Demo users are created as the plain seed creates the first admin
+- **Date:** 2026-10-13
+- **Decision:** `wl seed --demo` creates its users through the same service path `wl seed` uses
+  for the first system admin (no `must_change_password`, no actor on the audit events), except the
+  forced-change users, and adds their memberships through the org, roster, and project services.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C13a row)
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 2 on DL-83 to DL-86)
+
+### DL-89: `expectFocusNotObscured()` is proven in S1-C14, run on the shell in S1-C14a
+- **Date:** 2026-10-13
+- **Decision:** S1-C14 builds `expectFocusNotObscured()` and proves it can fail on a test fixture
+  with a sticky header; S1-C14a runs it on the shell pages.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C14 and S1-C14a rows); testing-strategy ("Accessibility");
+  ui-design-guide (§9)
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 3 on DL-83 to DL-86)
+
+### DL-90: `wl seed --demo` runs only where a setting allows it
+- **Date:** 2026-10-13
+- **Decision:** `wl seed --demo` refuses to run unless the `demo_seed_enabled` setting is on. It is
+  off by default and turned on only in `.env.example` (the local-dev default) and on the `wl e2e`
+  stack, as `api_docs_enabled` is, so a production database never gets known-password accounts.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C13a row; "Authentication", seed command; "Developer CLI";
+  "Done when")
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 4 on DL-83 to DL-86)
