@@ -115,6 +115,13 @@ class ProjectRepository:
             statement = statement.with_for_update(of=ProjectMembership)
         return await self.session.scalar(statement)
 
+    async def member_ids(self, project_id: uuid.UUID) -> set[uuid.UUID]:
+        """The user IDs of the project's explicit members, every role."""
+        rows = await self.session.scalars(
+            select(ProjectMembership.user_id).where(ProjectMembership.project_id == project_id)
+        )
+        return set(rows)
+
     def candidates(self, project: Project) -> Select[User]:
         """The picker: active org members and staff of the project's workspace not yet on the
         project (for a `ListSpec`)."""

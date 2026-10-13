@@ -7,7 +7,7 @@ lock order apply to it (DL-71). Each area describes its roster (`RosterSpec`) an
 `Roster`."""
 
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, cast
@@ -191,11 +191,17 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         )
 
     async def add_user(
-        self, ctx: AuthzContext, user: User, role: R, *, loc: tuple[str, ...] = ("body", "email")
+        self,
+        ctx: AuthzContext,
+        user: User,
+        role: R,
+        *,
+        loc: tuple[str, ...] = ("body", "email"),
+        details: Mapping[str, JsonValue] | None = None,
     ) -> Row:
-        """Add `user`, already checked, with `role`. Two adds of the same person racing: the
-        loser's unique violation is `already_member` on `loc`, the field its request used
-        (DL-80)."""
+        """Add `user`, already checked, with `role`; `details` go in the added event beside the
+        role. Two adds of the same person racing: the loser's unique violation is
+        `already_member` on `loc`, the field its request used (DL-80)."""
         if role == self.spec.owner:
             # A new owner joins the owners' lock (TD-25): a role change or removal holding it
             # finishes first, so the owners it locks never change under it.
@@ -208,7 +214,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             if not _already_member(exc):
                 raise
             raise _field_error(loc, self.spec.already_member, "already_member") from exc
-        self._log(self.spec.added, ctx, user.id, role=role.value)
+        self._log(self.spec.added, ctx, user.id, role=role.value, **(details or {}))
         membership.user = user
         return self.row(ctx, membership)
 
@@ -218,12 +224,13 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         email: str,
         role: R,
         *,
-        admit: Callable[[User], Awaitable[None]] | None = None,
+        admit: Callable[[User], Awaitable[Mapping[str, JsonValue] | None]] | None = None,
     ) -> Row:
         """Add an existing account, found by email: 422 on `email`, in this order, when it's
         already on the roster (`already_member`), has no account (`no_account`; the form goes on
         to create one), or is deactivated (`account_inactive`). `admit`, last, may refuse the
-        account or prepare its add (a project's `outside_org` and `join_org`, DL-78)."""
+        account or prepare its add (a project's `outside_org` and `join_org`, DL-78), and returns
+        any details for the added event (an export-control confirmation, DL-81)."""
         self._ensure_role_change(ctx, role)
         user = await UserRepository(self.session).get_by_email(email.strip().lower())
         if user is not None and await self.repository.membership(self.scope_id, user.id):
@@ -232,9 +239,8 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             raise _email_error("No account has this email.", "no_account")
         if not user.is_active:
             raise _email_error("This account is deactivated.", "account_inactive")
-        if admit is not None:
-            await admit(user)
-        return await self.add_user(ctx, user, role)
+        details = await admit(user) if admit is not None else None
+        return await self.add_user(ctx, user, role, details=details)
 
     async def create(self, ctx: AuthzContext, payload: NewUser, role: R) -> Row:
         """Create the account (with `must_change_password` set) and its membership in one step

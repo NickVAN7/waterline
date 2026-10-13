@@ -296,7 +296,8 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
   - **Content items** (requirements, tasks, test cases; later RAID items, status reports, budget
     lines, attachments) can raise the level and add categories, never go below the project's.
   - **Effective classification** = the stricter of the item's and the project's levels, plus
-    the union of their categories.
+    the union of their categories. Unclassified with Internal is Internal (owner decision,
+    Oct 12, 2026).
   - **Everything else inherits:** phases, milestones, workstreams, sprints, and test runs from
     the project; subtasks, comments, and links from their parent; approval requests from what
     they approve; a test result from its test case.

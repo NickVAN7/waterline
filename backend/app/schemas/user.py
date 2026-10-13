@@ -4,7 +4,7 @@ from enum import StrEnum
 from pydantic import BaseModel
 
 from app.authz.actions import Action
-from app.enums import WorkspaceRole
+from app.enums import AccessKind, WorkspaceRole
 
 
 class EmailCheck(BaseModel):
@@ -94,6 +94,9 @@ class ProjectReach(BaseModel):
     organization_id: uuid.UUID
     archived: bool
     reasons: list[AccessReason]
+    # `management`: reached as an inherited admin without an explicit membership on an
+    # export-controlled project (design-doc §3.1; DL-81).
+    access: AccessKind
 
 
 class AccessReview(BaseModel):

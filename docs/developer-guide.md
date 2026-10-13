@@ -4,8 +4,12 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C12 (Project members) done; next is S1-C13 (Classification & export control).
-> Project members are listed, picked, added by user ID or email (with `join_org` for someone from
+> **Status:** S1-C13 (Classification & export control) done; next is S1-C14 (Web: auth & app
+> shell). A project's classification is set at creation or with `PUT
+> /api/projects/{key}/classification` (`project.raise_classification`,
+> `project.lower_classification`), export control needs a confirmation on every member add and
+> when it's added, and both access reviews show `access` (`content` or `management`; build plan,
+> "Classification & export control"). S1-C12 (Project members) built the members: they are listed, picked, added by user ID or email (with `join_org` for someone from
 > outside the org), created, re-roled, and removed at `/api/projects/{key}/members`, and the
 > per-project access review is at `/api/projects/{key}/access` (build plan, "The project members
 > API"). S1-C11 (Projects) built the projects themselves. Projects are created in an
@@ -323,7 +327,8 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   that lock too, TD-25). The workspace and org services each describe their roster in a
   `RosterSpec` and call a `Roster`. Project members are a third roster with no owner role
   (`owner=None`, `manage_admins=None`; DL-71): it uses the list, the email-first add (whose
-  `admit` hook adds the project's `outside_org` and `join_org` step, DL-78), and `add_user`; the
+  `admit` hook adds the project's `outside_org` and `join_org` step, DL-78, and returns any details
+for the added event, such as the export-control confirmation, DL-81), and `add_user`; the
   project service changes roles and removes members itself. Two adds of one person racing: the
   roster turns the loser's unique violation into `already_member` on the field it used (`loc`,
   DL-80). Project member changes lock the project row first, then the membership.
@@ -400,14 +405,19 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
   `archive_exempt`, for a personal action its `relationship`, `visible` (granted to anyone
   who can see the target, e.g. `org.view` for a project member with no org role), and a targeted
   `rule(ctx, target)` checked after the roles (e.g. `user.check`: an admin role anywhere in the
-  target's workspace, DL-68). Real actions are members of
+  target's workspace, DL-68). Each action is marked `access`, content or management (design-doc
+  §3.1; the default is content, the closed side, so every management action says so, and every
+  action so far does; the export-control gate that reads it comes in Slice 2), and `explicit_when_export_controlled` makes only the explicit project role
+  grant it on an export-controlled project (`project.lower_classification`, DL-82). Real actions
+  are members of
   `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
   (DL-44); an unregistered action is denied. A project-level action normally sets
   `workspace_role=ADMIN, org_role=ADMIN` (inherited project admin).
 - **The context** (`AuthzContext`): the user's system-admin flag and memberships (each org's
   workspace in `org_workspaces`; each project's org, workspace, and `archived` state), loaded once
   per request (`UserRepository.authz_context`; an endpoint takes `ctx: AuthzContextDep`).
-- **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)`, and
+- **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)` (with
+  the project's `archived`, `enabled_modules`, and `export_controlled`), and
   `user_target(workspace_id, user_id, account)` for a user (level `user`, DL-73), whose actions
   apply the rank rule to `rank_account(ctx)` (`app/authz/context.py`). A user is seen by
   themselves, the workspace's owners/admins and system admins, and anyone with a membership of
@@ -617,7 +627,15 @@ before using or returning the row. List and feed queries never use it.
 nullable) and `classification_categories` (`text[]`, default `{}`). The model also adds
 `classification_categories_check(...)` to its `__table_args__` with the categories it allows:
 `PROJECT_CATEGORIES` on `project`, `CONTENT_ITEM_CATEGORIES` on content items
-(`export_controlled` is project-only in v1).
+(`export_controlled` is project-only in v1). `app/rules/classification.py` has the effective
+classification (`effective(item, project)`) and whether a change raises or lowers it
+(`change(old, new)`; unclassified ranks as Internal). The project service checks an export-control
+confirmation with `_confirmation(values, needed=..., members=...)`: the 422s
+`confirmation_required`, `members_changed`, and `confirmation_not_needed`, under the project's row
+lock, with the confirmation returned for the audit event (DL-81). `set_classification` checks its
+rights after taking the project's lock, against the project and the caller's own project role
+read again under it (`_with_current_role`): a removal takes that lock first, so an explicit admin
+removed meanwhile can't lower (owner decision, S1-C13 review).
 
 **Relationships** are always `lazy="raise"`: load what you use with `selectinload` /
 `joinedload` in the repository. Touching an unloaded relationship raises instead of emitting
@@ -625,8 +643,10 @@ SQL (which async sessions can't do).
 
 **Convention checks** (`tests/unit/core/test_model_conventions.py`) walk every mapped model and
 fail if a relationship isn't `lazy="raise"`, a model dropped `eager_defaults=True` (for example
-by replacing `__mapper_args__`), or a model has a `version` column that isn't checked (for
-example `VersionMixin` listed after `TimestampMixin`).
+by replacing `__mapper_args__`), a model has a `version` column that isn't checked (for
+example `VersionMixin` listed after `TimestampMixin`), or a classifiable model (`project`,
+`requirement`, `task`, `testcase`, or one with a `classification_*` column) doesn't use
+`ClassificationMixin`.
 
 ### Migrations
 

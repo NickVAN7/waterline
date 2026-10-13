@@ -12,7 +12,7 @@ from enum import StrEnum
 
 from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target
-from app.enums import OrgRole, ProjectRole, WorkspaceRole
+from app.enums import AccessKind, OrgRole, ProjectRole, WorkspaceRole
 from app.rules.account_rank import Account, can_manage_account
 
 
@@ -43,6 +43,11 @@ class ActionSpec:
       of the roles above: e.g. `org.view`, for a project member who has no org role.
     - `rule`: a targeted rule granting it on top of the roles above, from the whole context
       (e.g. `user.check`: an admin role anywhere in the target's workspace, DL-68).
+    - `access`: content or management (design-doc §3.1, §5); the export-control gate that uses
+      it comes in Slice 2. The default is content, the closed side: an action someone forgets to
+      mark is never let past the gate (S1-C13 security review).
+    - `explicit_when_export_controlled`: on an export-controlled project, only the project role
+      grants it, so an inherited admin without an explicit membership is denied (DL-82).
     """
 
     level: Level
@@ -54,6 +59,8 @@ class ActionSpec:
     relationship: Callable[[uuid.UUID, object], bool] | None = None
     visible: bool = False
     rule: Callable[[AuthzContext, Target], bool] | None = None
+    access: AccessKind = AccessKind.CONTENT
+    explicit_when_export_controlled: bool = False
 
 
 class Action(StrEnum):
@@ -79,10 +86,14 @@ class Action(StrEnum):
     PROJECT_UNARCHIVE = "project.unarchive"
     PROJECT_MEMBER_MANAGE = "project_member.manage"
     PROJECT_VIEW_ACCESS = "project.view_access"
+    PROJECT_RAISE_CLASSIFICATION = "project.raise_classification"
+    PROJECT_LOWER_CLASSIFICATION = "project.lower_classification"
 
 
 # Workspace owners/admins, and system admins (DL-45).
-_WORKSPACE_ADMINS = ActionSpec(Level.WORKSPACE, workspace_role=WorkspaceRole.ADMIN)
+_WORKSPACE_ADMINS = ActionSpec(
+    Level.WORKSPACE, access=AccessKind.MANAGEMENT, workspace_role=WorkspaceRole.ADMIN
+)
 
 
 def _adds_people_in_workspace(ctx: AuthzContext, target: Target) -> bool:
@@ -114,53 +125,81 @@ def _self_or_outranks(ctx: AuthzContext, target: Target) -> bool:
 
 REGISTRY: dict[str, ActionSpec] = {
     Action.WORKSPACE_VIEW: ActionSpec(
-        Level.WORKSPACE, workspace_role=WorkspaceRole.ADMIN, mutation=False
+        Level.WORKSPACE,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        mutation=False,
     ),
-    Action.WORKSPACE_UPDATE: ActionSpec(Level.WORKSPACE, workspace_role=WorkspaceRole.OWNER),
+    Action.WORKSPACE_UPDATE: ActionSpec(
+        Level.WORKSPACE, access=AccessKind.MANAGEMENT, workspace_role=WorkspaceRole.OWNER
+    ),
     Action.WORKSPACE_STAFF_MANAGE: _WORKSPACE_ADMINS,
     Action.ORG_CREATE: _WORKSPACE_ADMINS,
     # Granting, changing, or removing an owner or admin role: workspace owners (DL-56).
     Action.WORKSPACE_STAFF_MANAGE_ADMINS: ActionSpec(
-        Level.WORKSPACE, workspace_role=WorkspaceRole.OWNER
+        Level.WORKSPACE, access=AccessKind.MANAGEMENT, workspace_role=WorkspaceRole.OWNER
     ),
     # Anyone who sees the org, a project member with no org role included (DL-56).
-    Action.ORG_VIEW: ActionSpec(Level.ORGANIZATION, mutation=False, visible=True),
+    Action.ORG_VIEW: ActionSpec(
+        Level.ORGANIZATION, access=AccessKind.MANAGEMENT, mutation=False, visible=True
+    ),
     # Org owners, and workspace admins' "org owner capabilities in every org" (§5).
     Action.ORG_UPDATE: ActionSpec(
-        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.OWNER
+        Level.ORGANIZATION,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.OWNER,
     ),
     # Org owners/admins, and workspace admins as org owners in every org (§5; DL-68).
     Action.ORG_MEMBER_MANAGE: ActionSpec(
-        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.ADMIN
+        Level.ORGANIZATION,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
     ),
     # Granting, changing, or removing an org owner or admin role: org owners (DL-68).
     Action.ORG_MEMBER_MANAGE_ADMINS: ActionSpec(
-        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.OWNER
+        Level.ORGANIZATION,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.OWNER,
     ),
     # Whoever may add or create a person in the workspace (DL-66, DL-68).
     Action.USER_CHECK: ActionSpec(
         Level.WORKSPACE,
+        access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
         mutation=False,
         rule=_adds_people_in_workspace,
     ),
     # Every account action and the admin profile edit: the rank rule only (DL-73).
-    Action.USER_MANAGE: ActionSpec(Level.USER, rule=_outranks),
+    Action.USER_MANAGE: ActionSpec(Level.USER, access=AccessKind.MANAGEMENT, rule=_outranks),
     # The per-person access review: workspace admins, and the user or the rank rule (DL-73).
     Action.USER_VIEW_ACCESS: ActionSpec(
-        Level.USER, workspace_role=WorkspaceRole.ADMIN, mutation=False, rule=_self_or_outranks
+        Level.USER,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        mutation=False,
+        rule=_self_or_outranks,
     ),
     # Any org member, and the admins above (§5 Org roles; DL-77).
     Action.PROJECT_CREATE: ActionSpec(
-        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.MEMBER
+        Level.ORGANIZATION,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.MEMBER,
     ),
     # Naming someone else as a new project's first admin: org owners/admins and above (DL-77).
     Action.PROJECT_ASSIGN_FIRST_ADMIN: ActionSpec(
-        Level.ORGANIZATION, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.ADMIN
+        Level.ORGANIZATION,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
     ),
     # Project roles, and inherited project admin (§5; DL-77).
     Action.PROJECT_VIEW: ActionSpec(
         Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.VIEWER,
@@ -168,16 +207,21 @@ REGISTRY: dict[str, ActionSpec] = {
     ),
     Action.PROJECT_UPDATE: ActionSpec(
         Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.ADMIN,
     ),
     # The org's owners/admins and above, not a project admin by role alone (§5 Org roles).
     Action.PROJECT_ARCHIVE: ActionSpec(
-        Level.PROJECT, workspace_role=WorkspaceRole.ADMIN, org_role=OrgRole.ADMIN
+        Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
     ),
     Action.PROJECT_UNARCHIVE: ActionSpec(
         Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         archive_exempt=True,
@@ -185,6 +229,7 @@ REGISTRY: dict[str, ActionSpec] = {
     # Project admins, inherited included (§5; DL-79): a mutation, so an archived project denies it.
     Action.PROJECT_MEMBER_MANAGE: ActionSpec(
         Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.ADMIN,
@@ -192,9 +237,27 @@ REGISTRY: dict[str, ActionSpec] = {
     # The per-project access review: the same people, an archived project included (DL-79).
     Action.PROJECT_VIEW_ACCESS: ActionSpec(
         Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.ADMIN,
         mutation=False,
+    ),
+    # Project admins, inherited included (§3.1; DL-82).
+    Action.PROJECT_RAISE_CLASSIFICATION: ActionSpec(
+        Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    # The same, but an explicit project admin only on an export-controlled project (DL-82).
+    Action.PROJECT_LOWER_CLASSIFICATION: ActionSpec(
+        Level.PROJECT,
+        access=AccessKind.MANAGEMENT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        explicit_when_export_controlled=True,
     ),
 }

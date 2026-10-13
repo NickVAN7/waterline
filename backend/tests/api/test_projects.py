@@ -110,7 +110,13 @@ async def test_a_new_project_makes_its_creator_first_admin_and_lead_and_records_
     project = await stored(session, "INV")
     assert await members(session, project) == {olga.id: ProjectRole.ADMIN}
     assert await events(session) == [
-        (AuditAction.PROJECT_CREATED, olga.id, t.org.id, None, {}),
+        (
+            AuditAction.PROJECT_CREATED,
+            olga.id,
+            t.org.id,
+            None,
+            {"classification_level": None, "classification_categories": []},
+        ),
         (AuditAction.PROJECT_MEMBER_ADDED, olga.id, t.org.id, olga.id, {"role": "admin"}),
     ]
 

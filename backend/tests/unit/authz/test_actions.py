@@ -8,10 +8,10 @@ from app.authz.actions import REGISTRY, Level
 pytestmark = pytest.mark.security
 
 
-def test_the_registry_holds_exactly_the_s1_c7_to_s1_c12_actions() -> None:
+def test_the_registry_holds_exactly_the_s1_c7_to_s1_c13_actions() -> None:
     """DL-44: each checkpoint registers its own area's actions; S1-C7 the four workspace-level
     ones (DL-45), S1-C8 three more (DL-56), S1-C9 three more (DL-68), S1-C10 two (DL-73; no
-    separate `user.reset_password`), S1-C11 six (DL-77), S1-C12 two (DL-79)."""
+    separate `user.reset_password`), S1-C11 six (DL-77), S1-C12 two (DL-79), S1-C13 two (DL-82)."""
     assert sorted(REGISTRY) == [
         "org.create",
         "org.update",
@@ -21,6 +21,8 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c12_actions() -> None:
         "project.archive",
         "project.assign_first_admin",
         "project.create",
+        "project.lower_classification",
+        "project.raise_classification",
         "project.unarchive",
         "project.update",
         "project.view",

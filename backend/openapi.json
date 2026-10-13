@@ -3368,6 +3368,89 @@
         }
       }
     },
+    "/api/projects/{key}/classification": {
+      "put": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Set Project Classification",
+        "description": "Set the project's classification level and categories (DL-81): raising needs\n`project.raise_classification`, lowering `project.lower_classification`. 422 on\n`export_control_confirmed` and `confirmed_member_ids`: `confirmation_required`,\n`members_changed`, or `confirmation_not_needed`.",
+        "operationId": "set_project_classification_api_projects__key__classification_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassificationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/{key}/archive": {
       "post": {
         "tags": [
@@ -4513,6 +4596,15 @@
   },
   "components": {
     "schemas": {
+      "AccessKind": {
+        "type": "string",
+        "enum": [
+          "content",
+          "management"
+        ],
+        "title": "AccessKind",
+        "description": "Content or management (design-doc §3.1, §5): how each action is marked, and what an\ninherited admin keeps on an export-controlled project without an explicit membership."
+      },
       "AccessPerson": {
         "properties": {
           "id": {
@@ -4631,7 +4723,9 @@
           "project.archive",
           "project.unarchive",
           "project_member.manage",
-          "project.view_access"
+          "project.view_access",
+          "project.raise_classification",
+          "project.lower_classification"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
@@ -4654,6 +4748,73 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest"
+      },
+      "ClassificationCategory": {
+        "type": "string",
+        "enum": [
+          "financial",
+          "proprietary",
+          "pii",
+          "export_controlled"
+        ],
+        "title": "ClassificationCategory"
+      },
+      "ClassificationLevel": {
+        "type": "string",
+        "enum": [
+          "internal",
+          "confidential",
+          "restricted"
+        ],
+        "title": "ClassificationLevel"
+      },
+      "ClassificationUpdate": {
+        "properties": {
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClassificationLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationCategory"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "export_control_confirmed": {
+            "type": "boolean",
+            "title": "Export Control Confirmed",
+            "default": false
+          },
+          "confirmed_member_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed Member Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "categories"
+        ],
+        "title": "ClassificationUpdate",
+        "description": "`PUT /api/projects/{key}/classification` (DL-81): `level` (null: unclassified) and\n`categories` replace the current ones. Adding `export_controlled` also needs\n`export_control_confirmed` and `confirmed_member_ids`, the project's current explicit\nmembers."
       },
       "EmailCheck": {
         "properties": {
@@ -5580,13 +5741,17 @@
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "access": {
+            "$ref": "#/components/schemas/AccessKind"
           }
         },
         "type": "object",
         "required": [
           "user",
           "role",
-          "reasons"
+          "reasons",
+          "access"
         ],
         "title": "ProjectAccessEntry",
         "description": "One person who reaches the project: their explicit role, if any, and why they reach it."
@@ -5691,6 +5856,44 @@
               }
             ],
             "title": "First Admin Id"
+          },
+          "classification_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClassificationLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "classification_categories": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationCategory"
+            },
+            "type": "array",
+            "title": "Classification Categories",
+            "default": []
+          },
+          "export_control_confirmed": {
+            "type": "boolean",
+            "title": "Export Control Confirmed",
+            "default": false
+          },
+          "confirmed_member_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed Member Ids"
           }
         },
         "type": "object",
@@ -5791,6 +5994,11 @@
             "type": "boolean",
             "title": "Join Org",
             "default": false
+          },
+          "export_control_confirmed": {
+            "type": "boolean",
+            "title": "Export Control Confirmed",
+            "default": false
           }
         },
         "type": "object",
@@ -5820,6 +6028,11 @@
           },
           "role": {
             "$ref": "#/components/schemas/ProjectRole"
+          },
+          "export_control_confirmed": {
+            "type": "boolean",
+            "title": "Export Control Confirmed",
+            "default": false
           }
         },
         "type": "object",
@@ -5925,6 +6138,9 @@
             },
             "type": "array",
             "title": "Reasons"
+          },
+          "access": {
+            "$ref": "#/components/schemas/AccessKind"
           }
         },
         "type": "object",
@@ -5934,7 +6150,8 @@
           "name",
           "organization_id",
           "archived",
-          "reasons"
+          "reasons",
+          "access"
         ],
         "title": "ProjectReach"
       },
@@ -5998,6 +6215,23 @@
             "type": "boolean",
             "title": "Archived"
           },
+          "classification_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClassificationLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "classification_categories": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationCategory"
+            },
+            "type": "array",
+            "title": "Classification Categories"
+          },
           "modules_holding_data": {
             "items": {
               "$ref": "#/components/schemas/ProjectModule"
@@ -6025,6 +6259,8 @@
           "lead_id",
           "enabled_modules",
           "archived",
+          "classification_level",
+          "classification_categories",
           "modules_holding_data",
           "allowed_actions"
         ],

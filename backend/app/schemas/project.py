@@ -3,7 +3,15 @@ import uuid
 from pydantic import BaseModel
 
 from app.authz.actions import Action
-from app.enums import ProjectModule, ProjectRole, ProjectStatus, ProjectType
+from app.enums import (
+    AccessKind,
+    ClassificationCategory,
+    ClassificationLevel,
+    ProjectModule,
+    ProjectRole,
+    ProjectStatus,
+    ProjectType,
+)
 from app.schemas.user import AccessReason
 from app.schemas.workspace import NewUser
 
@@ -17,6 +25,11 @@ class ProjectCreate(BaseModel):
     description: str | None = None
     enabled_modules: list[ProjectModule] | None = None
     first_admin_id: uuid.UUID | None = None
+    classification_level: ClassificationLevel | None = None
+    classification_categories: list[ClassificationCategory] = []
+    # With `export_controlled` only: the first admin is the only explicit member (DL-81).
+    export_control_confirmed: bool = False
+    confirmed_member_ids: list[uuid.UUID] | None = None
 
 
 class ProjectUpdate(BaseModel):
@@ -41,8 +54,22 @@ class ProjectRead(BaseModel):
     lead_id: uuid.UUID | None
     enabled_modules: list[ProjectModule]
     archived: bool
+    classification_level: ClassificationLevel | None
+    classification_categories: list[ClassificationCategory]
     modules_holding_data: list[ProjectModule]
     allowed_actions: list[Action]
+
+
+class ClassificationUpdate(BaseModel):
+    """`PUT /api/projects/{key}/classification` (DL-81): `level` (null: unclassified) and
+    `categories` replace the current ones. Adding `export_controlled` also needs
+    `export_control_confirmed` and `confirmed_member_ids`, the project's current explicit
+    members."""
+
+    level: ClassificationLevel | None
+    categories: list[ClassificationCategory]
+    export_control_confirmed: bool = False
+    confirmed_member_ids: list[uuid.UUID] | None = None
 
 
 class ProjectItem(BaseModel):
@@ -123,10 +150,13 @@ class ProjectMemberAdd(BaseModel):
     user_id: uuid.UUID | None = None
     email: str | None = None
     join_org: bool = False
+    # On an export-controlled project only, and required there (DL-81).
+    export_control_confirmed: bool = False
 
 
 class ProjectMemberCreate(NewUser):
     role: ProjectRole
+    export_control_confirmed: bool = False
 
 
 class ProjectMemberRoleUpdate(BaseModel):
@@ -147,6 +177,9 @@ class ProjectAccessEntry(BaseModel):
     user: ProjectAccessUser
     role: ProjectRole | None
     reasons: list[AccessReason]
+    # `management`: an inherited admin without an explicit membership on an export-controlled
+    # project (design-doc §3.1; DL-81).
+    access: AccessKind
 
 
 class ProjectAccessReview(BaseModel):

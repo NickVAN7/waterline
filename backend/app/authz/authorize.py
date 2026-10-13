@@ -46,20 +46,24 @@ def _project_access(ctx: AuthzContext, target: Target) -> bool:
 
 def authorize(ctx: AuthzContext, action: str, target: Target) -> bool:
     """Whether the user may take `action` on `target`, in design-doc §5's order (the archived
-    project; personal actions; system admin; workspace role; org role; project role; targeted
+    project; an action only an explicit project role grants on an export-controlled project;
+    personal actions; system admin; workspace role; org role; project role; targeted
     rules). An action not in the registry is denied."""
     spec = REGISTRY.get(action)
     if spec is None:
         return False
     if target.archived and spec.mutation and not spec.archive_exempt:
         return False
+    # A None ID (a target above that level) finds nothing: no membership is keyed by None.
+    project = ctx.projects.get(target.project_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
+    if spec.explicit_when_export_controlled and target.export_controlled:
+        # Only the explicit project role grants it (design-doc §3.1; DL-82).
+        return _at_least(project.role if project else None, spec.project_role)
     if spec.relationship is not None:
         # Only the relationship grants a personal action, and only with access to the project.
         return spec.relationship(ctx.user_id, target.entity) and _project_access(ctx, target)
     if spec.visible and can_see(ctx, target):
         return True
-    # A None ID (a target above that level) finds nothing: no membership is keyed by None.
-    project = ctx.projects.get(target.project_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
     org_role = ctx.org_roles.get(target.organization_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
     return (
         ctx.is_system_admin

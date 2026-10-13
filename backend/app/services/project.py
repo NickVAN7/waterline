@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import cast
 
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.admin_event import JsonValue, change_details, log_admin_event
@@ -20,6 +21,7 @@ from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
 from app.enums import (
     AuditAction,
     AuditEntityType,
+    ClassificationCategory,
     OrgRole,
     ProjectModule,
     ProjectRole,
@@ -30,10 +32,12 @@ from app.models.project import Project, ProjectMembership
 from app.models.user import User
 from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
+from app.rules.classification import Classification, change
 from app.rules.identifiers import normalize_project_key, project_key_problem
 from app.rules.modules import ALL_MODULES, is_available, recommended_modules, seed_modules
 from app.schemas.org import MemberCreate
 from app.schemas.project import (
+    ClassificationUpdate,
     MemberCandidate,
     ModuleGuidance,
     ModuleNote,
@@ -58,6 +62,7 @@ from app.services.user import (
     ORG_REASONS,
     PROJECT_REASONS,
     WORKSPACE_REASONS,
+    access_kind,
     identifier_error,
     required_error,
 )
@@ -133,6 +138,85 @@ def _field(field: str, message: str, type_: str) -> ValidationFailedError:
     return ValidationFailedError([FieldError(("body", field), message, type_)])
 
 
+_CONFIRMED = "export_control_confirmed"
+_MEMBER_IDS = "confirmed_member_ids"
+
+
+def _confirmation(
+    values: BaseModel, *, needed: bool, members: set[uuid.UUID] | None = None
+) -> dict[str, JsonValue]:
+    """Check an export-control confirmation (design-doc §3.1; DL-81) and return it for the audit
+    event. Where it's `needed`, `export_control_confirmed` must be true, and, when `members` is
+    given, `confirmed_member_ids` must list exactly them; where it isn't, neither field may be
+    sent. 422s: `confirmation_required`, `members_changed`, `confirmation_not_needed`."""
+    sent = values.model_fields_set
+    if not needed:
+        errors = [
+            FieldError(
+                ("body", f),
+                "No export-control confirmation is needed here.",
+                "confirmation_not_needed",
+            )
+            for f in (_CONFIRMED, _MEMBER_IDS)
+            if f in sent
+        ]
+        if errors:
+            raise ValidationFailedError(errors)
+        return {}
+    errors: list[FieldError] = []
+    if not getattr(values, _CONFIRMED):
+        errors.append(
+            FieldError(
+                ("body", _CONFIRMED),
+                "Confirm that the people involved are authorized for export-controlled data.",
+                "confirmation_required",
+            )
+        )
+    details: dict[str, JsonValue] = {_CONFIRMED: True}
+    if members is not None:
+        listed: list[uuid.UUID] | None = getattr(values, _MEMBER_IDS)
+        if listed is None:
+            errors.append(
+                FieldError(
+                    ("body", _MEMBER_IDS),
+                    "List the project's members you confirm.",
+                    "confirmation_required",
+                )
+            )
+        elif set(listed) != members:
+            errors.append(
+                FieldError(
+                    ("body", _MEMBER_IDS),
+                    "The project's members have changed. Review them and confirm again.",
+                    "members_changed",
+                )
+            )
+        details[_MEMBER_IDS] = list[JsonValue](sorted(str(m) for m in members))
+    if errors:
+        raise ValidationFailedError(errors)
+    return details
+
+
+def _classification(project: Project) -> Classification:
+    return Classification(
+        project.classification_level,
+        frozenset(ClassificationCategory(c) for c in project.classification_categories),
+    )
+
+
+def _stored(categories: frozenset[ClassificationCategory]) -> list[str]:
+    """Categories as stored: in `ClassificationCategory` order, no duplicates."""
+    return [c.value for c in ClassificationCategory if c in categories]
+
+
+def _classification_json(classification: Classification) -> dict[str, JsonValue]:
+    level = classification.level
+    return {
+        "classification_level": level.value if level else None,
+        "classification_categories": list[JsonValue](_stored(classification.categories)),
+    }
+
+
 class ProjectService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -200,6 +284,16 @@ class ProjectService:
         if problems:
             raise ValidationFailedError(problems)
         first_admin_id = await self._first_admin(ctx, org, values.first_admin_id)
+        classification = Classification(
+            values.classification_level, frozenset(values.classification_categories)
+        )
+        # Created export-controlled: the first admin is its only explicit member (§3.1).
+        export_controlled = ClassificationCategory.EXPORT_CONTROLLED in classification.categories
+        confirmation = _confirmation(
+            values,
+            needed=export_controlled,
+            members={first_admin_id} if export_controlled else None,
+        )
         modules = (
             values.enabled_modules
             if values.enabled_modules is not None
@@ -214,6 +308,8 @@ class ProjectService:
             type=values.type,
             enabled_modules=_distinct(modules),
             lead_id=first_admin_id,
+            classification_level=classification.level,
+            classification_categories=_stored(classification.categories),
         )
         self.session.add(project)
         await self.session.flush()
@@ -221,13 +317,22 @@ class ProjectService:
             ProjectMembership(project_id=project.id, user_id=first_admin_id, role=ProjectRole.ADMIN)
         )
         await self.session.flush()
-        self._log(AuditAction.PROJECT_CREATED, ctx.user_id, project)
+        self._log(
+            AuditAction.PROJECT_CREATED,
+            ctx.user_id,
+            project,
+            details={**_classification_json(classification), **confirmation},
+        )
         self._log(
             AuditAction.PROJECT_MEMBER_ADDED,
             ctx.user_id,
             project,
             target_user_id=first_admin_id,
-            details={"role": ProjectRole.ADMIN.value},
+            # As every add to an export-controlled project records it (DL-81).
+            details={
+                "role": ProjectRole.ADMIN.value,
+                **({_CONFIRMED: True} if confirmation else {}),
+            },
         )
         if first_admin_id == ctx.user_id:
             # The context predates the new membership: count it for the response's actions.
@@ -263,6 +368,10 @@ class ProjectService:
             lead_id=project.lead_id,
             enabled_modules=[ProjectModule(m) for m in project.enabled_modules],
             archived=project.archived_at is not None,
+            classification_level=project.classification_level,
+            classification_categories=[
+                ClassificationCategory(c) for c in project.classification_categories
+            ],
             # Each module's has-data hook arrives with its slice; none holds data yet.
             modules_holding_data=[],
             allowed_actions=allowed_actions(ctx, project_target(project)),
@@ -308,6 +417,68 @@ class ProjectService:
                 ctx.user_id,
                 project,
                 details=change_details(_json(changed)),
+            )
+        return self.read(ctx, project)
+
+    async def _with_current_role(self, ctx: AuthzContext, project: Project) -> AuthzContext:
+        """`ctx` with the caller's role on `project` read again, for a check made under the
+        project's lock."""
+        projects = {k: v for k, v in ctx.projects.items() if k != project.id}
+        membership = await self.repository.membership(project.id, ctx.user_id)
+        if membership is not None:
+            projects[project.id] = ProjectAccess(
+                membership.role,
+                project.organization_id,
+                project.workspace_id,
+                project.archived_at is not None,
+            )
+        return dataclasses.replace(ctx, projects=projects)
+
+    async def set_classification(
+        self, ctx: AuthzContext, project: Project, values: ClassificationUpdate
+    ) -> ProjectRead:
+        """Replace the level and categories (`project_classification_changed`; DL-81): a raise
+        needs `project.raise_classification`, a lower `project.lower_classification`, a change
+        that does neither (the classification already held included, which records nothing)
+        either one. Adding `export_controlled` needs the confirmation, against the explicit
+        members as they commit."""
+        # Locked and read again: the rights, the "nothing to change" check, and the confirmed
+        # members all see what a concurrent change or member add committed (design-doc §5).
+        await self.repository.lock(project)
+        # The caller's own role too: a removal takes the project's lock first, so one that
+        # committed while this waited is seen, and a removed explicit admin can't lower (owner
+        # decision, S1-C13 security review).
+        ctx = await self._with_current_role(ctx, project)
+        target = project_target(project)
+        old = _classification(project)
+        new = Classification(values.level, frozenset(values.categories))
+        kind = change(old, new)
+        raise_, lower = Action.PROJECT_RAISE_CLASSIFICATION, Action.PROJECT_LOWER_CLASSIFICATION
+        needed = [a for a, does in ((raise_, kind.raises), (lower, kind.lowers)) if does]
+        # Neither: either action will do, and lower is never granted without raise (DL-82).
+        for action in needed or [raise_]:
+            ensure(ctx, action, target)
+        adds_export_control = ClassificationCategory.EXPORT_CONTROLLED in (
+            new.categories - old.categories
+        )
+        confirmation = _confirmation(
+            values,
+            needed=adds_export_control,
+            members=await self.repository.member_ids(project.id) if adds_export_control else None,
+        )
+        if new != old:
+            project.classification_level = new.level
+            project.classification_categories = _stored(new.categories)
+            await self.session.flush()
+            self._log(
+                AuditAction.PROJECT_CLASSIFICATION_CHANGED,
+                ctx.user_id,
+                project,
+                details={
+                    "old": _classification_json(old),
+                    "new": _classification_json(new),
+                    **confirmation,
+                },
             )
         return self.read(ctx, project)
 
@@ -364,6 +535,14 @@ class ProjectService:
         if project.archived_at is not None:
             raise ForbiddenError
 
+    async def _lock_for_add(
+        self, project: Project, payload: ProjectMemberAdd | ProjectMemberCreate
+    ) -> dict[str, JsonValue]:
+        """Lock the live project for a member add, then check the export-control confirmation
+        against what it is now (a classification change holds the same lock; DL-81)."""
+        await self._lock_live(project)
+        return _confirmation(payload, needed=project_target(project).export_controlled)
+
     async def list_members(
         self, ctx: AuthzContext, project: Project, query: object
     ) -> Page[ProjectMemberRead]:
@@ -401,7 +580,7 @@ class ProjectService:
         roster = self._members(project)
         if payload.email is not None:
 
-            async def admit(user: User) -> None:
+            async def admit(user: User) -> dict[str, JsonValue]:
                 if not await self.repository.org_member_or_staff(org, user.id):
                     if not payload.join_org:
                         raise _field(
@@ -412,21 +591,23 @@ class ProjectService:
                     await OrgService(self.session).add_member(ctx, org, user.email, OrgRole.MEMBER)
                 # A second add of the same person, waiting here, then hits the unique constraint:
                 # `already_member` on `email` (DL-80).
-                await self._lock_live(project)
+                return await self._lock_for_add(project, payload)
 
             return await roster.add(ctx, payload.email, payload.role, admit=admit)
         # Exactly one of the two was sent (checked above), so here it's `user_id`.
         user_id = cast(uuid.UUID, payload.user_id)
         if not await self.repository.org_member_or_staff(org, user_id):
             raise NotFoundError
-        await self._lock_live(project)
+        confirmation = await self._lock_for_add(project, payload)
         if await self.repository.membership(project.id, user_id):
             raise _field("user_id", _MEMBER_ROSTER.already_member, "already_member")
         # An org member or staff member has an account.
         user = cast(User, await UserRepository(self.session).get(user_id))
         if not user.is_active:
             raise _field("user_id", "This account is deactivated.", "account_inactive")
-        return await roster.add_user(ctx, user, payload.role, loc=("body", "user_id"))
+        return await roster.add_user(
+            ctx, user, payload.role, loc=("body", "user_id"), details=confirmation
+        )
 
     async def create_member(
         self, ctx: AuthzContext, project: Project, payload: ProjectMemberCreate
@@ -434,13 +615,13 @@ class ProjectService:
         """Create the account and its org membership through the org service, then the project
         membership through the roster (`user_created`, `org_member_added`,
         `project_member_added`)."""
-        await self._lock_live(project)
+        confirmation = await self._lock_for_add(project, payload)
         orgs = OrgService(self.session)
         org = cast(Organization, await orgs.get(project.organization_id))  # a foreign key
-        new = MemberCreate(**payload.model_dump(exclude={"role"}), role=OrgRole.MEMBER)
+        new = MemberCreate(**payload.model_dump(exclude={"role", _CONFIRMED}), role=OrgRole.MEMBER)
         row = await orgs.create_member(ctx, org, new)
         user = cast(User, await UserRepository(self.session).get(row.user_id))  # just created
-        return await self._members(project).add_user(ctx, user, payload.role)
+        return await self._members(project).add_user(ctx, user, payload.role, details=confirmation)
 
     async def change_member_role(
         self, ctx: AuthzContext, project: Project, user_id: uuid.UUID, role: ProjectRole
@@ -535,6 +716,7 @@ class ProjectService:
         for user, org_role in seen.org_admins:
             reach(user, ORG_REASONS[org_role])
         order = list(AccessReason)
+        export_controlled = project_target(project).export_controlled
         return ProjectAccessReview(
             people=[
                 ProjectAccessEntry(
@@ -547,6 +729,7 @@ class ProjectService:
                     ),
                     role=roles.get(u.id),
                     reasons=sorted(reasons[u.id], key=order.index),
+                    access=access_kind(export_controlled, explicit=u.id in roles),
                 )
                 for u in sorted(users.values(), key=lambda u: (u.name, u.id))
             ]

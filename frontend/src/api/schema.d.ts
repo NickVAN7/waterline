@@ -647,6 +647,29 @@ export interface paths {
         patch: operations["update_project_api_projects__key__patch"];
         trace?: never;
     };
+    "/api/projects/{key}/classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Project Classification
+         * @description Set the project's classification level and categories (DL-81): raising needs
+         *     `project.raise_classification`, lowering `project.lower_classification`. 422 on
+         *     `export_control_confirmed` and `confirmed_member_ids`: `confirmation_required`,
+         *     `members_changed`, or `confirmation_not_needed`.
+         */
+        put: operations["set_project_classification_api_projects__key__classification_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/archive": {
         parameters: {
             query?: never;
@@ -861,6 +884,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccessKind
+         * @description Content or management (design-doc §3.1, §5): how each action is marked, and what an
+         *     inherited admin keeps on an export-controlled project without an explicit membership.
+         * @enum {string}
+         */
+        AccessKind: "content" | "management";
         /** AccessPerson */
         AccessPerson: {
             /**
@@ -903,13 +933,42 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_classification" | "project.lower_classification";
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
             current_password: string;
             /** New Password */
             new_password: string;
+        };
+        /**
+         * ClassificationCategory
+         * @enum {string}
+         */
+        ClassificationCategory: "financial" | "proprietary" | "pii" | "export_controlled";
+        /**
+         * ClassificationLevel
+         * @enum {string}
+         */
+        ClassificationLevel: "internal" | "confidential" | "restricted";
+        /**
+         * ClassificationUpdate
+         * @description `PUT /api/projects/{key}/classification` (DL-81): `level` (null: unclassified) and
+         *     `categories` replace the current ones. Adding `export_controlled` also needs
+         *     `export_control_confirmed` and `confirmed_member_ids`, the project's current explicit
+         *     members.
+         */
+        ClassificationUpdate: {
+            level: components["schemas"]["ClassificationLevel"] | null;
+            /** Categories */
+            categories: components["schemas"]["ClassificationCategory"][];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
+            /** Confirmed Member Ids */
+            confirmed_member_ids?: string[] | null;
         };
         /**
          * EmailCheck
@@ -1314,6 +1373,7 @@ export interface components {
             role: components["schemas"]["ProjectRole"] | null;
             /** Reasons */
             reasons: components["schemas"]["AccessReason"][];
+            access: components["schemas"]["AccessKind"];
         };
         /**
          * ProjectAccessReview
@@ -1356,6 +1416,19 @@ export interface components {
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
             /** First Admin Id */
             first_admin_id?: string | null;
+            classification_level?: components["schemas"]["ClassificationLevel"] | null;
+            /**
+             * Classification Categories
+             * @default []
+             */
+            classification_categories: components["schemas"]["ClassificationCategory"][];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
+            /** Confirmed Member Ids */
+            confirmed_member_ids?: string[] | null;
         };
         /**
          * ProjectItem
@@ -1400,6 +1473,11 @@ export interface components {
              * @default false
              */
             join_org: boolean;
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
         };
         /** ProjectMemberCreate */
         ProjectMemberCreate: {
@@ -1412,6 +1490,11 @@ export interface components {
             /** Password */
             password: string;
             role: components["schemas"]["ProjectRole"];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
         };
         /**
          * ProjectMemberRead
@@ -1464,6 +1547,7 @@ export interface components {
             archived: boolean;
             /** Reasons */
             reasons: components["schemas"]["AccessReason"][];
+            access: components["schemas"]["AccessKind"];
         };
         /** ProjectRead */
         ProjectRead: {
@@ -1491,6 +1575,9 @@ export interface components {
             enabled_modules: components["schemas"]["ProjectModule"][];
             /** Archived */
             archived: boolean;
+            classification_level: components["schemas"]["ClassificationLevel"] | null;
+            /** Classification Categories */
+            classification_categories: components["schemas"]["ClassificationCategory"][];
             /** Modules Holding Data */
             modules_holding_data: components["schemas"]["ProjectModule"][];
             /** Allowed Actions */
@@ -3874,6 +3961,68 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProjectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    set_project_classification_api_projects__key__classification_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassificationUpdate"];
             };
         };
         responses: {

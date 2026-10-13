@@ -442,3 +442,18 @@ Entry format:
   `tests/support/concurrency.py` record a task's refusal as a value; the account, workspace, and
   auth race tests use them, and the versioning race test records its outcome with `suppress`; each
   asserts after its task group closes)
+
+### TD-31: Other locked mutations check rights against the role loaded before the lock
+- **Added:** S1-C13
+- **What:** the `AuthzContext` is loaded at the start of a request. The classification change
+  re-reads the caller's own project role after taking the project's lock (`_with_current_role`,
+  owner decision in the S1-C13 security review), so a role removed while it waits is seen. The
+  other mutations that wait on a lock (project update, archive, member adds, role changes and
+  removals, and the workspace and org rosters) still check rights against the context as loaded:
+  a caller whose role is removed while their request waits can still finish it. The window is
+  milliseconds and needs a request already in flight.
+- **Why:** the owner decided the classification change in S1-C13 and chose to revisit the rest
+  later.
+- **Fix by:** Slice 1 (the owner decides at the slice retro whether the other locked mutations
+  re-read the caller's role too)
+- **Status:** open

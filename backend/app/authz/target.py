@@ -5,6 +5,7 @@ user's memberships for the rank rule)."""
 import uuid
 from dataclasses import dataclass, field
 
+from app.enums import ClassificationCategory
 from app.models.org import Organization
 from app.models.project import Project
 from app.models.workspace import Workspace
@@ -15,14 +16,16 @@ from app.rules.account_rank import Account
 class Target:
     """`organization_id` is set for org- and project-level targets, `project_id` for project
     level (an entity inside a project is a project-level target). `archived` and
-    `enabled_modules` describe that project. `user_id` is set for a user-level target (DL-73),
-    whose `entity` is the user's `Account` (their memberships, for the rank rule)."""
+    `enabled_modules` describe that project, and `export_controlled` whether it has the
+    `export_controlled` category (design-doc §3.1). `user_id` is set for a user-level target
+    (DL-73), whose `entity` is the user's `Account` (their memberships, for the rank rule)."""
 
     workspace_id: uuid.UUID
     organization_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None
     archived: bool = False
     enabled_modules: frozenset[str] = field(default_factory=frozenset[str])
+    export_controlled: bool = False
     entity: object = None
     user_id: uuid.UUID | None = None
 
@@ -46,6 +49,9 @@ def project_target(project: Project, entity: object = None) -> Target:
         project_id=project.id,
         archived=project.archived_at is not None,
         enabled_modules=frozenset(project.enabled_modules),
+        # An unsaved project has no categories until the database default fills them.
+        export_controlled=ClassificationCategory.EXPORT_CONTROLLED
+        in (project.classification_categories or ()),
         entity=entity,
     )
 

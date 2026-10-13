@@ -15,7 +15,14 @@ from app.authz.target import Target, user_target
 from app.core.errors import FieldError, ValidationFailedError
 from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
 from app.core.security import hash_password
-from app.enums import AuditAction, OrgRole, ProjectRole, WorkspaceRole
+from app.enums import (
+    AccessKind,
+    AuditAction,
+    ClassificationCategory,
+    OrgRole,
+    ProjectRole,
+    WorkspaceRole,
+)
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.user import UserRepository
@@ -161,6 +168,12 @@ PROJECT_REASONS = {
     ProjectRole.MEMBER: AccessReason.PROJECT_MEMBER,
     ProjectRole.VIEWER: AccessReason.PROJECT_VIEWER,
 }
+
+
+def access_kind(export_controlled: bool, *, explicit: bool) -> AccessKind:
+    """What someone who reaches a project has there (the access reviews, design-doc §5): on an
+    export-controlled project, management only without an explicit membership (§3.1; DL-81)."""
+    return AccessKind.MANAGEMENT if export_controlled and not explicit else AccessKind.CONTENT
 
 
 # The entity a user endpoint loads, for routers (which never import models).
@@ -492,6 +505,7 @@ class UserService:
                     if project.organization_id == org_id:
                         projects[project.id].add(ORG_REASONS[role])
         by_id = {project.id: project for project in seen.projects}
+        explicit = {project_id for project_id, _ in seen.project_roles}
         for project_id, role in seen.project_roles:
             projects[project_id].add(PROJECT_REASONS[role])
             orgs[by_id[project_id].organization_id].add(AccessReason.PROJECT_MEMBERSHIP)
@@ -521,6 +535,10 @@ class UserService:
                     organization_id=p.organization_id,
                     archived=p.archived_at is not None,
                     reasons=sorted(projects[p.id], key=order.index),
+                    access=access_kind(
+                        ClassificationCategory.EXPORT_CONTROLLED in p.classification_categories,
+                        explicit=p.id in explicit,
+                    ),
                 )
                 for p in sorted(seen.projects, key=lambda p: p.key)
                 if p.id in projects

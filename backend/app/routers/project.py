@@ -17,6 +17,7 @@ from app.routers.deps import (
     load_project,
 )
 from app.schemas.project import (
+    ClassificationUpdate,
     MemberCandidate,
     ModuleGuidance,
     ProjectAccessReview,
@@ -111,6 +112,17 @@ async def update_project(
 ) -> ProjectRead:
     """Change the project's details. 422 on `lead_id`: `not_member` or `account_inactive`."""
     return await ProjectService(session).update(ctx, project, body)
+
+
+@router.put("/projects/{key}/classification", responses=_ERRORS)
+async def set_project_classification(
+    project: Viewed, body: ClassificationUpdate, ctx: AuthzContextDep, session: SessionDep
+) -> ProjectRead:
+    """Set the project's classification level and categories (DL-81): raising needs
+    `project.raise_classification`, lowering `project.lower_classification`. 422 on
+    `export_control_confirmed` and `confirmed_member_ids`: `confirmation_required`,
+    `members_changed`, or `confirmation_not_needed`."""
+    return await ProjectService(session).set_classification(ctx, project, body)
 
 
 @router.post("/projects/{key}/archive", status_code=status.HTTP_204_NO_CONTENT, responses=_ERRORS)
