@@ -495,9 +495,10 @@ render inside the full shell when signed in.
   uses a hint instead (UI-FRM-17).
 - **UI-FRM-4** The server is the validator. The client checks only that a required field is not
   empty; every other rule (format, uniqueness, policy) comes back as a 422 and is shown as the
-  server wrote it. Do not copy business rules into the UI (`frontend/CLAUDE.md`). One exception:
+  server wrote it. Do not copy business rules into the UI (`frontend/CLAUDE.md`). Two exceptions:
   the password requirements list (UI-FRM-10) checks the requirements the server publishes as the
-  user types; the server still decides on submit (DL-91).
+  user types; the server still decides on submit (DL-91); and a 422 on a listed requirement is
+  shown as that line's own label with a "Not met:" cue, not the server's message (DL-95).
 - **UI-FRM-5** **Field errors from a 422** (`details.fields[]` with `loc`, `message`, `type`):
   the last element of `loc` names the field. Show the message directly under the field with an
   error icon and text in `--color-tone-danger-fg`, give the control a thicker (2 px)
@@ -548,8 +549,8 @@ render inside the full shell when signed in.
   your current password" with no current-password field) is shown as plain text. No number is
   written into the screen (DL-91). **A 422 on a listed requirement** (its field error's `type` is
   the requirement's `code`) shows on that line of the list instead of as a separate message
-  under the field: the line turns to the error state (error icon and text in
-  `--color-tone-danger-fg`), the field gets the 2 px danger border and `aria-invalid`, and it
+  under the field: the line keeps its label, prefixed "Not met:", and turns to the error state
+  (error icon and text in `--color-tone-danger-fg`; DL-95), the field gets the 2 px danger border and `aria-invalid`, and it
   counts in UI-FRM-6's announcement and takes focus like any invalid field. An error the list
   doesn't name (the 256-character cap) is shown under the field as UI-FRM-5 says (DL-94). The show/hide toggle is a small icon button **inside** the field
   (28×28, `type="button"`, `aria-label` "Show password" / "Hide password", `aria-pressed`, and a

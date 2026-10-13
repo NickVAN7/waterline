@@ -91,9 +91,10 @@ correct; you decide whether the code does it.
   Is a hard rule hidden in a hint? (UI-FRM-3, UI-FRM-17)
 - **Hints:** shown on hover and on keyboard focus, dismissed by Esc, stay while hovered, never the
   only copy (the same text is in `aria-describedby` or the accessible name)? (UI-FRM-17)
-- Does the client validate anything beyond "not empty"? Any copy of a server rule? (One
-  exception: the `PasswordRequirements` list checks the requirements the server publishes as the
-  user types; DL-91.) (UI-FRM-4)
+- Does the client validate anything beyond "not empty"? Any copy of a server rule? (Two
+  exceptions: the `PasswordRequirements` list checks the requirements the server publishes as the
+  user types, and a 422 on a listed requirement shows the line's label, not the server's message;
+  DL-91, DL-95.) (UI-FRM-4)
 - 422 handling: `loc` mapped to the field; message with icon and text; thicker danger border;
   `aria-invalid`; id added to `aria-describedby`; errors shown only after a failed submit?
   (UI-FRM-5)
@@ -117,7 +118,8 @@ correct; you decide whether the code does it.
   the `PasswordRequirements` list under the field, built from `GET /api/auth/password-policy`
   with no number in the code, icon and text per line, tied by `aria-describedby`, and not
   announced per keystroke? Does a 422 on a listed requirement mark that line (not a second
-  message under the field), with the field still invalid, counted, and focused (DL-94)?
+  message under the field), with the field still invalid, counted, and focused (DL-94), the line
+  keeping its label prefixed "Not met:" (DL-95)?
   Temporary password shown as UI-FRM-11 says, including an honest copy-failure message?
   (UI-FRM-10, UI-FRM-11)
 - Fieldset and legend for groups; native radios or a Select before a combobox? (UI-FRM-12)

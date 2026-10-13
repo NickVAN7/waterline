@@ -1243,3 +1243,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   password-policy endpoint); `.claude/agents/ui-reviewer.md`
 - **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-91 to DL-93,
   option c)
+
+### DL-95: A marked requirement line keeps its label, with a "Not met:" cue
+- **Date:** 2026-10-13
+- **Decision:** A requirements-list line marked by a 422 (DL-94) keeps the list's own label,
+  prefixed with a "Not met:" text cue, in the error state (error icon and danger text); the
+  server's message for that error isn't shown. This is a second exception to "show the server's
+  message" in UI-FRM-4.
+- **Supersedes:** none (an exception to ui-design-guide UI-FRM-4)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-4, UI-FRM-10); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-94, option a)
