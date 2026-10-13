@@ -316,7 +316,8 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   every 5 minutes, and returns the user; otherwise it raises 401 `not_authenticated`. While the
   user must change their password it raises 403 `password_change_required` instead (the forced
   change). Only `/me` and change-password take `UserPendingPasswordChangeDep`, which lets that
-  user through; sign-out needs no user at all. A new endpoint always takes `SignedInUserDep`.
+  user through; sign-out needs no user at all, nor, from S1-C14a, `GET /api/auth/password-policy`
+  (open to anyone, DL-91). Any other new endpoint takes `SignedInUserDep`.
 - **Change password** (`POST /api/auth/change-password`, `current_password` and
   `new_password`): 422 on `current_password` (`incorrect`) or `new_password` (the password
   policy's problems, each its own `type`); on success the session keeps its row but gets a new

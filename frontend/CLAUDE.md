@@ -31,7 +31,9 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   `schema.d.ts` by hand.
 - **The server is authoritative.** The UI may hide actions a user can't take, but never assumes
   it's enforcing permissions. Don't duplicate business rules; e.g. rank is computed by the
-  server (send neighbor IDs, not rank values), and transitions are validated by the server.
+  server (send neighbor IDs, not rank values), and transitions are validated by the server. One
+  exception: the `PasswordRequirements` list checks the requirements the server publishes as the
+  user types (DL-91).
 - **Handle the error format** (`{code, message, details}`) consistently: 409 → prompt to
   reload; 404 → not-found view (TD-32); 422 → field errors from `details.fields`
   (`loc`, `message`, `type` per field). Forms use `useFormErrors` for all of this. A 401 and a
@@ -84,6 +86,10 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - An error is never only in a toast. A toast never takes focus or covers the focused element
   (UI-FBK-1, UI-FBK-9, UI-FBK-10). An alert that reports an event has a dismiss button; a
   persistent banner does not (UI-FBK-13).
+- Announcements: an alert for a new event is a new element (key it on `useFormErrors`'
+  `alertKey`); a repeated live message is cleared and set again after `ANNOUNCE_DELAY_MS`; Retry
+  focuses the control whose action failed before repeating it; a landmark with nothing in it
+  isn't rendered (UI-FBK-2, UI-FRM-6, UI-FRM-7, UI-SHL-2; DL-93).
 - A 404 looks identical whether the thing is missing or not visible to the user (UI-FBK-14).
 - Loading: a skeleton after about 300 ms with `aria-busy`; a pending action shows on its
   control (UI-FBK-11, UI-FRM-8).
@@ -91,7 +97,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - Targets at least 24×24 px; focus ring from `--color-focus`, never `outline: none` (UI-TOK-5,
   UI-TOK-6).
 - A new color pair is added to `check_contrast.py` in the same change (UI-TOK-3).
-- Password fields allow paste, set `autocomplete`, and have no `maxlength` (UI-FRM-10).
+- Password fields allow paste, set `autocomplete`, and have no `maxlength`. A field where users
+  choose their own new password has the `PasswordRequirements` list under it, built from `GET
+/api/auth/password-policy`, never from numbers in the code (UI-FRM-10, DL-91).
 - Every new view and component spec calls `expectNoA11yViolations()`; end-to-end flows run axe
   in both themes (guide §9).
 

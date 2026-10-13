@@ -529,9 +529,12 @@ Workspace (the firm: tenant boundary)
   email or username (ignoring case). The same rule applies to changes, admin resets, and new
   accounts. When users change their own password, the new one must also differ from the
   current one; an admin reset doesn't check that (owner decision, Oct 7, 2026: not needed in
-  v1). The minimum rises to 12 before the first non-local deployment.
+  v1). The minimum rises to 12 before the first non-local deployment. The policy's requirements,
+  with a label for each, are published to anyone at `GET /api/auth/password-policy`, so the web
+  app lists them under a new-password field and ticks them off as the user types; the server
+  still decides on submit (DL-91).
 - **Forced change:** while `must_change_password` is set, every endpoint except `/me`,
-  change-password, and sign-out returns 403 (`password_change_required`).
+  change-password, sign-out, and the password policy returns 403 (`password_change_required`).
 
 ### Sessions
 - Server-side sessions in a `session` table, referenced by an httpOnly cookie (not JWTs), so

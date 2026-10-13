@@ -1189,3 +1189,42 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (S1-C13a row; "Authentication", seed command; "Developer CLI";
   "Done when")
 - **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 4 on DL-83 to DL-86)
+
+### DL-91: A live password requirements list under every new-password field
+- **Date:** 2026-10-13
+- **Decision:** Wherever users choose their own new password (the forced change, account
+  settings, and any later self-service reset; not an admin's generated temporary password), a
+  list of the policy's requirements sits under the field and ticks each one off as they type
+  (icon and text, linked to the field, no announcement per keystroke). The requirements and their
+  labels come from the server (`GET /api/auth/password-policy`, open to anyone and during a forced
+  change), not from numbers written into the screen; the server still decides on submit.
+- **Supersedes:** ui-design-guide UI-FRM-10 ("length only, shown as help text") and, for this
+  list only, UI-FRM-4 (the client checks only that a field isn't empty)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-4, UI-FRM-5, UI-FRM-10, §8); design-doc §4 (password
+  policy, forced change); build plan ("Authentication"; S1-C14a row); tech-debt TD-34
+- **Source:** chat session (owner, Oct 13, 2026: the S1-C14 review's TD-34 question)
+
+### DL-92: The pending spinner's speed is Tailwind's `animate-spin`
+- **Date:** 2026-10-13
+- **Decision:** The spinner in a pending button turns at Tailwind's `animate-spin` speed, an
+  exception to "durations come from tokens"; the label carries the meaning and reduced motion
+  stops it. Revisit if more animations need it.
+- **Supersedes:** none (an exception to ui-design-guide UI-TOK-7)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-TOK-7); tech-debt TD-35
+- **Source:** chat session (owner, Oct 13, 2026: the S1-C14 review's TD-35 question)
+
+### DL-93: Four UI-guide rules from the S1-C14 UI review
+- **Date:** 2026-10-13
+- **Decision:** A landmark is rendered only when it has content (UI-SHL-2). Retry in a form alert
+  moves focus to the control whose action failed, which shows its pending state, before the alert
+  goes (UI-FRM-7). An alert reporting a new event is a new element, keyed in the shared code, so
+  a repeat with the same text is announced again (UI-FBK-2). A live region repeating the same
+  text clears it and sets it again after a short delay in another task (UI-FRM-6).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SHL-2, UI-FRM-6, UI-FRM-7, UI-FBK-2); `frontend/CLAUDE.md`
+  (UI)
+- **Source:** chat session (owner, Oct 13, 2026: the ui-reviewer's proposed rules in
+  docs/reviews/s1/S1-C14.md)

@@ -483,15 +483,14 @@ Entry format:
 
 ### TD-34: The new-password help can't show the minimum length
 - **Added:** S1-C14
-- **What:** UI-FRM-10 wants the password help to be the length, with the number taken from the
-  server (UI-FRM-3: never hard-coded; TD-12 will change it). No endpoint exposes the policy, so
-  `ChangePasswordView` shows only "It can't be your email, your username, or your current
-  password." The minimum is learned from a 422. Those three rules are written into the view,
-  which drifts if `rules/password_policy.py` changes.
-- **Why:** ui-reviewer finding (S1-C14 review). Exposing the policy is an API change outside
-  S1-C14's scope, and whether the help names the non-length rules is the owner's call.
-- **Fix by:** S1-C14a (its change-password form in account settings is the second password
-  form; the owner decides at its start how the number reaches the client)
+- **What:** UI-FRM-10 wants the password requirements under a new-password field to come from
+  the server. No endpoint publishes the policy yet, so `ChangePasswordView` shows fixed help
+  text ("It can't be your email, your username, or your current password."), without the
+  minimum, which is learned from a 422.
+- **Why:** ui-reviewer finding (S1-C14 review). The owner decided the fix (DL-91): a live
+  requirements list from `GET /api/auth/password-policy`, an API addition outside S1-C14.
+- **Fix by:** S1-C14a (the password-policy endpoint and `PasswordRequirements`, replacing the
+  fixed help text; DL-91)
 - **Status:** open
 
 ### TD-35: The pending spinner's speed isn't a token
@@ -504,7 +503,8 @@ Entry format:
   the spinner, changes the UI design guide, so it's the owner's call.
 - **Fix by:** S1-C14a (the owner chooses a token in `tokens.css` and the guide, or a guide
   exception)
-- **Status:** open
+- **Status:** resolved in DL-92: a guide exception (UI-TOK-7); the spinner keeps `animate-spin`,
+  to revisit if more animations need it
 
 ### TD-36: Route focus also moves on a query-only navigation
 - **Added:** S1-C14

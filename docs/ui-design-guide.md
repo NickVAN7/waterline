@@ -344,7 +344,8 @@ html {
   alert dismiss X). **One exception:** the show/hide toggle inside a password field is 28×28
   (UI-FRM-10), still above the 24 px floor. Links inside running text are exempt.
 - **UI-TOK-7** Durations come from tokens. No animation carries information that is not also in
-  text. The global reduced-motion rule above stays in `base.css`.
+  text. The global reduced-motion rule above stays in `base.css`. One exception: the spinner in
+  a pending button (UI-FRM-8) turns at Tailwind's `animate-spin` speed (DL-92).
 
 ### 3.4 Control states
 
@@ -426,7 +427,8 @@ render inside the full shell when signed in.
 - **UI-SHL-2** Landmarks: one `banner` (header), `nav aria-label="Main"` (My work and the
   project selector), `nav aria-label="Project"` (the selected project's pages), and one
   `main` (`tabindex="-1"` so the skip link can focus it). Nothing meaningful sits outside a
-  landmark.
+  landmark. A landmark is rendered only when it has content: a navigation with no links (the
+  Main nav while signed out) is left out, not left empty (DL-93).
 - **UI-SHL-3** The header is sticky at `--header-height`. The only other sticky layer in v1 is a
   table's selection toolbar, and only while rows are selected (UI-TBL-8). Any later sticky
   element needs the same `scroll-padding` treatment and an end-to-end focus check
@@ -486,24 +488,30 @@ render inside the full shell when signed in.
   `novalidate`, so our messages replace the browser's pop-ups. The asterisk is red on purpose:
   it is the one place the owner chose danger red for something that is not an error.
 - **UI-FRM-3** **Help text** for a hard rule (a format, a limit, what the field is for when the
-  label can't say) is **visible**, sits between the label and the control, and is tied to the
+  label can't say) is **visible**, sits between the label and the control (except the password
+  requirements list, which sits under the field, UI-FRM-10, DL-91), and is tied to the
   control with `aria-describedby`. It is short and never hard-codes a number the server owns (the
   password length changes with TD-12). Most fields need no help text at all. An optional nicety
   uses a hint instead (UI-FRM-17).
 - **UI-FRM-4** The server is the validator. The client checks only that a required field is not
   empty; every other rule (format, uniqueness, policy) comes back as a 422 and is shown as the
-  server wrote it. Do not copy business rules into the UI (`frontend/CLAUDE.md`).
+  server wrote it. Do not copy business rules into the UI (`frontend/CLAUDE.md`). One exception:
+  the password requirements list (UI-FRM-10) checks the requirements the server publishes as the
+  user types; the server still decides on submit (DL-91).
 - **UI-FRM-5** **Field errors from a 422** (`details.fields[]` with `loc`, `message`, `type`):
   the last element of `loc` names the field. Show the message directly under the field with an
   error icon and text in `--color-tone-danger-fg`, give the control a thicker (2 px)
   `--color-tone-danger-edge` border, set `aria-invalid="true"`, and add the message's id to the
   control's `aria-describedby`. The border is extra: the icon and message carry the meaning.
-  Errors appear only after a failed submit, never as the user types.
+  Errors appear only after a failed submit, never as the user types (the password requirements
+  list, UI-FRM-10, is guidance, not errors).
 - **UI-FRM-6** **No error summary box.** The inline errors are the errors. When a submit fails,
   move focus to the **first invalid field**, and announce through a visually hidden polite live
   region "N fields need attention: Name, Key" (or "1 field needs attention: Name"). An error whose
   `loc` matches no field, and every form-level failure, is a form alert (UI-FRM-7). A field's
-  error clears when the user edits it.
+  error clears when the user edits it. A repeat of the same announcement is cleared and set
+  again after a short delay in another task (`useFormErrors`' `ANNOUNCE_DELAY_MS`), never in the
+  same task, so the browser sees a change and reads it again (DL-93).
 - **UI-FRM-7** **Form-level failures** use the `Alert` component (§6.1, UI-FBK-13) at the top of
   the form, `role="alert"`, with focus moved to it and the user's typed values kept, and plain
   copy written by us: **403**, "You don't have permission to do that", then refetch the entity
@@ -511,7 +519,9 @@ render inside the full shell when signed in.
   you were editing. Reload to see the latest version", with a Reload button, and the typed
   values stay until the user presses it; **network_error**, "We couldn't reach the server", with
   a Retry button; anything else, a generic message with no codes or stack details. The alert has
-  a dismiss X; the form stays usable.
+  a dismiss X; the form stays usable. Retry first moves focus to the control whose action failed,
+  which shows its pending state, then repeats the action, so focus never falls to the page while
+  the alert is replaced; dismissing returns focus as UI-FBK-13 says (DL-93).
 - **UI-FRM-8** **Pending state:** the submit button stays enabled in the DOM with
   `aria-disabled="true"` (a real `disabled` would drop focus), keeps its normal colors (UI-TOK-10),
   its label changes to "Saving…" with a small inline spinner, its width is fixed so nothing
@@ -526,8 +536,15 @@ render inside the full shell when signed in.
   (DL-66); a taken name comes back as the 422 on save (UI-FRM-5).
 - **UI-FRM-10** **Password fields:** correct `autocomplete` (`username` or `email` for the
   identifier, `current-password`, `new-password`); paste is never blocked; **no `maxlength`**;
-  the policy is length only, shown as help text with the number taken from the server; **no
-  "confirm password" field**. The show/hide toggle is a small icon button **inside** the field
+  **no "confirm password" field**. Where users choose their own new password (not an admin's
+  generated temporary password, UI-FRM-11), a **requirements list** sits under the field
+  (`PasswordRequirements`): each requirement the server publishes (`GET
+  /api/auth/password-policy`, its label included) is a line with an icon and text that turns
+  from unmet to met as the user types, never color alone. The list is tied to the field with
+  `aria-describedby`, so it is read when the field gets focus, and is not a live region: nothing
+  is announced per keystroke. A requirement the screen can't check (one it doesn't know, or "not
+  your current password" with no current-password field) is shown as plain text. No number is
+  written into the screen (DL-91). The show/hide toggle is a small icon button **inside** the field
   (28×28, `type="button"`, `aria-label` "Show password" / "Hide password", `aria-pressed`, and a
   `title`), and the browser's own reveal icon is hidden (`::-ms-reveal`). Whether a password
   manager's icon collides with the toggle on the real sign-in page is still to check (§10).
@@ -599,7 +616,9 @@ render inside the full shell when signed in.
 - **UI-FBK-2** `role="alert"` is used only for a message that appears because of something the
   user just did: a submit, a row action, or a load or retry the user asked for. A message already
   on the page when it loads is plain text in a labelled region, so a screen reader doesn't read
-  it out on arrival.
+  it out on arrival. An alert reporting a new event is a new element, keyed on a counter in the
+  shared code (`useFormErrors`' `alertKey`), so a repeat with the same text is announced again;
+  the role is never added to an element already on the page (DL-93).
 - **UI-FBK-3** Messages say what happened and what to do next, in plain language, with no codes in
   the headline or body. Use the server's `message` for field errors (it is written for users) and
   our own copy for 403, 404, 409, and network errors. A small "Error 404" label above an error
@@ -881,6 +900,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | `IconButton`, `FieldHint` | `IconButton` requires an accessible-name prop; `--control-height-sm` minimum. `FieldHint` is UI-FRM-17 |
 | `FormField` | Wires label, required asterisk, help, hint, and error ids and `aria-*` for every control inside it |
 | `TextField`, `PasswordField`, `SelectField`, `CheckboxField`, `RadioGroup` | Built on `FormField`; `PasswordField` has the inside toggle (UI-FRM-10) |
+| `PasswordRequirements` | The live requirements list under a new-password field (UI-FRM-10, DL-91), from S1-C14a |
 | `Alert` | Tone, icon, text, optional actions, optional dismiss (UI-FBK-13); `role="alert"` only per UI-FBK-2 |
 | `Badge`, `Banner` | Driven by the mapping module (UI-FBK-5, UI-FBK-6); banners are not dismissible |
 | `Dialog`, `ConfirmDialog` | Native `<dialog>`; UI-FRM-14 |

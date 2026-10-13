@@ -46,8 +46,9 @@ The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
      handler `auth` registers, in the same transaction (check that path too); removing a membership leaves sessions
      alone, so every request must re-check memberships in `authorize()`;
    - idle and absolute expiry enforced server-side on every request;
-   - `must_change_password` blocks everything except `GET /api/auth/me`, change-password, and
-     sign-out, with 403 `password_change_required`;
+   - `must_change_password` blocks everything except `GET /api/auth/me`, change-password,
+     sign-out, and `GET /api/auth/password-policy` (from S1-C14a, DL-91), with 403
+     `password_change_required`;
    - Argon2id, run off the event loop; sign-in doesn't reveal whether an email exists (same
      error; the unknown-user path still does comparable hashing work); `account_inactive` is
      returned only after the password is verified; a password over 256 characters is refused

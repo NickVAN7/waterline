@@ -37,7 +37,8 @@ correct; you decide whether the code does it.
   row (`Actions for Jane Doe` or `Remove Jane Doe`, never `Actions` or `Remove`)? Is an icon
   control ever hover-only? (UI-TBL-4, UI-STY-4)
 - Is there exactly one `h1` per page, headings in order, and landmarks as in UI-SHL-2 (`banner`,
-  `nav` "Main", `nav` "Project", one `main`)? Is any content outside a landmark?
+  `nav` "Main", `nav` "Project", one `main`)? Is any content outside a landmark, or any landmark
+  rendered with nothing in it?
 - Is any click handler on a non-interactive element (`<div @click>`, `<span @click>`)? Any
   `tabindex` above 0? Any link used as a button, or a button used to navigate? (UI-FRM-15)
 - Does any custom code hand-roll a focus trap, roving tabindex, or ARIA state for a menu,
@@ -84,20 +85,26 @@ correct; you decide whether the code does it.
 - **Required marking:** a red bold asterisk (`--color-danger`) with `aria-hidden="true"` in the
   label of each required field, `aria-required="true"` on the control, the "* Required field"
   legend at the top, optional fields unmarked, and `novalidate` on the form? (UI-FRM-2)
-- Help text visible for hard rules, tied by `aria-describedby`, with no number the server owns?
+- Help text visible for hard rules, between the label and the control (the password
+  requirements list sits under the field instead, UI-FRM-10), tied by `aria-describedby`, with no
+  number the server owns?
   Is a hard rule hidden in a hint? (UI-FRM-3, UI-FRM-17)
 - **Hints:** shown on hover and on keyboard focus, dismissed by Esc, stay while hovered, never the
   only copy (the same text is in `aria-describedby` or the accessible name)? (UI-FRM-17)
-- Does the client validate anything beyond "not empty"? Any copy of a server rule? (UI-FRM-4)
+- Does the client validate anything beyond "not empty"? Any copy of a server rule? (One
+  exception: the `PasswordRequirements` list checks the requirements the server publishes as the
+  user types; DL-91.) (UI-FRM-4)
 - 422 handling: `loc` mapped to the field; message with icon and text; thicker danger border;
   `aria-invalid`; id added to `aria-describedby`; errors shown only after a failed submit?
   (UI-FRM-5)
 - **No error summary box.** On a failed submit does focus move to the first invalid field, and
-  does a polite live region say "N fields need attention: …"? Is an unmapped error shown as a
-  form alert, not dropped? (UI-FRM-6)
+  does a polite live region say "N fields need attention: …"? Is a repeat of the same message
+  cleared and set again after a delay in another task, not in the same task? Is an unmapped error
+  shown as a form alert, not dropped? (UI-FRM-6)
 - 403, 409, network, and 500 handled with our copy and the right follow-up (refetch, Reload,
   Retry), as a dismissible alert at the top of the form that takes focus; typed values kept on
-  409 until Reload? (UI-FRM-7, UI-FBK-13)
+  409 until Reload? Does Retry move focus to the control whose action failed (pending) before the
+  alert goes? (UI-FRM-7, UI-FBK-13)
 - Pending state: `aria-disabled` not `disabled`, normal colors, fixed width at least as wide as
   the longest label, double-submit ignored, outcome announced? Is the submit button disabled
   because the form is invalid? (UI-FRM-8, UI-FRM-15, UI-TOK-10)
@@ -105,8 +112,11 @@ correct; you decide whether the code does it.
   their own username in their profile gets none, by design; a taken one is the 422 on save.)
   (UI-FRM-9)
 - Password fields: `autocomplete` values, no `@paste.prevent` or `onpaste`, no `maxlength`, no
-  confirm field, length-only help from the server's number, and the show/hide toggle inside the
-  field (28×28, `aria-label`, `aria-pressed`, `title`) with the browser's reveal icon hidden?
+  confirm field, and the show/hide toggle inside the field (28×28, `aria-label`, `aria-pressed`,
+  `title`) with the browser's reveal icon hidden? Where users choose their own new password, is
+  the `PasswordRequirements` list under the field, built from `GET /api/auth/password-policy`
+  with no number in the code, icon and text per line, tied by `aria-describedby`, and not
+  announced per keystroke?
   Temporary password shown as UI-FRM-11 says, including an honest copy-failure message?
   (UI-FRM-10, UI-FRM-11)
 - Fieldset and legend for groups; native radios or a Select before a combobox? (UI-FRM-12)
@@ -126,7 +136,9 @@ correct; you decide whether the code does it.
 ### 2.3 Feedback and status (UI-FBK)
 - Is any error reported only in a toast? Any information a toast holds that the page lacks?
   (UI-FBK-1)
-- `role="alert"` on content that was already on the page at load? (UI-FBK-2)
+- `role="alert"` on content that was already on the page at load, or added to an element
+  already on the page? Is an alert for a new event a new element (keyed), so a repeat is
+  announced? (UI-FBK-2)
 - Plain-language copy with no codes in the headline or body? Does the 404 copy or behavior reveal
   whether the thing exists, or does a missing page and a not-visible page differ in any way?
   (UI-FBK-3, UI-FBK-14)
@@ -177,8 +189,8 @@ correct; you decide whether the code does it.
   Selected rows use `--color-selected` plus a checked box and a 3 px leading bar; disabled uses
   the three disabled tokens, not `opacity`; placeholders use `--color-placeholder`? (UI-TOK-8 to
   11)
-- Does any animation or transition use literal durations or convey information alone?
-  (UI-TOK-7)
+- Does any animation or transition use literal durations or convey information alone? (The
+  pending spinner's `animate-spin` is the one exception, DL-92.) (UI-TOK-7)
 - Any new UI dependency in `package.json`, or a major-version change to PrimeVue or Tailwind?
   That needs a design change. A second widget library, any `@svar/*` (PRO) package, or an
   `@svar-ui/*` version with `^` or `~` is the same kind of finding. (UI-STY-5, UI-STY-7,
