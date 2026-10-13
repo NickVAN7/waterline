@@ -4,8 +4,9 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C13 (Classification & export control) done; S1-C13a (Demo seed data) built `wl seed --demo` (section 5, "Demo
-> data"); next is S1-C14 (Web: foundations & sign-in), then S1-C14a (Web: app shell; DL-84). A project's classification is set at creation or with `PUT
+> **Status:** S1-C13a (Demo seed data) done: `wl seed --demo` builds the demo dataset (section 5,
+> "Demo data"); next is S1-C14 (Web: foundations & sign-in), then S1-C14a (Web: app shell; DL-84).
+> S1-C13 (Classification & export control) built classification. A project's classification is set at creation or with `PUT
 > /api/projects/{key}/classification` (`project.raise_classification`,
 > `project.lower_classification`), export control needs a confirmation on every member add and
 > when it's added, and both access reviews show `access` (`content` or `management`; build plan,
