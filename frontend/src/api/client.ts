@@ -7,7 +7,7 @@
  * Requests go to the page's own origin (Vite proxies `/api` to the backend), send cookies, and
  * use JSON bodies only.
  */
-import createClient, { type ClientOptions } from 'openapi-fetch'
+import createClient, { type ClientOptions, type Middleware } from 'openapi-fetch'
 
 import type { components, paths } from './schema'
 
@@ -47,6 +47,38 @@ export function createApiClient(options: ClientOptions = {}) {
 }
 
 export const client = createApiClient()
+
+/**
+ * A response that means the session can't go on: 401 (no valid session; not a failed sign-in,
+ * which is also 401) or 403 `password_change_required`. The app registers one handler
+ * (`onSessionProblem`) that redirects; this module only reports.
+ */
+export type SessionProblem = 'session_ended' | 'password_change_required'
+
+let sessionHandler: ((problem: SessionProblem) => void) | undefined
+
+export function onSessionProblem(handler: (problem: SessionProblem) => void): void {
+  sessionHandler = handler
+}
+
+export const sessionMiddleware: Middleware = {
+  async onResponse({ request, response }) {
+    if (!sessionHandler) return
+    if (response.status === 401 && !new URL(request.url).pathname.endsWith('/api/auth/sign-in')) {
+      sessionHandler('session_ended')
+    } else if (response.status === 403) {
+      const body: unknown = await response
+        .clone()
+        .json()
+        .catch(() => undefined)
+      if (isErrorBody(body) && body.code === 'password_change_required') {
+        sessionHandler('password_change_required')
+      }
+    }
+  },
+}
+
+client.use(sessionMiddleware)
 
 function isErrorBody(value: unknown): value is ErrorBody {
   if (typeof value !== 'object' || value === null) return false

@@ -1,0 +1,112 @@
+/* src/app/styles/tokens.css
+   One definition per token. Tailwind turns the --color-*, --text-*, --radius-*, --shadow-*
+   and --font-* names into utilities (bg-surface, text-muted, rounded-md ...); PrimeVue reads
+   the same variables through the preset (src/app/theme/preset.ts). `static` makes Tailwind
+   emit every variable even when no class uses it, which the preset relies on. */
+
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+
+@theme static {
+  /* Drop Tailwind's defaults so only our tokens exist */
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  /* Surfaces */
+  --color-bg: light-dark(#ffffff, #0f141a);
+  --color-surface: light-dark(#f4f6f8, #171e26);
+  --color-surface-raised: light-dark(#ffffff, #1e2730);
+
+  /* Borders: --color-border is for component boundaries (inputs, checkboxes), >= 3:1.
+     --color-border-subtle is decorative separators only. */
+  --color-border: light-dark(#6b7685, #8793a2);
+  --color-border-subtle: light-dark(#d5dbe1, #2c3744);
+
+  /* Text */
+  --color-text: light-dark(#0a1018, #f6f9fc);
+  --color-text-muted: light-dark(#4a5565, #a8b3bf);
+  --color-placeholder: light-dark(#66707f, #84909e);
+  --color-link: light-dark(#213870, #87c9ee);
+  --color-link-hover: light-dark(#14244f, #b3dff5);
+
+  /* Accent (primary actions), from the logo: navy in light, ice blue in dark */
+  --color-accent: light-dark(#213870, #87c9ee);
+  --color-accent-hover: light-dark(#172a57, #a9d8f2);
+  --color-on-accent: light-dark(#ffffff, #0a1420);
+
+  /* Danger (destructive actions, required-field asterisk) */
+  --color-danger: light-dark(#b42318, #f28b82);
+  --color-danger-hover: light-dark(#8f1c13, #f6a8a1);
+  --color-on-danger: light-dark(#ffffff, #2a0a0a);
+
+  /* Interaction states */
+  --color-hover: light-dark(#e4e9ee, #2a3643);      /* rows, menu items, secondary button */
+  --color-selected: light-dark(#dbdfe8, #293c49);   /* selected rows and items; never alone: UI-TOK-9 */
+  --color-disabled-bg: light-dark(#e9edf1, #232d38);
+  --color-disabled-text: light-dark(#69737f, #8a96a4);
+  --color-disabled-border: light-dark(#c3cbd4, #3a4757);
+  --color-focus: light-dark(#213870, #87c9ee);      /* focus ring only */
+
+  /* Status tones: -bg (fill), -fg (text on the fill), -edge (icon and border) */
+  --color-tone-success-bg: light-dark(#e6f4ea, #10281a);
+  --color-tone-success-fg: light-dark(#13502a, #a9e6bf);
+  --color-tone-success-edge: light-dark(#2c7a46, #4fb673);
+  --color-tone-warning-bg: light-dark(#fff3cf, #33270a);
+  --color-tone-warning-fg: light-dark(#5f3d00, #f6d78a);
+  --color-tone-warning-edge: light-dark(#946200, #d9a22e);
+  --color-tone-danger-bg: light-dark(#fdecec, #3a1517);
+  --color-tone-danger-fg: light-dark(#8a1a1a, #f7b5b5);
+  --color-tone-danger-edge: light-dark(#c0302f, #ef7070);
+  --color-tone-info-bg: light-dark(#e6f0fa, #0f2a46);
+  --color-tone-info-fg: light-dark(#0a437a, #acd3fb);
+  --color-tone-info-edge: light-dark(#2b6cb0, #5ea4ee);
+  --color-tone-neutral-bg: light-dark(#eef1f4, #232d38);
+  --color-tone-neutral-fg: light-dark(#38424f, #cbd4de);
+  --color-tone-neutral-edge: light-dark(#6b7685, #8793a2);
+
+  /* Type: system fonts (no network, no layout shift); monospace for keys and IDs */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-xs: 0.875rem;    /* 14px: badges, table meta; the smallest size allowed */
+  --text-sm: 0.9375rem;   /* 15px: tables, help text */
+  --text-base: 1rem;      /* 16px: body, form fields */
+  --text-lg: 1.25rem;     /* 20px: h3, lead text */
+  --text-xl: 1.5rem;      /* 24px: h2 */
+  --text-2xl: 2rem;       /* 32px: h1 */
+
+  /* Radius */
+  --radius-sm: 0.25rem;   /* badges, checkboxes */
+  --radius-md: 0.375rem;  /* buttons, inputs */
+  --radius-lg: 0.625rem;  /* dialogs, cards, banners */
+
+  /* Elevation: borders carry structure; shadows only for floating layers */
+  --shadow-popover: 0 4px 16px rgb(0 0 0 / 0.18);
+  --shadow-dialog: 0 12px 40px rgb(0 0 0 / 0.28);
+
+  /* Sizes (spacing is Tailwind's built-in 4px scale: p-4, gap-2) */
+  --target-min: 1.5rem;          /* 24px: the floor for any pointer target (WCAG 2.5.8) */
+  --control-height-sm: 2rem;     /* 32px: icon-only buttons, dense rows */
+  --control-height: 2.25rem;     /* 36px: buttons and inputs */
+  --header-height: 3.5rem;
+  --sidebar-width: 15rem;
+  --content-narrow: 40rem;       /* forms, settings */
+  --content-wide: 80rem;         /* lists, tables */
+
+  /* Focus ring */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+
+  /* Layers */
+  --z-header: 10;
+  --z-toolbar: 20;
+  --z-popover: 30;
+  --z-dialog: 40;
+  --z-toast: 50;
+}

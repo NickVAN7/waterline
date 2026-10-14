@@ -2,6 +2,11 @@
 
 from sqlalchemy.orm import registry
 
+from app.core.base_model import ClassificationMixin
+
+# The classifiable tables (schema-doc, conventions: "Classification"), each from its own slice.
+CLASSIFIABLE_TABLES = frozenset({"project", "requirement", "task", "testcase"})
+
 
 def relationships_that_can_lazy_load(models: registry) -> list[str]:
     """Relationships not declared `lazy="raise"`: touching one unloaded would emit SQL, which
@@ -30,4 +35,18 @@ def versioned_tables_without_version_checks(models: registry) -> list[str]:
         mapper.class_.__name__
         for mapper in models.mappers
         if "version" in mapper.columns and mapper.version_id_col is None
+    )
+
+
+def classifiable_models_without_the_mixin(models: registry) -> list[str]:
+    """Models of a classifiable table, or with a `classification_*` column, that don't use
+    `ClassificationMixin` (design-doc §3.1): their columns would drift from the shared ones."""
+    return sorted(
+        mapper.class_.__name__
+        for mapper in models.mappers
+        if (
+            mapper.persist_selectable.name in CLASSIFIABLE_TABLES  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+            or any(key.startswith("classification_") for key in mapper.columns.keys())  # noqa: SIM118
+        )
+        and not issubclass(mapper.class_, ClassificationMixin)
     )

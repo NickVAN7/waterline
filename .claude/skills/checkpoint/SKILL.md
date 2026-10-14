@@ -18,8 +18,9 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 2. Run the gates
 
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
-  import-linter contracts, migration checks, generated-client freshness, mutation testing, and
-  the supply-chain audit (`wl audit`, which needs the network).
+  import-linter contracts, migration checks, generated-client freshness, and mutation testing
+  (when anything it depends on changed). The supply-chain audit and the end-to-end tests run in
+  CI (`wl check --full`, DL-99), whose green run step 6 waits for.
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
 - **Last checkpoint of a slice:** search `docs/schema-doc.md` for `Added in Slice <n>.` (this
   slice's number) and confirm each marked column is in its model. The docs consistency tests
@@ -49,7 +50,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 4. Independent review
 
 - **Spec tests first:** if the checkpoint adds or changes `app/rules/` or `app/authz/`, start
-  `docs/reviews/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
+  `docs/reviews/s<n>/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
   behavior table and its files table, with each file's `git hash-object`), plus any change to
   those files the owner approved (what and why). `checkpoint-reviewer` compares the files with
   the recorded hashes.
@@ -66,13 +67,16 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
     areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
     `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
     store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
+- Also invoke the `ui-reviewer` agent, with the same inputs, whenever the diff touches
+  `frontend/src/` or `frontend/e2e/` (DL-62). It is read-only and runs no tests.
 - **One reviewer at a time:** when both run, invoke `security-reviewer` first and
-  `checkpoint-reviewer` once it has finished, never in parallel. Both can run tests against the
-  shared test database (`waterline_test`), and two runs at once collide: the concurrency tests
-  truncate tables and then require every table to be empty, and each run migrates the test
-  database at its start. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests
-  yourself while a reviewer is running.
-- Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
+  `checkpoint-reviewer` once it has finished, never in parallel (then `ui-reviewer`, when it
+  runs). Both can run tests against the shared test databases (`waterline_test` and the per-worker
+  copies, DL-100), and two runs at once collide: each run drops and recreates the workers'
+  databases at its start, and the concurrency tests truncate tables and then require every table
+  to be empty. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests yourself
+  while a reviewer is running.
+- Do not pass any reviewer your reasoning or a summary of the work; they review from the docs
   and the diff.
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
   (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
@@ -107,12 +111,12 @@ If fixes changed behavior (not just docs or tests), run the reviewer again on th
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
-**Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
-docs-consistency, repo-auditor) in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`).
+**Record every pass** of every reviewer that ran (checkpoint, security, UI, fresh-clone,
+docs-consistency, repo-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
 Include the base commit, the totals, the "Spec tests" section (when the checkpoint has one), and
 for each pass its verdict, its findings table in the `S0-C1.md` columns, one row per finding with
 its resolution (fixed / logged with TD number / rejected with evidence / proposed to the owner;
-for `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor`, the four parts condensed
+for `checkpoint-reviewer`, `security-reviewer`, `ui-reviewer`, and `repo-auditor`, the four parts condensed
 into the Finding cell, DL-42), `checkpoint-reviewer`'s "Sabotage checks" table, and the
 questions it raised. End with the questions still open for the owner and any owner decisions made during review.
 The record goes in the checkpoint's commit.
@@ -139,7 +143,7 @@ Tests:
 Decisions / deviations:
 - ... (or "None")
 
-Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/<ID>.md)
+Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/s<n>/<ID>.md)
 Security review: <n> findings — … (or "not required")
 Fresh-clone verification: <result> (last checkpoint of a slice only)
 Docs consistency: <n> fixes — …; <m> decisions for the owner (last checkpoint of a slice only)
@@ -181,9 +185,9 @@ reviewers, not verification.
 
 Send the owner:
 - the review note (the commit message body);
-- each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency,
+- each reviewer's findings table (checkpoint, security, UI, fresh-clone, docs-consistency,
   repo-auditor) with
-  the resolution of each finding (as recorded in `docs/reviews/<ID>.md`);
+  the resolution of each finding (as recorded in `docs/reviews/s<n>/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review;
 - the PR link and its CI result, and whether this checkpoint ends its group (a review point)
@@ -210,5 +214,5 @@ Then **stop**. Do not begin the next checkpoint until the owner explicitly appro
   in the review note. Say in the report that it auto-continued and why. If any condition
   fails, stop as usual.
 - **S1-C10:** a full stop for the whole group. The report covers S1-C8 to S1-C10, with links to
-  the three review records and the group's diff range (from S1-C8's base, the last commit
+  the four review records (S1-C8, S1-C8a, S1-C9, S1-C10; DL-60) and the group's diff range (from S1-C8's base, the last commit
   before its work started, to the S1-C10 commit).

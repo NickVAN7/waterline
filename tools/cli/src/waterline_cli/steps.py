@@ -34,7 +34,9 @@ def backend_test(extra: Sequence[str] = ()) -> list[Step]:
     pytest enforces both gates itself: coverage's fail_under, and 100% for app/authz and
     app/rules (a hook in backend/tests/conftest.py)."""
     if extra:
-        return [step("uv", "run", "pytest", "--no-cov", *extra, cwd=BACKEND)]
+        # In one process (DL-100): faster for a few tests, and breakpoints work. A `-n` in
+        # `extra` comes later, so it wins.
+        return [step("uv", "run", "pytest", "--no-cov", "-n", "0", *extra, cwd=BACKEND)]
     return [step("uv", "run", "pytest", cwd=BACKEND)]
 
 
@@ -50,14 +52,14 @@ def backend_mutate() -> list[Step]:
     ]
 
 
-def backend_check() -> list[Step]:
+def backend_check(*, mutate: bool = True) -> list[Step]:
     return [
         step("uv", "lock", "--check", cwd=BACKEND),
         # backend/openapi.json matches the code (client freshness, first half).
         step("uv", "run", "python", "-m", "app.openapi_export", "--check", cwd=BACKEND),
         *backend_lint(),
         *backend_test(),
-        *backend_mutate(),
+        *(backend_mutate() if mutate else []),
     ]
 
 
@@ -69,6 +71,35 @@ def migrate() -> list[Step]:
     """Apply migrations to the dev database with the Compose migrate service (its image rebuilt
     first, so a dependency change since the last `wl up` is included)."""
     return [step("docker", "compose", "run", "--rm", "--build", "migrate")]
+
+
+# The seed command's environment variables (backend/app/cli.py), passed into the container
+# when they're set, so `wl seed` runs non-interactively from them (CI).
+SEED_ENV = (
+    "SEED_WORKSPACE_NAME",
+    "SEED_WORKSPACE_SLUG",
+    "SEED_EMAIL",
+    "SEED_USERNAME",
+    "SEED_NAME",
+    "SEED_PASSWORD",
+)
+
+
+def app_cli(args: Sequence[str], env: Sequence[str] = ()) -> list[Step]:
+    """Run an app admin command (`python -m app.cli`) in a one-off container from the api
+    service's image; Compose runs the migrations first (the api service depends on them)."""
+    passed = [flag for name in env for flag in ("-e", name)]
+    return [
+        step("docker", "compose", "run", "--rm", *passed, "api", "python", "-m", "app.cli", *args)
+    ]
+
+
+def seed(extra: Sequence[str] = ()) -> list[Step]:
+    return app_cli(["seed", *extra], env=SEED_ENV)
+
+
+def admin(extra: Sequence[str] = ()) -> list[Step]:
+    return app_cli(extra)
 
 
 def up(extra: Sequence[str] = ()) -> list[Step]:
@@ -96,6 +127,37 @@ def down(extra: Sequence[str] = ()) -> list[Step]:
 def logs(extra: Sequence[str] = ()) -> list[Step]:
     """Follow the stack's logs (one service's, when named)."""
     return [step("docker", "compose", "logs", "--follow", *extra)]
+
+
+# The isolated end-to-end stack (docker-compose.e2e.yml), under its own Compose project.
+E2E_COMPOSE = (
+    "docker",
+    "compose",
+    "--project-name",
+    "waterline-e2e",
+    "--file",
+    "docker-compose.yml",
+    "--file",
+    "docker-compose.e2e.yml",
+)
+
+
+def e2e(extra: Sequence[str] = ()) -> list[Step]:
+    """Clear any stack an earlier run left behind (its database would refuse the demo seed),
+    start the end-to-end stack, seed it with the demo data, and run Playwright (extra arguments
+    go to Playwright). `e2e_down` always follows, pass or fail (DL-65)."""
+    return [
+        *e2e_down(),
+        step(*E2E_COMPOSE, "up", "--detach", "--wait", "--build"),
+        step(*E2E_COMPOSE, "run", "--rm", "api", "python", "-m", "app.cli", "seed", "--demo"),
+        step("npx", "playwright", "test", *extra, cwd=FRONTEND),
+    ]
+
+
+def e2e_down() -> list[Step]:
+    """Remove the end-to-end stack and its volumes, so the next run starts from an empty
+    database."""
+    return [step(*E2E_COMPOSE, "down", "--volumes")]
 
 
 def gen_client() -> list[Step]:

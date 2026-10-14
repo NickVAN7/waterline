@@ -1,0 +1,132 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { client } from '@/api/client'
+import { expectNoA11yViolations } from '@/test/a11y'
+import { failed, ok } from '@/test/api'
+import { projectItem } from '@/test/projects'
+import { testRouter } from '@/test/router'
+
+import MyWorkView from './MyWorkView.vue'
+
+type Section = { available: boolean; items: ReturnType<typeof projectItem>[]; total: number }
+const work = (projects: Section) => ok({ sections: { projects } })
+const NETWORK = failed(503, { code: 'network_error', message: '', details: {} })
+
+async function mountView() {
+  const router = await testRouter('/')
+  // In the shell, as the app mounts it: focus moves to `main h1`.
+  const main = document.body.appendChild(document.createElement('main'))
+  const wrapper = mount(MyWorkView, { global: { plugins: [router] }, attachTo: main })
+  await flushPromises()
+  return wrapper
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
+
+afterEach(() => {
+  document.body.innerHTML = ''
+})
+
+describe('MyWorkView', () => {
+  it('lists the projects the user can open, linked to each, with its count announced', async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(
+      work({
+        available: true,
+        items: [
+          projectItem('ERP', { name: 'ERP rollout' }),
+          projectItem('PORTAL', { status: 'on_hold' }),
+        ],
+        total: 2,
+      }),
+    )
+
+    const wrapper = await mountView()
+
+    expect(get).toHaveBeenCalledWith('/api/me/work')
+    expect(wrapper.get('h1').text()).toBe('My work')
+    const links = wrapper.findAll('section li a')
+    expect(links.map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['ERP rollout', '/acme/projects/ERP'],
+      ['PORTAL project', '/acme/projects/PORTAL'],
+    ])
+    expect(wrapper.findAll('section li')[1]!.text()).toContain('On hold')
+    expect(wrapper.get('[aria-live=polite]').text()).toBe('2 projects')
+    expect(wrapper.get('section').attributes('aria-busy')).toBe('false')
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('is busy, saying so, while the projects load', async () => {
+    vi.spyOn(client, 'GET').mockReturnValue(new Promise(() => {}) as never)
+
+    const wrapper = await mountView()
+
+    expect(wrapper.get('section').attributes('aria-busy')).toBe('true')
+    expect(wrapper.get('[aria-live=polite]').text()).toBe('Loading your projects…')
+  })
+
+  it('has an empty state when the user has no projects', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(work({ available: true, items: [], total: 0 }))
+
+    const wrapper = await mountView()
+
+    // One level below the section's own heading (UI-SHL-8).
+    expect(wrapper.get('section h3').text()).toBe('No projects yet')
+  })
+
+  it('says how many it shows when there are more than the first items', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      work({ available: true, items: [projectItem('ERP')], total: 14 }),
+    )
+
+    const wrapper = await mountView()
+
+    expect(wrapper.text()).toContain('Showing 1 of 14 projects.')
+  })
+
+  it.each([
+    ['the request fails', NETWORK],
+    ['the section is unavailable', work({ available: false, items: [], total: 0 })],
+  ])(
+    'announces a failed Try again as a new alert, focus staying on Try again, when %s',
+    async (_, answer) => {
+      vi.spyOn(client, 'GET').mockResolvedValue(answer)
+      const wrapper = await mountView()
+      expect(wrapper.find('[role=alert]').exists()).toBe(false)
+
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Try again')!
+        .trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role=alert]').text()).toContain("Couldn't load your projects")
+      expect(document.activeElement?.textContent?.trim()).toBe('Try again')
+    },
+  )
+
+  it.each([
+    ['the request fails', NETWORK],
+    ['the section is unavailable', work({ available: false, items: [], total: 0 })],
+  ])('shows an error state with Try again when %s', async (_, answer) => {
+    const get = vi
+      .spyOn(client, 'GET')
+      .mockResolvedValueOnce(answer)
+      .mockResolvedValueOnce(work({ available: true, items: [projectItem('ERP')], total: 1 }))
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain("Couldn't load your projects")
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Try again')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(wrapper.findAll('section li a').map((a) => a.text())).toEqual(['ERP project'])
+    expect(document.activeElement).toBe(wrapper.get('h1').element)
+  })
+})

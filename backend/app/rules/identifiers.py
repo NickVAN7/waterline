@@ -4,6 +4,7 @@ can report a specific field error.
 """
 
 import string
+import unicodedata
 from enum import StrEnum
 
 PROJECT_KEY_MIN = 3
@@ -89,3 +90,26 @@ def slug_problem(slug: str) -> IdentifierProblem | None:
     if problem is None and slug in RESERVED_SLUGS:
         return IdentifierProblem.RESERVED
     return problem
+
+
+def suggest_username(name: str, suffix: int | None = None) -> str | None:
+    """A username suggested from a person's name (DL-66; build plan, "The user check"): the name
+    lowercased, accents removed, and every other character the username rule doesn't allow
+    dropped; the first and last remaining word joined by a hyphen (one word alone); cut to
+    `SLUG_MAX`, or with `suffix` n, the base shortened so base plus `-n` fits; trailing hyphens
+    stripped after any cut. None when no valid username results."""
+    # NFKD splits an accented letter into the letter and its accent, which is then dropped.
+    decomposed = unicodedata.normalize("NFKD", name.lower())
+    words = [
+        w
+        for w in ("".join(c for c in word if c in _SLUG_CHARACTERS) for word in decomposed.split())
+        if w
+    ]
+    if not words:
+        return None
+    base = words[0] if len(words) == 1 else f"{words[0]}-{words[-1]}"
+    tail = "" if suffix is None else f"-{suffix}"
+    # Equivalent mutant: `rstrip("XX-XX")` also strips uppercase X, which a lowercased base
+    # never holds, so no input tells the two apart.
+    candidate = base[: SLUG_MAX - len(tail)].rstrip("-") + tail  # pragma: no mutate
+    return None if username_problem(candidate) else candidate

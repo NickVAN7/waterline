@@ -1,0 +1,16 @@
+# The end-to-end stack (`wl e2e`, DL-65), layered over docker-compose.yml under its own project
+# name (waterline-e2e): its own containers, network, and database volume, never the dev stack's.
+# Only the web app is published, on its own port, so it runs beside the dev stack and beside CI's
+# Postgres. Its API allows the demo seed (DL-90), which `wl e2e` loads before Playwright runs.
+services:
+  postgres:
+    ports: !reset []
+
+  api:
+    environment:
+      DEMO_SEED_ENABLED: "true"
+    ports: !reset []
+
+  web:
+    ports: !override
+      - "127.0.0.1:5174:5173"

@@ -1,0 +1,51 @@
+/* Base rules (docs/ui-design-guide.md §3.3): the focus ring, focus clearance for sticky
+   layers, reduced motion, and the page's own colors and type. */
+@layer base {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* PrimeVue's menus keep DOM focus on the list and mark the active item with `.p-focus`
+     (aria-activedescendant), so the ring goes on that item: a tint alone isn't a focus indicator
+     (UI-TOK-5). Inset, so the menu's edge doesn't clip it. */
+  .p-menu-item.p-focus > .p-menu-item-content {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  html {
+    /* Keeps keyboard focus clear of the sticky header, a sticky selection toolbar (when one is
+       showing), and any visible toasts */
+    scroll-padding-top: calc(var(--header-height) + var(--toolbar-clearance, 0px) + 1rem);
+    scroll-padding-bottom: var(--toast-clearance, 0px);
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    color: var(--color-text);
+    background: var(--color-bg);
+  }
+
+  a {
+    color: var(--color-link);
+  }
+
+  a:hover {
+    color: var(--color-link-hover);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

@@ -12,7 +12,7 @@ be checked for completeness.
 | 4. Cross-cutting views | Boards, search, reports, activity: views spanning entities | |
 | 5. States | Empty, loading, error, permission denied, conflict, archived, module disabled, deactivated user | Loading decided (Oct 5, 2026; "Noted for later steps") |
 | 6. Consolidate | One inventory; page vs. panel vs. dialog vs. inline; mapped to build slices | |
-| 7. Design guide | Tokens, enum → visual mapping, components, patterns (written last) | Notes recorded ("Noted for later steps") |
+| 7. Design guide | Tokens, enum → visual mapping, components, patterns | **Done as a draft** (Oct 10, 2026): `docs/ui-design-guide.md` (DL-61) |
 
 Early mockups (sprint board, requirement detail, delete-requirement dialog, test case) exist on
 the "Waterline key screens" design canvas. They predate this inventory and will be revisited in
@@ -118,18 +118,20 @@ Workspace (the firm: tenant boundary)
 - **Loading states (step 5; decided Oct 5, 2026): skeleton loaders, not spinners.** While a
   page or panel loads, it shows a skeleton: an outline of the content's layout (blocks where
   the headings, rows, and cards will be).
-  - The skeleton appears only if loading takes more than about 200 ms, so fast loads don't
-    flash.
+  - The skeleton appears only if loading takes more than about 300 ms, so fast loads don't
+    flash (DL-63).
   - The loading region carries `aria-busy="true"`.
   - Any shimmer animation is off under `prefers-reduced-motion`.
   - Actions such as saving a form show a pending state on the control itself, not a skeleton.
 
-  The first skeletons are built in Slice 1 (build plan, Checkpoint 14).
-- **Design guide (step 7):** the skeleton-loader rules above; WCAG 2.2 AA (design-doc §1):
-  never color alone for status, RAG, or badges (always text or an icon too), controls at least
-  24×24 CSS pixels, sticky headers and toasts never covering the focused element, a
-  single-pointer alternative to every drag, and password fields that allow paste and password
-  managers.
+  The first skeletons are built in Slice 1 (build plan, Checkpoint 14a).
+- **Design guide (step 7; done as a draft, `docs/ui-design-guide.md`):** the styling approach
+  (PrimeVue plus Tailwind, one token set; SVAR for the board and editable grids); the brand
+  accent from the logo; the skeleton-loader rules above; WCAG 2.2 AA (design-doc §1): never
+  color alone for status, RAG, or badges (always text or an icon too), controls at least 24×24
+  CSS pixels, sticky headers and toasts never covering the focused element, a single-pointer
+  alternative to every drag, and password fields that allow paste and password managers; and
+  bulk selection (UI-TBL-6 to UI-TBL-8).
 - **Data classification** (design-doc §3.1): a banner on project pages and a badge on items
   showing the level and categories as text, never color alone; the export-control
   confirmation dialogs (adding a member to an export-controlled project; marking a project

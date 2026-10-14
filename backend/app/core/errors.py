@@ -82,6 +82,15 @@ class AppError(Exception):
         super().__init__(self.error_message)
 
 
+class UnauthorizedError(AppError):
+    """No valid session (none sent, unknown, expired, or its user deactivated), or a failed
+    sign-in (`invalid_credentials`)."""
+
+    status_code = status.HTTP_401_UNAUTHORIZED
+    code = "not_authenticated"
+    message = "Sign in to continue."
+
+
 class NotFoundError(AppError):
     """The entity doesn't exist, or the caller may not see it (404, not 403, so existence
     isn't leaked; design-doc §5)."""

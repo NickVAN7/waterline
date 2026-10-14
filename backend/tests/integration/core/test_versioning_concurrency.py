@@ -1,5 +1,7 @@
 """Optimistic locking between truly parallel transactions (testing-strategy.md, "Concurrency")."""
 
+from contextlib import suppress
+
 import anyio
 import pytest
 from sqlalchemy import func, select
@@ -28,10 +30,13 @@ async def test_second_of_two_parallel_saves_on_the_same_version_is_stale(
         alices.title = "alice's edit"
         await alice.flush()  # UPDATE … WHERE version = 1: holds the row lock until commit
         bobs.title = "bob's edit"
+        saved: list[bool] = []
 
         async def bob_saves() -> None:
-            with pytest.raises(StaleDataError):
+            # Nothing asserted in here (TD-30): the outcome is checked after the group closes.
+            with suppress(StaleDataError):
                 await bob.flush()  # blocks on alice's row lock, then finds version 2
+                saved.append(True)
 
         with anyio.fail_after(10):
             async with anyio.create_task_group() as group:
@@ -42,4 +47,4 @@ async def test_second_of_two_parallel_saves_on_the_same_version_is_stale(
 
     async with concurrency() as check:
         stored = (await check.execute(select(Document.title, Document.version))).one()
-    assert tuple(stored) == ("alice's edit", 2)
+    assert (saved, tuple(stored)) == ([], ("alice's edit", 2))

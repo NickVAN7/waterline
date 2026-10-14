@@ -147,3 +147,27 @@ def can_manage_account(actor: Account, target: Account) -> bool:
         any(_contains(role, held) and _rank(role) >= _rank(held) for role in admin_roles)
         for held in target_held
     )
+
+
+def in_scope(actor: Account, target: Account) -> bool:
+    """Whether `target` holds at least one membership in `actor`'s scope: the rank rule's first
+    half, which decides whether the actor sees the target at all (a 404 otherwise, DL-72). The
+    target's system-admin flag is in a system admin's scope only."""
+    return any(_contains(role, held) for role in _admin_roles(actor) for held in _held(target))
+
+
+def covering_orgs(actor: Account, target: Account) -> frozenset[uuid.UUID]:
+    """The orgs an account action's audit events go to (DL-75): empty when a system-admin or
+    workspace role of `actor` covers `target`; otherwise each org whose owner/admin role of
+    `actor` covers one of `target`'s memberships."""
+    above_orgs = Account(
+        is_system_admin=actor.is_system_admin,
+        memberships=tuple(m for m in actor.memberships if isinstance(m, WorkspaceRoleHeld)),
+    )
+    if can_manage_account(above_orgs, target):
+        return frozenset()
+    return frozenset(
+        role.org_id
+        for role in _admin_roles(actor)
+        if isinstance(role, OrgRoleHeld) and any(_contains(role, held) for held in _held(target))
+    )

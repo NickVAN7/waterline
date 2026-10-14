@@ -81,6 +81,14 @@ class ClassificationCategory(StrEnum):
     EXPORT_CONTROLLED = "export_controlled"  # project-only in v1
 
 
+class AccessKind(StrEnum):
+    """Content or management (design-doc §3.1, §5): how each action is marked, and what an
+    inherited admin keeps on an export-controlled project without an explicit membership."""
+
+    CONTENT = "content"
+    MANAGEMENT = "management"
+
+
 PROJECT_CATEGORIES = tuple(ClassificationCategory)
 CONTENT_ITEM_CATEGORIES = tuple(
     category

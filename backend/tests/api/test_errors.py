@@ -9,13 +9,14 @@ from collections.abc import AsyncIterator
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import select, text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.base_model import check_version
 from app.core.db import SessionDep, SessionMaker
 from app.core.errors import ForbiddenError, NotFoundError, register_error_handlers
+from tests.support.api import api_client
 from tests.support.models import Document, Widget
 
 pytestmark = [pytest.mark.anyio, pytest.mark.usefixtures("support_tables")]
@@ -98,9 +99,7 @@ def build_app(sessionmaker: SessionMaker) -> FastAPI:
 
 @pytest.fixture
 async def client(sessionmaker: SessionMaker) -> AsyncIterator[AsyncClient]:
-    async with AsyncClient(
-        transport=ASGITransport(app=build_app(sessionmaker)), base_url="http://testserver"
-    ) as client:
+    async with api_client(build_app(sessionmaker)) as client:
         yield client
 
 

@@ -44,6 +44,8 @@ class Membership(BaseModel):
             "organization_id",
             info=user_error("user_id", "already_member", "This person is already a member."),
         ),
+        # An org's members list (DL-34).
+        Index(None, "organization_id"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(User.id))

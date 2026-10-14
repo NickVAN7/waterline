@@ -1,10 +1,13 @@
 import re
+import subprocess
+from pathlib import Path
 
 import pytest
 import typer
 from typer.core import TyperGroup
 from typer.testing import CliRunner
 
+from waterline_cli import mutation
 from waterline_cli.main import app
 
 runner = CliRunner()
@@ -59,6 +62,19 @@ CLI_FMT = [
 ]
 CLI_TEST = ["(cd tools/cli && uv run pytest)"]
 CLI_CHECK = ["uv lock --check", *CLI_LINT, *CLI_TEST]
+E2E_COMPOSE = (
+    "docker compose --project-name waterline-e2e --file docker-compose.yml"
+    " --file docker-compose.e2e.yml"
+)
+E2E_DOWN = [f"{E2E_COMPOSE} down --volumes"]
+# A leftover stack is cleared first, so the demo seed always meets an empty database.
+E2E_RUN = [
+    *E2E_DOWN,
+    f"{E2E_COMPOSE} up --detach --wait --build",
+    f"{E2E_COMPOSE} run --rm api python -m app.cli seed --demo",
+    "(cd frontend && npx playwright test)",
+]
+E2E = [*E2E_RUN, *E2E_DOWN]
 # The repository's audit-allowlist.toml names no Python advisory, so uv audit ignores nothing.
 AUDIT = [
     "uv run python -m waterline_cli.audit network",
@@ -96,7 +112,12 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
-        pytest.param(["check"], [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK, *AUDIT], id="check"),
+        pytest.param(["e2e"], E2E, id="e2e"),
+        pytest.param(
+            ["e2e", "--project", "light"],
+            [*E2E_RUN[:-1], "(cd frontend && npx playwright test --project light)", *E2E_DOWN],
+            id="e2e-pass-through",
+        ),
         pytest.param(["audit"], AUDIT, id="audit"),
         pytest.param(["test"], [*BACKEND_TEST, *FRONTEND_TEST, *CLI_TEST], id="test"),
         pytest.param(["lint"], [*BACKEND_LINT, *FRONTEND_LINT, *CLI_LINT], id="lint"),
@@ -108,7 +129,7 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
         pytest.param(["backend", "fmt"], BACKEND_FMT, id="backend-fmt"),
         pytest.param(
             ["backend", "test", "-k", "approval", "-x"],
-            ["(cd backend && uv run pytest --no-cov -k approval -x)"],
+            ["(cd backend && uv run pytest --no-cov -n 0 -k approval -x)"],
             id="backend-test-pass-through",
         ),
         pytest.param(["frontend", "check"], FRONTEND_CHECK, id="frontend-check"),
@@ -127,6 +148,34 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
         pytest.param(["logs"], ["docker compose logs --follow"], id="logs"),
         pytest.param(["logs", "api"], ["docker compose logs --follow api"], id="logs-service"),
         pytest.param(["migrate"], ["docker compose run --rm --build migrate"], id="migrate"),
+        pytest.param(
+            ["seed"],
+            [
+                "docker compose run --rm -e SEED_WORKSPACE_NAME -e SEED_WORKSPACE_SLUG"
+                " -e SEED_EMAIL -e SEED_USERNAME -e SEED_NAME -e SEED_PASSWORD"
+                " api python -m app.cli seed"
+            ],
+            id="seed",
+        ),
+        pytest.param(
+            ["seed", "--email", "ann@example.com"],
+            [
+                "docker compose run --rm -e SEED_WORKSPACE_NAME -e SEED_WORKSPACE_SLUG"
+                " -e SEED_EMAIL -e SEED_USERNAME -e SEED_NAME -e SEED_PASSWORD"
+                " api python -m app.cli seed --email ann@example.com"
+            ],
+            id="seed-flags",
+        ),
+        pytest.param(
+            ["admin", "grant-system-admin", "ann@example.com"],
+            ["docker compose run --rm api python -m app.cli grant-system-admin ann@example.com"],
+            id="admin-grant",
+        ),
+        pytest.param(
+            ["admin", "revoke-system-admin", "ann@example.com"],
+            ["docker compose run --rm api python -m app.cli revoke-system-admin ann@example.com"],
+            id="admin-revoke",
+        ),
         pytest.param(
             ["gen-client"],
             [
@@ -162,3 +211,139 @@ def test_dry_run_prints_underlying_commands(args: list[str], expected: list[str]
 
     assert result.exit_code == 0, result.output
     assert result.output.splitlines() == expected
+
+
+def _current(_backend: Path, _digest: str) -> bool:
+    return True
+
+
+def _changed(_backend: Path, _digest: str) -> bool:
+    return False
+
+
+def test_check_full_runs_everything_ci_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--full runs mutation testing even when nothing it depends on changed (DL-99)."""
+    monkeypatch.setattr(mutation, "is_current", _current)
+
+    result = runner.invoke(app, ["check", "--full", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines() == [
+        *BACKEND_CHECK,
+        *FRONTEND_CHECK,
+        *CLI_CHECK,
+        *AUDIT,
+        *E2E,
+    ]
+
+
+def test_check_leaves_the_audit_and_end_to_end_tests_to_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(mutation, "is_current", _changed)
+
+    result = runner.invoke(app, ["check", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines() == [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK]
+
+
+def test_check_skips_mutation_testing_when_nothing_it_depends_on_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(mutation, "is_current", _current)
+
+    result = runner.invoke(app, ["check", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    without_mutation = [s for s in BACKEND_CHECK if s not in BACKEND_MUTATE]
+    assert result.stdout.splitlines() == [*without_mutation, *FRONTEND_CHECK, *CLI_CHECK]
+    assert "Mutation testing skipped" in result.stderr
+
+
+def fake_repo(tmp_path: Path) -> Path:
+    """A repository with the backend files mutation testing depends on."""
+    (tmp_path / "tools" / "cli").mkdir(parents=True)
+    (tmp_path / "tools" / "cli" / "pyproject.toml").write_text("")
+    backend = tmp_path / "backend"
+    for name in ("app/rules", "tests/unit", "tests/factories", "mutants"):
+        (backend / name).mkdir(parents=True)
+    for name in ("app/rules/rule.py", "tests/factories/user.py", "pyproject.toml", "uv.lock"):
+        (backend / name).write_text("x = 1\n")
+    return backend
+
+
+@pytest.mark.parametrize(("fails", "recorded"), [(False, True), (True, False)])
+def test_check_records_mutation_testing_as_green_only_when_it_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fails: bool, recorded: bool
+) -> None:
+    backend = fake_repo(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    def fake_run(cmd: tuple[str, ...], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        failed = fails and "tests.support.mutation_gate" in cmd and "check" in cmd
+        return subprocess.CompletedProcess(cmd, 1 if failed else 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    runner.invoke(app, ["check"])
+
+    digest = mutation.inputs_hash(backend)
+    assert mutation.is_current(backend, digest) is recorded
+
+
+@pytest.mark.parametrize(
+    "changed", ["app/rules/rule.py", "tests/factories/user.py", "pyproject.toml", "uv.lock"]
+)
+def test_a_change_to_any_input_makes_mutation_testing_run_again(
+    tmp_path: Path, changed: str
+) -> None:
+    backend = fake_repo(tmp_path)
+    mutation.record(backend, mutation.inputs_hash(backend))
+
+    (backend / changed).write_text("x = 2\n")
+
+    assert not mutation.is_current(backend, mutation.inputs_hash(backend))
+
+
+def test_a_new_file_makes_mutation_testing_run_again(tmp_path: Path) -> None:
+    backend = fake_repo(tmp_path)
+    mutation.record(backend, mutation.inputs_hash(backend))
+
+    (backend / "app" / "new.py").write_text("")
+
+    assert not mutation.is_current(backend, mutation.inputs_hash(backend))
+
+
+def test_a_data_file_counts_but_python_bytecode_does_not(tmp_path: Path) -> None:
+    backend = fake_repo(tmp_path)
+    digest = mutation.inputs_hash(backend)
+    (backend / "app" / "__pycache__").mkdir()
+    (backend / "app" / "__pycache__" / "rule.cpython-314.pyc").write_bytes(b"\0")
+    assert mutation.inputs_hash(backend) == digest
+
+    (backend / "tests" / "unit" / "cases.json").write_text("[]")
+
+    assert mutation.inputs_hash(backend) != digest
+
+
+def test_e2e_tears_the_stack_down_when_a_step_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stack and its volume go even when Playwright (or anything before it) fails."""
+    ran: list[list[str]] = []
+
+    def fake_run(cmd: tuple[str, ...], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        ran.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 1 if "playwright" in cmd else 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = runner.invoke(app, ["e2e"])
+
+    assert result.exit_code == 1
+    assert [" ".join(cmd) for cmd in ran] == [
+        *E2E_DOWN,
+        f"{E2E_COMPOSE} up --detach --wait --build",
+        f"{E2E_COMPOSE} run --rm api python -m app.cli seed --demo",
+        "npx playwright test",
+        *E2E_DOWN,
+    ]

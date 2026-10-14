@@ -1,0 +1,123 @@
+/* Reference file from the Oct 10 SVAR spike (guide §7.1, UI-SVR-3). Verified in Chromium with
+   @svar-ui/vue-kanban 2.6.0, vue-grid 2.7.5, vue-gantt 2.7.4, vue-core 2.6.1: zero colors outside our
+   tokens in light and dark. Goes to frontend/src/app/theme/svar-theme.css in the first checkpoint that
+   ships a board or grid; that checkpoint re-runs the theme audit against the real wrappers. */
+/* svar-theme.css: points SVAR's Willow variables at OUR tokens, so one palette (and light-dark())
+   drives every SVAR widget. Written on `div.wx-willow-theme` (higher specificity than SVAR's own
+   `.wx-willow-theme`, so import order does not matter) because SVAR resolves its derived variables
+   on that same element. We use Willow only and never WillowDark: the tokens switch themselves. */
+div.wx-willow-theme {
+  /* core colors */
+  --wx-color-primary: var(--color-accent);
+  --wx-color-primary-selected: var(--color-selected);
+  --wx-color-primary-font: var(--color-on-accent);
+  --wx-color-secondary-hover: var(--color-hover);
+  --wx-color-secondary-border-disabled: var(--color-disabled-border);
+  --wx-color-success: var(--color-tone-success-edge);
+  --wx-color-warning: var(--color-tone-warning-edge);
+  --wx-color-info: var(--color-tone-info-edge);
+  --wx-color-danger: var(--color-danger);
+  --wx-color-disabled: var(--color-disabled-bg);
+  --wx-color-disabled-alt: var(--color-disabled-bg);
+  --wx-color-font: var(--color-text);
+  --wx-color-font-alt: var(--color-text-muted);
+  --wx-color-font-disabled: var(--color-disabled-text);
+  --wx-background: var(--color-bg);
+  --wx-background-alt: var(--color-surface);
+  --wx-background-hover: var(--color-hover);
+  --wx-icon-color: var(--color-text-muted);
+  --wx-border-color: var(--color-border-subtle);
+  --wx-border-medium: 1px solid var(--color-border-subtle);
+  /* inputs and checkboxes need the 3:1 component border, not the decorative one */
+  --wx-input-border: 1px solid var(--color-border);
+  --wx-input-border-focus: 2px solid var(--color-focus);
+  --wx-input-placeholder-color: var(--color-placeholder);
+  --wx-checkbox-border-color: var(--color-border);
+  /* type and shape */
+  --wx-font-family: var(--font-sans);
+  --wx-font-size: var(--text-sm);
+  --wx-font-size-md: var(--text-sm);
+  --wx-font-size-hd: var(--text-base);
+  --wx-font-size-sm: var(--text-xs);
+  --wx-border-radius: var(--radius-md);
+  --wx-radius-major: var(--radius-lg);
+  --wx-box-shadow: var(--shadow-popover);
+  --wx-box-shadow-strong: var(--shadow-dialog);
+  --wx-shadow-light: var(--shadow-popover);
+  --wx-shadow-medium: var(--shadow-popover);
+
+  /* ---- Kanban ---- */
+  --wx-kanban-bg: var(--color-bg);
+  --wx-kanban-column-bg: var(--color-surface);
+  --wx-kanban-card-bg: var(--color-surface-raised);
+  --wx-kanban-border-color: var(--color-border-subtle);
+  --wx-kanban-tag-bg: var(--color-tone-neutral-bg);
+  --wx-kanban-avatar-bg: var(--color-tone-neutral-bg);
+  --wx-kanban-column-over-limit-bg: var(--color-tone-danger-bg);
+  --wx-kanban-drop-placeholder-bg: var(--color-selected);
+  --wx-kanban-card-shadow: 0 0 0 1px var(--color-border-subtle);
+  --wx-kanban-card-shadow-hover: var(--shadow-popover);
+  --wx-kanban-card-shadow-drag: var(--shadow-dialog);
+  --wx-kanban-progress-bg: var(--color-border-subtle);
+  --wx-kanban-progress-fill: var(--color-accent);
+  --wx-kanban-priority-high-bg: var(--color-tone-danger-bg);
+  --wx-kanban-priority-high-color: var(--color-tone-danger-fg);
+  --wx-kanban-priority-medium-bg: var(--color-tone-warning-bg);
+  --wx-kanban-priority-medium-color: var(--color-tone-warning-fg);
+  --wx-kanban-priority-low-bg: var(--color-tone-success-bg);
+  --wx-kanban-priority-low-color: var(--color-tone-success-fg);
+  /* ---- Gantt ---- */
+  --wx-gantt-border-color: var(--color-border-subtle);
+  --wx-gantt-border: 1px solid var(--color-border-subtle);
+  --wx-gantt-icon-color: var(--color-text-muted);
+  --wx-gantt-select-color: var(--color-selected);
+  --wx-gantt-holiday-background: var(--color-tone-neutral-bg);
+  --wx-gantt-holiday-color: var(--color-text-muted);
+  --wx-gantt-task-color: var(--color-accent);
+  --wx-gantt-task-fill-color: var(--color-accent);
+  --wx-gantt-task-border-color: var(--color-accent);
+  --wx-gantt-task-font-color: var(--color-on-accent);
+  --wx-gantt-summary-color: var(--color-tone-neutral-fg);
+  --wx-gantt-summary-fill-color: var(--color-tone-neutral-fg);
+  --wx-gantt-summary-border-color: var(--color-tone-neutral-fg);
+  --wx-gantt-summary-font-color: var(--color-tone-neutral-bg);
+  --wx-gantt-milestone-color: var(--color-tone-info-edge);
+  --wx-gantt-critical-color: var(--color-danger);
+  --wx-gantt-task-critical-fill-color: var(--color-danger);
+  --wx-gantt-link-color: var(--color-text-muted);
+  --wx-gantt-link-color-hovered: var(--color-text);
+  --wx-gantt-link-marker-background: var(--color-tone-neutral-bg);
+  --wx-gantt-link-marker-color: var(--color-text-muted);
+  --wx-gantt-progress-border-color: var(--color-border);
+  --wx-gantt-marker-color: var(--color-tone-info-edge);
+  --wx-gantt-marker-font-color: var(--color-bg);
+  --wx-gantt-task-slack-color: var(--color-tone-neutral-bg);
+  --wx-gantt-task-slack-border-color: var(--color-tone-neutral-edge);
+  --wx-gantt-load-normal-color: var(--color-tone-success-bg);
+  --wx-gantt-load-danger-color: var(--color-tone-danger-bg);
+  /* ---- Grid (and the Gantt's task table) ---- */
+  --wx-border: 1px solid var(--color-border-subtle);
+  --wx-table-border: 1px solid var(--color-border-subtle);
+  --wx-table-header-background: var(--color-surface);
+  --wx-table-select-background: var(--color-selected);
+  --wx-table-select-border: inset 3px 0 var(--color-accent);
+  --wx-table-drag-over-background: var(--color-hover);
+  --wx-table-fixed-column-border: 3px solid var(--color-border-subtle);
+  --wx-table-editor-dropdown-shadow: var(--shadow-popover);
+  --wx-input-background: var(--color-bg);
+  --wx-input-font-color: var(--color-text);
+}
+
+/* A few Gantt colours are hard-coded in SVAR's CSS instead of variables (baseline bar). Override by selector. */
+div.wx-willow-theme .wx-baseline { background-color: var(--color-tone-neutral-edge); }
+
+/* Keyboard focus: SVAR draws 1px on cells and nothing on the Gantt's outer stop. Use our one ring.
+   !important is deliberate: SVAR's rules carry scoped attribute selectors we cannot out-rank cleanly. */
+div.wx-willow-theme :focus-visible,
+div.wx-willow-theme:focus-visible,
+div.wx-willow-theme .wx-cell:focus {
+  outline: var(--focus-ring-width) solid var(--color-focus) !important;
+  outline-offset: calc(var(--focus-ring-width) * -1) !important;
+}
+/* WCAG 2.5.8: SVAR's card menu button is 22x22 */
+div.wx-willow-theme button.wx-menu { width: 24px; height: 24px; }

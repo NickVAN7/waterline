@@ -94,7 +94,7 @@ scope against the decision-log entries and the docs that code implements.
    Surviving mutants in `app/rules/` or `app/authz/` (docs/testing-strategy.md, "Mutation
    testing"), or a `# pragma: no mutate` without a convincing reason, are a **blocker**.
    **Spec tests** (checkpoints that add or change `app/rules/` or `app/authz/`): the review
-   record (`docs/reviews/<ID>.md`, "Spec tests") lists the files `spec-test-writer` wrote, each
+   record (`docs/reviews/s<n>/<ID>.md`, "Spec tests") lists the files `spec-test-writer` wrote, each
    with its `git hash-object`. Run `git hash-object` on each file as it is about to be
    committed and compare. A file that differs, and isn't listed in the record as an
    owner-approved change, is a **blocker**; so is a checkpoint that changes `app/rules/` or

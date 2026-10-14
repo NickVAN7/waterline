@@ -4,8 +4,48 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C4 (API conventions) done, closing the `s1-foundations` group; next is S1-C5
-> (Sessions & sign-in), on the `s1` branch (one branch and PR for the rest of Slice 1). The tenancy,
+> **Status:** S1-C15 (Web: workspace admin) done: the workspace administration pages (staff, orgs,
+> users, settings, and a person's access review, reached from the user menu, DL-104), the shared
+> admin pieces S1-C15a reuses (`ModalDialog`, the roster dialogs in `views/roster/`, the account
+> action dialogs in `views/user/`, the temporary-password field and notice, `RowActions`,
+> `useAvailability`), `PageHeader` on every page, and staff and org member rows carrying
+> `is_active` and the account actions (DL-102); next is S1-C15a (Web: org admin). S1-C14a (Web:
+> app shell) built the shell (skip link, header with the org switcher
+> and user menu, the sidebar with My work, the project selector, and the project's pages), the
+> System / Light / Dark theme, My work's projects section, account settings, the password
+> requirements list (`GET /api/auth/password-policy`), the no-access page, a minimal project home
+> and org project list (DL-97), `useListQuery`, and the first skeleton loaders (section 7); next
+> is S1-C15 (Web: workspace admin). S1-C14 (Web: foundations & sign-in) built the styling
+> foundation, the current-user store, route guards, sign-in, the forced password change, and
+> `wl e2e`. S1-C13a (Demo seed data) built `wl seed --demo` (section 5, "Demo
+> data"). S1-C13 (Classification & export control) built classification. A project's classification is set at creation or with `PUT
+> /api/projects/{key}/classification` (`project.raise_classification`,
+> `project.lower_classification`), export control needs a confirmation on every member add and
+> when it's added, and both access reviews show `access` (`content` or `management`; build plan,
+> "Classification & export control"). S1-C12 (Project members) built the members: they are listed, picked, added by user ID or email (with `join_org` for someone from
+> outside the org), created, re-roled, and removed at `/api/projects/{key}/members`, and the
+> per-project access review is at `/api/projects/{key}/access` (build plan, "The project members
+> API"). S1-C11 (Projects) built the projects themselves. Projects are created in an
+> org (`POST /api/orgs/{id}/projects`, the first admin becoming the lead), listed, read and updated
+> at `/api/projects/{key}`, archived and unarchived; `GET /api/module-guidance` and My work's
+> projects section (`GET /api/me/work`) are built (build plan, "The projects API"). S1-C10 (Account
+> actions & profile) closed the `s1-workspace` group. Admins deactivate, reactivate, reset the password of, sign out
+> everywhere, and edit the email, name, and username of users under the rank rule
+> (`/api/users/{id}/…`, `user.manage`); users edit their own name and username (`PATCH /api/me`);
+> the workspace users list (`GET /api/workspaces/{id}/users`) and the per-person access review
+> (`GET /api/users/{id}/access`, `user.view_access`) are built (build plan, "The account API"). Every
+> last-owner guard counts active owners (DL-74). An org's members work like the workspace's staff, through one shared
+> roster (`app/services/roster.py`): email-first add, create, roles with the owner-only rule,
+> stepping down, removal, and the last owner's handover (`new_owner_id`). The user check
+> (`GET /api/workspaces/{id}/user-check`) answers whether an email has an account, whether a
+> username is free, or suggests one from a name. The workspace and org API is built: the
+> workspace, its staff, and orgs with their first owner (build plan, "The workspace and org API",
+> "The org members API"). Every check goes through `authorize()`
+> ("Authorization" below); `/me` carries each workspace's `allowed_actions`. Sign-in, sign-out,
+> change password, and `GET /api/auth/me` work over a server-side session in the `__Host-session`
+> cookie, a forced password change blocks every other endpoint, and every mutating request passes
+> the `Origin` and JSON-only checks first ("Authentication" below). `wl seed` creates the workspace
+> and its first system admin, and `wl admin` grants and revokes the system-admin flag. The tenancy,
 > project, and audit tables exist (models, migrations, constraint tests, a factory per model;
 > `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the base
 > repository, and `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`).
@@ -17,9 +57,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > procrastinate, the model conventions (enums, soft delete, optimistic locking with 409,
 > `direct_update`), the standard error format (including a catch-all 500), and the password and
 > token helpers; `GET /api/health` checks the database. Docker Compose runs the whole stack
-> (postgres, migrate, api, worker, web). The frontend is a Vue shell: layout, router with a 404
-> page, Pinia, the generated API client, and a home page showing the health check through the Vite
-> proxy. CI runs `wl check` on every push to `main` and every pull request.
+> (postgres, migrate, api, worker, web). CI runs `wl check --full` on every push to `main` and every pull request.
 
 ## 1. Workstation setup
 
@@ -28,7 +66,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 | Tool | Version | Why |
 |---|---|---|
 | Git | ≥ 2.31 | Source control |
-| Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.20, daemon running | The local stack: Postgres, the API, the worker, and the web dev server |
+| Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.24.4 (`wl e2e`'s override uses `!reset` and `!override`), daemon running | The local stack: Postgres, the API, the worker, and the web dev server |
 | uv | ≥ 0.12 | Python versions, dependencies, and running everything; `uv audit` (`wl audit`) |
 | Python | 3.14 | The backend (`uv` installs it: `uv python install 3.14`) |
 | Node | 22.x, ≥ 22.18 (with npm) | The frontend's tools (tests, lint, types, client generation) run on the host |
@@ -47,13 +85,19 @@ uv run wl doctor                 # check the toolchain; fix anything marked ✗ 
                                  # warning clears after `pre-commit install` below)
 uv sync --directory backend      # backend env (backend/.venv)
 npm ci --prefix frontend         # frontend tools (frontend/node_modules); before `wl up`
+(cd frontend && npx playwright install chromium)    # the end-to-end tests' browser
+(cd frontend && sudo env "PATH=$PATH" npx playwright install-deps chromium)
+                                 # its system libraries (apt; `env PATH` because sudo resets
+                                 # PATH and won't find an npx installed by fnm or nvm)
 uv run pre-commit install        # git hooks: ruff, Prettier, ESLint, generated files
 cp .env.example .env             # local settings (never committed); edit if needed
 uv run wl up                     # build and start the stack; applies migrations
-uv run wl check                  # everything CI runs; should be green on a fresh clone
+uv run wl check --full           # everything CI runs; should be green on a fresh clone
 ```
 
-Then open <http://localhost:5173>: the home page shows whether the API and database are up.
+Then open <http://localhost:5173>: it sends you to sign in. Build the demo data first ("Demo
+data" in section 5) to have someone to sign in as; <http://localhost:5173/status> shows whether
+the API and database are up without signing in.
 
 Nothing is installed on the workstation beyond the tools above: Postgres, the API, the worker,
 and the Vite dev server run in Docker. Tests and the other `wl` tools run on the host and reach
@@ -71,9 +115,10 @@ failing) if the pre-commit hooks aren't installed.
 ```
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
-docs/           design, schema, build plan, testing strategy, screen inventory, these guides,
-                tech-debt log, decision log, reviews/ (one record per checkpoint, and per
-                design-change tooling review, DC-<date>.md), spikes/
+docs/           design, schema, build plan, testing strategy, screen inventory, UI design
+                guide (ui-design-guide.md, with reference copies in ui/), these guides,
+                tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
+                design-changes/: one per tooling review), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
@@ -83,7 +128,7 @@ docker/postgres/initdb/   first-start scripts for the postgres container (test d
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
                 design-change), agents (checkpoint-reviewer, security-reviewer,
                 fresh-clone-verifier, docs-consistency, spec-test-writer,
-                repo-auditor),
+                repo-auditor, ui-reviewer),
                 hooks (see section 11)
 ```
 
@@ -102,7 +147,8 @@ underlying commands instead of running them, and stops at the first failing step
 | Command | Does |
 |---|---|
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
-| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI — and then `wl audit` |
+| `wl check` | The gate before every commit (DL-99): lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates — backend, then frontend, then CLI — and mutation testing when anything it depends on changed since its last green run (the backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`; the hash is kept in `backend/mutants/inputs.sha256`), saying so when it skips it. `--full` is everything CI runs: mutation testing whatever changed, then `wl audit`, then `wl e2e` |
+| `wl e2e [args]` | The Playwright end-to-end tests on their own stack: the Compose project `waterline-e2e` (`docker-compose.e2e.yml`: no published database or API port, the web server on `127.0.0.1:5174`, `DEMO_SEED_ENABLED=true`), cleared of anything an earlier run left, built, seeded with `seed --demo`, tested in the `light` and `dark` projects, and always torn down with its volume. Runs beside the dev stack, but only one `wl e2e` at a time: a second run shares the project, and its first step clears the first run's stack. Extra args go to `playwright test` (e.g. `wl e2e sign-in --project light`) |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
 | `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
@@ -110,7 +156,7 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl fmt` | ruff format and safe ruff fixes (backend, CLI, and `.claude/hooks/`); Prettier and safe ESLint fixes |
 | `wl backend check\|lint\|test\|fmt` | The same, backend only |
 | `wl backend mutate` | Mutation testing (mutmut) over `app/rules/` and `app/authz/`, from a clean slate; fails on any mutant not killed (section 9) |
-| `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate |
+| `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate, and runs in one process (`-n 0`), so `breakpoint()` works; pass `-n auto` to spread it over workers |
 | `wl frontend check\|lint\|test\|fmt` | The same, frontend only (the npm scripts in `frontend/package.json`) |
 | `wl frontend test <args>` | `vitest run <args>`, e.g. `wl frontend test src/api -t network`, without the coverage gate |
 | `wl gen-client` | Export `backend/openapi.json` from the code, then generate `frontend/src/api/schema.d.ts` from it. Run after any API change and commit both files |
@@ -120,8 +166,16 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl migrate` | `docker compose run --rm --build migrate`: `alembic upgrade head` against the dev database, in the Compose `migrate` service (its image rebuilt first if dependencies changed) |
 | `wl backend migration "<message>"` | `alembic revision --autogenerate -m "<message>"` on the host; review the generated file by hand |
 
-Still to come (Slice 1): `wl seed` and `wl admin <command>` (app admin commands, e.g.
-`wl admin grant-system-admin <email>`).
+
+**App admin commands** (`backend/app/cli.py`, run as `python -m app.cli <command>` in a one-off
+container from the api service's image: `docker compose run --rm api ...`, after the migrations):
+
+| Command | Does |
+|---|---|
+| `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
+| `wl seed --demo` | Build the demo dataset instead, workspace and system admin included ("Demo data" in section 5): refused once a workspace exists, and unless `DEMO_SEED_ENABLED=true` (the `.env.example` default; off otherwise, and never on in production, since every demo account has the same public password). Takes no other values |
+| `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
+| `wl admin revoke-system-admin <email>` | Take it away; refused for the last active system admin |
 
 The CLI is a **thin orchestrator**: the real tool configuration is in each project's
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
@@ -168,11 +222,14 @@ backend/app/
                        SoftDeleteMixin, VersionMixin, check_version
   core/enums.py        enum_type (VARCHAR + CHECK enum columns)
   core/errors.py       error format: AppError and its subclasses, ErrorBody, the handlers
+  core/request_guard.py   the Origin and JSON-only checks (middleware, before everything else)
   core/migration_filters.py   what Alembic autogenerate ignores (procrastinate's objects)
   core/security.py     password hashing (Argon2id, off the event loop), session tokens
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
+  routers/deps.py      shared router dependencies: SettingsDep, AuthServiceDep, SignedInUserDep,
+                       AuthzContextDep, authorized()
   rules/          pure business rules, no database
-  authz/          authorize() and friends (Slice 1)
+  authz/          authorize(), the action registry, targets, list scoping (pure: no queries)
   audit/          log_admin_event() (Slice 1, S1-C4) and log_change() (Slice 2)
   jobs/           background jobs: app.py (jobs_app), enqueue.py, task_names.py, tasks/, worker.py
 ```
@@ -257,6 +314,148 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
 - Mark tests of security behavior `@pytest.mark.security` (run just those with
   `wl backend test -m security`).
 
+### Authentication
+
+Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `services/auth.py`,
+`repositories/auth.py`); design-doc §4 has the rules.
+
+- **The signed-in user:** an endpoint that needs one takes `user: SignedInUserDep`
+  (`app/routers/deps.py`). It reads the `__Host-session` cookie, finds a live session (within
+  its lifetime and idle timeout, its user active), brings `last_seen_at` up to date at most
+  every 5 minutes, and returns the user; otherwise it raises 401 `not_authenticated`. While the
+  user must change their password it raises 403 `password_change_required` instead (the forced
+  change). Only `/me` and change-password take `UserPendingPasswordChangeDep`, which lets that
+  user through; sign-out needs no user at all, nor `GET /api/auth/password-policy` (open to
+  anyone, DL-91: the requirements, each with its `code`, which is the 422 `type` it prevents,
+  a `label`, and its number, from `rules/password_policy.py`). Any other new endpoint takes `SignedInUserDep`.
+- **Change password** (`POST /api/auth/change-password`, `current_password` and
+  `new_password`): 422 on `current_password` (`incorrect`) or `new_password` (the password
+  policy's problems, each its own `type`); on success the session keeps its row but gets a new
+  token (a new cookie), the user's other sessions are deleted, `must_change_password` is cleared,
+  and `password_changed` is recorded.
+- **Password and identifier messages:** `password_errors()`, `identifier_error()`,
+  `required_error()`, `email_error()`, and `new_user_errors()` (`app/services/user.py`) turn the
+  problems into field errors (`under=` for a nested object, e.g. `("body", "new_owner")`); use
+  them wherever a password, username, slug, or new account is set.
+- **Accounts an admin creates** (staff, an org's first owner, org members, project members)
+  go through `UserService.create_account(actor_id, workspace_id, new, organization_id=...)`:
+  validated, `must_change_password` set, `user_created` recorded. Pass the org's ID when the
+  account is made through that org (its members, later its projects' members), so its admins see
+  the event (design-doc §10.1, "Scope"); the roster does this for org members.
+- **Staff and org members share one set of rules** (`app/services/roster.py`, DL-70): the
+  email-first add, the create, the owner-only rule for owner and admin roles, stepping down, the
+  last-owner guard and handover, and the lock order (owners' rows first; adding an owner takes
+  that lock too, TD-25). The workspace and org services each describe their roster in a
+  `RosterSpec` and call a `Roster`. Project members are a third roster with no owner role
+  (`owner=None`, `manage_admins=None`; DL-71): it uses the list, the email-first add (whose
+  `admit` hook adds the project's `outside_org` and `join_org` step, DL-78, and returns any details
+for the added event, such as the export-control confirmation, DL-81), and `add_user`; the
+  project service changes roles and removes members itself. Two adds of one person racing: the
+  roster turns the loser's unique violation into `already_member` on the field it used (`loc`,
+  DL-80). Project member changes lock the project row first, then the membership.
+- **Removing a member "with their projects"** calls the handlers registered with
+  `register_on_member_removed()` (`app/services/roster.py`), each given a `MemberRemoval`
+  (`organization_id` is None for staff). The project area registers one
+  (`ProjectService.remove_with_projects`): it removes the person's memberships on the org's (or
+  workspace's) projects, archived ones included, clearing a lead, with `via` in each event. Tests
+  of what the roster passes stand in for it with the `removals` fixture (`tests/api/conftest.py`).
+- **The user check** (`GET /api/workspaces/{id}/user-check`, DL-66) answers one of `email`,
+  `username`, or `name`; `suggest_username()` (`app/rules/identifiers.py`) builds the name's
+  username, and `UserService.check` adds `-2`, `-3`, … while it's taken.
+- **Account actions** (DL-72, DL-73) take a user loaded by `load_user` (`app/routers/deps.py`):
+  an `AccountSubject` (the user, their workspace, and their memberships as the rank rule's
+  `Account`, from `UserRepository.accounts`). Deactivate, reset password, and sign out everywhere
+  are in `AuthService`; reactivate and profile edits in `UserService`. Record their events with
+  `UserService.log_account_event`, which writes one per covering org (DL-75). An email change ends
+  the user's sessions through the handler `auth` registers with `register_on_email_changed()`.
+- **Projects** (`app/services/project.py`, DL-76): a key is normalized with
+  `normalize_project_key` (create, the availability check, and the by-key loader `load_project`);
+  a taken key is the unique constraint's 422. Update, archive, and unarchive lock the project row
+  first (`ProjectRepository.lock`) and check again, so an archive committing meanwhile still
+  denies an update. Modules come from `app/rules/modules.py`: the
+  type's seed (`seed_modules`), its recommendations, and which modules have shipped (`_SHIPPED`;
+  a module's slice adds itself there). The project list's `ListSpec` (`PROJECTS`) and row mapping
+  (`item`) live in `app/services/my_work.py`, the lower layer, so the project area can share them;
+  an endpoint with other query parameters besides a list's extends its query model
+  (`OrgProjectQuery`), since FastAPI reads a query model only as the sole query parameter.
+- **My work** (`app/services/my_work.py`): each section's query runs in a savepoint and a
+  database error marks it `available: false` (the one sanctioned savepoint-and-continue).
+- **Last-owner guards** count active owners (DL-74): lock the owners with `lock_owners`, then
+  compare `active_owners` (both on the workspace and org repositories). A deactivation locks the
+  owners of every workspace and org the user belongs to first, so it queues behind a handover
+  (TD-27).
+- **Update events** record `change_details(changed_fields(entity, values))`
+  (`app/audit/admin_event.py`): `{"old": {...}, "new": {...}}`, the changed fields only.
+- **`ReservedSlug`** isn't returned by any route: `create_app` adds it to the OpenAPI schema's
+  components (`_add_schema_components`, `app/main.py`).
+- **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
+  password (the same body either way) and 403 `account_inactive` for a deactivated account with its
+  correct password; a password over 256 characters is a 422 on `password` (`string_too_long`) before
+  any hashing (DL-49), as is a `current_password` over 256 on change password (DL-52). A
+  successful sign-in deletes the session the browser sent, if any (DL-53). Sign-out is always 204,
+  with or without a session, and clears the cookie.
+- **Middleware errors** (DL-54): besides its own responses, every `POST`, `PUT`, `PATCH`, or
+  `DELETE` can return 403 `origin_rejected` (no path is exempt yet), and any request whose body
+  isn't JSON can return 415 `unsupported_media_type` (`app/core/request_guard.py`). They come before
+  routing, so no route declares them in the OpenAPI schema; clients branch on `code` as for any
+  error.
+- **Session lengths:** `SESSION_IDLE_TIMEOUT` and `SESSION_LIFETIME` in `.env` (ISO 8601
+  durations such as `P7D`; defaults 7 and 30 days; Compose passes them to the backend
+  services). The idle timeout must be over 5 minutes, the gap between `last_seen_at` writes;
+  the app refuses to start otherwise. The test `settings` fixture pins both to the defaults;
+  a test of other lengths builds its app from `settings.model_copy(update=...)`. Both are
+  checked against the database clock, so tests backdate `last_seen_at` or `expires_at` with
+  `func.now() - timedelta(...)`. Expired rows aren't deleted
+  yet (the nightly cleanup is TD-14); they're ignored.
+- **The `Origin` and JSON-only checks** run in `RequestGuardMiddleware`
+  (`app/core/request_guard.py`), before routing: a `POST`, `PUT`, `PATCH`, or `DELETE` whose
+  `Origin` doesn't name the request's own `Host` is 403 `origin_rejected`; then any request with
+  a body that isn't `application/json` is 415 `unsupported_media_type`. `ORIGIN_EXEMPT_PATHS`
+  is empty; adding a path needs the owner's approval (design-doc §4).
+- **The cookie** is set with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/` in every
+  environment. Reach the dev server at `localhost`: browsers accept a `Secure` cookie over plain
+  http only there.
+
+### Authorization
+
+`app/authz/` decides; it never queries (mutation testing runs only database-free unit tests
+against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)" the actions.
+
+- **Actions** are registered in `REGISTRY` (`app/authz/actions.py`), one `ActionSpec` each: its
+  level, the lowest workspace, org, and project role that grants it, whether it's a mutation,
+  `archive_exempt`, for a personal action its `relationship`, `visible` (granted to anyone
+  who can see the target, e.g. `org.view` for a project member with no org role), and a targeted
+  `rule(ctx, target)` checked after the roles (e.g. `user.check`: an admin role anywhere in the
+  target's workspace, DL-68). Each action is marked `access`, content or management (design-doc
+  §3.1; the default is content, the closed side, so every management action says so, and every
+  action so far does; the export-control gate that reads it comes in Slice 2), and `explicit_when_export_controlled` makes only the explicit project role
+  grant it on an export-controlled project (`project.lower_classification`, DL-82). Real actions
+  are members of
+  `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
+  (DL-44); an unregistered action is denied. A project-level action normally sets
+  `workspace_role=ADMIN, org_role=ADMIN` (inherited project admin).
+- **The context** (`AuthzContext`): the user's system-admin flag and memberships (each org's
+  workspace in `org_workspaces`; each project's org, workspace, and `archived` state), loaded once
+  per request (`UserRepository.authz_context`; an endpoint takes `ctx: AuthzContextDep`).
+- **Targets:** `workspace_target(ws)`, `org_target(org)`, `project_target(project, entity)` (with
+  the project's `archived`, `enabled_modules`, and `export_controlled`), and
+  `user_target(workspace_id, user_id, account)` for a user (level `user`, DL-73), whose actions
+  apply the rank rule to `rank_account(ctx)` (`app/authz/context.py`). A user is seen by
+  themselves, the workspace's owners/admins and system admins, and anyone with a membership of
+  theirs in scope (`in_scope`, `app/rules/account_rank.py`); otherwise a 404.
+- **Checks:** `authorize(ctx, action, target)` → bool; `ensure(...)` raises 404 when the user
+  can't see the target, 403 when they can but may not act; `allowed_actions(ctx, target)` for a
+  single-entity read; `module_enabled(target, module)`.
+- **Endpoints on one entity** take `authorized(loader, action, module=...)`
+  (`app/routers/deps.py`): `loader` is a dependency returning `(entity, target)` or None; the
+  endpoint gets the entity only once the check passes (404 for missing or unseen, then the
+  module, then 403). `hide_denial=True` makes every denial a 404 (the access review).
+- **Lists** scope their query: `project_scope(ctx)` / `org_scope(ctx)` give the `Scope`, and
+  `scope_clause(scope, id_column, workspace_column, org_column)` (`app/repositories/base.py`)
+  the `WHERE`.
+- **Tests:** `tests/support/authz.py` has the personas, test-only actions
+  (`register_test_actions(monkeypatch)`), a test-only router, and `sign_in_as`.
+
 ### Import rules (enforced)
 
 `import-linter` checks these on every `wl lint` / `wl check`; the contracts are in
@@ -305,6 +504,38 @@ case there — including an indirect path (A → B → forbidden) wherever indir
   main stack first (`wl down`) or change the ports in its `.env`.
 - Ports are published on `127.0.0.1` only, so nothing in the stack (the dev database, with its
   public default password, included) is reachable from other machines on your network.
+
+### Demo data
+
+`uv run wl seed --demo` fills an empty dev database with a fixed workspace to look at in the
+browser (`backend/app/demo.py`; build plan, S1-C13a). The end-to-end tests run on the same data.
+To start over: `uv run wl down -v && uv run wl up && uv run wl seed --demo`. It runs only where
+`DEMO_SEED_ENABLED=true` (in `.env.example`; an `.env` copied before S1-C13a needs the line
+added).
+
+Every account's email is `<username>@harbor.example`, and every password is `harbor-demo`.
+The workspace is Harbor Consulting (`harbor`), with two orgs, Acme Manufacturing (`acme`) and
+Globex Retail (`globex`). Each step is recorded in the audit log as the person who would take it:
+the system admin creates the orgs, each org's owner adds its members, creates its projects, and
+archives `LEGACY`, and each lead adds the project's members. Each step is checked against the
+permission its endpoint checks, so a step the app would refuse fails the seed.
+
+| Username | Role |
+|---|---|
+| `admin` | System admin, workspace owner |
+| `wendy` | Workspace admin |
+| `olivia`, `oscar` | Owner of `acme`, of `globex` |
+| `liam`, `lena`, `luke` | Leads (project admins) of `ERP`, `PORTAL`, and the archived `LEGACY` (`acme`) |
+| `leo`, `lucy` | Leads of `INV` and `FIN` (`globex`; `FIN` is Confidential, `financial`) |
+| `amara`, `ella`, `ivan`, `noah` | Project admin of `ERP`, `PORTAL`, `INV`, `FIN` |
+| `ben`, `chloe` | Members of `ERP` and the archived `LEGACY` |
+| `finn`, `jade`, `omar`, `priya` | Members of `PORTAL`, `INV`, `FIN`, `FIN` |
+| `sam` | Member of both `acme` projects (`ERP`, `PORTAL`) |
+| `max` | Member of both `globex` projects (`INV`, `FIN`) |
+| `casey` | In both orgs: member of `PORTAL` and `INV` |
+| `dev`, `hana`, `kira`, `quinn` | Viewers of `ERP`, `PORTAL`, `INV`, `FIN` |
+| `fiona`, `felix` | Members of `ERP` who must change their password at sign-in (one per theme run of the end-to-end flow) |
+| `nora` | No memberships: the no-access page |
 
 ### Local Postgres
 
@@ -449,7 +680,15 @@ before using or returning the row. List and feed queries never use it.
 nullable) and `classification_categories` (`text[]`, default `{}`). The model also adds
 `classification_categories_check(...)` to its `__table_args__` with the categories it allows:
 `PROJECT_CATEGORIES` on `project`, `CONTENT_ITEM_CATEGORIES` on content items
-(`export_controlled` is project-only in v1).
+(`export_controlled` is project-only in v1). `app/rules/classification.py` has the effective
+classification (`effective(item, project)`) and whether a change raises or lowers it
+(`change(old, new)`; unclassified ranks as Internal). The project service checks an export-control
+confirmation with `_confirmation(values, needed=..., members=...)`: the 422s
+`confirmation_required`, `members_changed`, and `confirmation_not_needed`, under the project's row
+lock, with the confirmation returned for the audit event (DL-81). `set_classification` checks its
+rights after taking the project's lock, against the project and the caller's own project role
+read again under it (`_with_current_role`): a removal takes that lock first, so an explicit admin
+removed meanwhile can't lower (owner decision, S1-C13 review).
 
 **Relationships** are always `lazy="raise"`: load what you use with `selectinload` /
 `joinedload` in the repository. Touching an unloaded relationship raises instead of emitting
@@ -457,8 +696,10 @@ SQL (which async sessions can't do).
 
 **Convention checks** (`tests/unit/core/test_model_conventions.py`) walk every mapped model and
 fail if a relationship isn't `lazy="raise"`, a model dropped `eager_defaults=True` (for example
-by replacing `__mapper_args__`), or a model has a `version` column that isn't checked (for
-example `VersionMixin` listed after `TimestampMixin`).
+by replacing `__mapper_args__`), a model has a `version` column that isn't checked (for
+example `VersionMixin` listed after `TimestampMixin`), or a classifiable model (`project`,
+`requirement`, `task`, `testcase`, or one with a `classification_*` column) doesn't use
+`ClassificationMixin`.
 
 ### Migrations
 
@@ -542,22 +783,54 @@ it.
 ## 7. Frontend
 
 Vue 3 (Composition API, `<script setup lang="ts">`), TypeScript strict, Vite, Vue Router, Pinia.
-The rules are in `frontend/CLAUDE.md`; this section is the how.
+The rules are in `frontend/CLAUDE.md`, and the UI rules in full, by rule ID, in
+`docs/ui-design-guide.md`; this section is the how.
 
 ```
 frontend/src/
-  main.ts            mounts App with Pinia and the router
-  App.vue            AppLayout around the router view
-  api/client.ts      the configured openapi-fetch `client`, `api()`, `ApiError`
+  main.ts            imports the styles and mounts createWaterlineApp()
+  App.vue            AuthLayout or AppLayout (the route's `meta.layout`) around the router view,
+                     keyed by path (a new path is a new page; a query change keeps it)
+  api/client.ts      the configured openapi-fetch `client`, `api()`, `ApiError`, the session hook
   api/schema.d.ts    generated by `wl gen-client`; never edit
-  app/               AppLayout.vue (header, nav, content), router.ts, styles.css; route guards
-                     go in app/guards/
-  components/        shared UI components
-  composables/       shared logic
-  stores/            Pinia stores
-  views/<area>/      screens by backend area name, singular (views/project/, views/task/, …);
-                     plus views/home/ (health) and views/errors/ (404)
+  app/               createApp.ts (Pinia, router, PrimeVue, session hook), router.ts, the two
+                     layouts (AppLayout is the shell), shell/ (OrgSwitcher, UserMenu,
+                     ProjectSelector, LinkPopover, SidebarLink), labels.ts (display labels),
+                     routeFocus.ts,
+                     session.ts; guards/auth.ts; styles/ (main.css, tokens.css, base.css);
+                     theme/preset.ts (PrimeVue's colors)
+  components/        shared UI components: Button, Alert, FormAlert, FormField, TextField,
+                     SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
+                     TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
+                     Pagination, SuccessStatus, PageHeader, SectionNav, ModalDialog,
+                     RowActions, Icon
+  composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
+                     useAvailability, useSignOut, useTheme, useWorkspace, temporaryPassword,
+                     allowedActions (`allows()`)
+  stores/            Pinia stores: currentUser, currentOrg (the current org and project)
+  views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
+                     my_work/, project/ (org project list, project home), user/ (account
+                     settings, access review, the account-action dialogs), workspace/ (staff,
+                     orgs, users, settings), roster/ (the dialogs staff and org members share:
+                     add person, change role, remove); plus status/ and errors/ (404, no
+                     access)
+  test/              helpers for the specs: a11y.ts, api.ts (typed responses), projects.ts,
+                     overlay.ts (`stubResizeObserver`, `stubDialog`), router.ts, workspace.ts
+                     (`mountWorkspaceView`)
+frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
 ```
+
+**Routes:** `/` My work; `/sign-in` (signed out only); `/account` (account settings);
+`/account/change-password` (the forced change); `/account/no-access` (a user with no
+memberships, who is sent there from everything but account settings); `/status` (open to
+anyone); `/workspace/staff`, `/workspace/orgs`, `/workspace/users`,
+`/workspace/users/{user_id}/access`, and `/workspace/settings` (workspace administration, DL-104;
+`/workspace` goes to staff; anyone without `workspace.view`, or whom the API refuses, gets the
+403 page, `ForbiddenView`, saying who to ask, UI-FBK-14);
+`/{org_slug}/projects` and `/{org_slug}/projects/{key}` (an org's projects and a
+project's home; a stale org slug or a lowercase key is redirected to the project's own);
+anything else, the not-found page. Every top-level segment is on the reserved-slug list
+(`router.spec.ts` checks it against `ReservedSlug` in `backend/openapi.json`).
 
 - **Running it:** `wl up` serves it at <http://localhost:5173> (the `web` service, hot reload on
   the mounted source). To run Vite on the host instead: `docker compose stop web`, then
@@ -588,8 +861,71 @@ frontend/src/
   `src/api/lint-rules.spec.ts` proves the rules fire.
 - **After an API change:** `uv run wl gen-client`, then use the new types; commit both
   generated files.
+- **Signing in and route guards:** `src/app/guards/auth.ts` loads the current user once
+  (`GET /api/auth/me`; a 401 means signed out) and sends a signed-out visitor to `/sign-in`
+  with `next` (the page they asked for), and a user who must change their password to
+  `/account/change-password`. `meta.public` opens a route to anyone, `meta.guest` only to the
+  signed out. `next` is used only when it's a path on this site (`safeNext`: one leading `/`,
+  never `//` or `/\`). A 401 on any later request (the session ended) or a 403
+  `password_change_required` goes through the client's session hook (`onSessionProblem`,
+  wired in `src/app/session.ts`), so views never handle either.
+- **Forms:** `useFormErrors(labels)` maps a 422's `details.fields` to each field (by the last
+  part of `loc`), moves the rest into the form's alert, and builds the screen-reader
+  announcement; other failures get our own wording (`FORM_MESSAGES`: retry for a network error,
+  reload for a 409). See `src/views/auth/SignInView.vue`.
+- **Styles:** Tailwind v4 utilities from the tokens (`src/app/styles/tokens.css`, a copy of
+  `docs/ui/tokens.css`; a new color pair goes in `docs/ui/check_contrast.py`, run as
+  `python3 docs/ui/check_contrast.py frontend/src/app/styles/tokens.css`). PrimeVue reads the
+  same tokens through `src/app/theme/preset.ts`. Dark mode follows the system;
+  `data-theme="light"`/`"dark"` on `<html>` overrides it: the user menu's theme choice sets it
+  (`useTheme`, kept in `localStorage`, applied by `main.ts` before mounting).
+- **Loading a region:** `useLoad(() => api(...))` gives `data`, `error`, `loading`, and `retry`.
+  Show `Skeleton` while there's no data (it appears after 300 ms), `ErrorState` (Try again) on
+  an error, mark the region `aria-busy` while loading, and announce "Loading …" and the result
+  in a polite live region. A 404 from a record's own read shows `NotFoundView` in place. See
+  `src/views/my_work/MyWorkView.vue`.
+- **List state in the URL:** `useListQuery({ limit })` reads the page from `?offset=`;
+  `linkTo(offset)` is the location of another page, which `Pagination` links to (a
+  `nav aria-label="Pagination"` whose Previous and Next stay focusable, `aria-disabled`, at the
+  ends). A query-only navigation moves neither focus nor the title (`routeFocus.ts`), so the list
+  announces its new count instead. Put the polite live region outside the `aria-busy` region:
+  screen readers hold back changes inside a busy one. See `src/views/project/OrgProjectsView.vue`.
+- **A success with no other visible trace** (a saved profile) shows `SuccessStatus` under the
+  form's buttons, which is visible and polite.
+- **Allowed actions:** `allows(entity, 'project.create')` (`@/composables/allowedActions`)
+  hides an action the user may never take; the server still checks.
+- **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
+  menu button with a popover of links that the org switcher and project selector share; opening
+  it moves focus inside (the popover sits at the end of `<body>`, out of the Tab order). A spec
+  that opens one stubs `ResizeObserver` (`stubResizeObserver()`, `@/test/overlay`), turns
+  transitions back on (`stubs: { transition: false }`, so the overlay's `show` and `hide` events
+  fire), waits a tick after mounting before opening it, and unmounts its wrappers
+  (`enableAutoUnmount(afterEach)`) before the body is cleared.
+- **Dialogs:** `ModalDialog` is the native `<dialog>` (UI-FRM-14): `open()` puts focus on the
+  element marked `data-autofocus` (a confirmation's Cancel) or the first field, and closing
+  returns focus to whatever had it, or to `fallbackFocus` when that's gone (a removed row).
+  `RowActions` puts focus back on its own button before an action runs, so a dialog it opens
+  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A form
+  alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
+  before repeating the action (UI-FRM-7).
+- **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
+  only the latest answer, and gives the message for a polite live region under the field; `skip`
+  leaves out a value that needs no check (the person's own username).
+- **Temporary passwords** (UI-FRM-11): `TemporaryPasswordField` before saving (generated, at
+  least the policy's minimum, from `GET /api/auth/password-policy`), `TemporaryPasswordNotice`
+  after (shown once, with Copy). A dialog that reopens its form keys it on each opening, so the
+  field generates a new password.
+- **Admin rosters:** a page gives the dialogs in `views/roster/` a `Roster` (its roles, scope
+  words, and endpoints); the dialogs show what the server answers, including the last-owner
+  refusal that brings up the replacement-owner picker (DL-59). `AccountActions` holds the account
+  dialogs and turns a row into its menu items from the row's `allowed_actions` (DL-102).
 - **Adding a screen:** a view in `src/views/<area>/`, a route in `src/app/router.ts` (above the
-  not-found route, which must stay last), and a `*.spec.ts` next to it.
+  not-found route, which must stay last), and a `*.spec.ts` next to it that calls
+  `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
+  page's primary actions (UI-SHL-8): navigation sets the title
+  to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
+  `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
+  `src/views/project/ProjectHomeView.vue`).
 
 ## 8. Conventions
 
@@ -620,8 +956,16 @@ Strategy, layers, and gates: `testing-strategy.md`. Layout in `backend/tests/`:
   skipped case of `test_model_column_matches_schema_doc`; nothing else should skip.
 - Tests use pytest's `importlib` import mode, so test folders have no `__init__.py` (only the
   importable helper packages `factories/` and `support/` do).
-- **Postgres must be running** (`wl up`). The run migrates the test database, `waterline_test`,
-  to head once per session; tests never touch the dev database.
+- **Postgres must be running** (`wl up`). Each worker migrates its own test database to head
+  once per session (`waterline_test` itself under `-n 0`); tests never touch the dev database.
+- **Tests run in parallel** (pytest-xdist, DL-100): `pytest` alone spreads the suite over one
+  worker per core, at most 8 (`addopts` in `pyproject.toml`). Each worker drops, recreates, and
+  migrates its own database, `waterline_test_gw<n>`, at its start; they stay until the next run
+  (`wl down -v` clears them). `-n 0` runs in one process on `waterline_test` (filtered runs do,
+  and so does mutmut). Coverage is combined across workers, so the gates are unchanged. A test
+  that passes alone but fails in the full run depends on another test's state or order: fix
+  the test, never the worker count. Run one full `pytest` at a time against a stack: a second
+  run drops the first run's worker databases.
 - **Async tests** run on the anyio plugin: mark the module `pytestmark = pytest.mark.anyio`.
   A synchronous test must not use async fixtures.
 
@@ -633,8 +977,8 @@ inside an outer transaction that is always rolled back, so tests never see each 
 | `session` | An `AsyncSession` for arranging and asserting; factories persist through it |
 | `sessionmaker` | Sessions that join the test transaction (`join_transaction_mode="create_savepoint"`): their commits only release savepoints |
 | `connection` / `engine` | The raw connection and the session-scoped test engine |
-| `client` (api/) | An `httpx.AsyncClient` on the real app, whose per-request sessions join the test transaction |
-| `settings` | `Settings` from the environment, with API docs on |
+| `client` (api/) | An `httpx.AsyncClient` on the real app, whose per-request sessions join the test transaction; built by `api_client(app)` (`tests/support/api.py`) on `https://testserver`, sending `Origin: https://testserver` by default. Build any other client with `api_client` too: httpx won't send the `Secure` session cookie over `http://`, and a mutation without the `Origin` is a 403 |
+| `settings` | `Settings` from the environment, with API docs on and the session lengths pinned to their defaults |
 
 ```python
 pytestmark = pytest.mark.anyio
@@ -693,7 +1037,7 @@ between runs and failures are replayed from `.hypothesis/` (gitignored); CI (`CI
 `ci` profile, derandomized. A property over the database (e.g. numbering) runs each example in
 a savepoint it rolls back, with `suppress_health_check=[HealthCheck.function_scoped_fixture]`.
 
-**Mutation testing** (`wl backend mutate`, in `wl check` and CI): mutmut changes `app/rules/`
+**Mutation testing** (`wl backend mutate`; in `wl check` when anything it depends on changed, and always in `wl check --full` and CI, DL-99): mutmut changes `app/rules/`
 and `app/authz/` one small edit at a time (`[tool.mutmut]` in `pyproject.toml`) and runs their
 unit tests against each; every mutant must be killed. On a failure, `uv run mutmut results`
 lists the survivors and `uv run mutmut show <name>` shows one: kill it with a new or sharper
@@ -749,7 +1093,8 @@ afterwards (see `tests/integration/test_migrations.py`).
   `app/authz/` and `app/rules/` (run by `wl backend test`).
 - **Frontend tests** are Vitest specs next to the code they test (`src/**/*.spec.ts`), run in
   jsdom with Vue Test Utils. Mock only the API client: spy on the method the component calls,
-  with results typed from the generated schema (see `src/views/home/HomeView.spec.ts`):
+  with results typed from the generated schema (see `src/views/status/StatusView.spec.ts`, and
+  the helpers in `src/test/api.ts`):
 
   ```ts
   vi.spyOn(client, 'GET').mockResolvedValue({ data: healthy, response: new Response() })
@@ -758,7 +1103,16 @@ afterwards (see `tests/integration/test_migrations.py`).
   Assert what the user sees (text, roles, links), not component internals. Spies are restored
   after each test (`restoreMocks`). The client itself is tested against a fake `fetch`
   (`src/api/client.spec.ts`). **Coverage gates** (`vitest.config.ts`): 80% of lines overall,
-  90% in `src/composables/`, `src/stores/`, and `src/app/guards/`.
+  90% in `src/composables/`, `src/stores/`, and `src/app/guards/`. Every view and component
+  spec runs axe (`expectNoA11yViolations`, WCAG 2.2 AA tags plus `target-size`; contrast is
+  left to the browser runs, since jsdom can't compute it).
+- **End-to-end tests** (`frontend/e2e/`, Playwright, Chromium) run through `wl e2e` against
+  the demo data, each spec in the `light` and `dark` projects. Each page is checked with axe
+  (`expectNoA11yViolations(page)`, contrast included, once running animations have finished,
+  so an overlay mid-fade isn't read as low contrast) and, on the shell's pages,
+  `expectFocusNotObscured(page)` (`e2e/support/a11y.ts`). `signIn(page, username)`
+  (`e2e/support/demo.ts`) signs in as a demo user. A flow that changes data uses its
+  own user or keys per run (`forcedChangeUser`: `fiona` in light, `felix` in dark).
 - **CLI tests** live in `tools/cli/tests/`: every command's `--help` works, every command has
   `--dry-run`, dry-run output matches the expected commands, and the doctor checks are tested
   with fake probes. The CLI is held to **100% line + branch coverage** (in
@@ -781,7 +1135,7 @@ database. They check:
 | Decision log | an entry lacks Date/Decision/Supersedes/Superseded by/Applies to/Source, numbers aren't 1..n, a Superseded by is neither `none` nor another entry (`DL-<n>`), or a `DL-<n>` reference (same files as TD references) has no entry |
 | Audit allowlist | an `audit-allowlist.toml` entry names a tech-debt entry that doesn't exist or is resolved |
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
-| § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` always means a design-doc section, so refer to this guide's sections as "section N" |
+| § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` means a design-doc section, so refer to this guide's sections as "section N". The exceptions: `guide §N` (or `ui-design-guide §N`) names a section of `docs/ui-design-guide.md`; in that guide a bare `§N` is its own section; in `.claude/agents/ui-reviewer.md` a bare `§N` is its own section or the guide's; and in both, `design-doc §N` still means the design doc |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
 
 Fixing a failure: the message names both files and the mismatch. Update whichever side is
@@ -812,14 +1166,15 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
   branch, no force-push or deletion; on `main`, changes only through a pull request with the
   `wl check` status check green, merged with a merge commit.
-- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check` on every push to
-  `main` and every pull request, so a green `wl check` locally means a green run there. It
+- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check --full` on every push
+  to `main` and every pull request (its job is still named `wl check`, the status check the
+  ruleset requires), so a green `wl check --full` locally means a green run there. It
   checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the
   dependencies from the lockfiles (`uv sync --locked`, `npm ci`), and runs the tests against a
   `postgres:18` service container; the test database is created by the same init script as in
   Compose (`docker/postgres/initdb/`). There's no `.env` in CI: the workflow sets the
   `POSTGRES_*` variables. A new tool the checks need goes into the workflow's setup steps and
-  the developer guide's prerequisites together. `wl check` includes `wl audit`, so CI also
+  the developer guide's prerequisites together. `wl check --full` includes `wl audit`, so CI also
   scans the dependencies and the git history for every push; it needs the network, which the
   runners have.
 - The pre-commit hooks run gitleaks on the staged changes (secrets); ruff (lint with safe
@@ -829,7 +1184,8 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   would produce, so a generated file can't be hand-edited or left stale; and
   whitespace/YAML/TOML/merge-conflict/large-file checks. If a hook modifies files, review them,
   `git add`, and commit again.
-- `uv run wl check` must pass before a checkpoint goes to review.
+- `uv run wl check` must pass before a checkpoint goes to review, and CI (`wl check --full`)
+  before it's reported (DL-99). A failure only CI finds gets a `fix(<ID>):` commit.
 
 ## 11. Claude Code configuration
 
@@ -838,13 +1194,16 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
   `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`.
+  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`,
+  `ui-reviewer`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
   changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
   at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
   security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
   two or three behaviors in a temporary copy, and reviews a design change's tooling code under
-  a `DC-<YYYY-MM-DD>` review ID), and `fresh-clone-verifier`, `docs-consistency`, and
+  a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
+  `frontend/e2e/` (read-only: accessibility and frontend conventions against
+  `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`, `docs-consistency`, and
   `repo-auditor` (a whole-repository audit that runs no tests, DL-41) at the last checkpoint of
   a slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
   concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same
@@ -857,8 +1216,8 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   commit. A change to code already built becomes a new checkpoint with a letter suffix
   (`S1-C13a`); checkpoints are never renumbered. Developer-tooling and process code (hooks, the
   `wl` CLI, CI, the docs consistency tests) is built in the change itself, in `chore:` or `ci:`
-  commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
-  (DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+  commits, after a `checkpoint-reviewer` pass recorded in
+  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). A checkpoint in progress is parked with `git stash` while a design change is applied,
   and its review base becomes the design change's last commit (DL-20).
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
@@ -935,6 +1294,7 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 
 | Symptom | Fix |
 |---|---|
+| `wl e2e` fails with Chromium exiting 127, or `error while loading shared libraries: libnspr4.so` | Chromium's system libraries are missing: `cd frontend && sudo env "PATH=$PATH" npx playwright install-deps chromium`. Plain `sudo npx …` says `npx: command not found`, because sudo resets `PATH`. |
 | `warning: VIRTUAL_ENV=… does not match the project environment path` | Harmless when running `uv run` inside `backend/` from an activated root venv; `wl` strips `VIRTUAL_ENV` for its subprocesses. Deactivate the root venv or use `wl`. |
 | `wl doctor`: Docker daemon not reachable | Start Docker Desktop (with WSL integration on Windows) or `sudo service docker start`. |
 | `wl doctor`: Python 3.14 not found by uv | `uv python install 3.14` |

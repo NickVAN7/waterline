@@ -26,6 +26,7 @@ dev = [
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.16.9",
 ]
 
@@ -68,6 +69,9 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--import-mode=importlib",
+    # One worker per core, at most 8, each on its own database (DL-100); `-n 0` runs serially.
+    "-n", "auto",
+    "--maxprocesses", "8",
     "--cov=app",
     "--cov-report=term-missing:skip-covered",
 ]
@@ -91,13 +95,13 @@ exclude_also = ["if TYPE_CHECKING:"]
 
 # --- Mutation testing (docs/testing-strategy.md, "Mutation testing") ---------------------------
 # mutmut copies the code to mutants/ and runs the selected tests against each mutant: only the
-# unit tests of the mutated packages (pure, no database). When app/authz/ gets code (S1-C7), its
-# unit tests (tests/unit/authz) join the selection.
+# unit tests of the mutated packages (pure, no database).
 [tool.mutmut]
 source_paths = ["app"]
 only_mutate = ["app/rules/*", "app/authz/*"]
-pytest_add_cli_args_test_selection = ["tests/unit/rules"]
-pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider"]
+pytest_add_cli_args_test_selection = ["tests/unit/rules", "tests/unit/authz"]
+# `-n 0`: mutmut runs its mutants in parallel itself; each test run stays in one process.
+pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider", "-n", "0"]
 
 # --- Import rules (docs/build-plan.md, "Backend architecture" and "Feature map") -------------
 
@@ -144,7 +148,7 @@ broken_contract_guidance = "Services call authorize() and log_change(), never th
 name = "Only the worker imports job modules"
 type = "forbidden"
 source_modules = [
-    "app.main", "app.openapi_export", "app.enums", "app.routers", "app.services", "app.repositories",
+    "app.main", "app.cli", "app.demo", "app.openapi_export", "app.enums", "app.routers", "app.services", "app.repositories",
     "app.models", "app.schemas",
     "app.core", "app.authz", "app.audit", "app.rules", "app.jobs.enqueue", "app.jobs.app",
 ]
@@ -174,6 +178,7 @@ layers = [
     "(task)",
     "(project) | (phase) | (workstream) | (milestone)",
     "(auth) | (workspace) | (org)",
-    "(user) | (numbering) | (approval) | (activity) | (comment) | (tag) | (link) | (search) | (health)",
+    "(roster)",
+    "(user) | (numbering) | (approval) | (activity) | (comment) | (tag) | (link) | (search) | (my_work) | (health)",
 ]
 broken_contract_guidance = "Call only services in lower layers; reach upward with a registered handler."

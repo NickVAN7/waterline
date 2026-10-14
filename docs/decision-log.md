@@ -13,7 +13,7 @@ Entry format:
 - **Supersedes:** <DL-<n>, a doc section, or a recorded decision such as S1-plan D4; or "none">
 - **Superseded by:** <DL-<n>, or "none">
 - **Applies to:** <the doc sections, files, or checkpoints it changed>
-- **Source:** <chat session, a checkpoint review ID, or docs/reviews/S1-plan.md>
+- **Source:** <chat session, a checkpoint review ID, or docs/reviews/s1/S1-plan.md>
 ```
 
 Design changes are applied with the `design-change` skill, which adds the entries.
@@ -55,7 +55,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Date:** 2026-10-05
 - **Decision:** Classification & export control (design-doc §3.1) is built in Slice 1 as
   Checkpoint 13, so the plan's Checkpoints 13–16 run as 14–17.
-- **Supersedes:** the Slice 1 checkpoint numbering in `docs/reviews/S1-plan.md` (its
+- **Supersedes:** the Slice 1 checkpoint numbering in `docs/reviews/s1/S1-plan.md` (its
   Checkpoints 13–16)
 - **Superseded by:** none
 - **Applies to:** build plan (Slice 1 checkpoints, "Classification & export control"); every
@@ -81,7 +81,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** DL-9
 - **Applies to:** build plan ("Pull requests", Slice 1's groups); `checkpoint` skill; developer
   guide section 10; testing strategy ("Workflow and gates")
-- **Source:** S0-C8 (`docs/reviews/S0-C8.md`, owner decisions 2 and 3)
+- **Source:** S0-C8 (`docs/reviews/s0/S0-C8.md`, owner decisions 2 and 3)
 
 ### DL-6: Admins change a user's email in v1
 - **Date:** 2026-10-07
@@ -131,7 +131,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Pull requests", Slice 1's groups); `checkpoint` skill; root
   `CLAUDE.md`; developer guide (Status line, section 10); testing strategy ("Workflow and
-  gates"); TD-15; the base commits in `docs/reviews/S1-C1.md` to `S1-C4.md`
+  gates"); TD-15; the base commits in `docs/reviews/s1/S1-C1.md` to `S1-C4.md`
 - **Source:** chat session (workflow review)
 
 ### DL-10: Review-tier trial on the `s1-workspace` group
@@ -142,7 +142,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   verdict at the group review and in the slice retro (S1-C17).
 - **Supersedes:** none (an exception to the owner's approval before each checkpoint, for these
   two checkpoints only)
-- **Superseded by:** none
+- **Superseded by:** DL-60 (in part: the group report's records)
 - **Applies to:** build plan ("Verification"); `checkpoint` skill ("Report and stop"); root
   `CLAUDE.md`; S1-C8 to S1-C10
 - **Source:** chat session (workflow review)
@@ -182,7 +182,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   needs the network. An advisory is ignored only through an allowlist entry with a reason and a
   tech-debt entry; a red audit is fixed before any checkpoint starts.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-99, in part (`wl audit` runs in `wl check --full`, not `wl check`)
 - **Applies to:** `tools/cli/` (`wl audit`), `audit-allowlist.toml`, `.pre-commit-config.yaml`;
   build plan (developer CLI, "Tests & CI"); developer guide sections 1, 3, and 10; testing
   strategy ("Workflow and gates"); root `CLAUDE.md`
@@ -544,3 +544,842 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` agents;
   `checkpoint` skill (step 5); build plan ("Claude configuration"); developer guide section 11
 - **Source:** chat session (owner, as DL-36)
+
+### DL-43: Review records live in a folder per slice, design changes named by content
+- **Date:** 2026-10-09
+- **Decision:** Checkpoint review records go in `docs/reviews/s<n>/` (one folder per slice; a
+  slice plan's record too, e.g. `s1/S1-plan.md`), and design-change tooling reviews in
+  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming what the
+  change covers. The review ID stays `DC-<YYYY-MM-DD>` (with its letter); existing records were
+  moved and renamed without changing their contents.
+- **Supersedes:** DL-18's record path, `docs/reviews/DC-<YYYY-MM-DD>.md`
+- **Superseded by:** none
+- **Applies to:** `checkpoint` and `design-change` skills; `checkpoint-reviewer` agent; build
+  plan ("What every checkpoint delivers", "Design changes outside a checkpoint", "Claude
+  configuration", the Slice 0 repository layout, Slice 1's plan reference); developer guide
+  sections 2 and 11; root `CLAUDE.md`; `README.md`
+- **Source:** chat session (owner)
+
+### DL-44: The authorization core registers only the workspace-level actions
+- **Date:** 2026-10-09
+- **Decision:** S1-C7 registers only the workspace-level actions (DL-45) in the action
+  registry. The core's rules are proven with test-only actions at org and project level, and
+  each later checkpoint (S1-C8 to S1-C13) registers its own area's actions with their spec
+  tests.
+- **Supersedes:** none (the build plan didn't say which actions S1-C7 registers)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C7 row; "Authorization (§5)")
+- **Source:** chat session (owner, before S1-C7)
+
+### DL-45: The workspace-level actions
+- **Date:** 2026-10-09
+- **Decision:** Four workspace-level actions: `workspace.view` (the workspace pages, and
+  reading them: staff, orgs, users), `workspace.update` (rename the workspace, change its
+  slug), `workspace_staff.manage` (add and create staff, change roles, remove; changes only),
+  and `org.create` (create an org and assign its first owner). All are allowed to workspace
+  owners/admins and system admins, except `workspace.update`: workspace owners and system
+  admins. Granting, changing, or removing the owner and admin roles is for workspace owners and
+  system admins only (not workspace admins), a targeted rule in S1-C8; system admins keep it,
+  as design-doc §5 says.
+- **Supersedes:** none (the docs named no workspace-level action)
+- **Superseded by:** DL-56 (in part: the targeted rule is an action)
+- **Applies to:** build plan ("Authorization (§5)", "Authentication" `/me`, the S1-C8 row)
+- **Source:** chat session (owner, before S1-C7; the role and staff-list wording settled after
+  the docs-consistency check)
+
+### DL-46: `/me` lists every workspace for a system admin
+- **Date:** 2026-10-09
+- **Decision:** For a system admin, `/me` lists every workspace, with a null role where they
+  hold no workspace membership (as its orgs already do), so each entry's workspace-level
+  `allowed_actions` reach them. Other users see their workspace memberships.
+- **Supersedes:** none (the build plan said "their workspaces and roles")
+- **Superseded by:** none
+- **Applies to:** build plan ("Authentication" `/me`); built in S1-C7
+- **Source:** chat session (owner, before S1-C7)
+
+### DL-47: Module gating is an option of the load-and-authorize dependency
+- **Date:** 2026-10-09
+- **Decision:** Module gating is the `module` option of the load-and-authorize dependency
+  (`authorized(loader, action, module=...)`), not a dependency of its own: one dependency loads
+  the entity once and checks in a fixed order (404 for a disabled module, then `authorize()`).
+  If authorization becomes a bottleneck, it's the first place to look.
+- **Supersedes:** design-doc §5's "Module gating is a separate dependency"
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("The choke point"); build plan ("Authorization (§5)")
+- **Source:** chat session (owner, after S1-C7; review question)
+
+### DL-48: Two edge cases left until they're a problem
+- **Date:** 2026-10-09
+- **Decision:** A user-level audit event whose workspace is ambiguous (only possible with a
+  second workspace) keeps a null `workspace_id` until several workspaces are needed (TD-21
+  closed); and the seed takes no lock against two runs at the same moment ("run it once" is
+  enough for a one-time setup command).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** tech-debt TD-21
+- **Source:** chat session (owner, after S1-C7; questions from S1-C6)
+
+### DL-49: Sign-in refuses an oversized password
+- **Date:** 2026-10-09
+- **Decision:** Sign-in refuses a password longer than the policy's 256 characters with a 422
+  before any verification, so an oversized password costs no Argon2 hash. Built in a new
+  checkpoint, S1-C7a, since sign-in is built.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sign-in responses"); build plan (the S1-C7a row,
+  "Authentication (§4)", the groups)
+- **Source:** chat session (owner, after S1-C7; S1-C5 security review question)
+
+### DL-50: Sign-in and the app shell stay in S1-C14 for now
+- **Date:** 2026-10-09
+- **Decision:** Sign-in and the app shell aren't pulled forward now; they stay in S1-C14 until
+  the owner chooses to pull them forward, once the "Before S1-C14" items (the UI design guide,
+  the `ui-reviewer` agent) exist.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Workflow items scheduled")
+- **Source:** chat session (owner, after S1-C7)
+
+### DL-51: S1-C7a is outside the review-tier trial
+- **Date:** 2026-10-09
+- **Decision:** S1-C7a sits in the `s1-workspace` group but outside the review-tier trial: it
+  stops for the owner's approval as usual, and the trial stays S1-C8 to S1-C10, its group report
+  covering those three (DL-10).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Verification", the review-tier trial)
+- **Source:** chat session (owner, after the DL-49 docs-consistency check)
+
+### DL-52: Change password refuses an oversized current password
+- **Date:** 2026-10-09
+- **Decision:** Change password refuses a `current_password` longer than the policy's 256
+  characters with a 422 before any verification, as sign-in does (DL-49). Built in S1-C7b.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sign-in responses"); build plan ("Authentication (§4)", the
+  S1-C7b row)
+- **Source:** chat session (owner, after S1-C7a; security review question)
+
+### DL-53: Sign-in deletes the session the browser signed in with
+- **Date:** 2026-10-09
+- **Decision:** When a sign-in succeeds and the request carried a session cookie, that session
+  is deleted (whoever it belongs to), so signing in again cuts off a copy of the old token. A
+  failed sign-in (401, 403, or the 422 cap) leaves it alone, so a mistyped password doesn't sign
+  the user out. It removes one
+  session by its token, not a sweep of a user's sessions, so it takes no user-row lock. Built in
+  S1-C7b.
+- **Supersedes:** none (design-doc §4 said only "never reuse an existing session")
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Slice 1 security checklist"); build plan (the S1-C7b row)
+- **Source:** chat session (owner, after S1-C7a; S1-C5 security review question)
+
+### DL-54: The middleware's 403 and 415 are documented, not declared per route
+- **Date:** 2026-10-09
+- **Decision:** The `Origin` check's 403 `origin_rejected` and the JSON-only check's 415
+  `unsupported_media_type` stay out of each route's OpenAPI responses; the developer guide says
+  every mutating route can return them.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** developer guide ("Authentication")
+- **Source:** chat session (owner, after S1-C7a; S1-C5 review question)
+
+### DL-55: The workspace and org API (S1-C8)
+- **Date:** 2026-10-09
+- **Decision:** S1-C8's endpoints, payloads, and errors as listed in the build plan ("The
+  workspace and org API"): the workspace read and update; slug availability for the workspace,
+  a new org, and an existing org (`{available, problem}`); the staff list, the email-first add
+  (422 `already_member`, `no_account`, or `account_inactive` on `email`), the create (a new user
+  and the membership in one step, at `/staff/new`), the role change, and the removal
+  (`with_projects`, default true); the org list, the create (with exactly one of `owner_id`, an
+  existing active user: no such user a 404, a deactivated one a 422 `account_inactive`; or
+  `new_owner`, a new user), the read, and the update. A workspace's or org's own slug counts as
+  available on its slug check. The web form checks an email (S1-C9's email availability) and
+  confirms before posting an add; S1-C9's org and S1-C12's project email-first adds use the same
+  three errors as the staff add. Demoting or
+  removing the last owner is a 422 `validation_error` of type `last_owner` (409 stays for
+  version conflicts), the org guard in S1-C9 alike. `create_app` adds a `ReservedSlug` enum to
+  the OpenAPI components.
+- **Supersedes:** none (the docs gave the URL patterns, not the endpoints)
+- **Superseded by:** DL-59 (in part); DL-66 (in part: S1-C9's email availability is now the user
+  check); DL-74 (in part: the last-owner guard counts active owners)
+- **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C8 row)
+- **Source:** chat session (owner, before S1-C8; the details settled after the docs-consistency
+  check)
+
+### DL-56: Three actions for S1-C8
+- **Date:** 2026-10-09
+- **Decision:** `workspace_staff.manage_admins` (granting, changing, or removing a workspace owner
+  or admin role, needed on top of `workspace_staff.manage`: workspace owners and system admins;
+  carried in `/me` like every workspace-level action), `org.view` (anyone who sees the org), and
+  `org.update` (org owners, workspace owners/admins, system admins).
+- **Supersedes:** DL-45 in part (its "a targeted rule in S1-C8": the rule is this action)
+- **Superseded by:** DL-59 (in part)
+- **Applies to:** build plan ("Authorization (§5)")
+- **Source:** chat session (owner, before S1-C8)
+
+### DL-57: Uniqueness checks may reveal other orgs' slugs and projects' keys
+- **Date:** 2026-10-09
+- **Decision:** Org slugs and project keys stay unique across the workspace, so a client's org
+  owner checking or setting one can learn that another org or project uses it. Accepted: the
+  scope is small for the foreseeable future.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Errors from constraints")
+- **Source:** chat session (owner, after S1-C8; security review question)
+
+### DL-58: The visible step in `authorize()`'s order
+- **Date:** 2026-10-09
+- **Decision:** An action marked `visible` is granted to anyone who can see the target, as a step
+  after the archived project, the export-control gate, and personal actions, and before the admin
+  levels; it is never used for a project content action, so it can't take an inherited admin past
+  the export-control gate.
+- **Supersedes:** none (design-doc §5's list didn't have the step)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("The choke point"); build plan ("Authorization (§5)");
+  `backend/CLAUDE.md`; the `security-reviewer` agent
+- **Source:** chat session (owner, after S1-C8; security review question)
+
+### DL-59: Stepping down, and the last owner's handover
+- **Date:** 2026-10-09
+- **Decision:** A workspace or org admin may demote or remove themselves without the owner-only
+  right those roles otherwise need, and their own row carries the action. The last owner of a
+  workspace or an org may step down or leave only when a replacement owner is named
+  (`new_owner_id`, an existing member there) in the same request, who becomes owner in the same
+  transaction; without one, still a 422 `last_owner`. Whoever may demote or remove an owner
+  (owners, system admins) may name one; 422 on `new_owner_id` for someone not a member, a
+  deactivated account, the target themselves, or a target that isn't an owner. The UI offers it
+  (S1-C15's replacement-owner picker). The workspace's part changes S1-C8's code, so it's a new
+  checkpoint, S1-C8a; S1-C9 builds the org's.
+- **Supersedes:** design-doc §5's "the last owner … cannot leave or be demoted" (now: without
+  naming a replacement); DL-55 in part (the last-owner 422); DL-56 in part (`manage_admins` for
+  one's own admin role)
+- **Superseded by:** DL-74 (in part: the last-owner guard counts active owners)
+- **Applies to:** design-doc §5 ("Other targeted rules"); schema-doc (`workspace_membership`,
+  `membership`); build plan ("Authorization (§5)", "The workspace and org API", the guards, UI
+  notes, the S1-C8a, S1-C9, and S1-C15 rows, the groups, the review-tier trial); the
+  `security-reviewer` agent
+- **Source:** chat session (owner, after S1-C8; checkpoint review question)
+
+### DL-60: S1-C8a and the review-tier trial
+- **Date:** 2026-10-09
+- **Decision:** A checkpoint inserted for a new owner requirement (S1-C8a) isn't "rework" for the
+  trial's failure clause, and S1-C10's group report covers all four records in the range (S1-C8,
+  S1-C8a, S1-C9, S1-C10).
+- **Supersedes:** DL-10 in part (the group report's "three review records")
+- **Superseded by:** none
+- **Applies to:** build plan ("Verification", the review-tier trial); `checkpoint` skill
+- **Source:** chat session (owner, after S1-C8; docs-consistency decisions)
+
+### DL-61: The UI design guide and the styling approach
+- **Date:** 2026-10-10
+- **Decision:** `docs/ui-design-guide.md` is the authoritative UI guide, with rule IDs that
+  reviewers cite (renumbering is a design change), and `frontend/CLAUDE.md` gains a short "UI"
+  section pointing at it. Styling is PrimeVue (Aura base, our preset) plus Tailwind v4, fed by one
+  token set (`src/app/styles/tokens.css`); the accent comes from the company logo; the shell,
+  form, feedback, and table patterns are those of the guide, chosen in the owner's walkthrough.
+  S1-C14 adds the libraries, the token file, the preset, and the contrast check. Reference copies
+  of the token file, its contrast check, and the SVAR mapping live in `docs/ui/`.
+- **Supersedes:** the build plan's workflow item "A short UI design guide (`frontend/CLAUDE.md` or
+  a new doc; decided then)"
+- **Superseded by:** DL-66 (in part: UI-FRM-13's email-first flow)
+- **Applies to:** `docs/ui-design-guide.md`, `docs/ui/`; `frontend/CLAUDE.md`; build plan
+  (workflow items, repository layout, S1-C14 row, "Web shell", "Web screens"); screen-inventory
+  (step 7); design-doc §1, §2; build plan ("Tooling"); root `CLAUDE.md`; developer guide
+- **Source:** chat session (owner's design walkthrough, Oct 10, 2026; UI design change note)
+
+### DL-62: The `ui-reviewer` agent
+- **Date:** 2026-10-10
+- **Decision:** A read-only `ui-reviewer` agent reviews frontend changes for accessibility and
+  frontend conventions against the guide's rule IDs. The `checkpoint` skill runs it whenever the
+  diff touches `frontend/src/` or `frontend/e2e/`, after `checkpoint-reviewer`.
+- **Supersedes:** the build plan's workflow item for the `ui-reviewer` agent ("run on S1-C14 to
+  S1-C16"; now every web checkpoint)
+- **Superseded by:** none
+- **Applies to:** `.claude/agents/ui-reviewer.md`; `checkpoint` skill (reviewers step); build plan
+  ("Claude configuration", Slice 1); root `CLAUDE.md`; developer guide (sections 2 and 11)
+- **Source:** chat session (owner, Oct 10, 2026; UI design change note)
+
+### DL-63: The skeleton appears after about 300 ms
+- **Date:** 2026-10-10
+- **Decision:** A loading skeleton appears only when loading takes more than about 300 ms (was
+  about 200 ms), chosen against a live example in the walkthrough.
+- **Supersedes:** screen-inventory step 5 ("Loading states", about 200 ms)
+- **Superseded by:** none
+- **Applies to:** screen-inventory ("Loading states"); `frontend/CLAUDE.md`; ui-design-guide
+  UI-FBK-11
+- **Source:** chat session (owner's design walkthrough, Oct 10, 2026)
+
+### DL-64: SVAR widgets for the board, editable grids, and the Gantt chart
+- **Date:** 2026-10-10
+- **Decision:** SVAR Vue Kanban and DataGrid (MIT `@svar-ui/*`) are used in v1 for the board and
+  for lists where inline editing or manual order is the point, and SVAR Gantt in v2, each only
+  through our wrapper, themed by one mapping file onto our tokens, with every move decided by the
+  server. The packages are pinned exactly and arrive in the first checkpoint that ships a board or
+  an editable grid (placed when Slices 2 and 3 are planned), not in S1-C14.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §7; build plan (Slice overview, Slice 2 notes);
+  testing-strategy ("Accessibility"); `frontend/CLAUDE.md`
+- **Source:** chat session (owner's design walkthrough and the SVAR spike, Oct 10, 2026)
+
+### DL-65: S1-C14's end-to-end runs, home route, and accessibility tooling
+- **Date:** 2026-10-10
+- **Decision:** `wl check` runs the end-to-end tests last, through a new `wl e2e` that starts an
+  isolated, seeded Compose project and always tears it down (CI calls the same `wl check`;
+  `--skip-e2e` is for quick loops only, never a checkpoint close-out). `/` is a real My work
+  route from S1-C14's first commit, and the status page moves to `/status` in that commit. The
+  axe helpers (`vitest-axe`, `@axe-core/playwright`) and `expectFocusNotObscured()` are set up
+  before the first screen, each proven able to fail, and the end-to-end checks run in both themes.
+- **Supersedes:** the S1-C14 row's "How `wl check` runs end-to-end tests … is decided here"
+- **Superseded by:** DL-99, in part (the end-to-end tests run in `wl check --full`, which CI
+  calls; `--skip-e2e` is gone)
+- **Applies to:** build plan (S1-C14 row, "Developer CLI"); testing-strategy ("Accessibility")
+- **Source:** chat session (owner, Oct 10, 2026; UI design change note, items 2.1 to 2.3)
+
+### DL-66: The email-first form suggests a username, and one user check
+- **Date:** 2026-10-10
+- **Decision:** The email-first add-person form keeps design-doc §4's flow: an existing account is
+  added after a confirm step that names only the email ("An account already exists for <email>. Add
+  them?"), and a new account asks for name, username, and temporary password. The username is
+  pre-filled with a server suggestion from the name (first and last word joined by a hyphen, made
+  available with a numeric suffix), which the admin may change. One user check endpoint answers for
+  an email (whether it has an account, never whose), a username (availability), or a name (the
+  suggestion), replacing S1-C9's separate email and username availability checks. It has one
+  audience for every form: those who may add or create a person (workspace and org owners and
+  admins, admins of a project that isn't archived, system admins) and takes no user ID (an edit form
+  skips the check while a field holds the user's current value); a user changing their own username
+  gets no live check (UI-FRM-9). The suggestion rule drops disallowed characters before picking the
+  first and last word, shortens its base so a suffix stays within 40 characters, strips trailing
+  hyphens, and owns the suffix cutting (test-first in `rules/`). The name stays one field for now
+  (TD-28).
+- **Supersedes:** DL-61 in part (UI-FRM-13: an existing account "added directly", and step 2
+  asking "only for the name"); DL-55 in part (the web form's "S1-C9's email availability")
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Account management"); build plan (S1-C9 row, "Workspace,
+  organizations & memberships", the staff API table); ui-design-guide UI-FRM-9, UI-FRM-13; the
+  `ui-reviewer` agent; tech-debt TD-28
+- **Source:** chat session (owner, Oct 10, 2026; docs-consistency decision on PR #10)
+
+### DL-67: The org members API (S1-C9)
+- **Date:** 2026-10-11
+- **Decision:** S1-C9's endpoints as listed in the build plan ("The org members API"), mirroring
+  S1-C8's staff API: the member list (per-row `allowed_actions`), the email-first add (the three
+  422s of DL-55), the create at `/members/new`, the role change and the removal (each with an
+  optional `new_owner_id`; `with_projects`, default true, on the removal), and the user check
+  (DL-66) at `GET /api/workspaces/{workspace_id}/user-check`. The org's last-owner guard, the
+  replacement owner, and the lock order work as for staff.
+- **Supersedes:** none (the docs gave the URL pattern, not the endpoints)
+- **Superseded by:** none
+- **Applies to:** build plan ("Workspace, organizations & memberships"; the S1-C9 row)
+- **Source:** chat session (owner, before S1-C9)
+
+### DL-68: Three actions for S1-C9
+- **Date:** 2026-10-11
+- **Decision:** `org_member.manage` (listing and managing an org's members, one action for both:
+  org owners/admins, workspace owners/admins, system admins); `org_member.manage_admins`
+  (granting, changing, or removing an org owner or admin role, on top of `org_member.manage`,
+  except an admin stepping down: org owners, workspace owners/admins, system admins); and
+  `user.check` (the user check: workspace owners/admins and system admins, plus a targeted rule
+  for org owners/admins in the workspace and explicit admins of its non-archived projects; 404
+  for anyone else, as for the workspace pages). The authorization context gains each project's
+  archived state and each org role's workspace for the rule.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Authorization (§5)", "The org members API")
+- **Source:** chat session (owner, before S1-C9)
+
+### DL-69: An org admin may bring a membership-less account into their scope
+- **Date:** 2026-10-11
+- **Decision:** Accepted as a known risk: an org admin may add any active account to their org by
+  email, including one with no memberships left (otherwise managed only by workspace owners/admins
+  and system admins). The new membership brings it into that admin's scope under the rank rule,
+  so from S1-C10 they could reset its password. The harm is limited to impersonation inside that
+  admin's own org; no extra check is added.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Account management", the rank rule); S1-C10's account actions
+- **Source:** chat session (owner, Oct 11, 2026; S1-C9 security review question)
+
+### DL-70: The roster: one set of membership rules, in its own service layer
+- **Date:** 2026-10-11
+- **Decision:** Workspace staff and org members (and, from S1-C12, project members) share one
+  module, `services/roster.py`: the email-first add, the create, the owner-only rule for owner and
+  admin roles, stepping down, the last-owner guard and handover, the lock order, and the
+  `on_member_removed` hook. It sits in its own service layer, 1b, between `auth`/`workspace`/`org`
+  (which may not import each other) and `user`; it owns no tables and writes the membership rows
+  only when the owning service calls it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Cross-area rules": the service layer table and the removal handlers;
+  the feature map; the S1-C12 row); `backend/pyproject.toml` (the layers contract); developer
+  guide
+- **Source:** chat session (owner, Oct 11, 2026; S1-C9 checkpoint review finding)
+
+### DL-71: Project members use the roster for adding and removal only
+- **Date:** 2026-10-11
+- **Decision:** From S1-C12, project members go through the roster (DL-70) for the email-first add,
+  the create, the lock order, and the `on_member_removed` hook only. Projects have no owner role,
+  so there is no last-admin guard, handover, or stepping-down rule for them.
+- **Supersedes:** none (narrows how DL-70 applies to project members)
+- **Superseded by:** none
+- **Applies to:** build plan (the feature map's `project` and `roster` rows, the service layer
+  table, the S1-C12 row)
+- **Source:** chat session (owner, Oct 11, 2026; docs-consistency question after DL-70)
+
+### DL-72: The account API (S1-C10)
+- **Date:** 2026-10-11
+- **Decision:** S1-C10's endpoints, payloads, and errors as listed in the build plan ("The
+  account API"): the workspace users list; deactivate, reactivate, reset password, and sign out
+  everywhere as `POST`s on `/api/users/{user_id}/…`; the admin profile edit (`PATCH
+  /api/users/{user_id}`) and the user's own (`PATCH /api/me`); the per-person access review
+  (`GET /api/users/{user_id}/access`) with its reasons. A user the actor can't see is a 404, one
+  they see but may not act on a 403; the access review is a 404 on any denial. The last active
+  system admin and the last active owner of the workspace or an org can't be deactivated (422
+  `last_system_admin`, `last_owner`), the deactivation taking the owners' locks first (TD-27).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Users": the account API; the S1-C10 row)
+- **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C10, approved
+  with "go ahead"; the access-review response shape and its reasons were filled in from design-doc
+  §5, "Access review", after the proposal was cut short)
+
+### DL-73: Two account actions, on a user target (S1-C10)
+- **Date:** 2026-10-11
+- **Decision:** `user.manage` (every account action and the admin profile edit) is granted only
+  by a targeted rule, the rank rule over the target's memberships, which the target's entity
+  carries (system admins hold it as for every action); `user.view_access` (the per-person access
+  review) by workspace admins and system admins, and by a targeted rule: the user themselves, or
+  the rank rule. The proposal's separate `user.reset_password` is dropped: system admins pass
+  every role check before the targeted rules, so no action can express "not one's own account";
+  the service refuses the self-reset (403), and the UI hides it on the actor's own row.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Users": the account actions; the S1-C10 row); `app/authz/`
+- **Source:** chat session (owner, Oct 11, 2026, with DL-72)
+
+### DL-74: Every last-owner guard counts active owners
+- **Date:** 2026-10-11
+- **Decision:** A change is refused when it would leave the workspace or an org with no active
+  owner: demoting, removing, or deactivating its last active owner (unless, for a demotion or
+  removal, a replacement is named). A deactivated owner never counts as one. The roster's guard
+  (role change, removal) changes to this rule in S1-C10, with its tests.
+- **Supersedes:** the "last owner" wording of DL-55 and DL-59 (every owner counted)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 (the last owner); schema-doc (`workspace_membership`,
+  `membership`); build plan ("The account API", the S1-C10 row); `services/roster.py`;
+  `.claude/agents/security-reviewer.md`
+- **Source:** chat session (owner, Oct 11, 2026; docs-consistency decision on DL-72)
+
+### DL-75: Account-action events carry the covering org; member rows decided at S1-C15
+- **Date:** 2026-10-11
+- **Decision:** An account action's audit events (deactivate, reactivate, reset password, sign out
+  everywhere, the admin profile edit): when a system-admin or workspace role of the actor covers
+  the target under the rank rule, one event with no `organization_id`; otherwise one event per org
+  whose owner/admin role of the actor covers one of the target's memberships, each with that org,
+  so each org's admins see it (an exception to one `user_updated` per request). The endpoints
+  take no org. Whether staff and org member rows carry `is_active` (for the UI to explain the
+  last-active-owner guard, DL-74) is decided with the member-row question at S1-C15. How S1-C15's org members page learns which
+  account actions to offer on a row is decided at the start of S1-C15. The users page creates no
+  accounts (they come through the staff and org flows), and the own-profile edit stays at
+  `PATCH /api/me`.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("The account API", the S1-C13 and S1-C15 rows, the workspace admin
+  pages); design-doc §10.1 ("Profile edits"); schema-doc (`audit_event` action values)
+- **Source:** chat session (owner, Oct 11, 2026; docs-consistency decisions on DL-72)
+
+### DL-76: The projects API (S1-C11)
+- **Date:** 2026-10-11
+- **Decision:** S1-C11's endpoints, payloads, and errors as listed in the build plan ("The
+  projects API"): create in an org (with an optional `first_admin_id`), the org's project list,
+  key availability, the project read (with `allowed_actions` and `modules_holding_data`), the
+  update, archive and unarchive, static module guidance (`GET /api/module-guidance`), and My
+  work's projects section; `/me`'s org entries carry their `allowed_actions`. Create seeds the
+  type's v1 modules (design-doc §1.1) unless it's given `enabled_modules`; the lead may be cleared;
+  naming a deactivated first admin or lead is a 422 `account_inactive`; the key check uppercases as
+  create does; My work's shape is `{sections: {projects: {available, items, total}}}`, 10 items
+  each (docs-consistency decisions, Oct 11, 2026).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the projects API; the S1-C11 and S1-C16 rows); design-doc
+  §1.1 (the lead); schema-doc (`project.lead_id`)
+- **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C11)
+
+### DL-77: Six project actions (S1-C11)
+- **Date:** 2026-10-11
+- **Decision:** `project.create`, `project.assign_first_admin` (org level); `project.view`,
+  `project.update`, `project.archive`, `project.unarchive` (project level), granted as the build
+  plan lists ("The project actions"), from design-doc §5's role tables.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the project actions; the S1-C11 row); `app/authz/`
+- **Source:** chat session (owner, Oct 11, 2026, with DL-76)
+
+### DL-78: The project members API (S1-C12)
+- **Date:** 2026-10-12
+- **Decision:** S1-C12's endpoints, payloads, and errors as listed in the build plan ("The project
+  members API"): the member list (any project member can read it, through `project.view`), the
+  picker's candidates, the add by `user_id` or `email`, the create, the role change, the removal,
+  and the per-project access review. The email-first add has four outcomes: `already_member`,
+  `no_account`, `account_inactive`, and, for an account outside the project's org and the
+  workspace's staff, a 422 `outside_org` unless the request confirms with `join_org: true`, which
+  adds them to the org as a member and to the project (design-doc §4). A deactivated account is
+  refused before `outside_org`, so `join_org` never adds one; the picker hides deactivated users,
+  and adding one by `user_id` is a 422 `account_inactive` on `user_id` (as staff and org adds,
+  DL-55). Both paths check in the same order: by `user_id`, a 404 for anyone outside the org's
+  members and the staff, then `already_member`, then `account_inactive`; by `email`,
+  `already_member`, `no_account`, `account_inactive`, then `outside_org`. Removing a lead clears
+  `lead_id`; the `on_member_removed` handler removes the person's roles on the org's (or the
+  workspace's) projects, archived ones included, one `project_member_removed` per project with
+  `via`.
+- **Supersedes:** the S1-C12 row's "three cases ... as for staff (DL-55)" (build plan)
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the project members API; the S1-C12 row); design-doc §4
+  ("Project admins" add people)
+- **Source:** chat session (owner, Oct 12, 2026: the proposal at the start of S1-C12)
+
+### DL-79: Two project member actions (S1-C12)
+- **Date:** 2026-10-12
+- **Decision:** `project_member.manage` (project admins, inherited included; a mutation, so an
+  archived project denies it) and `project.view_access` (the same people; not a mutation), both
+  project level. Any project admin grants, changes, or removes any project role, their own
+  included; there is no last-admin guard (DL-71).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Projects": the project member actions; the S1-C12 row); `app/authz/`
+- **Source:** chat session (owner, Oct 12, 2026, with DL-78)
+
+### DL-80: A membership race reports `already_member` on the field the request used (TD-23)
+- **Date:** 2026-10-12
+- **Decision:** When two adds of the same person race, the roster turns the losing request's
+  unique-constraint violation into `already_member` on the field that request used: `email` for
+  an email add (staff, org members, project members), `user_id` for a project picker add. Built in
+  the shared roster in S1-C12. A race on a new account's email or username inside a nested object
+  (TD-23's second half) stays open, retargeted to S1-C15, when the web forms consume those errors.
+- **Supersedes:** TD-23's "Fix by: S1-C12" for the add race
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C12 row; "The project members API"); `docs/tech-debt.md` (TD-23);
+  `app/services/roster.py`
+- **Source:** chat session (owner, Oct 12, 2026: docs-consistency decision on DL-78)
+
+### DL-81: The classification API (S1-C13)
+- **Date:** 2026-10-12
+- **Decision:** S1-C13's endpoint, fields, and errors as listed in the build plan ("The
+  classification API"): a separate `PUT /api/projects/{key}/classification` (`level`,
+  `categories`; `project_classification_changed`), the classification fields on project create and
+  the project read, `export_control_confirmed: true` on every member add to an export-controlled
+  project and whenever a create or change adds `export_controlled` (else a 422
+  `confirmation_required`), and, when marking a project export-controlled, `confirmed_member_ids`
+  that must be exactly its current explicit members (else a 422 `members_changed`), checked under
+  the project's row lock; either field sent where it isn't needed is a 422
+  `confirmation_not_needed`. Each row of the per-project review, and each project of the per-person
+  review, gains `access` (`content` or `management`).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Classification & export control": the classification API and access
+  reviews; "The account API"; "The project members API"; the S1-C13 row)
+- **Source:** chat session (owner, Oct 12, 2026: the proposal at the start of S1-C13; the owner
+  noted `export_controlled` will rarely be used for the foreseeable future;
+  `confirmation_not_needed`: a docs-consistency decision on DL-81)
+
+### DL-82: Two classification actions; every action content or management (S1-C13)
+- **Date:** 2026-10-12
+- **Decision:** `project.raise_classification` (project admins, inherited included) and
+  `project.lower_classification` (the same, but on an export-controlled project an explicit
+  project admin only, which also covers removing `export_controlled`), both project-level
+  mutations. A classification change that neither raises nor lowers, including one to the
+  classification already held, needs either action; unclassified ranks as Internal for the raise
+  and lower rules (design-doc §3.1). The registry marks every action content or management; every action so far is
+  management.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Classification & export control": the classification actions; the
+  S1-C13 row); `app/authz/`
+- **Source:** chat session (owner, Oct 12, 2026, with DL-81; the no-op and unclassified rules:
+  docs-consistency decisions on DL-81 and DL-82)
+
+### DL-83: Demo seed data, `wl seed --demo` (S1-C13a)
+- **Date:** 2026-10-13
+- **Decision:** `wl seed --demo` builds a fixed demo dataset in an empty database, through the
+  services so every audit event is recorded, and refuses a database that already holds a
+  workspace; it creates the workspace and its system admin itself. It is also the data `wl e2e`
+  seeds its stack with. Every demo user shares one known password, documented in the developer
+  guide. The contents are listed in the build plan (S1-C13a row). It is built as a new
+  checkpoint, S1-C13a, since it changes app code (`app/cli.py`).
+- **Supersedes:** the build plan's workflow item "Before S1-C14: demo seed data"; "`wl e2e` …
+  seeds it with the non-interactive `wl seed`" (build plan, "Developer CLI"; testing-strategy)
+- **Superseded by:** DL-87 (in part: two forced-change users, not one)
+- **Applies to:** build plan (checkpoint table, S1-C13a row; "Workflow items scheduled";
+  "Developer CLI"; "Authentication", seed command; groups; "Done when"); testing-strategy
+  ("Test layers"); developer guide (status)
+- **Source:** chat session (owner, Oct 13, 2026: one workspace, two orgs, two projects each, a
+  workspace admin, an org admin per org, a lead per project, five users per project with one in
+  each org on both its projects; the extra users and projects proposed by Claude and accepted)
+
+### DL-84: S1-C14 split into S1-C14 and S1-C14a
+- **Date:** 2026-10-13
+- **Decision:** S1-C14 (Web: foundations & sign-in) builds the styling foundation, the accessibility
+  tooling, Playwright and `wl e2e`, the current-user store, route guards, error handling,
+  sign-in, the forced password change, and `/` as My work with its `h1` and empty state (the
+  status page moving to `/status`); S1-C14a (Web: app shell) builds the shell, My work's
+  projects section, account settings, the theme choice, the no-access page, the reserved-route
+  test, `useListQuery`, the `allowed_actions` pattern, and the first skeleton loaders. So the
+  foundation every screen depends on is reviewed before the screens are built on it.
+- **Supersedes:** the single S1-C14 row ("Web: auth & app shell")
+- **Superseded by:** none
+- **Applies to:** build plan (checkpoint table; groups; "Workflow items scheduled"; "Web shell";
+  "Workspace, organizations & memberships"; "Web screens"); screen-inventory (step 5)
+- **Source:** chat session (owner, Oct 13, 2026)
+
+### DL-85: The theme choice ships with the app shell (S1-C14a)
+- **Date:** 2026-10-13
+- **Decision:** The System / Light / Dark choice in the account menu (ui-design-guide UI-TOK-2)
+  is built in S1-C14a with the user menu, not deferred.
+- **Supersedes:** ui-design-guide §10 open item 7 ("recommended to ship with S1-C14")
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C14a row; "Web screens"); ui-design-guide (§10, item 7)
+- **Source:** chat session (owner, Oct 13, 2026)
+
+### DL-86: TD-19 re-targeted to the S1-C17 tech-debt review
+- **Date:** 2026-10-13
+- **Decision:** The `braces` advisory stays allowlisted; no fixed `braces` is published (3.0.3 is
+  still the latest), and the S1-C17 tech-debt review revisits it.
+- **Supersedes:** TD-19's "Fix by: S1-C14"
+- **Superseded by:** none
+- **Applies to:** tech-debt (TD-19)
+- **Source:** chat session (owner, Oct 13, 2026)
+
+### DL-87: One forced-change demo user per theme run
+- **Date:** 2026-10-13
+- **Decision:** The demo data has two users who must change their password, one for each theme's
+  run of the forced-change flow, since the flow clears the flag. End-to-end flows that create
+  data use keys and users unique to the run, so each flow can run in both themes on one stack.
+- **Supersedes:** DL-83's "one user who must change their password"
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C13a, S1-C14, and S1-C16 rows); testing-strategy
+  ("Accessibility")
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 1 on DL-83 to DL-86)
+
+### DL-88: Demo users are created as the plain seed creates the first admin
+- **Date:** 2026-10-13
+- **Decision:** `wl seed --demo` creates its users through the same service path `wl seed` uses
+  for the first system admin (no `must_change_password`, no actor on the audit events), except the
+  forced-change users, and adds their memberships through the org, roster, and project services.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C13a row)
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 2 on DL-83 to DL-86)
+
+### DL-89: `expectFocusNotObscured()` is proven in S1-C14, run on the shell in S1-C14a
+- **Date:** 2026-10-13
+- **Decision:** S1-C14 builds `expectFocusNotObscured()` and proves it can fail on a test fixture
+  with a sticky header; S1-C14a runs it on the shell pages.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C14 and S1-C14a rows); testing-strategy ("Accessibility");
+  ui-design-guide (§9)
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 3 on DL-83 to DL-86)
+
+### DL-90: `wl seed --demo` runs only where a setting allows it
+- **Date:** 2026-10-13
+- **Decision:** `wl seed --demo` refuses to run unless the `demo_seed_enabled` setting is on. It is
+  off by default and turned on only in `.env.example` (the local-dev default) and on the `wl e2e`
+  stack, as `api_docs_enabled` is, so a production database never gets known-password accounts.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C13a row; "Authentication", seed command; "Developer CLI";
+  "Done when")
+- **Source:** chat session (owner, Oct 13, 2026; docs-consistency decision 4 on DL-83 to DL-86)
+
+### DL-91: A live password requirements list under every new-password field
+- **Date:** 2026-10-13
+- **Decision:** Wherever users choose their own new password (the forced change, account
+  settings, and any later self-service reset; not an admin's generated temporary password), a
+  list of the policy's requirements sits under the field and ticks each one off as they type
+  (icon and text, linked to the field, no announcement per keystroke). The requirements and their
+  labels come from the server (`GET /api/auth/password-policy`, open to anyone and during a forced
+  change), not from numbers written into the screen; the server still decides on submit.
+- **Supersedes:** ui-design-guide UI-FRM-10 ("length only, shown as help text") and, for this
+  list only, UI-FRM-4 (the client checks only that a field isn't empty)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-4, UI-FRM-5, UI-FRM-10, §8); design-doc §4 (password
+  policy, forced change); build plan ("Authentication"; S1-C14a row); tech-debt TD-34
+- **Source:** chat session (owner, Oct 13, 2026: the S1-C14 review's TD-34 question)
+
+### DL-92: The pending spinner's speed is Tailwind's `animate-spin`
+- **Date:** 2026-10-13
+- **Decision:** The spinner in a pending button turns at Tailwind's `animate-spin` speed, an
+  exception to "durations come from tokens"; the label carries the meaning and reduced motion
+  stops it. Revisit if more animations need it.
+- **Supersedes:** none (an exception to ui-design-guide UI-TOK-7)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-TOK-7); tech-debt TD-35
+- **Source:** chat session (owner, Oct 13, 2026: the S1-C14 review's TD-35 question)
+
+### DL-93: Four UI-guide rules from the S1-C14 UI review
+- **Date:** 2026-10-13
+- **Decision:** A landmark is rendered only when it has content (UI-SHL-2). Retry in a form alert
+  moves focus to the control whose action failed, which shows its pending state, before the alert
+  goes (UI-FRM-7). An alert reporting a new event is a new element, keyed in the shared code, so
+  a repeat with the same text is announced again (UI-FBK-2). A live region repeating the same
+  text clears it and sets it again after a short delay in another task (UI-FRM-6).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SHL-2, UI-FRM-6, UI-FRM-7, UI-FBK-2); `frontend/CLAUDE.md`
+  (UI)
+- **Source:** chat session (owner, Oct 13, 2026: the ui-reviewer's proposed rules in
+  docs/reviews/s1/S1-C14.md)
+
+### DL-94: A 422 on a listed password requirement shows on its line of the list
+- **Date:** 2026-10-13
+- **Decision:** Under a new-password field with the requirements list (DL-91), a 422 whose field
+  error `type` matches a listed requirement marks that line as the error, with no separate
+  message under the field; the field is still invalid, counted in the announcement, and focused.
+  The policy endpoint's requirement codes are the 422 `type`s they prevent (`too_short`,
+  `same_as_email`, `same_as_username`, `same_as_current`). An unlisted error, such as the
+  256-character cap, shows under the field as usual.
+- **Supersedes:** none (an exception to ui-design-guide UI-FRM-5's placement)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-5, UI-FRM-10); build plan ("Authentication", the
+  password-policy endpoint); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-91 to DL-93,
+  option c)
+
+### DL-95: A marked requirement line keeps its label, with a "Not met:" cue
+- **Date:** 2026-10-13
+- **Decision:** A requirements-list line marked by a 422 (DL-94) keeps the list's own label,
+  prefixed with a "Not met:" text cue, in the error state (error icon and danger text); the
+  server's message for that error isn't shown. This is a second exception to "show the server's
+  message" in UI-FRM-4.
+- **Supersedes:** none (an exception to ui-design-guide UI-FRM-4)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-4, UI-FRM-10); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-94, option a)
+
+### DL-96: A requirement line's icon names its state for screen readers
+- **Date:** 2026-10-13
+- **Decision:** Each line of the password requirements list (DL-91) carries its met or unmet
+  state as visually hidden text with its icon ("Met" / "Not met"), read with the line's label
+  wherever the list is read (when the field gets focus, or browsing the list); there is still no
+  live announcement (DL-91). On a line a 422 marked, the visible "Not met:" cue (DL-95) takes
+  the hidden text's place, so it is read once. A line the screen can't check has no state.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-10); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-95, option b)
+
+### DL-97: S1-C14a ships a minimal project home and org project list
+- **Date:** 2026-10-13
+- **Decision:** So the project selector and org switcher never link to a missing screen
+  (UI-SHL-6), S1-C14a adds the project home (`/{org_slug}/projects/{key}`: the project header
+  with name, key, status, and a "No lead" badge when there is none) and the org's project list
+  (`/{org_slug}/projects`: a plain list over `useListQuery`). The project pages nav lists only
+  pages that exist (Home, until S1-C16 adds Members, Settings, and the greyed-out unshipped
+  modules), and the selector has no "New project" until S1-C16 builds its dialog. An unknown
+  org slug or a project the user can't see shows the not-found page, so the 404 handling
+  (TD-32) comes in S1-C14a, and so do the redirects: a visible project under a stale or wrong
+  org slug, or with a lowercase key, is redirected to its org's slug and the uppercase key.
+  S1-C16 completes both pages (the lead's name, the list's filters, create project).
+- **Supersedes:** the build plan's S1-C14a and S1-C16 rows (where the project list, pages, and
+  stale-slug redirect start); TD-32's "Fix by: S1-C16"
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C14a and S1-C16 rows); ui-design-guide (UI-SHL-6);
+  `docs/tech-debt.md` (TD-32); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026, at the start of S1-C14a)
+
+### DL-98: Below 40 rem the header wraps and isn't sticky
+- **Date:** 2026-10-13
+- **Decision:** Below 40 rem (Tailwind's `sm`) the shell's header wraps onto as many rows as it
+  needs (the Menu button, the app name, the org switcher, the user menu) and scrolls away with
+  the page; from 40 rem up it stays one sticky row at `--header-height`. This meets reflow at
+  320 CSS px (WCAG 1.4.10) for any org or user name, without a taller sticky header covering
+  focus.
+- **Supersedes:** none (narrows ui-design-guide UI-SHL-3's sticky header to 40 rem and up)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SHL-3); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: S1-C14a's UI review found the header 98 px too
+  wide at 320 CSS px)
+
+### DL-99: `wl check` is the gate before every commit; `wl check --full` is CI's
+- **Date:** 2026-10-14
+- **Decision:** `wl check` runs lockfiles, client freshness, lint, types, import rules, the
+  tests, and the coverage gates, plus mutation testing only when anything it depends on (the
+  backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`) changed since its
+  last green run. `wl check --full` adds mutation testing whatever changed, `wl audit`, and
+  `wl e2e`; CI runs it, and `--skip-e2e` is removed. A checkpoint still needs `wl check` green
+  before review and CI green before its report; a failure only CI finds gets a `fix(<ID>):`
+  commit. `wl audit` still runs before each checkpoint starts.
+- **Supersedes:** DL-13 and DL-65 in part (where `wl audit` and the end-to-end tests run)
+- **Superseded by:** none
+- **Applies to:** `tools/cli/` (`check`, `backend mutate`, `waterline_cli/mutation.py`);
+  `.github/workflows/ci.yml`; build plan ("Developer CLI", "Tech stack"); testing strategy
+  ("Accessibility", "Mutation testing", "Workflow and gates"); developer guide sections 1, 3, 9,
+  and 10; root `CLAUDE.md`; the `checkpoint` and `design-change` skills
+- **Source:** chat session (owner, Oct 14, 2026: `wl check` took 4.5 to 6 minutes locally)
+
+### DL-100: Backend tests run in parallel, one database per worker
+- **Date:** 2026-10-14
+- **Decision:** The backend suite runs under pytest-xdist (`-n auto --maxprocesses 8` in
+  `addopts`; 8 measured fastest: 4 workers 84 s, 8 workers 61 s, 12 workers 64 s, against 208 s
+  serially). Each worker drops, recreates, and migrates its own database,
+  `waterline_test_gw<n>`; a run with `-n 0` (filtered `wl backend test` runs, mutmut) uses
+  `waterline_test`. pytest-cov combines the workers' coverage on the controller, where the 100%
+  gate on `app/authz` and `app/rules` checks the total.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `backend/pyproject.toml` (`addopts`, `[tool.mutmut]`); `backend/tests/conftest.py`;
+  `tools/cli/` (`wl backend test`); testing strategy ("Database isolation", "Coverage gates");
+  build plan ("Docker Compose"); developer guide sections 3 and 9; `backend/CLAUDE.md`; the
+  `checkpoint` skill (reviewers one at a time)
+- **Source:** chat session (owner, Oct 14, 2026)
+
+### DL-101: A new gate joins `wl check` unless it needs the network or a stack
+- **Date:** 2026-10-14
+- **Decision:** Every new gate (a check, a test layer, a scan) runs in `wl check`, the gate
+  before every commit, unless it needs the network or a running stack; those run only in
+  `wl check --full` (and so CI). The token contrast check, once ported to a Vitest test, is in
+  `wl check`.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** testing strategy ("Workflow and gates")
+- **Source:** chat session (owner, Oct 14, 2026: docs-consistency decision 1 on DL-99, option a)
+
+### DL-102: Staff and org member rows carry `is_active` and the account actions
+- **Date:** 2026-10-14
+- **Decision:** From S1-C15, each row of `GET /api/workspaces/{workspace_id}/staff` and
+  `GET /api/orgs/{org_id}/members` carries `is_active`, and its `allowed_actions` also hold the
+  `user`-level actions on that person (`user.manage`, `user.view_access`, evaluated as on a
+  users-list row, from the context the list already loads). The members and staff pages offer
+  account actions from the row alone (no per-user read), show a deactivated person as such, and
+  can explain the last-active-owner guard (DL-74) before the server's 422.
+- **Supersedes:** none (settles the two questions DL-75 left for S1-C15)
+- **Superseded by:** none
+- **Applies to:** build plan ("The workspace and org API", "The org members API", the S1-C15 row)
+- **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
+
+### DL-103: S1-C15 splits into workspace admin (C15) and org admin (C15a)
+- **Date:** 2026-10-14
+- **Decision:** S1-C15 (Web: workspace admin) builds the admin layout, the shared pieces (dialogs,
+  the role select, the temporary-password field, the row actions menu, the email-first
+  add-person flow, the account-action dialogs, the replacement-owner picker, the D2 removal
+  dialog), the workspace pages, the per-person access review, and DL-102's backend change.
+  S1-C15a (Web: org admin) builds org settings and the org members page on those pieces. Two
+  reviewable diffs, as S1-C14 was split (DL-83).
+- **Supersedes:** the build plan's S1-C15 row (one checkpoint for workspace and org admin)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C15 and S1-C15a rows); developer guide (status line)
+- **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
+
+### DL-104: Admin pages are separate routes under a section nav, entered from the user menu
+- **Date:** 2026-10-14
+- **Decision:** The entry point is confirmed: the user menu has an "Administration" item for each
+  admin area the user may open (the workspace, and the current org), shown only when
+  `allowed_actions` allows it. Each admin area is its own pages under a section nav of links,
+  not one page of tabs: `/workspace/staff`, `/workspace/orgs`, `/workspace/users` (with
+  `/workspace/users/{user_id}/access`), `/workspace/settings`; `/{org_slug}/members`,
+  `/{org_slug}/settings`. Every page is linkable and keeps its list state in the URL.
+- **Supersedes:** none (settles UI-SHL-10's "proposed default" entry point and its "internal
+  layout is decided when they are built"; closes the guide's open item 6 for the entry point)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SHL-10); build plan (the S1-C15 row)
+- **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
