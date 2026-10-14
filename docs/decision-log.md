@@ -1266,3 +1266,22 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide (UI-FRM-10); `.claude/agents/ui-reviewer.md`
 - **Source:** chat session (owner, Oct 13, 2026: docs-consistency decision 1 on DL-95, option b)
+
+### DL-97: S1-C14a ships a minimal project home and org project list
+- **Date:** 2026-10-13
+- **Decision:** So the project selector and org switcher never link to a missing screen
+  (UI-SHL-6), S1-C14a adds the project home (`/{org_slug}/projects/{key}`: the project header
+  with name, key, status, and a "No lead" badge when there is none) and the org's project list
+  (`/{org_slug}/projects`: a plain list over `useListQuery`). The project pages nav lists only
+  pages that exist (Home, until S1-C16 adds Members, Settings, and the greyed-out unshipped
+  modules), and the selector has no "New project" until S1-C16 builds its dialog. An unknown
+  org slug or a project the user can't see shows the not-found page, so the 404 handling
+  (TD-32) comes in S1-C14a, and so do the redirects: a visible project under a stale or wrong
+  org slug, or with a lowercase key, is redirected to its org's slug and the uppercase key.
+  S1-C16 completes both pages (the lead's name, the list's filters, create project).
+- **Supersedes:** the build plan's S1-C14a and S1-C16 rows (where the project list, pages, and
+  stale-slug redirect start); TD-32's "Fix by: S1-C16"
+- **Superseded by:** none
+- **Applies to:** build plan (S1-C14a and S1-C16 rows); ui-design-guide (UI-SHL-6);
+  `docs/tech-debt.md` (TD-32); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026, at the start of S1-C14a)

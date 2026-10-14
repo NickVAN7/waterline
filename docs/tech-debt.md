@@ -467,8 +467,7 @@ Entry format:
   nothing turns an API 404 into the not-found page.
 - **Why:** owner decision (S1-C14): build it with the first page that loads a record, rather
   than with nothing to use it.
-- **Fix by:** S1-C16 (the project pages, whose row already includes the stale-slug redirect and
-  404)
+- **Fix by:** S1-C14a (its minimal project home is the first page that loads a record, DL-97)
 - **Status:** open
 
 ### TD-33: A failed sign-out from the header says nothing

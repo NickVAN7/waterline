@@ -456,7 +456,8 @@ render inside the full shell when signed in.
   a broken screen. **Only the page you are on has `aria-current="page"`**: "All projects" is
   not current while you are inside a project. The page itself still shows a project header
   (name, key in monospace, status badge, lead, or a "No lead" warning badge); there is no
-  separate project sub-nav row.
+  separate project sub-nav row. Until S1-C16 the pages are Home only, the header has no lead
+  name, and the selector has no "New project" (DL-97).
 - **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
   up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. Pages
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
