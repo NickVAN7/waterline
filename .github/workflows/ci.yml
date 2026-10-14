@@ -1,6 +1,7 @@
-# CI: everything `wl check` runs, on every push to main and every pull request (build-plan.md,
-# "Tests & CI"; testing-strategy.md, "Workflow and gates"). CI calls the developer CLI, so a
-# green `uv run wl check` locally means a green run here.
+# CI: `wl check --full`, on every push to main and every pull request (build-plan.md,
+# "Tests & CI"; testing-strategy.md, "Workflow and gates"; DL-99). CI calls the developer CLI, so
+# a green `uv run wl check --full` locally means a green run here. The job keeps the name
+# "wl check": the main branch's ruleset requires that status check.
 name: CI
 
 on:
@@ -87,7 +88,8 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      # Includes `wl audit`: uv audit (both lockfiles), npm audit, and gitleaks over the full
-      # history (the version pinned in .pre-commit-config.yaml, as locally). It needs the network.
+      # --full (DL-99): mutation testing whatever changed, `wl audit` (uv audit on both
+      # lockfiles, npm audit, and gitleaks over the full history, the version pinned in
+      # .pre-commit-config.yaml; it needs the network), and `wl e2e`.
       - name: wl check
-        run: uv run wl check
+        run: uv run wl check --full
