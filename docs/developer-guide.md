@@ -9,7 +9,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > System / Light / Dark theme, My work's projects section, account settings, the password
 > requirements list (`GET /api/auth/password-policy`), the no-access page, a minimal project home
 > and org project list (DL-97), `useListQuery`, and the first skeleton loaders (section 7); next
-> is S1-C15 (Web: workspace & org admin). S1-C14 (Web: foundations & sign-in) built the styling
+> is S1-C15 (Web: workspace admin). S1-C14 (Web: foundations & sign-in) built the styling
 > foundation, the current-user store, route guards, sign-in, the forced password change, and
 > `wl e2e`. S1-C13a (Demo seed data) built `wl seed --demo` (section 5, "Demo
 > data"). S1-C13 (Classification & export control) built classification. A project's classification is set at creation or with `PUT

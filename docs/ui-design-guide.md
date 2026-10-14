@@ -474,9 +474,14 @@ render inside the full shell when signed in.
   does not move focus; it updates a polite live region instead ("12 projects").
 - **UI-SHL-10** **Admin pages.** Organization administration (members, settings) and workspace
   administration (staff, orgs, users) are separate pages, not sidebar sections and not part of
-  the org switcher. The entry point is an "Administration" item in the user menu, shown only
-  when `allowed_actions` allows it (this entry point is a proposed default, not yet confirmed
-  with the owner). Their internal layout is decided when they are built.
+  the org switcher. The entry point is the user menu: an "Administration" item for each admin
+  area the user may open (the workspace, and the current org), shown only when `allowed_actions`
+  allows it (DL-104). Each admin area is its own pages under a section nav of links
+  (`aria-current="page"` on the current one), so every page is linkable and its list state is
+  in the URL (DL-104): workspace administration at `/workspace/staff`, `/workspace/orgs`,
+  `/workspace/users` (a person's access review at `/workspace/users/{user_id}/access`), and
+  `/workspace/settings`; org administration at `/{org_slug}/members` and
+  `/{org_slug}/settings`.
 
 ---
 
@@ -972,8 +977,8 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    DataGrid's parent and child (tree) mode is in the MIT package, and how it behaves with the
    keyboard, was not tested; it must be before the DataGrid is chosen for the requirement tree
    (Slice 2).
-6. **My work styling** (UI-SHL-5) and the **admin entry point** (UI-SHL-10): revisit once pages
-   are populated; both are defaults the owner accepted for now.
+6. **My work styling** (UI-SHL-5): revisit once pages are populated; a default the owner
+   accepted for now. (The admin entry point, UI-SHL-10, is confirmed: DL-104.)
 7. **Theme override** (UI-TOK-2): ships with S1-C14a, in the user menu (DL-85).
 8. **Enum mappings:** tone and icon for requirement, task, test, and approval statuses and for
    priority and severity are decided as each first appears (UI-FBK-5).

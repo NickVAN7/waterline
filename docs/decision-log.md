@@ -1356,3 +1356,30 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("The workspace and org API", "The org members API", the S1-C15 row)
 - **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
+
+### DL-103: S1-C15 splits into workspace admin (C15) and org admin (C15a)
+- **Date:** 2026-10-14
+- **Decision:** S1-C15 (Web: workspace admin) builds the admin layout, the shared pieces (dialogs,
+  the role select, the temporary-password field, the row actions menu, the email-first
+  add-person flow, the account-action dialogs, the replacement-owner picker, the D2 removal
+  dialog), the workspace pages, the per-person access review, and DL-102's backend change.
+  S1-C15a (Web: org admin) builds org settings and the org members page on those pieces. Two
+  reviewable diffs, as S1-C14 was split (DL-83).
+- **Supersedes:** the build plan's S1-C15 row (one checkpoint for workspace and org admin)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C15 and S1-C15a rows); developer guide (status line)
+- **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
+
+### DL-104: Admin pages are separate routes under a section nav, entered from the user menu
+- **Date:** 2026-10-14
+- **Decision:** The entry point is confirmed: the user menu has an "Administration" item for each
+  admin area the user may open (the workspace, and the current org), shown only when
+  `allowed_actions` allows it. Each admin area is its own pages under a section nav of links,
+  not one page of tabs: `/workspace/staff`, `/workspace/orgs`, `/workspace/users` (with
+  `/workspace/users/{user_id}/access`), `/workspace/settings`; `/{org_slug}/members`,
+  `/{org_slug}/settings`. Every page is linkable and keeps its list state in the URL.
+- **Supersedes:** none (settles UI-SHL-10's "proposed default" entry point and its "internal
+  layout is decided when they are built"; closes the guide's open item 6 for the entry point)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SHL-10); build plan (the S1-C15 row)
+- **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)

@@ -383,8 +383,9 @@ Entry format:
   ignored rather than refused with its 422. Staff and org members share this path (the roster,
   DL-70).
 - **Why:** nothing changes, so nothing is wrong; the owner accepted it for now (after S1-C8a).
-- **Fix by:** S1-C15 (with the staff and org member pages' role pickers: check `new_owner_id` on a
-  no-op too, or confirm the pickers never send one without a change).
+- **Fix by:** S1-C15 (with the shared role select and the staff page's role change; staff and org
+  members share the path, DL-70, DL-103: check `new_owner_id` on a no-op too, or confirm the
+  pickers never send one without a change).
 - **Status:** open
 
 ### TD-27: Deactivation must wait behind a handover
