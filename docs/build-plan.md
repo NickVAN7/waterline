@@ -441,22 +441,24 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>`, `wl e2e` (from S1-C14, DL-65) | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29); Playwright against an isolated, seeded stack it starts and always tears down |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
-  on any surviving mutant; `wl check` includes it. `wl audit` (DL-13) fails on any known
+  on any surviving mutant; `wl check --full` always includes it, and `wl check` when anything it
+  depends on changed since its last green run (DL-99). `wl audit` (DL-13) fails on any known
   vulnerability in either Python lockfile or the npm lockfile (dev dependencies included), and
-  on any secret in the git history; it needs the network, and `wl check` includes it. `wl e2e`
+  on any secret in the git history; it needs the network, and `wl check --full` includes it.
+  `wl e2e`
   (DL-65) starts a separate Compose project (`docker compose -p waterline-e2e`, its own database
   volume and ports, never the dev stack) reached at `localhost`, waits for it to be healthy, seeds
   it with `wl seed --demo` (DL-83; with `demo_seed_enabled` on, DL-90) as CI does, runs Playwright, and tears the stack and its
-  volume down, pass or fail. `wl check` runs it last, after the fast gates; `wl check --skip-e2e`
-  is for quick loops only, prints a warning that CI will run them, and is never used to close a
-  checkpoint.
+  volume down, pass or fail. `wl check --full` runs it last, after the other gates. `wl check`,
+  the gate before every commit, leaves out the audit and the end-to-end tests; `wl check --full`
+  is what CI runs (DL-99).
 
 - **Rules:**
   1. **Thin orchestrator only:** each command runs existing tools (docker compose, uv, npm,
      alembic) as subprocesses in the right folder. No application logic.
   2. `package.json` scripts and the backend's tool configuration remain the real definitions;
      running `npm run test` or `uv run pytest` directly gives the same result.
-  3. **CI calls the CLI** (`wl check`), so local runs and CI can't diverge.
+  3. **CI calls the CLI** (`wl check --full`), so local runs and CI can't diverge.
   4. **`--dry-run`** on every command prints the underlying commands instead of running them.
   5. **Light tests:** every command's `--help` works, and dry-run output matches the expected
      commands.
@@ -622,7 +624,8 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   PrimeVue and Tailwind v4 from S1-C14 (DL-61); SVAR Vue widgets from the first checkpoint that
   ships a board or an editable grid (DL-64);
   Playwright from Slice 1 (Chromium only in v1; implementation decision 9).
-- `pre-commit` for local hooks; `wl check` runs everything CI runs.
+- `pre-commit` for local hooks; `wl check --full` runs everything CI runs, and `wl check` the
+  gate before every commit (DL-99).
 - Testing approach, layers, and gates: see `testing-strategy.md`.
 - Settings via `pydantic-settings` (environment variables, `.env` for local dev).
 
@@ -633,7 +636,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
     (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`; `.env.example` is committed, `.env` is
     not);
   - an init script creates a separate test database (`waterline_test`) so tests never touch
-    dev data;
+    dev data; each pytest-xdist worker makes its own copy from it (DL-100);
   - tables are created by Alembic (the `migrate` service, or `wl migrate`), never by hand;
   - the host port is configurable in `.env` (default 5432) in case another Postgres is already
     running on the workstation.
@@ -1017,7 +1020,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   any lowering or removal, denied to inherited admins and allowed to an explicit project
   admin). The export-control gate's rows come in Slice 2.
 - **Mutation testing:** mutmut over `app/rules/` and `app/authz/`, run by `wl backend mutate`,
-  included in `wl check` and CI; fails on any surviving mutant not marked equivalent
+  included in `wl check` when its inputs changed and always in `wl check --full` and CI (DL-99);
+  fails on any surviving mutant not marked equivalent
   (`testing-strategy.md`, "Mutation testing").
 
 ### Admin audit events (§10.1)

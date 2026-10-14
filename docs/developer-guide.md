@@ -51,7 +51,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > procrastinate, the model conventions (enums, soft delete, optimistic locking with 409,
 > `direct_update`), the standard error format (including a catch-all 500), and the password and
 > token helpers; `GET /api/health` checks the database. Docker Compose runs the whole stack
-> (postgres, migrate, api, worker, web). CI runs `wl check` on every push to `main` and every pull request.
+> (postgres, migrate, api, worker, web). CI runs `wl check --full` on every push to `main` and every pull request.
 
 ## 1. Workstation setup
 
@@ -86,7 +86,7 @@ npm ci --prefix frontend         # frontend tools (frontend/node_modules); befor
 uv run pre-commit install        # git hooks: ruff, Prettier, ESLint, generated files
 cp .env.example .env             # local settings (never committed); edit if needed
 uv run wl up                     # build and start the stack; applies migrations
-uv run wl check                  # everything CI runs; should be green on a fresh clone
+uv run wl check --full           # everything CI runs; should be green on a fresh clone
 ```
 
 Then open <http://localhost:5173>: it sends you to sign in. Build the demo data first ("Demo
@@ -141,7 +141,7 @@ underlying commands instead of running them, and stops at the first failing step
 | Command | Does |
 |---|---|
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
-| `wl check` | Everything CI runs: lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates, mutation testing — backend, then frontend, then CLI — then `wl audit`, then `wl e2e`. `--skip-e2e` leaves the end-to-end tests out, with a warning (CI never skips them) |
+| `wl check` | The gate before every commit (DL-99): lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates — backend, then frontend, then CLI — and mutation testing when anything it depends on changed since its last green run (the backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`; the hash is kept in `backend/mutants/inputs.sha256`), saying so when it skips it. `--full` is everything CI runs: mutation testing whatever changed, then `wl audit`, then `wl e2e` |
 | `wl e2e [args]` | The Playwright end-to-end tests on their own stack: the Compose project `waterline-e2e` (`docker-compose.e2e.yml`: no published database or API port, the web server on `127.0.0.1:5174`, `DEMO_SEED_ENABLED=true`), cleared of anything an earlier run left, built, seeded with `seed --demo`, tested in the `light` and `dark` projects, and always torn down with its volume. Runs beside the dev stack, but only one `wl e2e` at a time: a second run shares the project, and its first step clears the first run's stack. Extra args go to `playwright test` (e.g. `wl e2e sign-in --project light`) |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
@@ -150,7 +150,7 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl fmt` | ruff format and safe ruff fixes (backend, CLI, and `.claude/hooks/`); Prettier and safe ESLint fixes |
 | `wl backend check\|lint\|test\|fmt` | The same, backend only |
 | `wl backend mutate` | Mutation testing (mutmut) over `app/rules/` and `app/authz/`, from a clean slate; fails on any mutant not killed (section 9) |
-| `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate |
+| `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate, and runs in one process (`-n 0`), so `breakpoint()` works; pass `-n auto` to spread it over workers |
 | `wl frontend check\|lint\|test\|fmt` | The same, frontend only (the npm scripts in `frontend/package.json`) |
 | `wl frontend test <args>` | `vitest run <args>`, e.g. `wl frontend test src/api -t network`, without the coverage gate |
 | `wl gen-client` | Export `backend/openapi.json` from the code, then generate `frontend/src/api/schema.d.ts` from it. Run after any API change and commit both files |
@@ -920,8 +920,16 @@ Strategy, layers, and gates: `testing-strategy.md`. Layout in `backend/tests/`:
   skipped case of `test_model_column_matches_schema_doc`; nothing else should skip.
 - Tests use pytest's `importlib` import mode, so test folders have no `__init__.py` (only the
   importable helper packages `factories/` and `support/` do).
-- **Postgres must be running** (`wl up`). The run migrates the test database, `waterline_test`,
-  to head once per session; tests never touch the dev database.
+- **Postgres must be running** (`wl up`). Each worker migrates its own test database to head
+  once per session (`waterline_test` itself under `-n 0`); tests never touch the dev database.
+- **Tests run in parallel** (pytest-xdist, DL-100): `pytest` alone spreads the suite over one
+  worker per core, at most 8 (`addopts` in `pyproject.toml`). Each worker drops, recreates, and
+  migrates its own database, `waterline_test_gw<n>`, at its start; they stay until the next run
+  (`wl down -v` clears them). `-n 0` runs in one process on `waterline_test` (filtered runs do,
+  and so does mutmut). Coverage is combined across workers, so the gates are unchanged. A test
+  that passes alone but fails in the full run depends on another test's state or order: fix
+  the test, never the worker count. Run one full `pytest` at a time against a stack: a second
+  run drops the first run's worker databases.
 - **Async tests** run on the anyio plugin: mark the module `pytestmark = pytest.mark.anyio`.
   A synchronous test must not use async fixtures.
 
@@ -993,7 +1001,7 @@ between runs and failures are replayed from `.hypothesis/` (gitignored); CI (`CI
 `ci` profile, derandomized. A property over the database (e.g. numbering) runs each example in
 a savepoint it rolls back, with `suppress_health_check=[HealthCheck.function_scoped_fixture]`.
 
-**Mutation testing** (`wl backend mutate`, in `wl check` and CI): mutmut changes `app/rules/`
+**Mutation testing** (`wl backend mutate`; in `wl check` when anything it depends on changed, and always in `wl check --full` and CI, DL-99): mutmut changes `app/rules/`
 and `app/authz/` one small edit at a time (`[tool.mutmut]` in `pyproject.toml`) and runs their
 unit tests against each; every mutant must be killed. On a failure, `uv run mutmut results`
 lists the survivors and `uv run mutmut show <name>` shows one: kill it with a new or sharper
@@ -1122,14 +1130,15 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
   branch, no force-push or deletion; on `main`, changes only through a pull request with the
   `wl check` status check green, merged with a merge commit.
-- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check` on every push to
-  `main` and every pull request, so a green `wl check` locally means a green run there. It
+- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check --full` on every push
+  to `main` and every pull request (its job is still named `wl check`, the status check the
+  ruleset requires), so a green `wl check --full` locally means a green run there. It
   checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the
   dependencies from the lockfiles (`uv sync --locked`, `npm ci`), and runs the tests against a
   `postgres:18` service container; the test database is created by the same init script as in
   Compose (`docker/postgres/initdb/`). There's no `.env` in CI: the workflow sets the
   `POSTGRES_*` variables. A new tool the checks need goes into the workflow's setup steps and
-  the developer guide's prerequisites together. `wl check` includes `wl audit`, so CI also
+  the developer guide's prerequisites together. `wl check --full` includes `wl audit`, so CI also
   scans the dependencies and the git history for every push; it needs the network, which the
   runners have.
 - The pre-commit hooks run gitleaks on the staged changes (secrets); ruff (lint with safe
@@ -1139,7 +1148,8 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
   would produce, so a generated file can't be hand-edited or left stale; and
   whitespace/YAML/TOML/merge-conflict/large-file checks. If a hook modifies files, review them,
   `git add`, and commit again.
-- `uv run wl check` must pass before a checkpoint goes to review.
+- `uv run wl check` must pass before a checkpoint goes to review, and CI (`wl check --full`)
+  before it's reported (DL-99). A failure only CI finds gets a `fix(<ID>):` commit.
 
 ## 11. Claude Code configuration
 

@@ -74,7 +74,8 @@ history in the docs; the log holds it.
 
 ## 7. Check
 
-- `uv run wl check` green.
+- `uv run wl check` green (and, for tooling code that changes what CI runs,
+  `uv run wl check --full`).
 - **Tooling code** (step 4): invoke `checkpoint-reviewer` with the review ID
   `DC-<YYYY-MM-DD>` (add a letter for a second one that day: `DC-2026-10-08b`), the base
   (the commit before this change), and the files in scope. Resolve every finding as the

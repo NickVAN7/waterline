@@ -18,8 +18,9 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 2. Run the gates
 
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
-  import-linter contracts, migration checks, generated-client freshness, mutation testing, and
-  the supply-chain audit (`wl audit`, which needs the network).
+  import-linter contracts, migration checks, generated-client freshness, and mutation testing
+  (when anything it depends on changed). The supply-chain audit and the end-to-end tests run in
+  CI (`wl check --full`, DL-99), whose green run step 6 waits for.
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
 - **Last checkpoint of a slice:** search `docs/schema-doc.md` for `Added in Slice <n>.` (this
   slice's number) and confirm each marked column is in its model. The docs consistency tests
@@ -70,11 +71,11 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   `frontend/src/` or `frontend/e2e/` (DL-62). It is read-only and runs no tests.
 - **One reviewer at a time:** when both run, invoke `security-reviewer` first and
   `checkpoint-reviewer` once it has finished, never in parallel (then `ui-reviewer`, when it
-  runs). Both can run tests against the
-  shared test database (`waterline_test`), and two runs at once collide: the concurrency tests
-  truncate tables and then require every table to be empty, and each run migrates the test
-  database at its start. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests
-  yourself while a reviewer is running.
+  runs). Both can run tests against the shared test databases (`waterline_test` and the per-worker
+  copies, DL-100), and two runs at once collide: each run drops and recreates the workers'
+  databases at its start, and the concurrency tests truncate tables and then require every table
+  to be empty. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests yourself
+  while a reviewer is running.
 - Do not pass any reviewer your reasoning or a summary of the work; they review from the docs
   and the diff.
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`

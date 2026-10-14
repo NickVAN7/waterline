@@ -182,7 +182,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   needs the network. An advisory is ignored only through an allowlist entry with a reason and a
   tech-debt entry; a red audit is fixed before any checkpoint starts.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-99, in part (`wl audit` runs in `wl check --full`, not `wl check`)
 - **Applies to:** `tools/cli/` (`wl audit`), `audit-allowlist.toml`, `.pre-commit-config.yaml`;
   build plan (developer CLI, "Tests & CI"); developer guide sections 1, 3, and 10; testing
   strategy ("Workflow and gates"); root `CLAUDE.md`
@@ -831,7 +831,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   axe helpers (`vitest-axe`, `@axe-core/playwright`) and `expectFocusNotObscured()` are set up
   before the first screen, each proven able to fail, and the end-to-end checks run in both themes.
 - **Supersedes:** the S1-C14 row's "How `wl check` runs end-to-end tests … is decided here"
-- **Superseded by:** none
+- **Superseded by:** DL-99, in part (the end-to-end tests run in `wl check --full`, which CI
+  calls; `--skip-e2e` is gone)
 - **Applies to:** build plan (S1-C14 row, "Developer CLI"); testing-strategy ("Accessibility")
 - **Source:** chat session (owner, Oct 10, 2026; UI design change note, items 2.1 to 2.3)
 
@@ -1298,3 +1299,36 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide (UI-SHL-3); `.claude/agents/ui-reviewer.md`
 - **Source:** chat session (owner, Oct 13, 2026: S1-C14a's UI review found the header 98 px too
   wide at 320 CSS px)
+
+### DL-99: `wl check` is the gate before every commit; `wl check --full` is CI's
+- **Date:** 2026-10-14
+- **Decision:** `wl check` runs lockfiles, client freshness, lint, types, import rules, the
+  tests, and the coverage gates, plus mutation testing only when anything it depends on (the
+  backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`) changed since its
+  last green run. `wl check --full` adds mutation testing whatever changed, `wl audit`, and
+  `wl e2e`; CI runs it, and `--skip-e2e` is removed. A checkpoint still needs `wl check` green
+  before review and CI green before its report; a failure only CI finds gets a `fix(<ID>):`
+  commit. `wl audit` still runs before each checkpoint starts.
+- **Supersedes:** DL-13 and DL-65 in part (where `wl audit` and the end-to-end tests run)
+- **Superseded by:** none
+- **Applies to:** `tools/cli/` (`check`, `backend mutate`, `waterline_cli/mutation.py`);
+  `.github/workflows/ci.yml`; build plan ("Developer CLI", "Tech stack"); testing strategy
+  ("Accessibility", "Mutation testing", "Workflow and gates"); developer guide sections 1, 3, 9,
+  and 10; root `CLAUDE.md`; the `checkpoint` and `design-change` skills
+- **Source:** chat session (owner, Oct 14, 2026: `wl check` took 4.5 to 6 minutes locally)
+
+### DL-100: Backend tests run in parallel, one database per worker
+- **Date:** 2026-10-14
+- **Decision:** The backend suite runs under pytest-xdist (`-n auto --maxprocesses 8` in
+  `addopts`; 8 measured fastest: 4 workers 84 s, 8 workers 61 s, 12 workers 64 s, against 208 s
+  serially). Each worker drops, recreates, and migrates its own database,
+  `waterline_test_gw<n>`; a run with `-n 0` (filtered `wl backend test` runs, mutmut) uses
+  `waterline_test`. pytest-cov combines the workers' coverage on the controller, where the 100%
+  gate on `app/authz` and `app/rules` checks the total.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `backend/pyproject.toml` (`addopts`, `[tool.mutmut]`); `backend/tests/conftest.py`;
+  `tools/cli/` (`wl backend test`); testing strategy ("Database isolation", "Coverage gates");
+  build plan ("Docker Compose"); developer guide sections 3 and 9; `backend/CLAUDE.md`; the
+  `checkpoint` skill (reviewers one at a time)
+- **Source:** chat session (owner, Oct 14, 2026)

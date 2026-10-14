@@ -35,9 +35,11 @@ Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <
 - `wl doctor` — check the toolchain
 - `wl up` / `wl down` — the Docker Compose stack (`wl up` also applies migrations);
   `wl logs [service]`
-- `wl check` — everything CI runs (lint, types, tests, coverage, import rules, migrations,
-  client freshness, mutation testing, and `wl audit`). Must pass before any checkpoint goes to
-  review.
+- `wl check` — the gate before every commit (lint, types, tests, coverage, import rules,
+  migrations, client freshness, and mutation testing when anything it depends on changed). Must
+  pass before any checkpoint goes to review. `wl check --full` adds mutation testing whatever
+  changed, `wl audit`, and `wl e2e`: it's what CI runs, and CI must be green before a
+  checkpoint is reported (DL-99).
 - `wl audit` — supply-chain gates: known vulnerabilities in the Python and npm dependencies,
   and secrets in the git history (needs the network). A red audit is fixed before any
   checkpoint starts, with a `chore(deps):` commit on the slice branch.
@@ -56,7 +58,8 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 
 - Do only the current checkpoint's scope. Anything else goes in `docs/tech-debt.md` or is raised
   with the owner.
-- Never start work while anything is red, and never start the next checkpoint without the
+- Never start work while anything is red (run `uv run wl audit` before starting a checkpoint:
+  `wl check` leaves it to `--full`, DL-99), and never start the next checkpoint without the
   owner's explicit approval. One exception, a trial: S1-C8 and S1-C9 go straight on to the next
   checkpoint when every condition in the build plan's review-tier trial holds ("Verification";
   the `checkpoint` skill, "Report and stop").

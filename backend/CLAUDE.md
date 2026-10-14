@@ -172,8 +172,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   running inside the task group records its outcome and the test asserts after the group closes:
   a failure inside the group stops the other transaction's commit and leaves rows that break later
   tests (S1-C11 review; TD-30). Tests only
-  ever use the test database (`waterline_test`, or a `scratch_database` created from it for one
-  test); never point a test at the dev database.
+  ever use the test database (`waterline_test`, a pytest-xdist worker's copy of it, DL-100, or a
+  `scratch_database` created from it for one test); never point a test at the dev database.
+  Tests run in parallel, in any order: no test may depend on another's state.
 - Every test that calls `create_app` passes `sessionmaker=` (the test transaction), or points
   `postgres_db` at `TEST_DATABASE_NAME` when it tests the app's own engine. Never override the
   session dependency instead.
@@ -190,6 +191,7 @@ Calls flow **routers → services → repositories → models**. Services also u
 - Coverage: 90% overall; 100% for `app/authz/` and `app/rules/` (a hook in `tests/conftest.py`
   enforces it in plain `uv run pytest` too). A `match` covering every type of its subject marks
   its last `case` `# pragma: no branch` (it can't fail to match; pyright checks exhaustiveness).
-- Mutation testing (`wl backend mutate`, in `wl check`): no surviving mutants in `app/rules/` or
+- Mutation testing (`wl backend mutate`; in `wl check` when its inputs changed, always in
+  `wl check --full`, DL-99): no surviving mutants in `app/rules/` or
   `app/authz/`. Kill a survivor with a sharper test; `# pragma: no mutate` only for an
   equivalent mutant, with a comment why.
