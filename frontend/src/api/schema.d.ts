@@ -1161,6 +1161,8 @@ export interface components {
             /** Name */
             name: string;
             role: components["schemas"]["OrgRole"];
+            /** Is Active */
+            is_active: boolean;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -1717,6 +1719,8 @@ export interface components {
             /** Name */
             name: string;
             role: components["schemas"]["WorkspaceRole"];
+            /** Is Active */
+            is_active: boolean;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };

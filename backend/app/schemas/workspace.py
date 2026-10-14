@@ -43,6 +43,7 @@ class StaffRead(BaseModel):
     username: str
     name: str
     role: WorkspaceRole
+    is_active: bool
     allowed_actions: list[Action]
 
 

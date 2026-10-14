@@ -921,7 +921,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | `PasswordRequirements` | The live requirements list under a new-password field (UI-FRM-10, DL-91), from S1-C14a |
 | `Alert` | Tone, icon, text, optional actions, optional dismiss (UI-FBK-13); `role="alert"` only per UI-FBK-2 |
 | `Badge`, `Banner` | Driven by the mapping module (UI-FBK-5, UI-FBK-6); banners are not dismissible |
-| `Dialog`, `ConfirmDialog` | Native `<dialog>`; UI-FRM-14 |
+| `ModalDialog` | Native `<dialog>`; UI-FRM-14. A confirmation is a `ModalDialog` whose Cancel is marked `data-autofocus` |
 | `Toast` and `useToast` | §6.2 |
 | `Skeleton` | §6.3 |
 | `EmptyState`, `ErrorState`, `ForbiddenView`, `NotFoundView`, `NoAccessView` | §6.1, UI-FBK-8, UI-FBK-14, UI-FBK-15 |

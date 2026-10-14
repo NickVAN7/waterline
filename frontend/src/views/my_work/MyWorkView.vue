@@ -6,6 +6,7 @@ import { computed, onMounted } from 'vue'
 import { ApiError, api, client, UNEXPECTED_RESPONSE } from '@/api/client'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { useLoad } from '@/composables/useLoad'
 import ProjectList from '@/views/project/ProjectList.vue'
@@ -36,7 +37,7 @@ const announcement = computed(() => {
 
 <template>
   <div class="flex flex-col gap-6">
-    <h1 class="m-0 text-2xl leading-tight font-semibold">My work</h1>
+    <PageHeader title="My work" />
     <section
       aria-labelledby="projects-heading"
       :aria-busy="work.loading.value ? 'true' : 'false'"

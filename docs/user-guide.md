@@ -4,8 +4,9 @@ How to use each feature, from an end user's point of view. Kept current at every
 
 > **Status:** Slice 1 in progress. You can sign in, change a temporary password, find your
 > projects from My work, the org switcher, and the project selector, open a project's home, edit
-> your profile and password, and choose a light or dark theme. Workspace and organization
-> administration, and the project pages, come next.
+> your profile and password, and choose a light or dark theme. Workspace owners and admins run
+> the workspace from its administration pages. Organization administration, and the project
+> pages, come next.
 
 ## Signing in
 
@@ -92,6 +93,42 @@ a new one that meets the requirements listed under it. Once it's changed you lan
 If you're signed in but no longer belong to any organization or project, you see **No access**,
 with your email and a note to ask an administrator to add you. Account settings and **Sign out**
 still work.
+
+## Workspace administration
+
+Workspace owners and admins (and system admins) find **Workspace administration** in the account
+menu, at the top right. Its pages are linked along the top: **Staff**, **Organizations**,
+**Users**, and **Settings** (workspace admins see the settings; owners and system admins change
+them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
+its **Actions for …** menu, which lists only what you may do to that person.
+
+- **Staff** lists the workspace's staff and their roles. **Add person** asks for the email first.
+  If the email already has an account, you confirm adding that person (you're shown only the
+  email). If not, you create the account: name, username (suggested from the name; you're told
+  if it's taken), and a temporary password, generated for you, which you can replace. Once it's
+  saved, the password is shown once: copy it and give it to the person, who must change it when
+  they first sign in. From a row you can **Change role** (stepping down yourself included) and
+  **Remove from staff**, which by default also removes them from the workspace's projects; clear
+  the box to let them keep those projects. The last owner can't step down or leave until you
+  choose who becomes owner: Waterline asks for that person when it happens.
+- **Organizations** lists the workspace's organizations. **Create organization** asks for its
+  name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
+  existing person, or a new account with a temporary password, shown once.
+- **Users** lists everyone in the workspace, with a **System admin** column you can read but not
+  change (system admins are granted outside the app).
+- **Settings** renames the workspace and changes its slug (workspace owners and system admins).
+
+**Account actions.** Where your role covers someone (the rank rule: you can act on people at your
+level or below, everywhere they belong), their row offers **Edit details** (email, name, and
+username; changing the email signs them out everywhere), **Reset password** (a new temporary
+password, shown once), **Sign out everywhere**, and **Deactivate** (they're signed out and can't
+sign in until reactivated; their work stays). A deactivated person shows a **Deactivated** badge
+and is offered **Reactivate** instead. The last active owner, or the last system admin, can't be
+deactivated.
+
+**Access review.** A person's row offers **Access review** to those who may see it: every
+organization and project they can reach, why (their role, or a role above it), and, for each
+project, whether they reach its content or only its management.
 
 ## System status
 

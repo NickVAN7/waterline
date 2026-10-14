@@ -345,8 +345,11 @@ Entry format:
   decided with that path.
 - **Fix by:** S1-C15 for the nested create's race, when the web forms consume those errors
   (DL-80).
-- **Status:** open (the add race resolved in S1-C12: `already_member` on the field the request
-  used, `email` or `user_id`, through `Roster.add_user`'s `loc`, DL-80)
+- **Status:** resolved in S1-C15 (the add race in S1-C12: `already_member` on the field the
+  request used, `email` or `user_id`, through `Roster.add_user`'s `loc`, DL-80). The web forms
+  read a field error by the end of its `loc`, so the nested create's race lands on the right field
+  either way: the create-org dialog sends a bare `email` or `username` to the new owner's fields,
+  with a test for each location
 
 ### TD-24: An intermittent Hypothesis error in an identifier property test
 - **Added:** S1-C8
@@ -386,7 +389,8 @@ Entry format:
 - **Fix by:** S1-C15 (with the shared role select and the staff page's role change; staff and org
   members share the path, DL-70, DL-103: check `new_owner_id` on a no-op too, or confirm the
   pickers never send one without a change).
-- **Status:** open
+- **Status:** resolved in S1-C15: the role dialog sends nothing when the role is unchanged, so
+  `new_owner_id` never travels with a no-op (`ChangeRoleDialog.spec.ts`, sabotage-checked)
 
 ### TD-27: Deactivation must wait behind a handover
 - **Added:** S1-C8a
@@ -546,7 +550,9 @@ Entry format:
 - **Why:** smallest complete change: a component with nothing to hold but the heading would be
   speculative (checkpoint-reviewer question, S1-C14a review).
 - **Fix by:** S1-C15 (its admin pages have the first primary actions)
-- **Status:** open
+- **Status:** resolved in S1-C15: `PageHeader`, on the admin pages and the earlier pages (My work,
+  an org's projects, account settings, no access, sign in, change password). The project home
+  keeps its project header (UI-SHL-6), and the status and not-found pages their own headings
 
 ### TD-40: An unavailable My work section fails the whole page
 - **Added:** S1-C14a
@@ -557,4 +563,27 @@ Entry format:
   per-section error state would have nothing beside it.
 - **Fix by:** Slice 2 (My work's approvals section, its second; each section gets its own error
   state)
+- **Status:** open
+
+### TD-41: Pickers of people load the first 200
+- **Added:** S1-C15
+- **What:** the replacement-owner picker (the roster's people) and the create-org dialog's owner
+  picker (the workspace's active users) each load one page at the API's limit (200) and offer
+  those; a roster or workspace with more people shows only the first 200 by name.
+- **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
+  would be new API (the lists have no text filter yet).
+- **Fix by:** Slice 3 (the filter bar's text search, which the pickers can call)
+- **Status:** open
+
+### TD-42: The own-row reset is hidden by a client-side check
+- **Added:** S1-C15
+- **What:** the server refuses an admin's reset of their own password (403, S1-C4 security
+  review), but `allowed_actions` still carries `user.manage` on their own row, so
+  `AccountActions` hides "Reset password" by comparing the row's id with the signed-in user's: a
+  copy of a server rule in the client (frontend/CLAUDE.md).
+- **Why:** removing it needs a separate authorization action for the reset, which `allowed_actions`
+  leaves out on one's own row: a design change in `app/authz/` with spec tests, outside S1-C15
+  (owner decision, S1-C15 review).
+- **Fix by:** Slice 1's retro (a design change splitting the reset into its own action, e.g.
+  `user.reset_password`; then the check goes)
 - **Status:** open

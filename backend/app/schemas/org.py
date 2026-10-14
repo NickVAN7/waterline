@@ -46,6 +46,7 @@ class MemberRead(BaseModel):
     username: str
     name: str
     role: OrgRole
+    is_active: bool
     allowed_actions: list[Action]
 
 

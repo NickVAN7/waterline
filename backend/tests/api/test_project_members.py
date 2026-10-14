@@ -564,6 +564,21 @@ async def test_the_member_list_is_sorted_by_name_and_filters_by_role(
     assert [m["name"] for m in viewers.json()["items"]] == ["Zed"]
 
 
+async def test_project_member_rows_carry_no_account_fields(client: AsyncClient, t: Tenancy) -> None:
+    """DL-102 covers staff and org member rows only. A workspace admin may open anyone's access
+    review (design-doc §5), so `user.view_access` would show here if the rows carried it."""
+    await sign_in_as(client, await staff(t, WorkspaceRole.ADMIN))
+    bea = await UserFactory.create_async(name="Bea")
+    await ProjectMembershipFactory.create_async(
+        project=t.project, user=bea, role=ProjectRole.MEMBER
+    )
+
+    rows = {m["name"]: m for m in (await client.get(MEMBERS)).json()["items"]}
+
+    assert "is_active" not in rows["Bea"]
+    assert rows["Bea"]["allowed_actions"] == ["project_member.manage"]
+
+
 UNSEEN = [
     "org_member",
     "other_project_admin",

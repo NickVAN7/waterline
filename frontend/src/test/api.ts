@@ -62,3 +62,17 @@ export const PASSWORD_POLICY = {
     { code: 'same_as_current', label: 'Not your current password', value: null },
   ],
 } satisfies components['schemas']['PasswordPolicyRead']
+
+/** The user's workspace entry in `/me`, with the workspace-level actions they may take (DL-45). */
+export function workspaceEntry(
+  allowed: components['schemas']['Action'][],
+  role: components['schemas']['WorkspaceRole'] | null = 'admin',
+): Me['workspaces'][number] {
+  return {
+    id: '0190f0a0-0000-7000-8000-0000000000b1',
+    name: 'Harbor Consulting',
+    slug: 'harbor',
+    role,
+    allowed_actions: allowed,
+  }
+}

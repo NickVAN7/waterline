@@ -197,6 +197,7 @@ class WorkspaceService:
                 workspace_id=workspace.id, user_id=user_id, role=role
             ),
             row_model=StaffRead,
+            account_actions=True,
         )
 
     async def list_staff(

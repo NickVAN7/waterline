@@ -4,7 +4,13 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C14a (Web: app shell) done: the shell (skip link, header with the org switcher
+> **Status:** S1-C15 (Web: workspace admin) done: the workspace administration pages (staff, orgs,
+> users, settings, and a person's access review, reached from the user menu, DL-104), the shared
+> admin pieces S1-C15a reuses (`ModalDialog`, the roster dialogs in `views/roster/`, the account
+> action dialogs in `views/user/`, the temporary-password field and notice, `RowActions`,
+> `useAvailability`), `PageHeader` on every page, and staff and org member rows carrying
+> `is_active` and the account actions (DL-102); next is S1-C15a (Web: org admin). S1-C14a (Web:
+> app shell) built the shell (skip link, header with the org switcher
 > and user menu, the sidebar with My work, the project selector, and the project's pages), the
 > System / Light / Dark theme, My work's projects section, account settings, the password
 > requirements list (`GET /api/auth/password-policy`), the no-access page, a minimal project home
@@ -794,23 +800,34 @@ frontend/src/
                      session.ts; guards/auth.ts; styles/ (main.css, tokens.css, base.css);
                      theme/preset.ts (PrimeVue's colors)
   components/        shared UI components: Button, Alert, FormAlert, FormField, TextField,
-                     PasswordField, PasswordRequirements, Badge, EmptyState, ErrorState,
-                     Skeleton, Pagination, SuccessStatus, Icon
+                     SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
+                     TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
+                     Pagination, SuccessStatus, PageHeader, SectionNav, ModalDialog,
+                     RowActions, Icon
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
-                     useSignOut, useTheme, allowedActions (`allows()`)
+                     useAvailability, useSignOut, useTheme, useWorkspace, temporaryPassword,
+                     allowedActions (`allows()`)
   stores/            Pinia stores: currentUser, currentOrg (the current org and project)
   views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
                      my_work/, project/ (org project list, project home), user/ (account
-                     settings); plus status/ and errors/ (404, no access)
+                     settings, access review, the account-action dialogs), workspace/ (staff,
+                     orgs, users, settings), roster/ (the dialogs staff and org members share:
+                     add person, change role, remove); plus status/ and errors/ (404, no
+                     access)
   test/              helpers for the specs: a11y.ts, api.ts (typed responses), projects.ts,
-                     overlay.ts, router.ts
+                     overlay.ts (`stubResizeObserver`, `stubDialog`), router.ts, workspace.ts
+                     (`mountWorkspaceView`)
 frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
 ```
 
 **Routes:** `/` My work; `/sign-in` (signed out only); `/account` (account settings);
 `/account/change-password` (the forced change); `/account/no-access` (a user with no
 memberships, who is sent there from everything but account settings); `/status` (open to
-anyone); `/{org_slug}/projects` and `/{org_slug}/projects/{key}` (an org's projects and a
+anyone); `/workspace/staff`, `/workspace/orgs`, `/workspace/users`,
+`/workspace/users/{user_id}/access`, and `/workspace/settings` (workspace administration, DL-104;
+`/workspace` goes to staff; anyone without `workspace.view`, or whom the API refuses, gets the
+403 page, `ForbiddenView`, saying who to ask, UI-FBK-14);
+`/{org_slug}/projects` and `/{org_slug}/projects/{key}` (an org's projects and a
 project's home; a stale org slug or a lowercase key is redirected to the project's own);
 anything else, the not-found page. Every top-level segment is on the reserved-slug list
 (`router.spec.ts` checks it against `ReservedSlug` in `backend/openapi.json`).
@@ -884,9 +901,28 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   transitions back on (`stubs: { transition: false }`, so the overlay's `show` and `hide` events
   fire), waits a tick after mounting before opening it, and unmounts its wrappers
   (`enableAutoUnmount(afterEach)`) before the body is cleared.
+- **Dialogs:** `ModalDialog` is the native `<dialog>` (UI-FRM-14): `open()` puts focus on the
+  element marked `data-autofocus` (a confirmation's Cancel) or the first field, and closing
+  returns focus to whatever had it, or to `fallbackFocus` when that's gone (a removed row).
+  `RowActions` puts focus back on its own button before an action runs, so a dialog it opens
+  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A form
+  alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
+  before repeating the action (UI-FRM-7).
+- **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
+  only the latest answer, and gives the message for a polite live region under the field; `skip`
+  leaves out a value that needs no check (the person's own username).
+- **Temporary passwords** (UI-FRM-11): `TemporaryPasswordField` before saving (generated, at
+  least the policy's minimum, from `GET /api/auth/password-policy`), `TemporaryPasswordNotice`
+  after (shown once, with Copy). A dialog that reopens its form keys it on each opening, so the
+  field generates a new password.
+- **Admin rosters:** a page gives the dialogs in `views/roster/` a `Roster` (its roles, scope
+  words, and endpoints); the dialogs show what the server answers, including the last-owner
+  refusal that brings up the replacement-owner picker (DL-59). `AccountActions` holds the account
+  dialogs and turns a row into its menu items from the row's `allowed_actions` (DL-102).
 - **Adding a screen:** a view in `src/views/<area>/`, a route in `src/app/router.ts` (above the
   not-found route, which must stay last), and a `*.spec.ts` next to it that calls
-  `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`: navigation sets the title
+  `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
+  page's primary actions (UI-SHL-8): navigation sets the title
   to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
   `src/views/project/ProjectHomeView.vue`).

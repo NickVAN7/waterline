@@ -5174,6 +5174,10 @@
           "role": {
             "$ref": "#/components/schemas/OrgRole"
           },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
           "allowed_actions": {
             "items": {
               "$ref": "#/components/schemas/Action"
@@ -5189,6 +5193,7 @@
           "username",
           "name",
           "role",
+          "is_active",
           "allowed_actions"
         ],
         "title": "MemberRead",
@@ -6566,6 +6571,10 @@
           "role": {
             "$ref": "#/components/schemas/WorkspaceRole"
           },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
           "allowed_actions": {
             "items": {
               "$ref": "#/components/schemas/Action"
@@ -6581,6 +6590,7 @@
           "username",
           "name",
           "role",
+          "is_active",
           "allowed_actions"
         ],
         "title": "StaffRead",

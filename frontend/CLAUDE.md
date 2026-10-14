@@ -18,7 +18,8 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 - `src/views/<area>/` — screens, grouped by the same area names as the backend, singular
   (`project/`, `task/`, …); `status/` and `errors/` aren't backend areas
 - `src/test/` — shared test helpers: `a11y.ts` (`expectNoA11yViolations`), `api.ts` (typed
-  responses), `projects.ts`, `overlay.ts` (`stubResizeObserver`), `router.ts`
+  responses), `projects.ts`, `overlay.ts` (`stubResizeObserver`, `stubDialog`), `router.ts`,
+  `workspace.ts` (`mountWorkspaceView`)
 - `e2e/` — Playwright tests; `e2e/support/` holds their helpers (`a11y.ts`: axe and
   `expectFocusNotObscured`; `demo.ts`: the demo users)
 
@@ -107,6 +108,12 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   first, once loaded content has rendered): it sits at the end of `<body>`, so Tab from its
   button never reaches it. A PrimeVue menu's active item (`.p-focus`) gets the focus ring
   (`base.css`). Their e2e tests open them with the keyboard and assert which element has focus.
+- A form alert's Retry never calls the submit directly: it goes through `retryFromSubmit`
+  (`useFormErrors`), which focuses the submit button first, since the alert holding Retry goes
+  as the action restarts (UI-FRM-7; S1-C15 review).
+- Row menu items come only from `allows(row, …)`; never compare a row's id with the signed-in
+  user's to decide an action (S1-C15 review). The one logged exception is the reset on your own
+  row (TD-42).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).

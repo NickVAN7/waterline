@@ -38,6 +38,34 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/errors/NoAccessView.vue'),
     meta: { layout: 'auth' },
   },
+  // Workspace administration (UI-SHL-10, DL-104): every page is for its owners, admins, and system
+  // admins; anyone else gets the not-found page from the API's 404.
+  { path: '/workspace', redirect: { name: 'workspace-staff' } },
+  {
+    path: '/workspace/staff',
+    name: 'workspace-staff',
+    component: () => import('@/views/workspace/StaffView.vue'),
+  },
+  {
+    path: '/workspace/orgs',
+    name: 'workspace-orgs',
+    component: () => import('@/views/workspace/OrgsView.vue'),
+  },
+  {
+    path: '/workspace/users',
+    name: 'workspace-users',
+    component: () => import('@/views/workspace/UsersView.vue'),
+  },
+  {
+    path: '/workspace/users/:userId/access',
+    name: 'user-access',
+    component: () => import('@/views/user/AccessReviewView.vue'),
+  },
+  {
+    path: '/workspace/settings',
+    name: 'workspace-settings',
+    component: () => import('@/views/workspace/WorkspaceSettingsView.vue'),
+  },
   {
     path: '/:orgSlug/projects',
     name: 'org-projects',

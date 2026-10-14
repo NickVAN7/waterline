@@ -40,6 +40,9 @@ SEE_ONLY = [
 ]
 UNSEEN = ["workspace_member", "other_org_owner", "other_workspace_owner", "nobody"]
 BOTH = ["org_member.manage", "org_member.manage_admins"]
+# The account actions on the person (DL-102), under the rank rule (design-doc §4, "Account
+# management") and, for the access review, workspace admins by role (design-doc §5).
+ACCOUNT = ["user.manage", "user.view_access"]
 
 
 async def signed_in(client: AsyncClient, who: str) -> tuple[Tenancy, User]:
@@ -137,7 +140,8 @@ async def test_an_org_admin_is_offered_actions_only_on_rows_they_may_change(
     client: AsyncClient,
 ) -> None:
     """None on an owner's or another admin's row; their own row carries `org_member.manage`, for
-    stepping down (DL-59)."""
+    stepping down (DL-59). The account actions follow the rank rule: an org admin covers admins
+    (themselves included) and members at equal or higher rank, never an owner (DL-102)."""
     t, me = await signed_in(client, "org_admin")
     await keeper(t)
     await member(t, OrgRole.ADMIN, "gina@bolt.example")
@@ -145,9 +149,9 @@ async def test_an_org_admin_is_offered_actions_only_on_rows_they_may_change(
 
     assert await row_actions(client, t) == {
         "keeper@bolt.example": [],
-        "gina@bolt.example": [],
-        "frank@bolt.example": ["org_member.manage"],
-        me.email: ["org_member.manage"],
+        "gina@bolt.example": ACCOUNT,
+        "frank@bolt.example": ["org_member.manage", *ACCOUNT],
+        me.email: ["org_member.manage", *ACCOUNT],
     }
 
 
@@ -162,9 +166,9 @@ async def test_a_holder_of_manage_admins_is_offered_both_actions_on_every_row(
 
     actions = await row_actions(client, t)
 
-    assert actions["keeper@bolt.example"] == BOTH
-    assert actions["gina@bolt.example"] == BOTH
-    assert actions["frank@bolt.example"] == BOTH
+    assert actions["keeper@bolt.example"] == [*BOTH, *ACCOUNT]
+    assert actions["gina@bolt.example"] == [*BOTH, *ACCOUNT]
+    assert actions["frank@bolt.example"] == [*BOTH, *ACCOUNT]
 
 
 # --- POST members: add an existing account by email ---------------------------------------------

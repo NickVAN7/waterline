@@ -117,6 +117,57 @@ async def test_an_unknown_list_parameter_is_a_422(client: AsyncClient, org: Orga
     assert response.status_code == 422
 
 
+async def test_each_member_row_says_whether_the_person_is_active(
+    client: AsyncClient, org: Organization
+) -> None:
+    """DL-102: the page marks a deactivated member and offers Reactivate instead."""
+    await signed_in(client, org)
+    await member(org, email="on@bolt.example", is_active=True)
+    await member(org, email="off@bolt.example", is_active=False)
+
+    response = await client.get(f"/api/orgs/{org.id}/members")
+
+    active = {row["email"]: row["is_active"] for row in response.json()["items"]}
+    assert (active["on@bolt.example"], active["off@bolt.example"]) == (True, False)
+
+
+async def test_an_added_members_row_carries_is_active_and_the_account_actions(
+    client: AsyncClient, org: Organization
+) -> None:
+    """The add response is a list row like any other (DL-102): an org owner outranks a member."""
+    await signed_in(client, org)
+    await UserFactory.create_async(email="ann@bolt.example")
+
+    response = await client.post(
+        f"/api/orgs/{org.id}/members", json={"email": "ann@bolt.example", "role": "member"}
+    )
+
+    row = response.json()
+    assert (row["is_active"], row["allowed_actions"]) == (
+        True,
+        ["org_member.manage", "org_member.manage_admins", "user.manage", "user.view_access"],
+    )
+
+
+async def test_a_role_change_response_is_a_full_row_with_the_account_actions(
+    client: AsyncClient, org: Organization
+) -> None:
+    """The role-change response is a list row like any other (DL-102): `is_active` and the account
+    actions included. (An owner covers the person as admin and as owner alike, so this doesn't
+    tell the old role's actions from the new's.)"""
+    await signed_in(client, org)
+    bob = await member(org, OrgRole.ADMIN)
+
+    response = await client.patch(f"/api/orgs/{org.id}/members/{bob.id}", json={"role": "owner"})
+
+    assert response.json()["allowed_actions"] == [
+        "org_member.manage",
+        "org_member.manage_admins",
+        "user.manage",
+        "user.view_access",
+    ]
+
+
 # --- Adding and creating -----------------------------------------------------------------------
 
 

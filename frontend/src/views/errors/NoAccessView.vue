@@ -5,6 +5,7 @@ import { ref } from 'vue'
 
 import Alert from '@/components/Alert.vue'
 import Button from '@/components/Button.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useSignOut } from '@/composables/useSignOut'
 import { useCurrentUserStore } from '@/stores/currentUser'
 
@@ -18,7 +19,7 @@ const dismiss = () =>
 </script>
 
 <template>
-  <h1 class="m-0 text-2xl leading-tight font-semibold">No access</h1>
+  <PageHeader title="No access" />
   <p class="m-0">
     You're signed in as {{ store.me?.user.email }}, but you aren't a member of any organization or
     project yet. Ask an administrator to add you.

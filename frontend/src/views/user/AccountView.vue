@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // Account settings (design-doc §4): your profile and your password.
+import PageHeader from '@/components/PageHeader.vue'
 import ChangePasswordForm from '@/views/auth/ChangePasswordForm.vue'
 
 import ProfileForm from './ProfileForm.vue'
@@ -7,7 +8,7 @@ import ProfileForm from './ProfileForm.vue'
 
 <template>
   <div class="flex max-w-(--content-narrow) flex-col gap-8">
-    <h1 class="m-0 text-2xl leading-tight font-semibold">Account settings</h1>
+    <PageHeader title="Account settings" />
     <section aria-labelledby="profile-heading" class="flex flex-col gap-4">
       <h2 id="profile-heading" class="m-0 text-lg font-semibold">Profile</h2>
       <ProfileForm />

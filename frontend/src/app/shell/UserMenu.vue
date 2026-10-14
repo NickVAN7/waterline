@@ -1,19 +1,23 @@
 <script setup lang="ts">
 // The user menu (UI-SHL-8, UI-TOK-2): account settings, the System / Light / Dark theme (radio
 // items, so the choice is announced as checked), and sign out. PrimeVue's Menu (UI-STY-3); its
-// pass-through options give the theme items their radio role. Administration joins it in S1-C15.
+// pass-through options give the theme items their radio role. "Workspace administration" leads to
+// the workspace's admin pages for those who may see them (`workspace.view`; UI-SHL-10, DL-104).
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { computed, ref } from 'vue'
 
 import Icon from '@/components/Icon.vue'
+import { allows } from '@/composables/allowedActions'
 import { type ThemeChoice, useTheme } from '@/composables/useTheme'
+import { useWorkspace } from '@/composables/useWorkspace'
 import { useCurrentUserStore } from '@/stores/currentUser'
 
 const emit = defineEmits<{ signOut: [] }>()
 
 const store = useCurrentUserStore()
 const { choice, choose } = useTheme()
+const workspace = useWorkspace()
 
 const menu = ref<InstanceType<typeof Menu>>()
 const button = ref<HTMLButtonElement>()
@@ -29,6 +33,9 @@ const THEMES: { value: ThemeChoice; label: string }[] = [
 const items = computed<MenuItem[]>(() => [
   // A link, so it reads as navigation and opens in a new tab like any other (UI-FRM-15).
   { label: 'Account settings', route: { name: 'account' } },
+  ...(allows(workspace.value, 'workspace.view')
+    ? [{ label: 'Workspace administration', route: { name: 'workspace-staff' } }]
+    : []),
   { separator: true },
   ...THEMES.map((theme) => ({
     label: theme.label,

@@ -15,6 +15,7 @@ export type IconName =
   | 'chevron-down'
   | 'menu'
   | 'home'
+  | 'more'
 
 const props = defineProps<{ name: IconName; label?: string }>()
 
@@ -40,6 +41,7 @@ const PATHS: Record<IconName, string[]> = {
   'chevron-down': ['M6 9l6 6 6-6'],
   menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
   home: ['M4 11l8-7 8 7', 'M6 9.5V20h12V9.5'],
+  more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
 }
 
 const paths = computed(() => PATHS[props.name])

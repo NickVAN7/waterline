@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api, client } from '@/api/client'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { settlePage } from '@/app/routeFocus'
@@ -71,7 +72,7 @@ const announcement = computed(() => {
   <!-- An org the user doesn't see, or one they've lost since `/me` loaded (UI-FBK-14). -->
   <NotFoundView v-if="!org || page.error.value?.status === 404" />
   <div v-else class="flex flex-col gap-6">
-    <h1 class="m-0 text-2xl leading-tight font-semibold">{{ org.name }} projects</h1>
+    <PageHeader :title="`${org.name} projects`" />
     <section
       aria-label="Projects"
       :aria-busy="page.loading.value ? 'true' : 'false'"

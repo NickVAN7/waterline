@@ -5,14 +5,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { me } from '@/test/api'
+import { me, workspaceEntry } from '@/test/api'
 import { stubResizeObserver } from '@/test/overlay'
 import { testRouter } from '@/test/router'
 
 import UserMenu from './UserMenu.vue'
 
-async function openMenu() {
-  useCurrentUserStore().me = me()
+async function openMenu(overrides: Parameters<typeof me>[0] = {}) {
+  useCurrentUserStore().me = me(overrides)
   const router = await testRouter('/')
   const wrapper = mount(UserMenu, {
     // Real transitions: the overlay's show and hide events fire from them.
@@ -103,6 +103,23 @@ describe('UserMenu', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('account')
+  })
+
+  it('links to workspace administration for those who may see it (UI-SHL-10, DL-104)', async () => {
+    const { router } = await openMenu({ workspaces: [workspaceEntry(['workspace.view'])] })
+    const link = item('Workspace administration').querySelector('a')!
+    expect(link.getAttribute('href')).toBe('/workspace/staff')
+
+    link.click()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('workspace-staff')
+  })
+
+  it("has no workspace administration for staff who can't see the workspace pages", async () => {
+    await openMenu({ workspaces: [workspaceEntry([])] })
+
+    expect(items().map((li) => li.textContent?.trim())).not.toContain('Workspace administration')
   })
 
   it('asks the shell to sign out', async () => {

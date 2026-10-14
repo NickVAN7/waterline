@@ -205,6 +205,21 @@ async def test_the_staff_list_is_sorted_by_name_and_filters_by_role(
     assert ([row["name"] for row in body["items"]], body["total"]) == (["Abe", "Cleo"], 2)
 
 
+async def test_each_staff_row_says_whether_the_person_is_active(
+    client: AsyncClient, workspace: Workspace
+) -> None:
+    """DL-102: the page marks a deactivated staff member."""
+    await owner_of(client, workspace)
+    for name, is_active in (("On", True), ("Off", False)):
+        user = await UserFactory.create_async(name=name, is_active=is_active)
+        await WorkspaceMembershipFactory.create_async(workspace=workspace, user=user)
+
+    response = await client.get(f"/api/workspaces/{workspace.id}/staff")
+
+    active = {row["name"]: row["is_active"] for row in response.json()["items"]}
+    assert (active["On"], active["Off"]) == (True, False)
+
+
 async def staff_row_actions(client: AsyncClient, workspace: Workspace) -> dict[str, list[str]]:
     """Each staff row's `allowed_actions`, by the member's name."""
     response = await client.get(f"/api/workspaces/{workspace.id}/staff")
@@ -230,10 +245,12 @@ async def test_a_workspace_admin_sees_staff_actions_only_on_rows_they_may_change
     )
     await sign_in_as(client, admin)
 
+    # Account actions (DL-102): the rank rule never lets an admin manage the owner, but a
+    # workspace admin opens anyone's access review (design-doc §5).
     assert await staff_row_actions(client, workspace) == {
-        "Ada Admin": ["workspace_staff.manage"],
-        "Mo Member": ["workspace_staff.manage"],
-        "Olga Owner": [],
+        "Ada Admin": ["workspace_staff.manage", "user.manage", "user.view_access"],
+        "Mo Member": ["workspace_staff.manage", "user.manage", "user.view_access"],
+        "Olga Owner": ["user.view_access"],
     }
 
 
@@ -251,8 +268,13 @@ async def test_a_workspace_owner_sees_both_staff_actions_on_every_row(
     )
     await sign_in_as(client, owner)
 
-    both = ["workspace_staff.manage", "workspace_staff.manage_admins"]
-    assert await staff_row_actions(client, workspace) == {"Ada Admin": both, "Olga Owner": both}
+    every = [
+        "workspace_staff.manage",
+        "workspace_staff.manage_admins",
+        "user.manage",
+        "user.view_access",
+    ]
+    assert await staff_row_actions(client, workspace) == {"Ada Admin": every, "Olga Owner": every}
 
 
 async def test_a_role_change_to_the_same_role_changes_and_records_nothing(

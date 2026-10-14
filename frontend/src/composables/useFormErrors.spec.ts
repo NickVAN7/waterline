@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError, NETWORK_ERROR } from '@/api/client'
 
-import { ANNOUNCE_DELAY_MS, FORM_MESSAGES, useFormErrors } from './useFormErrors'
+import { retryFromSubmit, ANNOUNCE_DELAY_MS, FORM_MESSAGES, useFormErrors } from './useFormErrors'
 
 const LABELS = { email: 'Email', password: 'Password' }
 
@@ -203,5 +203,18 @@ describe('useFormErrors', () => {
       expect(errors.requireFilled({ email: 'a@b.example', password: ' ' })).toBeNull()
       expect(errors.fieldErrors.value).toEqual({})
     })
+  })
+})
+
+describe('retryFromSubmit (UI-FRM-7)', () => {
+  it("focuses the form's submit button, then repeats the action", () => {
+    const form = document.body.appendChild(document.createElement('form'))
+    form.innerHTML = '<button type="button">Cancel</button><button type="submit">Save</button>'
+    let focusedAtRetry: Element | null = null
+
+    retryFromSubmit({ value: form }, () => (focusedAtRetry = document.activeElement))()
+
+    expect(focusedAtRetry).toBe(form.querySelector('button[type=submit]'))
+    form.remove()
   })
 })

@@ -164,3 +164,17 @@ function formAlert(error: ApiError, serverMessageCodes: string[]): FormAlert {
     return { tone: 'warning', message: FORM_MESSAGES.conflict, action: 'reload' }
   return { tone: 'danger', message: FORM_MESSAGES.generic }
 }
+
+/**
+ * Retry for a form's alert (UI-FRM-7): focus the form's submit button first, so focus isn't lost
+ * with the alert that held the Retry button, then repeat the action.
+ */
+export function retryFromSubmit(
+  form: { value?: HTMLFormElement | undefined },
+  again: () => unknown,
+): () => unknown {
+  return () => {
+    form.value?.querySelector<HTMLElement>('button[type=submit]')?.focus()
+    return again()
+  }
+}

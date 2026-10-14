@@ -21,7 +21,7 @@ from app.audit.admin_event import JsonValue, log_admin_event
 from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, ensure
 from app.authz.context import AuthzContext
-from app.authz.target import Target
+from app.authz.target import Target, user_target
 from app.core.base_model import Base
 from app.core.constraint_errors import constraint_registry
 from app.core.errors import FieldError, NotFoundError, ValidationFailedError, violated_constraint
@@ -29,6 +29,7 @@ from app.core.lists import ListSpec, Page, fetch_page
 from app.enums import AuditAction, AuditEntityType
 from app.models.user import User
 from app.repositories.user import UserRepository
+from app.rules.account_rank import Account
 from app.schemas.workspace import NewUser
 from app.services.user import UserService
 
@@ -103,7 +104,8 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
     workspace's, org's, or project's ID; `target`, where the roster's actions are checked (its
     `organization_id` is None for staff);
     `new_membership(user_id, role)` builds a row of `M`; `row_model` is the response for one
-    (`StaffRead`, `MemberRead`)."""
+    (`StaffRead`, `MemberRead`). With `account_actions`, each row also carries the person's
+    `is_active` and the `user`-level actions the caller may take on them (DL-102)."""
 
     def __init__(
         self,
@@ -115,6 +117,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         target: Target,
         new_membership: Callable[[uuid.UUID, R], M],
         row_model: Callable[..., Row],
+        account_actions: bool = False,
     ) -> None:
         self.session = session
         self.spec = spec
@@ -123,6 +126,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         self.target = target
         self.new_membership = new_membership
         self.row_model = row_model
+        self.account_actions = account_actions
         # The roles whose grant or change needs `manage_admins`; none without an owner role.
         self.admin_roles = () if spec.owner is None else (spec.owner, spec.admin)
 
@@ -131,10 +135,23 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         # Only a roster with an owner role reaches the owner rules (`spec.owner` is set).
         return cast(OwnersRepository[M], self.repository)
 
-    def row(self, ctx: AuthzContext, membership: M) -> Row:
+    async def rows(self, ctx: AuthzContext, memberships: list[M]) -> list[Row]:
+        """Roster rows, with the people's accounts loaded in one query when the rows carry
+        account actions."""
+        users = [m.user for m in memberships]
+        accounts = (
+            await UserRepository(self.session).accounts(users) if self.account_actions else {}
+        )
+        return [self.row(ctx, m, accounts.get(m.user_id)) for m in memberships]
+
+    async def _row(self, ctx: AuthzContext, membership: M) -> Row:
+        return (await self.rows(ctx, [membership]))[0]
+
+    def row(self, ctx: AuthzContext, membership: M, account: Account | None = None) -> Row:
         """A roster row, with what the caller may do to it: an owner's or admin's row needs the
         roster's `manage_admins` as well (DL-56, DL-68), except the caller's own row, where
-        stepping down needs only `manage` (DL-59)."""
+        stepping down needs only `manage` (DL-59). Given the person's `account`, the row also
+        has their `is_active` and the `user`-level actions on them (DL-102)."""
         prefix = self.spec.manage.split(".")[0] + "."
         actions = [a for a in allowed_actions(ctx, self.target) if a.startswith(prefix)]
         own = membership.user_id == ctx.user_id
@@ -145,6 +162,11 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         ):
             actions = []
         user = membership.user
+        extra: dict[str, object] = {}
+        if account is not None:
+            target = user_target(self.target.workspace_id, user.id, account)
+            actions = [*actions, *allowed_actions(ctx, target)]
+            extra["is_active"] = user.is_active
         return self.row_model(
             user_id=user.id,
             email=user.email,
@@ -152,6 +174,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             name=user.name,
             role=membership.role,
             allowed_actions=actions,
+            **extra,
         )
 
     async def list(self, ctx: AuthzContext, list_spec: ListSpec, query: object) -> Page[Row]:
@@ -162,7 +185,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             query,  # pyright: ignore[reportArgumentType] -- list_spec.query_model
         )
         return Page[Row](
-            items=[self.row(ctx, m) for m in page.items],  # pyright: ignore[reportArgumentType] -- rows of M
+            items=await self.rows(ctx, page.items),  # pyright: ignore[reportArgumentType] -- rows of M
             total=page.total,
             limit=page.limit,
             offset=page.offset,
@@ -216,7 +239,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             raise _field_error(loc, self.spec.already_member, "already_member") from exc
         self._log(self.spec.added, ctx, user.id, role=role.value, **(details or {}))
         membership.user = user
-        return self.row(ctx, membership)
+        return await self._row(ctx, membership)
 
     async def add(
         self,
@@ -325,13 +348,13 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         membership = await self._member(user_id)
         self._ensure_change(ctx, membership, role)
         if membership.role == role:
-            return self.row(ctx, membership)
+            return await self._row(ctx, membership)
         if new_owner_id is not None:
             await self._hand_over(ctx, membership, new_owner_id, ("body", "new_owner_id"))
         if membership.role == self.spec.owner:
             await self._guard_last_owner(membership, ("body", "role"))
         await self._set_role(ctx, membership, role)
-        return self.row(ctx, membership)
+        return await self._row(ctx, membership)
 
     async def remove(
         self,

@@ -178,6 +178,7 @@ class OrgService:
                 organization_id=org.id, user_id=user_id, role=role
             ),
             row_model=MemberRead,
+            account_actions=True,
         )
 
     async def list_members(
