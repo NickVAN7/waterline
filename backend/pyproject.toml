@@ -26,6 +26,7 @@ dev = [
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.16.9",
 ]
 
@@ -68,6 +69,9 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--import-mode=importlib",
+    # One worker per core, at most 8, each on its own database (DL-100); `-n 0` runs serially.
+    "-n", "auto",
+    "--maxprocesses", "8",
     "--cov=app",
     "--cov-report=term-missing:skip-covered",
 ]
@@ -96,7 +100,8 @@ exclude_also = ["if TYPE_CHECKING:"]
 source_paths = ["app"]
 only_mutate = ["app/rules/*", "app/authz/*"]
 pytest_add_cli_args_test_selection = ["tests/unit/rules", "tests/unit/authz"]
-pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider"]
+# `-n 0`: mutmut runs its mutants in parallel itself; each test run stays in one process.
+pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider", "-n", "0"]
 
 # --- Import rules (docs/build-plan.md, "Backend architecture" and "Feature map") -------------
 

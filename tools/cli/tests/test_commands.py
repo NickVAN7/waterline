@@ -1,11 +1,13 @@
 import re
 import subprocess
+from pathlib import Path
 
 import pytest
 import typer
 from typer.core import TyperGroup
 from typer.testing import CliRunner
 
+from waterline_cli import mutation
 from waterline_cli.main import app
 
 runner = CliRunner()
@@ -110,9 +112,6 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
-        pytest.param(
-            ["check"], [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK, *AUDIT, *E2E], id="check"
-        ),
         pytest.param(["e2e"], E2E, id="e2e"),
         pytest.param(
             ["e2e", "--project", "light"],
@@ -130,7 +129,7 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
         pytest.param(["backend", "fmt"], BACKEND_FMT, id="backend-fmt"),
         pytest.param(
             ["backend", "test", "-k", "approval", "-x"],
-            ["(cd backend && uv run pytest --no-cov -k approval -x)"],
+            ["(cd backend && uv run pytest --no-cov -n 0 -k approval -x)"],
             id="backend-test-pass-through",
         ),
         pytest.param(["frontend", "check"], FRONTEND_CHECK, id="frontend-check"),
@@ -214,12 +213,118 @@ def test_dry_run_prints_underlying_commands(args: list[str], expected: list[str]
     assert result.output.splitlines() == expected
 
 
-def test_check_skip_e2e_leaves_out_the_end_to_end_tests_and_warns() -> None:
-    result = runner.invoke(app, ["check", "--skip-e2e", "--dry-run"])
+def _current(_backend: Path, _digest: str) -> bool:
+    return True
+
+
+def _changed(_backend: Path, _digest: str) -> bool:
+    return False
+
+
+def test_check_full_runs_everything_ci_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--full runs mutation testing even when nothing it depends on changed (DL-99)."""
+    monkeypatch.setattr(mutation, "is_current", _current)
+
+    result = runner.invoke(app, ["check", "--full", "--dry-run"])
 
     assert result.exit_code == 0, result.output
-    assert result.stdout.splitlines() == [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK, *AUDIT]
-    assert "End-to-end tests skipped: CI runs them." in result.stderr
+    assert result.stdout.splitlines() == [
+        *BACKEND_CHECK,
+        *FRONTEND_CHECK,
+        *CLI_CHECK,
+        *AUDIT,
+        *E2E,
+    ]
+
+
+def test_check_leaves_the_audit_and_end_to_end_tests_to_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(mutation, "is_current", _changed)
+
+    result = runner.invoke(app, ["check", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines() == [*BACKEND_CHECK, *FRONTEND_CHECK, *CLI_CHECK]
+
+
+def test_check_skips_mutation_testing_when_nothing_it_depends_on_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(mutation, "is_current", _current)
+
+    result = runner.invoke(app, ["check", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    without_mutation = [s for s in BACKEND_CHECK if s not in BACKEND_MUTATE]
+    assert result.stdout.splitlines() == [*without_mutation, *FRONTEND_CHECK, *CLI_CHECK]
+    assert "Mutation testing skipped" in result.stderr
+
+
+def fake_repo(tmp_path: Path) -> Path:
+    """A repository with the backend files mutation testing depends on."""
+    (tmp_path / "tools" / "cli").mkdir(parents=True)
+    (tmp_path / "tools" / "cli" / "pyproject.toml").write_text("")
+    backend = tmp_path / "backend"
+    for name in ("app/rules", "tests/unit", "tests/factories", "mutants"):
+        (backend / name).mkdir(parents=True)
+    for name in ("app/rules/rule.py", "tests/factories/user.py", "pyproject.toml", "uv.lock"):
+        (backend / name).write_text("x = 1\n")
+    return backend
+
+
+@pytest.mark.parametrize(("fails", "recorded"), [(False, True), (True, False)])
+def test_check_records_mutation_testing_as_green_only_when_it_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fails: bool, recorded: bool
+) -> None:
+    backend = fake_repo(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    def fake_run(cmd: tuple[str, ...], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        failed = fails and "tests.support.mutation_gate" in cmd and "check" in cmd
+        return subprocess.CompletedProcess(cmd, 1 if failed else 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    runner.invoke(app, ["check"])
+
+    digest = mutation.inputs_hash(backend)
+    assert mutation.is_current(backend, digest) is recorded
+
+
+@pytest.mark.parametrize(
+    "changed", ["app/rules/rule.py", "tests/factories/user.py", "pyproject.toml", "uv.lock"]
+)
+def test_a_change_to_any_input_makes_mutation_testing_run_again(
+    tmp_path: Path, changed: str
+) -> None:
+    backend = fake_repo(tmp_path)
+    mutation.record(backend, mutation.inputs_hash(backend))
+
+    (backend / changed).write_text("x = 2\n")
+
+    assert not mutation.is_current(backend, mutation.inputs_hash(backend))
+
+
+def test_a_new_file_makes_mutation_testing_run_again(tmp_path: Path) -> None:
+    backend = fake_repo(tmp_path)
+    mutation.record(backend, mutation.inputs_hash(backend))
+
+    (backend / "app" / "new.py").write_text("")
+
+    assert not mutation.is_current(backend, mutation.inputs_hash(backend))
+
+
+def test_a_data_file_counts_but_python_bytecode_does_not(tmp_path: Path) -> None:
+    backend = fake_repo(tmp_path)
+    digest = mutation.inputs_hash(backend)
+    (backend / "app" / "__pycache__").mkdir()
+    (backend / "app" / "__pycache__" / "rule.cpython-314.pyc").write_bytes(b"\0")
+    assert mutation.inputs_hash(backend) == digest
+
+    (backend / "tests" / "unit" / "cases.json").write_text("[]")
+
+    assert mutation.inputs_hash(backend) != digest
 
 
 def test_e2e_tears_the_stack_down_when_a_step_fails(monkeypatch: pytest.MonkeyPatch) -> None:

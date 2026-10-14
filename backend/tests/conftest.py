@@ -1,7 +1,8 @@
 """Test harness (docs/testing-strategy.md, "Database isolation").
 
-The test database is migrated once per session with Alembic. Each test that asks for a database
-gets one connection inside an outer transaction; the app's sessions join it with
+The test database is migrated once per session with Alembic; under pytest-xdist each worker gets
+its own copy, `waterline_test_<worker>`, recreated empty at its start (DL-100). Each test that
+asks for a database gets one connection inside an outer transaction; the app's sessions join it with
 `join_transaction_mode="create_savepoint"`, so their commits only release savepoints and
 everything is rolled back when the test ends.
 """
@@ -19,6 +20,7 @@ from alembic import command
 from alembic.config import Config
 from hypothesis import settings as hypothesis_settings
 from sqlalchemy import URL, text
+from sqlalchemy import create_engine as create_sync_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -54,7 +56,8 @@ STRICT_COVERAGE_PACKAGES = ("app/authz", "app/rules")
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_runtestloop(session: pytest.Session) -> Generator[None, object, object]:
-    """After pytest-cov has measured the run (this wrapper is outside its own), fail the session
+    """After pytest-cov has measured the run (this wrapper is outside its own; under xdist, the
+    controller's run holds the workers' combined data, DL-100), fail the session
     if a strict package is below 100%. Skipped only when coverage is off (`--no-cov`) or nothing
     runs (`--collect-only`); if pytest-cov's internals ever change, it fails instead of quietly
     dropping the gate."""
@@ -115,10 +118,23 @@ def settings() -> Settings:
 
 
 @pytest.fixture(scope="session")
-def test_database_url(settings: Settings) -> URL:
+def test_database_url(settings: Settings, worker_id: str) -> URL:
+    """The test database, or under xdist this worker's own copy of it (DL-100). `worker_id` is
+    pytest-xdist's: "master" when tests aren't distributed."""
     url = settings.test_database_url()
     assert url.database == TEST_DATABASE_NAME, "tests only ever run against the test database"
-    return url
+    return url if worker_id == "master" else url.set(database=f"{TEST_DATABASE_NAME}_{worker_id}")
+
+
+def recreate_database(url: URL) -> None:
+    """Drop and create `url`'s database, from a connection to the test database."""
+    admin = create_sync_engine(url.set(database=TEST_DATABASE_NAME), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as connection:
+            connection.execute(text(f'DROP DATABASE IF EXISTS "{url.database}" WITH (FORCE)'))
+            connection.execute(text(f'CREATE DATABASE "{url.database}"'))
+    finally:
+        admin.dispose()
 
 
 @pytest.fixture(scope="session")
@@ -128,6 +144,8 @@ def migrated_database(test_database_url: URL) -> URL:
     config.attributes["url"] = test_database_url
     config.attributes["configure_logger"] = False
     try:
+        if test_database_url.database != TEST_DATABASE_NAME:
+            recreate_database(test_database_url)
         command.upgrade(config, "head")
     except OperationalError as exc:
         pytest.exit(

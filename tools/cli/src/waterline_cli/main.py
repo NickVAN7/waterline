@@ -10,7 +10,7 @@ from typing import Annotated
 
 import typer
 
-from waterline_cli import steps
+from waterline_cli import mutation, steps
 from waterline_cli.audit import ALLOWLIST, AllowlistError, load_allowlist, uv_ignores
 from waterline_cli.doctor import CHECKS, Status, run_checks
 from waterline_cli.review_copy import CopyError, describe, make_copy
@@ -72,28 +72,46 @@ def _run_e2e(extra: list[str], *, dry_run: bool) -> None:
         run_steps(steps.e2e_down(), dry_run=dry_run)
 
 
+def _mutate_steps(steps_to_run: list[Step], digest: str, *, dry_run: bool) -> None:
+    """Run steps ending in mutation testing; once they pass, record its inputs as green."""
+    run_steps(steps_to_run, dry_run=dry_run)
+    if not dry_run:
+        mutation.record(find_repo_root() / steps.BACKEND, digest)
+
+
 @app.command()
 def check(
     dry_run: DryRun = False,
-    skip_e2e: Annotated[
+    full: Annotated[
         bool,
-        typer.Option("--skip-e2e", help="Leave out the end-to-end tests (quick loops only)."),
+        typer.Option(
+            "--full",
+            help="Also the supply-chain audit, the end-to-end tests, and mutation testing "
+            "whatever changed. CI runs this.",
+        ),
     ] = False,
 ) -> None:
-    """Everything CI runs: lockfiles, client freshness, lint, types, import rules, tests,
-    coverage gates, mutation testing, the supply-chain audit, and, last, the end-to-end tests."""
-    run_steps(
-        [*steps.backend_check(), *steps.frontend_check(), *steps.cli_check(), *_audit_steps()],
-        dry_run=dry_run,
-    )
-    if skip_e2e:
+    """Before every commit: lockfiles, client freshness, lint, types, import rules, tests,
+    coverage gates, and mutation testing when anything it depends on changed since its last
+    green run. With --full (CI), also the supply-chain audit and, last, the end-to-end tests
+    (DL-99)."""
+    backend_dir = find_repo_root() / steps.BACKEND
+    digest = mutation.inputs_hash(backend_dir)
+    if full or not mutation.is_current(backend_dir, digest):
+        _mutate_steps(steps.backend_check(), digest, dry_run=dry_run)
+    else:
+        run_steps(steps.backend_check(mutate=False), dry_run=dry_run)
         typer.secho(
-            "End-to-end tests skipped: CI runs them. Never close a checkpoint with --skip-e2e.",
+            "Mutation testing skipped: nothing it depends on changed since its last green run.",
             fg=typer.colors.YELLOW,
             err=True,
         )
-        return
-    _run_e2e([], dry_run=dry_run)
+    run_steps(
+        [*steps.frontend_check(), *steps.cli_check(), *(_audit_steps() if full else [])],
+        dry_run=dry_run,
+    )
+    if full:
+        _run_e2e([], dry_run=dry_run)
 
 
 @app.command(context_settings=PASS_THROUGH)
@@ -219,7 +237,8 @@ def backend_test(ctx: typer.Context, dry_run: DryRun = False) -> None:
 @backend.command("mutate")
 def backend_mutate(dry_run: DryRun = False) -> None:
     """Mutation testing over app/rules and app/authz; fails on any surviving mutant."""
-    run_steps(steps.backend_mutate(), dry_run=dry_run)
+    digest = mutation.inputs_hash(find_repo_root() / steps.BACKEND)
+    _mutate_steps(steps.backend_mutate(), digest, dry_run=dry_run)
 
 
 @backend.command("lint")

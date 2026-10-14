@@ -34,7 +34,9 @@ def backend_test(extra: Sequence[str] = ()) -> list[Step]:
     pytest enforces both gates itself: coverage's fail_under, and 100% for app/authz and
     app/rules (a hook in backend/tests/conftest.py)."""
     if extra:
-        return [step("uv", "run", "pytest", "--no-cov", *extra, cwd=BACKEND)]
+        # In one process (DL-100): faster for a few tests, and breakpoints work. A `-n` in
+        # `extra` comes later, so it wins.
+        return [step("uv", "run", "pytest", "--no-cov", "-n", "0", *extra, cwd=BACKEND)]
     return [step("uv", "run", "pytest", cwd=BACKEND)]
 
 
@@ -50,14 +52,14 @@ def backend_mutate() -> list[Step]:
     ]
 
 
-def backend_check() -> list[Step]:
+def backend_check(*, mutate: bool = True) -> list[Step]:
     return [
         step("uv", "lock", "--check", cwd=BACKEND),
         # backend/openapi.json matches the code (client freshness, first half).
         step("uv", "run", "python", "-m", "app.openapi_export", "--check", cwd=BACKEND),
         *backend_lint(),
         *backend_test(),
-        *backend_mutate(),
+        *(backend_mutate() if mutate else []),
     ]
 
 
