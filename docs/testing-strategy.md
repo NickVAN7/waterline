@@ -294,12 +294,14 @@ saying why.
 - **`wl check`** (the developer CLI; `waterline check` in full) is the gate before every commit:
   everything CI runs except the supply-chain audit and the end-to-end tests, and mutation testing
   only when something it depends on changed (DL-99). **`wl check --full`** runs everything; CI
-  calls it, so local and CI can't diverge.
+  calls it, so local and CI can't diverge. A new gate joins `wl check` unless it needs the
+  network or a running stack, which put it in `--full` only (DL-101).
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
   tests with coverage, mutation testing on `rules/` and `authz/` (from Slice 1, S1-C3),
   import-linter contracts, migration checks, frontend tests with coverage, generated-client
   freshness, end-to-end tests (from Slice 1), and the supply-chain audit (`wl audit`).
-- **Supply-chain audit** (`wl audit`, part of `wl check --full`; DL-13, DL-99): known vulnerabilities in both
+- **Supply-chain audit** (`wl audit`, part of `wl check --full`; DL-13, DL-99): known
+  vulnerabilities in both
   Python lockfiles and the npm lockfile, dev dependencies included, and secrets anywhere in the
   git history. Any known vulnerability fails; an advisory is ignored only through an
   `audit-allowlist.toml` entry with a reason and an open tech-debt entry whose Fix by is the

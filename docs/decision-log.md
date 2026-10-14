@@ -1332,3 +1332,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   build plan ("Docker Compose"); developer guide sections 3 and 9; `backend/CLAUDE.md`; the
   `checkpoint` skill (reviewers one at a time)
 - **Source:** chat session (owner, Oct 14, 2026)
+
+### DL-101: A new gate joins `wl check` unless it needs the network or a stack
+- **Date:** 2026-10-14
+- **Decision:** Every new gate (a check, a test layer, a scan) runs in `wl check`, the gate
+  before every commit, unless it needs the network or a running stack; those run only in
+  `wl check --full` (and so CI). The token contrast check, once ported to a Vitest test, is in
+  `wl check`.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** testing strategy ("Workflow and gates")
+- **Source:** chat session (owner, Oct 14, 2026: docs-consistency decision 1 on DL-99, option a)

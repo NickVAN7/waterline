@@ -70,11 +70,11 @@ No findings. No copy this pass: the only new behavior is the input list, covered
 | 4 | stale | `backend/CLAUDE.md`; `docs/build-plan.md` (Slice 1 notes) | Mutation testing "in `wl check`" unconditionally. | **Fixed** in both; the S1-C3 checkpoint row is history and stays. |
 | 5 | stale | `.claude/agents/fresh-clone-verifier.md` | Its example setup check was `wl check`; the guide's is `wl check --full`. | **Fixed.** |
 
-**Decision for the owner (open):** which `wl check` level a *future* gate joins (e.g. the token
+**Decision for the owner (decided: (a), DL-101):** which `wl check` level a *future* gate joins (e.g. the token
 contrast check once ported, ui-design-guide §9). (a) Every gate goes in `wl check` unless it
 needs the network or a running stack: one rule, but `wl check` grows. (b) Decided per gate:
 each needs its own doc line, and drift is likelier.
 
 ## Open questions for the owner
 
-- The docs-consistency decision above.
+- None. The docs-consistency decision was decided as (a), DL-101 (owner, Oct 14, 2026).
