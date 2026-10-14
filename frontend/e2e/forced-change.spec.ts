@@ -22,7 +22,8 @@ test('a user with a temporary password must change it before anything else', asy
   await page.goto('/')
   await expect(page).toHaveURL('/account/change-password')
 
-  // The server's policy message, under the field.
+  // The server refuses a listed requirement: its line is marked, not a message under the field
+  // (DL-94, DL-95).
   await page.getByRole('textbox', { name: 'Current password', exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('textbox', { name: 'New password', exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('button', { name: 'Change password' }).click()
@@ -31,7 +32,10 @@ test('a user with a temporary password must change it before anything else', asy
     'aria-invalid',
     'true',
   )
-  await expect(page.getByText('Choose a password different from the current one.')).toBeVisible()
+  await expect(page.locator('#new_password-requirements li').last()).toHaveText(
+    /^\s*Not met:\s*Not your current password\s*$/,
+  )
+  await expect(page.getByText('Choose a password different from the current one.')).toHaveCount(0)
   await expectNoA11yViolations(page)
 
   await page.getByRole('textbox', { name: 'New password', exact: true }).fill(newPassword)
@@ -40,7 +44,8 @@ test('a user with a temporary password must change it before anything else', asy
   await expect(page.getByRole('heading', { level: 1, name: 'My work' })).toBeVisible()
 
   // The new password is the one that works now.
-  await page.getByRole('button', { name: 'Sign out' }).click()
+  await page.getByRole('button', { name: /Account menu/ }).click()
+  await page.getByRole('menuitem', { name: 'Sign out' }).click()
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill(email(username))
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill(newPassword)
   await page.getByRole('button', { name: 'Sign in' }).click()

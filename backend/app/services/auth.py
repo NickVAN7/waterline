@@ -33,7 +33,15 @@ from app.repositories.org import OrgRepository
 from app.repositories.user import UserRepository
 from app.repositories.workspace import WorkspaceRepository
 from app.rules.account_rank import OrgRoleHeld, WorkspaceRoleHeld
-from app.schemas.auth import MeOrg, MeRead, MeUser, MeWorkspace
+from app.rules.password_policy import MIN_LENGTH, PasswordProblem
+from app.schemas.auth import (
+    MeOrg,
+    MeRead,
+    MeUser,
+    MeWorkspace,
+    PasswordPolicyRead,
+    PasswordRequirement,
+)
 from app.services.user import (
     AccountSubject,
     UserService,
@@ -51,6 +59,25 @@ class SignedIn:
 
     token: str
     me: MeRead
+
+
+def password_policy() -> PasswordPolicyRead:
+    """The requirements the screens list under a new-password field (DL-91, DL-94). The number is
+    the policy's own, so raising the minimum (TD-12) changes the list with no frontend change."""
+    return PasswordPolicyRead(
+        requirements=[
+            PasswordRequirement(
+                code=PasswordProblem.TOO_SHORT,
+                label=f"At least {MIN_LENGTH} characters",
+                value=MIN_LENGTH,
+            ),
+            PasswordRequirement(code=PasswordProblem.SAME_AS_EMAIL, label="Not your email"),
+            PasswordRequirement(code=PasswordProblem.SAME_AS_USERNAME, label="Not your username"),
+            PasswordRequirement(
+                code=PasswordProblem.SAME_AS_CURRENT, label="Not your current password"
+            ),
+        ]
+    )
 
 
 def _invalid_credentials() -> UnauthorizedError:

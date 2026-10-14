@@ -102,6 +102,7 @@ export const overrides = {
     overlay: {
       select: overlay,
       popover: overlay,
+      navigation: overlay,
       modal: { ...overlay, shadow: 'var(--shadow-dialog)' },
     },
     list: {

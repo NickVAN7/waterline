@@ -13,7 +13,9 @@ const ROUTES: RouteRecordRaw[] = [
   { path: '/', name: 'my-work', component: Page },
   { path: '/projects', name: 'projects', component: Page },
   { path: '/sign-in', name: 'sign-in', component: Page, meta: { guest: true } },
+  { path: '/account', name: 'account', component: Page },
   { path: '/account/change-password', name: 'change-password', component: Page },
+  { path: '/account/no-access', name: 'no-access', component: Page },
   { path: '/status', name: 'status', component: Page, meta: { public: true } },
 ]
 
@@ -28,6 +30,14 @@ async function landAt(path: string) {
   await r.push(path)
   return r.currentRoute.value.fullPath
 }
+
+const WORKSPACE = {
+  id: '0190f0a0-0000-7000-8000-0000000000b1',
+  name: 'Harbor Consulting',
+  slug: 'harbor',
+  role: 'admin',
+  allowed_actions: [],
+} satisfies ReturnType<typeof me>['workspaces'][number]
 
 const SIGNED_OUT = failed(401, {
   code: 'not_authenticated',
@@ -108,6 +118,32 @@ describe('signed in', () => {
     await r.push('/projects')
 
     expect(get).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('no memberships left', () => {
+  const NOBODY = me({ orgs: [], workspaces: [], is_system_admin: false })
+
+  it.each(['/', '/projects', '/sign-in'])('is sent from %s to the no-access page', async (path) => {
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(NOBODY))
+
+    expect(await landAt(path)).toBe('/account/no-access')
+  })
+
+  it('can still open account settings', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(NOBODY))
+
+    expect(await landAt('/account')).toBe('/account')
+  })
+
+  it.each([
+    ['an org', me({ workspaces: [] })],
+    ['only staff', me({ orgs: [], workspaces: [WORKSPACE] })],
+    ['only the system-admin flag', me({ orgs: [], is_system_admin: true })],
+  ])('is not for a user with %s, who goes to My work from it', async (_, user) => {
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(user))
+
+    expect(await landAt('/account/no-access')).toBe('/')
   })
 })
 

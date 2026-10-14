@@ -110,6 +110,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Password Policy
+         * @description What a new password must meet, for the requirements list under the field (DL-91). Open to
+         *     anyone, signed in or not, and during a forced password change.
+         */
+        get: operations["get_password_policy_api_auth_password_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workspaces/{workspace_id}": {
         parameters: {
             query?: never;
@@ -1357,6 +1378,32 @@ export interface components {
             offset: number;
         };
         /**
+         * PasswordPolicyRead
+         * @description `GET /api/auth/password-policy` (DL-91): the requirements, in order. The length cap isn't
+         *     listed; the server refuses it.
+         */
+        PasswordPolicyRead: {
+            /** Requirements */
+            requirements: components["schemas"]["PasswordRequirement"][];
+        };
+        /**
+         * PasswordProblem
+         * @enum {string}
+         */
+        PasswordProblem: "too_short" | "too_long" | "same_as_email" | "same_as_username" | "same_as_current";
+        /**
+         * PasswordRequirement
+         * @description One requirement a new password must meet: `code` is the 422 field error `type` it prevents
+         *     (DL-94), `label` is written for users, and `value` is the number it needs, where it has one.
+         */
+        PasswordRequirement: {
+            code: components["schemas"]["PasswordProblem"];
+            /** Label */
+            label: string;
+            /** Value */
+            value?: number | null;
+        };
+        /**
          * PasswordReset
          * @description The temporary password an admin sets; the user must change it at next sign-in.
          */
@@ -1990,6 +2037,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_password_policy_api_auth_password_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordPolicyRead"];
                 };
             };
         };

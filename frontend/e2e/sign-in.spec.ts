@@ -18,7 +18,8 @@ test('signing in lands on My work, and signing out returns to sign-in', async ({
   await expect(page).toHaveTitle('My work · Waterline')
   await expectNoA11yViolations(page)
 
-  await page.getByRole('button', { name: 'Sign out' }).click()
+  await page.getByRole('button', { name: /Account menu/ }).click()
+  await page.getByRole('menuitem', { name: 'Sign out' }).click()
   await expect(page).toHaveURL('/sign-in')
   await page.goto('/')
   await expect(page).toHaveURL('/sign-in')

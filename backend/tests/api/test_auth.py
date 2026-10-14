@@ -917,3 +917,44 @@ async def test_the_origin_check_runs_before_the_forced_change_check(
 
     assert response.status_code == 403
     assert response.json()["code"] == "origin_rejected"
+
+
+# GET /api/auth/password-policy (DL-91, DL-94): open to anyone, the codes are the 422 types.
+PASSWORD_POLICY = {
+    "requirements": [
+        {"code": "too_short", "label": "At least 8 characters", "value": 8},
+        {"code": "same_as_email", "label": "Not your email", "value": None},
+        {"code": "same_as_username", "label": "Not your username", "value": None},
+        {"code": "same_as_current", "label": "Not your current password", "value": None},
+    ]
+}
+
+
+async def test_the_password_policy_is_open_to_a_signed_out_caller(client: AsyncClient) -> None:
+    response = await client.get("/api/auth/password-policy")
+
+    assert (response.status_code, response.json()) == (200, PASSWORD_POLICY)
+
+
+async def test_the_password_policy_is_open_during_a_forced_change(client: AsyncClient) -> None:
+    await UserFactory.create_async(email="ann@example.com", must_change_password=True)
+    await sign_in(client, "ann@example.com")
+
+    response = await client.get("/api/auth/password-policy")
+
+    assert (response.status_code, response.json()) == (200, PASSWORD_POLICY)
+
+
+async def test_the_password_policy_follows_the_policys_minimum(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Raising the minimum (TD-12) changes the list, with no frontend change."""
+    monkeypatch.setattr(auth_service, "MIN_LENGTH", 12)
+
+    response = await client.get("/api/auth/password-policy")
+
+    assert response.json()["requirements"][0] == {
+        "code": "too_short",
+        "label": "At least 12 characters",
+        "value": 12,
+    }

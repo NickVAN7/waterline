@@ -1,5 +1,6 @@
 /** Typed results for the mocked API client in component tests (`vi.spyOn(client, 'GET')`). */
 import type { ErrorBody } from '@/api/client'
+import type { components } from '@/api/schema'
 import type { Me } from '@/stores/currentUser'
 
 // The client's result type, for `mockResolvedValue`; the payloads are typed from the schema.
@@ -27,6 +28,15 @@ export function validationFailed(
   })
 }
 
+export const ACME: Me['orgs'][number] = {
+  id: '0190f0a0-0000-7000-8000-0000000000a1',
+  name: 'Acme Manufacturing',
+  slug: 'acme',
+  role: 'member',
+  allowed_actions: [],
+}
+
+/** A signed-in user, a member of one org (`ACME`) unless the overrides say otherwise. */
 export function me(overrides: Partial<Me> = {}): Me {
   return {
     user: {
@@ -38,7 +48,17 @@ export function me(overrides: Partial<Me> = {}): Me {
     is_system_admin: false,
     must_change_password: false,
     workspaces: [],
-    orgs: [],
+    orgs: [ACME],
     ...overrides,
   }
 }
+
+/** `GET /api/auth/password-policy` as the server sends it (DL-91, DL-94). */
+export const PASSWORD_POLICY = {
+  requirements: [
+    { code: 'too_short', label: 'At least 8 characters', value: 8 },
+    { code: 'same_as_email', label: 'Not your email', value: null },
+    { code: 'same_as_username', label: 'Not your username', value: null },
+    { code: 'same_as_current', label: 'Not your current password', value: null },
+  ],
+} satisfies components['schemas']['PasswordPolicyRead']

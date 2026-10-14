@@ -7,8 +7,12 @@ import { expect, type Page } from '@playwright/test'
 
 export const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
-/** Fail on any axe violation on the page as it is now. */
+/** Fail on any axe violation on the page once it's still: an overlay mid-fade has partial opacity,
+ * which axe would report as low contrast. */
 export async function expectNoA11yViolations(page: Page): Promise<void> {
+  await page.waitForFunction(() =>
+    document.getAnimations().every((animation) => animation.playState !== 'running'),
+  )
   // `options` first: `withTags` adds to them. `target-size` is off by default in axe-core.
   const { violations } = await new AxeBuilder({ page })
     .options({ rules: { 'target-size': { enabled: true } } })

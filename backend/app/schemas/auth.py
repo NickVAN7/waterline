@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import OrgRole, WorkspaceRole
-from app.rules.password_policy import MAX_LENGTH
+from app.rules.password_policy import MAX_LENGTH, PasswordProblem
 
 
 class SignInRequest(BaseModel):
@@ -58,3 +58,19 @@ class MeRead(BaseModel):
     must_change_password: bool
     workspaces: list[MeWorkspace]
     orgs: list[MeOrg]
+
+
+class PasswordRequirement(BaseModel):
+    """One requirement a new password must meet: `code` is the 422 field error `type` it prevents
+    (DL-94), `label` is written for users, and `value` is the number it needs, where it has one."""
+
+    code: PasswordProblem
+    label: str
+    value: int | None = None
+
+
+class PasswordPolicyRead(BaseModel):
+    """`GET /api/auth/password-policy` (DL-91): the requirements, in order. The length cap isn't
+    listed; the server refuses it."""
+
+    requirements: list[PasswordRequirement]

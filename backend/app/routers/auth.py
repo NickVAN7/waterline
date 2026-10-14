@@ -11,7 +11,8 @@ from app.routers.deps import (
     SettingsDep,
     UserPendingPasswordChangeDep,
 )
-from app.schemas.auth import ChangePasswordRequest, MeRead, SignInRequest
+from app.schemas.auth import ChangePasswordRequest, MeRead, PasswordPolicyRead, SignInRequest
+from app.services.auth import password_policy
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -74,6 +75,13 @@ async def change_password(
 async def get_me(user: UserPendingPasswordChangeDep, auth: AuthServiceDep) -> MeRead:
     """The signed-in user. 401 `not_authenticated` without a live session."""
     return await auth.me(user)
+
+
+@router.get("/password-policy")
+async def get_password_policy() -> PasswordPolicyRead:
+    """What a new password must meet, for the requirements list under the field (DL-91). Open to
+    anyone, signed in or not, and during a forced password change."""
+    return password_policy()
 
 
 def _set_session_cookie(response: Response, token: str, settings: Settings) -> None:

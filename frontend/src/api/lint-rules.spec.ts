@@ -4,9 +4,13 @@
  * fire, so a config change can't silently switch them off.
  */
 import { ESLint } from 'eslint'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 const eslint = new ESLint({ cwd: new URL('../..', import.meta.url).pathname })
+
+// The first lint loads the config and its parsers, which under a full `wl check` can take longer
+// than a test's 5 s; done once here, with room, so no test pays for it.
+beforeAll(() => eslint.lintText('', { filePath: 'src/warm-up.ts' }), 60_000)
 
 async function ruleIds(code: string, filePath: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath })

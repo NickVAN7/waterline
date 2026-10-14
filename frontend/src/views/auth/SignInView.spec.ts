@@ -140,8 +140,8 @@ describe('SignInView', () => {
     await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
 
     expect(wrapper.find('[role=alert]').exists()).toBe(false)
-    expect(wrapper.get('[aria-live=polite]').text()).toBe('Alert dismissed')
     expect(document.activeElement).toBe(wrapper.get('button[type=submit]').element)
+    await vi.waitFor(() => expect(wrapper.get('[aria-live=polite]').text()).toBe('Alert dismissed'))
   })
 
   it("shows a 422's errors under their fields and focuses the first", async () => {

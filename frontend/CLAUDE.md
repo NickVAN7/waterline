@@ -7,8 +7,9 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 
 - `src/api/` — `schema.d.ts` (generated) and `client.ts`: the configured `openapi-fetch`
   `client`, `api()`, and `ApiError`
-- `src/app/` — `createApp.ts` (the app the tests and `main.ts` both build), layouts, router,
-  route focus, the session hook; route guards in `src/app/guards/`
+- `src/app/` — `createApp.ts` (the app the tests and `main.ts` both build), layouts (`AppLayout`
+  is the shell), router, route focus, the session hook, `labels.ts` (display labels); the shell's
+  parts in `src/app/shell/`; route guards in `src/app/guards/`
 - `src/app/styles/` (`tokens.css`, `base.css`), `src/app/theme/` (`preset.ts`, and, once a board
   or grid ships, `svar-theme.css`)
 - `src/components/` — shared UI components
@@ -17,7 +18,7 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 - `src/views/<area>/` — screens, grouped by the same area names as the backend, singular
   (`project/`, `task/`, …); `status/` and `errors/` aren't backend areas
 - `src/test/` — shared test helpers: `a11y.ts` (`expectNoA11yViolations`), `api.ts` (typed
-  responses), `router.ts`
+  responses), `projects.ts`, `overlay.ts` (`stubResizeObserver`), `router.ts`
 - `e2e/` — Playwright tests; `e2e/support/` holds their helpers (`a11y.ts`: axe and
   `expectFocusNotObscured`; `demo.ts`: the demo users)
 
@@ -35,7 +36,7 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   exception: the `PasswordRequirements` list checks the requirements the server publishes as the
   user types (DL-91).
 - **Handle the error format** (`{code, message, details}`) consistently: 409 → prompt to
-  reload; 404 → not-found view (TD-32); 422 → field errors from `details.fields`
+  reload; 404 → `NotFoundView` in place (see `ProjectHomeView`); 422 → field errors from `details.fields`
   (`loc`, `message`, `type` per field). Forms use `useFormErrors` for all of this. A 401 and a
   403 `password_change_required` are handled once, by the API client's session hook
   (`src/app/session.ts`); a view never handles them itself.
@@ -45,7 +46,7 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last.
 - **Display labels** for stored values (e.g. task type per project type) come from one mapping
-  module, never inline strings.
+  module, `src/app/labels.ts`, never inline strings.
 - UI guidance text (e.g. module recommendations) is rendered from the API response, not
   hard-coded.
 - **Accessibility: WCAG 2.2 AA** (design-doc §1). Every drag has a single-pointer alternative
@@ -102,6 +103,16 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 /api/auth/password-policy`, never from numbers in the code (UI-FRM-10, DL-91).
 - Every new view and component spec calls `expectNoA11yViolations()`; end-to-end flows run axe
   in both themes (guide §9).
+- Overlays: a popover moves focus into itself when it opens (the filter, the current link, or the
+  first, once loaded content has rendered): it sits at the end of `<body>`, so Tab from its
+  button never reaches it. A PrimeVue menu's active item (`.p-focus`) gets the focus ring
+  (`base.css`). Their e2e tests open them with the keyboard and assert which element has focus.
+- A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
+  stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
+  UI-TOK-10).
+- A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
+  back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
+  never only hidden text.
 
 ## Tests
 
@@ -113,6 +124,11 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   test through `createWaterlineApp()` in `src/app/router.spec.ts`: unit tests of each piece don't
   show they're connected. Wait for a navigation to a lazy-loaded route with `vi.waitFor`, not
   `flushPromises`.
+- A spec that opens a PrimeVue overlay (`Menu`, `Popover`) runs real transitions
+  (`stubs: { transition: false }`) so its `show` and `hide` events fire, calls
+  `stubResizeObserver()`, waits a tick after mounting before opening it, and registers
+  `enableAutoUnmount(afterEach)` after its own clean-up hook (after-hooks run last to first), so
+  each overlay is unmounted before the body is cleared.
 - Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
   `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
   not `getByLabel`: the label's text includes the required asterisk, the accessible name

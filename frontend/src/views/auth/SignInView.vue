@@ -64,7 +64,6 @@ async function submit() {
 
 function dismissAlert() {
   errors.dismissAlert()
-  status.value = 'Alert dismissed'
   ;(submitButton.value?.$el as HTMLElement | undefined)?.focus()
 }
 </script>

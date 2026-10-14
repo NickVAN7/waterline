@@ -211,6 +211,28 @@
         }
       }
     },
+    "/api/auth/password-policy": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get Password Policy",
+        "description": "What a new password must meet, for the requirements list under the field (DL-91). Open to\nanyone, signed in or not, and during a forced password change.",
+        "operationId": "get_password_policy_api_auth_password_policy_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordPolicyRead"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{workspace_id}": {
       "get": {
         "tags": [
@@ -5705,6 +5727,63 @@
           "offset"
         ],
         "title": "Page[UserRow]"
+      },
+      "PasswordPolicyRead": {
+        "properties": {
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/PasswordRequirement"
+            },
+            "type": "array",
+            "title": "Requirements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirements"
+        ],
+        "title": "PasswordPolicyRead",
+        "description": "`GET /api/auth/password-policy` (DL-91): the requirements, in order. The length cap isn't\nlisted; the server refuses it."
+      },
+      "PasswordProblem": {
+        "type": "string",
+        "enum": [
+          "too_short",
+          "too_long",
+          "same_as_email",
+          "same_as_username",
+          "same_as_current"
+        ],
+        "title": "PasswordProblem"
+      },
+      "PasswordRequirement": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/PasswordProblem"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "PasswordRequirement",
+        "description": "One requirement a new password must meet: `code` is the 422 field error `type` it prevents\n(DL-94), `label` is written for users, and `value` is the number it needs, where it has one."
       },
       "PasswordReset": {
         "properties": {

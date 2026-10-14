@@ -14,8 +14,10 @@ withDefaults(
     required?: boolean
     help?: string
     error?: string
+    invalid?: boolean
+    describedBy?: string
   }>(),
-  { required: false, help: undefined, error: undefined },
+  { required: false, help: undefined, error: undefined, invalid: false, describedBy: undefined },
 )
 
 const model = defineModel<string>({ required: true })
@@ -25,8 +27,16 @@ defineExpose({ focus: () => input.value?.focus() })
 </script>
 
 <template>
-  <FormField :id="id" :label="label" :required="required" :help="help" :error="error">
-    <template #default="{ describedBy, invalid }">
+  <FormField
+    :id="id"
+    :label="label"
+    :required="required"
+    :help="help"
+    :error="error"
+    :invalid="invalid"
+    :described-by="describedBy"
+  >
+    <template #default="{ describedBy: ids, invalid: marked }">
       <div class="relative">
         <input
           :id="id"
@@ -36,11 +46,11 @@ defineExpose({ focus: () => input.value?.focus() })
           :name="id"
           :autocomplete="autocomplete"
           :aria-required="required ? 'true' : undefined"
-          :aria-invalid="invalid ? 'true' : undefined"
-          :aria-describedby="describedBy"
+          :aria-invalid="marked ? 'true' : undefined"
+          :aria-describedby="ids"
           :class="[
             'password min-h-(--control-height) w-full rounded-md bg-bg py-0 pr-10 pl-3 text-text',
-            invalid ? 'border-2 border-tone-danger-edge' : 'border border-border',
+            marked ? 'border-2 border-tone-danger-edge' : 'border border-border',
           ]"
         />
         <button

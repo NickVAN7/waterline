@@ -6,6 +6,14 @@
     outline-offset: var(--focus-ring-offset);
   }
 
+  /* PrimeVue's menus keep DOM focus on the list and mark the active item with `.p-focus`
+     (aria-activedescendant), so the ring goes on that item: a tint alone isn't a focus indicator
+     (UI-TOK-5). Inset, so the menu's edge doesn't clip it. */
+  .p-menu-item.p-focus > .p-menu-item-content {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
   html {
     /* Keeps keyboard focus clear of the sticky header, a sticky selection toolbar (when one is
        showing), and any visible toasts */

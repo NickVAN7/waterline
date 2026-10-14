@@ -11,6 +11,8 @@ const layout = computed(() => (route.meta.layout === 'auth' ? AuthLayout : AppLa
 
 <template>
   <component :is="layout">
-    <RouterView />
+    <!-- A new path is a new page (a project's redirect to its own URL reloads it); a query
+         change, a list's page, keeps it. -->
+    <RouterView :key="route.path" />
   </component>
 </template>

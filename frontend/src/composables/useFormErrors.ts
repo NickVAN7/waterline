@@ -10,7 +10,10 @@ import { ApiError, NETWORK_ERROR } from '@/api/client'
 
 export type FormAlert = { tone: 'danger' | 'warning'; message: string; action?: 'reload' | 'retry' }
 
-type FieldError = { loc: (string | number)[]; message: string }
+type FieldError = { loc: (string | number)[]; message: string; type: string }
+
+/** One 422 field error, as the server sent it. */
+export type FieldProblem = { message: string; type: string }
 
 const REQUIRED = 'This is required.'
 
@@ -35,6 +38,8 @@ export function useFormErrors<F extends string>(
 ) {
   const fields = Object.keys(labels) as F[]
   const fieldErrors = ref<Partial<Record<F, string>>>({})
+  // Every 422 error on each field, for a field that shows some of them elsewhere (DL-94).
+  const fieldProblems = ref<Partial<Record<F, FieldProblem[]>>>({})
   const alert = ref<FormAlert | null>(null)
   // Changes with every alert shown: the form keys its alert on it, so a repeat with the same
   // text is a new `role="alert"` node and is announced again (UI-FBK-2).
@@ -54,6 +59,7 @@ export function useFormErrors<F extends string>(
 
   function reset(): void {
     fieldErrors.value = {}
+    fieldProblems.value = {}
     alert.value = null
     silence()
   }
@@ -62,6 +68,9 @@ export function useFormErrors<F extends string>(
     const next = { ...fieldErrors.value }
     delete next[field]
     fieldErrors.value = next
+    const problems = { ...fieldProblems.value }
+    delete problems[field]
+    fieldProblems.value = problems
   }
 
   function isField(name: unknown): name is F {
@@ -81,10 +90,14 @@ export function useFormErrors<F extends string>(
     }, ANNOUNCE_DELAY_MS)
   }
 
-  /** The alert's dismiss button: the alert and its announcement go (UI-FBK-13). */
+  /** The alert's dismiss button: the alert goes, and that's announced (UI-FBK-13), set in another
+   * task so a repeat is read again (UI-FRM-6). */
   function dismissAlert(): void {
     alert.value = null
     silence()
+    announcing = setTimeout(() => {
+      announcement.value = 'Alert dismissed'
+    }, ANNOUNCE_DELAY_MS)
   }
 
   /** The one check the client makes (UI-FRM-4): required fields aren't empty. Returns the first
@@ -109,12 +122,19 @@ export function useFormErrors<F extends string>(
     }
     const unmatched: string[] = []
     const found: Partial<Record<F, string>> = {}
-    for (const { loc, message } of (error.details.fields ?? []) as FieldError[]) {
+    const problems: Partial<Record<F, FieldProblem[]>> = {}
+    for (const { loc, message, type } of (error.details.fields ?? []) as FieldError[]) {
       const name = loc.at(-1)
-      if (isField(name) && found[name] === undefined) found[name] = message
-      else unmatched.push(message)
+      if (!isField(name)) {
+        unmatched.push(message)
+        continue
+      }
+      // Every message on a field is shown under it, none dropped (UI-FRM-6).
+      found[name] = found[name] === undefined ? message : `${found[name]} ${message}`
+      ;(problems[name] ??= []).push({ message, type })
     }
     fieldErrors.value = found
+    fieldProblems.value = problems
     const invalid = fields.filter((field) => found[field] !== undefined)
     if (unmatched.length) showAlert({ tone: 'danger', message: unmatched.join(' ') })
     if (invalid.length) announce(invalid)
@@ -123,6 +143,7 @@ export function useFormErrors<F extends string>(
 
   return {
     fieldErrors,
+    fieldProblems,
     alert,
     alertKey,
     announcement,

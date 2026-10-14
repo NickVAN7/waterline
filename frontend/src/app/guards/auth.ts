@@ -1,22 +1,30 @@
 /**
  * Who may open which route (build plan, "Web screens"): signed out → sign-in, keeping where they
- * were going; `must_change_password` → the change-password screen until it's done. Routes say
- * `meta.public` (anyone) or `meta.guest` (only when signed out: sign-in).
+ * were going; `must_change_password` → the change-password screen until it's done; no
+ * memberships left → the no-access page (design-doc §4, "Sessions"), though account settings
+ * still open. Routes say `meta.public` (anyone) or `meta.guest` (only when signed out: sign-in).
  */
 import type { NavigationGuardWithThis, RouteLocationRaw } from 'vue-router'
 
 import { ApiError } from '@/api/client'
-import { useCurrentUserStore } from '@/stores/currentUser'
+import { type Me, useCurrentUserStore } from '@/stores/currentUser'
 
 declare module 'vue-router' {
   interface RouteMeta {
     public?: boolean
     guest?: boolean
     layout?: 'auth'
+    /** The page sets its title and focus once its data loads (`settlePage()`). */
+    settlesItself?: boolean
   }
 }
 
 const HOME = '/'
+
+/** Whether the user can open anything: a system admin, or staff, or in an org or project. */
+export function hasAccess(me: Me): boolean {
+  return me.is_system_admin || me.workspaces.length > 0 || me.orgs.length > 0
+}
 
 /** A `next` that stays inside the app: a path, never another origin (`//evil.example`). */
 export function safeNext(next: unknown): string {
@@ -45,5 +53,8 @@ export const authGuard: NavigationGuardWithThis<undefined> = async (to) => {
     return to.name === 'change-password' ? true : ({ name: 'change-password' } as RouteLocationRaw)
   }
   if (to.meta.guest || to.name === 'change-password') return safeNext(to.query.next)
+  if (!hasAccess(me))
+    return to.name === 'no-access' || to.name === 'account' || { name: 'no-access' }
+  if (to.name === 'no-access') return HOME
   return true
 }

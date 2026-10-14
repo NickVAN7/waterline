@@ -468,7 +468,8 @@ Entry format:
 - **Why:** owner decision (S1-C14): build it with the first page that loads a record, rather
   than with nothing to use it.
 - **Fix by:** S1-C14a (its minimal project home is the first page that loads a record, DL-97)
-- **Status:** open
+- **Status:** resolved in S1-C14a: the project home shows the not-found page for an API 404, and
+  an org page for an org slug the user doesn't see
 
 ### TD-33: A failed sign-out from the header says nothing
 - **Added:** S1-C14
@@ -478,7 +479,8 @@ Entry format:
 - **Why:** checkpoint-reviewer finding (S1-C14 review, 1.3). S1-C14a replaces the header with
   the shell's user menu, so the handling is built there rather than in a header about to go.
 - **Fix by:** S1-C14a (the user menu's sign-out reports a failure)
-- **Status:** open
+- **Status:** resolved in S1-C14a: the user menu's (and the no-access page's) sign-out reports a
+  failure in an alert (`useSignOut`)
 
 ### TD-34: The new-password help can't show the minimum length
 - **Added:** S1-C14
@@ -490,7 +492,8 @@ Entry format:
   requirements list from `GET /api/auth/password-policy`, an API addition outside S1-C14.
 - **Fix by:** S1-C14a (the password-policy endpoint and `PasswordRequirements`, replacing the
   fixed help text; DL-91)
-- **Status:** open
+- **Status:** resolved in S1-C14a: `GET /api/auth/password-policy` and `PasswordRequirements`, on the
+  forced change and account settings
 
 ### TD-35: The pending spinner's speed isn't a token
 - **Added:** S1-C14
@@ -512,4 +515,45 @@ Entry format:
   and page in the URL, each of those would pull focus to the heading (UI-SHL-9).
 - **Why:** ui-reviewer note (S1-C14 review, pass 3). No screen changes only the query yet.
 - **Fix by:** S1-C14a (with `useListQuery`: skip the focus move when only the query changed)
+- **Status:** resolved in S1-C14a: a query-only navigation moves neither focus nor the title; the list
+  announces its count instead
+
+### TD-37: My work has no "see all" for its projects
+- **Added:** S1-C14a
+- **What:** My work's projects section shows the first 10 projects (`GET /api/me/work`) and says
+  how many there are, but has no "see all" list over `GET /api/me/work/{section}` (design-doc
+  §11); a user on more than 10 projects finds the rest on each org's project list.
+- **Why:** smallest complete change: no demo user is on more than two projects, and the org list
+  already shows them all. The "see all" list belongs with the sections that need one most.
+- **Fix by:** Slice 3 (with My work's tasks section, whose lists are long)
+- **Status:** open
+
+### TD-38: The project selector lists an org's first 200 projects
+- **Added:** S1-C14a
+- **What:** the project selector loads the current org's projects in one request at the API's
+  page limit (200) and filters them in the browser, so an org with more than 200 projects
+  shows only the first 200 there (all of them are on its project list).
+- **Why:** smallest complete change: v1's orgs have tens of projects. A server-side search
+  parameter would be new API.
+- **Fix by:** Slice 3 (the filter bar's text search, which the selector can call)
+- **Status:** open
+
+### TD-39: No `PageHeader` component yet
+- **Added:** S1-C14a
+- **What:** UI-SHL-8 puts each page's `h1` in a `PageHeader` that holds its primary actions.
+  S1-C14a's pages have no primary action yet, so each writes its `h1` directly.
+- **Why:** smallest complete change: a component with nothing to hold but the heading would be
+  speculative (checkpoint-reviewer question, S1-C14a review).
+- **Fix by:** S1-C15 (its admin pages have the first primary actions)
+- **Status:** open
+
+### TD-40: An unavailable My work section fails the whole page
+- **Added:** S1-C14a
+- **What:** My work treats an unavailable projects section (`available: false` in
+  `GET /api/me/work`) as a failed load, so its error state and Try again behave like any other
+  failure (UI-FBK-15). With more than one section, that would hide the sections that did load.
+- **Why:** ui-reviewer finding (S1-C14a review, pass 2). Slice 1 has one section, so a
+  per-section error state would have nothing beside it.
+- **Fix by:** Slice 2 (My work's approvals section, its second; each section gets its own error
+  state)
 - **Status:** open

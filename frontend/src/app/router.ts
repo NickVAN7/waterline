@@ -11,7 +11,8 @@ import { installRouteFocus } from './routeFocus'
 import MyWorkView from '@/views/my_work/MyWorkView.vue'
 
 // Every top-level path segment here is on the backend's reserved-slug list (`ReservedSlug` in the
-// API schema), so no org slug can take it; `/` is My work.
+// API schema), so no org slug can take it; `/` is My work, and `/:orgSlug` is an org's pages
+// (router.spec.ts checks it).
 export const routes: RouteRecordRaw[] = [
   { path: '/', name: 'my-work', component: MyWorkView },
   {
@@ -25,6 +26,28 @@ export const routes: RouteRecordRaw[] = [
     name: 'change-password',
     component: () => import('@/views/auth/ChangePasswordView.vue'),
     meta: { layout: 'auth' },
+  },
+  {
+    path: '/account',
+    name: 'account',
+    component: () => import('@/views/user/AccountView.vue'),
+  },
+  {
+    path: '/account/no-access',
+    name: 'no-access',
+    component: () => import('@/views/errors/NoAccessView.vue'),
+    meta: { layout: 'auth' },
+  },
+  {
+    path: '/:orgSlug/projects',
+    name: 'org-projects',
+    component: () => import('@/views/project/OrgProjectsView.vue'),
+  },
+  {
+    path: '/:orgSlug/projects/:key',
+    name: 'project-home',
+    component: () => import('@/views/project/ProjectHomeView.vue'),
+    meta: { settlesItself: true },
   },
   {
     path: '/status',

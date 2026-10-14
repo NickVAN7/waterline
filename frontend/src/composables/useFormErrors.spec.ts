@@ -50,15 +50,21 @@ describe('useFormErrors', () => {
     expect(errors.announcement.value).toBe('1 field needs attention: Password')
   })
 
-  it('drops the alert and the announcement when the alert is dismissed', () => {
+  it('drops the alert and announces the dismissal, again on a repeat', () => {
     const errors = useFormErrors(LABELS)
     errors.apply(invalid(['password', 'Too short.'], ['other', 'Something else.']))
     vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
 
     errors.dismissAlert()
-    vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
-
     expect([errors.alert.value, errors.announcement.value]).toEqual([null, ''])
+    vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
+    expect(errors.announcement.value).toBe('Alert dismissed')
+
+    // A second dismiss empties the region first, so the same text is read again.
+    errors.dismissAlert()
+    expect(errors.announcement.value).toBe('')
+    vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
+    expect(errors.announcement.value).toBe('Alert dismissed')
   })
 
   it('says "1 field" for one', () => {
@@ -70,12 +76,13 @@ describe('useFormErrors', () => {
     expect(errors.announcement.value).toBe('1 field needs attention: Password')
   })
 
-  it('keeps the first message for a field that has several', () => {
+  it('shows every message for a field that has several, none dropped', () => {
     const errors = useFormErrors(LABELS)
 
     errors.apply(invalid(['password', 'Too short.'], ['password', 'Same as your email.']))
 
-    expect(errors.fieldErrors.value).toEqual({ password: 'Too short.' })
+    expect(errors.fieldErrors.value).toEqual({ password: 'Too short. Same as your email.' })
+    expect(errors.alert.value).toBeNull()
   })
 
   it('puts an error for a field the form does not show in the form alert', () => {
@@ -131,6 +138,38 @@ describe('useFormErrors', () => {
 
     expect(errors.fieldErrors.value).toEqual({})
     expect(errors.announcement.value).toBe('')
+  })
+
+  it('keeps every error on each field, with its type, for a field that shows them elsewhere', () => {
+    const errors = useFormErrors(LABELS)
+
+    errors.apply(
+      apiError(422, 'validation_error', {
+        fields: [
+          { loc: ['body', 'password'], message: 'Too short.', type: 'too_short' },
+          { loc: ['body', 'password'], message: 'Same as your email.', type: 'same_as_email' },
+          { loc: ['body', 'other'], message: 'Not shown.', type: 'x' },
+        ],
+      }),
+    )
+
+    expect(errors.fieldProblems.value).toEqual({
+      password: [
+        { message: 'Too short.', type: 'too_short' },
+        { message: 'Same as your email.', type: 'same_as_email' },
+      ],
+    })
+  })
+
+  it("clears a field's kept errors when the user edits it, and all of them on the next submit", () => {
+    const errors = useFormErrors(LABELS)
+    errors.apply(invalid(['email', 'Not an email.'], ['password', 'Too short.']))
+
+    errors.clearField('email')
+    expect(Object.keys(errors.fieldProblems.value)).toEqual(['password'])
+
+    errors.reset()
+    expect(errors.fieldProblems.value).toEqual({})
   })
 
   it('clears one field when the user edits it', () => {
