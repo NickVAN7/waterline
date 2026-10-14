@@ -1343,3 +1343,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** testing strategy ("Workflow and gates")
 - **Source:** chat session (owner, Oct 14, 2026: docs-consistency decision 1 on DL-99, option a)
+
+### DL-102: Staff and org member rows carry `is_active` and the account actions
+- **Date:** 2026-10-14
+- **Decision:** From S1-C15, each row of `GET /api/workspaces/{workspace_id}/staff` and
+  `GET /api/orgs/{org_id}/members` carries `is_active`, and its `allowed_actions` also hold the
+  `user`-level actions on that person (`user.manage`, `user.view_access`, evaluated as on a
+  users-list row, from the context the list already loads). The members and staff pages offer
+  account actions from the row alone (no per-user read), show a deactivated person as such, and
+  can explain the last-active-owner guard (DL-74) before the server's 422.
+- **Supersedes:** none (settles the two questions DL-75 left for S1-C15)
+- **Superseded by:** none
+- **Applies to:** build plan ("The workspace and org API", "The org members API", the S1-C15 row)
+- **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
