@@ -1285,3 +1285,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (S1-C14a and S1-C16 rows); ui-design-guide (UI-SHL-6);
   `docs/tech-debt.md` (TD-32); `.claude/agents/ui-reviewer.md`
 - **Source:** chat session (owner, Oct 13, 2026, at the start of S1-C14a)
+
+### DL-98: Below 40 rem the header wraps and isn't sticky
+- **Date:** 2026-10-13
+- **Decision:** Below 40 rem (Tailwind's `sm`) the shell's header wraps onto as many rows as it
+  needs (the Menu button, the app name, the org switcher, the user menu) and scrolls away with
+  the page; from 40 rem up it stays one sticky row at `--header-height`. This meets reflow at
+  320 CSS px (WCAG 1.4.10) for any org or user name, without a taller sticky header covering
+  focus.
+- **Supersedes:** none (narrows ui-design-guide UI-SHL-3's sticky header to 40 rem and up)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SHL-3); `.claude/agents/ui-reviewer.md`
+- **Source:** chat session (owner, Oct 13, 2026: S1-C14a's UI review found the header 98 px too
+  wide at 320 CSS px)

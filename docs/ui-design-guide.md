@@ -429,7 +429,9 @@ render inside the full shell when signed in.
   `main` (`tabindex="-1"` so the skip link can focus it). Nothing meaningful sits outside a
   landmark. A landmark is rendered only when it has content: a navigation with no links (the
   Main nav while signed out) is left out, not left empty (DL-93).
-- **UI-SHL-3** The header is sticky at `--header-height`. The only other sticky layer in v1 is a
+- **UI-SHL-3** The header is sticky at `--header-height`. Below 40 rem it wraps onto as many
+  rows as its contents need and is not sticky, so the page reflows to 320 CSS px with no
+  horizontal scroll and a taller header never covers focus (DL-98). The only other sticky layer in v1 is a
   table's selection toolbar, and only while rows are selected (UI-TBL-8). Any later sticky
   element needs the same `scroll-padding` treatment and an end-to-end focus check
   (UI-FBK-10).

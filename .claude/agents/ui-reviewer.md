@@ -61,7 +61,8 @@ correct; you decide whether the code does it.
 - Does a wide table scroll inside a named, focusable region and not the page? Any fixed widths
   or `100vw` that would break reflow at 320 CSS px? (UI-SHL-7)
 - Is any element other than the header (and a selection toolbar while rows are selected)
-  `position: sticky` or `fixed`? (UI-SHL-3)
+  `position: sticky` or `fixed`? Below 40 rem, does the header wrap and stop being sticky, with
+  no horizontal scroll at 320 CSS px (DL-98)? (UI-SHL-3)
 - Is the skip link still the first focusable element and does it reach `main`? (UI-SHL-1)
 - **Org switcher:** in the header on the right, orgs only (no members or settings links), a menu
   of links with `aria-current` for several orgs, plain text for one, never hidden at narrow
