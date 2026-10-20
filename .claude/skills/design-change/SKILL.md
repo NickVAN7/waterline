@@ -76,17 +76,18 @@ history in the docs; the log holds it.
 
 - `uv run wl check` green (and, for tooling code that changes what CI runs,
   `uv run wl check --full`).
-- **Tooling code** (step 4): take the review snapshot as the `checkpoint` skill's step 4 says
-  (`wl review-copy`, DL-105), then invoke `checkpoint-reviewer` with the review ID
-  `DC-<YYYY-MM-DD>` (add a letter for a second one that day: `DC-2026-10-08b`), the base
-  (the commit before this change), and the files in scope. Resolve every finding as the
-  `checkpoint` skill's step 5 says, and record every pass in
-  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming what the
-  change covers (`DC-2026-10-08b-git-guard-allow-list.md`; format: `docs/reviews/s0/S0-C1.md`), with its "Sabotage checks" table. Don't run tests while it
-  runs.
-- Invoke the `docs-consistency` agent with trigger `design-change` and, as the base, the
-  commit before this change. Fix its clear-cut **Fixes**. Its **Decisions** go to the owner
-  undecided; if one blocks the change, stop.
+- **Reviewers, on one snapshot** (DL-105): take the review snapshot as the `checkpoint` skill's
+  step 4 says (`wl review-copy`). For **tooling code** (step 4), invoke `checkpoint-reviewer`
+  with the review ID `DC-<YYYY-MM-DD>` (add a letter for a second one that day:
+  `DC-2026-10-08b`), the base (the commit before this change), and the files in scope; don't
+  run tests while it runs. Then invoke the `docs-consistency` agent with trigger
+  `design-change` and, as the base, the commit before this change.
+- **Then fix, in one batch,** as the `checkpoint` skill's step 5 says (only `checkpoint-reviewer`
+  is re-reviewed, DL-108): every tooling finding, and `docs-consistency`'s clear-cut **Fixes**.
+  Its **Decisions** go to the owner undecided; if one blocks the change, stop. Record every
+  pass in `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming
+  what the change covers (`DC-2026-10-08b-git-guard-allow-list.md`; format:
+  `docs/reviews/s0/S0-C1.md`), with its "Sabotage checks" table.
 
 ## 8. Commit and push
 

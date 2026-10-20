@@ -37,7 +37,7 @@ after the controller's check has passed. It saves their probes.
 caught.
 
 **Question:** does "fix nothing until every reviewer has reported" include the slice-end agents
-(`fresh-clone-verifier`, `docs-consistency`, `repo-auditor`)? *For the owner, below.*
+(`fresh-clone-verifier`, `docs-consistency`, `repo-auditor`)? *Settled after review: one batch (DL-108).*
 
 ## docs-consistency (trigger `design-change`, base `cd712fe`)
 
@@ -47,7 +47,7 @@ caught.
 | F2 | broken-ref | `.claude/skills/checkpoint/SKILL.md` | "the frontend's and backend's 'easy to break' lists": `frontend/CLAUDE.md` has no such list. | **Fixed:** the real sections named. |
 | F3 | broken-ref | root `CLAUDE.md` | "(the `checkpoint` skill, step 5)": the snapshot and self-review are in step 4. | **Fixed:** "steps 4 and 5". |
 
-**Decisions** (for the owner, undecided except D1):
+**Decisions** (D1 and D4 settled here; D2 and D3 after review, DL-108):
 
 | # | Question | Options |
 |---|---|---|
@@ -58,8 +58,7 @@ caught.
 
 ## Open questions for the owner
 
-- D2 and D3 above, and the reviewer's question on the slice-end agents; they matter from the
-  first re-review (S1-C16 at the earliest) and at S1-C17.
+- D2, D3, and the question: settled after review (DL-108).
 - Not checked by either reviewer: a database host that drops connections silently rather than
   refusing them; the probe has no connect timeout (nor had the fixture before it).
 
@@ -67,3 +66,4 @@ caught.
 
 - None during review. Before it: the decisions themselves (DL-105 to DL-107, Oct 20, 2026), and
   one commit for docs and code.
+- After it: D2 (a), D3 (a), and the question (one batch, the slice-end agents included): DL-108.

@@ -18,7 +18,8 @@ A **re-review** (DL-105) also gets a fix diff (a file: `diff -ruN -x .git` of th
 against the fixed one) and your previous pass's findings with their resolutions. Review the fix
 diff, reading whatever code it touches in full, and check each resolution: is the finding really
 fixed, and did the fix break anything near it? Don't re-review the rest of the checkpoint, and
-don't reopen a resolution the owner decided.
+don't reopen a resolution the owner decided. Sabotage-check **one** behavior the fix changed
+(step 6), not two or three (DL-108).
 
 ## Rules
 

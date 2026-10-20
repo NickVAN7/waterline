@@ -1431,3 +1431,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `backend/tests/unit/test_database_check.py`; testing strategy ("Workflow and gates")
 - **Source:** chat session (owner, Oct 20, 2026: `wl check` failed with an INTERNALERROR in
   S1-C15a while the stack was down)
+
+### DL-108: Which reviewers are re-reviewed, how, and the slice-end batch
+- **Date:** 2026-10-20
+- **Decision:** Only `checkpoint-reviewer`, `security-reviewer`, and `ui-reviewer` are
+  re-reviewed (DL-105); the other agents' findings are fixed without another pass. A
+  `checkpoint-reviewer` re-review sabotage-checks one behavior the fix changed. At a slice's
+  last checkpoint, the slice-end agents (`fresh-clone-verifier`, `docs-consistency`,
+  `repo-auditor`) report before anything is fixed, so every finding is in one batch.
+- **Supersedes:** none (settles DC-2026-10-20's decisions D2 and D3 and its question)
+- **Superseded by:** none
+- **Applies to:** the `checkpoint` skill (steps 4 and 5); the `design-change` skill (step 7,
+  reviewers before fixes); the `checkpoint-reviewer` agent
+- **Source:** chat session (owner, Oct 20, 2026, approving the recommendations, before S1-C16)

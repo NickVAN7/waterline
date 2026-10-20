@@ -84,7 +84,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - **Every reviewer reviews the same snapshot** (DL-105): before invoking the first one, take
   `uv run wl review-copy <dir>/reviewed-1`, in a new directory (`mktemp -d` in your scratchpad;
   `review-copy` refuses one that isn't empty). Fix nothing until every reviewer that runs has
-  reported.
+  reported: at a slice's last checkpoint, the slice-end agents below included, so their
+  findings join the one batch (DL-108).
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
   (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
   absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
@@ -124,7 +125,9 @@ and its findings feed the slice retro.
 
 **Re-review, at most once** (DL-105): a reviewer runs again only when a fix resolved one of its
 **major or blocker** findings, or added behavior its finding didn't ask for; fixes to minor
-findings, tests, or docs alone don't trigger one. The re-review gets, besides the usual inputs:
+findings, tests, or docs alone don't trigger one. Only `checkpoint-reviewer`,
+`security-reviewer`, and `ui-reviewer` are re-reviewed; the other agents' findings are fixed
+without another pass (DL-108). The re-review gets, besides the usual inputs:
 - the fix diff: take `uv run wl review-copy <dir>/reviewed-2` and pass the reviewer
   `diff -ruN -x .git <dir>/reviewed-1 <dir>/reviewed-2`, saved to a file, as what to review
   (each copy is a clone, with its own `.git`; the rest of the diff was reviewed in pass 1);
