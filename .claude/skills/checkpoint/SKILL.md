@@ -77,7 +77,14 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   to be empty. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests yourself
   while a reviewer is running.
 - Do not pass any reviewer your reasoning or a summary of the work; they review from the docs
-  and the diff.
+  and the diff (a re-review also gets the previous pass's record, step 5; DL-105).
+- **Before the first reviewer** (DL-106): review your own diff against the `CLAUDE.md` files'
+  rules (`backend/CLAUDE.md`'s "Rules that are easy to break silently", `frontend/CLAUDE.md`'s
+  "Rules" and "UI"); if that changes anything, rerun `uv run wl check`.
+- **Every reviewer reviews the same snapshot** (DL-105): before invoking the first one, take
+  `uv run wl review-copy <dir>/reviewed-1`, in a new directory (`mktemp -d` in your scratchpad;
+  `review-copy` refuses one that isn't empty). Fix nothing until every reviewer that runs has
+  reported.
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
   (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
   absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
@@ -92,7 +99,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 5. Resolve every finding
 
 For each finding from every reviewer that ran, exactly one of:
-- **Fixed:** make the fix, then rerun `uv run wl check`.
+- **Fixed:** made in the batch below, with `uv run wl check` once the batch is done.
 - **Logged:** add a tech-debt entry (reason and target) — only for minor findings, or others
   the owner has agreed to defer.
 - **Rejected:** only when the finding is factually wrong; record the evidence.
@@ -107,7 +114,26 @@ scope: fix one only when the fix is within it. Otherwise log it (minor), or put 
 for the owner as a proposed design change (major or blocker). Its questions go to the owner,
 and its findings feed the slice retro.
 
-If fixes changed behavior (not just docs or tests), run the reviewer again on the fixes.
+**Fix in one batch** (DL-105, DL-106), once every reviewer has reported:
+- Fix every finding together. Before each fix, grep for the same pattern elsewhere in the diff
+  and the code it touches, and fix every instance at once.
+- Fix code from an earlier checkpoint only when the finding or this checkpoint's scope needs
+  it; otherwise log it in `docs/tech-debt.md`.
+- While fixing, run only the affected tests (`wl frontend test <spec>`, `wl backend test -k …`);
+  run `uv run wl check` once the batch is done.
+
+**Re-review, at most once** (DL-105): a reviewer runs again only when a fix resolved one of its
+**major or blocker** findings, or added behavior its finding didn't ask for; fixes to minor
+findings, tests, or docs alone don't trigger one. The re-review gets, besides the usual inputs:
+- the fix diff: take `uv run wl review-copy <dir>/reviewed-2` and pass the reviewer
+  `diff -ruN -x .git <dir>/reviewed-1 <dir>/reviewed-2`, saved to a file, as what to review
+  (each copy is a clone, with its own `.git`; the rest of the diff was reviewed in pass 1);
+- its previous pass's findings and their resolutions, as recorded in the review record.
+
+Two passes per reviewer at most. Findings from the second pass are fixed without another
+pass, logged, or, when a fix would change behavior beyond the finding, put to the owner in the
+report.
+
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 

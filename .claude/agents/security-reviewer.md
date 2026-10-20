@@ -12,6 +12,12 @@ A separate reviewer covers general correctness and conventions; focus entirely o
 
 The checkpoint ID (e.g. `S1-C3`) and the base commit to diff against.
 
+A **re-review** (DL-105) also gets a fix diff (a file: `diff -ruN -x .git` of the reviewed copy
+against the fixed one) and your previous pass's findings with their resolutions. Review the fix
+diff, reading whatever code it touches in full, and check each resolution: is the finding really
+fixed, and did the fix break anything near it? Don't re-review the rest of the checkpoint, and
+don't reopen a resolution the owner decided.
+
 ## Rules
 
 - **Do not modify any file.** Use Bash only for read-only commands (`git diff`, `git log`,

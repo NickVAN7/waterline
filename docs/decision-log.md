@@ -1383,3 +1383,51 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide (UI-SHL-10); build plan (the S1-C15 row)
 - **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
+
+### DL-105: Reviewers review one snapshot; fixes come in one batch; a re-review covers the fix diff, once
+- **Date:** 2026-10-20
+- **Decision:** Every reviewer of a checkpoint (or a design change's tooling) reviews the same
+  snapshot (`wl review-copy`), and nothing is fixed until all have reported. A reviewer runs
+  again only when a fix resolved one of its major or blocker findings or added behavior beyond
+  the finding, at most once: that pass gets the fix diff (`diff -ruN -x .git` of the reviewed copy
+  against the fixed one) and its previous pass's findings with their resolutions, and reviews
+  only those. Second-pass findings are fixed without another pass, logged, or put to the owner.
+- **Supersedes:** the `checkpoint` skill's "If fixes changed behavior, run the reviewer again on
+  the fixes"; its "they review from the docs and the diff", in part (a re-review also gets the
+  previous pass's record)
+- **Superseded by:** none
+- **Applies to:** the `checkpoint` skill (steps 4 and 5; the `design-change` skill's tooling
+  review follows it); the `checkpoint-reviewer`, `security-reviewer`, and `ui-reviewer` agents;
+  root `CLAUDE.md`
+- **Source:** chat session (owner, Oct 20, 2026, after S1-C15a: UI review took five passes and
+  checkpoint review four, about 1M tokens, ten of the 19 findings caused by earlier fixes;
+  applied mid-group at the owner's request)
+
+### DL-106: Fixes are self-checked, scoped, and applied to every instance
+- **Date:** 2026-10-20
+- **Decision:** Before the first reviewer, the implementing session reviews its own diff
+  against the `CLAUDE.md` files' rules. Each fix goes to every instance of its pattern at once.
+  Code from an earlier checkpoint is fixed only when a finding or the scope needs it, and is
+  otherwise logged as tech debt. While fixing, only the affected tests run; `wl check` runs once
+  the batch is done, and before the commit as always.
+- **Supersedes:** the `checkpoint` skill's "make the fix, then rerun `uv run wl check`"
+- **Superseded by:** none
+- **Applies to:** the `checkpoint` skill (steps 4 and 5); testing strategy ("Workflow and
+  gates"); root `CLAUDE.md`
+- **Source:** chat session (owner, Oct 20, 2026, with DL-105)
+
+### DL-107: A distributed test run checks the database before its workers start
+- **Date:** 2026-10-20
+- **Decision:** A backend test run distributed by pytest-xdist checks that Postgres answers
+  before the workers start, and stops with the test database's message (start it with
+  `wl up`) when it doesn't; a worker's exit only crashed it, an opaque INTERNALERROR. A run with
+  `-n 0` keeps its check in the `migrated_database` fixture, so tests that need no database
+  still run without Postgres. At the owner's request, this change's docs and code (DL-105 to
+  DL-107) share one commit, an exception to DL-18's separate `docs:` and `chore:` commits for
+  this change only.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `backend/tests/conftest.py` (`pytest_sessionstart`);
+  `backend/tests/unit/test_database_check.py`; testing strategy ("Workflow and gates")
+- **Source:** chat session (owner, Oct 20, 2026: `wl check` failed with an INTERNALERROR in
+  S1-C15a while the stack was down)

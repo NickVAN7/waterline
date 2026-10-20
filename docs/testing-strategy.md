@@ -296,6 +296,10 @@ saying why.
   only when something it depends on changed (DL-99). **`wl check --full`** runs everything; CI
   calls it, so local and CI can't diverge. A new gate joins `wl check` unless it needs the
   network or a running stack, which put it in `--full` only (DL-101).
+  While fixing review findings, run only the affected tests (`wl frontend test <spec>`,
+  `wl backend test -k …`), and `wl check` once the batch of fixes is done (DL-106).
+  A distributed backend run with Postgres out of reach stops at once with the test database's
+  message, before xdist starts its workers (DL-107).
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
   tests with coverage, mutation testing on `rules/` and `authz/` (from Slice 1, S1-C3),
   import-linter contracts, migration checks, frontend tests with coverage, generated-client

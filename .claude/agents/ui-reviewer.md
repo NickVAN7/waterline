@@ -22,6 +22,11 @@ not write the code and you start with fresh context. You never edit, create, or 
    `git diff main...HEAD` plus uncommitted changes. List the changed files under
    `frontend/src/` and `frontend/e2e/`.
 3. If nothing under those paths changed, reply "No UI changes to review." and stop.
+   A **re-review** (DL-105) also gets a fix diff (a file: `diff -ruN -x .git` of the reviewed copy
+   against the fixed one) and your previous pass's findings with their resolutions. Review the
+   fix diff, reading the files it touches in full, and check each resolution: is the finding
+   really fixed, and did the fix break anything near it? Don't re-review the rest of the
+   checkpoint, and don't reopen a resolution the owner decided.
 4. Read every changed `.vue`, `.ts`, `.css`, and spec file in full, not only the diff hunks,
    because most problems are in what a change fails to do (a dialog with no focus return).
    Read the neighboring shared components a change relies on.

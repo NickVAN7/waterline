@@ -126,6 +126,34 @@ def test_database_url(settings: Settings, worker_id: str) -> URL:
     return url if worker_id == "master" else url.set(database=f"{TEST_DATABASE_NAME}_{worker_id}")
 
 
+def unreachable(url: URL, exc: OperationalError) -> str:
+    return (
+        f"Can't reach the test database {url.render_as_string()}: {exc.orig}\n"
+        "Start Postgres with `uv run wl up`. If the test database is missing, the volume "
+        "predates it: recreate it with `uv run wl down -v && uv run wl up`."
+    )
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """A distributed run checks the test database before xdist starts its workers (its own hook
+    runs last; DL-107): a worker's exit would only crash it, an opaque INTERNALERROR. A run with
+    `-n 0` is checked by `migrated_database`, and only when a test needs the database."""
+    # xdist's controller (its `is_xdist_controller`, inlined: xdist ships no type stubs):
+    # distributing, and not a worker. `--collect-only` starts no workers and needs no database.
+    config = session.config
+    if config.option.dist == "no" or hasattr(config, "workerinput") or config.option.collectonly:
+        return
+    url = Settings().test_database_url()  # pyright: ignore[reportCallIssue]
+    probe = create_sync_engine(url)
+    try:
+        with probe.connect():
+            pass
+    except OperationalError as exc:
+        pytest.exit(unreachable(url, exc), returncode=1)
+    finally:
+        probe.dispose()
+
+
 def recreate_database(url: URL) -> None:
     """Drop and create `url`'s database, from a connection to the test database."""
     admin = create_sync_engine(url.set(database=TEST_DATABASE_NAME), isolation_level="AUTOCOMMIT")
@@ -148,12 +176,7 @@ def migrated_database(test_database_url: URL) -> URL:
             recreate_database(test_database_url)
         command.upgrade(config, "head")
     except OperationalError as exc:
-        pytest.exit(
-            f"Can't reach the test database {test_database_url.render_as_string()}: {exc.orig}\n"
-            "Start Postgres with `uv run wl up`. If the test database is missing, the volume "
-            "predates it: recreate it with `uv run wl down -v && uv run wl up`.",
-            returncode=1,
-        )
+        pytest.exit(unreachable(test_database_url, exc), returncode=1)
     return test_database_url
 
 

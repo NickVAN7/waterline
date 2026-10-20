@@ -94,6 +94,11 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   repo, the standard library, an installed dependency, then the minimum new code. No speculative
   options, config, or abstractions; keep the layers the docs require. For a bug fix, grep every
   caller of the function you change and fix the root cause once, in the shared code.
+- **Fix findings in one batch, everywhere at once** (DL-105, DL-106): self-review the diff
+  against the `CLAUDE.md` rules before the first reviewer; every reviewer reviews the same
+  snapshot before anything is fixed; each fix goes to every instance of its pattern; code from
+  an earlier checkpoint is fixed only when needed, otherwise logged; a re-review covers only the
+  fix diff, at most once (the `checkpoint` skill, steps 4 and 5).
 - Never hand-edit generated files: `backend/openapi.json`, `frontend/src/api/schema.d.ts`.
 - When a review catches a mistake that a rule would have prevented, add that rule to the
   relevant `CLAUDE.md` as part of the fix.

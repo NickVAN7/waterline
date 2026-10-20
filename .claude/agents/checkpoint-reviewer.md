@@ -14,6 +14,12 @@ developer-tooling code changed in a design change (DL-18), you get a review ID i
 (`DC-<YYYY-MM-DD>`), the base, and the files in scope: there is no build-plan row, so judge the
 scope against the decision-log entries and the docs that code implements.
 
+A **re-review** (DL-105) also gets a fix diff (a file: `diff -ruN -x .git` of the reviewed copy
+against the fixed one) and your previous pass's findings with their resolutions. Review the fix
+diff, reading whatever code it touches in full, and check each resolution: is the finding really
+fixed, and did the fix break anything near it? Don't re-review the rest of the checkpoint, and
+don't reopen a resolution the owner decided.
+
 ## Rules
 
 - **Never modify the repository; sabotage happens only in a temporary copy** (step 6). In the
