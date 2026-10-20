@@ -3,6 +3,9 @@ import type { components } from '@/api/schema'
 import type { IconName } from '@/components/Icon.vue'
 
 type ProjectStatus = components['schemas']['ProjectStatus']
+type ProjectType = components['schemas']['ProjectType']
+type ClassificationLevel = components['schemas']['ClassificationLevel']
+type ClassificationCategory = components['schemas']['ClassificationCategory']
 export type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
 
 export type BadgeLabel = { label: string; tone: Tone; icon: IconName }
@@ -15,6 +18,67 @@ export const PROJECT_STATUS: Record<ProjectStatus, BadgeLabel> = {
   on_hold: { label: 'On hold', tone: 'warning', icon: 'warning' },
   completed: { label: 'Completed', tone: 'info', icon: 'check' },
   cancelled: { label: 'Cancelled', tone: 'neutral', icon: 'x' },
+}
+
+/** Project types (design-doc §1.1): the type seeds the modules and picks the labels. */
+export const PROJECT_TYPE: Record<ProjectType, string> = {
+  software: 'Software',
+  erp: 'ERP implementation',
+  general: 'General',
+}
+
+/** Module names (design-doc §1.1), v2 ones included: module guidance lists them all. */
+export const MODULE: Record<string, string> = {
+  sprints: 'Sprints',
+  github: 'GitHub',
+  raid: 'RAID log',
+  status_reports: 'Status reports',
+  budget: 'Budget',
+  data_migration: 'Data migration',
+  cutover: 'Cutover',
+}
+
+/** An enabled module whose slice hasn't shipped (design-doc §1.1, UI-SHL-6). */
+export const NOT_AVAILABLE_YET = 'Not available yet'
+
+/** Classification levels with the description shown beside each choice (design-doc §3.1, its
+ * "Means" column), and the banner's tone (UI-FBK-6; the alert's icon follows the tone). */
+export const CLASSIFICATION_LEVEL: Record<
+  ClassificationLevel,
+  { label: string; description: string; tone: 'info' | 'warning' | 'danger' }
+> = {
+  internal: {
+    label: 'Internal',
+    description:
+      "For the firm and the client's project team; not for the public. Disclosure is embarrassing, not damaging.",
+    tone: 'info',
+  },
+  confidential: {
+    label: 'Confidential',
+    description:
+      'Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement.',
+    tone: 'warning',
+  },
+  restricted: {
+    label: 'Restricted',
+    description:
+      'Disclosure would cause serious harm or breach a legal or regulatory duty; need-to-know.',
+    tone: 'danger',
+  },
+}
+
+/** The unclassified choice (design-doc §3.1): no banner. */
+export const UNCLASSIFIED = {
+  label: 'Not classified',
+  description: 'Not yet classified; treated like Internal for every rule.',
+}
+
+/** Why content is sensitive (design-doc §3.1). */
+export const CLASSIFICATION_CATEGORY: Record<ClassificationCategory, string> = {
+  financial: 'Financial',
+  proprietary: 'Proprietary',
+  pii: 'Personal data (PII)',
+  export_controlled: 'Export-controlled',
 }
 
 /** A project with no lead is flagged (UI-SHL-6). */
@@ -77,4 +141,11 @@ export const IDENTIFIER_PROBLEM: Record<string, string> = {
   too_long: 'is too long',
   must_start_with_letter: 'must start with a letter',
   invalid_characters: 'may use only lowercase letters, digits, and hyphens',
+}
+
+/** A project key's problems (design-doc §3: 3–6 uppercase letters or digits, starting with a
+ * letter): the identifier rule's, with the key's own characters. */
+export const KEY_PROBLEM: Record<string, string> = {
+  ...IDENTIFIER_PROBLEM,
+  invalid_characters: 'may use only letters and digits',
 }

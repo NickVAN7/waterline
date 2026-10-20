@@ -103,7 +103,7 @@ async def project_key_availability(
 @router.get("/projects/{key}", responses=_ERRORS)
 async def get_project(project: Viewed, ctx: AuthzContextDep, session: SessionDep) -> ProjectRead:
     """The project, with the actions the caller may take on it."""
-    return ProjectService(session).read(ctx, project)
+    return await ProjectService(session).read(ctx, project)
 
 
 @router.patch("/projects/{key}", responses=_ERRORS)

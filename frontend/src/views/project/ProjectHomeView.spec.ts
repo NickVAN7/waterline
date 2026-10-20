@@ -52,19 +52,42 @@ describe('ProjectHomeView', () => {
     expect(wrapper.get('h1').text()).toBe('ERP rollout')
     expect(wrapper.get('header').text()).toContain('ERP')
     expect(wrapper.get('header').text()).toContain('Active')
+    expect(wrapper.get('header').text()).toContain('Lead: Liam Lead')
     expect(wrapper.text()).not.toContain('No lead')
+    // Unclassified: no banner (design-doc §3.1).
+    expect(wrapper.text()).not.toContain('Classification:')
     expect(document.title).toBe('ERP rollout · Waterline')
     expect(useCurrentOrgStore().project?.key).toBe('ERP')
     await expectNoA11yViolations(wrapper)
   })
 
   it('flags a project with no lead, and an archived one', async () => {
-    vi.spyOn(client, 'GET').mockResolvedValue(ok(project({ lead_id: null, archived: true })))
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      ok(project({ lead_id: null, lead_name: null, archived: true })),
+    )
 
     const { wrapper } = await mountAt('/acme/projects/ERP')
 
     expect(wrapper.get('header').text()).toContain('No lead')
     expect(wrapper.text()).toContain('This project is archived. It is read-only.')
+  })
+
+  it('shows the classification banner, level and categories as text (UI-FBK-6)', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      ok(
+        project({
+          classification_level: 'confidential',
+          classification_categories: ['financial', 'pii'],
+        }),
+      ),
+    )
+
+    const { wrapper } = await mountAt('/acme/projects/ERP')
+
+    expect(wrapper.text()).toContain(
+      'Classification: Confidential. Categories: Financial, Personal data (PII).',
+    )
+    await expectNoA11yViolations(wrapper)
   })
 
   it("shows the not-found page for a project the user can't see", async () => {

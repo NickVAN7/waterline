@@ -102,7 +102,8 @@ export function useFormErrors<F extends string>(
 
   /** The one check the client makes (UI-FRM-4): required fields aren't empty. Returns the first
    * empty field, to focus, or null when the form may be sent. */
-  function requireFilled(values: Record<F, string>): F | null {
+  // A field not passed isn't required here.
+  function requireFilled(values: Partial<Record<F, string>>): F | null {
     reset()
     const empty = fields.filter((field) => values[field] === '')
     if (!empty.length) return null

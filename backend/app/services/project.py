@@ -338,7 +338,7 @@ class ProjectService:
             # The context predates the new membership: count it for the response's actions.
             access = ProjectAccess(ProjectRole.ADMIN, org.id, org.workspace_id)
             ctx = dataclasses.replace(ctx, projects={**ctx.projects, project.id: access})
-        return self.read(ctx, project)
+        return await self.read(ctx, project)
 
     async def list_in_org(
         self, ctx: AuthzContext, org: Organization, query: OrgProjectQuery
@@ -356,7 +356,9 @@ class ProjectService:
         taken = problem is None and await self.repository.key_taken(org.workspace_id, key)
         return SlugAvailability.of(problem.value if problem else None, taken=taken)
 
-    def read(self, ctx: AuthzContext, project: Project) -> ProjectRead:
+    async def read(self, ctx: AuthzContext, project: Project) -> ProjectRead:
+        # By id, not `project.lead`: right after a create or a lead change too (DL-111).
+        lead = await UserRepository(self.session).get(project.lead_id) if project.lead_id else None
         return ProjectRead(
             id=project.id,
             organization_id=project.organization_id,
@@ -366,6 +368,7 @@ class ProjectService:
             type=project.type,
             status=project.status,
             lead_id=project.lead_id,
+            lead_name=lead.name if lead else None,
             enabled_modules=[ProjectModule(m) for m in project.enabled_modules],
             archived=project.archived_at is not None,
             classification_level=project.classification_level,
@@ -418,7 +421,7 @@ class ProjectService:
                 project,
                 details=change_details(_json(changed)),
             )
-        return self.read(ctx, project)
+        return await self.read(ctx, project)
 
     async def _with_current_role(self, ctx: AuthzContext, project: Project) -> AuthzContext:
         """`ctx` with the caller's role on `project` read again, for a check made under the
@@ -480,7 +483,7 @@ class ProjectService:
                     **confirmation,
                 },
             )
-        return self.read(ctx, project)
+        return await self.read(ctx, project)
 
     async def _check_lead(self, project: Project, lead_id: uuid.UUID) -> None:
         if not await self.repository.is_member(project.id, lead_id):

@@ -14,6 +14,7 @@ import { useCurrentOrgStore } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 
 import OrgSwitcher from './shell/OrgSwitcher.vue'
+import ProjectPages from './shell/ProjectPages.vue'
 import ProjectSelector from './shell/ProjectSelector.vue'
 import SidebarLink from './shell/SidebarLink.vue'
 import UserMenu from './shell/UserMenu.vue'
@@ -78,16 +79,12 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
           </div>
           <ProjectSelector />
         </nav>
-        <nav v-if="nav.project" aria-label="Project" class="flex flex-col gap-1">
-          <SidebarLink
-            :to="{
-              name: 'project-home',
-              params: { orgSlug: nav.org?.slug, key: nav.project.key },
-            }"
-          >
-            Home
-          </SidebarLink>
-        </nav>
+        <ProjectPages
+          v-if="nav.project"
+          :key="nav.project.id"
+          :project="nav.project"
+          :org-slug="nav.org?.slug"
+        />
       </div>
       <main
         id="main"

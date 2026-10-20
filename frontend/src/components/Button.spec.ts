@@ -72,4 +72,33 @@ describe('Button', () => {
 
     expect(submits).toBe(0)
   })
+
+  it('while blocked keeps its label, stays focusable, and neither clicks nor submits (UI-FRM-15)', async () => {
+    let submits = 0
+    const form = document.createElement('form')
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      submits += 1
+    })
+    document.body.append(form)
+    const wrapper = mount(Button, {
+      props: { blocked: true, type: 'submit' },
+      slots: { default: 'Create project' },
+      attachTo: form,
+    })
+    const button = wrapper.get('button')
+
+    await button.trigger('click')
+
+    expect(button.attributes('aria-disabled')).toBe('true')
+    expect(button.attributes('disabled')).toBeUndefined()
+    expect(button.text()).toBe('Create project')
+    expect(wrapper.emitted('click')).toBeUndefined()
+    expect(submits).toBe(0)
+    // Drawn as unavailable with the disabled tokens, not the accent (UI-TOK-10).
+    expect(button.classes()).toEqual(
+      expect.arrayContaining(['bg-disabled-bg', 'text-disabled-text', 'border-disabled-border']),
+    )
+    expect(button.classes()).not.toContain('bg-accent')
+  })
 })

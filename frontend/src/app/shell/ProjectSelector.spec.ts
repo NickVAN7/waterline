@@ -9,7 +9,7 @@ import { useCurrentOrgStore, type Project } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok } from '@/test/api'
-import { stubResizeObserver } from '@/test/overlay'
+import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { testRouter } from '@/test/router'
 
 import ProjectSelector from './ProjectSelector.vue'
@@ -29,9 +29,12 @@ const item = (key: string, name: string): Item => ({
 
 const page = (items: Item[]) => ok({ items, total: items.length, limit: 200, offset: 0 })
 
-async function openSelector(answer = page([item('ERP', 'ERP rollout'), item('PORTAL', 'Portal')])) {
+async function openSelector(
+  answer = page([item('ERP', 'ERP rollout'), item('PORTAL', 'Portal')]),
+  allowed: components['schemas']['Action'][] = [],
+) {
   const get = vi.spyOn(client, 'GET').mockResolvedValue(answer)
-  useCurrentUserStore().me = me()
+  useCurrentUserStore().me = me({ orgs: [{ ...ACME, allowed_actions: allowed }] })
   const router = await testRouter('/')
   const wrapper = mount(ProjectSelector, {
     // Real transitions: the overlay's show and hide events fire from them.
@@ -50,6 +53,7 @@ const dialog = () => document.querySelector('[role=dialog]')!
 beforeEach(() => {
   setActivePinia(createPinia())
   stubResizeObserver()
+  stubDialog()
 })
 
 afterEach(() => {
@@ -172,6 +176,30 @@ describe('ProjectSelector', () => {
     await openSelector(page([]))
 
     expect(dialog().textContent).toContain('No projects to show.')
+  })
+
+  it('offers New project only to those who may create one', async () => {
+    await openSelector()
+
+    expect(dialog().textContent).toContain('All projects')
+    expect(dialog().textContent).not.toContain('New project')
+  })
+
+  it('opens the create dialog from New project, its button holding focus to return to', async () => {
+    const { wrapper, get } = await openSelector(undefined, ['project.create'])
+    get.mockResolvedValue(ok({ modules: [], types: [] }))
+    const newProject = [...dialog().querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === 'New project',
+    )!
+
+    newProject.click()
+    await flushPromises()
+
+    const create = document.querySelector<HTMLDialogElement>('dialog[open]')!
+    expect(create.textContent).toContain('Create a project')
+    expect(document.activeElement?.id).toBe('create-project-name')
+    create.close()
+    expect(document.activeElement).toBe(wrapper.get('button[aria-haspopup=dialog]').element)
   })
 })
 

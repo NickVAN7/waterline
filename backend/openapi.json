@@ -6288,6 +6288,17 @@
             ],
             "title": "Lead Id"
           },
+          "lead_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Name"
+          },
           "enabled_modules": {
             "items": {
               "$ref": "#/components/schemas/ProjectModule"
@@ -6341,6 +6352,7 @@
           "type",
           "status",
           "lead_id",
+          "lead_name",
           "enabled_modules",
           "archived",
           "classification_level",

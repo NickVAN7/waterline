@@ -91,7 +91,7 @@ def new(**values: object) -> dict[str, object]:
 async def test_a_new_project_makes_its_creator_first_admin_and_lead_and_records_both(
     client: AsyncClient, session: AsyncSession, t: Tenancy
 ) -> None:
-    olga = await signed_in(client, await org_member(t))
+    olga = await signed_in(client, await org_member(t, name="Olga Owens"))
 
     response = await client.post(
         f"/api/orgs/{t.org.id}/projects", json=new(key=" inv ", name=" Invoicing ")
@@ -99,11 +99,12 @@ async def test_a_new_project_makes_its_creator_first_admin_and_lead_and_records_
 
     body = response.json()
     assert response.status_code == 201
-    assert (body["key"], body["name"], body["status"], body["lead_id"]) == (
+    assert (body["key"], body["name"], body["status"], body["lead_id"], body["lead_name"]) == (
         "INV",
         "Invoicing",
         "planning",
         str(olga.id),
+        "Olga Owens",  # the lead's name in the response, from the new lead (DL-111)
     )
     # The creator's new membership counts in the response's actions.
     assert "project.update" in body["allowed_actions"]
@@ -293,6 +294,24 @@ async def test_an_update_that_changes_nothing_records_nothing(
     assert await events(session) == []
 
 
+async def test_the_project_read_names_its_lead_and_none_without_one(
+    client: AsyncClient, session: AsyncSession, t: Tenancy
+) -> None:
+    await admin_of_pmt(client, t)
+    lena = await UserFactory.create_async(name="Lena Lead")
+    led = await ProjectFactory.create_async(organization=t.org, key="LED", lead=lena)
+    await ProjectMembershipFactory.create_async(project=led, user=lena)
+
+    with_lead = await client.get("/api/projects/LED")
+    without = await client.get("/api/projects/PMT")
+
+    assert (with_lead.json()["lead_id"], with_lead.json()["lead_name"]) == (
+        str(lena.id),
+        "Lena Lead",
+    )
+    assert (without.json()["lead_id"], without.json()["lead_name"]) == (None, None)
+
+
 async def test_the_lead_must_be_a_project_member(
     client: AsyncClient, session: AsyncSession, t: Tenancy
 ) -> None:
@@ -311,13 +330,15 @@ async def test_a_member_becomes_lead_and_null_clears_the_lead(
     client: AsyncClient, session: AsyncSession, t: Tenancy
 ) -> None:
     await admin_of_pmt(client, t)
-    pia = await UserFactory.create_async()
+    pia = await UserFactory.create_async(name="Pia Park")
     await ProjectMembershipFactory.create_async(project=t.project, user=pia)
 
     named = await client.patch("/api/projects/PMT", json={"lead_id": str(pia.id)})
     cleared = await client.patch("/api/projects/PMT", json={"lead_id": None})
 
     assert (named.json()["lead_id"], cleared.json()["lead_id"]) == (str(pia.id), None)
+    # The new lead's name, not the one before the change (DL-111).
+    assert (named.json()["lead_name"], cleared.json()["lead_name"]) == ("Pia Park", None)
     assert (await stored(session, "PMT")).lead_id is None
     assert [details for *_, details in await events(session)] == [
         {"old": {"lead_id": None}, "new": {"lead_id": str(pia.id)}},

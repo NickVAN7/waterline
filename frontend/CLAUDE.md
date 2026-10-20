@@ -115,6 +115,15 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - Row menu items come only from `allows(row, …)`; never compare a row's id with the signed-in
   user's to decide an action (S1-C15 review). The one logged exception is the reset on your own
   row (TD-42).
+- A dialog whose action navigates away (Create project opens the new project) closes with
+  `close({ returnFocus: false })`: the native close event comes in a later task, and returning
+  focus to the opener would take it from the new page's `h1` (S1-C16).
+- A field group (`fieldset`) that can get a 422 shows its error as `FormField` does
+  (`GroupError`: the icon, an id in the group's `aria-describedby`, `aria-invalid`), and every
+  field named in `useFormErrors`' labels renders its error somewhere (S1-C16 review).
+- `Button`'s `blocked` draws the disabled tokens (UI-TOK-10); `pending` keeps its own look.
+- A dialog component is mounted once per page: two copies share their fields' ids, so each label
+  names both fields (S1-C16).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).

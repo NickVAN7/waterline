@@ -458,9 +458,9 @@ render inside the full shell when signed in.
   a broken screen. **Only the page you are on has `aria-current="page"`**: "All projects" is
   not current while you are inside a project. The page itself still shows a project header
   (name, key in monospace, status badge, lead, or a "No lead" warning badge); there is no
-  separate project sub-nav row. Until S1-C16 the pages are Home only, the header has no lead
-  name, and the selector has no "New project" (DL-97); Settings joins the pages at S1-C16a and
-  Members at S1-C16b, each with its page (DL-109).
+  separate project sub-nav row. From S1-C16 the header shows the lead's name and the selector has "New project"
+  (DL-97); Settings joins the pages at S1-C16a and Members at S1-C16b, each with its page
+  (DL-109).
 - **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
   up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. Pages
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
@@ -663,8 +663,10 @@ render inside the full shell when signed in.
 
 - **UI-FBK-6** **Persistent banners** sit at the top of `main` and are text plus icon plus
   tone: archived project (info tone, "This project is archived. It is read-only."), and the
-  classification banner on every project page (the level and each category as text, with an
-  icon; its tone is chosen when S1-C16 builds it). **They are not dismissible**: they state what
+  classification banner on every project page (the level and each category as text, with
+  the tone's icon: Internal info, Confidential warning, Restricted danger; categories without a
+  level show "Not classified" in Internal's tone; an unclassified project with no categories has
+  none). **They are not dismissible**: they state what
   the page is, not that something happened. A "Deactivated" neutral badge follows a deactivated
   user's name everywhere it appears.
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog

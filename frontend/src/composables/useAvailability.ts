@@ -17,6 +17,8 @@ export function useAvailability(
   noun: string,
   check: (value: string) => Promise<{ available: boolean; problem: string | null }>,
   skip: (value: string) => boolean = (v) => v === '',
+  // What each problem says: a slug's by default, a project key's for a key.
+  problems: Record<string, string> = IDENTIFIER_PROBLEM,
 ) {
   const message = ref('')
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -34,7 +36,7 @@ export function useAvailability(
         if (id !== latest) return
         message.value = result.available
           ? `${noun} is available`
-          : `${noun} ${IDENTIFIER_PROBLEM[result.problem ?? 'taken'] ?? 'is not available'}`
+          : `${noun} ${problems[result.problem ?? 'taken'] ?? 'is not available'}`
       } catch (error) {
         if (!(error instanceof ApiError)) throw error
       }

@@ -11,8 +11,11 @@ const props = withDefaults(
     type?: 'button' | 'submit'
     pending?: boolean
     pendingLabel?: string
+    // Blocked until something on the page is done, its reason shown and tied by
+    // `aria-describedby` (UI-FRM-15's export-control exception, UI-TOK-10).
+    blocked?: boolean
   }>(),
-  { variant: 'primary', type: 'button', pending: false, pendingLabel: 'Saving…' },
+  { variant: 'primary', type: 'button', pending: false, pendingLabel: 'Saving…', blocked: false },
 )
 
 const emit = defineEmits<{ click: [event: MouseEvent] }>()
@@ -24,11 +27,14 @@ const VARIANTS = {
   ghost: 'border-transparent bg-transparent text-text hover:bg-hover',
 }
 
+// Blocked draws the disabled tokens (UI-TOK-10); pending keeps its own look.
+const BLOCKED = 'cursor-default border-disabled-border bg-disabled-bg text-disabled-text'
+
 const classes = computed(() => [
   'inline-flex min-h-(--control-height) items-center justify-center gap-2 rounded-md border px-4',
   'font-medium',
   props.variant === 'primary' ? 'min-w-38' : '',
-  VARIANTS[props.variant],
+  props.blocked && !props.pending ? BLOCKED : VARIANTS[props.variant],
 ])
 
 // Going pending, hold the width it had, so a longer label or the spinner doesn't move the layout.
@@ -43,8 +49,8 @@ watch(
 )
 
 function onClick(event: MouseEvent) {
-  if (props.pending) {
-    // Also stops a submit button from submitting its form again.
+  if (props.pending || props.blocked) {
+    // Also stops a submit button from submitting its form (again).
     event.preventDefault()
     return
   }
@@ -58,7 +64,7 @@ function onClick(event: MouseEvent) {
     :type="type"
     :class="classes"
     :style="heldWidth ? { minWidth: `${heldWidth}px` } : undefined"
-    :aria-disabled="pending ? 'true' : undefined"
+    :aria-disabled="pending || blocked ? 'true' : undefined"
     @click="onClick"
   >
     <Icon v-if="pending" name="spinner" class="animate-spin" />

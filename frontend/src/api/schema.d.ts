@@ -1620,6 +1620,8 @@ export interface components {
             status: components["schemas"]["ProjectStatus"];
             /** Lead Id */
             lead_id: string | null;
+            /** Lead Name */
+            lead_name: string | null;
             /** Enabled Modules */
             enabled_modules: components["schemas"]["ProjectModule"][];
             /** Archived */

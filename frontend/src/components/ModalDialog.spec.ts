@@ -87,4 +87,34 @@ describe('ModalDialog', () => {
 
     expect(fallback).toHaveBeenCalledOnce()
   })
+
+  it('closed without returning focus, leaves it where the action put it, once', async () => {
+    const fallback = vi.fn()
+    const wrapper = mountPage('<button type="button">Go</button>', fallback)
+    const dialog = wrapper.findComponent(ModalDialog)
+    await openFrom(wrapper)
+
+    dialog.vm.close({ returnFocus: false })
+
+    expect(document.activeElement?.id).not.toBe('opener')
+    expect(fallback).not.toHaveBeenCalled()
+    // The next close, by Esc (the native close), returns focus as usual.
+    await openFrom(wrapper)
+    wrapper.get<HTMLDialogElement>('dialog').element.close()
+    expect(document.activeElement?.id).toBe('opener')
+  })
+
+  it('ignores a close without focus return on a dialog already closed', async () => {
+    const wrapper = mountPage('<button type="button">Go</button>')
+    const dialog = wrapper.findComponent(ModalDialog)
+    await openFrom(wrapper)
+    wrapper.get<HTMLDialogElement>('dialog').element.close()
+
+    // An action finishing after Cancel closed it.
+    dialog.vm.close({ returnFocus: false })
+    await openFrom(wrapper)
+    wrapper.get<HTMLDialogElement>('dialog').element.close()
+
+    expect(document.activeElement?.id).toBe('opener')
+  })
 })

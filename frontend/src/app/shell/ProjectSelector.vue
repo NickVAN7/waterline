@@ -1,17 +1,27 @@
 <script setup lang="ts">
 // The project selector (UI-SHL-6): a menu button showing the selected project, opening a popover
-// of links to the current org's projects, and "All projects". "New project" comes with its dialog
-// in S1-C16 (DL-97).
-import { computed } from 'vue'
+// of links to the current org's projects, "All projects", and "New project" for those who may
+// create one (`project.create`), which opens the create dialog.
+import { computed, ref } from 'vue'
 
 import { api, client } from '@/api/client'
 import Button from '@/components/Button.vue'
+import { allows } from '@/composables/allowedActions'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
+import CreateProjectDialog from '@/views/project/CreateProjectDialog.vue'
 
 import LinkPopover from './LinkPopover.vue'
 
 const nav = useCurrentOrgStore()
+const popover = ref<InstanceType<typeof LinkPopover>>()
+const creator = ref<InstanceType<typeof CreateProjectDialog>>()
+
+function newProject(close: () => void) {
+  close()
+  popover.value?.focus()
+  void creator.value?.open()
+}
 
 // shortcut: the selector lists an org's first 200 projects (the API's page limit; TD-38); a
 // server-side search replaces it if an org ever has more.
@@ -60,6 +70,7 @@ const links = computed(() =>
 <template>
   <LinkPopover
     v-if="nav.org"
+    ref="popover"
     name="Projects"
     :links="links"
     :current-id="nav.project?.id"
@@ -100,6 +111,17 @@ const links = computed(() =>
       >
         All projects
       </RouterLink>
+      <Button
+        v-if="allows(nav.org, 'project.create')"
+        variant="ghost"
+        class="justify-start"
+        @click="newProject(close)"
+        >New project</Button
+      >
     </template>
   </LinkPopover>
+  <!-- Out of the sidebar's nav landmark (and its hidden state below 48 rem). -->
+  <Teleport to="body">
+    <CreateProjectDialog v-if="nav.org" ref="creator" :org="nav.org" />
+  </Teleport>
 </template>

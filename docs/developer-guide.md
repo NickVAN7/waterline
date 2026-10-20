@@ -4,11 +4,16 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C15a (Web: org admin) done: an org's members and settings pages
+> **Status:** S1-C16 (Web: projects) done: the create-project dialog (`views/project/`,
+> opened from the project selector's New project), the org project list's status and type
+> filters (`useListQuery`'s `filters`), the project header's lead name (`lead_name` on the
+> project read, DL-111), the classification banner (`ClassificationBanner`), and the sidebar's
+> greyed-out unshipped modules (`app/shell/ProjectPages.vue`); next is S1-C16a (Web: project
+> settings). S1-C15a (Web: org admin) built an org's members and settings pages
 > (`/{org_slug}/members`, `/{org_slug}/settings`), reached from the user menu's "Organization
 > administration" (DL-104); `RosterPage` (`views/roster/`), the roster list both the staff and the
 > org members pages are built on; and `useRouteOrg`, an org page's org from its URL, which follows
-> a slug change to the new URL; next is S1-C16 (Web: projects). S1-C15 (Web: workspace admin)
+> a slug change to the new URL. S1-C15 (Web: workspace admin)
 > built the workspace administration pages (staff, orgs,
 > users, settings, and a person's access review, reached from the user menu, DL-104), the shared
 > admin pieces (`ModalDialog`, the roster dialogs in `views/roster/`, the account
@@ -815,7 +820,8 @@ frontend/src/
                      allowedActions (`allows()`)
   stores/            Pinia stores: currentUser, currentOrg (the current org and project)
   views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
-                     my_work/, project/ (org project list, project home), user/ (account
+                     my_work/, project/ (org project list, project home, the
+                     create dialog, the classification banner), user/ (account
                      settings, access review, the account-action dialogs), workspace/ (staff,
                      orgs, users, settings), org/ (members, settings), roster/ (what staff and
                      org members share: `RosterPage`, the list with its row menus, and the add

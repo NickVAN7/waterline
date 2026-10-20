@@ -24,6 +24,10 @@ const emit = defineEmits<{ open: [] }>()
 const FILTER_AFTER = 8
 
 const popover = ref<InstanceType<typeof Popover>>()
+const button = ref<HTMLButtonElement>()
+// For an action in the footer that opens a dialog: focus back on the button first, so the dialog
+// returns focus there.
+defineExpose({ focus: () => button.value?.focus() })
 const expanded = ref(false)
 const filter = ref('')
 const popoverId = `popover-${props.name.toLowerCase().replace(/\W+/g, '-')}`
@@ -84,6 +88,7 @@ function onHide() {
 
 <template>
   <button
+    ref="button"
     type="button"
     aria-haspopup="dialog"
     :aria-expanded="expanded ? 'true' : 'false'"

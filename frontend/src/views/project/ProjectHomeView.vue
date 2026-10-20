@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// A project's home (`/{org_slug}/projects/{key}`; DL-97): for now, its header (name, key, status,
-// and "No lead" when it has none). A project the user can't see is the not-found page, the same
+// A project's home (`/{org_slug}/projects/{key}`; DL-97): for now, its classification banner and
+// header (name, key, status, and the lead's name, or "No lead" when it has none). A project the user can't see is the not-found page, the same
 // as one that doesn't exist (UI-FBK-14). A stale or wrong org slug, or a lowercase key, is
 // replaced with the project's own.
 import { computed, onMounted } from 'vue'
@@ -16,6 +16,8 @@ import Skeleton from '@/components/Skeleton.vue'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
+
+import ClassificationBanner from './ClassificationBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -74,12 +76,16 @@ async function retry() {
       <Skeleton v-else-if="!project.data.value" :rows="2" />
       <template v-else-if="status">
         <Alert v-if="project.data.value.archived" tone="info">{{ ARCHIVED_BANNER }}</Alert>
+        <ClassificationBanner :project="project.data.value" />
         <header class="flex flex-col gap-2">
           <h1 class="m-0 text-2xl leading-tight font-semibold">{{ project.data.value.name }}</h1>
           <div class="flex flex-wrap items-center gap-3">
             <span class="font-mono text-text-muted">{{ project.data.value.key }}</span>
             <Badge :tone="status.tone" :icon="status.icon">{{ status.label }}</Badge>
-            <Badge v-if="!project.data.value.lead_id" :tone="NO_LEAD.tone" :icon="NO_LEAD.icon">
+            <span v-if="project.data.value.lead_name"
+              >Lead: {{ project.data.value.lead_name }}</span
+            >
+            <Badge v-else :tone="NO_LEAD.tone" :icon="NO_LEAD.icon">
               {{ NO_LEAD.label }}
             </Badge>
           </div>

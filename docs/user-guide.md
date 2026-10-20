@@ -54,11 +54,26 @@ be loaded, **Try again** loads it again.
 ## Projects
 
 An organization's project list (`/<organization>/projects`) shows its projects that you can
-see, 25 to a page, with **Previous page** and **Next page** links when there are more. The page you're
-on is in the address, so a link or a reload opens the same page.
+see, 25 to a page, with **Previous page** and **Next page** links when there are more. **Status**
+and **Type** narrow the list; **Clear filters** shows them all again. The page you're on and the
+filters are in the address, so a link or a reload opens the same list.
 
-A project's home (`/<organization>/projects/<KEY>`) shows its name, its key, its status, and
-"No lead" if it has no lead yet. An archived project says "This project is archived. It is
+**New project**, in the project selector, is there if you may create projects in the organization
+(any member may). Give it a name and a key: 3 to 6 letters or digits, starting with a letter,
+that starts every item's number (`PMT-TA-45`) and can't be changed later; you're told as you type
+if it's taken. Pick its type (Software, ERP implementation, or General), which suggests its
+modules: each is described, and a module that isn't built yet says "Not available yet". You
+become its first admin and lead, unless you're an organization owner or admin, who may name
+another member instead. You can also classify it: a level (Internal, Confidential, or
+Restricted, each described) and why it's sensitive (Financial, Proprietary, Personal data,
+Export-controlled). An export-controlled project lets only its explicit members see its content,
+so creating one asks you to confirm that its first admin is authorized for export-controlled
+data: **Create project** waits until you check the box. Once created, the project opens.
+
+A project's home (`/<organization>/projects/<KEY>`) shows its classification at the top, if it
+has one ("Classification: Confidential. Categories: Financial."), then its name, its key, its
+status, and its lead's name, or "No lead" if it has none. In the sidebar, under the project, a
+module it has turned on that isn't built yet is listed with "Not available yet". An archived project says "This project is archived. It is
 read-only." at the top. An address with an old organization name or a
 lowercase key takes you to the project's own address. A project you can't see shows "Page not
 found", the same as one that doesn't exist.

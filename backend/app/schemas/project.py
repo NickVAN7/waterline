@@ -52,6 +52,8 @@ class ProjectRead(BaseModel):
     type: ProjectType
     status: ProjectStatus
     lead_id: uuid.UUID | None
+    # The lead's name, or None with no lead (DL-111).
+    lead_name: str | None
     enabled_modules: list[ProjectModule]
     archived: bool
     classification_level: ClassificationLevel | None

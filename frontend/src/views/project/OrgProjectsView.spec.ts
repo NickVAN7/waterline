@@ -189,4 +189,84 @@ describe('OrgProjectsView', () => {
 
     expect(wrapper.text()).toContain("Couldn't load the projects")
   })
+
+  it('opens with the filters the URL names, sending each as a one-item list', async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(page(1))
+
+    const { wrapper } = await mountAt('/acme/projects?status=on_hold&type=erp')
+
+    expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/projects', {
+      params: {
+        path: { org_id: ACME.id },
+        query: { limit: 25, offset: 0, status: ['on_hold'], type: ['erp'] },
+      },
+    })
+    expect(wrapper.get<HTMLSelectElement>('#projects-status').element.value).toBe('on_hold')
+    expect(wrapper.get<HTMLSelectElement>('#projects-type').element.value).toBe('erp')
+  })
+
+  it('filters by status in the URL, from the first page, and reloads the list', async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(page(25, 60, 25))
+    const { wrapper, router } = await mountAt('/acme/projects?offset=25')
+
+    await wrapper.get('#projects-status').setValue('active')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/acme/projects?status=active')
+    expect(get).toHaveBeenLastCalledWith('/api/orgs/{org_id}/projects', {
+      params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0, status: ['active'] } },
+    })
+  })
+
+  it('says no projects match, and Clear filters empties them and focuses the first filter (UI-FBK-8)', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(page(0))
+    const { wrapper, router } = await mountAt('/acme/projects?type=general')
+
+    expect(wrapper.get('h2').text()).toBe('No projects match Type: General')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Clear filters')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/acme/projects')
+    expect(document.activeElement?.id).toBe('projects-status')
+    expect(wrapper.get('h2').text()).toBe('No projects yet')
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('names every active filter in the no-match heading', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(page(0))
+
+    const { wrapper } = await mountAt('/acme/projects?status=on_hold&type=erp')
+
+    expect(wrapper.get('h2').text()).toBe(
+      'No projects match Status: On hold, Type: ERP implementation',
+    )
+  })
+
+  it.each(['bogus', 'constructor'])(
+    "ignores a filter value the API doesn't know (%s), loading the list at Any",
+    async (value) => {
+      const get = vi.spyOn(client, 'GET').mockResolvedValue(page(1))
+
+      const { wrapper } = await mountAt(`/acme/projects?status=${value}&type=erp`)
+
+      expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/projects', {
+        params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0, type: ['erp'] } },
+      })
+      expect(wrapper.get<HTMLSelectElement>('#projects-status').element.value).toBe('')
+    },
+  )
+
+  it('announces the new count after a filter change (UI-TBL-3)', async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(page(3))
+    const { wrapper } = await mountAt('/acme/projects')
+    get.mockResolvedValue(page(1))
+
+    await wrapper.get('#projects-type').setValue('erp')
+    await flushPromises()
+
+    expect(wrapper.get('[aria-live=polite]').text()).toBe('1 project')
+  })
 })

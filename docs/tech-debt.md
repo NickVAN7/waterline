@@ -611,3 +611,24 @@ Entry format:
 - **Fix by:** Slice 2 (a `first-admin-candidates` endpoint under `project.assign_first_admin`, or
   the owner's other choice)
 - **Status:** open
+
+### TD-45: The project header doesn't mark a deactivated lead
+- **Added:** S1-C16
+- **What:** design-doc §1.1 says a deactivated lead stays the lead and is shown with the
+  "Deactivated" badge; the project read carries the lead's name (DL-111) but not whether the
+  account is active, so the header shows the name alone.
+- **Why:** the read's fields were settled for the name only (DL-111); the active flag is one more
+  field, best added with the lead picker that needs it.
+- **Fix by:** S1-C16a (project settings' lead picker shows deactivated members; the read gains
+  the flag then)
+- **Status:** open
+
+### TD-46: The other create dialogs don't reload `/me` after a 403
+- **Added:** S1-C16
+- **What:** UI-FRM-7 says a 403 refetches what the user may do. The create-project dialog and
+  the settings pages reload `/me` (or the entity) on a 403; the create-org, add-person, and
+  account dialogs show the alert but leave the actions that opened them on screen.
+- **Why:** found reviewing S1-C16; fixing S1-C15's dialogs isn't this checkpoint's scope
+  (DL-106).
+- **Fix by:** S1-C16b (the members page's dialogs are the same roster dialogs)
+- **Status:** open
