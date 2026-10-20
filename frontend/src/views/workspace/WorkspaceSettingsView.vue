@@ -5,8 +5,8 @@
 // the values and who can change them.
 import { computed, nextTick, ref, watch } from 'vue'
 
-import { api, ApiError, client } from '@/api/client'
-import { focusHeading, settlePage } from '@/app/routeFocus'
+import { api, client } from '@/api/client'
+import { settlePage } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import FormAlert from '@/components/FormAlert.vue'
@@ -18,6 +18,7 @@ import { allows } from '@/composables/allowedActions'
 import { useAvailability } from '@/composables/useAvailability'
 import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
+import { useSettingsSave } from '@/composables/useSettingsSave'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
@@ -28,9 +29,6 @@ import WorkspaceNav from './WorkspaceNav.vue'
 const workspace = useWorkspace()
 const store = useCurrentUserStore()
 const values = ref({ name: '', slug: '' })
-const pending = ref(false)
-const status = ref('')
-const done = ref('')
 const errors = useFormErrors({ name: 'Name', slug: 'Slug' })
 
 const nameField = ref<InstanceType<typeof TextField>>()
@@ -85,54 +83,35 @@ async function focus(target: 'name' | 'slug' | 'alert') {
   else (target === 'name' ? nameField : slugField).value?.focus()
 }
 
+const { pending, status, done, save, edited, dismissed } = useSettingsSave({
+  values,
+  form: formElement,
+  errors,
+  focus,
+  reload: async () => {
+    await page.run()
+    return allows(page.data.value, 'workspace.update')
+  },
+})
+
 async function submit(): Promise<void> {
-  if (pending.value || !page.data.value) return
-  done.value = ''
-  const empty = errors.requireFilled(values.value)
-  if (empty) return focus(empty)
-  pending.value = true
-  status.value = 'Saving the settings…'
-  try {
+  const current = page.data.value
+  if (!current) return
+  await save(values.value, async () => {
     page.data.value = await api(
       client.PATCH('/api/workspaces/{workspace_id}', {
-        params: { path: { workspace_id: page.data.value.id } },
+        params: { path: { workspace_id: current.id } },
         body: values.value,
       }),
     )
-    status.value = ''
-    done.value = 'Settings saved.'
-    // The workspace's name and slug in `/me` follow; a failed reload leaves the old ones until the
-    // next sign-in or reload, and the save itself stands.
+    // The workspace's name and slug in `/me` follow; a failed reload leaves the old ones until
+    // the next sign-in or reload, and the save itself stands.
     store.load().catch(() => {})
-  } catch (error) {
-    status.value = ''
-    await focus(errors.apply(error))
-    // What the user may do has changed: the reload shows it. If they still may save, the form
-    // keeps what they typed; if not, the alert moves above the read-only values and keeps focus
-    // (UI-FRM-7).
-    if (error instanceof ApiError && error.status === 403) {
-      const typed = { ...values.value }
-      await page.run()
-      if (allows(page.data.value, 'workspace.update')) values.value = typed
-      else await focus('alert')
-    }
-  } finally {
-    pending.value = false
-  }
-}
-
-function edited(field: 'name' | 'slug') {
-  errors.clearField(field)
-  done.value = ''
+    return 'Settings saved.'
+  })
 }
 
 const retry = retryFromSubmit(formElement, submit)
-
-// The read-only page's alert: dismissed, focus goes to the `h1` (the alert held it).
-function dismissed() {
-  errors.dismissAlert()
-  void focusHeading()
-}
 </script>
 
 <template>
@@ -171,7 +150,7 @@ function dismissed() {
           :key="errors.alertKey.value"
           ref="alertBox"
           :alert="errors.alert.value"
-          @dismiss="errors.dismissAlert()"
+          @dismiss="dismissed"
           @retry="retry"
         />
         <p class="m-0 text-sm text-text-muted">

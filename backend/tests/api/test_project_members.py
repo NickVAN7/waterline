@@ -564,7 +564,9 @@ async def test_the_member_list_is_sorted_by_name_and_filters_by_role(
     assert [m["name"] for m in viewers.json()["items"]] == ["Zed"]
 
 
-async def test_project_member_rows_carry_no_account_fields(client: AsyncClient, t: Tenancy) -> None:
+async def test_project_member_rows_carry_no_account_actions(
+    client: AsyncClient, t: Tenancy
+) -> None:
     """DL-102 covers staff and org member rows only. A workspace admin may open anyone's access
     review (design-doc §5), so `user.view_access` would show here if the rows carried it."""
     await sign_in_as(client, await staff(t, WorkspaceRole.ADMIN))
@@ -575,8 +577,24 @@ async def test_project_member_rows_carry_no_account_fields(client: AsyncClient, 
 
     rows = {m["name"]: m for m in (await client.get(MEMBERS)).json()["items"]}
 
-    assert "is_active" not in rows["Bea"]
     assert rows["Bea"]["allowed_actions"] == ["project_member.manage"]
+
+
+async def test_project_member_rows_say_whether_the_account_is_active(
+    client: AsyncClient, t: Tenancy, admin: User
+) -> None:
+    """DL-113: the lead picker marks a deactivated member, whom the server refuses as lead."""
+    for name, active in (("Bea", True), ("Gail", False)):
+        user = await UserFactory.create_async(name=name, is_active=active)
+        await ProjectMembershipFactory.create_async(project=t.project, user=user)
+
+    rows = (await client.get(MEMBERS)).json()["items"]
+
+    assert [(m["name"], m["is_active"]) for m in rows] == [
+        ("Ada Admin", True),
+        ("Bea", True),
+        ("Gail", False),
+    ]
 
 
 UNSEEN = [

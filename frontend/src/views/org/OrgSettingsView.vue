@@ -11,8 +11,8 @@ let carried = ''
 // them. A slug change moves the page to the new URL (`useRouteOrg`).
 import { computed, nextTick, ref, watch } from 'vue'
 
-import { api, ApiError, client } from '@/api/client'
-import { focusHeading, settlePage, syncTitle } from '@/app/routeFocus'
+import { api, client } from '@/api/client'
+import { settlePage, syncTitle } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import FormAlert from '@/components/FormAlert.vue'
@@ -25,6 +25,7 @@ import { useAvailability } from '@/composables/useAvailability'
 import { ANNOUNCE_DELAY_MS, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
 import { useRouteOrg } from '@/composables/useRouteOrg'
+import { useSettingsSave } from '@/composables/useSettingsSave'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
@@ -35,9 +36,6 @@ import { WHO_TO_ASK } from './orgAdmin'
 const org = useRouteOrg()
 const store = useCurrentUserStore()
 const values = ref({ name: '', slug: '' })
-const pending = ref(false)
-const status = ref('')
-const done = ref('')
 const errors = useFormErrors({ name: 'Name', slug: 'Slug' })
 
 const nameField = ref<InstanceType<typeof TextField>>()
@@ -105,61 +103,45 @@ async function focus(target: 'name' | 'slug' | 'alert') {
   else (target === 'name' ? nameField : slugField).value?.focus()
 }
 
+const { pending, status, done, save, edited, dismissed } = useSettingsSave({
+  values,
+  form: formElement,
+  errors,
+  focus,
+  reload: async () => {
+    await page.run()
+    return allows(page.data.value, 'org.update')
+  },
+})
+
 async function submit(): Promise<void> {
-  if (pending.value || !page.data.value) return
-  done.value = ''
-  const empty = errors.requireFilled(values.value)
-  if (empty) return focus(empty)
-  pending.value = true
-  status.value = 'Saving the settings…'
-  try {
+  const current = page.data.value
+  if (!current) return
+  await save(values.value, async () => {
     const saved = await api(
       client.PATCH('/api/orgs/{org_id}', {
-        params: { path: { org_id: page.data.value.id } },
+        params: { path: { org_id: current.id } },
         body: values.value,
       }),
     )
-    const moved = saved.slug !== page.data.value.slug
+    const moved = saved.slug !== current.slug
     page.data.value = saved
-    status.value = ''
-    if (moved) carried = 'Settings saved.'
-    else done.value = 'Settings saved.'
-    // The org's entry in `/me` takes the saved name and slug at once, and the page follows a new slug
-    // to its URL (`useRouteOrg`); the reload of `/me` follows.
+    // The org's entry in `/me` takes the saved name and slug at once, and the page follows a new
+    // slug to its URL (`useRouteOrg`); the reload of `/me` follows.
     const entry = store.me?.orgs.find((o) => o.id === saved.id)
     if (entry) Object.assign(entry, { name: saved.name, slug: saved.slug })
-    if (!moved) void syncTitle()
     // A failed reload changes nothing shown: the entry already holds what was saved.
     store.load().catch(() => {})
-  } catch (error) {
-    status.value = ''
-    await focus(errors.apply(error))
-    // What the user may do has changed: the reload shows it. If they still may save, the form
-    // keeps what they typed; if not, the alert moves above the read-only values and keeps focus
-    // (UI-FRM-7).
-    if (error instanceof ApiError && error.status === 403) {
-      const typed = { ...values.value }
-      await page.run()
-      if (allows(page.data.value, 'org.update')) values.value = typed
-      else await focus('alert')
+    if (moved) {
+      carried = 'Settings saved.'
+      return ''
     }
-  } finally {
-    pending.value = false
-  }
-}
-
-function edited(field: 'name' | 'slug') {
-  errors.clearField(field)
-  done.value = ''
+    void syncTitle()
+    return 'Settings saved.'
+  })
 }
 
 const retry = retryFromSubmit(formElement, submit)
-
-// The read-only page's alert: dismissed, focus goes to the `h1` (the alert held it).
-function dismissed() {
-  errors.dismissAlert()
-  void focusHeading()
-}
 </script>
 
 <template>
@@ -200,7 +182,7 @@ function dismissed() {
           :key="errors.alertKey.value"
           ref="alertBox"
           :alert="errors.alert.value"
-          @dismiss="errors.dismissAlert()"
+          @dismiss="dismissed"
           @retry="retry"
         />
         <p class="m-0 text-sm text-text-muted">

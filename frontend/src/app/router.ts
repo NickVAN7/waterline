@@ -89,6 +89,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { settlesItself: true },
   },
   {
+    path: '/:orgSlug/projects/:key/settings',
+    name: 'project-settings',
+    component: () => import('@/views/project/ProjectSettingsView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
     path: '/status',
     name: 'status',
     component: () => import('@/views/status/StatusView.vue'),

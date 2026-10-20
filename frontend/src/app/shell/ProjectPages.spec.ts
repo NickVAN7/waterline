@@ -2,12 +2,15 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
+import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok } from '@/test/api'
 import { project } from '@/test/projects'
 import { testRouter } from '@/test/router'
 
 import ProjectPages from './ProjectPages.vue'
+
+type Action = components['schemas']['Action']
 
 const guidance = (available: boolean) =>
   ok({
@@ -18,11 +21,18 @@ const guidance = (available: boolean) =>
     types: [],
   })
 
-async function mountWith(answer: unknown, enabled: ('sprints' | 'github')[] = ['sprints']) {
+async function mountWith(
+  answer: unknown,
+  enabled: ('sprints' | 'github')[] = ['sprints'],
+  allowed: Action[] = [],
+) {
   vi.spyOn(client, 'GET').mockResolvedValue(answer as never)
   const router = await testRouter('/')
   const wrapper = mount(ProjectPages, {
-    props: { project: project({ enabled_modules: enabled }), orgSlug: 'acme' },
+    props: {
+      project: project({ enabled_modules: enabled, allowed_actions: allowed }),
+      orgSlug: 'acme',
+    },
     global: { plugins: [router] },
   })
   await flushPromises()
@@ -56,5 +66,25 @@ describe('ProjectPages', () => {
       failed(503, { code: 'network_error', message: '', details: {} }),
     )
     expect(unknown.find('p').exists()).toBe(false)
+  })
+
+  it.each<Action>([
+    'project.update',
+    'project.raise_classification',
+    'project.archive',
+    'project.unarchive',
+  ])('links Settings for whoever it offers anything: %s', async (action) => {
+    const wrapper = await mountWith(guidance(true), [], [action])
+
+    expect(wrapper.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Home', '/acme/projects/ERP'],
+      ['Settings', '/acme/projects/ERP/settings'],
+    ])
+  })
+
+  it('links no Settings with only project.view', async () => {
+    const wrapper = await mountWith(guidance(true), [], ['project.view'])
+
+    expect(wrapper.findAll('a').map((a) => a.text())).toEqual(['Home'])
   })
 })

@@ -67,6 +67,17 @@ describe('ModalDialog', () => {
     expect(document.activeElement?.id).toBe('cancel')
   })
 
+  it('focuses its own field, never one in a dialog nested inside it (S1-C16a)', async () => {
+    const wrapper = mountPage(
+      '<input id="own" aria-label="Own field" />' +
+        '<dialog><button data-autofocus type="button">Nested</button></dialog>',
+    )
+
+    await openFrom(wrapper)
+
+    expect(document.activeElement?.id).toBe('own')
+  })
+
   it('returns focus to the control that opened it when it closes', async () => {
     const wrapper = mountPage('<button type="button">Go</button>')
     await openFrom(wrapper)

@@ -89,6 +89,12 @@ async function submit(wrapper: Wrapper) {
   await flushPromises()
 }
 
+/** The export-control confirmation, the dialog inside the create dialog. */
+const confirmation = (wrapper: Wrapper) => wrapper.findAll('dialog')[1]!
+
+const buttonNamed = (scope: ReturnType<Wrapper['get']>, text: string) =>
+  scope.findAll('button').find((b) => b.text() === text)!
+
 const categoryBox = (wrapper: Wrapper, value: string) =>
   wrapper.get<HTMLInputElement>(`input[type=checkbox][value=${value}]`)
 
@@ -210,24 +216,24 @@ describe('CreateProjectDialog', () => {
     expect(sent(post)).toMatchObject({ first_admin_id: 'u-ann' })
   })
 
-  it('blocks creating an export-controlled project until its first admin is confirmed (UI-FRM-15)', async () => {
+  it('asks for the confirmation in its own dialog before creating an export-controlled project (DL-114)', async () => {
     const { wrapper, post } = await openDialog()
     await fill(wrapper)
-
     await categoryBox(wrapper, 'export_controlled').setValue(true)
-    const create = wrapper.findAll('button').find((b) => b.text() === 'Create project')!
-    expect(create.attributes('aria-disabled')).toBe('true')
-    expect(create.attributes('aria-describedby')).toBe('create-project-blocked')
-    expect(wrapper.get('#create-project-blocked').text()).toBe('Check the box to continue.')
-    expect(wrapper.text()).toContain('I confirm I am authorized for export-controlled data.')
+
     await submit(wrapper)
     expect(post).not.toHaveBeenCalled()
+    const confirm = confirmation(wrapper)
+    expect(confirm.attributes('open')).toBeDefined()
+    expect(confirm.text()).toContain('Casey Cole (casey@harbor.example) (you)')
+    expect(confirm.text()).toContain('I confirm I am authorized for export-controlled data.')
     await expectNoA11yViolations(wrapper)
 
-    await wrapper.get('#create-project-export-control-confirmed').setValue(true)
-    expect(create.attributes('aria-disabled')).toBeUndefined()
-    await submit(wrapper)
+    await confirm.get('input[type=checkbox]').setValue(true)
+    await confirm.get('form').trigger('submit')
+    await flushPromises()
 
+    expect(confirm.attributes('open')).toBeUndefined()
     expect(sent(post)).toMatchObject({
       classification_categories: ['export_controlled'],
       export_control_confirmed: true,
@@ -235,19 +241,32 @@ describe('CreateProjectDialog', () => {
     })
   })
 
-  it('confirms the named first admin, and asks again when the admin changes', async () => {
+  it('creates nothing when the export-control confirmation is cancelled', async () => {
+    const { wrapper, post } = await openDialog()
+    await fill(wrapper)
+    await categoryBox(wrapper, 'export_controlled').setValue(true)
+    await submit(wrapper)
+
+    await buttonNamed(confirmation(wrapper), 'Cancel').trigger('click')
+    await flushPromises()
+
+    expect(post).not.toHaveBeenCalled()
+    expect(wrapper.get('dialog').attributes('open')).toBeDefined()
+  })
+
+  it('confirms the named first admin as the only explicit member', async () => {
     const { wrapper, post } = await openDialog(['project.create', 'project.assign_first_admin'])
     await fill(wrapper)
     await categoryBox(wrapper, 'export_controlled').setValue(true)
-    await wrapper.get('#create-project-export-control-confirmed').setValue(true)
-
     await wrapper.get('#create-project-first-admin-id').setValue('u-ann')
-    expect(wrapper.text()).toContain('I confirm Ann Lee is authorized for export-controlled data.')
-    expect(
-      wrapper.get<HTMLInputElement>('#create-project-export-control-confirmed').element.checked,
-    ).toBe(false)
-    await wrapper.get('#create-project-export-control-confirmed').setValue(true)
     await submit(wrapper)
+
+    const confirm = confirmation(wrapper)
+    expect(confirm.text()).toContain('I confirm Ann Lee is authorized for export-controlled data.')
+    expect(confirm.text()).not.toContain('(you)')
+    await confirm.get('input[type=checkbox]').setValue(true)
+    await confirm.get('form').trigger('submit')
+    await flushPromises()
 
     expect(sent(post)).toMatchObject({ confirmed_member_ids: ['u-ann'] })
   })

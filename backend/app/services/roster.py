@@ -104,8 +104,9 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
     workspace's, org's, or project's ID; `target`, where the roster's actions are checked (its
     `organization_id` is None for staff);
     `new_membership(user_id, role)` builds a row of `M`; `row_model` is the response for one
-    (`StaffRead`, `MemberRead`). With `account_actions`, each row also carries the person's
-    `is_active` and the `user`-level actions the caller may take on them (DL-102)."""
+    (`StaffRead`, `MemberRead`, `ProjectMemberRead`), with the person's `is_active`. With
+    `account_actions`, each row also carries the `user`-level actions the caller may take on them
+    (DL-102)."""
 
     def __init__(
         self,
@@ -151,7 +152,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         """A roster row, with what the caller may do to it: an owner's or admin's row needs the
         roster's `manage_admins` as well (DL-56, DL-68), except the caller's own row, where
         stepping down needs only `manage` (DL-59). Given the person's `account`, the row also
-        has their `is_active` and the `user`-level actions on them (DL-102)."""
+        has the `user`-level actions on them (DL-102)."""
         prefix = self.spec.manage.split(".")[0] + "."
         actions = [a for a in allowed_actions(ctx, self.target) if a.startswith(prefix)]
         own = membership.user_id == ctx.user_id
@@ -162,19 +163,17 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         ):
             actions = []
         user = membership.user
-        extra: dict[str, object] = {}
         if account is not None:
             target = user_target(self.target.workspace_id, user.id, account)
             actions = [*actions, *allowed_actions(ctx, target)]
-            extra["is_active"] = user.is_active
         return self.row_model(
             user_id=user.id,
             email=user.email,
             username=user.username,
             name=user.name,
             role=membership.role,
+            is_active=user.is_active,
             allowed_actions=actions,
-            **extra,
         )
 
     async def list(self, ctx: AuthzContext, list_spec: ListSpec, query: object) -> Page[Row]:

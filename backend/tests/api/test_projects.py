@@ -305,11 +305,34 @@ async def test_the_project_read_names_its_lead_and_none_without_one(
     with_lead = await client.get("/api/projects/LED")
     without = await client.get("/api/projects/PMT")
 
-    assert (with_lead.json()["lead_id"], with_lead.json()["lead_name"]) == (
-        str(lena.id),
-        "Lena Lead",
+    assert (
+        with_lead.json()["lead_id"],
+        with_lead.json()["lead_name"],
+        with_lead.json()["lead_is_active"],
+    ) == (str(lena.id), "Lena Lead", True)
+    assert (
+        without.json()["lead_id"],
+        without.json()["lead_name"],
+        without.json()["lead_is_active"],
+    ) == (None, None, None)
+
+
+async def test_a_deactivated_lead_stays_the_lead_marked_inactive(
+    client: AsyncClient, session: AsyncSession, t: Tenancy
+) -> None:
+    """Design-doc §1.1: a deactivated lead stays the lead, shown as deactivated (DL-113)."""
+    await admin_of_pmt(client, t)
+    gail = await UserFactory.create_async(name="Gail Gone", is_active=False)
+    led = await ProjectFactory.create_async(organization=t.org, key="LED", lead=gail)
+    await ProjectMembershipFactory.create_async(project=led, user=gail)
+
+    body = (await client.get("/api/projects/LED")).json()
+
+    assert (body["lead_id"], body["lead_name"], body["lead_is_active"]) == (
+        str(gail.id),
+        "Gail Gone",
+        False,
     )
-    assert (without.json()["lead_id"], without.json()["lead_name"]) == (None, None)
 
 
 async def test_the_lead_must_be_a_project_member(

@@ -31,6 +31,7 @@ export function project(overrides: Partial<Project> = {}): Project {
     status: 'active',
     lead_id: '0190f0a0-0000-7000-8000-0000000000d1',
     lead_name: 'Liam Lead',
+    lead_is_active: true,
     enabled_modules: [],
     archived: false,
     classification_level: null,

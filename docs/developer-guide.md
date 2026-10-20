@@ -4,12 +4,19 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C16 (Web: projects) done: the create-project dialog (`views/project/`,
+> **Status:** S1-C16a (Web: project settings) done: the project settings page
+> (`ProjectSettingsView`, `/{org_slug}/projects/{key}/settings`, Settings in the project pages nav
+> for whoever `hasSettings`), with details, modules (`ModuleFields`, warning when one is turned
+> off), classification (`ClassificationFields`), and archiving; the export-control confirmation
+> as its own dialog (`ExportControlDialog`, DL-114), which the create dialog opens too;
+> `ConfirmDialog`, a promise-based confirmation; `useSettingsSave`, the settings forms' shared save
+> handling (TD-43); `useProjectPage` and `ProjectHeader`, every project page's loading and header;
+> and `lead_is_active` on the project read and `is_active` on project member rows (DL-113); next
+> is S1-C16b (Web: project members). S1-C16 (Web: projects) built: the create-project dialog (`views/project/`,
 > opened from the project selector's New project), the org project list's status and type
 > filters (`useListQuery`'s `filters`), the project header's lead name (`lead_name` on the
 > project read, DL-111), the classification banner (`ClassificationBanner`), and the sidebar's
-> greyed-out unshipped modules (`app/shell/ProjectPages.vue`); next is S1-C16a (Web: project
-> settings). S1-C15a (Web: org admin) built an org's members and settings pages
+> greyed-out unshipped modules (`app/shell/ProjectPages.vue`). S1-C15a (Web: org admin) built an org's members and settings pages
 > (`/{org_slug}/members`, `/{org_slug}/settings`), reached from the user menu's "Organization
 > administration" (DL-104); `RosterPage` (`views/roster/`), the roster list both the staff and the
 > org members pages are built on; and `useRouteOrg`, an org page's org from its URL, which follows

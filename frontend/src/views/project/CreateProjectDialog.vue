@@ -3,33 +3,29 @@
 // name, a key checked live (UI-FRM-9), the type, a description, the modules (the type's
 // recommendations and each module's note, from module guidance), a first admin when the org's
 // entry in `/me` allows naming one (the org's active members, DL-112), and the classification.
-// Marking it export-controlled needs the confirmation that its first admin is authorized; its
-// button is blocked until the box is checked (UI-FRM-15). Created, the dialog opens the project.
+// Marking it export-controlled first asks, in its own dialog, for the confirmation that its first
+// admin is authorized (DL-114). Created, the dialog opens the project.
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
-import {
-  CLASSIFICATION_CATEGORY,
-  CLASSIFICATION_LEVEL,
-  KEY_PROBLEM,
-  MODULE,
-  NOT_AVAILABLE_YET,
-  PROJECT_TYPE,
-  UNCLASSIFIED,
-} from '@/app/labels'
+import { KEY_PROBLEM, PROJECT_TYPE } from '@/app/labels'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import FormField from '@/components/FormField.vue'
-import GroupError from '@/components/GroupError.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import SelectField from '@/components/SelectField.vue'
 import TextField from '@/components/TextField.vue'
 import { allows } from '@/composables/allowedActions'
 import { useAvailability } from '@/composables/useAvailability'
-import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 import { useCurrentUserStore } from '@/stores/currentUser'
+
+import ClassificationFields from './ClassificationFields.vue'
+import ExportControlDialog from './ExportControlDialog.vue'
+import ModuleFields from './ModuleFields.vue'
+import { recommendedFor } from './modules'
 
 type Org = components['schemas']['MeOrg']
 type ProjectType = components['schemas']['ProjectType']
@@ -39,11 +35,6 @@ type Category = components['schemas']['ClassificationCategory']
 type Guidance = components['schemas']['ModuleGuidance']
 
 const props = defineProps<{ org: Org }>()
-
-// The modules a project may enable (the API's `ProjectModule`); the rest of module guidance's are
-// v2 and only described. Typed from the schema, so a new module is a compile error here.
-const ENABLEABLE: Record<ProjectModule, true> = { sprints: true, github: true }
-const enableable = (module: string): module is ProjectModule => module in ENABLEABLE
 
 const store = useCurrentUserStore()
 const router = useRouter()
@@ -59,9 +50,8 @@ const values = ref({
 const modules = ref<ProjectModule[]>([])
 const modulesEdited = ref(false)
 const categories = ref<Category[]>([])
-const confirmed = ref(false)
 const guidance = ref<Guidance | null>(null)
-const people = ref<{ value: string; label: string; name: string }[]>([])
+const people = ref<{ value: string; label: string; name: string; email: string }[]>([])
 const pending = ref(false)
 const status = ref('')
 const errors = useFormErrors({
@@ -73,10 +63,10 @@ const errors = useFormErrors({
   first_admin_id: 'First admin',
   classification_level: 'Classification',
   classification_categories: 'Categories',
-  export_control_confirmed: 'Confirmation',
 })
 
 const dialog = ref<InstanceType<typeof ModalDialog>>()
+const exportControl = ref<InstanceType<typeof ExportControlDialog>>()
 const alertBox = ref<InstanceType<typeof FormAlert>>()
 const nameField = ref<InstanceType<typeof TextField>>()
 const keyField = ref<InstanceType<typeof TextField>>()
@@ -98,17 +88,11 @@ const { message: keyAvailability } = useAvailability(
   KEY_PROBLEM,
 )
 
-/** The type's recommended modules that may be enabled: what the server would seed. */
-function recommendedFor(type: ProjectType): ProjectModule[] {
-  const recommended = guidance.value?.types.find((t) => t.type === type)?.recommended ?? []
-  return recommended.filter(enableable)
-}
-
 // Until the modules are edited, they follow the type's recommendations.
 watch(
   () => values.value.type,
   (type) => {
-    if (!modulesEdited.value) modules.value = recommendedFor(type)
+    if (!modulesEdited.value) modules.value = recommendedFor(guidance.value, type)
   },
 )
 
@@ -117,28 +101,20 @@ function toggleModule() {
   errors.clearField('enabled_modules')
 }
 
-const recommended = computed(
-  () => new Set(guidance.value?.types.find((t) => t.type === values.value.type)?.recommended),
-)
-
 const exportControlled = computed(() => categories.value.includes('export_controlled'))
 // The confirmation covers the first admin, the only explicit member a new project has (§3.1).
 const firstAdminId = computed(() => values.value.first_admin_id || store.me?.user.id || '')
-const firstAdminName = computed(() =>
-  values.value.first_admin_id
-    ? (people.value.find((p) => p.value === values.value.first_admin_id)?.name ?? '')
-    : (store.me?.user.name ?? ''),
-)
-// The confirmation's sentence: "I am" for the creator themselves.
-const confirmation = computed(() =>
-  values.value.first_admin_id
-    ? `I confirm ${firstAdminName.value} is authorized for export-controlled data.`
-    : 'I confirm I am authorized for export-controlled data.',
-)
-const blocked = computed(() => exportControlled.value && !confirmed.value)
-
-watch(exportControlled, (marked) => {
-  if (!marked) confirmed.value = false
+const firstAdmin = computed(() => {
+  const named = people.value.find((p) => p.value === values.value.first_admin_id)
+  return named
+    ? { id: named.value, name: named.name, email: named.email, active: true, you: false }
+    : {
+        id: firstAdminId.value,
+        name: store.me?.user.name ?? '',
+        email: store.me?.user.email ?? '',
+        active: true,
+        you: true,
+      }
 })
 
 async function open(): Promise<void> {
@@ -152,7 +128,6 @@ async function open(): Promise<void> {
   }
   modulesEdited.value = false
   categories.value = []
-  confirmed.value = false
   people.value = []
   errors.reset()
   status.value = ''
@@ -163,7 +138,7 @@ async function open(): Promise<void> {
 async function loadGuidance() {
   try {
     guidance.value = await api(client.GET('/api/module-guidance'))
-    if (!modulesEdited.value) modules.value = recommendedFor(values.value.type)
+    if (!modulesEdited.value) modules.value = recommendedFor(guidance.value, values.value.type)
   } catch (error) {
     if (!(error instanceof ApiError)) throw error
     // No guidance: the modules aren't offered, and the server seeds them from the type.
@@ -181,7 +156,12 @@ async function loadPeople() {
     )
     people.value = members.items
       .filter((m) => m.is_active && m.user_id !== store.me?.user.id)
-      .map((m) => ({ value: m.user_id, label: `${m.name} (${m.email})`, name: m.name }))
+      .map((m) => ({
+        value: m.user_id,
+        label: `${m.name} (${m.email})`,
+        name: m.name,
+        email: m.email,
+      }))
   } catch (error) {
     if (!(error instanceof ApiError)) throw error
     // The picker offers only "Me"; the creator becomes the first admin.
@@ -197,9 +177,10 @@ async function focus(target: string) {
 }
 
 async function submit(): Promise<void> {
-  if (pending.value || blocked.value) return
+  if (pending.value) return
   const empty = errors.requireFilled({ name: values.value.name, key: values.value.key })
   if (empty) return focus(empty)
+  if (exportControlled.value && !(await exportControl.value?.open([firstAdmin.value]))) return
   pending.value = true
   status.value = 'Creating the project…'
   try {
@@ -241,6 +222,7 @@ async function submit(): Promise<void> {
 }
 
 const retry = retryFromSubmit(formElement, submit)
+const dismissed = () => dismissToSubmit(errors, formElement)
 
 defineExpose({ open })
 </script>
@@ -253,7 +235,7 @@ defineExpose({ open })
         :key="errors.alertKey.value"
         ref="alertBox"
         :alert="errors.alert.value"
-        @dismiss="errors.dismissAlert()"
+        @dismiss="dismissed"
         @retry="retry"
       />
       <p class="m-0 text-sm text-text-muted">
@@ -315,54 +297,15 @@ defineExpose({ open })
           />
         </template>
       </FormField>
-      <fieldset
+      <ModuleFields
         v-if="guidance"
-        id="create-project-enabled-modules"
-        tabindex="-1"
-        :aria-describedby="
-          errors.fieldErrors.value.enabled_modules ? 'create-project-modules-error' : undefined
-        "
-        :aria-invalid="errors.fieldErrors.value.enabled_modules ? 'true' : undefined"
-        class="m-0 flex flex-col gap-2 border-0 p-0"
-      >
-        <legend class="mb-2 font-medium">Modules</legend>
-        <template v-for="note in guidance.modules" :key="note.module">
-          <label v-if="enableable(note.module)" class="flex items-start gap-2">
-            <input
-              v-model="modules"
-              type="checkbox"
-              :value="note.module"
-              class="size-(--target-min) shrink-0"
-              @change="toggleModule"
-            />
-            <span class="flex flex-col">
-              <span class="font-medium">
-                {{ MODULE[note.module] ?? note.module }}
-                <span v-if="recommended.has(note.module)" class="text-sm text-text-muted">
-                  · Recommended for {{ PROJECT_TYPE[values.type] }}</span
-                >
-                <span v-if="!note.available" class="text-sm text-text-muted">
-                  · {{ NOT_AVAILABLE_YET }}</span
-                >
-              </span>
-              <span class="text-sm text-text-muted">{{ note.note }}</span>
-            </span>
-          </label>
-          <p v-else class="m-0 flex flex-col pl-8 text-text-muted">
-            <span>
-              {{ MODULE[note.module] ?? note.module }} · {{ NOT_AVAILABLE_YET }}
-              <span v-if="recommended.has(note.module)">
-                · Recommended for {{ PROJECT_TYPE[values.type] }}</span
-              >
-            </span>
-            <span class="text-sm">{{ note.note }}</span>
-          </p>
-        </template>
-        <GroupError
-          id="create-project-modules-error"
-          :error="errors.fieldErrors.value.enabled_modules"
-        />
-      </fieldset>
+        v-model="modules"
+        prefix="create-project"
+        :guidance="guidance"
+        :type="values.type"
+        :error="errors.fieldErrors.value.enabled_modules"
+        @edit="toggleModule"
+      />
       <SelectField
         v-if="canNameAdmin"
         id="create-project-first-admin-id"
@@ -371,125 +314,23 @@ defineExpose({ open })
         :options="[{ value: '', label: `Me (${store.me?.user.name ?? ''})` }, ...people]"
         help="The project's first admin and lead. You can name another of the organization's members."
         :error="errors.fieldErrors.value.first_admin_id"
-        @update:model-value="
-          () => {
-            errors.clearField('first_admin_id')
-            confirmed = false
-          }
-        "
+        @update:model-value="errors.clearField('first_admin_id')"
       />
-      <fieldset
-        id="create-project-classification-level"
-        tabindex="-1"
-        :aria-describedby="
-          errors.fieldErrors.value.classification_level ? 'create-project-level-error' : undefined
-        "
-        :aria-invalid="errors.fieldErrors.value.classification_level ? 'true' : undefined"
-        class="m-0 flex flex-col gap-2 border-0 p-0"
-      >
-        <legend class="mb-2 font-medium">Classification</legend>
-        <label
-          v-for="choice in [
-            { value: '', ...UNCLASSIFIED },
-            ...(Object.keys(CLASSIFICATION_LEVEL) as Level[]).map((value) => ({
-              value,
-              ...CLASSIFICATION_LEVEL[value],
-            })),
-          ]"
-          :key="choice.value"
-          class="flex items-start gap-2"
-        >
-          <input
-            v-model="values.level"
-            type="radio"
-            name="create-project-level"
-            :value="choice.value"
-            class="size-(--target-min) shrink-0"
-            @change="errors.clearField('classification_level')"
-          />
-          <span class="flex flex-col">
-            <span class="font-medium">{{ choice.label }}</span>
-            <span class="text-sm text-text-muted">{{ choice.description }}</span>
-          </span>
-        </label>
-        <GroupError
-          id="create-project-level-error"
-          :error="errors.fieldErrors.value.classification_level"
-        />
-      </fieldset>
-      <fieldset
-        id="create-project-classification-categories"
-        tabindex="-1"
-        :aria-describedby="
-          errors.fieldErrors.value.classification_categories
-            ? 'create-project-categories-error'
-            : undefined
-        "
-        :aria-invalid="errors.fieldErrors.value.classification_categories ? 'true' : undefined"
-        class="m-0 flex flex-col gap-2 border-0 p-0"
-      >
-        <legend class="mb-2 font-medium">Categories</legend>
-        <label
-          v-for="(label, category) in CLASSIFICATION_CATEGORY"
-          :key="category"
-          class="flex items-center gap-2"
-        >
-          <input
-            v-model="categories"
-            type="checkbox"
-            :value="category"
-            class="size-(--target-min) shrink-0"
-            @change="errors.clearField('classification_categories')"
-          />
-          {{ label }}
-        </label>
-        <GroupError
-          id="create-project-categories-error"
-          :error="errors.fieldErrors.value.classification_categories"
-        />
-      </fieldset>
-      <div v-if="exportControlled" class="flex flex-col gap-2 rounded-md border border-border p-3">
-        <p class="m-0">
-          On an export-controlled project, only its explicit members reach its content. Its only
-          explicit member to start with is its first admin, {{ firstAdminName
-          }}{{ values.first_admin_id ? '' : ' (you)' }}.
-        </p>
-        <label class="flex items-start gap-2">
-          <input
-            id="create-project-export-control-confirmed"
-            v-model="confirmed"
-            type="checkbox"
-            :aria-describedby="
-              errors.fieldErrors.value.export_control_confirmed
-                ? 'create-project-confirmation-error'
-                : undefined
-            "
-            :aria-invalid="errors.fieldErrors.value.export_control_confirmed ? 'true' : undefined"
-            class="size-(--target-min) shrink-0"
-            @change="errors.clearField('export_control_confirmed')"
-          />
-          <span>{{ confirmation }}</span>
-        </label>
-        <GroupError
-          id="create-project-confirmation-error"
-          :error="errors.fieldErrors.value.export_control_confirmed"
-        />
-      </div>
+      <ClassificationFields
+        v-model:level="values.level"
+        v-model:categories="categories"
+        prefix="create-project"
+        :level-error="errors.fieldErrors.value.classification_level"
+        :categories-error="errors.fieldErrors.value.classification_categories"
+        @edit-level="errors.clearField('classification_level')"
+        @edit-categories="errors.clearField('classification_categories')"
+      />
       <div class="flex flex-wrap items-center gap-3">
-        <Button
-          type="submit"
-          :pending="pending"
-          pending-label="Creating…"
-          :blocked="blocked"
-          :aria-describedby="blocked ? 'create-project-blocked' : undefined"
-          >Create project</Button
-        >
+        <Button type="submit" :pending="pending" pending-label="Creating…">Create project</Button>
         <Button variant="secondary" @click="dialog?.close()">Cancel</Button>
-        <p v-if="blocked" id="create-project-blocked" class="m-0 text-sm text-text-muted">
-          Check the box to continue.
-        </p>
       </div>
       <p class="sr-only" aria-live="polite">{{ errors.announcement.value || status }}</p>
     </form>
+    <ExportControlDialog ref="exportControl" />
   </ModalDialog>
 </template>

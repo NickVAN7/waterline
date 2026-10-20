@@ -1562,6 +1562,8 @@ export interface components {
             /** Name */
             name: string;
             role: components["schemas"]["ProjectRole"];
+            /** Is Active */
+            is_active: boolean;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -1622,6 +1624,8 @@ export interface components {
             lead_id: string | null;
             /** Lead Name */
             lead_name: string | null;
+            /** Lead Is Active */
+            lead_is_active: boolean | null;
             /** Enabled Modules */
             enabled_modules: components["schemas"]["ProjectModule"][];
             /** Archived */

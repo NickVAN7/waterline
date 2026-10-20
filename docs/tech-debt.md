@@ -598,7 +598,7 @@ Entry format:
   form than guessed from two (S1-C15a review).
 - **Fix by:** S1-C16a (project settings, the third such form, DL-109: the shared part moves into
   `useFormErrors` or a settings-form composable)
-- **Status:** open
+- **Status:** resolved in S1-C16a
 
 ### TD-44: The first-admin picker lists only the org's members
 - **Added:** S1-C16 (DL-112)
@@ -621,7 +621,7 @@ Entry format:
   field, best added with the lead picker that needs it.
 - **Fix by:** S1-C16a (project settings' lead picker shows deactivated members; the read gains
   the flag then)
-- **Status:** open
+- **Status:** resolved in S1-C16a
 
 ### TD-46: The other create dialogs don't reload `/me` after a 403
 - **Added:** S1-C16
@@ -631,4 +631,17 @@ Entry format:
 - **Why:** found reviewing S1-C16; fixing S1-C15's dialogs isn't this checkpoint's scope
   (DL-106).
 - **Fix by:** S1-C16b (the members page's dialogs are the same roster dialogs)
+- **Status:** open
+
+### TD-47: The older dialogs' alerts drop focus when dismissed
+- **Added:** S1-C16a
+- **What:** UI-FBK-13: dismissing a form alert, which holds focus, should return focus to the
+  submit button whose action failed (`dismissToSubmit` in `useFormErrors`). The settings pages
+  and the create-project dialog do; the account confirm, details, and password dialogs and the
+  roster's add-person, change-role, and remove dialogs, and the create-organization dialog, call
+  `dismissAlert()` alone, so focus
+  falls to the dialog.
+- **Why:** found reviewing S1-C16a; S1-C15's and S1-C15a's dialogs aren't this checkpoint's scope
+  (DL-106).
+- **Fix by:** S1-C16b (the members page reuses the roster dialogs)
 - **Status:** open

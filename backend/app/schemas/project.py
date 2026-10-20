@@ -52,8 +52,9 @@ class ProjectRead(BaseModel):
     type: ProjectType
     status: ProjectStatus
     lead_id: uuid.UUID | None
-    # The lead's name, or None with no lead (DL-111).
+    # The lead's name and whether their account is active, or None with no lead (DL-111; TD-45).
     lead_name: str | None
+    lead_is_active: bool | None
     enabled_modules: list[ProjectModule]
     archived: bool
     classification_level: ClassificationLevel | None
@@ -131,6 +132,7 @@ class ProjectMemberRead(BaseModel):
     username: str
     name: str
     role: ProjectRole
+    is_active: bool
     allowed_actions: list[Action]
 
 

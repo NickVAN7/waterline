@@ -4,9 +4,10 @@
  * no field shows, as one form alert in our own words. `apply()` returns what should take focus:
  * the first invalid field, or the alert.
  */
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 
 import { ApiError, NETWORK_ERROR } from '@/api/client'
+import { focusHeading } from '@/app/routeFocus'
 
 export type FormAlert = { tone: 'danger' | 'warning'; message: string; action?: 'reload' | 'retry' }
 
@@ -178,4 +179,20 @@ export function retryFromSubmit(
     form.value?.querySelector<HTMLElement>('button[type=submit]')?.focus()
     return again()
   }
+}
+
+/**
+ * A form alert's dismiss (UI-FBK-13): the alert goes, and focus, which it held, goes to the form's
+ * submit button (the action that failed), or to the `h1` when the form is gone (a page gone
+ * read-only).
+ */
+export async function dismissToSubmit(
+  errors: { dismissAlert: () => void },
+  form: { value?: HTMLFormElement | undefined },
+): Promise<void> {
+  errors.dismissAlert()
+  await nextTick()
+  const submit = form.value?.querySelector<HTMLElement>('button[type=submit]')
+  if (submit) submit.focus()
+  else await focusHeading()
 }

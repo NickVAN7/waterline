@@ -19,10 +19,14 @@ async function open(): Promise<void> {
   opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
   dialog.value?.showModal()
   await nextTick()
-  const first =
-    dialog.value?.querySelector<HTMLElement>('[data-autofocus]') ??
-    dialog.value?.querySelector<HTMLElement>('input, select, textarea, button')
-  first?.focus()
+  ;(own('[data-autofocus]') ?? own('input, select, textarea, button'))?.focus()
+}
+
+/** The first match that is this dialog's own, not inside a dialog nested in it. */
+function own(selector: string): HTMLElement | undefined {
+  return [...(dialog.value?.querySelectorAll<HTMLElement>(selector) ?? [])].find(
+    (element) => element.closest('dialog') === dialog.value,
+  )
 }
 
 function close({ returnFocus: back = true } = {}): void {

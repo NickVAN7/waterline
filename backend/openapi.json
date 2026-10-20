@@ -6151,6 +6151,10 @@
           "role": {
             "$ref": "#/components/schemas/ProjectRole"
           },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
           "allowed_actions": {
             "items": {
               "$ref": "#/components/schemas/Action"
@@ -6166,6 +6170,7 @@
           "username",
           "name",
           "role",
+          "is_active",
           "allowed_actions"
         ],
         "title": "ProjectMemberRead",
@@ -6299,6 +6304,17 @@
             ],
             "title": "Lead Name"
           },
+          "lead_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Is Active"
+          },
           "enabled_modules": {
             "items": {
               "$ref": "#/components/schemas/ProjectModule"
@@ -6353,6 +6369,7 @@
           "status",
           "lead_id",
           "lead_name",
+          "lead_is_active",
           "enabled_modules",
           "archived",
           "classification_level",

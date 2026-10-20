@@ -54,6 +54,7 @@ describe('ProjectHomeView', () => {
     expect(wrapper.get('header').text()).toContain('Active')
     expect(wrapper.get('header').text()).toContain('Lead: Liam Lead')
     expect(wrapper.text()).not.toContain('No lead')
+    expect(wrapper.get('header').text()).not.toContain('Deactivated')
     // Unclassified: no banner (design-doc §3.1).
     expect(wrapper.text()).not.toContain('Classification:')
     expect(document.title).toBe('ERP rollout · Waterline')
@@ -70,6 +71,15 @@ describe('ProjectHomeView', () => {
 
     expect(wrapper.get('header').text()).toContain('No lead')
     expect(wrapper.text()).toContain('This project is archived. It is read-only.')
+  })
+
+  it('marks a deactivated lead, who stays the lead (design-doc §1.1; TD-45)', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(project({ lead_is_active: false })))
+
+    const { wrapper } = await mountAt('/acme/projects/ERP')
+
+    expect(wrapper.get('header').text()).toContain('Lead: Liam Lead')
+    expect(wrapper.get('header').text()).toContain('Deactivated')
   })
 
   it('shows the classification banner, level and categories as text (UI-FBK-6)', async () => {

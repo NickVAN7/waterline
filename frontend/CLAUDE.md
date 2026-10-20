@@ -122,6 +122,14 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   (`GroupError`: the icon, an id in the group's `aria-describedby`, `aria-invalid`), and every
   field named in `useFormErrors`' labels renders its error somewhere (S1-C16 review).
 - `Button`'s `blocked` draws the disabled tokens (UI-TOK-10); `pending` keeps its own look.
+- A form alert's dismiss returns focus to the form's submit button (`dismissToSubmit`, or
+  `useSettingsSave`'s `dismissed`), never `dismissAlert()` alone: the alert held focus (UI-FBK-13;
+  S1-C16a review).
+- A reload after a 403 that leaves the page without the form (now a 403 or 404 page, or an
+  error state) settles it as a navigation does, `settlePage()`: the alert that held focus is gone
+  (UI-FRM-7, UI-SHL-9; S1-C16a review).
+- A confirmation that names people shows each with their email and their "Deactivated" badge,
+  keyed by id: names aren't unique (UI-FBK-6; S1-C16a review).
 - A dialog component is mounted once per page: two copies share their fields' ids, so each label
   names both fields (S1-C16).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next

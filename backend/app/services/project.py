@@ -369,6 +369,7 @@ class ProjectService:
             status=project.status,
             lead_id=project.lead_id,
             lead_name=lead.name if lead else None,
+            lead_is_active=lead.is_active if lead else None,
             enabled_modules=[ProjectModule(m) for m in project.enabled_modules],
             archived=project.archived_at is not None,
             classification_level=project.classification_level,
