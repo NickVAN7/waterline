@@ -587,3 +587,14 @@ Entry format:
 - **Fix by:** Slice 1's retro (a design change splitting the reset into its own action, e.g.
   `user.reset_password`; then the check goes)
 - **Status:** open
+
+### TD-43: The two settings forms repeat their save handling
+- **Added:** S1-C15a
+- **What:** `OrgSettingsView` and `WorkspaceSettingsView` each hold the same save flow: the
+  required check, focus on the first invalid field, and a 403's reload (read-only with focus on
+  the `h1`, or the typed values kept, UI-FRM-7). A fix to one must be made in the other.
+- **Why:** two copies, edited together in S1-C15a; a shared helper is better shaped by a third
+  form than guessed from two (S1-C15a review).
+- **Fix by:** S1-C16 (project settings, the third such form: the shared part moves into
+  `useFormErrors` or a settings-form composable)
+- **Status:** open

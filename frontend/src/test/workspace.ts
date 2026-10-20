@@ -5,7 +5,7 @@ import { afterEach } from 'vitest'
 import type { Component } from 'vue'
 
 import type { Action } from '@/composables/allowedActions'
-import { useCurrentUserStore } from '@/stores/currentUser'
+import { type Me, useCurrentUserStore } from '@/stores/currentUser'
 
 import { me, workspaceEntry } from './api'
 import { testRouter } from './router'
@@ -19,7 +19,12 @@ export async function mountWorkspaceView(
   allowed: Action[] = ['workspace.view'],
   workspaces = [workspaceEntry(allowed)],
 ) {
-  useCurrentUserStore().me = me({ workspaces })
+  return mountSignedIn(view, path, me({ workspaces }))
+}
+
+/** `view` at `path` for the user `signedIn`, in a `main`. */
+export async function mountSignedIn(view: Component, path: string, signedIn: Me) {
+  useCurrentUserStore().me = signedIn
   const router = await testRouter(path)
   const wrapper = mount(
     { components: { AdminPage: view }, template: '<main><AdminPage /></main>' },

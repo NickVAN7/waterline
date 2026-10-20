@@ -3,9 +3,10 @@ import { createPinia, setActivePinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { useCurrentOrgStore } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { me, workspaceEntry } from '@/test/api'
+import { ACME, me, workspaceEntry } from '@/test/api'
 import { stubResizeObserver } from '@/test/overlay'
 import { testRouter } from '@/test/router'
 
@@ -120,6 +121,18 @@ describe('UserMenu', () => {
     await openMenu({ workspaces: [workspaceEntry([])] })
 
     expect(items().map((li) => li.textContent?.trim())).not.toContain('Workspace administration')
+  })
+
+  it("links to the current org's administration for those who may manage it (DL-104)", async () => {
+    const globex = { ...ACME, id: 'org-globex', name: 'Globex Retail', slug: 'globex' }
+    await openMenu({ orgs: [ACME, { ...globex, allowed_actions: ['org_member.manage'] }] })
+    expect(items().map((li) => li.textContent?.trim())).not.toContain('Organization administration')
+
+    useCurrentOrgStore().enter('globex')
+    await flushPromises()
+
+    const link = item('Organization administration').querySelector('a')!
+    expect(link.getAttribute('href')).toBe('/globex/members')
   })
 
   it('asks the shell to sign out', async () => {

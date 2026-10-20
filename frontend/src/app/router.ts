@@ -66,6 +66,17 @@ export const routes: RouteRecordRaw[] = [
     name: 'workspace-settings',
     component: () => import('@/views/workspace/WorkspaceSettingsView.vue'),
   },
+  // Org administration (UI-SHL-10, DL-104): for its owners and admins, and workspace admins.
+  {
+    path: '/:orgSlug/members',
+    name: 'org-members',
+    component: () => import('@/views/org/OrgMembersView.vue'),
+  },
+  {
+    path: '/:orgSlug/settings',
+    name: 'org-settings',
+    component: () => import('@/views/org/OrgSettingsView.vue'),
+  },
   {
     path: '/:orgSlug/projects',
     name: 'org-projects',

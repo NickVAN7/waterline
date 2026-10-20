@@ -19,6 +19,8 @@ export async function testRouter(path = '/') {
       { path: '/workspace/users', name: 'workspace-users', component: Page },
       { path: '/workspace/users/:userId/access', name: 'user-access', component: Page },
       { path: '/workspace/settings', name: 'workspace-settings', component: Page },
+      { path: '/:orgSlug/members', name: 'org-members', component: Page },
+      { path: '/:orgSlug/settings', name: 'org-settings', component: Page },
       { path: '/:orgSlug/projects', name: 'org-projects', component: Page },
       { path: '/:orgSlug/projects/:key', name: 'project-home', component: Page },
     ],

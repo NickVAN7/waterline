@@ -5,8 +5,8 @@ How to use each feature, from an end user's point of view. Kept current at every
 > **Status:** Slice 1 in progress. You can sign in, change a temporary password, find your
 > projects from My work, the org switcher, and the project selector, open a project's home, edit
 > your profile and password, and choose a light or dark theme. Workspace owners and admins run
-> the workspace from its administration pages. Organization administration, and the project
-> pages, come next.
+> the workspace from its administration pages, and organization owners and admins run their
+> organization's members and settings from theirs. The project pages come next.
 
 ## Signing in
 
@@ -129,6 +129,26 @@ deactivated.
 **Access review.** A person's row offers **Access review** to those who may see it: every
 organization and project they can reach, why (their role, or a role above it), and, for each
 project, whether they reach its content or only its management.
+
+## Organization administration
+
+Organization owners and admins (and workspace owners and admins, in every organization) find
+**Organization administration** in the account menu, for the organization they're in (switch
+organizations first to administer another). Its pages are linked along the top: **Members** and
+**Settings**. Anyone else who opens these pages is told to ask the organization's owners or
+admins.
+
+- **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
+  as **Staff** does under workspace administration: **Add person** asks for the email first, then
+  either confirms an existing account or creates one with a temporary password, shown once; a
+  row offers **Change role** and **Remove from organization**, which by default also removes the
+  person from the organization's projects; and the last owner can't step down or leave until you
+  choose who becomes owner. Only owners grant, change, or remove the owner and admin roles. Rows
+  also offer the account actions and the access review your role covers (see "Account actions"
+  and "Access review" above).
+- **Settings** renames the organization and changes its slug, which is in its web addresses
+  (organization owners and workspace admins; organization admins see the values). After a slug
+  change the page moves to its new address; links with the old slug no longer open it.
 
 ## System status
 

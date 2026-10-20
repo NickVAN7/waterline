@@ -4,12 +4,17 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C15 (Web: workspace admin) done: the workspace administration pages (staff, orgs,
+> **Status:** S1-C15a (Web: org admin) done: an org's members and settings pages
+> (`/{org_slug}/members`, `/{org_slug}/settings`), reached from the user menu's "Organization
+> administration" (DL-104); `RosterPage` (`views/roster/`), the roster list both the staff and the
+> org members pages are built on; and `useRouteOrg`, an org page's org from its URL, which follows
+> a slug change to the new URL; next is S1-C16 (Web: projects). S1-C15 (Web: workspace admin)
+> built the workspace administration pages (staff, orgs,
 > users, settings, and a person's access review, reached from the user menu, DL-104), the shared
-> admin pieces S1-C15a reuses (`ModalDialog`, the roster dialogs in `views/roster/`, the account
+> admin pieces (`ModalDialog`, the roster dialogs in `views/roster/`, the account
 > action dialogs in `views/user/`, the temporary-password field and notice, `RowActions`,
 > `useAvailability`), `PageHeader` on every page, and staff and org member rows carrying
-> `is_active` and the account actions (DL-102); next is S1-C15a (Web: org admin). S1-C14a (Web:
+> `is_active` and the account actions (DL-102). S1-C14a (Web:
 > app shell) built the shell (skip link, header with the org switcher
 > and user menu, the sidebar with My work, the project selector, and the project's pages), the
 > System / Light / Dark theme, My work's projects section, account settings, the password
@@ -805,18 +810,21 @@ frontend/src/
                      Pagination, SuccessStatus, PageHeader, SectionNav, ModalDialog,
                      RowActions, Icon
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
-                     useAvailability, useSignOut, useTheme, useWorkspace, temporaryPassword,
+                     useAvailability, useRouteOrg, useSignOut, useTheme, useWorkspace,
+                     temporaryPassword,
                      allowedActions (`allows()`)
   stores/            Pinia stores: currentUser, currentOrg (the current org and project)
   views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
                      my_work/, project/ (org project list, project home), user/ (account
                      settings, access review, the account-action dialogs), workspace/ (staff,
-                     orgs, users, settings), roster/ (the dialogs staff and org members share:
-                     add person, change role, remove); plus status/ and errors/ (404, no
-                     access)
+                     orgs, users, settings), org/ (members, settings), roster/ (what staff and
+                     org members share: `RosterPage`, the list with its row menus, and the add
+                     person, change role, and remove dialogs); plus status/ and errors/ (404,
+                     403, no access)
   test/              helpers for the specs: a11y.ts, api.ts (typed responses), projects.ts,
                      overlay.ts (`stubResizeObserver`, `stubDialog`), router.ts, workspace.ts
-                     (`mountWorkspaceView`)
+                     (`mountWorkspaceView`, `mountSignedIn`), org.ts (`mountOrgView`,
+                     `mountOrgPages`)
 frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
 ```
 
@@ -827,8 +835,13 @@ anyone); `/workspace/staff`, `/workspace/orgs`, `/workspace/users`,
 `/workspace/users/{user_id}/access`, and `/workspace/settings` (workspace administration, DL-104;
 `/workspace` goes to staff; anyone without `workspace.view`, or whom the API refuses, gets the
 403 page, `ForbiddenView`, saying who to ask, UI-FBK-14);
+`/{org_slug}/members` and `/{org_slug}/settings` (org administration, DL-104, for anyone with
+`org_member.manage` in the org's `/me` entry; anyone else, or anyone the API refuses with a 403,
+gets the 403 page, and an org the API no longer finds, the not-found page, since an org's
+existence isn't public, UI-FBK-14);
 `/{org_slug}/projects` and `/{org_slug}/projects/{key}` (an org's projects and a
-project's home; a stale org slug or a lowercase key is redirected to the project's own);
+project's home; a stale org slug or a lowercase key is redirected to the project's own; an org
+page open when its org's slug changes moves to the new URL, `useRouteOrg`);
 anything else, the not-found page. Every top-level segment is on the reserved-slug list
 (`router.spec.ts` checks it against `ReservedSlug` in `backend/openapi.json`).
 

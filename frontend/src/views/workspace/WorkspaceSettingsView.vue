@@ -5,8 +5,8 @@
 // the values and who can change them.
 import { computed, nextTick, ref, watch } from 'vue'
 
-import { api, client } from '@/api/client'
-import { settlePage } from '@/app/routeFocus'
+import { api, ApiError, client } from '@/api/client'
+import { focusHeading, settlePage } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import FormAlert from '@/components/FormAlert.vue'
@@ -16,7 +16,7 @@ import SuccessStatus from '@/components/SuccessStatus.vue'
 import TextField from '@/components/TextField.vue'
 import { allows } from '@/composables/allowedActions'
 import { useAvailability } from '@/composables/useAvailability'
-import { useFormErrors } from '@/composables/useFormErrors'
+import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useCurrentUserStore } from '@/stores/currentUser'
@@ -36,7 +36,7 @@ const errors = useFormErrors({ name: 'Name', slug: 'Slug' })
 const nameField = ref<InstanceType<typeof TextField>>()
 const slugField = ref<InstanceType<typeof TextField>>()
 const alertBox = ref<InstanceType<typeof FormAlert>>()
-const submitButton = ref<InstanceType<typeof Button>>()
+const formElement = ref<HTMLFormElement>()
 
 const page = useLoad(() =>
   api(
@@ -47,12 +47,17 @@ const page = useLoad(() =>
 )
 watch(
   () => workspace.value?.id,
-  async (id) => {
-    if (!id || !allows(workspace.value, 'workspace.view')) return
-    if (!(await page.run()) || !page.data.value) return
-    values.value = { name: page.data.value.name, slug: page.data.value.slug }
+  (id) => {
+    if (id && allows(workspace.value, 'workspace.view')) void page.run()
   },
   { immediate: true },
+)
+// Every load fills the form, Try again's included.
+watch(
+  () => page.data.value,
+  (data) => {
+    if (data) values.value = { name: data.name, slug: data.slug }
+  },
 )
 watch(
   () => page.error.value?.status === 404,
@@ -96,11 +101,21 @@ async function submit(): Promise<void> {
     )
     status.value = ''
     done.value = 'Settings saved.'
-    // The workspace's name and slug in `/me` follow.
-    void store.load()
+    // The workspace's name and slug in `/me` follow; a failed reload leaves the old ones until the
+    // next sign-in or reload, and the save itself stands.
+    store.load().catch(() => {})
   } catch (error) {
     status.value = ''
     await focus(errors.apply(error))
+    // What the user may do has changed: the reload shows it. If they still may save, the form
+    // keeps what they typed; if not, the alert moves above the read-only values and keeps focus
+    // (UI-FRM-7).
+    if (error instanceof ApiError && error.status === 403) {
+      const typed = { ...values.value }
+      await page.run()
+      if (allows(page.data.value, 'workspace.update')) values.value = typed
+      else await focus('alert')
+    }
   } finally {
     pending.value = false
   }
@@ -111,9 +126,12 @@ function edited(field: 'name' | 'slug') {
   done.value = ''
 }
 
-function retry() {
-  ;(submitButton.value?.$el as HTMLElement | undefined)?.focus()
-  return submit()
+const retry = retryFromSubmit(formElement, submit)
+
+// The read-only page's alert: dismissed, focus goes to the `h1` (the alert held it).
+function dismissed() {
+  errors.dismissAlert()
+  void focusHeading()
 }
 </script>
 
@@ -143,6 +161,7 @@ function retry() {
       <Skeleton v-else-if="!page.data.value" />
       <form
         v-else-if="allows(page.data.value, 'workspace.update')"
+        ref="formElement"
         novalidate
         class="flex flex-col gap-4"
         @submit.prevent="submit"
@@ -181,12 +200,20 @@ function retry() {
         />
         <p class="m-0 text-sm" aria-live="polite">{{ availability }}</p>
         <div>
-          <Button ref="submitButton" type="submit" :pending="pending">Save settings</Button>
+          <Button type="submit" :pending="pending">Save settings</Button>
         </div>
         <SuccessStatus :message="done" />
         <p class="sr-only" aria-live="polite">{{ errors.announcement.value || status }}</p>
       </form>
       <template v-else>
+        <!-- A 403 on save that left the page read-only: the refusal stays (UI-FRM-7). -->
+        <FormAlert
+          v-if="errors.alert.value"
+          :key="errors.alertKey.value"
+          ref="alertBox"
+          :alert="errors.alert.value"
+          @dismiss="dismissed"
+        />
         <dl class="m-0 flex flex-col gap-1">
           <dt class="font-medium">Name</dt>
           <dd class="m-0">{{ page.data.value.name }}</dd>

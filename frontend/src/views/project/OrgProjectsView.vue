@@ -3,7 +3,7 @@
 // is in the URL. S1-C16 adds its filters and New project. An org slug the user doesn't see is the
 // not-found page.
 import { computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
 import EmptyState from '@/components/EmptyState.vue'
@@ -15,17 +15,15 @@ import { settlePage } from '@/app/routeFocus'
 import { allows } from '@/composables/allowedActions'
 import { useListQuery } from '@/composables/useListQuery'
 import { useLoad } from '@/composables/useLoad'
-import { useCurrentOrgStore } from '@/stores/currentOrg'
+import { useRouteOrg } from '@/composables/useRouteOrg'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
 import ProjectList from './ProjectList.vue'
 
-const route = useRoute()
 const router = useRouter()
-const nav = useCurrentOrgStore()
 const list = useListQuery({ limit: 25 })
 
-const org = computed(() => nav.orgs.find((o) => o.slug === route.params.orgSlug) ?? null)
+const org = useRouteOrg()
 
 const page = useLoad(() =>
   api(
@@ -39,7 +37,6 @@ watch(
   [org, list.params],
   () => {
     if (!org.value) return
-    nav.enter(org.value.slug)
     void page.run().then((loaded) => {
       // A page past the end (an old link, since the list shrank) goes back to the first.
       if (loaded && !page.data.value?.items.length && list.offset.value > 0) {

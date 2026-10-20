@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { failed, noContent, ok } from '@/test/api'
+import { failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { cleanUpAfterEach, listPage, mountWorkspaceView, WORKSPACE_ID } from '@/test/workspace'
 
@@ -153,14 +153,30 @@ describe('StaffView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
-  it('shows an error state with Try again when the list fails', async () => {
+  it('is the 403 page when the API refuses with a 403 (UI-FBK-14)', async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(
-      failed(503, { code: 'network_error', message: '', details: {} }),
+      failed(403, { code: 'forbidden', message: 'Forbidden.', details: {} }),
     )
 
     const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff')
 
+    expect(wrapper.get('h1').text()).toBe("You can't open this page")
+    expect(document.title).toBe("You can't open this page · Waterline")
+    expect(wrapper.text()).not.toContain("Couldn't load the staff")
+  })
+
+  it('shows an error state with Try again when the list fails, leaving the title and focus', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      failed(503, { code: 'network_error', message: '', details: {} }),
+    )
+
+    const before = document.title
+
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff')
+
     expect(wrapper.text()).toContain("Couldn't load the staff")
+    // The page stays: its title and focus are left alone (UI-FBK-15).
+    expect(document.title).toBe(before)
   })
 
   it('reloads the list and says what happened after an action', async () => {
@@ -197,6 +213,120 @@ describe('StaffView', () => {
         ([p]) => p === '/api/workspaces/{workspace_id}/staff',
       ),
     ).toHaveLength(2)
+  })
+
+  it('creates a staff account in one step when the email has none', async () => {
+    vi.spyOn(client, 'GET').mockImplementation(((path: string) =>
+      Promise.resolve(
+        path === '/api/auth/password-policy'
+          ? ok(PASSWORD_POLICY)
+          : path.endsWith('user-check')
+            ? ok({ email: 'ann@harbor.example', exists: false })
+            : ok(listPage([OLGA, MO, DEE])),
+      )) as never)
+    const post = vi.spyOn(client, 'POST').mockResolvedValue(ok(row('Ann Lee'), 201))
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff', [
+      'workspace.view',
+      'workspace_staff.manage',
+    ])
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Add person')!
+      .trigger('click')
+    await flushPromises()
+
+    await wrapper.get('#add-role').setValue('admin')
+    await wrapper.get('#add-email').setValue('ann@harbor.example')
+    await wrapper.get<HTMLInputElement>('#add-email').element.form!.requestSubmit()
+    await flushPromises()
+    await wrapper.get('#add-name').setValue('Ann Lee')
+    await wrapper.get('#add-username').setValue('ann')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+    await wrapper.get<HTMLInputElement>('#add-name').element.form!.requestSubmit()
+    await flushPromises()
+
+    expect(post).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff/new', {
+      params: { path: { workspace_id: WORKSPACE_ID } },
+      body: {
+        email: 'ann@harbor.example',
+        username: 'ann',
+        name: 'Ann Lee',
+        password: 'fake-fake-fake-01',
+        role: 'admin',
+      },
+    })
+  })
+
+  it('hands ownership to the person chosen when the last owner steps down (DL-59)', async () => {
+    const owner = { ...OLGA, allowed_actions: ['workspace_staff.manage' as const] }
+    const get = staffAnswers([owner, MO])
+    const patch = vi
+      .spyOn(client, 'PATCH')
+      .mockResolvedValueOnce(
+        validationFailed([
+          { loc: ['body', 'role'], message: 'Olga is the last owner.', type: 'last_owner' },
+        ]),
+      )
+      .mockResolvedValue(ok({ ...owner, role: 'admin' }))
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff')
+    await wrapper.get('button[aria-label="Actions for Olga Owner"]').trigger('click')
+    await flushPromises()
+    ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
+      .find((li) => li.textContent?.trim() === 'Change role')!
+      .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+      .click()
+    await flushPromises()
+
+    await wrapper.get('#role-change').setValue('admin')
+    await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
+    await flushPromises()
+    await wrapper.get('#role-change-owner').setValue(MO.user_id)
+    await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
+    await flushPromises()
+
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
+      params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 200 } },
+    })
+    expect(patch).toHaveBeenLastCalledWith('/api/workspaces/{workspace_id}/staff/{user_id}', {
+      params: { path: { workspace_id: WORKSPACE_ID, user_id: OLGA.user_id } },
+      body: { role: 'admin', new_owner_id: MO.user_id },
+    })
+  })
+
+  it('removes the last owner, with the replacement chosen and projects kept (DL-59, D2)', async () => {
+    const owner = { ...OLGA, allowed_actions: ['workspace_staff.manage' as const] }
+    const get = staffAnswers([owner, MO])
+    const del = vi
+      .spyOn(client, 'DELETE')
+      .mockResolvedValueOnce(
+        validationFailed([
+          { loc: ['path', 'user_id'], message: 'The last owner.', type: 'last_owner' },
+        ]),
+      )
+      .mockResolvedValue(noContent())
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff')
+    await wrapper.get('button[aria-label="Actions for Olga Owner"]').trigger('click')
+    await flushPromises()
+    ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
+      .find((li) => li.textContent?.trim() === 'Remove from staff')!
+      .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+      .click()
+    await flushPromises()
+    get.mockResolvedValue(ok(listPage([MO])))
+
+    await wrapper.get('#remove-with-projects').setValue(false)
+    await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
+    await flushPromises()
+    await wrapper.get('#remove-owner').setValue(MO.user_id)
+    await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
+    await flushPromises()
+
+    expect(del).toHaveBeenLastCalledWith('/api/workspaces/{workspace_id}/staff/{user_id}', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID, user_id: owner.user_id },
+        query: { with_projects: false, new_owner_id: MO.user_id },
+      },
+    })
   })
 
   it("moves focus to the next row's actions once a removed row is gone (UI-FRM-14)", async () => {

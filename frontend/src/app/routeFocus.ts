@@ -37,11 +37,16 @@ export async function redirectInPlace(go: () => Promise<unknown>): Promise<void>
   }
 }
 
-/** Set the title from the `h1` and, after the first page, focus it. */
-export async function settlePage(): Promise<void> {
+/** Set the title from the `h1`, for a page whose `h1` changed in place (a rename). */
+export async function syncTitle(): Promise<void> {
   await nextTick()
   const h1 = heading()
   document.title = h1?.textContent ? `${h1.textContent.trim()} · ${APP_NAME}` : APP_NAME
+}
+
+/** Set the title from the `h1` and, after the first page, focus it. */
+export async function settlePage(): Promise<void> {
+  await syncTitle()
   if (!firstPage) await focusHeading()
 }
 

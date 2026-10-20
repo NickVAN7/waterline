@@ -19,7 +19,7 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   (`project/`, `task/`, …); `status/` and `errors/` aren't backend areas
 - `src/test/` — shared test helpers: `a11y.ts` (`expectNoA11yViolations`), `api.ts` (typed
   responses), `projects.ts`, `overlay.ts` (`stubResizeObserver`, `stubDialog`), `router.ts`,
-  `workspace.ts` (`mountWorkspaceView`)
+  `workspace.ts` (`mountWorkspaceView`, `mountSignedIn`), `org.ts` (`mountOrgView`, `mountOrgPages`)
 - `e2e/` — Playwright tests; `e2e/support/` holds their helpers (`a11y.ts`: axe and
   `expectFocusNotObscured`; `demo.ts`: the demo users)
 
@@ -45,7 +45,8 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   bodies only.
 - **Rendered markdown** is sanitized before display.
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
-  must stay last.
+  must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
+  slug change to the new URL; a null org is the not-found page.
 - **Display labels** for stored values (e.g. task type per project type) come from one mapping
   module, `src/app/labels.ts`, never inline strings.
 - UI guidance text (e.g. module recommendations) is rendered from the API response, not
@@ -136,6 +137,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   `stubResizeObserver()`, waits a tick after mounting before opening it, and registers
   `enableAutoUnmount(afterEach)` after its own clean-up hook (after-hooks run last to first), so
   each overlay is unmounted before the body is cleared.
+- A page that changes its own URL's path (an org's slug change) is remounted: `App.vue` keys
+  `RouterView` on `route.path`. Its spec mounts through a `RouterView` keyed the same way
+  (`mountOrgPages`), and an outcome it reports is carried to the new page (S1-C15a review).
 - Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
   `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
   not `getByLabel`: the label's text includes the required asterisk, the accessible name
