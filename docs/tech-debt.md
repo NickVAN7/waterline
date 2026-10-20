@@ -567,9 +567,10 @@ Entry format:
 
 ### TD-41: Pickers of people load the first 200
 - **Added:** S1-C15
-- **What:** the replacement-owner picker (the roster's people) and the create-org dialog's owner
-  picker (the workspace's active users) each load one page at the API's limit (200) and offer
-  those; a roster or workspace with more people shows only the first 200 by name.
+- **What:** the replacement-owner picker (the roster's people), the create-org dialog's owner
+  picker (the workspace's active users), and the create-project dialog's first-admin picker (the
+  org's active members, from S1-C16, DL-112) each load one page at the API's limit (200) and
+  offer those; a roster, workspace, or org with more people shows only the first 200 by name.
 - **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
   would be new API (the lists have no text filter yet).
 - **Fix by:** Slice 3 (the filter bar's text search, which the pickers can call)
@@ -597,4 +598,16 @@ Entry format:
   form than guessed from two (S1-C15a review).
 - **Fix by:** S1-C16a (project settings, the third such form, DL-109: the shared part moves into
   `useFormErrors` or a settings-form composable)
+- **Status:** open
+
+### TD-44: The first-admin picker lists only the org's members
+- **Added:** S1-C16 (DL-112)
+- **What:** an org owner or admin creating a project may name any org member or workspace staff
+  member as its first admin (design-doc §5; the API accepts either), but the create dialog's
+  picker lists only the org's members: no endpoint lists the staff to someone without
+  `workspace.view`, and `member-candidates` needs an existing project.
+- **Why:** a candidates endpoint for project creation is new API and authorization surface;
+  the owner chose the org's members for now (DL-112).
+- **Fix by:** Slice 2 (a `first-admin-candidates` endpoint under `project.assign_first_admin`, or
+  the owner's other choice)
 - **Status:** open

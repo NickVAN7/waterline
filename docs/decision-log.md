@@ -1000,7 +1000,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   create does; My work's shape is `{sections: {projects: {available, items, total}}}`, 10 items
   each (docs-consistency decisions, Oct 11, 2026).
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-111, in part (the project read gains `lead_name`)
 - **Applies to:** build plan ("Projects": the projects API; the S1-C11 and S1-C16 rows); design-doc
   §1.1 (the lead); schema-doc (`project.lead_id`)
 - **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C11)
@@ -1475,3 +1475,27 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   re-review inputs)
 - **Source:** chat session (owner, Oct 20, 2026: the docs-consistency decision on DL-108,
   option b)
+
+### DL-111: The project read carries the lead's name
+- **Date:** 2026-10-20
+- **Decision:** `GET /api/projects/{key}` (and every response that returns the project read)
+  carries `lead_name`, the lead's name, or null with no lead, so the project header shows it
+  without another request.
+- **Supersedes:** DL-76, in part (the build plan's project read fields, "The projects API")
+- **Superseded by:** none
+- **Applies to:** build plan ("The projects API"; the S1-C16 row)
+- **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16: option a, over a
+  lookup in the first 200 project members)
+
+### DL-112: The create dialog's first-admin picker lists the org's members
+- **Date:** 2026-10-20
+- **Decision:** The create-project dialog's first-admin picker lists the org's members only
+  (`GET /api/orgs/{org_id}/members`, which every holder of `project.assign_first_admin` may
+  read), active ones only, from its first 200 by name (TD-41). The workspace's staff, whom the API also accepts, aren't listed until an endpoint can
+  list them to an org admin (TD-44).
+- **Supersedes:** the build plan's "Web screens" picker of "the org's members and the
+  workspace's staff", in part
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C16 row; "Web screens"); tech debt (TD-44, TD-41)
+- **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16: option b, over a new
+  candidates endpoint)
