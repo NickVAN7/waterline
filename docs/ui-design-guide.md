@@ -459,7 +459,8 @@ render inside the full shell when signed in.
   not current while you are inside a project. The page itself still shows a project header
   (name, key in monospace, status badge, lead, or a "No lead" warning badge); there is no
   separate project sub-nav row. Until S1-C16 the pages are Home only, the header has no lead
-  name, and the selector has no "New project" (DL-97).
+  name, and the selector has no "New project" (DL-97); Settings joins the pages at S1-C16a and
+  Members at S1-C16b, each with its page (DL-109).
 - **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
   up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. Pages
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
@@ -906,7 +907,7 @@ Not in V1. This is the plan so that V2 starts from decisions, not research.
 
 ---
 
-## 8. Components to build with S1-C14 to C16
+## 8. Components to build with S1-C14 to C16b
 
 Shared components live in `src/components/`; each has a spec that calls the axe helper (§9).
 

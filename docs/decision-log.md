@@ -1440,7 +1440,38 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   last checkpoint, the slice-end agents (`fresh-clone-verifier`, `docs-consistency`,
   `repo-auditor`) report before anything is fixed, so every finding is in one batch.
 - **Supersedes:** none (settles DC-2026-10-20's decisions D2 and D3 and its question)
-- **Superseded by:** none
+- **Superseded by:** DL-110, in part (a slice-end agent's major fix is re-reviewed)
 - **Applies to:** the `checkpoint` skill (steps 4 and 5); the `design-change` skill (step 7,
   reviewers before fixes); the `checkpoint-reviewer` agent
 - **Source:** chat session (owner, Oct 20, 2026, approving the recommendations, before S1-C16)
+
+### DL-109: S1-C16 splits into projects (C16), project settings (C16a), and project members (C16b)
+- **Date:** 2026-10-20
+- **Decision:** S1-C16 (Web: projects) builds the project list's filters, the header's lead
+  name, "New project" and the create-project dialog with classification, the project banner,
+  the greyed-out unshipped modules, and the end-to-end creation flow. S1-C16a (Web: project
+  settings) builds project settings with classification and Settings in the pages nav, and
+  TD-43's shared save handling. S1-C16b (Web: project members) builds the members page,
+  Members in the pages nav, the per-project access review, and the end-to-end membership flow.
+  Each nav item arrives with its page. Three reviewable diffs, as S1-C15 was split (DL-103).
+- **Supersedes:** the build plan's S1-C16 row (one checkpoint for all the project screens)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C16 to S1-C16b rows; the security reviewer's range);
+  ui-design-guide (UI-SHL-6, §8's heading); tech debt (TD-43's Fix by); the `checkpoint` skill
+  (its example range); the `ui-reviewer` agent (the project selector item)
+- **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16: S1-C16 was about
+  three times S1-C15a, whose review took about 1M tokens)
+
+### DL-110: A code fix for a slice-end agent's major finding is re-reviewed
+- **Date:** 2026-10-20
+- **Decision:** At a slice's last checkpoint, a code fix for a major or blocker finding from
+  `repo-auditor` or `fresh-clone-verifier` is covered by `checkpoint-reviewer`'s re-review of the
+  fix diff, or by one pass of it when it had no re-review, given those findings and their
+  resolutions too, so no behavior change reaches the slice's last commit unreviewed.
+  `docs-consistency` reports no severities and fixes docs only, so it never triggers one.
+- **Supersedes:** DL-108, in part (those agents' findings are fixed without another pass)
+- **Superseded by:** none
+- **Applies to:** the `checkpoint` skill (step 5); the `checkpoint-reviewer` agent (its
+  re-review inputs)
+- **Source:** chat session (owner, Oct 20, 2026: the docs-consistency decision on DL-108,
+  option b)

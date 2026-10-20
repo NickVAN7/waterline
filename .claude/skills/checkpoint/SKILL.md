@@ -60,7 +60,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   design change's last commit.
 - Also invoke the `security-reviewer` agent, with the same inputs, when **either** holds:
   - the build plan's section for the slice says the checkpoint gets the security reviewer
-    (e.g. Slice 1: "every checkpoint from 1 to 16"); or
+    (e.g. Slice 1: "every checkpoint from 1 to 16b"); or
   - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
     `password_policy.py`, `identifiers.py`, or `classification.py`; session, token, password,
     or cookie code in `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project`
@@ -127,7 +127,9 @@ and its findings feed the slice retro.
 **major or blocker** findings, or added behavior its finding didn't ask for; fixes to minor
 findings, tests, or docs alone don't trigger one. Only `checkpoint-reviewer`,
 `security-reviewer`, and `ui-reviewer` are re-reviewed; the other agents' findings are fixed
-without another pass (DL-108). The re-review gets, besides the usual inputs:
+without another pass (DL-108), except that a code fix for a major or blocker finding from
+`repo-auditor` or `fresh-clone-verifier` is covered by `checkpoint-reviewer`'s re-review, or by
+one pass of it if it had none, given those findings and their resolutions too (DL-110). The re-review gets, besides the usual inputs:
 - the fix diff: take `uv run wl review-copy <dir>/reviewed-2` and pass the reviewer
   `diff -ruN -x .git <dir>/reviewed-1 <dir>/reviewed-2`, saved to a file, as what to review
   (each copy is a clone, with its own `.git`; the rest of the diff was reviewed in pass 1);

@@ -80,7 +80,7 @@ correct; you decide whether the code does it.
 - **Project selector:** a disclosure popover of links, with a filter past about eight projects,
   "All projects", and "New project" only when allowed. An enabled-but-unshipped module is plain
   text with "Not available yet" and never a link to a broken screen? (Before S1-C16 the project
-  pages are Home only, with no "New project" and no lead name in the header, DL-97.) (UI-SHL-6)
+  pages are Home only, with no "New project" and no lead name in the header, DL-97; Settings joins the pages at S1-C16a and Members at S1-C16b, each with its page, DL-109.) (UI-SHL-6)
 - Does the page use `PageHeader` with its primary action, one `h1`, and, if a help link was
   added, the user-menu placement? (UI-SHL-8)
 - From Slice 2 on: does every drag have a menu alternative ("Move to top", "Move up",

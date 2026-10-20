@@ -595,6 +595,6 @@ Entry format:
   the `h1`, or the typed values kept, UI-FRM-7). A fix to one must be made in the other.
 - **Why:** two copies, edited together in S1-C15a; a shared helper is better shaped by a third
   form than guessed from two (S1-C15a review).
-- **Fix by:** S1-C16 (project settings, the third such form: the shared part moves into
+- **Fix by:** S1-C16a (project settings, the third such form, DL-109: the shared part moves into
   `useFormErrors` or a settings-form composable)
 - **Status:** open
