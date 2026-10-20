@@ -1482,7 +1482,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   carries `lead_name`, the lead's name, or null with no lead, so the project header shows it
   without another request.
 - **Supersedes:** DL-76, in part (the build plan's project read fields, "The projects API")
-- **Superseded by:** none
+- **Superseded by:** DL-113, in part (the project read gains `lead_is_active`)
 - **Applies to:** build plan ("The projects API"; the S1-C16 row)
 - **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16: option a, over a
   lookup in the first 200 project members)
@@ -1499,3 +1499,30 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (the S1-C16 row; "Web screens"); tech debt (TD-44, TD-41)
 - **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16: option b, over a new
   candidates endpoint)
+
+### DL-113: The project read and project member rows say whether an account is active
+- **Date:** 2026-10-20
+- **Decision:** From S1-C16a, the project read carries `lead_is_active` (whether the lead's
+  account is active, or null with no lead), and each row of `GET /api/projects/{key}/members`
+  (and every response returning one) carries `is_active`. The rows still carry no `user`-level
+  actions (DL-102 covers staff and org member rows only). The header and settings mark a
+  deactivated lead (design-doc §1.1; TD-45), and the lead picker marks deactivated members, whom
+  the server refuses as lead (`account_inactive`).
+- **Supersedes:** DL-111, in part (the project read's fields); the build plan's project member
+  row fields ("The project members API")
+- **Superseded by:** none
+- **Applies to:** build plan ("The projects API", "The project members API", the S1-C16a row)
+- **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16a: option a, over the flag
+  on the read only, or neither)
+
+### DL-114: The create dialog's export-control confirmation is its own dialog, in S1-C16a
+- **Date:** 2026-10-20
+- **Decision:** Marking a project export-controlled, at creation or in settings, opens a separate
+  confirmation dialog (the lockdown explained, the explicit members listed, its confirm button
+  blocked until the box is checked, UI-FRM-15), not a checkbox inside the create dialog.
+  S1-C16a builds it and moves S1-C16's create dialog onto it.
+- **Supersedes:** S1-C16's inline confirmation (its review's open question)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C16a row)
+- **Source:** chat session (owner, Oct 20, 2026, answering S1-C16's review question; folded into
+  S1-C16a)
