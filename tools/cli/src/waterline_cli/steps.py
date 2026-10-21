@@ -104,8 +104,11 @@ def admin(extra: Sequence[str] = ()) -> list[Step]:
 
 def up(extra: Sequence[str] = ()) -> list[Step]:
     """Build the images, start the stack in the background, and wait until every service is up.
-    `--renew-anon-volumes` refreshes the web container's node_modules from its image."""
+    `--renew-anon-volumes` refreshes the web container's node_modules from its image. The host's
+    `frontend/node_modules` is made first: Docker, as root, would create that mount point owned by
+    root, and a later host `npm ci` couldn't write it (TD-11)."""
     return [
+        step("mkdir", "-p", "frontend/node_modules"),
         step(
             "docker",
             "compose",
@@ -115,7 +118,7 @@ def up(extra: Sequence[str] = ()) -> list[Step]:
             "--build",
             "--renew-anon-volumes",
             *extra,
-        )
+        ),
     ]
 
 

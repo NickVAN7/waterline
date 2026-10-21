@@ -6,7 +6,12 @@ name: waterline
 # api, worker, and migrate run the backend image with the source mounted, against the postgres
 # service (inside Compose it listens on 5432, whatever POSTGRES_PORT publishes on the host).
 x-backend: &backend
-  build: ./backend
+  build:
+    context: ./backend
+    # The host's user and group IDs, for the image's non-root user (TD-11); `wl` sets them.
+    args: &host-user
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
   # One image, shared by all three services (built once, rebuilt by `wl up` / `wl migrate`).
   # Named after the Compose project (`waterline-backend` by default), so a second stack under
   # another project name (e.g. a fresh-clone check) builds its own image, not over this one.
@@ -84,7 +89,9 @@ services:
         condition: service_completed_successfully
 
   web:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args: *host-user
     environment:
       # Vite proxies /api here (frontend/vite.config.ts).
       API_PROXY_TARGET: http://api:8000

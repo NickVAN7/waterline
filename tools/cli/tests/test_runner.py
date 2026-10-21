@@ -59,6 +59,32 @@ def test_run_steps_hides_the_root_venv_from_nested_uv(monkeypatch: pytest.Monkey
     assert "VIRTUAL_ENV" not in fake.calls[0]["env"]
 
 
+def test_run_steps_passes_the_hosts_user_and_group_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeRun([0])
+    monkeypatch.setattr(runner.subprocess, "run", fake)
+    monkeypatch.delenv("HOST_UID", raising=False)
+    monkeypatch.delenv("HOST_GID", raising=False)
+    monkeypatch.setattr(runner.os, "getuid", lambda: 1234)
+    monkeypatch.setattr(runner.os, "getgid", lambda: 5678)
+
+    run_steps([step("a")], dry_run=False)
+
+    assert (fake.calls[0]["env"]["HOST_UID"], fake.calls[0]["env"]["HOST_GID"]) == ("1234", "5678")
+
+
+def test_run_steps_keeps_user_and_group_ids_already_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeRun([0])
+    monkeypatch.setattr(runner.subprocess, "run", fake)
+    monkeypatch.setenv("HOST_UID", "2000")
+    monkeypatch.setenv("HOST_GID", "3000")
+    monkeypatch.setattr(runner.os, "getuid", lambda: 1234)
+    monkeypatch.setattr(runner.os, "getgid", lambda: 5678)
+
+    run_steps([step("a")], dry_run=False)
+
+    assert (fake.calls[0]["env"]["HOST_UID"], fake.calls[0]["env"]["HOST_GID"]) == ("2000", "3000")
+
+
 def test_dry_run_runs_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = FakeRun([])
     monkeypatch.setattr(runner.subprocess, "run", fake)

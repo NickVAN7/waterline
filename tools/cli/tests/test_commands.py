@@ -51,6 +51,8 @@ FRONTEND_FMT = ["(cd frontend && npm run format)", "(cd frontend && npm run lint
 FRONTEND_TEST = ["(cd frontend && npm run test)"]
 FRONTEND_CHECK = ["(cd frontend && npm run check:client)", *FRONTEND_LINT, *FRONTEND_TEST]
 UP = "docker compose up --detach --wait --build --renew-anon-volumes"
+# Made before the stack starts, so Docker doesn't create the mount point as root (TD-11).
+MKDIR_NODE_MODULES = "mkdir -p frontend/node_modules"
 CLI_LINT = [
     "(cd tools/cli && uv run ruff check . ../../.claude/hooks)",
     "(cd tools/cli && uv run ruff format --check . ../../.claude/hooks)",
@@ -141,8 +143,8 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
             ["(cd frontend && npx vitest run src/api -t network)"],
             id="frontend-test-pass-through",
         ),
-        pytest.param(["up"], [UP], id="up"),
-        pytest.param(["up", "postgres"], [f"{UP} postgres"], id="up-service"),
+        pytest.param(["up"], [MKDIR_NODE_MODULES, UP], id="up"),
+        pytest.param(["up", "postgres"], [MKDIR_NODE_MODULES, f"{UP} postgres"], id="up-service"),
         pytest.param(["down"], ["docker compose down"], id="down"),
         pytest.param(["down", "-v"], ["docker compose down -v"], id="down-volumes"),
         pytest.param(["logs"], ["docker compose logs --follow"], id="logs"),
