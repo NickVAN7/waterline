@@ -4,12 +4,13 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import Result, select, update
+from sqlalchemy import ColumnElement, Result, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, class_mapper
 from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.sql import Executable, Update
 
+from app.authz.scoping import Scope
 from app.core.base_model import INCLUDE_DELETED, IdMixin
 
 
@@ -88,3 +89,19 @@ async def direct_update(
         for key, value in updated.items():
             set_committed_value(loaded, key, value)
     return {key: updated[key] for key in values}
+
+
+def scope_clause(
+    scope: Scope,
+    id_column: InstrumentedAttribute[uuid.UUID],
+    workspace_column: InstrumentedAttribute[uuid.UUID],
+    organization_column: InstrumentedAttribute[uuid.UUID] | None = None,
+) -> ColumnElement[bool]:
+    """The `WHERE` limiting a list to the rows `scope` covers (app/authz/scoping.py): every row,
+    or those whose own ID, org (when the table has one), or workspace it lists."""
+    if scope.everything:
+        return true()
+    clauses = [id_column.in_(scope.ids), workspace_column.in_(scope.workspace_ids)]
+    if organization_column is not None:
+        clauses.append(organization_column.in_(scope.organization_ids))
+    return or_(*clauses)

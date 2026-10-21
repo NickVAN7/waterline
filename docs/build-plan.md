@@ -27,7 +27,7 @@ marked for the slice is in the model (the `checkpoint` skill, step 2).
 | **0** | Skeleton: stack, shared conventions, CI, app shell. No features. |
 | **1** | Auth, tenancy (workspace, organizations, workspace/org/project memberships), projects (types, modules, keys, status, lead), number allocation, `authorize()`, admin audit events, the API conventions (lists, errors, allowed actions, identifiers), access review, and My work as the home page (its projects section). |
 | 2 | Requirements: tree, `RQ` numbering, rank (the helper and its tests, first used for the requirement tree), revisions (any two compared), approvals (My work's approvals section), `log_change()` and the activity log. Starts by verifying the `new-area` skill (drafted earlier) against Slice 1's `project` area and correcting it where they differ. |
-| 3 | Tasks and subtasks, phases, workstreams, transition rules, rank for tasks; backlog and board; copy branch name; My work's task sections (assigned, awaiting review). |
+| 3 | Tasks and subtasks, phases, workstreams, transition rules, rank for tasks; backlog and board (the board is SVAR Kanban through a wrapper, ui-design-guide §7.1; DL-64); copy branch name; My work's task sections (assigned, awaiting review). |
 | 4 | Sprints (module), including completing a sprint with unfinished tasks; milestones/gates. |
 | 5 | Test cases, runs, results (with assignees), ad-hoc runs, re-running failed cases; My work's test-case section. |
 | 6 | Comments, tags (with the built-in per-type defaults, copied into new orgs and backfilled into existing ones), dependencies, links, search; the comment prompt when a task is sent back from review. |
@@ -59,8 +59,8 @@ minutes. The next checkpoint starts only after the current one is approved.
    - Design, schema, and build-plan docs, if anything drifted.
 5. **Tech-debt log** (`docs/tech-debt.md`): any shortcut is recorded with its reason and the
    checkpoint or slice that will fix it. The goal is an empty log; nothing is left unrecorded.
-6. **Review record** (`docs/reviews/<ID>.md`, e.g. `S0-C1.md`): every reviewer pass with its
-   verdict, findings, and the resolution of each, plus open questions and owner decisions.
+6. **Review record** (`docs/reviews/s<n>/<ID>.md`, e.g. `s0/S0-C1.md`): every reviewer pass
+   with its verdict, findings, and the resolution of each, plus open questions and owner decisions.
 
 ### Pull requests
 Each slice works on **one branch and one draft pull request** (DL-9). Slice 0's checkpoints
@@ -116,8 +116,9 @@ each verification claim with who verified it (e.g. "sabotage-checked by checkpoi
    against the running dev stack, with at least one step that should be denied; the owner's
    run is the check.
 
-**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10)** (DL-10). A trial, not yet the
-rule; every other checkpoint keeps the full stop for approval.
+**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10; S1-C7a (DL-51), S1-C7b, and
+S1-C8a, also in the group, stop for approval as usual: the trial is S1-C8 to S1-C10)**
+(DL-10). A trial, not yet the rule; every other checkpoint keeps the full stop for approval.
 - **S1-C8 and S1-C9 auto-continue:** after its report, the session goes straight on to the next
   checkpoint, without stopping for approval, only if **all** of these hold:
   - `wl check` and CI are green;
@@ -128,12 +129,16 @@ rule; every other checkpoint keeps the full stop for approval.
 
   If any of them fails, the checkpoint stops as usual.
 - **S1-C10 is a full stop for the whole group:** its report covers S1-C8 to S1-C10, with links
-  to the three review records and the group's diff range, and the owner reviews all three.
+  to the four review records (S1-C8, S1-C8a, S1-C9, S1-C10; DL-60) and the group's diff range,
+  and the owner reviews all four.
 - **What counts as failure:** the trial fails if the owner finds at the group review anything
   in S1-C8 or S1-C9 that should have stopped it (a defect, a scope miss, or doc drift the
-  reviewers didn't flag), or if a later checkpoint has to rework their output. The owner
+  reviewers didn't flag), or if a later checkpoint has to rework their output (a checkpoint
+  inserted for a new owner requirement, such as S1-C8a, isn't rework, DL-60). The owner
   records the verdict at the group review and again in the slice retro (S1-C17); either way it
   gets a decision-log entry.
+- **Verdict: not exercised** (DL-125). Neither S1-C8 nor S1-C9 met the conditions to
+  auto-continue, and nothing in them needed rework. Every checkpoint stops for approval.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
@@ -154,10 +159,13 @@ work. Each decision gets a decision-log entry (`docs/decision-log.md`), every do
 old rule is updated, and `docs-consistency` runs (trigger `design-change`) before committing;
 its decisions go to the owner. A change to code already built becomes a new checkpoint,
 inserted with a letter suffix where it runs (`S1-C13a` between `S1-C13` and `S1-C14`);
-existing checkpoints are never renumbered. Developer-tooling and process code (hooks, the `wl`
+existing checkpoints are never renumbered. Review answers that change built code are bundled:
+into the next planned checkpoint, or one follow-up checkpoint per group (DL-131). Developer-tooling and process code (hooks, the `wl`
 CLI, CI, the docs consistency tests) is built in the design change itself, as `chore:` or `ci:`
-commits, after a `checkpoint-reviewer` pass recorded in `docs/reviews/DC-<YYYY-MM-DD>.md`
-(DL-18). A checkpoint in progress is parked with `git stash` while a design change is applied,
+commits, after a `checkpoint-reviewer` pass recorded in
+`docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). Every design change,
+docs-only or tooling, gets a record there, holding its `docs-consistency` pass (and, for
+tooling, `checkpoint-reviewer`'s passes) (DL-126). A checkpoint in progress is parked with `git stash` while a design change is applied,
 and its review base becomes the design change's last commit (DL-20). Each checkpoint's review
 diffs from the last commit before its work started, so design changes stay out of it (DL-17).
 
@@ -199,15 +207,20 @@ Everything lives in the repository, version-controlled and present on every work
   - docs and tech-debt updates;
   - the reviewers, one at a time: `security-reviewer` when the slice's section names the
     checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
-    every time, and at the end of a slice `fresh-clone-verifier`, `docs-consistency`, and
+    every time, then `ui-reviewer` when the diff touches `frontend/src/` or `frontend/e2e/`
+    (DL-62), and at the end of a slice `fresh-clone-verifier`, `docs-consistency`, and
     `repo-auditor`;
-  - resolving every finding, and the review record in `docs/reviews/<ID>.md`;
+  - resolving every finding, and the review record in `docs/reviews/s<n>/<ID>.md`;
   - one commit with the review note, pushed to the slice branch;
   - the report, and stopping for approval.
 - **`security-reviewer` agent** (`.claude/agents/`): a read-only, security-focused reviewer run
   before `checkpoint-reviewer` when the slice's section names the checkpoint for it, or
   when a checkpoint touches auth, sessions, authorization, routers, rendered markdown, or
   GitHub code. Each finding has a confirmed path to harm (DL-39), in plain English (DL-42).
+- **`ui-reviewer` agent** (`.claude/agents/`): a read-only reviewer of `frontend/` changes for
+  accessibility and frontend conventions that axe and ESLint can't catch, reporting by the rule
+  IDs of `docs/ui-design-guide.md`; run after `checkpoint-reviewer` whenever the diff touches
+  `frontend/src/` or `frontend/e2e/` (DL-62).
 - **`repo-auditor` agent** (`.claude/agents/`): at the last checkpoint of each slice, after
   `docs-consistency`, a read-only audit of the whole repository (DL-41): bugs, security, scale
   against the expected load, risky code without a test, slowness, and lean, each finding with a
@@ -231,12 +244,13 @@ Everything lives in the repository, version-controlled and present on every work
 - **`design-change` skill** (`.claude/skills/design-change/`): applying a design change outside
   a checkpoint's scope ("Design changes outside a checkpoint" above): timing, checking the
   repository, parking a checkpoint in progress (DL-20), classifying each decision (docs only,
-  future checkpoints, a new inserted checkpoint for built product code, or developer-tooling
+  future checkpoints, an inserted checkpoint for built product code (review answers bundled,
+  DL-131), or developer-tooling
   code built in the change and reviewed by `checkpoint-reviewer`, DL-18), the decision-log
   entries, every affected doc, `docs-consistency`, and the report.
 - **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
-  verified and corrected against the hand-built `project` area at the start of Slice 2.
+  verified and corrected against the hand-built `project` area in S2-C0 (DL-132).
 - **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
   generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`), committed migrations,
   `.pre-commit-config.yaml` (the owner's to edit, DL-30), and git's own files (anything in `.git/`,
@@ -259,10 +273,6 @@ named checkpoint when its trigger arrives.
 
 | Trigger | Item |
 |---|---|
-| After S1-C7 is approved (end of the `s1-auth` group) | The owner decides whether to pull sign-in and the app shell (part of S1-C14) forward, so a real screen uses the API conventions sooner |
-| Before S1-C14 | A short UI design guide (`frontend/CLAUDE.md` or a new doc; decided then); demo seed data (`wl seed --demo`), added right before the checkpoint; the `ui-reviewer` agent (read-only: accessibility and frontend conventions axe can't catch, run on S1-C14 to S1-C16) |
-| After S1-C14 | The `vue-screen` skill, distilled from S1-C14's hand-built screens |
-| S1-C17 | The `user-guide-verifier` agent (follows `docs/user-guide.md` literally in a browser against a seeded stack, and walks the "Done when" list) |
 | Start of Slice 2 planning | A slice-planning procedure: the format used for Slice 1's plan (fixes, decisions, conventions), plus a short threat-model pass |
 | Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
 
@@ -343,7 +353,8 @@ The sections below describe the content; the table above is the order of work.
 │   │   ├── rules/                pure business rules, no database: identifiers.py,
 │   │   │                         password_policy.py, account_rank.py, task_transitions.py,
 │   │   │                         approval_policy.py, …
-│   │   ├── authz/                authorize(), action registry, module gating dependency
+│   │   ├── authz/                authorize(), action registry, targets, list scoping, module check
+│   │   │                         (pure; the FastAPI dependencies are in routers/deps.py)
 │   │   ├── audit/                log_change(), log_admin_event()
 │   │   └── jobs/                 procrastinate app, enqueue.py (only entry point), job functions
 │   ├── migrations/               Alembic
@@ -361,14 +372,16 @@ The sections below describe the content; the table above is the order of work.
 │   ├── Dockerfile                the Vite dev server (the web service)
 │   └── src/
 │       ├── api/                  generated types (schema.d.ts) + configured openapi-fetch client
-│       ├── app/                  layout, router, route guards
+│       ├── app/                  layout, router, route guards; styles/ (tokens.css, base.css)
+│       │                         and theme/ (PrimeVue preset, later svar-theme.css) from S1-C14
 │       ├── components/           shared UI components
 │       ├── composables/          shared logic (auth state, permissions, forms)
 │       ├── stores/               Pinia stores (current user, current org)
 │       └── views/                screens, grouped by area (singular, as in the backend): auth/,
-│                                 org/, project/, …; plus home/ and errors/ (home/ becomes
-│                                 status/ in S1-C14, beside my_work/)
-│   └── e2e/                      Playwright end-to-end tests (from Slice 1)
+│                                 org/, project/, my_work/, …; plus status/ and errors/
+│       └── test/                 shared test helpers (axe, API responses, router)
+│   └── e2e/                      Playwright end-to-end tests (from S1-C14; support/ holds
+│                                 their helpers)
 │
 ├── CLAUDE.md                     project rules for Claude sessions (backend/ and frontend/
 │                                 each have their own CLAUDE.md too)
@@ -378,14 +391,16 @@ The sections below describe the content; the table above is the order of work.
 │   │                                   hook_paths.py (shared helpers)
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md, docs-consistency.md,
-│   │                                   spec-test-writer.md, repo-auditor.md
+│   │                                   spec-test-writer.md, repo-auditor.md, ui-reviewer.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
 │                                       design-change/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
-│                                 tech-debt.md, decision-log.md, screen-inventory.md, reviews/
-│                                 (one record per checkpoint, and per design-change tooling
-│                                 review, DC-<date>.md), spikes/ (spike code kept as evidence);
+│                                 tech-debt.md, decision-log.md, screen-inventory.md,
+│                                 ui-design-guide.md, ui/ (reference copies of the token file,
+│                                 its contrast check, and the SVAR theme mapping), reviews/
+│                                 (s<n>/: one record per checkpoint; design-changes/: one
+│                                 per design change, DL-126), spikes/ (spike code kept as evidence);
 │                                 the source of truth (DL-14)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
@@ -425,20 +440,28 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   |---|---|---|
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
   | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
-  | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
-  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>` | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29) |
+  | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl seed --demo` (from S1-C13a, DL-83), `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
+  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>`, `wl e2e` (from S1-C14, DL-65) | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29); Playwright against an isolated, seeded stack it starts and always tears down |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
-  on any surviving mutant; `wl check` includes it. `wl audit` (DL-13) fails on any known
+  on any surviving mutant; `wl check --full` always includes it, and `wl check` when anything it
+  depends on changed since its last green run (DL-99). `wl audit` (DL-13) fails on any known
   vulnerability in either Python lockfile or the npm lockfile (dev dependencies included), and
-  on any secret in the git history; it needs the network, and `wl check` includes it.
+  on any secret in the git history; it needs the network, and `wl check --full` includes it.
+  `wl e2e`
+  (DL-65) starts a separate Compose project (`docker compose -p waterline-e2e`, its own database
+  volume and ports, never the dev stack) reached at `localhost`, waits for it to be healthy, seeds
+  it with `wl seed --demo` (DL-83; with `demo_seed_enabled` on, DL-90) as CI does, runs Playwright, and tears the stack and its
+  volume down, pass or fail. `wl check --full` runs it last, after the other gates. `wl check`,
+  the gate before every commit, leaves out the audit and the end-to-end tests; `wl check --full`
+  is what CI runs (DL-99).
 
 - **Rules:**
   1. **Thin orchestrator only:** each command runs existing tools (docker compose, uv, npm,
      alembic) as subprocesses in the right folder. No application logic.
   2. `package.json` scripts and the backend's tool configuration remain the real definitions;
      running `npm run test` or `uv run pytest` directly gives the same result.
-  3. **CI calls the CLI** (`wl check`), so local runs and CI can't diverge.
+  3. **CI calls the CLI** (`wl check --full`), so local runs and CI can't diverge.
   4. **`--dry-run`** on every command prints the underlying commands instead of running them.
   5. **Light tests:** every command's `--help` works, and dry-run output matches the expected
      commands.
@@ -496,15 +519,17 @@ Calls flow one way: **routers → services → repositories → models**. Servic
 The organizing unit is the **aggregate**: one main entity plus the child rows that exist only
 through it. Each aggregate has one file name, repeated in every layer (`models/`, `schemas/`,
 `repositories/`, `services/`, `routers/`, and `authz/policies/`). That area **owns** its tables:
-it is the only place that writes them.
+it is the only place that writes them, apart from the roster, which writes the membership rows
+when the owning service calls it (DL-70).
 
 | File name | Owns (tables) | Slice | Calls into (services) |
 |---|---|---|---|
 | `user` | user | 1 | auth (only through its registered `on_email_changed` handler) |
 | `auth` | session; user_identity (added in Slice 7) | 1 | user (registers `on_email_changed` with it); approval (approver replacement, from Slice 2) |
-| `workspace` | workspace, workspace_membership | 1 | user; project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
-| `org` | organization, membership | 1 | user; tag (copies the default tags into a new org, from Slice 6); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
-| `project` | project (incl. modules and module guidance), project_membership | 1 | org, workspace (registers `on_member_removed` with both), user (creating a user for the project goes through the org service); approval (approver replacement, from Slice 2) |
+| `workspace` | workspace, workspace_membership | 1 | user; roster (its staff rules); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
+| `org` | organization, membership | 1 | user; roster (its member rules); tag (copies the default tags into a new org, from Slice 6); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
+| `project` | project (incl. modules and module guidance), project_membership | 1 | org, workspace; roster (its member rules: the email-first add and create, the lock order, and registering `on_member_removed`, DL-71); user (creating a user for the project goes through the org service); approval (approver replacement, from Slice 2) |
+| `roster` *(service only; no tables)* | none (writes the workspace, org, and (from S1-C12) project areas' membership rows only when their services call it: the membership rules they share, DL-70, DL-71) | 1 | user |
 | `numbering` *(service + repository only)* | project_counter; `task.next_subtask_number` | 1 | — |
 | `requirement` | requirement, requirement_revision | 2 | numbering, approval, task, testcase |
 | `approval` | approval_request, approval | 2 | approvable areas via registered handlers only |
@@ -558,8 +583,9 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   deletes the user's sessions (design-doc §4).
 - **Membership removal handlers:** the org and workspace services never import the project
   area. When an org member or staff member is removed "with their project memberships", the
-  service calls the `on_member_removed` handler the project area registered, which removes
-  the project memberships (design-doc §4, "Removing a member with their projects").
+  roster (`services/roster.py`, the membership rules both services share, DL-70) calls the
+  `on_member_removed` handler the project area registered, which removes the project memberships
+  (design-doc §4, "Removing a member with their projects").
 - **Requirement ↔ test case links** are owned by `testcase`. The requirement screens show and
   edit links through the testcase service. This keeps dependencies one-way (requirement →
   testcase), lets the link table ship with test cases in Slice 5, and keeps coverage queries
@@ -573,7 +599,8 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   | Layer | Services | May call |
   |---|---|---|
   | 1 | user, numbering, approval, activity, comment, tag, link, search, my_work, health | no other service (approval and user reach areas only through registered handlers) |
-  | 2 | auth, workspace, org | layer 1 |
+  | 1b | roster (the membership rules workspace staff, org members, and from S1-C12 project members share, DL-70, DL-71) | layer 1 |
+  | 2 | auth, workspace, org | layers 1–1b |
   | 3 | project, phase, workstream, milestone | layers 1–2 |
   | 4 | task | layers 1–3 |
   | 5 | sprint, testcase, test_run, github | layers 1–4 |
@@ -597,8 +624,11 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   `pytest` with `anyio`, `pytest-cov`, `polyfactory` + Faker (fixed seed), Hypothesis,
   import-linter.
 - Frontend: Vite, Vue Router, Pinia, ESLint + Prettier, `vue-tsc`, Vitest + Vue Test Utils;
+  PrimeVue and Tailwind v4 from S1-C14 (DL-61); SVAR Vue widgets from the first checkpoint that
+  ships a board or an editable grid (DL-64);
   Playwright from Slice 1 (Chromium only in v1; implementation decision 9).
-- `pre-commit` for local hooks; `wl check` runs everything CI runs.
+- `pre-commit` for local hooks; `wl check --full` runs everything CI runs, and `wl check` the
+  gate before every commit (DL-99).
 - Testing approach, layers, and gates: see `testing-strategy.md`.
 - Settings via `pydantic-settings` (environment variables, `.env` for local dev).
 
@@ -609,7 +639,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
     (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`; `.env.example` is committed, `.env` is
     not);
   - an init script creates a separate test database (`waterline_test`) so tests never touch
-    dev data;
+    dev data; each pytest-xdist worker makes its own copy from it (DL-100);
   - tables are created by Alembic (the `migrate` service, or `wl migrate`), never by hand;
   - the host port is configurable in `.env` (default 5432) in case another Postgres is already
     running on the workstation.
@@ -713,13 +743,15 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   can trigger). A test fails if any unique constraint declares neither. An unmapped
   `IntegrityError` stays a **500**.
 - Availability checks (project key, org and workspace slug, username, email) reveal only whether a
-  value is taken, never where.
+  value is taken, never where. Org slugs and project keys are unique across the workspace, so a
+  client's org owner can learn that another org or project uses one; accepted for v1's scale
+  (DL-57).
 
 **Allowed actions**
-- Single-entity reads return `allowed_actions`, evaluated through `authorize()`; `/me` returns
-  workspace-level actions, and each of its orgs carries that org's actions (e.g. `project.create`,
-  `project.assign_first_admin`; owner decision, Oct 7, 2026). Lists include per-row actions only
-  where the screen needs per-row buttons (member lists).
+- Single-entity reads return `allowed_actions`, evaluated through `authorize()`; each workspace
+  entry in `/me` carries that workspace's actions (DL-45), and each of its orgs that org's actions
+  (e.g. `project.create`, `project.assign_first_admin`; owner decision, Oct 7, 2026). Lists include
+  per-row actions only where the screen needs per-row buttons (member lists).
 - Action names (`project.update`, `org_member.manage`, …) come from the action registry and are
   exported as an OpenAPI enum, so the generated client types them.
 - Rules that depend on data get their own field next to `allowed_actions` (e.g. Slice 3's
@@ -773,7 +805,7 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 ### Web shell
 - App layout (header, nav area, content), router with a 404 page, API client wrapper
   (`credentials: 'include'`, JSON only, error-body parsing), a placeholder home page that calls
-  `/api/health`.
+  `/api/health`. (S1-C14a replaces the layout with the ui-design-guide §4 shell.)
 
 ### Done when
 - [x] `docker compose up` starts postgres, api, worker (and web); the web shell loads and shows
@@ -814,16 +846,26 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 4 | API conventions | List helpers (offset paging, cursor paging for feeds, sort allowlist, declared filter specs and their translator, unknown query parameters → 422); the constraint-name error registry and its completeness test; `log_admin_event()`; all exercised through test-only tables and routers in `tests/support/` |
 | 5 | Sessions & sign-in | Session service and `session` table use; `POST /api/auth/sign-in`, `POST /api/auth/sign-out`, `GET /api/auth/me`; every item on the §4 security checklist (token; cookie attributes, each with its own test: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`; fresh token at sign-in, expiry, `last_seen_at` throttle); the `Origin` check (against the request's `Host`; missing `Origin` rejected; design-doc §4) and the JSON-only check; sign-in responses (§4, "Sign-in"); API test client on an `https://` base URL; one migration adding the indexes on `session.user_id`, `membership.organization_id`, and `project.organization_id` (schema-doc; DL-34); the `CustomFilter` docstring (`app/core/lists.py`) brought in line with DL-35 |
 | 6 | Passwords, seed & system-admin CLI | Change password; the `must_change_password` gate (F1); `wl seed`, interactive and non-interactive (F6); `grant-system-admin` / `revoke-system-admin` app CLI commands (run as `wl admin <command>`), implemented in the `auth` service with the last-active-system-admin guard; audit events for all of these (the seed records `workspace_created`, `user_created`, `system_admin_granted`, and `workspace_member_added`) |
-| 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module-gating dependency, tested through a test-only gated router (F7); `allowed_actions` helper; `/me` gains workspace-level `allowed_actions` (per-org actions come in Checkpoint 11); the full matrix (including personal actions) and fail-closed tests |
-| 8 | Workspace & organizations | Workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners; live slug availability); owner-only grants of owner/admin roles; last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14 router test (owner decision, Oct 7, 2026) |
-| 9 | Org members & user creation | Org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`: owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); email and username availability; last-owner guard for orgs; audit events |
-| 10 | Account actions & profile | Deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
-| 11 | Projects | Create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin, a separate action `project.assign_first_admin` in the org's `allowed_actions`, carried on each org entry in `/me`; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
-| 12 | Project members | List (per-row `allowed_actions`); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its three cases (design-doc §4; an existing member found by email is a 422 on `email`, `already_member`); change role; remove (removing the lead's membership clears `lead_id`, recorded in the `project_member_removed` details, also in archived projects through removal with their projects); the per-project access review (design-doc §5); registers the `on_member_removed` handler with the org and workspace services, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
-| 13 | Classification & export control | `rules/classification.py` (effective classification; the raise and lower rules), test-first (`spec-test-writer`, against stubs) and mutation-tested, with the `authz/` changes' tests from `spec-test-writer` too; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin` |
-| 14 | Web: auth & app shell | Current-user store (TD-10); sign-in; My work as the home page, with its projects section (design-doc §11); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); forced password change; account settings (profile, change password); route guards; org switcher; no-access page; reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); error handling (401, 403, 404, 409, 422 with field errors); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation; Playwright (Chromium) with end-to-end sign-in and forced-change flows; CI runs end-to-end tests against a seeded stack. How `wl check` runs end-to-end tests (they need the running stack) is decided here |
-| 15 | Web: workspace & org admin | Workspace pages (staff, orgs, users with account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners); the per-person access review; org settings; org members page (email-first add-person form with a generated temporary password shown once, role changes, account actions, the D2 removal dialog) |
-| 16 | Web: projects | Project list (fixed filters over `useListQuery`); create-project dialog (live key validation, type, description, module selection with guidance, and a first-admin picker shown only when the org's entry in `/me` includes `project.assign_first_admin`); project settings (description, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged); the per-project access review; classification on the create dialog and project settings (level descriptions, categories, the export-control confirmation dialogs) and the project banner; project members page (with the export-control confirmation on add); unshipped modules greyed out; stale-slug redirect and 404; end-to-end project creation and membership flows |
+| 7 | Authorization core | Tests for `app/authz/` from `spec-test-writer`, written against stubs before the implementation; action registry (exported as an OpenAPI enum) with the workspace-level actions (DL-45), the core's rules proven with test-only actions at org and project level (DL-44); per-request authorization context; `authorize()` in design-doc §5 order (archive check first, with the unarchive and member-removal exceptions; then the personal-action step, tested through a test-only personal action that every admin level, system admin included, is denied, that its relationship rule allows only for a user with project access, and that a user with the relationship but no project access is denied; the export-control gate comes in Slice 2); load-and-authorize dependency (404 for unseen entities); access-scoping helper for lists; module gating (the `module` option of the load-and-authorize dependency, DL-47), tested through a test-only gated router (F7); `allowed_actions` helper; each workspace entry in `/me` gains its workspace-level `allowed_actions` (DL-45), and `/me` lists every workspace for a system admin, with a null role where they hold no membership (DL-46); per-org actions come in Checkpoint 11; the full matrix (including personal actions) and fail-closed tests |
+| 7a | Sign-in password cap | Sign-in refuses a password longer than the policy's 256 characters with a 422 (`validation_error` on `password`) before any verification, so an oversized one costs no hash and reveals nothing about the account (DL-49; design-doc §4, "Sign-in responses") |
+| 7b | Change-password cap & old session at sign-in | Change password refuses a `current_password` longer than 256 characters with a 422 before any verification (DL-52); a successful sign-in deletes the session the request carried, if any, whoever it belongs to (a failed one leaves it; DL-53; one session by its token, not a sweep of the user's sessions, so no row lock is needed); the developer guide documents the middleware's 403 `origin_rejected` and 415 `unsupported_media_type` on every mutating route (DL-54) |
+| 8 | Workspace & organizations | The endpoints in "The workspace and org API" (DL-55) and their actions (DL-56), with their spec tests; workspace staff (list, add, create, change role, remove; the project-membership option calls the `on_member_removed` handler, tested here with a stub until Checkpoint 12 registers the real one); create an org with its first owner; list the workspace's orgs; org rename and slug change (with slug availability); workspace rename and slug change (workspace owners and system admins, DL-45; live slug availability); grants of owner/admin roles only by owners (and system admins, DL-45); last-owner guard for the workspace; audit events; `RESERVED_SLUGS` (`rules/identifiers.py`) exported through the OpenAPI schema as an enum, for the S1-C14a router test (owner decision, Oct 7, 2026) |
+| 8a | Owner handover & stepping down | A workspace admin may demote or remove themselves without `workspace_staff.manage_admins`, and their own staff row carries the action; the workspace's last owner may step down or leave when whoever acts (`manage_admins`) names a replacement owner (`new_owner_id`, current staff; its four 422 types) in the same request, which promotes them in the same transaction (DL-59; "The workspace and org API") |
+| 9 | Org members & user creation | The endpoints in "The org members API" (DL-67) and their actions (DL-68), with their spec tests; org members (list with per-row `allowed_actions`, email-first add (an existing member found by email is a 422 on `email`, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`, as for staff (DL-55): owner decision, Oct 7, 2026), create user and membership in one step, change role, remove with the project-membership option through the same handler, D2); the user check (email, username, and a username suggested from a name; DL-66), with `rules/identifiers.py`'s suggestion rule test-first; last-owner guard for orgs, with the replacement-owner handover and org admins stepping down on their own (DL-59); audit events |
+| 10 | Account actions & profile | The endpoints in "The account API" (DL-72) and their actions (DL-73), with their spec tests; every last-owner guard counting active owners only, the roster's included (DL-74); deactivate, reactivate, reset password, sign out everywhere (in the `auth` service, under the rank rule); admin changes to a user's email, name, and username (in the `user` service, under the rank rule; an email change signs the user out through `auth`'s registered `on_email_changed` handler; one `user_updated` event per profile edit, or per covering org, DL-75); users list for workspace pages (showing who holds system admin); own profile update (name, username); the per-person access review (design-doc §5); boundary tests both ways at each rank; audit events |
+| 11 | Projects | The endpoints in "The projects API" (DL-76) and their actions (DL-77), with their spec tests; `(my_work)` in the service-layers contract (TD-16); create (any org member; key, type, module seeding; the creator becomes first admin and lead by default, or an org owner/admin names another first admin, a separate action `project.assign_first_admin` in the org's `allowed_actions`, carried on each org entry in `/me`; unclassified until Checkpoint 13 adds classification at creation), list, view, update (name, description, type, status, lead, modules), archive and unarchive; key availability; the `my_work` read area with its projects section (`GET /api/me/work`, `GET /api/me/work/{section}`; design-doc §11); module guidance (recommended modules, notes, `available` flag, has-data hook, F8); audit events |
+| 12 | Project members | The endpoints in "The project members API" (DL-78) and their actions (DL-79), with their spec tests; list (per-row `allowed_actions`; any project member reads it); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its four cases (design-doc §4, DL-78; an existing member found by email is a 422 on `email`, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`, as for staff (DL-55); an account outside the org and the staff, `outside_org`, unless confirmed with `join_org: true`, which adds them to the org as a member too; a deactivated account refused before `outside_org`, on either path, `account_inactive`); the add race's `already_member` on the field the request used, in the shared roster (DL-80, TD-23); change role; remove (removing the lead's membership clears `lead_id`, recorded in the `project_member_removed` details, also in archived projects through removal with their projects); the per-project access review (design-doc §5); the email-first add, the create (the user and their org membership through the org service, the project membership through the roster), and the lock order go through the roster (`services/roster.py`; projects have no last-admin guard or stepping down, DL-71), with which the project area registers its `on_member_removed` handler, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
+| 13 | Classification & export control | The endpoints and fields in "The classification API" (DL-81) and their actions (DL-82), with their spec tests; `rules/classification.py` (effective classification; the raise and lower rules), test-first (`spec-test-writer`, against stubs) and mutation-tested, with the `authz/` changes' tests from `spec-test-writer` too; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin`; the management/content split in both access reviews, per person and per project (design-doc §5, §3.1; DL-72) |
+| 13a | Demo seed data | `wl seed --demo` (DL-83): only when the `demo_seed_enabled` setting is on (off by default; on in `.env.example`, the local-dev default, and on the `wl e2e` stack, DL-90) and in an empty database (refused once a workspace exists), through the services so every audit event is recorded, its users created as `wl seed` creates the first admin (no `must_change_password`, no actor), except the two forced-change users (DL-87), whom the `ERP` lead creates through the project's create-member path, and their memberships through the org, roster, and project services (DL-88), each step acting as the person who would take it (the system admin creates the orgs, each org's owner adds its members, creates its projects naming their leads, and archives the fifth, each lead adds the project's members, every step under the action its endpoint checks; owner decision, Oct 13, 2026): the workspace and its system admin (its owner), a workspace admin, and two orgs, each with one org admin (its owner) and two projects of different types; each project has a lead (its first admin) and five users (one admin, three members, one viewer), distinct people except one member of each org who is on both its projects; one user in both orgs, on a project in each (the org switcher); two users who must change their password, on one project, one for each theme's run of the forced-change flow (DL-87); one user with no memberships (the no-access page); a fifth project, archived, with a lead and two members (My work leaves it out); one project classified Confidential with the `financial` category (the banner; no export-controlled project and no deactivated user yet); every demo user with one shared known password, which the command prints and the developer guide lists with each user's role; the data `wl e2e` seeds its stack with |
+| 14 | Web: foundations & sign-in | The styling foundation (`docs/ui-design-guide.md`, DL-61): `primevue`, `@primeuix/themes`, `tailwindcss` with `@tailwindcss/vite`, and `tailwindcss-primeui`; the token file (`src/app/styles/tokens.css`) and base rules, the PrimeVue preset (`src/app/theme/preset.ts`), and the token contrast check (`docs/ui/check_contrast.py`, until ported to a Vitest test); first, before any screen, the accessibility tooling (DL-65): one shared helper each for `vitest-axe` and `@axe-core/playwright` (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`) with a deliberately violating fixture each helper rejects, an undersized-target fixture proving `target-size` runs, and `expectFocusNotObscured()`, proven able to fail on a test fixture with a sticky header (DL-89); current-user store (TD-10); route guards (unauthenticated → sign-in; `must_change_password` → change password); error handling (401, 403, 404, 409, 422 with field errors); sign-in; forced password change; My work as the home page, a real `/` route from the first commit (its `h1` and an empty state until S1-C14a's projects section replaces it, DL-65); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation, each end-to-end flow run in light and dark (a flow that creates data uses keys and users unique to the run, DL-87); Playwright (Chromium) with end-to-end sign-in (landing on My work) and forced-change flows; `wl e2e`, run by `wl check --full` (and so by CI; DL-99) on its own stack seeded with `wl seed --demo` (DL-65, DL-83, DL-84) |
+| 14a | Web: app shell | The app shell (ui-design-guide §4): sidebar with project selector, the org switcher, and the user menu with the System / Light / Dark theme choice (UI-TOK-2, DL-85); My work's projects section (design-doc §11); account settings (profile, change password); the password requirements list (`GET /api/auth/password-policy`, a backend endpoint in the `auth` area, with its API tests and `wl gen-client`, and `PasswordRequirements`, on the forced change and account settings' change password; UI-FRM-10, DL-91); no-access page; a minimal project home (`/{org_slug}/projects/{key}`: the project header with name, key, status, and a "No lead" badge; the project pages nav lists only Home) and org project list (`/{org_slug}/projects`, a plain list over `useListQuery`), so the selector and switcher never link to a missing screen (no "New project" until S1-C16), with the 404 handling for an unknown org or a project the user can't see (TD-32) and the redirect of a stale or wrong org slug or a lowercase key (DL-97); reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; axe-core checks in component and end-to-end tests for each new screen, in light and dark; `expectFocusNotObscured()` on the shell pages (DL-84, DL-89) |
+| 15 | Web: workspace admin | The admin pages' layout (UI-SHL-10, DL-104): the "Administration" entry in the user menu, the section nav, and `PageHeader` (TD-39); the shared pieces S1-C15a reuses: a dialog and confirm dialog (UI-FRM-14), the role select, the temporary-password field (UI-FRM-11), the row actions menu (UI-TBL-4), the email-first add-person flow (UI-FRM-13), the account-action dialogs (deactivate, reactivate, reset password, sign out everywhere, edit email, name, and username), the replacement-owner picker (DL-59), and the D2 removal dialog; workspace pages (staff: add, create, change role (stepping down from one's own row; the last owner's replacement), account actions, remove; orgs: list and create with its first owner; users: account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners and system admins); the per-person access review; staff and org member rows gain `is_active` and the `user`-level actions in their `allowed_actions` (backend, with API tests and `wl gen-client`; DL-102), so each row's menu offers only the account actions allowed and a deactivated member shows as such |
+| 15a | Web: org admin | Org settings (rename, change slug, live availability; a slug change moves to the new URL); org members page (the email-first add-person form with a generated temporary password shown once, role changes (stepping down from one's own row; the last owner's replacement-owner picker, DL-59), account actions, the D2 removal dialog with the project-membership option), on S1-C15's shared pieces (DL-103) |
+| 16 | Web: projects | Project list (fixed filters over `useListQuery`, on S1-C14a's org project list, DL-97); the project header's lead name and "New project" in the project selector; create-project dialog (live key validation, type, description, module selection with guidance, and a first-admin picker of the org's members, DL-112, shown only when the org's entry in `/me` includes `project.assign_first_admin`); `lead_name` on the project read (backend, with API tests and `wl gen-client`; DL-111); classification on the create dialog (level descriptions, categories, the export-control confirmation, inline until S1-C16a gives it its own dialog, DL-114) and the project banner; unshipped modules greyed out in the project pages nav; the end-to-end project creation flow (keys unique to the run, DL-87). Members and Settings join the nav with their pages (S1-C16a, S1-C16b; DL-109) |
+| 16a | Web: project settings | Project settings (name, description, type, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged), with Settings in the project pages nav; classification in project settings (raising, lowering, and removing categories, with the export-control confirmation dialogs); the create dialog's export-control confirmation moved into its own dialog, the one settings uses (DL-114); `lead_is_active` on the project read and `is_active` on project member rows (backend, with API tests and `wl gen-client`; DL-113), so the header and settings mark a deactivated lead (TD-45) and the lead picker marks deactivated members; the settings forms' shared save handling (TD-43), on S1-C16's pieces (DL-109) |
+| 16b | Web: project members | Project members page (the picker and the email-first add-person form, with the `join_org` confirmation for an account from outside the org, DL-78, and the export-control confirmation on add), with Members in the project pages nav; the per-project access review; the end-to-end membership flow (users unique to the run, DL-87), on S1-C15's roster pieces (DL-109) |
+| 16c | Review follow-ups | From the S1-C16b review (DL-116 to DL-118): an add on the members page, or project settings' classification save, refused with `confirmation_required` or `confirmation_not_needed` on `export_control_confirmed` reloads the project, as a 403 does, so the confirmation appears or goes (TD-48); the add-person dialog's "account exists" and "join the organization" steps start on Back (DL-117), each step's text in the focused control's `aria-describedby` (DL-118) |
+| 16d | Review follow-ups (2) | From the S1-C16c review (DL-120, DL-122): project settings' classification save refused with `members_changed` on `confirmed_member_ids` reloads the project, as DL-116's refusals do; the create-organization dialog's "created" step and the password reset's "shown once" step put their text and the temporary password's warning in Done's `aria-describedby` (DL-118, TD-50) |
 | 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; `repo-auditor` (DL-41); tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
 
 **Groups** ("Pull requests"): five review points. Group 1 landed as its own PR
@@ -834,19 +876,22 @@ rest of the slice.
 |---|---|---|
 | 1 | `s1-foundations` | 1–4 (models, numbering, pure rules, API conventions) |
 | 2 | `s1-auth` | 5–7 (sessions, passwords and CLI, authorization core) |
-| 3 | `s1-workspace` | 8–10 (workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
+| 3 | `s1-workspace` | 7a–10 (the sign-in password cap, the change-password cap and old session, the owner handover, workspace and orgs, org members, account actions; the review-tier trial, "Verification") |
 | 4 | `s1-projects` | 11–13 (projects, project members, classification) |
-| 5 | `s1-web` | 14–17 (web screens and slice verification) |
+| 5 | `s1-web` | 13a–17 (demo seed data, web screens, and slice verification) |
 
 Checkpoints 7 to 13 add or change `app/authz/` code (the authorization core, then each area's
 policy) or `app/rules/` code, so each starts with `spec-test-writer` (DL-15).
 
 Checkpoints touching authentication, sessions, authorization, or routers get the
-`security-reviewer` as well: every checkpoint from 1 to 16. The `checkpoint` skill runs it for
+`security-reviewer` as well: every checkpoint from 1 to 16b (the follow-ups inserted after it,
+S1-C16c and S1-C16d, only when their diff calls for it, DL-121). The `checkpoint` skill runs it for
 every checkpoint this paragraph names, and also whenever a diff touches security-relevant code.
+The `ui-reviewer` runs whenever a diff touches `frontend/src/` or `frontend/e2e/` (from S1-C14
+on; DL-62).
 The sections below describe the content; the table above is the order of work. The decisions
-behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/S1-plan.md`; its
-Checkpoints 13–16 are this table's 14–17 (DL-3). Admins change a user's email in Checkpoint 10
+behind this plan (F1–F10, D1–D7, C1–C5) are recorded in `docs/reviews/s1/S1-plan.md`; its
+Checkpoint 13 is this table's 14 and 14a, and its 14–16 are 15–17 (DL-3, DL-84). Admins change a user's email in Checkpoint 10
 (design-doc §4; DL-6 supersedes the record's D4).
 
 ### Migration (Checkpoint 1)
@@ -872,27 +917,41 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   `invalid_credentials`, and an unknown email still runs a password verification against a
   dummy hash, so timing doesn't reveal which emails have accounts; a deactivated account returns
   `account_inactive` only after the password is verified; emails are lowercased before lookup;
-  a hash made with older Argon2 parameters is upgraded after a successful sign-in. The sign-in
-  response has the same shape as `/me`.
-- **`/me`**: the user, `is_system_admin`, their workspaces and roles, their orgs (for the
-  switcher), `must_change_password`, and workspace-level `allowed_actions` (from Checkpoint 7);
-  each org entry carries that org's `allowed_actions` (from Checkpoint 11, for the
-  create-project dialog).
+  a hash made with older Argon2 parameters is upgraded after a successful sign-in; a password over
+  256 characters is a 422 before any verification (DL-49, Checkpoint 7a). The sign-in response
+  has the same shape as `/me`.
+- **`/me`**: the user, `is_system_admin`, their workspaces and roles (for a system admin, every
+  workspace, with a null role where they hold no membership; DL-46), their orgs (for the switcher),
+  and `must_change_password`; each workspace entry carries that workspace's `allowed_actions` (from
+  Checkpoint 7, DL-45), and each org entry carries that org's `allowed_actions` (from Checkpoint 11,
+  for the create-project dialog).
 - **Password policy** (`rules/password_policy.py`, §4): 8–256 characters, no composition rules,
   not equal to the email or username (ignoring case); when users change their own, the new
   password differs from the current one (`same_as_current`; admin resets and new accounts pass
   False). Used by change password, admin reset, and account creation.
+- `GET /api/auth/password-policy` (from S1-C14a, DL-91): open to anyone, signed in or not, and
+  during a forced change. Returns `requirements`, in order, each with a `code`, a `label` written
+  for users, and the number it needs where it has one. Each `code` is the 422 field error `type`
+  that requirement prevents (DL-94): `too_short` ("At least 8 characters", `value` 8),
+  `same_as_email`, `same_as_username`, `same_as_current` (for a user choosing their own). The
+  labels live in the `auth` area; the number is `rules/password_policy.py`'s `MIN_LENGTH`, read,
+  not changed (no `rules/` change, so no spec tests), so raising the minimum (TD-12) changes the
+  list with no frontend change. The 256-character cap is not listed; the server refuses it.
 - `must_change_password`: while set, every endpoint except `GET /api/auth/me`, change-password,
-  and sign-out returns 403 with the error code `password_change_required`; the web app redirects
-  to the change-password screen.
-- `POST /api/auth/change-password` (requires the current password; replaces the current
-  session's token and deletes the user's other sessions).
+  sign-out, and the password policy returns 403 with the error code `password_change_required`;
+  the web app redirects to the change-password screen.
+- `POST /api/auth/change-password` (requires the current password, a 422 over 256 characters
+  before any verification, DL-52; replaces the current session's token and deletes the user's
+  other sessions).
 - **Seed command:** an app admin command (`app/cli.py`, run as `wl seed`) that creates the
   workspace (name and slug) and the first system admin (email, username, name, password), and
   makes that admin the workspace's owner (`workspace_membership`, role owner). It prompts by
-  default; with flags or environment variables it runs non-interactively (CI end-to-end tests,
-  `fresh-clone-verifier`). It refuses to run when a workspace already exists. There is no UI or
-  endpoint for creating workspaces.
+  default; with flags or environment variables it runs non-interactively
+  (`fresh-clone-verifier`). It refuses to run when a workspace already exists. There is no UI or
+  endpoint for creating workspaces. With `--demo` (S1-C13a, DL-83; only where the
+  `demo_seed_enabled` setting is on, DL-90) it instead builds the fixed
+  demo dataset (the S1-C13a row), workspace and system admin included, with one shared known
+  password; `wl e2e` seeds its stack with it.
 - **System-admin commands:** `grant-system-admin` and `revoke-system-admin` (`app/cli.py`, by
   email), run as `wl admin <command>`: a pass-through to the app CLI in the backend image,
   covered by the CLI's dry-run tests. Revoking refuses when it would leave no active system
@@ -905,7 +964,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   removing a member with their projects) → export-control gate (a content action on an
   export-controlled project needs an explicit project membership, §3.1; built in Slice 2 with
   the first content) → personal actions (the relationship rule decides, for a user with project
-  access; no admin level or project role grants them) → system admin → workspace owner/admin →
+  access; no admin level or project role grants them) → visible actions (anyone who sees the
+  target; never a project content action, DL-58) → system admin → workspace owner/admin →
   org role (owner/admin of the project's org; an org member only for `project.create`) →
   project role → targeted rules. The admin levels grant inherited project admin.
 - **Action registry:** every action is marked content or management (§3.1; from Checkpoint
@@ -914,6 +974,36 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   through a test-only personal action: denied to every admin level, system admin included,
   allowed only through its relationship rule, and denied to a user with the relationship but
   no project access.
+- **Which actions, when** (DL-44): Checkpoint 7 registers only the workspace-level actions
+  below; the core's rules (the archived check, personal actions, inherited project admin, an
+  org member's `project.create`, project roles) are proven with test-only actions at org and
+  project level. Each later checkpoint (8 to 13) registers its own area's actions, with their
+  spec tests.
+- **Workspace-level actions** (DL-45), the ones `/me` carries:
+
+  | Action | Allows | Allowed to |
+  |---|---|---|
+  | `workspace.view` | the workspace pages, and reading them: staff, orgs, users | workspace owners/admins, system admins |
+  | `workspace.update` | renaming the workspace, changing its slug | workspace owners, system admins |
+  | `workspace_staff.manage` | adding and creating staff; changing their roles; removing them | workspace owners/admins, system admins (granting, changing, or removing the owner and admin roles also needs `workspace_staff.manage_admins`, DL-56, except an admin demoting or removing themselves, DL-59) |
+  | `org.create` | creating an org and assigning its first owner | workspace owners/admins, system admins |
+
+  Checkpoint 8 adds (DL-56): `workspace_staff.manage_admins` (granting, changing, or removing a
+  workspace owner or admin role, on top of `workspace_staff.manage`, except an admin demoting or
+  removing themselves, DL-59: workspace owners and system admins; a workspace-level action, so
+  `/me` carries it too), and at org level `org.view` (anyone who sees
+  the org, §4 "Visibility") and `org.update` (renaming the org, changing its slug: org owners,
+  workspace owners/admins, system admins).
+
+  Checkpoint 9 adds (DL-68): `org_member.manage` (listing the org's members, adding and creating
+  members, changing roles, removing members: org owners/admins, workspace owners/admins, system
+  admins); `org_member.manage_admins` (granting, changing, or removing an org owner or admin role,
+  on top of `org_member.manage`, except an admin demoting or removing themselves, DL-59: org
+  owners, workspace owners/admins, system admins); and `user.check` (the user check, DL-66: a
+  workspace-level action for workspace owners/admins and system admins, with a targeted rule for
+  org owners/admins in the workspace and explicit admins of its non-archived projects, so each
+  project in the authorization context carries its archived state and each org role its org's
+  workspace; anyone else gets a 404).
 - **Authorization context:** the user's system-admin flag and their workspace, org, and project
   memberships, loaded once per request and reused by every check, by `allowed_actions`, and by
   list scoping.
@@ -924,8 +1014,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - **`allowed_actions`** (build plan, "API conventions"): single-entity reads return the actions
   the user may take, evaluated through `authorize()`. Action names come from the registry and are
   exported as an OpenAPI enum.
-- **Module gating dependency:** a request to a module disabled for the project returns 404,
-  tested through a test-only gated router in `tests/support/` (`sprints` and `github` have no
+- **Module gating** (DL-47: the `module` option of the load-and-authorize dependency): a request
+  to a module disabled for the project returns 404 before `authorize()`, tested through a
+  test-only gated router in `tests/support/` (`sprints` and `github` have no
   endpoints yet). Both are allowed values from Slice 1 and seeded from the project type
   (design-doc §1.1).
 - **Test matrix:** one parametrized test per action × role, covering project roles (viewer,
@@ -938,7 +1029,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   any lowering or removal, denied to inherited admins and allowed to an explicit project
   admin). The export-control gate's rows come in Slice 2.
 - **Mutation testing:** mutmut over `app/rules/` and `app/authz/`, run by `wl backend mutate`,
-  included in `wl check` and CI; fails on any surviving mutant not marked equivalent
+  included in `wl check` when its inputs changed and always in `wl check --full` and CI (DL-99);
+  fails on any surviving mutant not marked equivalent
   (`testing-strategy.md`, "Mutation testing").
 
 ### Admin audit events (§10.1)
@@ -955,14 +1047,40 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - Workspace owner/admin (and system admin): list, add, and create staff (workspace members);
   change their roles; remove them. Create orgs, assign each its first owner, list all orgs in
   the workspace. An org is created with a name and slug; its owners rename it and change its
-  slug. Workspace owners rename the workspace and change its slug (`workspace_updated`). Slugs
-  follow `rules/identifiers.py`, including the reserved list (§3).
+  slug. Workspace owners (and system admins, DL-45) rename the workspace and change its slug
+  (`workspace_updated`). Slugs follow `rules/identifiers.py`, including the reserved list (§3).
 - Org owner/admin (and workspace owner/admin): list members; add an existing user by email;
   create a new user (email, username, name, temporary password) and their membership in one
   step; change roles; remove members. Adding by email uses the email-first form (§4): an
   existing account is added after confirmation, otherwise the form continues to account
-  creation.
-- Project admin (including inherited): list the project's members; add a user with a project
+  creation, with the username pre-filled from the name (DL-66).
+- **The user check** (DL-66; S1-C9): `GET /api/workspaces/{workspace_id}/user-check` with exactly
+  one of `email`, `username`, or `name` (none or several is a 422):
+  - `email`: `{email, exists}`, whether an account has that email, and never its name, username,
+    or orgs;
+  - `username`: `{available, problem}`, the username rule's problem or `taken`, like the slug
+    checks;
+  - `name`: `{suggestion}`, an available username from the name. The rule,
+    `suggest_username(name, suffix=None)` in `rules/identifiers.py`, lowercases the name,
+    removes accents, and drops every other character the username rule doesn't allow, then
+    joins the first and last remaining word with a hyphen (`jane-doe`; "Jane 2nd" gives
+    `jane-2nd`, "李 Smith" gives `smith`, one word gives `jane`). It cuts the result to the
+    rule's 40 characters, or with a suffix number `n` shortens the base so base plus `-n` fits
+    in 40, and strips trailing hyphens after any cut; it returns `None` when no valid username
+    results. The service asks for the next suffix (`2`, `3`, …) while the candidate is taken.
+
+  One audience for every form of the check: those who may add or create a person in the
+  workspace (workspace owners and admins, org owners and admins, admins of a project that isn't
+  archived, system admins). The action is `user.check` (DL-68): the route is at workspace level
+  but the right can come from an org or project role, so it has a targeted rule, with its spec
+  tests. Anyone else gets a 404, as for the workspace pages (design-doc §4, "Visibility"). A user changing their
+  own username gets no live check; a taken one is the 422 `taken` on save (UI-FRM-9). An admin's
+  edit form (S1-C10, S1-C15) skips the check while a field still holds the user's current value,
+  so the check never takes a user ID: given one, it would tell an admin whether a chosen user has
+  a given email. The form shows the suggestion until the admin edits the username; the server
+  still validates on submit.
+- Any project member (inherited admins included) lists the project's members (DL-78). Project
+  admin (including inherited): add a user with a project
   role (admin, member, viewer), choosing from the org's members and the workspace's staff (the
   picker lists no one else, and adding by user ID rejects anyone else with a 404); add by email
   with the email-first form (§4): a new email creates the user, an org membership (member), and
@@ -975,9 +1093,72 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   (§4). Each removal is its own audit event.
 - Removing any membership leaves the user's sessions alone (§4): access ends on the next
   request because `authorize()` re-checks memberships.
-- Guards: the last owner of an org, and of the workspace, can't leave or be demoted; only
-  owners can grant, change, or remove the owner and admin roles at their level (§5 role
-  tables).
+- Guards: the last active owner of an org, and of the workspace, can't leave or be demoted without
+  naming a replacement owner (`new_owner_id`, DL-59), or be deactivated (DL-72; DL-74); only owners can grant, change, or remove
+  the owner and admin roles at their level (§5 role tables; at the workspace level, system admins
+  too, DL-45; at the org level, workspace owners/admins and system admins too, DL-68), except that
+  an admin may demote or remove themselves (DL-59).
+- **The workspace and org API** (Checkpoint 8, DL-55):
+
+  | Endpoint | Does | Action |
+  |---|---|---|
+  | `GET /api/workspaces/{workspace_id}` | the workspace (name, slug) with its `allowed_actions` | `workspace.view` |
+  | `PATCH /api/workspaces/{workspace_id}` | rename, change slug (`workspace_updated`, old and new values) | `workspace.update` |
+  | `GET /api/workspaces/{workspace_id}/slug-availability?slug=` | `{available, problem}`: the slug rule's problem, or `taken` (the workspace's own slug counts as available) | `workspace.update` |
+  | `GET /api/workspaces/{workspace_id}/staff` | the staff list (offset paging, `ListSpec`: sort by name or email, filter by role), each row with its `is_active` and `allowed_actions` (from S1-C15, DL-102) | `workspace.view` |
+  | `POST /api/workspaces/{workspace_id}/staff` | add an existing account, email first (design-doc §4): `email`, `role`; already staff is a 422 `already_member` on `email`, no account a 422 `no_account` on `email` (the form goes on to create one), a deactivated account a 422 `account_inactive` on `email`; the web form first checks the email (S1-C9's user check, DL-66) and confirms adding that person by the email alone (design-doc §4), then posts (`workspace_member_added`) | `workspace_staff.manage` |
+  | `POST /api/workspaces/{workspace_id}/staff/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `workspace_member_added`) | `workspace_staff.manage` |
+  | `PATCH /api/workspaces/{workspace_id}/staff/{user_id}` | change the role (`workspace_member_role_changed`) | `workspace_staff.manage` |
+  | `DELETE /api/workspaces/{workspace_id}/staff/{user_id}?with_projects=true` | remove; `with_projects` (default true) calls the `on_member_removed` handler (a stub until Checkpoint 12) (`workspace_member_removed`) | `workspace_staff.manage` |
+  | `GET /api/workspaces/{workspace_id}/orgs` | the workspace's orgs (offset paging, sort by name) | `workspace.view` |
+  | `POST /api/workspaces/{workspace_id}/orgs` | create an org (name, slug) and its first owner: exactly one of `owner_id` (an existing active user: no such user is a 404, a deactivated one a 422 `account_inactive` on `owner_id`) or `new_owner` (email, username, name, temporary password; `user_created`) (`org_created`, `org_member_added`) | `org.create` |
+  | `GET /api/workspaces/{workspace_id}/org-slug-availability?slug=` | the same shape, for a new org | `org.create` |
+  | `GET /api/orgs/{org_id}` | the org with its `allowed_actions` | `org.view` |
+  | `PATCH /api/orgs/{org_id}` | rename, change slug (`org_updated`) | `org.update` |
+  | `GET /api/orgs/{org_id}/slug-availability?slug=` | the same shape; the org's own slug counts as available | `org.update` |
+
+  Granting, changing, or removing an owner or admin role also needs
+  `workspace_staff.manage_admins` (403 otherwise; checked before the email on an add). A staff
+  row's `allowed_actions` are the caller's `workspace_staff.*` actions, plus, from S1-C15, the
+  `user`-level actions on that person (`user.manage`, `user.view_access`, as on a users-list row;
+  DL-102), and no `workspace_staff.*` action on an owner's or
+  admin's row unless the caller holds `manage_admins` (an admin's own row carries
+  `workspace_staff.manage`, for stepping down, DL-59), so the UI never offers what the API would
+  refuse with a 403 (the last owner's own row still offers changes the guard refuses unless a
+  replacement is named). A role change to the role already held changes and records nothing. A
+  workspace admin may demote or remove themselves without `manage_admins` (DL-59). Demoting or
+  removing the workspace's last active owner (DL-74) is a 422 `validation_error` of type `last_owner`, on
+  `role` (a demotion) or on the path's `user_id` (a removal), unless the request names a
+  replacement (DL-59, Checkpoint 8a): whoever may demote or remove an owner (`manage_admins`)
+  may pass `new_owner_id` (a body field on the role change, a query parameter on the removal),
+  and that staff member becomes owner in the same transaction (`workspace_member_role_changed`
+  for them too). 422 on `new_owner_id`: not staff `not_member`, deactivated `account_inactive`,
+  the target themselves `same_user`, the target not an owner `not_owner`; naming someone already
+  an owner is accepted (nothing to promote). A role change or removal locks the owners' rows, then
+  the target's, then the replacement's, so concurrent changes queue in one order. S1-C9's org
+  guard and self-service work the same way. `create_app` adds a `ReservedSlug` enum
+  (`RESERVED_SLUGS`) to the OpenAPI schema's components, with a test that it's there, for the
+  S1-C14a router test (owner decision, Oct 7, 2026).
+- **The org members API** (Checkpoint 9, DL-67):
+
+  | Endpoint | Does | Action |
+  |---|---|---|
+  | `GET /api/orgs/{org_id}/members` | the member list (offset paging, `ListSpec`: sort by name or email, filter by role), each row with its `is_active` and `allowed_actions` (from S1-C15, DL-102) | `org_member.manage` |
+  | `POST /api/orgs/{org_id}/members` | add an existing account, email first (design-doc §4): `email`, `role`; already a member is a 422 `already_member` on `email`, no account a 422 `no_account` on `email` (the form goes on to create one), a deactivated account a 422 `account_inactive` on `email`; the web form first checks the email (the user check, DL-66) and confirms by the email alone (`org_member_added`) | `org_member.manage` |
+  | `POST /api/orgs/{org_id}/members/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `org_member_added`) | `org_member.manage` |
+  | `PATCH /api/orgs/{org_id}/members/{user_id}` | change the role, with an optional `new_owner_id` (`org_member_role_changed`) | `org_member.manage` |
+  | `DELETE /api/orgs/{org_id}/members/{user_id}?with_projects=true` | remove, with an optional `new_owner_id` query parameter; `with_projects` (default true) calls the `on_member_removed` handler (a stub until Checkpoint 12) (`org_member_removed`) | `org_member.manage` |
+  | `GET /api/workspaces/{workspace_id}/user-check` | the user check (DL-66, above) | `user.check` |
+
+  Granting, changing, or removing an org owner or admin role also needs
+  `org_member.manage_admins` (403 otherwise; checked before the email on an add), and a member
+  row's `allowed_actions` follow the staff rows' rule (the `user`-level actions included, DL-102):
+  no `org_member.*` action on an owner's or admin's row unless
+  the caller holds `manage_admins`, an admin's own row carrying `org_member.manage` for stepping
+  down (DL-59). The org's last-owner guard (`last_owner`, on `role` or the path's `user_id`), the
+  replacement owner (`new_owner_id`, an org member: `not_member`, `account_inactive`,
+  `same_user`, `not_owner`), a no-op role change, and the lock order work as for staff, with
+  TD-25's fix applied to both (adding an owner takes the owner lock too; one race test).
 
 ### Users (system admin, plus workspace-admin and org-admin scope)
 - Create (through the org and project flows above), deactivate, reactivate, reset password
@@ -989,7 +1170,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   holds at least one membership in the actor's scope, and every membership the target holds is
   covered by an actor role at an equal or higher rank (system admin \> workspace owner \> workspace
   admin \> workspace member \> org owner \> org admin \> org member \> project-only user). Users
-  with no memberships: workspace owners/admins and system admins. Tested both ways at each boundary:
+  with no memberships: workspace owners/admins and system admins, until an org admin adds them to
+  their org by email, which brings them into that admin's scope (an accepted risk, DL-69). Tested both ways at each boundary:
   e.g. an org admin can reset another admin of their org but not a workspace member, a user in
   another org, or a user on another org's project; a workspace admin can't reset the workspace owner
   or a system admin. The rule trusts the memberships it's given, so the loader builds them from real
@@ -1007,7 +1189,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   security review, owner decision Oct 7, 2026), with a security test. Every other account action may
   target the actor's own account (owner decision, Oct 7, 2026; the last-owner and last-system-admin
   guards still apply), with a test for each. Every profile edit, the user's own or an admin's,
-  records one `user_updated` event with the old and new value of every changed field.
+  records one `user_updated` event with the old and new value of every changed field (an admin's,
+  one per covering org when they act through several orgs' roles, DL-75).
 - The workspace users list shows which users hold system admin (read-only; granting and
   revoking stay in the CLI).
 - **Access review, per person** (design-doc §5, "Access review"): every org and project the
@@ -1015,6 +1198,50 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   system admins open it for anyone, org owners/admins for a person within their rank scope
   (the full rank rule: every membership the person holds is covered), and every user for
   themselves; anyone else gets a 404.
+- **The account API** (Checkpoint 10, DL-72):
+
+  | Endpoint | Does | Action |
+  |---|---|---|
+  | `GET /api/workspaces/{workspace_id}/users` | the users list: everyone with a membership in the workspace (staff, org members, project members) and every account with no memberships; each row `id`, `email`, `username`, `name`, `is_active`, `is_system_admin` (read-only), and its `allowed_actions` (offset paging, `ListSpec`: sort by name or email, filter by `is_active`) | `workspace.view` |
+  | `POST /api/users/{user_id}/deactivate` | set `is_active` false and delete the user's sessions (`user_deactivated`); already inactive changes and records nothing | `user.manage` |
+  | `POST /api/users/{user_id}/reactivate` | set `is_active` true (`user_reactivated`); already active changes and records nothing | `user.manage` |
+  | `POST /api/users/{user_id}/reset-password` | `password` (the temporary password the form generates, under the password policy): set it and `must_change_password`, and delete the user's sessions (`password_reset`) | `user.manage` |
+  | `POST /api/users/{user_id}/sign-out-everywhere` | delete the user's sessions (`signed_out_everywhere`) | `user.manage` |
+  | `PATCH /api/users/{user_id}` | change `email`, `name`, `username` (any subset); one `user_updated` event with the changed fields (per covering org, "Audit scope" below); an email change deletes the user's sessions through `on_email_changed` | `user.manage` |
+  | `PATCH /api/me` | the signed-in user's own `name` and `username` (`user_updated`) | signed in |
+  | `GET /api/users/{user_id}/access` | the per-person access review: the person (`id`, `email`, `username`, `name`, `is_active`, `is_system_admin`, `workspace_role`), every org they can reach and every project they can reach, each with its `reasons` | `user.view_access` |
+
+  The two `PATCH`es return the user: `PATCH /api/users/{user_id}` as a users-list row, `PATCH
+  /api/me` as `GET /api/auth/me` returns it (`user`); the four `POST`s return 204. **Who sees whom:** a user target the actor can't see is
+  a 404, one they see but may not act on a 403 (`ensure`). The actor sees a user who holds at
+  least one membership in the actor's scope (the rank rule's first half), themselves, and, for
+  workspace owners/admins and system admins, every user. `user.view_access` is a 404 on any
+  denial (design-doc §5, "Access review"). **Errors:** deactivating the last active system admin
+  is a 422 `validation_error` of type `last_system_admin`, and the last active owner of the
+  workspace or of an org a 422 of type `last_owner`, both on the path's `user_id`; the
+  deactivation takes the owners' locks of every workspace and org the user belongs to, and the system
+  admins' lock when they hold the flag, before the guard, so it queues behind a handover (TD-27).
+  Like every last-owner guard, it counts active owners only (DL-74). **Audit scope:** when a system-admin or
+  workspace role of the actor covers the target under the rank rule, one event with no
+  `organization_id`; otherwise one event per org whose owner/admin role of the actor covers one
+  of the target's memberships, each with that org (DL-75).
+  The admin reset of one's own password is a 403 `forbidden` (S1-C4 security review); an admin
+  change to one's own email is a 422 of type `own_email` on `email`. A taken email or username is
+  the 422 `taken`; the policy's problems on `password`; the username rule's on `username`.
+  **Access reasons:** for an org, `system_admin`, `workspace_owner`, `workspace_admin`,
+  `org_owner`, `org_admin`, `org_member`, `project_membership` (a role on one of its projects);
+  for a project (`id`, `key`, `name`, `organization_id`, `archived`), `system_admin`,
+  `workspace_owner`, `workspace_admin`, `org_owner`, `org_admin` (inherited project admin), and
+  `project_admin`, `project_member`, `project_viewer`. Orgs sorted by name, projects by key; no
+  paging. Each project also carries `access`, `content` or `management` (design-doc §3.1;
+  Checkpoint 13, DL-81).
+- **The account actions** (DL-73): a user is a target at its own level, `user`: its workspace,
+  and the user's ID and memberships for the rank rule (`rules/account_rank.py`), loaded from real
+  joins (a user with no memberships is in the only workspace, design-doc §4, "One workspace"). `user.manage` is granted by no role, only its targeted rule: the rank rule
+  (`can_manage_account`, the actor's roles from the context); system admins hold it as for every
+  action. `user.view_access`: workspace admins (and so owners) and system admins by role, and a
+  targeted rule: the user themselves, or the rank rule. A users-list row's `allowed_actions`
+  are the `user`-level actions.
 
 ### Projects (§1.1, §3)
 - Create (any org member, and so org owners/admins, including inherited): name, key (3–6 characters,
@@ -1037,15 +1264,70 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   activity feed. A deactivated lead stays the
   lead, shown with the "deactivated" badge.
 - **Access review, per project** (design-doc §5, "Access review"; Checkpoint 12): everyone with
-  access and why, separating management from content access on an export-controlled project.
-  Project admins (including inherited) open it.
+  access and why; Checkpoint 13 adds the split of management from content access on an
+  export-controlled project. Project admins (including inherited) open it.
 - Key is immutable: no endpoint accepts a key change. Key availability is checked live
   (`taken`, in the "Errors from constraints" shape of "API conventions").
-- **Module guidance** returned by the API alongside project settings (recommended modules per
-  type, a best-practice note per module, and warnings when disabling a recommended module or
-  one that holds data), plus each module's `available` flag (shipped or not; `sprints` and
-  `github` are not yet), so the UI only renders it and greys out unavailable modules. "Holds
-  data" is a per-module hook that returns false until the module's slice implements it.
+- **Module guidance** from `GET /api/module-guidance` (DL-76): the recommended modules per type, a
+  best-practice note per module, and each module's `available` flag (shipped or not; `sprints` and
+  `github` are not yet), so the UI greys out unavailable modules; with `modules_holding_data` on the
+  project read, the UI shows the warnings when disabling a recommended module or one that holds
+  data. "Holds data" is a per-module hook that returns false until the module's slice implements
+  it.
+- **The projects API** (Checkpoint 11, DL-76):
+
+  | Endpoint | Does | Action |
+  |---|---|---|
+  | `POST /api/orgs/{org_id}/projects` | create: `name`, `key` (uppercased as typed), `type`, optional `description`, optional `enabled_modules` (else seeded from the type: its v1 modules, so a software project gets `sprints` and `github`, design-doc §1.1), optional `first_admin_id`; `status` `planning`; the first admin (the creator, or `first_admin_id`) gets an explicit admin `project_membership` and becomes the lead (`project_created`, `project_member_added`); 201 with the project | `project.create`; `first_admin_id` also `project.assign_first_admin` |
+  | `GET /api/orgs/{org_id}/projects` | the org's projects the caller can open (offset paging, `ListSpec`: sort by name or key, filter by `status` and `type`; archived hidden unless `include_archived=true`) | `org.view` |
+  | `GET /api/orgs/{org_id}/project-key-availability?key=` | `{available, problem}`: the key, uppercased as create does, with the key rule's problem or `taken` (anywhere in the workspace) | `project.create` |
+  | `GET /api/projects/{key}` | the project (`id`, `key`, `name`, `description`, `type`, `status`, `lead_id`, `lead_name` (the lead's name, or null with no lead; from S1-C16, DL-111), `lead_is_active` (whether the lead's account is active, or null with no lead; from S1-C16a, DL-113), `enabled_modules`, `archived`, `organization_id`) with its `allowed_actions` and `modules_holding_data` (each module's has-data hook; empty until a module's slice implements it) | `project.view` |
+  | `PATCH /api/projects/{key}` | change `name`, `description`, `type`, `status`, `lead_id` (null clears it), `enabled_modules` (`project_updated`, the changed fields); a `key` is ignored like any unknown field | `project.update` |
+  | `POST /api/projects/{key}/archive` | set `archived_at` (`project_archived`); 204 | `project.archive` |
+  | `POST /api/projects/{key}/unarchive` | clear it (`project_unarchived`); already unarchived changes and records nothing; 204 | `project.unarchive` |
+  | `GET /api/module-guidance` | for each type, the recommended modules; for each module in design-doc §1.1's table, v2 included (`available` false, so its names aren't typed by `ProjectModule`), a best-practice note and `available` (static, for the create dialog before a project exists) | signed in |
+  | `GET /api/me/work`, `GET /api/me/work/projects` | My work (design-doc §11): `{sections: {projects: {available, items, total}}}`, the first 10 items of each section (a section whose query failed is `{available: false}`); `/projects` is the section as an offset-paged list. A project item: `id`, `key`, `name`, `type`, `status`, `lead_id`, `organization_id`, `organization_slug`, sorted by name; the projects the user can open, archived left out | signed in |
+
+  `/me`'s org entries carry their org-level `allowed_actions` (`project.create`,
+  `project.assign_first_admin`, …). **Errors:** 422 on `key` (the key rule's problems, `taken`);
+  a `first_admin_id` who isn't an org member or staff is a 404, and naming one without
+  `project.assign_first_admin` a 403 (design-doc §5); naming a deactivated user as `first_admin_id`, or
+  changing `lead_id` to one, is a 422 `account_inactive` on that field (an unchanged `lead_id` is no
+  change, so a deactivated lead never blocks a save); 422 on `lead_id`, `not_member`, when the lead holds no
+  `project_membership`; `enabled_modules` takes the allowed modules only (`ProjectModule`: the v1
+  modules), anything else FastAPI's 422 `enum`.
+  Archiving an archived project is denied with the other mutations on it (403).
+- **The project actions** (DL-77): `project.create` (org members and up, workspace admins, system
+  admins; a project-only link to the org grants nothing); `project.assign_first_admin` (org
+  owners/admins, workspace admins, system admins); `project.view` (project viewers and up, and
+  inherited admins; not a mutation, so allowed on an archived project); `project.update` (project
+  admins, inherited included); `project.archive` and `project.unarchive` (org owners/admins,
+  workspace admins, system admins; `project.unarchive` archive-exempt). An archived project
+  denies every other mutation.
+- **The project members API** (Checkpoint 12, DL-78):
+
+  | Endpoint | Does | Action |
+  |---|---|---|
+  | `GET /api/projects/{key}/members` | the explicit project memberships (offset paging, `ListSpec`: sort by name or email, filter by role), each row (`user_id`, `email`, `username`, `name`, `role`, and, from S1-C16a, `is_active`, DL-113) with its `allowed_actions` (never the `user`-level actions, DL-102); inherited admins without a membership aren't listed (the access review shows them) | `project.view` |
+  | `GET /api/projects/{key}/member-candidates?q=` | the picker: the project org's members and the workspace's staff not yet on the project (offset paging, sort by name, `q` over name, email, and username) | `project_member.manage` |
+  | `POST /api/projects/{key}/members` | add with a `role` and exactly one of `user_id` (from the picker, which hides deactivated users; checked in this order: anyone outside the org's members and the staff, a 404; already on the project, a 422 `already_member` on `user_id`; a deactivated account, `account_inactive` on `user_id`) or `email` (email first, design-doc §4, checked in this order: already on the project, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`; an account outside the org and the staff, `outside_org`, each a 422 on `email`, unless `join_org: true` confirms the last, which adds them to the org as a member too, `org_member_added`; since `account_inactive` is checked first, `join_org` never adds a deactivated account); an org member's or staff member's email adds only the project membership (`project_member_added`); 201 with the row | `project_member.manage` |
+  | `POST /api/projects/{key}/members/new` | create the user (email, username, name, temporary password; `must_change_password` set), their org membership (role member) through the org service, and the project membership (`role`) through the roster, in one step (`user_created`, `org_member_added`, `project_member_added`); 201 with the row | `project_member.manage` |
+  | `PATCH /api/projects/{key}/members/{user_id}` | change the role (`project_member_role_changed`); the role already held changes and records nothing | `project_member.manage` |
+  | `DELETE /api/projects/{key}/members/{user_id}` | remove (`project_member_removed`, with `role`); removing the lead clears `lead_id`, recorded as `lead_cleared: true`; 204 | `project_member.manage` |
+  | `GET /api/projects/{key}/access` | the per-project access review (design-doc §5): everyone who reaches the project, sorted by name, each with `user` (`id`, `email`, `username`, `name`, `is_active`), their explicit `role` (or null), and `reasons` (the `AccessReason` values: an explicit project role, or inherited admin through `system_admin`, `workspace_owner`, `workspace_admin`, `org_owner`, `org_admin`); and `access` (`content` or `management`, from Checkpoint 13, DL-81); not paged | `project.view_access` |
+
+  Two adds of the same person racing: the loser's unique-constraint violation is `already_member`
+  on the field it used, `email` or `user_id`, in the shared roster, so staff and org adds get it
+  too (DL-80, TD-23). A member row carries `project_member.manage` when the caller holds it. Projects have no last-admin
+  guard, handover, or stepping down (DL-71): a project admin grants, changes, or removes any role,
+  their own included. **Removal with their projects:** the `on_member_removed` handler the project
+  area registers with the roster removes the person's memberships on the org's projects (an org
+  removal) or the workspace's projects (a staff removal), archived ones included, clearing a
+  lead as above; one `project_member_removed` per project, the remover as actor, with `via`
+  (`org_member_removed` or `workspace_member_removed`).
+- **The project member actions** (DL-79): `project_member.manage` (project admins, inherited
+  included; a mutation, so an archived project denies it) and `project.view_access` (the same
+  people; not a mutation), both project level.
 
 ### Classification & export control (§3.1; Checkpoint 13)
 - `rules/classification.py`: effective classification (the stricter level, the union of
@@ -1062,6 +1344,35 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - The export-control confirmation (a required field; 422 without it) on every member-add path,
   when marking a project export-controlled, and when creating one, recorded in the audit event.
 - A convention test that every classifiable model uses `ClassificationMixin`.
+- **The classification API** (Checkpoint 13, DL-81):
+
+  | Endpoint | Does | Action |
+  |---|---|---|
+  | `PUT /api/projects/{key}/classification` | set `level` (`internal`, `confidential`, `restricted`, or null for unclassified) and `categories` (any of `financial`, `proprietary`, `pii`, `export_controlled`), both required, replacing the current ones; adding `export_controlled` also needs `export_control_confirmed: true` and `confirmed_member_ids`, the project's current explicit members (`project_classification_changed`: the old and new level and categories, and `confirmed_member_ids` when it adds `export_controlled`); the classification already held changes and records nothing; 200 with the project | `project.raise_classification` for a higher level or an added category; `project.lower_classification` for a lower level or a removed category; both for a change that does both; either for a change that does neither, including the classification already held. Unclassified ranks as `internal` (design-doc §3.1), so a change between them is neither |
+
+  `POST /api/orgs/{org_id}/projects` takes optional `classification_level` and
+  `classification_categories` (default unclassified, none) under `project.create` alone, and, with
+  `export_controlled`, `export_control_confirmed: true` and `confirmed_member_ids` (the first admin
+  only), recorded in `project_created`. The project read carries `classification_level` and
+  `classification_categories`. On an export-controlled project, every member add (`POST
+  /api/projects/{key}/members` either way, and `POST /api/projects/{key}/members/new`) needs
+  `export_control_confirmed: true`, recorded in `project_member_added`. **Errors:** a missing or
+  false `export_control_confirmed` where it's needed is a 422 of type `confirmation_required` on
+  it, and a missing `confirmed_member_ids` the same on that field; `confirmed_member_ids` that
+  aren't exactly the current explicit members (every role) is a 422 of type `members_changed` on
+  it; either field sent where it isn't needed is a 422 of type `confirmation_not_needed` on it.
+  The classification change and every member add hold the project's row lock, so the
+  confirmation is checked against the members that commit with it. A change the caller lacks
+  the action for is a 403.
+- **The classification actions** (DL-82): `project.raise_classification` (project admins, inherited
+  included) and `project.lower_classification` (project admins, inherited included; on an
+  export-controlled project, an explicit project admin only, which also covers removing
+  `export_controlled`), both project-level mutations, so an archived project denies them; the
+  project read's `allowed_actions` carries them. The action registry marks every action content or
+  management (design-doc §5); every action up to Checkpoint 13 is management.
+- **Access reviews** (DL-81): each row of the per-project review, and each project of the
+  per-person review, gains `access`: `management` for an inherited admin without an explicit
+  membership on an export-controlled project, `content` otherwise.
 
 ### Number allocation (§3)
 - `allocate_number(project, prefix)` using the lazy upsert on `project_counter`; prefixes come
@@ -1072,26 +1383,33 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - `allocate_subtask_number(task)` waits for Slice 3, when `task` exists.
 
 ### Web screens
-- Sign-in; forced password change; account settings (profile, change password).
-- App shell with an org switcher (for users who can see several orgs) and route guards
-  (unauthenticated → sign-in; `must_change_password` → change-password).
+- Sign-in; forced password change; account settings (profile, change password); the System /
+  Light / Dark theme choice in the user menu (UI-TOK-2, DL-85).
+- App shell (ui-design-guide §4): a sidebar with My work, the project selector, and the
+  selected project's pages; an org switcher in the header (for users who can see several orgs;
+  it switches orgs only); and route guards (unauthenticated → sign-in; `must_change_password` →
+  change-password). The org and workspace pages are separate admin pages reached from the user
+  menu (ui-design-guide UI-SHL-10), not part of the sidebar or the switcher.
 - **My work** as the home page after sign-in (design-doc §11), from the `my_work` area: in
   Slice 1, the projects the user can open (archived ones left out); later slices add their
   sections. It lives at `/`, so it adds nothing to the reserved list. The system-status page
   (the S0 home page's health check) moves to `/status`, which joins the reserved list.
 - Project list; create-project dialog with live key validation, type selection, module
-  selection showing the recommendations and notes, and a first-admin picker (the org's members
-  and the workspace's staff) shown only when the org's entry in `/me` includes
-  `project.assign_first_admin`; project settings with description, status,
+  selection showing the recommendations and notes, and a first-admin picker (the org's members; the
+  workspace's staff aren't listed yet, TD-44, DL-112) shown only when the org's entry in `/me` includes
+  `project.assign_first_admin`; project settings with name, description, type, status,
   lead (a project with no lead flagged), module toggles and warnings; archive/unarchive.
 - Org settings: rename, change slug.
 - Org members page: list, add (email-first) or create user, change role, account actions by
   rank, remove (with the project-membership option).
-- Project members page: list, add with a role, change role, remove.
+- Project members page: list, add with a role (the picker, or the email-first add-person form
+  with a generated temporary password shown once, and the confirmation before adding an account
+  from outside the org, `join_org`, DL-78), change role, remove.
 - Account creation and password reset forms generate a temporary password meeting the policy
   and show it to the admin once, to pass on (it can't be retrieved afterwards); the admin may
   replace it with their own before saving.
-- Workspace settings (owners): rename, change slug (with live availability). Users page: a read-only
+- Workspace settings (workspace owners and system admins, shown through `workspace.update` in
+  `allowed_actions`): rename, change slug (with live availability). Users page: a read-only
   system-admin column; editing a user's email, name, and username under the rank rule.
 - Access review screens: per project and per person.
 - Features and links of an enabled module whose slice hasn't shipped (`sprints`, `github`) are
@@ -1099,74 +1417,77 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - A "no access" page for a signed-in user with no memberships left (design-doc §4,
   "Sessions").
 - Workspace admin pages: staff (add, create, change role, remove), organizations (create,
-  list), users (create, deactivate, reactivate, reset password, sign out everywhere, edit
-  email, name, and username). Only
+  list), users (deactivate, reactivate, reset password, sign out everywhere, edit email, name,
+  and username; accounts are created through the staff and org flows, DL-75). Only
   workspace owners/admins and system admins see workspace pages.
 - Browser routes include the org slug (`/{org_slug}/projects/{key}/…`); a stale slug
   redirects; a lowercase key is uppercased and redirected. Top-level routes (`/workspace`,
   `/account`, `/sign-in`, …) are on the reserved-slug list.
 - Actions the user can't take are hidden (`allowed_actions`); a state-based denial (archived
-  project, last owner) is explained from data the screen already has.
+  project, last owner) is explained from data the screen already has; for the last owner, with
+  a replacement-owner picker that hands ownership over (DL-59).
 - Classification on the create-project dialog and project settings (each level with its
   description, categories, the export-control confirmation dialogs) and the project banner
   (level and categories as text, never color alone).
 - Loading states use skeleton loaders, not spinners (`frontend/CLAUDE.md`); the first ones are
-  built in Checkpoint 14.
+  built in Checkpoint 14a.
 - Every screen targets WCAG 2.2 AA (design-doc §1), checked automatically with axe-core and by
   a manual keyboard and screen-reader pass at slice verification.
 - End-to-end tests (Playwright, Chromium): sign-in (landing on My work), forced password
   change, project creation, adding a project member.
 
 ### Done when
-- [ ] `wl seed` creates the workspace and a system admin who is its owner (interactively and
+- [x] `wl seed` creates the workspace and a system admin who is its owner (interactively and
       with flags); the admin signs in, creates an org, and creates its owner.
-- [ ] The owner signs in (forced to change password first), creates a project with a key, type,
+- [x] `wl seed --demo` builds the demo dataset in an empty database, and refuses one that
+      already has a workspace and any stack where `demo_seed_enabled` is off; the end-to-end tests run on it.
+- [x] The owner signs in (forced to change password first), creates a project with a key, type,
       and modules, and adds a project member and a project viewer.
-- [ ] The member sees the project; the viewer sees it but can't change its settings; an org member
+- [x] The member sees the project; the viewer sees it but can't change its settings; an org member
       not on the project, a workspace member not assigned to it, and a user in another org all get a
       404 for it; a workspace admin sees it and has project admin on it.
-- [ ] An org member creates a project and becomes its admin (with a `project_membership` row)
+- [x] An org member creates a project and becomes its admin (with a `project_membership` row)
       and its lead; an org admin creates one naming someone else as first admin and lead;
       removing the lead's membership clears the lead.
-- [ ] An admin changes another user's email under the rank rule: an actor whose roles cover
+- [x] An admin changes another user's email under the rank rule: an actor whose roles cover
       every membership the target holds at an equal or higher rank is allowed, any other actor
       is denied; a taken email is refused; the user's sessions end; one `user_updated` event
-      records the change.
-- [ ] After sign-in the user lands on My work; the health check is at `/status`.
-- [ ] A project admin creates a new user for the project, who gets an org membership and the
+      records the change (one per covering org, DL-75).
+- [x] After sign-in the user lands on My work; the health check is at `/status`.
+- [x] A project admin creates a new user for the project, who gets an org membership and the
       project membership; adding by user ID someone outside the org's members and the
       workspace's staff returns 404; adding another org's user by email adds them to the org
       and project after confirmation.
-- [ ] Removing an org member offers to remove their project memberships; with it unchecked,
+- [x] Removing an org member offers to remove their project memberships; with it unchecked,
       they keep their projects as a project-only user.
-- [ ] A browser link with a stale org slug redirects to the current one; the same link for a
+- [x] A browser link with a stale org slug redirects to the current one; the same link for a
       project the user can't see is a 404; a reserved slug is rejected.
-- [ ] Deactivating a user ends their active sessions on the next request; `grant-system-admin`
+- [x] Deactivating a user ends their active sessions on the next request; `grant-system-admin`
       and `revoke-system-admin` work, and revoking the last active system admin is refused.
-- [ ] Every checklist item from §4 has a test (cookie attributes, rejected cross-origin and
+- [x] Every checklist item from §4 has a test (cookie attributes, rejected cross-origin and
       missing-`Origin` mutations, token replaced at sign-in and on password change, expiry),
       as do the sign-in responses and the password policy.
-- [ ] The `authorize()` matrix and fail-closed test pass, including personal actions (denied
+- [x] The `authorize()` matrix and fail-closed test pass, including personal actions (denied
       to every admin level); archived projects reject mutations (unarchive and removing a member
       with their projects excepted).
-- [ ] A project can be classified at creation and in settings; marking it export-controlled
+- [x] A project can be classified at creation and in settings; marking it export-controlled
       (at creation or later) and adding a member to it require the confirmation; on an
       export-controlled project, inherited admins keep management access (the project, its
       settings and members), while removing `export_controlled`, lowering the level, or
       removing a category is refused for them and allowed for an explicit project admin;
       classification changes record their audit events. (Hiding content is Slice 2's.)
-- [ ] Last-owner (org and workspace) and last-system-admin guards, and the rank rule for
+- [x] Last-owner (org and workspace) and last-system-admin guards, and the rank rule for
       account actions, are tested.
-- [ ] Every Slice 1 admin and security action records its audit event.
-- [ ] List endpoints follow the API conventions: unknown query parameters return 422, and every
+- [x] Every Slice 1 admin and security action records its audit event.
+- [x] List endpoints follow the API conventions: unknown query parameters return 422, and every
       unique constraint is mapped in the error registry.
-- [ ] `project_counter` concurrency tests pass.
-- [ ] Mutation testing runs in `wl check` and CI with no surviving mutants in `app/rules/` and
-      `app/authz/`.
-- [ ] End-to-end tests run in CI against a seeded stack.
-- [ ] Accessibility: the axe-core checks pass in component and end-to-end tests, and the manual
+- [x] `project_counter` concurrency tests pass.
+- [x] Mutation testing runs in `wl check --full` and CI (and in `wl check` when its inputs
+      changed, DL-99) with no surviving mutants in `app/rules/` and `app/authz/`.
+- [x] End-to-end tests run in CI against a seeded stack.
+- [x] Accessibility: the axe-core checks pass in component and end-to-end tests, and the manual
       keyboard and screen-reader pass found no unresolved problem on the slice's new screens.
-- [ ] CI is green.
+- [x] CI is green.
 
 ---
 
@@ -1174,10 +1495,39 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
 What's decided so far. This is not the slice's plan, which is written when Slice 2 is next.
 
+- **S2-C0, a pre-checkpoint, comes first** (DL-124), before Slice 2's features. Slice 2's plan
+  writes its rows. It covers:
+  - `repo-auditor`'s Slice 1 majors: a settings save sends only the changed fields (TD-56); an
+    update locks and re-reads its row before its change check (TD-57); a list goes back to page 1
+    when its last page empties (TD-58); one username-suggestion composable (TD-59);
+  - the docs and the authorization registry made to agree: per-area `authz/policies/` files, or
+    the docs describing the one `actions.py` registry (TD-60), before Slice 2's first new area;
+  - the owner's completed screen inventory, steps 2 to 6, checked against the docs and the built
+    screens (TD-62);
+  - the `vue-screen` skill, distilled from Slice 1's hand-built screens, and the
+    `user-guide-verifier` agent, which follows `docs/user-guide.md` literally in a browser
+    against a seeded stack and walks the "Done when" list (both scheduled in Slice 1 and missed;
+    `docs/reviews/s1/S1-retro.md`);
+  - the `new-area` skill verified and corrected against the hand-built `project` area (DL-132),
+    before Slice 2's first new area uses it;
+  - the owner's UI feedback on Slice 1, in `docs/ui-feedback.md`: many of its changes are made
+    here.
+
 - **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the
   rank helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual
   ordering") and its Hypothesis tests come with the requirement tree. Slice 3 keeps rank for tasks,
   the backlog, and the board.
+- **SVAR widgets** (DL-64; ui-design-guide §7.1): the requirement tree (an editable or ordered
+  list) and Slice 3's board are planned on SVAR Vue widgets (DataGrid, Kanban), used only
+  through our wrappers. The packages (`@svar-ui/*`, MIT, exact pins: vue-kanban 2.6.0, vue-grid
+  2.7.5, vue-gantt 2.7.4, vue-core 2.6.1) arrive in the first checkpoint that ships a board or an
+  editable grid, with its wrapper, its entries in `src/app/theme/svar-theme.css` (from the
+  reference copy in `docs/ui/`), the theme-audit and keyboard/move specs, any
+  `e2e/svar-known-issues.ts` entries, and the per-list choice recorded in `screen-inventory.md`
+  (UI-SVR-2); which checkpoint that is gets decided when Slices 2 and 3 are planned. Before the
+  DataGrid is chosen for the requirement tree, its tree mode is checked (ui-design-guide §10).
+  Rank fits the wrappers: a move goes through `api.intercept`, the client sends neighbor IDs,
+  and the server computes rank (UI-SVR-5).
 - **The requirement delete dialog grows by slice** (design-doc §9):
   - Slice 2: child requirements (promote or delete), and cancelling a pending approval request;
   - Slice 3: linked tasks;

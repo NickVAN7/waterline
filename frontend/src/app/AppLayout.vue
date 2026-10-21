@@ -1,54 +1,102 @@
 <script setup lang="ts">
-// The frame around every screen: header, navigation, and the content area.
+// The app shell (docs/ui-design-guide.md §4): the skip link, a sticky header with the org switcher
+// and user menu, the sidebar (My work, the project selector, the selected project's pages), and
+// `main`. Below 40rem the header wraps and scrolls with the page (DL-98); below 48rem the sidebar
+// is behind a "Menu" disclosure in the header. Signed out (the status and not-found pages), the
+// header has only the app name and Sign in.
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+
+import Alert from '@/components/Alert.vue'
+import Icon from '@/components/Icon.vue'
+import { useSignOut } from '@/composables/useSignOut'
+import { useCurrentOrgStore } from '@/stores/currentOrg'
+import { useCurrentUserStore } from '@/stores/currentUser'
+
+import OrgSwitcher from './shell/OrgSwitcher.vue'
+import ProjectPages from './shell/ProjectPages.vue'
+import ProjectSelector from './shell/ProjectSelector.vue'
+import SidebarLink from './shell/SidebarLink.vue'
+import UserMenu from './shell/UserMenu.vue'
+
+const store = useCurrentUserStore()
+const nav = useCurrentOrgStore()
+const route = useRoute()
+const { signOut, failed, failures, status, dismiss: dismissAlert } = useSignOut()
+
+const menuOpen = ref(false)
+const userMenu = ref<InstanceType<typeof UserMenu>>()
+watch(
+  () => route.path,
+  () => (menuOpen.value = false),
+)
+
+// Focus returns to the user menu's button, whose Sign out caused the alert.
+const dismiss = () => dismissAlert(() => userMenu.value?.focus())
 </script>
 
 <template>
-  <div class="layout">
-    <header class="layout__header">
-      <RouterLink to="/" class="layout__brand">Waterline</RouterLink>
-      <nav class="layout__nav" aria-label="Main">
-        <RouterLink to="/">Home</RouterLink>
-      </nav>
+  <div class="flex min-h-screen flex-col">
+    <a
+      href="#main"
+      class="sr-only rounded-md bg-surface-raised px-4 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-(--z-dialog)"
+    >
+      Skip to main content
+    </a>
+    <header
+      class="z-(--z-header) flex min-h-(--header-height) flex-wrap items-center gap-x-4 gap-y-2 border-b border-border-subtle bg-surface px-4 py-2 sm:sticky sm:top-0 sm:flex-nowrap sm:py-0"
+    >
+      <button
+        v-if="store.me"
+        type="button"
+        aria-controls="sidebar"
+        :aria-expanded="menuOpen ? 'true' : 'false'"
+        class="inline-flex min-h-(--control-height) items-center gap-2 rounded-md px-2 hover:bg-hover md:hidden"
+        @click="menuOpen = !menuOpen"
+      >
+        <Icon name="menu" />Menu
+      </button>
+      <RouterLink to="/" class="text-lg font-semibold text-text no-underline">Waterline</RouterLink>
+      <div class="flex-1" />
+      <template v-if="store.me">
+        <OrgSwitcher />
+        <UserMenu ref="userMenu" @sign-out="signOut" />
+      </template>
+      <RouterLink v-else :to="{ name: 'sign-in' }">Sign in</RouterLink>
     </header>
-    <main class="layout__content">
-      <slot />
-    </main>
+    <div class="flex flex-1 flex-col md:flex-row">
+      <div
+        v-if="store.me"
+        id="sidebar"
+        :class="[
+          'w-full shrink-0 flex-col gap-4 border-r border-border-subtle bg-surface p-4 md:flex md:w-(--sidebar-width)',
+          menuOpen ? 'flex' : 'hidden',
+        ]"
+      >
+        <nav aria-label="Main" class="flex flex-col gap-4">
+          <div class="border-b border-border-subtle pb-4 font-semibold">
+            <SidebarLink to="/"><Icon name="home" />My work</SidebarLink>
+          </div>
+          <ProjectSelector />
+        </nav>
+        <ProjectPages
+          v-if="nav.project"
+          :key="nav.project.id"
+          :project="nav.project"
+          :org-slug="nav.org?.slug"
+        />
+      </div>
+      <main
+        id="main"
+        tabindex="-1"
+        class="flex w-full max-w-(--content-wide) min-w-0 flex-1 flex-col gap-4 p-4 sm:p-6"
+      >
+        <Alert v-if="failed" :key="failures" tone="danger" live dismissible @dismiss="dismiss">
+          {{ failed }}
+        </Alert>
+        <slot />
+        <p class="sr-only" aria-live="polite">{{ status }}</p>
+      </main>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.layout {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.layout__header {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.layout__brand {
-  font-weight: 600;
-  font-size: 1.125rem;
-  color: var(--color-text);
-  text-decoration: none;
-}
-
-.layout__nav {
-  display: flex;
-  gap: 1rem;
-}
-
-.layout__content {
-  flex: 1;
-  width: 100%;
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-</style>

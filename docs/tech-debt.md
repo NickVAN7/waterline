@@ -153,7 +153,9 @@ Entry format:
   is enough for now; verify the installation in Slice 1.
 - **Fix by:** Slice 1, with the first store (the current user): a test that the running app
   resolves that store through the Pinia instance `main.ts` installs.
-- **Status:** open
+- **Status:** resolved in S1-C14 (`main.ts` mounts `createWaterlineApp()`, and
+  `src/app/router.spec.ts` "resolves the current-user store through the Pinia instance it
+  installs (TD-10)" signs in through that app and reads the store from its Pinia)
 
 ### TD-11: Dev containers run as root
 - **Added:** S0-C7
@@ -164,9 +166,9 @@ Entry format:
   host's `npm ci` (documented in the developer guide).
 - **Why:** Dev-only images, no problem seen yet. **Owner decision (S0-C7 review):** undecided;
   kept as a note to revisit.
-- **Fix by:** Slice 1: the owner decides then whether to add a non-root user to the dev images
-  or re-target this entry.
-- **Status:** open
+- **Fix by:** S1-C17 (the owner chose a non-root user in the dev images, built as its own tooling change
+  before S1-C17's commit, DL-18)
+- **Status:** resolved in S1-C17 (the tooling change DC-2026-10-21c, before its commit)
 
 ### TD-12: Password minimum is 8 characters
 - **Added:** S1 planning (Sept 30, 2026)
@@ -236,7 +238,7 @@ Entry format:
 - **Why:** The journey-decision pass was docs-only; no code or configuration changed.
 - **Fix by:** S1-C11 (when the `my_work` area is built): add `(my_work)` to the contract's
   layer-1 entry.
-- **Status:** open
+- **Status:** resolved in S1-C11 (`(my_work)` is in the layer-1 entry)
 
 ### TD-17: The app connects as the owner of its tables
 - **Added:** S1-C1 (security review of the append-only follow-up)
@@ -275,9 +277,8 @@ Entry format:
   latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
   The vulnerable code only expands glob patterns from the repository's own ESLint
   configuration, never untrusted input, and never ships in the app.
-- **Fix by:** S1-C14 (the first checkpoint that grows the frontend): update once a fixed
-  `braces` (or a `fast-glob`/`micromatch` without it) is published, and remove the allowlist
-  entry; if none is by then, re-target with the owner.
+- **Fix by:** Slice 2's tech-debt review (owner, S1-C17; still no fixed `braces` on Oct 21, 2026, and no
+  Slice 2 feature needs it: it only expands the linter's own globs)
 - **Status:** open
 
 ### TD-20: What the git guard can't see
@@ -301,4 +302,501 @@ Entry format:
   caught by CI's `wl check`.
 - **Fix by:** Slice 7 (the owner decides whether this closes as won't-fix now that the
   rulesets are on).
+- **Status:** open
+
+### TD-21: A user-level audit event's workspace is null when it's ambiguous
+- **Added:** S1-C6
+- **What:** `password_changed` (and the user-level events after it) take the workspace the user
+  belongs to, or, with no memberships, the only workspace there is (`AuthService._workspace_of`).
+  With a second workspace, a user in both (or a user with no memberships) gets `workspace_id`
+  null, which schema-doc `audit_event.workspace_id` allows only for instance-level events.
+- **Why:** design-doc §4 ("One workspace") leaves the rules for several workspaces undecided, and
+  v1 deploys one (the seed refuses a second), so the case can't happen yet.
+- **Fix by:** S1-C17 (the slice retro: the owner decides the rule, or that it waits for a
+  second workspace; then the schema doc or the code changes to match).
+- **Status:** resolved in DL-48: left as it is until a second workspace is needed (the owner,
+  after S1-C7), when the rules for several workspaces are decided (design-doc §4)
+
+### TD-22: The spec tests check list scoping through their own copy of `scope_clause`
+- **Added:** S1-C7
+- **What:** `tests/integration/authz/test_context.py` builds its `WHERE` with `scope_filter`
+  (`tests/support/authz.py`), the spec writer's model of a `Scope`, written before the code;
+  `scope_clause` (`app/repositories/base.py`) is the same code. A later change to `Scope` (e.g.
+  the export-control gate) must change both, or the spec test keeps checking the old meaning.
+  `tests/integration/repositories/test_scope_clause.py` tests the real one on real rows.
+- **Why:** both are spec-test files, which change only with the owner's approval.
+- **Fix by:** S1-C8 (the owner decides: switch the spec test to `scope_clause` and delete the
+  copy, or keep both and change them together).
+- **Status:** resolved in S1-C8 (the spec test uses `scope_clause`, and `scope_filter` is gone;
+  owner-approved)
+
+### TD-23: A race on the staff add reports its error on `user_id`
+- **Added:** S1-C8
+- **What:** the staff add checks for an existing membership, then inserts. Two admins adding the
+  same person at the same moment both pass the check, and the second hits the unique constraint
+  on `workspace_membership (workspace_id, user_id)`, whose field error is on `user_id`, a field the
+  email-first add doesn't have. The same holds for an account created inside a nested object (an
+  org's `new_owner`, and S1-C9's creates): `create_account` reports a taken email or username
+  under the nested field, but two requests taking the same one at once leave the second to the
+  `user` table's constraints, which report on `body.email` or `body.username`.
+- **Why:** only a race reaches it (the check reports `already_member` on `email` otherwise), and
+  S1-C12's add by user ID may want `user_id` from the same constraint, so the field is better
+  decided with that path.
+- **Fix by:** S1-C15 for the nested create's race, when the web forms consume those errors
+  (DL-80).
+- **Status:** resolved in S1-C15 (the add race in S1-C12: `already_member` on the field the
+  request used, `email` or `user_id`, through `Roster.add_user`'s `loc`, DL-80). The web forms
+  read a field error by the end of its `loc`, so the nested create's race lands on the right field
+  either way: the create-org dialog sends a bare `email` or `username` to the new owner's fields,
+  with a test for each location
+
+### TD-24: An intermittent Hypothesis error in an identifier property test
+- **Added:** S1-C8
+- **What:** `tests/unit/rules/test_identifiers.py::test_every_key_in_the_format_is_valid` failed
+  twice in S1-C8 (once in mutmut's statistics run, once in a reviewer's full run) with a
+  `TypeError: 'int' object is not callable` raised inside Hypothesis's own character-set code
+  (`hypothesis/internal/intervalsets.py`), not in the test or the app; every rerun passed.
+- **Why:** it doesn't reproduce on demand, the test file and the rule are unchanged since S1-C3,
+  and the error is in the library; chasing it would hold up the checkpoint without a lead.
+- **Fix by:** S1-C10 (if it recurs: pin or bump Hypothesis, or report it upstream; if it hasn't
+  recurred by then, close it with that note).
+- **Status:** resolved in S1-C10 (it didn't recur in S1-C8a to S1-C10: closed with that note)
+
+### TD-25: A rare deadlock between a staff change and an owner being added
+- **Added:** S1-C8a
+- **What:** a role change or removal locks the owners' rows twice (in `_member`, then in the
+  last-owner guard); an owner added through the staff add or create between the two takes no
+  owner lock, so a third concurrent staff change can lock that new owner first and wait on the
+  first change, which then waits on the new owner: Postgres aborts one, and that request fails
+  (a 500) and is rolled back. No rule is broken and no data is wrong.
+- **Why:** it needs three concurrent staff changes in one workspace with an owner added between
+  two locks; the fix (adding an owner takes the owner lock too; never having the guard reuse
+  the list `_member` locked, which can miss an owner promoted meanwhile and let the last owner go)
+  needs a race test that's costly to make deterministic for a retryable error.
+- **Fix by:** S1-C9 (the org version uses the same locks: fix both there, with one race test).
+- **Status:** resolved in S1-C9 (staff and org members share one roster, `services/roster.py`;
+  adding an owner takes the owners' lock first, proven by
+  `test_adding_an_owner_queues_behind_a_change_holding_the_owners_lock`)
+
+### TD-26: A no-op role change ignores `new_owner_id`, even an invalid one
+- **Added:** S1-C8a
+- **What:** re-sending the role someone already holds returns their row unchanged and records
+  nothing, without looking at `new_owner_id`; an invalid one (not on the roster, deactivated) is
+  ignored rather than refused with its 422. Staff and org members share this path (the roster,
+  DL-70).
+- **Why:** nothing changes, so nothing is wrong; the owner accepted it for now (after S1-C8a).
+- **Fix by:** S1-C15 (with the shared role select and the staff page's role change; staff and org
+  members share the path, DL-70, DL-103: check `new_owner_id` on a no-op too, or confirm the
+  pickers never send one without a change).
+- **Status:** resolved in S1-C15: the role dialog sends nothing when the role is unchanged, so
+  `new_owner_id` never travels with a no-op (`ChangeRoleDialog.spec.ts`, sabotage-checked)
+
+### TD-27: Deactivation must wait behind a handover
+- **Added:** S1-C8a
+- **What:** a handover checks that the replacement is active but doesn't lock the user row, so a
+  deactivation committing just after could leave the workspace's (or an org's) only owner
+  deactivated. The last-owner and last-system-admin guards on deactivation (design-doc §4) should
+  take the owners' lock first, so a deactivation queues behind a handover.
+- **Why:** deactivation isn't built yet (S1-C10); the owner chose to build it there.
+- **Fix by:** S1-C10 (deactivation takes the owners' lock, with a race test against a handover).
+- **Status:** resolved in S1-C10 (a deactivation locks the owners of every workspace and org the
+  user belongs to before its guard, proven by
+  `test_a_deactivation_queues_behind_a_handover_to_the_same_person`)
+
+### TD-28: A user's name is one field, so username suggestions guess first and last names
+- **Added:** design change DL-66 (Oct 10, 2026)
+- **What:** `user.name` is a single column, so the username suggestion (DL-66) takes the first and
+  last word as first and last name. That guesses wrong for names like "Mary Ann van der Berg"
+  (`mary-berg`), and gives nothing for a name with no Latin letters. Split the name into first-name
+  and last-name fields (schema, API, forms, the suggestion rule, and existing rows).
+- **Why:** the owner accepted the guess for now; the split touches the built `user` model and every
+  form that edits a name.
+- **Fix by:** Slice 7 (before the first non-local deployment, so no real accounts need their names
+  split)
+- **Status:** open
+
+### TD-29: An account action's rank check reads the target's memberships without a lock
+- **Added:** S1-C10
+- **What:** `UserService.load` reads the target's memberships for the rank rule with no lock, so
+  a role grant committing between the check and the action's commit can raise the target above
+  the actor: an org admin's password reset could land on someone just made a workspace admin,
+  handing the org admin a temporary password for a higher-ranked account (S1-C10 security
+  review). The fix locks the target's user row before the memberships are read and makes every
+  workspace and org role grant (the roster's add, create, role change, and handover) lock the
+  same row, in one order with the owners' locks so a deactivation and a role change can't
+  deadlock; with a race test.
+- **Why:** the window is narrow and not attacker-controlled (the promotion is someone else's
+  action), each reset ends the target's sessions and is audited, and the lock order needs its own
+  design across the roster and the account actions.
+- **Fix by:** Slice 7 (before the first non-local deployment, with "password re-entry for
+  sensitive actions")
+- **Status:** open
+
+### TD-30: Older race tests assert inside their task group
+- **Added:** S1-C11
+- **What:** several race tests (in `tests/integration/services/`: the workspace, org, and account
+  concurrency files, e.g. `test_a_deactivation_queues_behind_a_handover_to_the_same_person`) put
+  `pytest.raises` inside the task that waits on a lock. When the code regresses, that failure
+  stops the holding transaction's commit, the `concurrency` fixture's cleanup can't run, and the
+  committed rows break dozens of unrelated tests in the next run (S1-C11 checkpoint review). The
+  fix records the outcome inside the task and asserts after the task group closes, as
+  `test_an_update_waiting_on_an_archive_is_denied` does.
+- **Why:** the tests are correct while the code is; only a regression's report is noisy, and the
+  change touches earlier checkpoints' tests.
+- **Fix by:** S1-C12 (it adds the project-member race tests; convert the older ones with them)
+- **Status:** resolved in S1-C12 (`refusal()` and `refusal_types()` in
+  `tests/support/concurrency.py` record a task's refusal as a value; the account, workspace, and
+  auth race tests use them, and the versioning race test records its outcome with `suppress`; each
+  asserts after its task group closes)
+
+### TD-31: Other locked mutations check rights against the role loaded before the lock
+- **Added:** S1-C13
+- **What:** the `AuthzContext` is loaded at the start of a request. The classification change
+  re-reads the caller's own project role after taking the project's lock (`_with_current_role`,
+  owner decision in the S1-C13 security review), so a role removed while it waits is seen. The
+  other mutations that wait on a lock (project update, archive, member adds, role changes and
+  removals, and the workspace and org rosters) still check rights against the context as loaded:
+  a caller whose role is removed while their request waits can still finish it. The window is
+  milliseconds and needs a request already in flight.
+- **Why:** the owner decided the classification change in S1-C13 and chose to revisit the rest
+  later.
+- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
+  the window is milliseconds and needs a request already in flight; fix it when a checkpoint
+  adds a locked mutation where the race would matter
+- **Status:** open
+
+### TD-32: No page handles a 404 yet
+- **Added:** S1-C14
+- **What:** S1-C14's error handling covers 401 (session ended), 403, 409, and 422 with field
+  errors, and unknown URLs show the not-found page, but no screen loads a record by key yet, so
+  nothing turns an API 404 into the not-found page.
+- **Why:** owner decision (S1-C14): build it with the first page that loads a record, rather
+  than with nothing to use it.
+- **Fix by:** S1-C14a (its minimal project home is the first page that loads a record, DL-97)
+- **Status:** resolved in S1-C14a: the project home shows the not-found page for an API 404, and
+  an org page for an org slug the user doesn't see
+
+### TD-33: A failed sign-out from the header says nothing
+- **Added:** S1-C14
+- **What:** the temporary header's **Sign out** (`src/app/AppLayout.vue`) doesn't catch a
+  failed sign-out (the server can't be reached), so nothing happens and no message shows
+  (UI-FBK-1). The change-password screen's **Sign out** does report it, in its form alert.
+- **Why:** checkpoint-reviewer finding (S1-C14 review, 1.3). S1-C14a replaces the header with
+  the shell's user menu, so the handling is built there rather than in a header about to go.
+- **Fix by:** S1-C14a (the user menu's sign-out reports a failure)
+- **Status:** resolved in S1-C14a: the user menu's (and the no-access page's) sign-out reports a
+  failure in an alert (`useSignOut`)
+
+### TD-34: The new-password help can't show the minimum length
+- **Added:** S1-C14
+- **What:** UI-FRM-10 wants the password requirements under a new-password field to come from
+  the server. No endpoint publishes the policy yet, so `ChangePasswordView` shows fixed help
+  text ("It can't be your email, your username, or your current password."), without the
+  minimum, which is learned from a 422.
+- **Why:** ui-reviewer finding (S1-C14 review). The owner decided the fix (DL-91): a live
+  requirements list from `GET /api/auth/password-policy`, an API addition outside S1-C14.
+- **Fix by:** S1-C14a (the password-policy endpoint and `PasswordRequirements`, replacing the
+  fixed help text; DL-91)
+- **Status:** resolved in S1-C14a: `GET /api/auth/password-policy` and `PasswordRequirements`, on the
+  forced change and account settings
+
+### TD-35: The pending spinner's speed isn't a token
+- **Added:** S1-C14
+- **What:** `Button`'s spinner uses Tailwind's `animate-spin` (1 s per turn). UI-TOK-7 wants
+  motion from the tokens, which have only `--duration-fast` and `--duration-base` (120 and
+  200 ms, for transitions; too fast for a spinner). The pending label carries the meaning, and
+  the reduced-motion rule stops the spin.
+- **Why:** ui-reviewer finding (S1-C14 review, pass 2). A new motion token, or an exception for
+  the spinner, changes the UI design guide, so it's the owner's call.
+- **Fix by:** S1-C14a (the owner chooses a token in `tokens.css` and the guide, or a guide
+  exception)
+- **Status:** resolved in DL-92: a guide exception (UI-TOK-7); the spinner keeps `animate-spin`,
+  to revisit if more animations need it
+
+### TD-36: Route focus also moves on a query-only navigation
+- **Added:** S1-C14
+- **What:** `src/app/routeFocus.ts` sets the title and focuses the `h1` after every navigation,
+  including one that changes only the query. Once `useListQuery` keeps a list's sort, filters,
+  and page in the URL, each of those would pull focus to the heading (UI-SHL-9).
+- **Why:** ui-reviewer note (S1-C14 review, pass 3). No screen changes only the query yet.
+- **Fix by:** S1-C14a (with `useListQuery`: skip the focus move when only the query changed)
+- **Status:** resolved in S1-C14a: a query-only navigation moves neither focus nor the title; the list
+  announces its count instead
+
+### TD-37: My work has no "see all" for its projects
+- **Added:** S1-C14a
+- **What:** My work's projects section shows the first 10 projects (`GET /api/me/work`) and says
+  how many there are, but has no "see all" list over `GET /api/me/work/{section}` (design-doc
+  §11); a user on more than 10 projects finds the rest on each org's project list.
+- **Why:** smallest complete change: no demo user is on more than two projects, and the org list
+  already shows them all. The "see all" list belongs with the sections that need one most.
+- **Fix by:** Slice 3 (with My work's tasks section, whose lists are long)
+- **Status:** open
+
+### TD-38: The project selector lists an org's first 200 projects
+- **Added:** S1-C14a
+- **What:** the project selector loads the current org's projects in one request at the API's
+  page limit (200) and filters them in the browser, so an org with more than 200 projects
+  shows only the first 200 there (all of them are on its project list).
+- **Why:** smallest complete change: v1's orgs have tens of projects. A server-side search
+  parameter would be new API.
+- **Fix by:** Slice 3 (the filter bar's text search, which the selector can call)
+- **Status:** open
+
+### TD-39: No `PageHeader` component yet
+- **Added:** S1-C14a
+- **What:** UI-SHL-8 puts each page's `h1` in a `PageHeader` that holds its primary actions.
+  S1-C14a's pages have no primary action yet, so each writes its `h1` directly.
+- **Why:** smallest complete change: a component with nothing to hold but the heading would be
+  speculative (checkpoint-reviewer question, S1-C14a review).
+- **Fix by:** S1-C15 (its admin pages have the first primary actions)
+- **Status:** resolved in S1-C15: `PageHeader`, on the admin pages and the earlier pages (My work,
+  an org's projects, account settings, no access, sign in, change password). The project home
+  keeps its project header (UI-SHL-6), and the status and not-found pages their own headings
+
+### TD-40: An unavailable My work section fails the whole page
+- **Added:** S1-C14a
+- **What:** My work treats an unavailable projects section (`available: false` in
+  `GET /api/me/work`) as a failed load, so its error state and Try again behave like any other
+  failure (UI-FBK-15). With more than one section, that would hide the sections that did load.
+- **Why:** ui-reviewer finding (S1-C14a review, pass 2). Slice 1 has one section, so a
+  per-section error state would have nothing beside it.
+- **Fix by:** Slice 2 (My work's approvals section, its second; each section gets its own error
+  state)
+- **Status:** open
+
+### TD-41: Pickers of people load the first 200
+- **Added:** S1-C15
+- **What:** the replacement-owner picker (the roster's people), the create-org dialog's owner
+  picker (the workspace's active users), and the create-project dialog's first-admin picker (the
+  org's active members, from S1-C16, DL-112) each load one page at the API's limit (200) and
+  offer those; a roster, workspace, or org with more people shows only the first 200 by name.
+- **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
+  would be new API (the lists have no text filter yet).
+- **Fix by:** Slice 3 (the filter bar's text search, which the pickers can call)
+- **Status:** open
+
+### TD-42: The own-row reset is hidden by a client-side check
+- **Added:** S1-C15
+- **What:** the server refuses an admin's reset of their own password (403, S1-C4 security
+  review), but `allowed_actions` still carries `user.manage` on their own row, so
+  `AccountActions` hides "Reset password" by comparing the row's id with the signed-in user's: a
+  copy of a server rule in the client (frontend/CLAUDE.md).
+- **Why:** removing it needs a separate authorization action for the reset, which `allowed_actions`
+  leaves out on one's own row: a design change in `app/authz/` with spec tests, outside S1-C15
+  (owner decision, S1-C15 review).
+- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner re-targeted it at S1-C17 until an
+  account action needs its own authorization action; the split was dropped once already
+  (DL-73), so it comes back only as a design change
+- **Status:** open
+
+### TD-43: The two settings forms repeat their save handling
+- **Added:** S1-C15a
+- **What:** `OrgSettingsView` and `WorkspaceSettingsView` each hold the same save flow: the
+  required check, focus on the first invalid field, and a 403's reload (read-only with focus on
+  the `h1`, or the typed values kept, UI-FRM-7). A fix to one must be made in the other.
+- **Why:** two copies, edited together in S1-C15a; a shared helper is better shaped by a third
+  form than guessed from two (S1-C15a review).
+- **Fix by:** S1-C16a (project settings, the third such form, DL-109: the shared part moves into
+  `useFormErrors` or a settings-form composable)
+- **Status:** resolved in S1-C16a
+
+### TD-44: The first-admin picker lists only the org's members
+- **Added:** S1-C16 (DL-112)
+- **What:** an org owner or admin creating a project may name any org member or workspace staff
+  member as its first admin (design-doc §5; the API accepts either), but the create dialog's
+  picker lists only the org's members: no endpoint lists the staff to someone without
+  `workspace.view`, and `member-candidates` needs an existing project.
+- **Why:** a candidates endpoint for project creation is new API and authorization surface;
+  the owner chose the org's members for now (DL-112).
+- **Fix by:** Slice 2 (a `first-admin-candidates` endpoint under `project.assign_first_admin`, or
+  the owner's other choice)
+- **Status:** open
+
+### TD-45: The project header doesn't mark a deactivated lead
+- **Added:** S1-C16
+- **What:** design-doc §1.1 says a deactivated lead stays the lead and is shown with the
+  "Deactivated" badge; the project read carries the lead's name (DL-111) but not whether the
+  account is active, so the header shows the name alone.
+- **Why:** the read's fields were settled for the name only (DL-111); the active flag is one more
+  field, best added with the lead picker that needs it.
+- **Fix by:** S1-C16a (project settings' lead picker shows deactivated members; the read gains
+  the flag then)
+- **Status:** resolved in S1-C16a
+
+### TD-46: The other create dialogs don't reload `/me` after a 403
+- **Added:** S1-C16
+- **What:** UI-FRM-7 says a 403 refetches what the user may do. The create-project dialog and
+  the settings pages reload `/me` (or the entity) on a 403; the create-org, add-person, and
+  account dialogs show the alert but leave the actions that opened them on screen.
+- **Why:** found reviewing S1-C16; fixing S1-C15's dialogs isn't this checkpoint's scope
+  (DL-106).
+- **Fix by:** S1-C16b (the members page's dialogs are the same roster dialogs)
+- **Status:** resolved in S1-C16b
+
+### TD-47: The older dialogs' alerts drop focus when dismissed
+- **Added:** S1-C16a
+- **What:** UI-FBK-13: dismissing a form alert, which holds focus, should return focus to the
+  submit button whose action failed (`dismissToSubmit` in `useFormErrors`). The settings pages
+  and the create-project dialog do; the account confirm, details, and password dialogs and the
+  roster's add-person, change-role, and remove dialogs, and the create-organization dialog, call
+  `dismissAlert()` alone, so focus
+  falls to the dialog.
+- **Why:** found reviewing S1-C16a; S1-C15's and S1-C15a's dialogs aren't this checkpoint's scope
+  (DL-106).
+- **Fix by:** S1-C16b (the members page reuses the roster dialogs)
+- **Status:** resolved in S1-C16b
+
+### TD-48: A change to export control made elsewhere isn't picked up by an open add dialog
+- **Added:** S1-C16b (checkpoint review question)
+- **What:** the members page reads whether the project is export-controlled when it loads. If
+  another admin adds or removes `export_controlled` while it's open, an add answers 422
+  `confirmation_required` or `confirmation_not_needed` on `export_control_confirmed`, a field the
+  dialogs don't show: the server's message is the form's alert, and the checkbox appears or goes
+  only after a reload. Project settings' classification form has the same gap.
+- **Why:** rare (two admins changing one project at once), and the server refuses the add, so
+  nothing is recorded wrongly; the owner chose to reload the project on that 422, as a 403 does
+  (DL-116).
+- **Fix by:** S1-C16c (the owner chose the reload, DL-116)
+- **Status:** resolved in S1-C16c
+
+### TD-49: A project page's actions aren't in its header
+- **Added:** S1-C16b (ui-reviewer note, UI-SHL-8)
+- **What:** the members page's actions (Add member, Add by email, Access review) sit in a row
+  under `ProjectHeader`, not in a right-hand actions slot as `PageHeader`'s are.
+- **Why:** the owner left the layout as is for now; it may come with their changes in Slice 2.
+- **Fix by:** Slice 2 (the owner's layout changes, or a decision to keep it)
+- **Status:** open
+
+### TD-50: Two other dialogs' last step isn't read with Done
+- **Added:** S1-C16c (DL-118)
+- **What:** DL-118 puts a dialog step's text in the `aria-describedby` of the control that gets
+  focus. The add-person dialog does; the create-organization dialog's "created" step and the
+  password reset's "shown once" step move focus to Done without its text.
+- **Why:** S1-C16c's row covers the add-person dialog; the others are S1-C15's (DL-106: earlier
+  code changed only when needed).
+- **Fix by:** S1-C16d (the owner's choice, DL-122)
+- **Status:** resolved in S1-C16d
+
+### TD-51: The password reset's last step doesn't say the reset happened
+- **Added:** S1-C16d (ui-reviewer note)
+- **What:** the add-person and create-organization dialogs' last steps describe Done with a
+  sentence saying what was done and the "shown once" warning; the password reset's describes it
+  with the warning alone. "Password reset for <name>." goes to the page's success status, which a
+  screen reader hears only once the dialog closes.
+- **Why:** the owner chose to log the S1-C16d review's findings rather than fix them; DL-122 asked
+  for the step's existing text, which it has.
+- **Fix by:** Slice 2 (the owner's UI feedback at its start)
+- **Status:** open
+
+### TD-52: No length limit on names and descriptions
+- **Added:** S1-C17 (repo-auditor)
+- **What:** `name`, `description`, and the user `name` fields in the project, org, workspace, and
+  user schemas have no `max_length`, and nothing caps the request body. Each edit's old and new
+  values go into `audit_event`, which can't be deleted, so a very large value grows it for good.
+- **Why:** the limits aren't in the schema doc; the owner picks them.
+- **Fix by:** Slice 2 (the limits decided, then `Field(max_length=…)` and `wl gen-client`)
+- **Status:** open
+
+### TD-53: The routers' error-response map is written out four times
+- **Added:** S1-C17 (repo-auditor)
+- **What:** `routers/org.py`, `user.py`, `workspace.py`, and `project.py` each define the same
+  `ERRORS` map; one in `routers/deps.py` would do.
+- **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
+- **Fix by:** Slice 2 (the first checkpoint that adds a router)
+- **Status:** open
+
+### TD-54: Re-wrapping a page of rows is repeated five times
+- **Added:** S1-C17 (repo-auditor)
+- **What:** the workspace, roster, project, user, and my-work services each rebuild a `Page`
+  from a `PageResult`; a `PageResult.map(fn)` in `core/lists.py` would do.
+- **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
+- **Fix by:** Slice 2 (the first checkpoint that adds a list)
+- **Status:** open
+
+### TD-55: `anyio` is used by the app but declared only for development
+- **Added:** S1-C17 (repo-auditor)
+- **What:** `core/security.py` hashes passwords through `anyio.to_thread`, but `anyio` is in the
+  dev dependencies; production has it only because Starlette depends on it.
+- **Why:** found at the slice-end audit; harmless while Starlette brings it.
+- **Fix by:** Slice 2 (move it to `[project] dependencies`)
+- **Status:** open
+
+
+### TD-56: A settings save sends every field, undoing another admin's change
+- **Added:** S1-C17 (repo-auditor A1)
+- **What:** `ProjectSettingsView`, `OrgSettingsView`, `WorkspaceSettingsView`, and `ProfileForm`
+  send the whole form on save, so a field the user didn't touch reverts another admin's change
+  made since the page loaded, and the audit event names the saver as its author.
+  `AccountDetailsDialog` already sends only the changed fields.
+- **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
+  to a pre-checkpoint at the start of Slice 2.
+- **Fix by:** S2-C0 (send only the changed fields, as `AccountDetailsDialog` does)
+- **Status:** open
+
+### TD-57: An update's change check reads an unlocked row
+- **Added:** S1-C17 (repo-auditor A2)
+- **What:** the org, workspace, and user services' updates compare the request with a row they
+  haven't locked, so two edits at once can log duplicate events, or a wrong old value, in the
+  append-only `audit_event`.
+- **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
+  to a pre-checkpoint at the start of Slice 2.
+- **Fix by:** S2-C0 (lock and re-read the row before comparing, with a concurrency test for each)
+- **Status:** open
+
+### TD-58: Removing the last row of the last page leaves an empty page
+- **Added:** S1-C17 (repo-auditor A3)
+- **What:** on `RosterPage`, `UsersView`, and `OrgsView`, removing or deactivating the only row on
+  the last page shows an empty page with no Previous; the project list goes back to page 1.
+- **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
+  to a pre-checkpoint at the start of Slice 2.
+- **Fix by:** S2-C0 (the project list's return to page 1, moved into `useListQuery`)
+- **Status:** open
+
+### TD-59: The username suggestion is copied in two dialogs
+- **Added:** S1-C17 (repo-auditor A4)
+- **What:** `AddPersonDialog` and `CreateOrgDialog` each carry the same debounced username
+  suggestion (S1-C16d's timer fix had to go into both).
+- **Why:** found at the slice-end audit; the owner deferred it to a pre-checkpoint at the start
+  of Slice 2.
+- **Fix by:** S2-C0 (one `useUsernameSuggestion` composable)
+- **Status:** open
+
+### TD-60: The docs name per-area policy files; Slice 1 built one registry
+- **Added:** S1-C17 (docs-consistency)
+- **What:** the build plan (the area layout, the feature map), `backend/CLAUDE.md`, and the
+  `new-area` skill put each area's authorization in `authz/policies/<area>.py`; Slice 1 built one
+  registry, `authz/actions.py`.
+- **Why:** the owner decided the fix belongs at the start of Slice 2, before its first new area
+  follows the docs.
+- **Fix by:** S2-C0 (the docs and the registry made to agree, before the first Slice 2 area)
+- **Status:** open
+
+### TD-61: The token contrast check runs only by hand
+- **Added:** S1-C17 (docs-consistency)
+- **What:** `check_contrast.py` (ui-design-guide §9) isn't part of `wl check`, so nothing stops a
+  token change that fails the contrast minimums.
+- **Why:** no token has changed since it was written; the owner's brand values are still to
+  come. The owner revisits whether to port it at Slice 2's end.
+- **Fix by:** Slice 2 (its slice-end tech-debt review decides: port it into `wl check`, or
+  re-target)
+- **Status:** open
+
+### TD-62: Screen inventory steps 2 to 6 aren't done
+- **Added:** S1-C17 (docs-consistency)
+- **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) were never done;
+  Slice 1's screens were designed checkpoint by checkpoint.
+- **Why:** the owner completes the inventory separately, outside the checkpoints.
+- **Fix by:** S2-C0 (the owner's completed inventory checked against the docs and the built
+  screens)
+- **Status:** open
+
+### TD-63: Settings saves are last-save-wins, with no optimistic lock
+- **Added:** S1-C17 (repo-auditor's question)
+- **What:** project, org, and workspace settings have no version check, so when two admins change
+  the same field, the later save wins without either seeing the conflict. (TD-56 covers fields
+  the saver didn't change.)
+- **Why:** the owner judged it not an issue at Slice 1's scale.
+- **Fix by:** Slice 2 (its slice-end tech-debt review revisits it: an optimistic lock, or
+  re-target)
 - **Status:** open

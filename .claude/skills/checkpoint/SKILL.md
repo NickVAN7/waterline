@@ -18,8 +18,9 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 2. Run the gates
 
 - Run `uv run wl check`. Everything must pass: lint, types, tests, coverage thresholds,
-  import-linter contracts, migration checks, generated-client freshness, mutation testing, and
-  the supply-chain audit (`wl audit`, which needs the network).
+  import-linter contracts, migration checks, generated-client freshness, and mutation testing
+  (when anything it depends on changed). The supply-chain audit and the end-to-end tests run in
+  CI (`wl check --full`, DL-99), whose green run step 6 waits for.
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
 - **Last checkpoint of a slice:** search `docs/schema-doc.md` for `Added in Slice <n>.` (this
   slice's number) and confirm each marked column is in its model. The docs consistency tests
@@ -49,7 +50,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 4. Independent review
 
 - **Spec tests first:** if the checkpoint adds or changes `app/rules/` or `app/authz/`, start
-  `docs/reviews/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
+  `docs/reviews/s<n>/<ID>.md` now with a "Spec tests" section: `spec-test-writer`'s output (its
   behavior table and its files table, with each file's `git hash-object`), plus any change to
   those files the owner approved (what and why). `checkpoint-reviewer` compares the files with
   the recorded hashes.
@@ -59,21 +60,32 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   design change's last commit.
 - Also invoke the `security-reviewer` agent, with the same inputs, when **either** holds:
   - the build plan's section for the slice says the checkpoint gets the security reviewer
-    (e.g. Slice 1: "every checkpoint from 1 to 16"); or
+    (e.g. Slice 1: "every checkpoint from 1 to 16b"); or
   - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
     `password_policy.py`, `identifiers.py`, or `classification.py`; session, token, password,
     or cookie code in `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project`
     areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
     `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
     store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
+- Also invoke the `ui-reviewer` agent, with the same inputs, whenever the diff touches
+  `frontend/src/` or `frontend/e2e/` (DL-62). It is read-only and runs no tests.
 - **One reviewer at a time:** when both run, invoke `security-reviewer` first and
-  `checkpoint-reviewer` once it has finished, never in parallel. Both can run tests against the
-  shared test database (`waterline_test`), and two runs at once collide: the concurrency tests
-  truncate tables and then require every table to be empty, and each run migrates the test
-  database at its start. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests
-  yourself while a reviewer is running.
-- Do not pass either reviewer your reasoning or a summary of the work; they review from the docs
-  and the diff.
+  `checkpoint-reviewer` once it has finished, never in parallel (then `ui-reviewer`, when it
+  runs). Both can run tests against the shared test databases (`waterline_test` and the per-worker
+  copies, DL-100), and two runs at once collide: each run drops and recreates the workers'
+  databases at its start, and the concurrency tests truncate tables and then require every table
+  to be empty. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests yourself
+  while a reviewer is running.
+- Do not pass any reviewer your reasoning or a summary of the work; they review from the docs
+  and the diff (a re-review also gets the previous pass's record, step 5; DL-105).
+- **Before the first reviewer** (DL-106): review your own diff against the `CLAUDE.md` files'
+  rules (`backend/CLAUDE.md`'s "Rules that are easy to break silently", `frontend/CLAUDE.md`'s
+  "Rules" and "UI"); if that changes anything, rerun `uv run wl check`.
+- **Every reviewer reviews the same snapshot** (DL-105): before invoking the first one, take
+  `uv run wl review-copy <dir>/reviewed-1`, in a new directory (`mktemp -d` in your scratchpad;
+  `review-copy` refuses one that isn't empty). Fix nothing until every reviewer that runs has
+  reported: at a slice's last checkpoint, the slice-end agents below included, so their
+  findings join the one batch (DL-108).
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
   (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
   absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
@@ -88,7 +100,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 5. Resolve every finding
 
 For each finding from every reviewer that ran, exactly one of:
-- **Fixed:** make the fix, then rerun `uv run wl check`.
+- **Fixed:** made in the batch below, with `uv run wl check` once the batch is done.
 - **Logged:** add a tech-debt entry (reason and target) — only for minor findings, or others
   the owner has agreed to defer.
 - **Rejected:** only when the finding is factually wrong; record the evidence.
@@ -103,16 +115,43 @@ scope: fix one only when the fix is within it. Otherwise log it (minor), or put 
 for the owner as a proposed design change (major or blocker). Its questions go to the owner,
 and its findings feed the slice retro.
 
-If fixes changed behavior (not just docs or tests), run the reviewer again on the fixes.
+**Fix in one batch** (DL-105, DL-106), once every reviewer has reported:
+- Fix every finding together. Before each fix, grep for the same pattern elsewhere in the diff
+  and the code it touches, and fix every instance at once.
+- Fix code from an earlier checkpoint only when the finding or this checkpoint's scope needs
+  it; otherwise log it in `docs/tech-debt.md`.
+- While fixing, run only the affected tests (`wl frontend test <spec>`, `wl backend test -k …`);
+  run `uv run wl check` once the batch is done.
+
+**Re-review, at most once** (DL-105): a reviewer runs again only when a fix resolved one of its
+**major or blocker** findings, or added behavior its finding didn't ask for; fixes to minor
+findings, tests, or docs alone don't trigger one. Only `checkpoint-reviewer`,
+`security-reviewer`, and `ui-reviewer` are re-reviewed; the other agents' findings are fixed
+without another pass (DL-108), except that a code fix for a major or blocker finding from
+`repo-auditor` or `fresh-clone-verifier` is covered by `checkpoint-reviewer`'s re-review, or by
+one pass of it if it had none, given those findings and their resolutions too (DL-110). The re-review gets, besides the usual inputs:
+- the fix diff: take `uv run wl review-copy <dir>/reviewed-2` and pass the reviewer
+  `diff -ruN -x .git <dir>/reviewed-1 <dir>/reviewed-2`, saved to a file, as what to review
+  (each copy is a clone, with its own `.git`; the rest of the diff was reviewed in pass 1);
+- its previous pass's findings and their resolutions, as recorded in the review record.
+
+**List the siblings** (DL-128): for each fix, the review record says where else the pattern
+lives and what was done there. Before a re-review, run `uv run wl fmt`, and grep the docs for
+the behavior the fix removed.
+
+Two passes per reviewer at most. Findings from the second pass are fixed without another
+pass, logged, or, when a fix would change behavior beyond the finding, put to the owner in the
+report.
+
 If a finding shows a rule that would have prevented the mistake, add it to the relevant
 `CLAUDE.md`.
 
-**Record every pass** of every reviewer that ran (checkpoint, security, fresh-clone,
-docs-consistency, repo-auditor) in `docs/reviews/<ID>.md` (format: `docs/reviews/S0-C1.md`).
+**Record every pass** of every reviewer that ran (checkpoint, security, UI, fresh-clone,
+docs-consistency, repo-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
 Include the base commit, the totals, the "Spec tests" section (when the checkpoint has one), and
 for each pass its verdict, its findings table in the `S0-C1.md` columns, one row per finding with
 its resolution (fixed / logged with TD number / rejected with evidence / proposed to the owner;
-for `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor`, the four parts condensed
+for `checkpoint-reviewer`, `security-reviewer`, `ui-reviewer`, and `repo-auditor`, the four parts condensed
 into the Finding cell, DL-42), `checkpoint-reviewer`'s "Sabotage checks" table, and the
 questions it raised. End with the questions still open for the owner and any owner decisions made during review.
 The record goes in the checkpoint's commit.
@@ -139,7 +178,7 @@ Tests:
 Decisions / deviations:
 - ... (or "None")
 
-Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/<ID>.md)
+Review: <n> findings — <x> fixed, <y> logged (TD-…), <z> rejected (docs/reviews/s<n>/<ID>.md)
 Security review: <n> findings — … (or "not required")
 Fresh-clone verification: <result> (last checkpoint of a slice only)
 Docs consistency: <n> fixes — …; <m> decisions for the owner (last checkpoint of a slice only)
@@ -181,17 +220,22 @@ reviewers, not verification.
 
 Send the owner:
 - the review note (the commit message body);
-- each reviewer's findings table (checkpoint, security, fresh-clone, docs-consistency,
+- each reviewer's findings table (checkpoint, security, UI, fresh-clone, docs-consistency,
   repo-auditor) with
-  the resolution of each finding (as recorded in `docs/reviews/<ID>.md`);
+  the resolution of each finding (as recorded in `docs/reviews/s<n>/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
-- any open questions from the review;
+- any open questions from the review. Each decision or question says what it is, why it
+  matters, the options, and a recommendation (DL-130); every open question in the review record
+  is in the report;
 - the PR link and its CI result, and whether this checkpoint ends its group (a review point)
   or the slice (so the PR is ready to merge on approval);
 - **a try-it-yourself script**, for any checkpoint with behavior visible through the API or
   the UI: 3–6 numbered steps against the running dev stack (`curl` with a cookie jar and an
   `Origin` header before S1-C14, screens after), each with its expected result, including at
-  least one step that should be denied. Run it once yourself to make sure the steps are right;
+  least one step that should be denied. Its first step sets up or names the state it needs
+  (e.g. `uv run wl seed --demo` on an empty database), and before handing it over, check the
+  owner's dev stack (its users, `.env`), not only the end-to-end stack (DL-127). Run it once
+  yourself to make sure the steps are right;
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
   the owner, which skills and agents never triggered, the verdict of any process trial, and the
@@ -201,14 +245,3 @@ Send the owner:
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.
-
-**Review-tier trial** (`docs/build-plan.md`, "Verification"; S1-C8 to S1-C10 only):
-- **S1-C8 and S1-C9:** after sending the report, go straight on to the next checkpoint without
-  stopping, only if **all** of these hold: `wl check` and CI are green; every reviewer that ran
-  returned no findings, or only findings that were **fixed** (none logged, none rejected); and
-  there are no open questions, no `docs-consistency` Decisions, and no deviations from the docs
-  in the review note. Say in the report that it auto-continued and why. If any condition
-  fails, stop as usual.
-- **S1-C10:** a full stop for the whole group. The report covers S1-C8 to S1-C10, with links to
-  the three review records and the group's diff range (from S1-C8's base, the last commit
-  before its work started, to the S1-C10 commit).

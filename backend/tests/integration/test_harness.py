@@ -11,8 +11,9 @@ from tests.support.models import Widget, WidgetFactory
 pytestmark = pytest.mark.anyio
 
 
-async def test_tests_run_against_the_test_database(session: AsyncSession) -> None:
-    assert await session.scalar(text("SELECT current_database()")) == TEST_DATABASE_NAME
+async def test_tests_run_against_the_test_database(session: AsyncSession, worker_id: str) -> None:
+    expected = TEST_DATABASE_NAME if worker_id == "master" else f"{TEST_DATABASE_NAME}_{worker_id}"
+    assert await session.scalar(text("SELECT current_database()")) == expected
 
 
 async def test_test_database_is_migrated(session: AsyncSession) -> None:

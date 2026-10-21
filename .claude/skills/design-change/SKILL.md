@@ -44,7 +44,7 @@ changed, a rule the prompt didn't know about), stop and report it to the owner.
 |---|---|
 | Docs only (a rule not yet built) | Update the docs in this change. |
 | Changes future checkpoints | Update their build-plan rows ("Includes"), the "Done when" list, and the slice notes. |
-| Changes code already built | The code change becomes a **new checkpoint**, with its own tests and full review. This change records it in the build plan; it doesn't touch the code. |
+| Changes code already built | The code change becomes a **new checkpoint**, with its own tests and full review; review answers are bundled instead, into the next planned checkpoint or one follow-up checkpoint per group, not a checkpoint per answer (DL-131). This change records it in the build plan; it doesn't touch the code. |
 | Changes developer tooling or process code (`.claude/hooks/`, the `wl` CLI, CI, the docs consistency tests) | Built in this change, with its tests (`test-writer`), in `chore:` or `ci:` commits, and reviewed by `checkpoint-reviewer` before it's pushed (step 7; DL-18). A change to `.pre-commit-config.yaml` is proposed to the owner, who makes it (DL-30). |
 
 A new checkpoint is inserted with a letter suffix where it runs, e.g. `S1-C13a` between
@@ -74,21 +74,26 @@ history in the docs; the log holds it.
 
 ## 7. Check
 
-- `uv run wl check` green.
-- **Tooling code** (step 4): invoke `checkpoint-reviewer` with the review ID
-  `DC-<YYYY-MM-DD>` (add a letter for a second one that day: `DC-2026-10-08b`), the base
-  (the commit before this change), and the files in scope. Resolve every finding as the
-  `checkpoint` skill's step 5 says, and record every pass in `docs/reviews/DC-<YYYY-MM-DD>.md`
-  (format: `docs/reviews/S0-C1.md`), with its "Sabotage checks" table. Don't run tests while it
-  runs.
-- Invoke the `docs-consistency` agent with trigger `design-change` and, as the base, the
-  commit before this change. Fix its clear-cut **Fixes**. Its **Decisions** go to the owner
-  undecided; if one blocks the change, stop.
+- `uv run wl check` green (and, for tooling code that changes what CI runs,
+  `uv run wl check --full`).
+- **Reviewers, on one snapshot** (DL-105): take the review snapshot as the `checkpoint` skill's
+  step 4 says (`wl review-copy`). For **tooling code** (step 4), invoke `checkpoint-reviewer`
+  with the review ID `DC-<YYYY-MM-DD>` (add a letter for a second one that day:
+  `DC-2026-10-08b`), the base (the commit before this change), and the files in scope; don't
+  run tests while it runs. Then invoke the `docs-consistency` agent with trigger
+  `design-change` and, as the base, the commit before this change.
+- **Then fix, in one batch,** as the `checkpoint` skill's step 5 says (only `checkpoint-reviewer`
+  is re-reviewed, DL-108): every tooling finding, and `docs-consistency`'s clear-cut **Fixes**.
+  Its **Decisions** go to the owner undecided; if one blocks the change, stop. Every design
+  change, docs-only or tooling, gets a record (DL-126): record every pass in `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming
+  what the change covers (`DC-2026-10-08b-git-guard-allow-list.md`; format:
+  `docs/reviews/s0/S0-C1.md`), with, for tooling code, `checkpoint-reviewer`'s "Sabotage
+  checks" table.
 
 ## 8. Commit and push
 
-One `docs:` commit per logical change set (tooling code in `chore:` or `ci:` commits, with its
-review record), on the current slice branch (`docs/build-plan.md`, "Pull requests"). Push
+One `docs:` commit per logical change set (tooling code in `chore:` or `ci:` commits), each
+with its review record, docs-only or tooling (DL-126), on the current slice branch (`docs/build-plan.md`, "Pull requests"). Push
 (`git push -u origin s<n>` at the branch's first push, `git push` after; each git or gh
 command its own Bash call, DL-26). If the slice branch has no pull request yet, open it as a
 draft at this push (`gh pr create --draft`, as in the `checkpoint` skill, step 6): CI runs

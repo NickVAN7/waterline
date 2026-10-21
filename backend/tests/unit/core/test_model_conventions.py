@@ -2,13 +2,14 @@
 
 import uuid
 
-from sqlalchemy import ForeignKey, MetaData
+from sqlalchemy import ForeignKey, MetaData, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 import app.models  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every model
 from app.core.base_model import Base, IdMixin, TimestampMixin, VersionMixin
 from tests.support import models as support
 from tests.support.conventions import (
+    classifiable_models_without_the_mixin,
     mappers_without_eager_defaults,
     relationships_that_can_lazy_load,
     versioned_tables_without_version_checks,
@@ -25,6 +26,10 @@ def test_app_models_all_keep_eager_defaults() -> None:
 
 def test_app_versioned_models_all_check_their_version() -> None:
     assert versioned_tables_without_version_checks(Base.registry) == []
+
+
+def test_classifiable_models_all_use_the_classification_mixin() -> None:
+    assert classifiable_models_without_the_mixin(Base.registry) == []
 
 
 def test_support_models_follow_the_conventions() -> None:
@@ -56,6 +61,19 @@ class VersionedAfterTimestamps(IdMixin, TimestampMixin, VersionMixin, BadBase):
     __tablename__ = "bad_versioned"
 
 
+class Requirement(IdMixin, TimestampMixin, BadBase):
+    """A classifiable table without the mixin."""
+
+    __tablename__ = "requirement"
+
+
+class HandRolledLevel(IdMixin, TimestampMixin, BadBase):
+    """Its own classification column instead of the mixin's."""
+
+    __tablename__ = "bad_classified"
+    classification_level: Mapped[str | None] = mapped_column(String)
+
+
 class OverridesMapperArgs(IdMixin, TimestampMixin, BadBase):
     __tablename__ = "bad_override"
     __mapper_args__ = {"confirm_deleted_rows": True}  # noqa: RUF012 -- replaces eager_defaults
@@ -71,3 +89,10 @@ def test_check_finds_models_that_dropped_eager_defaults() -> None:
 
 def test_check_finds_versioned_models_whose_version_is_not_checked() -> None:
     assert versioned_tables_without_version_checks(BadBase.registry) == ["VersionedAfterTimestamps"]
+
+
+def test_check_finds_classifiable_models_without_the_mixin() -> None:
+    assert classifiable_models_without_the_mixin(BadBase.registry) == [
+        "HandRolledLevel",
+        "Requirement",
+    ]

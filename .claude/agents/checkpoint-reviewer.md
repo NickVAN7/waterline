@@ -14,6 +14,15 @@ developer-tooling code changed in a design change (DL-18), you get a review ID i
 (`DC-<YYYY-MM-DD>`), the base, and the files in scope: there is no build-plan row, so judge the
 scope against the decision-log entries and the docs that code implements.
 
+A **re-review** (DL-105) also gets a fix diff (a file: `diff -ruN -x .git` of the reviewed copy
+against the fixed one) and your previous pass's findings with their resolutions; at a slice's
+last checkpoint, also `repo-auditor`'s or `fresh-clone-verifier`'s major findings that the fix
+diff resolves, with their resolutions (DL-110). Review the fix
+diff, reading whatever code it touches in full, and check each resolution: is the finding really
+fixed, and did the fix break anything near it? Don't re-review the rest of the checkpoint, and
+don't reopen a resolution the owner decided. Sabotage-check **one** behavior the fix changed
+(step 6), not two or three (DL-108).
+
 ## Rules
 
 - **Never modify the repository; sabotage happens only in a temporary copy** (step 6). In the
@@ -94,7 +103,7 @@ scope against the decision-log entries and the docs that code implements.
    Surviving mutants in `app/rules/` or `app/authz/` (docs/testing-strategy.md, "Mutation
    testing"), or a `# pragma: no mutate` without a convincing reason, are a **blocker**.
    **Spec tests** (checkpoints that add or change `app/rules/` or `app/authz/`): the review
-   record (`docs/reviews/<ID>.md`, "Spec tests") lists the files `spec-test-writer` wrote, each
+   record (`docs/reviews/s<n>/<ID>.md`, "Spec tests") lists the files `spec-test-writer` wrote, each
    with its `git hash-object`. Run `git hash-object` on each file as it is about to be
    committed and compare. A file that differs, and isn't listed in the record as an
    owner-approved change, is a **blocker**; so is a checkpoint that changes `app/rules/` or

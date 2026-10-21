@@ -19,5 +19,14 @@ RUN uv sync --locked --no-dev --no-install-project
 
 COPY . .
 
+# Not root (TD-11): a user with the host's user and group IDs (`wl` passes them as HOST_UID and
+# HOST_GID), so anything written into the mounted source is the developer's, not root's.
+# `--non-unique`: the host's IDs may match one the image already has.
+ARG HOST_UID=1000
+ARG HOST_GID=1000
+RUN groupadd --non-unique --gid "$HOST_GID" app \
+    && useradd --non-unique --create-home --uid "$HOST_UID" --gid "$HOST_GID" app
+USER app
+
 EXPOSE 8000
 CMD ["uvicorn", "--factory", "app.main:create_app", "--host", "0.0.0.0", "--port", "8000"]

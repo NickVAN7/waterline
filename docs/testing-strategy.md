@@ -30,8 +30,8 @@ tested, what each kind of test is for, and the gates every change passes.
 | End-to-end | Critical user flows through the browser against the full stack | Real Postgres (seeded) | Playwright (Chromium only in v1) | `frontend/e2e/` |
 
 - **End-to-end tests start in Slice 1** (sign-in and project creation) and cover each slice's
-  critical flows, not every screen. Most behavior is proven at the cheaper layers. CI seeds
-  the stack with the non-interactive `wl seed` before running them.
+  critical flows, not every screen. Most behavior is proven at the cheaper layers. `wl e2e`
+  seeds the stack with the demo dataset (`wl seed --demo`, DL-83) before running them.
 - Frontend component tests mock only the API client, using the generated types, so mocks can't
   drift from the real API shapes.
 
@@ -57,8 +57,12 @@ tested, what each kind of test is for, and the gates every change passes.
 - Each test runs inside an outer transaction on a single connection; the app's session joins it
   with `join_transaction_mode="create_savepoint"`. Everything rolls back at the end, so tests
   never see each other's data.
-- The test database is migrated once per session with Alembic (not `create_all`), so tests run
-  against the real migrated schema.
+- Each test database (one per worker, below) is migrated once per session with Alembic (not
+  `create_all`), so tests run against the real migrated schema.
+- **In parallel** (DL-100): the backend suite runs under pytest-xdist (`-n auto`, at most 8
+  workers), each worker on its own database, `waterline_test_gw<n>`, dropped, recreated, and
+  migrated at its start. A run with `-n 0` (a filtered `wl backend test`, mutmut) uses
+  `waterline_test` itself. No test depends on another's order or state.
 - **Exception — concurrency tests** need separate connections and real commits (parallel
   transactions, or a background worker processing a job); they use the `concurrency` fixture,
   whose sessions really commit, and are marked `@pytest.mark.concurrency("<table>", ...)`;
@@ -126,7 +130,20 @@ tested, what each kind of test is for, and the gates every change passes.
   rules) are the `docs-consistency` agent's job.
 - **Accessibility** (WCAG 2.2 AA, design-doc §1; from Slice 1, Checkpoint 14):
   - automated checks with axe-core in component tests (`vitest-axe`) and end-to-end tests
-    (`@axe-core/playwright`), failing on any violation;
+    (`@axe-core/playwright`), failing on any violation, through one shared helper each, each
+    proven able to fail by a deliberately violating fixture (ui-design-guide §9);
+  - every end-to-end flow runs its axe checks in both themes, light and dark (`colorScheme`
+    emulation), since jsdom has no layout and contrast and target size are checked only there;
+    a flow that creates data uses keys and users unique to the run (DL-87);
+  - `expectFocusNotObscured()`, an end-to-end helper: Tab through the shell pages, a page with
+    a toast showing, and a table with rows selected, and the focused element is never covered
+    (WCAG 2.4.11); proven able to fail on a sticky-header fixture (S1-C14, DL-89);
+  - end-to-end tests run inside `wl check --full` (`wl e2e`, on an isolated seeded stack; DL-65,
+    DL-99), which CI runs;
+  - for each SVAR widget wrapper (from the first checkpoint that ships a board or an editable
+    grid; DL-64): a theme audit in both themes and in the interactive states that fails on any
+    color that is not one of our tokens, and keyboard and move/cancel specs that drive the
+    non-drag alternative with the server mocked to allow and to deny (ui-design-guide §7.1, §9);
   - a manual keyboard and screen-reader pass on each slice's new screens at slice
     verification, since automated checks find only part of the problems.
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):
@@ -218,7 +235,8 @@ tested, what each kind of test is for, and the gates every change passes.
 | Developer CLI (`tools/cli/`) | 100% line + branch |
 
 Coverage gates fail CI, and plain `pytest` (the backend's 100% gate is a hook in
-`tests/conftest.py`, not a separate step). Excluding code from coverage requires a comment
+`tests/conftest.py`, not a separate step). Under xdist, pytest-cov combines the workers' data on
+the controller, which checks both gates against the total (DL-100). Excluding code from coverage requires a comment
 saying why.
 
 ## Test-first and proving tests can fail
@@ -262,7 +280,9 @@ saying why.
   that cannot change behavior (an equivalent mutant) may be excluded, with `# pragma: no mutate`
   and a comment explaining why.
 - **When:** from Slice 1, when those folders first contain code. Run by
-  `wl backend mutate`, included in `wl check` and CI. mutmut exits 0 whatever survives, so the
+  `wl backend mutate`, and by `wl check` when anything it depends on (the backend's `app/`,
+  `tests/`, configuration, or lockfile) changed since its last green run; always
+  by `wl check --full` and so CI (DL-99). mutmut exits 0 whatever survives, so the
   command finishes with a gate (`tests/support/mutation_gate.py`) that fails on any mutant not
   killed (survived, untested, timed out, or otherwise), and starts from a clean slate so a
   cached result can't hide a survivor.
@@ -271,13 +291,21 @@ saying why.
 
 - **Pre-commit hooks** (local, fast): ruff format and lint, Prettier and ESLint, a check
   that no generated file is hand-edited, and gitleaks on the staged changes.
-- **`wl check`** (the developer CLI; `waterline check` in full) runs everything CI runs, locally.
-  CI calls the same command, so local and CI can't diverge.
+- **`wl check`** (the developer CLI; `waterline check` in full) is the gate before every commit:
+  everything CI runs except the supply-chain audit and the end-to-end tests, and mutation testing
+  only when something it depends on changed (DL-99). **`wl check --full`** runs everything; CI
+  calls it, so local and CI can't diverge. A new gate joins `wl check` unless it needs the
+  network or a running stack, which put it in `--full` only (DL-101).
+  While fixing review findings, run only the affected tests (`wl frontend test <spec>`,
+  `wl backend test -k …`), and `wl check` once the batch of fixes is done (DL-106).
+  A distributed backend run with Postgres out of reach stops at once with the test database's
+  message, before xdist starts its workers (DL-107).
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
   tests with coverage, mutation testing on `rules/` and `authz/` (from Slice 1, S1-C3),
   import-linter contracts, migration checks, frontend tests with coverage, generated-client
   freshness, end-to-end tests (from Slice 1), and the supply-chain audit (`wl audit`).
-- **Supply-chain audit** (`wl audit`, part of `wl check`; DL-13): known vulnerabilities in both
+- **Supply-chain audit** (`wl audit`, part of `wl check --full`; DL-13, DL-99): known
+  vulnerabilities in both
   Python lockfiles and the npm lockfile, dev dependencies included, and secrets anywhere in the
   git history. Any known vulnerability fails; an advisory is ignored only through an
   `audit-allowlist.toml` entry with a reason and an open tech-debt entry whose Fix by is the

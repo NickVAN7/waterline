@@ -7,13 +7,14 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import SessionMaker
 from app.core.settings import Settings
 from app.main import create_app
+from tests.support.api import api_client
 from tests.support.lists import router
 from tests.support.models import DocumentStatus, Record
 
@@ -28,7 +29,7 @@ BOB = uuid.UUID(int=2)
 async def client(settings: Settings, sessionmaker: SessionMaker) -> AsyncIterator[AsyncClient]:
     app = create_app(settings, sessionmaker=sessionmaker)
     app.include_router(router)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         yield c
 
 

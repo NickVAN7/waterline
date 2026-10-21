@@ -36,9 +36,12 @@ def find_repo_root(start: Path | None = None) -> Path:
 
 
 def subprocess_env() -> dict[str, str]:
-    """The current environment minus the root venv, so nested `uv run`s use their own project."""
+    """The current environment minus the root venv, so nested `uv run`s use their own project,
+    with the host's user and group IDs for the dev images' non-root user (TD-11), unless set."""
     env = dict(os.environ)
     env.pop("VIRTUAL_ENV", None)
+    env.setdefault("HOST_UID", str(os.getuid()))
+    env.setdefault("HOST_GID", str(os.getgid()))
     return env
 
 

@@ -1,11 +1,12 @@
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import URL, text
 from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.settings import Settings
 from app.main import create_app
+from tests.support.api import api_client
 
 pytestmark = pytest.mark.anyio
 
@@ -23,9 +24,7 @@ async def test_health_is_503_when_the_database_is_unreachable(settings: Settings
     engine = create_engine(unreachable)
     app = create_app(settings, sessionmaker=create_sessionmaker(engine))
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://testserver"
-        ) as client:
+        async with api_client(app) as client:
             response = await client.get("/api/health")
     finally:
         await engine.dispose()
@@ -49,9 +48,7 @@ async def test_health_is_503_not_500_when_a_pooled_connection_has_died(
     )
     app = create_app(settings, sessionmaker=create_sessionmaker(engine))
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://testserver"
-        ) as client:
+        async with api_client(app) as client:
             before = await client.get("/api/health")
             await connection.execute(
                 text(
@@ -97,7 +94,7 @@ async def test_api_docs_are_not_served_when_disabled(
     app = create_app(
         settings.model_copy(update={"api_docs_enabled": False}), sessionmaker=sessionmaker
     )
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         schema = await c.get("/api/openapi.json")
         docs = await c.get("/api/docs")
 

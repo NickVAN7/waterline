@@ -1,6 +1,7 @@
 """The 100% coverage gate on app/authz and app/rules (a hook in tests/conftest.py; TD-2) runs in
 plain `pytest`, not only through `wl`: proven by running pytest in a subprocess (no database:
-only rule unit tests) on a subset that can't cover app/rules, and on one that does."""
+only rule and authz unit tests) on a subset that can't cover app/rules, and on one that covers
+both packages."""
 
 import os
 import subprocess
@@ -17,7 +18,7 @@ def run_pytest(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
     # A separate coverage data file, so this run never touches the outer run's.
     env = {**os.environ, "COVERAGE_FILE": str(tmp_path / ".coverage")}
     return subprocess.run(  # noqa: S603 -- fixed arguments: this interpreter running pytest
-        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", *args],
+        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "-n", "0", *args],
         cwd=BACKEND,
         env=env,
         capture_output=True,
@@ -36,11 +37,24 @@ def test_a_run_below_100_percent_on_rules_fails(tmp_path: Path) -> None:
     assert "app/rules/identifiers.py" in result.stdout
 
 
-def test_a_run_covering_rules_fully_passes_the_gate(tmp_path: Path) -> None:
-    result = run_pytest(tmp_path, "tests/unit/rules", "--cov-fail-under=0")
+def test_a_run_covering_rules_and_authz_fully_passes_the_gate(tmp_path: Path) -> None:
+    result = run_pytest(tmp_path, "tests/unit/rules", "tests/unit/authz", "--cov-fail-under=0")
 
     assert result.returncode == 0, result.stdout
     assert "must have 100% coverage" not in result.stdout
+
+
+def test_under_xdist_the_controller_checks_the_combined_data(tmp_path: Path) -> None:
+    """Two workers each cover part of the packages; only their combined data reaches 100%, and a
+    subset below it still fails (DL-100)."""
+    full = run_pytest(
+        tmp_path, "tests/unit/rules", "tests/unit/authz", "--cov-fail-under=0", "-n", "2"
+    )
+    partial = run_pytest(tmp_path, PARTIAL, "--cov-fail-under=0", "-n", "2")
+
+    assert full.returncode == 0, full.stdout
+    assert partial.returncode == 1, partial.stdout
+    assert "app/authz, app/rules must have 100% coverage" in partial.stdout
 
 
 def test_the_gate_is_off_without_coverage(tmp_path: Path) -> None:

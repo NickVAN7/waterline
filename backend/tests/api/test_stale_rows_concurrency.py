@@ -8,12 +8,12 @@ from typing import Annotated
 
 import pytest
 from fastapi import FastAPI, Query
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, text
 
 from app.core.base_model import INCLUDE_DELETED
 from app.core.db import SessionDep, SessionMaker
 from app.core.errors import register_error_handlers
+from tests.support.api import api_client
 from tests.support.models import Document
 
 pytestmark = [pytest.mark.anyio, pytest.mark.concurrency("support_note", "support_document")]
@@ -79,7 +79,7 @@ async def stored_titles(sessionmaker: SessionMaker) -> set[str]:
 
 
 async def put(app: FastAPI, url: str, **params: str | list[str]) -> tuple[int, str]:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as c:
+    async with api_client(app) as c:
         response = await c.put(url, params=params)
     return response.status_code, response.json()["code"]
 

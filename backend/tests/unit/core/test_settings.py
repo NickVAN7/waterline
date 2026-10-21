@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 import pytest
+from pydantic import ValidationError
 
 from app.core.settings import TEST_DATABASE_NAME, Settings, get_settings
 
@@ -15,7 +18,13 @@ def make_settings(**overrides: object) -> Settings:
 
 @pytest.fixture(autouse=True)
 def _no_ambient_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("POSTGRES_HOST", "POSTGRES_PORT", "API_DOCS_ENABLED"):
+    for name in (
+        "POSTGRES_HOST",
+        "POSTGRES_PORT",
+        "API_DOCS_ENABLED",
+        "SESSION_IDLE_TIMEOUT",
+        "SESSION_LIFETIME",
+    ):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -39,6 +48,46 @@ def test_host_and_port_default_to_local_postgres() -> None:
 
 def test_api_docs_are_off_unless_enabled() -> None:
     assert make_settings().api_docs_enabled is False
+
+
+def test_sessions_default_to_a_7_day_idle_timeout_and_a_30_day_lifetime() -> None:
+    settings = make_settings()
+
+    assert (settings.session_idle_timeout, settings.session_lifetime) == (
+        timedelta(days=7),
+        timedelta(days=30),
+    )
+
+
+def test_session_lengths_are_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SESSION_IDLE_TIMEOUT", "PT2H")
+    monkeypatch.setenv("SESSION_LIFETIME", "P1D")
+
+    settings = make_settings()
+
+    assert (settings.session_idle_timeout, settings.session_lifetime) == (
+        timedelta(hours=2),
+        timedelta(days=1),
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("session_idle_timeout", timedelta(minutes=5)),
+        ("session_idle_timeout", timedelta(0)),
+        ("session_lifetime", timedelta(0)),
+    ],
+)
+def test_session_lengths_too_short_to_work_are_refused(field: str, value: timedelta) -> None:
+    with pytest.raises(ValidationError, match=field):
+        make_settings(**{field: value})
+
+
+def test_an_idle_timeout_just_over_the_last_seen_interval_is_accepted() -> None:
+    settings = make_settings(session_idle_timeout=timedelta(minutes=5, seconds=1))
+
+    assert settings.session_idle_timeout == timedelta(minutes=5, seconds=1)
 
 
 def test_password_is_not_shown_in_repr() -> None:

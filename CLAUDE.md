@@ -14,11 +14,12 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/build-plan.md` | Slices, checkpoints, architecture, feature map, developer CLI |
 | `docs/testing-strategy.md` | Test layers, factories, coverage gates, workflow |
 | `docs/screen-inventory.md` | People and personas, v1 scope, tenancy & access model, screens (derived step by step) |
+| `docs/ui-design-guide.md` | UI rules by ID (`UI-FRM-5`): styling approach, tokens, shell, forms, feedback, tables, SVAR widgets, how each is checked; reference copies in `docs/ui/` |
 | `docs/developer-guide.md` | Setup, commands, conventions, how-tos (kept current every checkpoint) |
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
 | `docs/decision-log.md` | Every owner decision that changed or superseded a recorded rule, or set a process (`DL-<n>`) |
-| `docs/reviews/<ID>.md` | Each checkpoint's independent review, and each design change's tooling review (`DC-<YYYY-MM-DD>.md`, DL-18): every pass, finding, and resolution |
+| `docs/reviews/s<n>/<ID>.md`, `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` | Each checkpoint's independent review (one folder per slice), and each design change's review (DL-18, DL-43, DL-126): every pass, finding, and resolution |
 | `docs/spikes/` | Spike code kept as evidence for a recorded decision (e.g. design-doc §13) |
 
 Read the relevant sections before changing anything. If the code needs to differ from the docs,
@@ -34,9 +35,11 @@ Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <
 - `wl doctor` — check the toolchain
 - `wl up` / `wl down` — the Docker Compose stack (`wl up` also applies migrations);
   `wl logs [service]`
-- `wl check` — everything CI runs (lint, types, tests, coverage, import rules, migrations,
-  client freshness, mutation testing, and `wl audit`). Must pass before any checkpoint goes to
-  review.
+- `wl check` — the gate before every commit (lint, types, tests, coverage, import rules,
+  migrations, client freshness, and mutation testing when anything it depends on changed). Must
+  pass before any checkpoint goes to review. `wl check --full` adds mutation testing whatever
+  changed, `wl audit`, and `wl e2e`: it's what CI runs, and CI must be green before a
+  checkpoint is reported (DL-99).
 - `wl audit` — supply-chain gates: known vulnerabilities in the Python and npm dependencies,
   and secrets in the git history (needs the network). A red audit is fixed before any
   checkpoint starts, with a `chore(deps):` commit on the slice branch.
@@ -55,13 +58,12 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 
 - Do only the current checkpoint's scope. Anything else goes in `docs/tech-debt.md` or is raised
   with the owner.
-- Never start work while anything is red, and never start the next checkpoint without the
-  owner's explicit approval. One exception, a trial: S1-C8 and S1-C9 go straight on to the next
-  checkpoint when every condition in the build plan's review-tier trial holds ("Verification";
-  the `checkpoint` skill, "Report and stop").
+- Never start work while anything is red (run `uv run wl audit` before starting a checkpoint:
+  `wl check` leaves it to `--full`, DL-99), and never start the next checkpoint without the
+  owner's explicit approval.
 - Finish every checkpoint with the `checkpoint` skill (gates → docs → independent review by the
   `checkpoint-reviewer` agent, plus the other reviewers when they apply → review record in
-  `docs/reviews/<ID>.md` → commit → push → report → stop).
+  `docs/reviews/s<n>/<ID>.md` → commit → push → report → stop).
 - One commit per checkpoint. The docs, tests, and tech-debt log change in the same commit as the
   code they describe.
 - Each slice works on one branch, `s<n>`, with one draft PR (build plan, "Pull requests");
@@ -90,6 +92,14 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   repo, the standard library, an installed dependency, then the minimum new code. No speculative
   options, config, or abstractions; keep the layers the docs require. For a bug fix, grep every
   caller of the function you change and fix the root cause once, in the shared code.
+- **Fix findings in one batch, everywhere at once** (DL-105, DL-106): self-review the diff
+  against the `CLAUDE.md` rules before the first reviewer; every reviewer reviews the same
+  snapshot before anything is fixed; each fix goes to every instance of its pattern; code from
+  an earlier checkpoint is fixed only when needed, otherwise logged; a re-review covers only the
+  fix diff, at most once (the `checkpoint` skill, steps 4 and 5).
+- **A new dependency names its license** (DL-129): the commit that adds one, or upgrades one
+  across a major version, says its license; anything not permissive, or that needs a key, goes
+  to the owner first.
 - Never hand-edit generated files: `backend/openapi.json`, `frontend/src/api/schema.d.ts`.
 - When a review catches a mistake that a rule would have prevented, add that rule to the
   relevant `CLAUDE.md` as part of the fix.
@@ -106,6 +116,7 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `checkpoint` — to close every checkpoint; it runs `security-reviewer` (when the build plan
   names the checkpoint for it, or the diff touches security-relevant code), then
   `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a temporary copy), then
+  `ui-reviewer` (when the diff touches `frontend/src/` or `frontend/e2e/`), then
   `fresh-clone-verifier`, `docs-consistency`, and `repo-auditor` (last checkpoint of a slice).
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in

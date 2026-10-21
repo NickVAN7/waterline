@@ -84,7 +84,8 @@ in 2.1 AA except the removed 4.1.1. Consequences for the design:
 - **Focus not obscured (2.4.11):** sticky headers and toasts never cover the focused element.
 - **Accessible authentication (3.3.8):** password fields allow paste and password managers.
 
-How it's tested: `testing-strategy.md`, "Accessibility".
+How it's tested: `testing-strategy.md`, "Accessibility". How the screens meet it, rule by rule:
+`docs/ui-design-guide.md`.
 
 ### 1.1 Project types & modules
 
@@ -107,7 +108,8 @@ per kind of project.
     must hold a `project_membership` on the project (naming anyone else is a 422 field error),
     and defaults to the project's first admin (§5, "Org roles"). Removing the lead's project
     membership (by any path, §4, including in an archived project, as part of removal "with
-    their projects") clears `lead_id` in the same transaction, recorded in the
+    their projects") clears `lead_id` in the same transaction (a project admin may also clear it,
+    DL-76), recorded in the
     `project_member_removed` event's details and, from Slice 2, as a `lead_id` change in the
     project activity feed (§10); the UI flags a project with no lead. A
     deactivated lead stays the lead and is shown with the "deactivated" badge (§4), for a
@@ -158,7 +160,7 @@ false.
 | ORM / Migrations | SQLAlchemy 2.x (plain, not SQLModel) + Alembic | Mature; fits the relational, traceability-heavy model. SQLModel was rejected (build-plan, implementation decision 1) |
 | Database | PostgreSQL | Also hosts the job queue and full-text search — no extra services in v1 |
 | Background jobs | procrastinate (Postgres-backed queue) | No new infrastructure; jobs enqueue in the same transaction as the data they act on |
-| Frontend | Vue 3 + TypeScript | Existing familiarity |
+| Frontend | Vue 3 + TypeScript; PrimeVue + Tailwind v4 on one token set; SVAR Vue Kanban and DataGrid for the board and editable grids, SVAR Gantt planned for v2 | Existing familiarity; accessible widgets we don't hand-build, one palette (`docs/ui-design-guide.md`) |
 | Local dev | Docker Compose: `api`, `worker`, `web`, `postgres`, plus a one-shot `migrate` | Worker and migrate run the same image as `api` with a different command; `migrate` applies migrations before `api` and `worker` start; `web` is the Vite dev server |
 | Deployment | Self-hosted/local initially | Stateless API + externalized DB keeps it cloud-portable |
 
@@ -294,7 +296,8 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
   - **Content items** (requirements, tasks, test cases; later RAID items, status reports, budget
     lines, attachments) can raise the level and add categories, never go below the project's.
   - **Effective classification** = the stricter of the item's and the project's levels, plus
-    the union of their categories.
+    the union of their categories. Unclassified with Internal is Internal (owner decision,
+    Oct 12, 2026).
   - **Everything else inherits:** phases, milestones, workstreams, sprints, and test runs from
     the project; subtasks, comments, and links from their parent; approval requests from what
     they approve; a test result from its test case.
@@ -447,10 +450,13 @@ Workspace (the firm: tenant boundary)
   users to it. Creating an account creates the user *and* their membership in that org in one
   step.
 - **The add-person form asks for the email first.** If the email already has an account, the
-  admin is asked to confirm adding that person (no name or password is asked for, and no
-  duplicate is created); otherwise the form continues to full account creation (username,
-  name, temporary password). The form therefore shows whether an email has an account, never
-  which org it belongs to; invitations (v2+) would hide even that.
+  admin is asked to confirm adding that person, by the email alone ("An account already exists
+  for jane@acme.com. Add them?"; no name or password is asked for, and no duplicate is created);
+  otherwise the form continues to full account creation (name, username, temporary password).
+  The username is pre-filled with a suggestion from the name (first and last word joined by a
+  hyphen, e.g. `jane-doe`, made available by the server), which the admin may change (DL-66).
+  The form therefore shows whether an email has an account, never which org it belongs to or
+  whose it is; invitations (v2+) would hide even that.
 - **Temporary passwords** (account creation and admin password reset): the form generates one
   that meets the policy and shows it to the admin once, to pass on; it can't be retrieved
   afterwards. The admin may replace it with their own before saving. Either way the user must
@@ -464,7 +470,8 @@ Workspace (the firm: tenant boundary)
   - an org member's or workspace staff member's email adds only the project membership (staff
     never get an org membership this way);
   - any **other** existing account (e.g. a user in another client org) is added to the project's
-    org as a member and to the project, after the admin confirms. The rank rule then keeps
+    org as a member and to the project, after the admin confirms (`join_org`; without it the
+    add is refused with `outside_org`, DL-78). The rank rule then keeps
     both orgs' admins from deactivating or resetting them.
 - **Removing a member with their projects.** Removing someone from an org offers to also
   remove their project memberships on that org's projects; removing staff from the
@@ -477,7 +484,8 @@ Workspace (the firm: tenant boundary)
   membership the target holds, the actor has a role covering it (the same workspace, org, or
   project, or one above it) at an equal or higher rank. The system-admin flag counts as a membership
   at the top rank. A user with no memberships left is managed by the workspace's owners/admins and
-  system admins. The ranking, highest first:
+  system admins, until an org admin adds them to their org, which brings them into that admin's
+  scope (an accepted risk, DL-69). The ranking, highest first:
 
   ```
   system admin
@@ -513,14 +521,20 @@ Workspace (the firm: tenant boundary)
   `invalid_credentials` error in the same time (an unknown email still verifies against a
   dummy hash). A deactivated account gets `account_inactive`, but only after its password is
   verified. Emails are lowercased before lookup. After a successful sign-in, a hash made with
-  older Argon2 parameters is re-hashed with the current ones.
+  older Argon2 parameters is re-hashed with the current ones. A password longer than the
+  policy's 256 characters is refused (422) before any verification, so an oversized one never
+  costs a hash (DL-49). Change password refuses a current password over 256 characters the
+  same way (DL-52).
 - **Password policy:** 8–256 characters, no composition rules, not equal to the account's
   email or username (ignoring case). The same rule applies to changes, admin resets, and new
   accounts. When users change their own password, the new one must also differ from the
   current one; an admin reset doesn't check that (owner decision, Oct 7, 2026: not needed in
-  v1). The minimum rises to 12 before the first non-local deployment.
+  v1). The minimum rises to 12 before the first non-local deployment. The policy's requirements,
+  with a label for each, are published to anyone at `GET /api/auth/password-policy`, so the web
+  app lists them under a new-password field and ticks them off as the user types; the server
+  still decides on submit (DL-91).
 - **Forced change:** while `must_change_password` is set, every endpoint except `/me`,
-  change-password, and sign-out returns 403 (`password_change_required`).
+  change-password, sign-out, and the password policy returns 403 (`password_change_required`).
 
 ### Sessions
 - Server-side sessions in a `session` table, referenced by an httpOnly cookie (not JWTs), so
@@ -532,8 +546,10 @@ Workspace (the firm: tenant boundary)
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
-  - A fresh token at every sign-in (never reuse an existing session); a password change
-    replaces the current session's token and deletes the user's other sessions.
+  - A fresh token at every sign-in (never reuse an existing session), and on a successful
+    sign-in the session the browser signed in with, if it sent one, is deleted, so signing in
+    again cuts off a copy of the old token (DL-53); a password change replaces the current session's token and deletes
+    the user's other sessions.
   - CSRF: `SameSite=Lax`, plus an `Origin` check on every mutating request, plus JSON-only
     request bodies, plus no `GET` ever changing state (so links from other sites, which only
     ever `GET`, are always safe to follow). Owner decisions after S0-C7:
@@ -626,13 +642,17 @@ Workspace (the firm: tenant boundary)
      denied (404) whatever the user's admin level (§3.1). Management actions pass through.
   3. **Personal actions** (below): the relationship rule decides, for a user with content
      access to the project.
-  4. `user.is_system_admin`.
-  5. A workspace owner/admin role in the entity's workspace.
-  6. A role in the entity's org (the project's org for a project or anything in it): owner
+  4. **Visible actions:** an action marked `visible` (e.g. `org.view`) is granted to anyone
+     who can see the target (§4, "Visibility"). It comes after the export-control gate and is
+     never used for a project content action, so it can't take an inherited admin past the
+     gate (DL-58).
+  5. `user.is_system_admin`.
+  6. A workspace owner/admin role in the entity's workspace.
+  7. A role in the entity's org (the project's org for a project or anything in it): owner
      or admin grants inherited project admin; member grants only creating a project in the
      org (`project.create`, "Org roles" below).
-  7. The user's project role.
-  8. The targeted field-based rules below.
+  8. The user's project role.
+  9. The targeted field-based rules below.
 
   Anything not granted along the way is denied. The action registry marks every action as
   **content** or **management** (§3.1; from Slice 1, Checkpoint 13), and marks the personal
@@ -654,8 +674,8 @@ Workspace (the firm: tenant boundary)
   - Both are enforced through a FastAPI dependency so an endpoint can't obtain an entity without
     the check.
   - Failures on entities the user can't see return **404, not 403**, so existence isn't leaked.
-- **Module gating** is a separate dependency: a request to a module that is disabled for the
-  project returns 404 before `authorize()` runs.
+- **Module gating** is part of the load-and-authorize dependency (an option on it, DL-47): a
+  request to a module that is disabled for the project returns 404 before `authorize()` runs.
 - **The UI asks the server.** Single-entity responses include `allowed_actions`, evaluated through
   `authorize()` (`/me` carries the workspace-level actions and each org's), so the frontend never
   re-implements role rules; it hides what the user can't do (build plan, "API conventions").
@@ -736,7 +756,13 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   approver** can decide their own approval row. This is a personal action (see "The choke
   point"): nobody, including project, org, or workspace admins, or system admins, decides on
   another approver's behalf. A project admin can cancel the request instead.
-- The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted.
+- The **last owner** of an org, and the last owner of a workspace, cannot leave or be demoted,
+  unless they name a replacement owner (an existing member there) in the same request: that
+  person becomes owner as they step down or leave (DL-59). Nor can the last active owner be
+  deactivated (DL-72). Every last-owner guard counts active owners: a change is refused when it
+  would leave no active owner, so a deactivated owner never stands in for one (DL-74).
+- **Stepping down:** a workspace or org admin may demote or remove themselves (taking access
+  away is always allowed) without the owner-only right those roles otherwise need (DL-59).
 
 ### Access review
 
@@ -1209,7 +1235,8 @@ table, `audit_event` (schema-doc, "Audit").
   their project's events (owner decision, Oct 7, 2026). Other project members never see them.
 - **Profile edits** (owner decision, Oct 7, 2026): a change to a user's name, username, or
   email, by the user or by an admin, is one `user_updated` event per request, carrying the old
-  and new value of every field it changed.
+  and new value of every field it changed: one per org when an admin acts through the owner/admin
+  roles of several orgs, so each org's admins see it (DL-75).
 - **Content:** the actor (none for app CLI commands), the target user, the entity, and
   action-specific details (e.g. old and new role). Never passwords, hashes, or tokens.
 - **Write path:** only `log_admin_event()`, in the same transaction as the change (the same
@@ -1530,7 +1557,7 @@ its own design pass.
   once email sending exists.
 
 ### v2+
-- Bulk edit of tasks
+- Bulk edit of tasks (on the bulk-selection pattern, ui-design-guide UI-TBL-6 to UI-TBL-8)
 - Configurable per-project workflows (replacing fixed statuses)
 - User-configurable display labels (beyond the per-type mapping)
 - Multi-project sprints (`sprint_project` join table)

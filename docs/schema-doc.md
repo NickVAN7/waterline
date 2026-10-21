@@ -491,8 +491,9 @@ workspace pages.
 
 `UNIQUE(workspace_id, user_id)`; index on `user_id` (access scoping looks memberships up by
 user). Members see only the orgs and projects they are assigned to;
-owners/admins see everything in the workspace. The last owner of a workspace cannot leave or be
-demoted (service-layer check).
+owners/admins see everything in the workspace. The last active owner of a workspace cannot leave,
+be demoted, or be deactivated unless a replacement owner is named in the same request (leaving and
+demotion only; service-layer check, DL-59, DL-72, DL-74).
 
 ### `organization`
 | Field | Type | Notes |
@@ -563,8 +564,9 @@ ends sessions through the handler `auth` registers with it (build plan, "Feature
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(user_id, organization_id)`; index on `organization_id` (an org's members list; the
-unique constraint serves only lookups by user, DL-34). Last owner of an org cannot leave or be demoted
-(service-layer check).
+unique constraint serves only lookups by user, DL-34). The last active owner of an org cannot
+leave, be demoted, or be deactivated unless a replacement owner is named in the same request
+(leaving and demotion only; service-layer check, DL-59, DL-72, DL-74).
 
 ### `project`
 | Field | Type | Notes |
@@ -577,7 +579,7 @@ unique constraint serves only lookups by user, DL-34). Last owner of an org cann
 | description | text, nullable | plain text |
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | status | enum: planning / active / on_hold / completed / cancelled | NOT NULL, default `planning`; informational only: gates nothing, separate from `archived_at` (design-doc §1.1, §7); changed by project admins |
-| lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check; otherwise a 422 field error); defaults to the first admin; cleared in the same transaction when that membership is removed, recorded in `project_member_removed` and, from Slice 2, as an `activity_log` `lead_id` change (design-doc §1.1) |
+| lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check; otherwise a 422 field error); defaults to the first admin; set to null by a project admin (`project_updated`, DL-76), or cleared in the same transaction when that membership is removed, recorded in `project_member_removed` and, from Slice 2, as an `activity_log` `lead_id` change (design-doc §1.1) |
 | enabled_modules | text[] | NOT NULL, no default: the service always seeds it from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
 | classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; null = unclassified; the floor for the project's items (design-doc §3.1) |
 | classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
@@ -993,13 +995,14 @@ for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, whether it cleared the project's lead); never passwords, hashes, or tokens |
+| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, the removed `role`, `lead_cleared` when it cleared the project's lead, and `via` (`org_member_removed` or `workspace_member_removed`) when an org or staff removal "with their projects" removed it, DL-78); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 
 `action` values: `workspace_created`, `user_created`, `user_deactivated`, `user_reactivated`,
 `password_reset`, `password_changed`, `signed_out_everywhere`, `user_updated` (every profile
-edit, by the user or an admin: one event per request), `system_admin_granted`,
+edit, by the user or an admin: one event per request, or per org for an admin acting through
+several orgs' roles, DL-75), `system_admin_granted`,
 `system_admin_revoked`, `workspace_updated`, `workspace_member_added`,
 `workspace_member_role_changed`, `workspace_member_removed`, `org_created`, `org_updated`,
 `org_member_added`, `org_member_role_changed`, `org_member_removed`, `project_created`,

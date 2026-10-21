@@ -10,7 +10,7 @@ from typing import Annotated
 
 import typer
 
-from waterline_cli import steps
+from waterline_cli import mutation, steps
 from waterline_cli.audit import ALLOWLIST, AllowlistError, load_allowlist, uv_ignores
 from waterline_cli.doctor import CHECKS, Status, run_checks
 from waterline_cli.review_copy import CopyError, describe, make_copy
@@ -65,14 +65,60 @@ def _audit_steps() -> list[Step]:
     return steps.audit(uv_ignores(allowlist))
 
 
+def _run_e2e(extra: list[str], *, dry_run: bool) -> None:
+    try:
+        run_steps(steps.e2e(extra), dry_run=dry_run)
+    finally:
+        run_steps(steps.e2e_down(), dry_run=dry_run)
+
+
+def _mutate_steps(steps_to_run: list[Step], digest: str, *, dry_run: bool) -> None:
+    """Run steps ending in mutation testing; once they pass, record its inputs as green."""
+    run_steps(steps_to_run, dry_run=dry_run)
+    if not dry_run:
+        mutation.record(find_repo_root() / steps.BACKEND, digest)
+
+
 @app.command()
-def check(dry_run: DryRun = False) -> None:
-    """Everything CI runs: lockfiles, client freshness, lint, types, import rules, tests,
-    coverage gates, mutation testing, and the supply-chain audit."""
+def check(
+    dry_run: DryRun = False,
+    full: Annotated[
+        bool,
+        typer.Option(
+            "--full",
+            help="Also the supply-chain audit, the end-to-end tests, and mutation testing "
+            "whatever changed. CI runs this.",
+        ),
+    ] = False,
+) -> None:
+    """Before every commit: lockfiles, client freshness, lint, types, import rules, tests,
+    coverage gates, and mutation testing when anything it depends on changed since its last
+    green run. With --full (CI), also the supply-chain audit and, last, the end-to-end tests
+    (DL-99)."""
+    backend_dir = find_repo_root() / steps.BACKEND
+    digest = mutation.inputs_hash(backend_dir)
+    if full or not mutation.is_current(backend_dir, digest):
+        _mutate_steps(steps.backend_check(), digest, dry_run=dry_run)
+    else:
+        run_steps(steps.backend_check(mutate=False), dry_run=dry_run)
+        typer.secho(
+            "Mutation testing skipped: nothing it depends on changed since its last green run.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
     run_steps(
-        [*steps.backend_check(), *steps.frontend_check(), *steps.cli_check(), *_audit_steps()],
+        [*steps.frontend_check(), *steps.cli_check(), *(_audit_steps() if full else [])],
         dry_run=dry_run,
     )
+    if full:
+        _run_e2e([], dry_run=dry_run)
+
+
+@app.command(context_settings=PASS_THROUGH)
+def e2e(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """End-to-end tests: start an isolated stack seeded with the demo data, run Playwright
+    (extra arguments go to it), and always tear the stack down."""
+    _run_e2e(ctx.args, dry_run=dry_run)
 
 
 @app.command("review-copy")
@@ -147,6 +193,20 @@ def migrate(dry_run: DryRun = False) -> None:
     run_steps(steps.migrate(), dry_run=dry_run)
 
 
+@app.command(context_settings=PASS_THROUGH)
+def seed(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """Create the workspace and its first system admin (its owner). Prompts for each value, or
+    takes it from a flag (`wl seed --email ...`) or a SEED_* variable (developer guide)."""
+    run_steps(steps.seed(ctx.args), dry_run=dry_run)
+
+
+@app.command(context_settings=PASS_THROUGH)
+def admin(ctx: typer.Context, dry_run: DryRun = False) -> None:
+    """Run an app admin command, e.g. `wl admin grant-system-admin <email>` or
+    `wl admin revoke-system-admin <email>`."""
+    run_steps(steps.admin(ctx.args), dry_run=dry_run)
+
+
 @app.command("gen-client")
 def gen_client(dry_run: DryRun = False) -> None:
     """Regenerate the frontend's API types: export backend/openapi.json, then schema.d.ts."""
@@ -177,7 +237,8 @@ def backend_test(ctx: typer.Context, dry_run: DryRun = False) -> None:
 @backend.command("mutate")
 def backend_mutate(dry_run: DryRun = False) -> None:
     """Mutation testing over app/rules and app/authz; fails on any surviving mutant."""
-    run_steps(steps.backend_mutate(), dry_run=dry_run)
+    digest = mutation.inputs_hash(find_repo_root() / steps.BACKEND)
+    _mutate_steps(steps.backend_mutate(), digest, dry_run=dry_run)
 
 
 @backend.command("lint")

@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import BaseModel
@@ -17,7 +17,11 @@ class UserSession(BaseModel):
 
     __tablename__ = "session"
     # A hash of 32 random bytes: a clash would be a bug, never a user's doing.
-    __table_args__ = (UniqueConstraint("token_hash", info=internal_only()),)
+    __table_args__ = (
+        UniqueConstraint("token_hash", info=internal_only()),
+        # Account actions delete all of a user's sessions (DL-34).
+        Index(None, "user_id"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(User.id))
     token_hash: Mapped[str]
