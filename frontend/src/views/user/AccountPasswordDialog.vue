@@ -91,8 +91,13 @@ defineExpose({ open })
     :fallback-focus="fallbackFocus"
   >
     <template v-if="shown">
-      <TemporaryPasswordNotice :password="shown" />
-      <div><Button ref="doneButton" @click="dialog?.close()">Done</Button></div>
+      <!-- The warning is read with Done, which gets focus (DL-118). -->
+      <TemporaryPasswordNotice :password="shown" warning-id="reset-password-warning" />
+      <div>
+        <Button ref="doneButton" aria-describedby="reset-password-warning" @click="dialog?.close()"
+          >Done</Button
+        >
+      </div>
     </template>
     <form
       v-else-if="opened"

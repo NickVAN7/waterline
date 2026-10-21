@@ -109,7 +109,14 @@ describe('CreateOrgDialog', () => {
       },
     })
     expect(wrapper.get('output').text()).toBe('fake-fake-fake-01')
-    expect(document.activeElement?.textContent?.trim()).toBe('Done')
+    const done = document.activeElement as HTMLElement
+    expect(done.textContent?.trim()).toBe('Done')
+    // What was done and the warning are read with Done (DL-118).
+    const ids = done.getAttribute('aria-describedby')!.split(' ')
+    expect(ids.map((id) => wrapper.get(`#${id}`).text())).toEqual([
+      'Initech is created, with Ben Ito as its owner.',
+      'This password is shown once. Give it to the user; they must change it at first sign-in.',
+    ])
   })
 
   it.each([

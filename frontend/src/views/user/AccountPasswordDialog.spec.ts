@@ -46,8 +46,12 @@ describe('AccountPasswordDialog', () => {
       body: { password: 'fake-fake-fake-01' },
     })
     expect(wrapper.get('output').text()).toBe('fake-fake-fake-01')
-    expect(wrapper.text()).toContain('This password is shown once.')
-    expect(document.activeElement?.textContent?.trim()).toBe('Done')
+    const done = document.activeElement as HTMLElement
+    expect(done.textContent?.trim()).toBe('Done')
+    // The warning is read with Done (DL-118).
+    expect(wrapper.get(`#${done.getAttribute('aria-describedby')}`).text()).toBe(
+      'This password is shown once. Give it to the user; they must change it at first sign-in.',
+    )
     expect(wrapper.emitted('done')).toEqual([['Password reset for Jane Doe.']])
   })
 

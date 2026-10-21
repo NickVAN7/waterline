@@ -1,9 +1,9 @@
 /**
  * A settings form's save (TD-43; docs/ui-design-guide.md UI-FRM-4 to UI-FRM-8): the required check
  * and focus on the first empty field, the pending state and its status, the success message, and
- * a failed save's errors. After a 403, or a refusal for a changed export control (DL-116), the
- * page's data is reloaded: the form keeps what was typed if they still may save, or goes read-only
- * with its alert focused (UI-FRM-7).
+ * a failed save's errors. After a 403, or a refusal for a changed export control or member list
+ * (DL-116, DL-120), the page's data is reloaded: the form keeps what was typed if they still may
+ * save, or goes read-only with its alert focused (UI-FRM-7).
  */
 import { ref, type Ref } from 'vue'
 

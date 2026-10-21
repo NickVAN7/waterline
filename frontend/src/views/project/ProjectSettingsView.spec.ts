@@ -339,6 +339,31 @@ describe('ProjectSettingsView', () => {
     ).toBe(true)
   })
 
+  it('reads the project again when its explicit members changed since they were confirmed (DL-120)', async () => {
+    const shown = project({ allowed_actions: ADMIN })
+    const { wrapper, get } = await mountAt(shown)
+    vi.spyOn(client, 'PUT').mockResolvedValue(
+      validationFailed([
+        {
+          loc: ['body', 'confirmed_member_ids'],
+          message: "The project's members changed. Confirm them again.",
+          type: 'members_changed',
+        },
+      ]),
+    )
+    const reads = () => get.mock.calls.filter((c) => c[0] === '/api/projects/{key}').length
+    const before = reads()
+    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
+    await submitForm(wrapper, 1)
+    const confirm = openDialog(wrapper)!
+    await confirm.get('input[type=checkbox]').setValue(true)
+    await confirm.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(reads()).toBe(before + 1)
+    expect(wrapper.text()).toContain("The project's members changed. Confirm them again.")
+  })
+
   it('marks the project export-controlled only once its explicit members are confirmed (DL-114)', async () => {
     const shown = project({ allowed_actions: ADMIN })
     const { wrapper } = await mountAt(shown)

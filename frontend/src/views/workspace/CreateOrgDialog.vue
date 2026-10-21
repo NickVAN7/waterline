@@ -255,9 +255,19 @@ defineExpose({ open })
 <template>
   <ModalDialog ref="dialog" title="Create an organization">
     <template v-if="created">
-      <p class="m-0">{{ values.name }} is created, with {{ values.owner_name }} as its owner.</p>
-      <TemporaryPasswordNotice :password="values.password" />
-      <div><Button ref="doneButton" @click="dialog?.close()">Done</Button></div>
+      <!-- Read with Done, which gets focus (DL-118). -->
+      <p id="org-created-what" class="m-0">
+        {{ values.name }} is created, with {{ values.owner_name }} as its owner.
+      </p>
+      <TemporaryPasswordNotice :password="values.password" warning-id="org-created-warning" />
+      <div>
+        <Button
+          ref="doneButton"
+          aria-describedby="org-created-what org-created-warning"
+          @click="dialog?.close()"
+          >Done</Button
+        >
+      </div>
     </template>
     <form v-else ref="formElement" novalidate class="flex flex-col gap-4" @submit.prevent="submit">
       <FormAlert

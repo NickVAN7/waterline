@@ -243,7 +243,12 @@ describe('refetchNeeded (UI-FRM-7, DL-116)', () => {
     ],
     ['another type on the field', invalid('export_control_confirmed', 'other'), false],
     ['the type on another field', invalid('confirmed_member_ids', 'confirmation_required'), false],
-    ['members_changed', invalid('confirmed_member_ids', 'members_changed'), false],
+    ['members_changed', invalid('confirmed_member_ids', 'members_changed'), true],
+    [
+      'members_changed on another field',
+      invalid('export_control_confirmed', 'members_changed'),
+      false,
+    ],
     ['a 409', new ApiError(409, { code: 'conflict', message: '', details: {} }), false],
     ['not an ApiError', new Error('boom'), false],
   ])('%s → %s', (_name, error, expected) => {

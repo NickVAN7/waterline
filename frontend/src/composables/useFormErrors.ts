@@ -161,7 +161,8 @@ export function useFormErrors<F extends string>(
  * A refusal meaning the page's data is out of date, so the page refetches it (UI-FRM-7): a 403
  * (what the user may do changed), or a 422 saying the project's export control changed since it
  * loaded, so the confirmation must appear or go (`confirmation_required` or
- * `confirmation_not_needed` on `export_control_confirmed`, DL-116).
+ * `confirmation_not_needed` on `export_control_confirmed`, DL-116), or that its explicit members
+ * changed since the confirmation listed them (`members_changed` on `confirmed_member_ids`, DL-120).
  */
 export function refetchNeeded(error: unknown): boolean {
   if (!(error instanceof ApiError)) return false
@@ -169,8 +170,9 @@ export function refetchNeeded(error: unknown): boolean {
   const fields = (error.details.fields ?? []) as FieldError[]
   return fields.some(
     (f) =>
-      f.loc.at(-1) === 'export_control_confirmed' &&
-      (f.type === 'confirmation_required' || f.type === 'confirmation_not_needed'),
+      (f.loc.at(-1) === 'export_control_confirmed' &&
+        (f.type === 'confirmation_required' || f.type === 'confirmation_not_needed')) ||
+      (f.loc.at(-1) === 'confirmed_member_ids' && f.type === 'members_changed'),
   )
 }
 

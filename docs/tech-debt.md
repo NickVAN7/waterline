@@ -675,4 +675,15 @@ Entry format:
 - **Why:** S1-C16c's row covers the add-person dialog; the others are S1-C15's (DL-106: earlier
   code changed only when needed).
 - **Fix by:** S1-C16d (the owner's choice, DL-122)
+- **Status:** resolved in S1-C16d
+
+### TD-51: The password reset's last step doesn't say the reset happened
+- **Added:** S1-C16d (ui-reviewer note)
+- **What:** the add-person and create-organization dialogs' last steps describe Done with a
+  sentence saying what was done and the "shown once" warning; the password reset's describes it
+  with the warning alone. "Password reset for <name>." goes to the page's success status, which a
+  screen reader hears only once the dialog closes.
+- **Why:** the owner chose to log the S1-C16d review's findings rather than fix them; DL-122 asked
+  for the step's existing text, which it has.
+- **Fix by:** Slice 2 (the owner's UI feedback at its start)
 - **Status:** open

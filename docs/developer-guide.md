@@ -4,12 +4,16 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C16c (Review follow-ups) done: `refetchNeeded` (`useFormErrors`), a 403 or a
+> **Status:** S1-C16d (Review follow-ups (2)) done: `refetchNeeded` also covers `members_changed`
+> on `confirmed_member_ids`, so project settings' classification save reloads the project when
+> its members changed (DL-120); the create-organization and password-reset dialogs read their
+> last step's text and the temporary password's warning with Done (DL-118, DL-122;
+> `TemporaryPasswordNotice`'s `warningId`); next is S1-C17 (Slice verification). S1-C16c (Review
+> follow-ups) built `refetchNeeded` (`useFormErrors`), a 403 or a
 > refusal for a project's changed export control, reloads the page's data in the add dialogs and
 > the settings forms (DL-116); the add-person dialog's confirmation steps start on Back (DL-117)
 > and each step's text is in the focused control's `aria-describedby` (DL-118; `TextField`'s
-> `describedBy`); next is S1-C16d (review follow-ups, DL-120 and DL-122), then S1-C17 (Slice
-> verification). S1-C16b (Web: project members) built a
+> `describedBy`). S1-C16b (Web: project members) built a
 > project's members page
 > (`ProjectMembersView`, `/{org_slug}/projects/{key}/members`, Members in the project pages nav
 > for anyone who sees the project) on `RosterPage`, whose `header` and `dialogs` slots the project
