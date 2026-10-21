@@ -8,7 +8,9 @@
 // On a project (S1-C16b): an account from outside the org (`outside_org`) is added only after a
 // second confirm that adds them to the org too (`join_org`, DL-78); on an export-controlled project,
 // each add first confirms the person is authorized (design-doc §3.1), its button blocked until then
-// (UI-FRM-15). A 403 tells the page (`refused`), so it reloads what the user may do (UI-FRM-7).
+// (UI-FRM-15). A confirmation step starts on Back (DL-117), and each step's text is read with the
+// control that gets focus (DL-118). A 403, or a refusal for a project's changed export control,
+// tells the page (`refused`), so it reloads what the user may do (UI-FRM-7, DL-116).
 import { computed, nextTick, ref, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
@@ -20,7 +22,7 @@ import TemporaryPasswordField from '@/components/TemporaryPasswordField.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
 import TextField from '@/components/TextField.vue'
 import { AVAILABILITY_DELAY_MS, useAvailability } from '@/composables/useAvailability'
-import { dismissToSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, refetchNeeded, useFormErrors } from '@/composables/useFormErrors'
 
 import type { Roster } from './roster'
 
@@ -58,6 +60,7 @@ const usernameField = ref<InstanceType<typeof TextField>>()
 const passwordField = ref<InstanceType<typeof TemporaryPasswordField>>()
 const confirmButton = ref<InstanceType<typeof Button>>()
 const joinButton = ref<InstanceType<typeof Button>>()
+const backButton = ref<InstanceType<typeof Button>>()
 const doneButton = ref<InstanceType<typeof Button>>()
 const fields = {
   email: emailField,
@@ -144,14 +147,14 @@ async function run(work: () => Promise<void>, saying: string): Promise<void> {
   } catch (error) {
     status.value = ''
     const target = errors.value.apply(error)
-    if (error instanceof ApiError && error.status === 403) emit('refused')
+    if (refetchNeeded(error)) emit('refused')
     const outside = emailErrors.fieldProblems.value.email?.find((p) => p.type === 'outside_org')
     if (step.value === 'confirm' && outside) {
       emailErrors.reset()
       joining.value = outside.message
       step.value = 'join'
       await nextTick()
-      return focusAction()
+      return focusBack()
     }
     // An email problem belongs to step 1, where the email can be changed.
     if ((target === 'email' || target === 'role') && step.value !== 'email') {
@@ -171,13 +174,15 @@ async function checkEmail(): Promise<void> {
     const { exists } = (await userCheck({ email: values.value.email })) as { exists: boolean }
     step.value = exists ? 'confirm' : 'create'
     await nextTick()
-    if (exists) (confirmButton.value?.$el as HTMLElement | undefined)?.focus()
+    if (exists) focusBack()
     else nameField.value?.focus()
   }, 'Checking the email…')
 }
 
 function options() {
-  return { joinOrg: step.value === 'join', exportControlConfirmed: authorized.value }
+  // From the project as it is now: a reload may have taken the export control, and the box, away.
+  const exportControlConfirmed = !!props.roster.exportControlled && authorized.value
+  return { joinOrg: step.value === 'join', exportControlConfirmed }
 }
 
 async function addExisting(): Promise<void> {
@@ -215,6 +220,11 @@ function stepForm(): HTMLFormElement | undefined {
   if (step.value !== 'email' && step.value !== 'create') return undefined
   const first = step.value === 'create' ? 'name' : 'email'
   return document.querySelector<HTMLInputElement>(`#add-${first}`)?.form ?? undefined
+}
+
+/** A confirmation step's Back, where it starts (DL-117). */
+function focusBack() {
+  ;(backButton.value?.$el as HTMLElement | undefined)?.focus()
 }
 
 /** The step's own action button: its form's submit, or the confirm step's button. */
@@ -289,7 +299,9 @@ defineExpose({ open })
       </div>
     </form>
     <div v-else-if="step === 'confirm'" class="flex flex-col gap-4">
-      <p class="m-0">An account already exists for {{ values.email }}. Add them?</p>
+      <p id="add-confirm-what" class="m-0">
+        An account already exists for {{ values.email }}. Add them?
+      </p>
       <label v-if="roster.exportControlled" class="flex items-start gap-2">
         <input v-model="authorized" type="checkbox" class="size-(--target-min) shrink-0" />
         <span>I confirm this person is authorized for export-controlled data.</span>
@@ -304,14 +316,20 @@ defineExpose({ open })
           @click="addExisting"
           >Add person</Button
         >
-        <Button variant="secondary" @click="back">Back</Button>
+        <Button
+          ref="backButton"
+          variant="secondary"
+          aria-describedby="add-confirm-what"
+          @click="back"
+          >Back</Button
+        >
         <p v-if="blocked" id="add-blocked" class="m-0 text-sm text-text-muted">
           Check the box to continue.
         </p>
       </div>
     </div>
     <div v-else-if="step === 'join'" class="flex flex-col gap-4">
-      <!-- Read with the button that gets focus: nothing else announces the step. -->
+      <!-- Read with Back, which gets focus, and with the action: nothing else announces it. -->
       <p id="add-join-reason" class="m-0">{{ joining }}</p>
       <p id="add-join-what" class="m-0">
         Add {{ values.email }} to the organization as a member, and to {{ roster.scope }}?
@@ -325,7 +343,13 @@ defineExpose({ open })
           @click="addExisting"
           >Add to both</Button
         >
-        <Button variant="secondary" @click="back">Back</Button>
+        <Button
+          ref="backButton"
+          variant="secondary"
+          aria-describedby="add-join-reason add-join-what"
+          @click="back"
+          >Back</Button
+        >
       </div>
     </div>
     <form
@@ -334,7 +358,7 @@ defineExpose({ open })
       class="flex flex-col gap-4"
       @submit.prevent="create"
     >
-      <p class="m-0">No account has this email yet. Create one:</p>
+      <p id="add-create-what" class="m-0">No account has this email yet. Create one:</p>
       <dl class="m-0 flex flex-col gap-1">
         <dt class="font-medium">Email</dt>
         <dd class="m-0">{{ values.email }}</dd>
@@ -347,6 +371,7 @@ defineExpose({ open })
         ref="nameField"
         v-model="values.name"
         label="Name"
+        described-by="add-create-what"
         autocomplete="off"
         required
         :error="createErrors.fieldErrors.value.name"
@@ -391,9 +416,16 @@ defineExpose({ open })
       </div>
     </form>
     <template v-else>
-      <p class="m-0">{{ values.name }} is added to {{ roster.scope }}.</p>
-      <TemporaryPasswordNotice :password="values.password" />
-      <div><Button ref="doneButton" @click="dialog?.close()">Done</Button></div>
+      <p id="add-created-what" class="m-0">{{ values.name }} is added to {{ roster.scope }}.</p>
+      <TemporaryPasswordNotice :password="values.password" warning-id="add-created-warning" />
+      <div>
+        <Button
+          ref="doneButton"
+          aria-describedby="add-created-what add-created-warning"
+          @click="dialog?.close()"
+          >Done</Button
+        >
+      </div>
     </template>
     <p class="sr-only" aria-live="polite">{{ errors.announcement.value || status }}</p>
   </ModalDialog>

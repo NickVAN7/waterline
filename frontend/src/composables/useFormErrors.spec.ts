@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError, NETWORK_ERROR } from '@/api/client'
 
-import { retryFromSubmit, ANNOUNCE_DELAY_MS, FORM_MESSAGES, useFormErrors } from './useFormErrors'
+import {
+  retryFromSubmit,
+  ANNOUNCE_DELAY_MS,
+  FORM_MESSAGES,
+  refetchNeeded,
+  useFormErrors,
+} from './useFormErrors'
 
 const LABELS = { email: 'Email', password: 'Password' }
 
@@ -216,5 +222,31 @@ describe('retryFromSubmit (UI-FRM-7)', () => {
 
     expect(focusedAtRetry).toBe(form.querySelector('button[type=submit]'))
     form.remove()
+  })
+})
+
+describe('refetchNeeded (UI-FRM-7, DL-116)', () => {
+  const invalid = (loc: string, type: string) =>
+    new ApiError(422, {
+      code: 'validation_error',
+      message: '',
+      details: { fields: [{ loc: ['body', loc], message: '', type }] },
+    })
+
+  it.each([
+    ['a 403', new ApiError(403, { code: 'forbidden', message: '', details: {} }), true],
+    ['confirmation_required', invalid('export_control_confirmed', 'confirmation_required'), true],
+    [
+      'confirmation_not_needed',
+      invalid('export_control_confirmed', 'confirmation_not_needed'),
+      true,
+    ],
+    ['another type on the field', invalid('export_control_confirmed', 'other'), false],
+    ['the type on another field', invalid('confirmed_member_ids', 'confirmation_required'), false],
+    ['members_changed', invalid('confirmed_member_ids', 'members_changed'), false],
+    ['a 409', new ApiError(409, { code: 'conflict', message: '', details: {} }), false],
+    ['not an ApiError', new Error('boom'), false],
+  ])('%s → %s', (_name, error, expected) => {
+    expect(refetchNeeded(error)).toBe(expected)
   })
 })

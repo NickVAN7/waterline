@@ -8,7 +8,8 @@ import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 
 import Button from './Button.vue'
 
-const props = defineProps<{ password: string }>()
+// `warningId`: so the control a dialog focuses can be described by the warning (DL-118).
+const props = defineProps<{ password: string; warningId?: string }>()
 
 const said = ref('')
 let announcing: ReturnType<typeof setTimeout> | undefined
@@ -39,7 +40,7 @@ async function copy(): Promise<void> {
       >
       <Button variant="secondary" @click="copy">Copy</Button>
     </div>
-    <p class="m-0 text-sm">
+    <p :id="warningId" class="m-0 text-sm">
       This password is shown once. Give it to the user; they must change it at first sign-in.
     </p>
     <p class="m-0 text-sm" aria-live="polite">{{ said }}</p>

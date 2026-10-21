@@ -14,8 +14,17 @@ withDefaults(
     required?: boolean
     help?: string
     error?: string
+    /** Ids of text outside the field that describes it (a dialog step's text, DL-118). */
+    describedBy?: string
   }>(),
-  { type: 'text', autocomplete: undefined, required: false, help: undefined, error: undefined },
+  {
+    type: 'text',
+    autocomplete: undefined,
+    required: false,
+    help: undefined,
+    error: undefined,
+    describedBy: undefined,
+  },
 )
 
 const model = defineModel<string>({ required: true })
@@ -24,7 +33,14 @@ defineExpose({ focus: () => input.value?.focus() })
 </script>
 
 <template>
-  <FormField :id="id" :label="label" :required="required" :help="help" :error="error">
+  <FormField
+    :id="id"
+    :label="label"
+    :required="required"
+    :help="help"
+    :error="error"
+    :described-by="describedBy"
+  >
     <template #default="{ describedBy, invalid }">
       <input
         :id="id"

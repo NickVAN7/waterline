@@ -657,7 +657,7 @@ Entry format:
   nothing is recorded wrongly; the owner chose to reload the project on that 422, as a 403 does
   (DL-116).
 - **Fix by:** S1-C16c (the owner chose the reload, DL-116)
-- **Status:** open
+- **Status:** resolved in S1-C16c
 
 ### TD-49: A project page's actions aren't in its header
 - **Added:** S1-C16b (ui-reviewer note, UI-SHL-8)
@@ -665,4 +665,14 @@ Entry format:
   under `ProjectHeader`, not in a right-hand actions slot as `PageHeader`'s are.
 - **Why:** the owner left the layout as is for now; it may come with their changes in Slice 2.
 - **Fix by:** Slice 2 (the owner's layout changes, or a decision to keep it)
+- **Status:** open
+
+### TD-50: Two other dialogs' last step isn't read with Done
+- **Added:** S1-C16c (DL-118)
+- **What:** DL-118 puts a dialog step's text in the `aria-describedby` of the control that gets
+  focus. The add-person dialog does; the create-organization dialog's "created" step and the
+  password reset's "shown once" step move focus to Done without its text.
+- **Why:** S1-C16c's row covers the add-person dialog; the others are S1-C15's (DL-106: earlier
+  code changed only when needed).
+- **Fix by:** Slice 2 (the first checkpoint that changes either dialog)
 - **Status:** open

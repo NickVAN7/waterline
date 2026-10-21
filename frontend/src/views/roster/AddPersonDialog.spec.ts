@@ -68,7 +68,8 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
     await continueWith(wrapper, 'ann@acme.example')
 
     expect(wrapper.text()).toContain('An account already exists for ann@acme.example. Add them?')
-    expect(document.activeElement?.textContent?.trim()).toBe('Add person')
+    // A confirmation step starts on Back (DL-117).
+    expect(document.activeElement?.textContent?.trim()).toBe('Back')
     await button(wrapper, 'Add person').trigger('click')
     await flushPromises()
     expect(roster.add).toHaveBeenCalledWith('ann@acme.example', 'member', {
@@ -273,7 +274,7 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
       "This person isn't in the organization. Confirm to add them to it too.",
     )
     expect(wrapper.find('#add-email').exists()).toBe(false)
-    expect(document.activeElement?.textContent?.trim()).toBe('Add to both')
+    expect(document.activeElement?.textContent?.trim()).toBe('Back')
     await button(wrapper, 'Add to both').trigger('click')
     await flushPromises()
     expect(roster.add).toHaveBeenLastCalledWith('out@else.example', 'member', {
@@ -347,7 +348,7 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
     expect(roster.add).not.toHaveBeenCalled()
   })
 
-  it("reads the join step's reason with the button it focuses", async () => {
+  it("reads the join step's reason with Back, which it focuses (DL-118)", async () => {
     userCheck(true)
     const { wrapper, roster } = await openDialog()
     roster.add.mockRejectedValueOnce(
@@ -361,7 +362,7 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
     await button(wrapper, 'Add person').trigger('click')
     await flushPromises()
 
-    const ids = button(wrapper, 'Add to both').attributes('aria-describedby')!.split(' ')
+    const ids = (document.activeElement as HTMLElement).getAttribute('aria-describedby')!.split(' ')
     expect(ids.map((id) => wrapper.get(`#${id}`).text())).toEqual([
       "This person isn't in the organization. Confirm to add them to it too.",
       "Add out@else.example to the organization as a member, and to the workspace's staff?",
@@ -384,5 +385,74 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
     await flushPromises()
 
     expect(roster.add).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    [true, 'An account already exists for ann@acme.example. Add them?'],
+    [false, 'No account has this email yet. Create one:'],
+  ])(
+    "reads the step's text with the control it focuses (DL-118), an account existing: %s",
+    async (exists, text) => {
+      userCheck(exists)
+      const { wrapper } = await openDialog()
+
+      await continueWith(wrapper, 'ann@acme.example')
+
+      const focused = document.activeElement as HTMLElement
+      const ids = focused.getAttribute('aria-describedby')!.split(' ')
+      expect(ids.map((id) => wrapper.get(`#${id}`).text())).toContain(text)
+    },
+  )
+
+  it('reads what was done with Done, once the account is created (DL-118)', async () => {
+    userCheck(false)
+    const { wrapper } = await openDialog()
+    await continueWith(wrapper, 'new@acme.example')
+    await wrapper.get('#add-name').setValue('Jane Doe')
+    await wrapper.get('#add-username').setValue('jane-doe')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const done = document.activeElement as HTMLElement
+    expect(done.textContent?.trim()).toBe('Done')
+    const ids = done.getAttribute('aria-describedby')!.split(' ')
+    expect(ids.map((id) => wrapper.get(`#${id}`).text())).toEqual([
+      "Jane Doe is added to the workspace's staff.",
+      'This password is shown once. Give it to the user; they must change it at first sign-in.',
+    ])
+  })
+
+  it.each(['confirmation_required', 'confirmation_not_needed'])(
+    "tells the page when the project's export control changed (%s), so it reloads (DL-116)",
+    async (type) => {
+      userCheck(true)
+      const { wrapper, roster } = await openDialog()
+      roster.add.mockRejectedValue(
+        invalid({ loc: ['body', 'export_control_confirmed'], message: 'Confirm again.', type }),
+      )
+      await continueWith(wrapper, 'ann@acme.example')
+
+      await button(wrapper, 'Add person').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.emitted('refused')).toHaveLength(1)
+      expect(wrapper.get('[role="alert"]').text()).toContain('Confirm again.')
+    },
+  )
+
+  it("doesn't reload for another 422", async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog()
+    roster.add.mockRejectedValue(
+      invalid({ loc: ['body', 'export_control_confirmed'], message: 'No.', type: 'other' }),
+    )
+    await continueWith(wrapper, 'ann@acme.example')
+
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('refused')).toBeUndefined()
   })
 })

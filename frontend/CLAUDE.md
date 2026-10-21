@@ -139,6 +139,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   actions, and every dialog whose opener can vanish (a row's menu, a hidden button) passes
   `fallbackFocus` (`focusHeading`): otherwise the alert that held focus, or focus on close, drops
   to `<body>` (UI-FRM-14; S1-C16b review).
+- A confirmation the client sends (`export_control_confirmed`) comes from the current server state
+  as well as the box: a reload can take the box away while it's still ticked (DL-116; S1-C16c
+  review).
 - A dialog's search or lookup that fails says so at its own field, not in the form's alert, whose
   Retry and dismiss belong to the submit (UI-FRM-7; S1-C16b review).
 - A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets

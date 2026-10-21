@@ -157,6 +157,23 @@ export function useFormErrors<F extends string>(
   }
 }
 
+/**
+ * A refusal meaning the page's data is out of date, so the page refetches it (UI-FRM-7): a 403
+ * (what the user may do changed), or a 422 saying the project's export control changed since it
+ * loaded, so the confirmation must appear or go (`confirmation_required` or
+ * `confirmation_not_needed` on `export_control_confirmed`, DL-116).
+ */
+export function refetchNeeded(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false
+  if (error.status === 403) return true
+  const fields = (error.details.fields ?? []) as FieldError[]
+  return fields.some(
+    (f) =>
+      f.loc.at(-1) === 'export_control_confirmed' &&
+      (f.type === 'confirmation_required' || f.type === 'confirmation_not_needed'),
+  )
+}
+
 function formAlert(error: ApiError, serverMessageCodes: string[]): FormAlert {
   if (serverMessageCodes.includes(error.code)) return { tone: 'danger', message: error.message }
   if (error.code === NETWORK_ERROR)

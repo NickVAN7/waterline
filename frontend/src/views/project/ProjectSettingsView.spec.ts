@@ -303,6 +303,42 @@ describe('ProjectSettingsView', () => {
     expect(document.activeElement?.closest('[role=alert]')).not.toBeNull()
   })
 
+  it('reads the project again, keeping what was typed, when its export control changed elsewhere (DL-116)', async () => {
+    const shown = project({ allowed_actions: ADMIN })
+    const { wrapper, get } = await mountAt(shown, [
+      project({ ...shown, classification_categories: ['export_controlled'] }),
+    ])
+    vi.spyOn(client, 'PUT').mockResolvedValue(
+      validationFailed([
+        {
+          loc: ['body', 'export_control_confirmed'],
+          message: 'This project is already export-controlled.',
+          type: 'confirmation_not_needed',
+        },
+      ]),
+    )
+    const reads = () => get.mock.calls.filter((c) => c[0] === '/api/projects/{key}').length
+    const before = reads()
+    // A level the reloaded project doesn't have: a reload that refilled the form would lose it.
+    await wrapper.get('input[type=radio][value=restricted]').setValue(true)
+    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
+    await submitForm(wrapper, 1)
+    const confirm = openDialog(wrapper)!
+    await confirm.get('input[type=checkbox]').setValue(true)
+    await confirm.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(reads()).toBe(before + 1)
+    expect(
+      wrapper.get<HTMLInputElement>('input[type=radio][value=restricted]').element.checked,
+    ).toBe(true)
+    expect(wrapper.text()).toContain('This project is already export-controlled.')
+    expect(
+      wrapper.get<HTMLInputElement>('input[type=checkbox][value=export_controlled]').element
+        .checked,
+    ).toBe(true)
+  })
+
   it('marks the project export-controlled only once its explicit members are confirmed (DL-114)', async () => {
     const shown = project({ allowed_actions: ADMIN })
     const { wrapper } = await mountAt(shown)

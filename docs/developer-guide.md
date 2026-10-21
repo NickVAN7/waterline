@@ -4,7 +4,12 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C16b (Web: project members) done: a project's members page
+> **Status:** S1-C16c (Review follow-ups) done: `refetchNeeded` (`useFormErrors`), a 403 or a
+> refusal for a project's changed export control, reloads the page's data in the add dialogs and
+> the settings forms (DL-116); the add-person dialog's confirmation steps start on Back (DL-117)
+> and each step's text is in the focused control's `aria-describedby` (DL-118; `TextField`'s
+> `describedBy`); next is S1-C17 (Slice verification). S1-C16b (Web: project members) built a
+> project's members page
 > (`ProjectMembersView`, `/{org_slug}/projects/{key}/members`, Members in the project pages nav
 > for anyone who sees the project) on `RosterPage`, whose `header` and `dialogs` slots the project
 > fills; the picker (`AddMemberDialog`, a PrimeVue `AutoComplete` over `member-candidates`); the
@@ -12,8 +17,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > (`AddPersonDialog`, through `Roster`'s `AddOptions`); the per-project access review
 > (`ProjectAccessView`, `/{org_slug}/projects/{key}/access`, linked from the members page for
 > `project.view_access`); and the roster, account, and create-org dialogs' 403 reload
-> (`refused`, TD-46) and alert dismiss back to the submit button (TD-47); next is S1-C16c
-> (review follow-ups, DL-116 to DL-118), then S1-C17 (Slice verification). S1-C16a (Web: project
+> (`refused`, TD-46) and alert dismiss back to the submit button (TD-47). S1-C16a (Web: project
 > settings) built the project settings page
 > (`ProjectSettingsView`, `/{org_slug}/projects/{key}/settings`, Settings in the project pages nav
 > for whoever `hasSettings`), with details, modules (`ModuleFields`, warning when one is turned

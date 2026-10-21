@@ -365,4 +365,71 @@ describe('ProjectMembersView', () => {
     await flushPromises()
     expect(document.activeElement?.tagName).toBe('H1')
   })
+
+  it('shows the confirmation in the open dialog once a refusal says the project became export-controlled (DL-116)', async () => {
+    const { wrapper } = await mountAt(
+      project({ allowed_actions: ADMIN }),
+      [member('Ann Lee')],
+      [project({ allowed_actions: ADMIN, classification_categories: ['export_controlled'] })],
+    )
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      validationFailed([
+        {
+          loc: ['body', 'export_control_confirmed'],
+          message: 'Confirm the person is authorized for export-controlled data.',
+          type: 'confirmation_required',
+        },
+      ]),
+    )
+    await pageButton(wrapper, 'Add by email')!.trigger('click')
+    await flushPromises()
+    await wrapper.get('#add-email').setValue('out@else.example')
+    await openDialog(wrapper).get('form').trigger('submit')
+    await flushPromises()
+    expect(openDialog(wrapper).find('input[type=checkbox]').exists()).toBe(false)
+
+    await button(wrapper, 'Add person')!.trigger('click')
+    await flushPromises()
+
+    expect(openDialog(wrapper).find('input[type=checkbox]').exists()).toBe(true)
+    expect(button(wrapper, 'Add person')!.attributes('aria-disabled')).toBe('true')
+  })
+
+  it('adds without the confirmation once a refusal says export control was removed (DL-116)', async () => {
+    const { wrapper } = await mountAt(
+      project({ allowed_actions: ADMIN, classification_categories: ['export_controlled'] }),
+      [member('Ann Lee')],
+      [project({ allowed_actions: ADMIN })],
+    )
+    const post = vi
+      .spyOn(client, 'POST')
+      .mockResolvedValueOnce(
+        validationFailed([
+          {
+            loc: ['body', 'export_control_confirmed'],
+            message: 'No export-control confirmation is needed here.',
+            type: 'confirmation_not_needed',
+          },
+        ]),
+      )
+      .mockResolvedValue(ok(member('Out Side'), 201))
+    await pageButton(wrapper, 'Add by email')!.trigger('click')
+    await flushPromises()
+    await wrapper.get('#add-email').setValue('out@else.example')
+    await openDialog(wrapper).get('form').trigger('submit')
+    await flushPromises()
+    await openDialog(wrapper).get('input[type=checkbox]').setValue(true)
+    await button(wrapper, 'Add person')!.trigger('click')
+    await flushPromises()
+    expect(openDialog(wrapper).find('input[type=checkbox]').exists()).toBe(false)
+
+    await button(wrapper, 'Add person')!.trigger('click')
+    await flushPromises()
+
+    expect((post.mock.calls[1]![1] as { body: unknown }).body).toEqual({
+      email: 'out@else.example',
+      role: 'viewer',
+    })
+    expect(wrapper.text()).toContain('out@else.example added to the project.')
+  })
 })

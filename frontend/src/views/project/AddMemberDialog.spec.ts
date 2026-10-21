@@ -244,4 +244,22 @@ describe('AddMemberDialog: the picker', () => {
     await vi.advanceTimersByTimeAsync(200)
     expect(region()).toBe("Couldn't search. Type again to try again.")
   })
+
+  it("tells the page when the project's export control changed, so it reloads (DL-116)", async () => {
+    const { wrapper, post } = await openDialog()
+    post.mockResolvedValue(
+      validationFailed([
+        {
+          loc: ['body', 'export_control_confirmed'],
+          message: 'Confirm the person is authorized.',
+          type: 'confirmation_required',
+        },
+      ]),
+    )
+    await choose(wrapper, 'ann')
+
+    await submit(wrapper)
+
+    expect(wrapper.emitted('refused')).toHaveLength(1)
+  })
 })

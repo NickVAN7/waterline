@@ -4,8 +4,9 @@
 // accounts aren't offered; UI-STY-3, UI-FRM-12), and a role. On an export-controlled project the
 // admin first confirms the person is authorized (design-doc §3.1), the button blocked until then
 // (UI-FRM-15), and choosing someone else clears the confirmation. A failed search says so under the
-// picker, where typing again retries it; it isn't the form's alert, whose Retry is the add. A 403
-// tells the page (`refused`), so it reloads what the user may do (UI-FRM-7).
+// picker, where typing again retries it; it isn't the form's alert, whose Retry is the add. A 403,
+// or a refusal for the project's changed export control, tells the page (`refused`), so it reloads
+// what the user may do (UI-FRM-7, DL-116).
 import AutoComplete from 'primevue/autocomplete'
 import { nextTick, ref } from 'vue'
 
@@ -20,6 +21,7 @@ import SelectField from '@/components/SelectField.vue'
 import {
   ANNOUNCE_DELAY_MS,
   dismissToSubmit,
+  refetchNeeded,
   retryFromSubmit,
   useFormErrors,
 } from '@/composables/useFormErrors'
@@ -131,7 +133,7 @@ async function submit(): Promise<void> {
   } catch (error) {
     status.value = ''
     await focus(errors.apply(error))
-    if (error instanceof ApiError && error.status === 403) emit('refused')
+    if (refetchNeeded(error)) emit('refused')
   } finally {
     pending.value = false
   }
