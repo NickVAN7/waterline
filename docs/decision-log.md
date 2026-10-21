@@ -1535,3 +1535,48 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-FRM-14; the `ui-reviewer` agent's dialog check
 - **Source:** chat session (owner, Oct 20, 2026, answering S1-C16a's review question)
+
+### DL-116: An add refused for a changed export-control flag reloads the project
+- **Date:** 2026-10-21
+- **Decision:** When a member add, or project settings' classification save, is refused with a 422
+  of type `confirmation_required` or `confirmation_not_needed` on `export_control_confirmed` (the
+  project's export control changed since the page loaded), the page reloads the project, as it
+  does after a 403, so the confirmation appears or goes. Built in S1-C16c.
+- **Supersedes:** TD-48's Fix by (Slice 2)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C16c row); ui-design-guide UI-FRM-7; tech debt (TD-48)
+- **Source:** chat session (owner, Oct 21, 2026, answering S1-C16b's review question)
+
+### DL-117: A confirmation step inside a dialog starts on Back
+- **Date:** 2026-10-21
+- **Decision:** A confirmation step inside a multi-step dialog (the add-person dialog's "an
+  account already exists" and "join the organization" steps) starts on its Back button, as a
+  confirmation dialog starts on Cancel (DL-115). Built in S1-C16c.
+- **Supersedes:** none (extends DL-115 to in-dialog steps)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-13, UI-FRM-14; build plan (the S1-C16c row); the
+  `ui-reviewer` agent's dialog check
+- **Source:** chat session (owner, Oct 21, 2026, answering S1-C16b's review question)
+
+### DL-118: A dialog's new step is read with the control that gets focus
+- **Date:** 2026-10-21
+- **Decision:** When a dialog moves to a new step, the step's explanatory text is in the
+  `aria-describedby` of the control that gets focus (its first field, its action, or, on a
+  confirmation step, Back, DL-117), so the reason is read with it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-14; build plan (the S1-C16c row); the `ui-reviewer`
+  agent's dialog check
+- **Source:** chat session (owner, Oct 21, 2026, accepting ui-reviewer's proposed rule at the
+  S1-C16b review)
+
+### DL-119: The per-project access review is its own page; two ways to add a member
+- **Date:** 2026-10-21
+- **Decision:** The per-project access review is its own page, `/{org_slug}/projects/{key}/access`,
+  linked from the members page for `project.view_access`, not a project pages nav item. The
+  members page offers two add buttons: Add member (the picker, primary) and Add by email (the
+  email-first form, secondary).
+- **Supersedes:** none (confirms S1-C16b's choices within its row)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-6; the `ui-reviewer` agent's project pages check
+- **Source:** chat session (owner, Oct 21, 2026, at the S1-C16b review)

@@ -12,8 +12,9 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > (`AddPersonDialog`, through `Roster`'s `AddOptions`); the per-project access review
 > (`ProjectAccessView`, `/{org_slug}/projects/{key}/access`, linked from the members page for
 > `project.view_access`); and the roster, account, and create-org dialogs' 403 reload
-> (`refused`, TD-46) and alert dismiss back to the submit button (TD-47); next is S1-C17 (Slice
-> verification). S1-C16a (Web: project settings) built the project settings page
+> (`refused`, TD-46) and alert dismiss back to the submit button (TD-47); next is S1-C16c
+> (review follow-ups, DL-116 to DL-118), then S1-C17 (Slice verification). S1-C16a (Web: project
+> settings) built the project settings page
 > (`ProjectSettingsView`, `/{org_slug}/projects/{key}/settings`, Settings in the project pages nav
 > for whoever `hasSettings`), with details, modules (`ModuleFields`, warning when one is turned
 > off), classification (`ClassificationFields`), and archiving; the export-control confirmation

@@ -80,7 +80,7 @@ correct; you decide whether the code does it.
 - **Project selector:** a disclosure popover of links, with a filter past about eight projects,
   "All projects", and "New project" only when allowed. An enabled-but-unshipped module is plain
   text with "Not available yet" and never a link to a broken screen? (Before S1-C16 the project
-  pages are Home only, with no "New project" and no lead name in the header, DL-97; Settings joins the pages at S1-C16a and Members at S1-C16b, each with its page, DL-109.) (UI-SHL-6)
+  pages are Home only, with no "New project" and no lead name in the header, DL-97; Settings joins the pages at S1-C16a and Members at S1-C16b, each with its page, DL-109; the access review is its own page linked from Members, not a pages item, and Members has Add member (primary) and Add by email (secondary), DL-119.) (UI-SHL-6)
 - Does the page use `PageHeader` with its primary action, one `h1`, and, if a help link was
   added, the user-menu placement? (UI-SHL-8)
 - From Slice 2 on: does every drag have a menu alternative ("Move to top", "Move up",
@@ -137,7 +137,7 @@ correct; you decide whether the code does it.
   from the server's suggestion, stopping once the admin edits it; and does an existing member get
   the right error? (UI-FRM-13)
 - Dialogs: native `<dialog>` with `showModal()`; initial focus right (a form's first field; a
-  confirmation's Cancel, even with a checkbox, DL-115); focus returns to the opener, or to the row now at that position or the `h1` if the
+  confirmation's Cancel, even with a checkbox, DL-115; a confirmation step inside a dialog on its Back, DL-117; a new step's text in the focused control's `aria-describedby`, DL-118); focus returns to the opener, or to the row now at that position or the `h1` if the
   opener is gone; confirm button names its action; destructive confirms use the danger button?
   Any `window.confirm`, `alert`, or `prompt`? (UI-FRM-14, UI-FBK-7)
 - Is any submit button disabled for a reason other than the export-control checkbox, and does

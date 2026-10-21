@@ -654,7 +654,15 @@ Entry format:
   dialogs don't show: the server's message is the form's alert, and the checkbox appears or goes
   only after a reload. Project settings' classification form has the same gap.
 - **Why:** rare (two admins changing one project at once), and the server refuses the add, so
-  nothing is recorded wrongly; reloading the project on that 422, as a 403 does, is new
-  behavior for the owner to decide.
-- **Fix by:** Slice 2 (or the owner's choice at the S1-C16b review)
+  nothing is recorded wrongly; the owner chose to reload the project on that 422, as a 403 does
+  (DL-116).
+- **Fix by:** S1-C16c (the owner chose the reload, DL-116)
+- **Status:** open
+
+### TD-49: A project page's actions aren't in its header
+- **Added:** S1-C16b (ui-reviewer note, UI-SHL-8)
+- **What:** the members page's actions (Add member, Add by email, Access review) sit in a row
+  under `ProjectHeader`, not in a right-hand actions slot as `PageHeader`'s are.
+- **Why:** the owner left the layout as is for now; it may come with their changes in Slice 2.
+- **Fix by:** Slice 2 (the owner's layout changes, or a decision to keep it)
 - **Status:** open

@@ -460,7 +460,9 @@ render inside the full shell when signed in.
   (name, key in monospace, status badge, lead, or a "No lead" warning badge); there is no
   separate project sub-nav row. From S1-C16 the header shows the lead's name and the selector has "New project"
   (DL-97); Settings joins the pages at S1-C16a and Members at S1-C16b, each with its page
-  (DL-109).
+  (DL-109). The per-project access review is its own page, `/{org_slug}/projects/{key}/access`,
+  linked from the members page, not a pages item; the members page adds with Add member (the
+  picker, primary) and Add by email (secondary) (DL-119).
 - **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
   up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. Pages
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
@@ -527,7 +529,9 @@ render inside the full shell when signed in.
 - **UI-FRM-7** **Form-level failures** use the `Alert` component (§6.1, UI-FBK-13) at the top of
   the form, `role="alert"`, with focus moved to it and the user's typed values kept, and plain
   copy written by us: **403**, "You don't have permission to do that", then refetch the entity
-  so `allowed_actions` is current; **409**, a warning alert, "Someone else changed this while
+  so `allowed_actions` is current (a 422 `confirmation_required` or `confirmation_not_needed` on
+  `export_control_confirmed`, meaning the project's export control changed, refetches it too,
+  DL-116); **409**, a warning alert, "Someone else changed this while
   you were editing. Reload to see the latest version", with a Reload button, and the typed
   values stay until the user presses it; **network_error**, "We couldn't reach the server", with
   a Retry button; anything else, a generic message with no codes or stack details. The alert has
@@ -581,7 +585,8 @@ render inside the full shell when signed in.
   **email-first** add-person flow asks for the email first and checks it (the user check, DL-66).
   If an account exists, a confirm step says only "An account already exists for <email>. Add
   them?" (never the account's name or username) and adds them on confirm; if it is already a
-  member, the error says so. Otherwise step 2 shows the email read-only and asks for the name, the
+  member, the error says so. This step, and a project's step to add an account from outside the
+  organization to it too (`join_org`), start on Back (DL-117; UI-FRM-14). Otherwise step 2 shows the email read-only and asks for the name, the
   username, and the temporary password (UI-FRM-11). The username is pre-filled with the server's
   suggestion for the name (`jane-doe`) and follows the name until the admin edits it; it is
   checked live (UI-FRM-9). The member table has separate Name and Email columns.
@@ -589,7 +594,10 @@ render inside the full shell when signed in.
   page behind is inert (focus stays in the dialog; the browser's Tab may cycle through its own
   UI, which is expected). Initial focus goes to the first field in a form dialog; a confirmation
   dialog starts on its Cancel button, even when it holds a field such as a confirm checkbox
-  (DL-115). Focus returns to the control that opened the
+  (DL-115), and a confirmation step inside a dialog (an existing account, joining the
+  organization) starts on its Back button (DL-117). When a dialog moves to a new step, the step's
+  explanatory text is in the `aria-describedby` of the control that gets focus, so the reason is
+  read with it (DL-118). Focus returns to the control that opened the
   dialog on close; **if that control no longer exists** (a removed row), focus goes to the row
   now at that position, or to the `h1` if there is none. The confirm button names its action
   ("Remove member", never "OK"); destructive confirms use the danger button.
