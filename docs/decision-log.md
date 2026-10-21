@@ -1526,3 +1526,12 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (the S1-C16a row)
 - **Source:** chat session (owner, Oct 20, 2026, answering S1-C16's review question; folded into
   S1-C16a)
+
+### DL-115: A confirmation dialog starts on Cancel, even with a field
+- **Date:** 2026-10-20
+- **Decision:** A confirmation dialog starts on its Cancel button even when it holds a field (the
+  export-control dialog's confirm checkbox); only a form dialog starts on its first field.
+- **Supersedes:** UI-FRM-14's "a confirmation dialog with no fields starts on its Cancel button"
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-14; the `ui-reviewer` agent's dialog check
+- **Source:** chat session (owner, Oct 20, 2026, answering S1-C16a's review question)

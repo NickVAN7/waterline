@@ -588,7 +588,8 @@ render inside the full shell when signed in.
 - **UI-FRM-14** **Dialogs:** native `<dialog>` opened with `showModal()`, so Esc closes and the
   page behind is inert (focus stays in the dialog; the browser's Tab may cycle through its own
   UI, which is expected). Initial focus goes to the first field in a form dialog; a confirmation
-  dialog with no fields starts on its Cancel button. Focus returns to the control that opened the
+  dialog starts on its Cancel button, even when it holds a field such as a confirm checkbox
+  (DL-115). Focus returns to the control that opened the
   dialog on close; **if that control no longer exists** (a removed row), focus goes to the row
   now at that position, or to the `h1` if there is none. The confirm button names its action
   ("Remove member", never "OK"); destructive confirms use the danger button.

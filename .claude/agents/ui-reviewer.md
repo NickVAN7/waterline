@@ -136,8 +136,8 @@ correct; you decide whether the code does it.
   account's name or username); does step 2 show the email read-only and pre-fill the username
   from the server's suggestion, stopping once the admin edits it; and does an existing member get
   the right error? (UI-FRM-13)
-- Dialogs: native `<dialog>` with `showModal()`; initial focus right (Cancel when there are no
-  fields); focus returns to the opener, or to the row now at that position or the `h1` if the
+- Dialogs: native `<dialog>` with `showModal()`; initial focus right (a form's first field; a
+  confirmation's Cancel, even with a checkbox, DL-115); focus returns to the opener, or to the row now at that position or the `h1` if the
   opener is gone; confirm button names its action; destructive confirms use the danger button?
   Any `window.confirm`, `alert`, or `prompt`? (UI-FRM-14, UI-FBK-7)
 - Is any submit button disabled for a reason other than the export-control checkbox, and does
