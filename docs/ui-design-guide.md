@@ -1,7 +1,7 @@
 # Waterline — UI Design Guide
 
-> **Status:** draft for owner review, Oct 10, 2026. Written as step 7 of `screen-inventory.md`
-> and meant to be in place before S1-C14 (the first web screens). The styling approach (§1) and
+> **Status:** the authoritative UI guide (DL-61), written as step 7 of `screen-inventory.md` on
+> Oct 10, 2026, and in use since S1-C14 (the first web screens). The styling approach (§1) and
 > every pattern in §4 to §7 were decided with the owner in the Oct 10 walkthrough, each against
 > a live example. **Still open:** the exact brand hex values (§3.1 uses colors sampled from the
 > logo), the PrimeVue checks, and the SVAR items listed in §10. The SVAR widgets (§7.1) were
@@ -934,7 +934,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | `PasswordRequirements` | The live requirements list under a new-password field (UI-FRM-10, DL-91), from S1-C14a |
 | `Alert` | Tone, icon, text, optional actions, optional dismiss (UI-FBK-13); `role="alert"` only per UI-FBK-2 |
 | `Badge`, `Banner` | Driven by the mapping module (UI-FBK-5, UI-FBK-6); banners are not dismissible |
-| `ModalDialog` | Native `<dialog>`; UI-FRM-14. A confirmation is a `ModalDialog` whose Cancel is marked `data-autofocus` |
+| `ModalDialog`, `ConfirmDialog` | Native `<dialog>`; UI-FRM-14. A confirmation is a `ModalDialog` whose Cancel is marked `data-autofocus`; `ConfirmDialog` is a promise-based one (S1-C16a) |
 | `Toast` and `useToast` | §6.2 |
 | `Skeleton` | §6.3 |
 | `EmptyState`, `ErrorState`, `ForbiddenView`, `NotFoundView`, `NoAccessView` | §6.1, UI-FBK-8, UI-FBK-14, UI-FBK-15 |
@@ -957,7 +957,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | SVAR theme audit | Each wrapped widget's end-to-end spec, in light and dark, at rest and with a focus, selection, open menu or editor, and popup showing; and after any SVAR upgrade (UI-SVR-1) | A helper walks every element's computed text, background, border, and outline color (the spike's check) and **fails on any color that is not one of our tokens**. Prove it can fail by disabling `svar-theme.css` in a throwaway run: the spike found 6 to 18 off-token colors per widget unmapped and 0 mapped |
 | SVAR keyboard and move/cancel | Each wrapper's end-to-end spec | Tab through the widget, use the arrow keys, F2, and Enter, check focus after an editor closes, and drive a move through the non-drag alternative with the server mocked to **allow** and to **deny**: after a denial the screen must equal the data (UI-SVR-5, UI-SVR-6) |
 | Manual keyboard and screen-reader pass | Slice verification (S1-C17) | Appendix A |
-| `ui-reviewer` agent | Every checkpoint whose diff touches `frontend/src/` | Reads the diff against this guide and reports by rule ID |
+| `ui-reviewer` agent | Every checkpoint whose diff touches `frontend/src/` or `frontend/e2e/` | Reads the diff against this guide and reports by rule ID |
 
 ---
 
@@ -966,10 +966,10 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 1. **Exact brand colors:** replace the logo-sampled navy and ice blue (§3.1) with the website's
    hex values, and re-run `check_contrast.py`. The derived tokens (hover, selected, link hover)
    may need a nudge if the accent moves.
-2. **PrimeVue checks not yet done:** (a) whether PrimeVue's Button can carry `aria-disabled`
-   (a wrapper component is the likely answer; UI-TOK-10); (b) the preset's placeholder
-   mapping and the per-severity Button focus rings render as specified; (c) a disclosure popover
-   for the project selector from PrimeVue's Popover; (d) whether PrimeVue's DataTable meets
+2. **PrimeVue checks not yet done:** (a) and (c) are done: our `Button` wrapper carries
+   `aria-disabled` (UI-TOK-10), and the project selector is a disclosure popover on PrimeVue's
+   Popover (S1-C14a). Still open: (b) the preset's placeholder mapping and the per-severity
+   Button focus rings render as specified; (d) whether PrimeVue's DataTable meets
    UI-TBL-1 to 8 or the table stays native; (e) whether PrimeVue's Toast could replace ours; (f)
    that a password manager's icon doesn't collide with the in-field toggle on the real sign-in
    page; (g) that no PrimeIcons font is pulled in (UI-STY-4).
@@ -992,14 +992,12 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    (Slice 2).
 6. **My work styling** (UI-SHL-5): revisit once pages are populated; a default the owner
    accepted for now. (The admin entry point, UI-SHL-10, is confirmed: DL-104.)
-7. **Theme override** (UI-TOK-2): ships with S1-C14a, in the user menu (DL-85).
+7. **Theme override** (UI-TOK-2): done in S1-C14a, in the user menu (DL-85).
 8. **Enum mappings:** tone and icon for requirement, task, test, and approval statuses and for
    priority and severity are decided as each first appears (UI-FBK-5).
 9. **Custom error page:** a more distinctive 404/403 design is planned (UI-FBK-14); content
    only.
-10. **Reconcile with S0-C7:** I could not see the repo, so check the existing router, 404
-   page, and health page against §4 and §6.1 when S1-C14 starts, and the shell when S1-C14a
-   starts (DL-84).
+10. **Reconcile with S0-C7:** done in S1-C14 and S1-C14a (DL-84).
 
 ---
 

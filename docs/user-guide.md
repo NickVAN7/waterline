@@ -2,11 +2,12 @@
 
 How to use each feature, from an end user's point of view. Kept current at every checkpoint.
 
-> **Status:** Slice 1 in progress. You can sign in, change a temporary password, find your
-> projects from My work, the org switcher, and the project selector, open a project's home, edit
-> your profile and password, and choose a light or dark theme. Workspace owners and admins run
-> the workspace from its administration pages, and organization owners and admins run their
-> organization's members and settings from theirs. The project pages come next.
+> **Status:** Slice 1's features. You can sign in, change a temporary password, find your
+> projects from My work, the org switcher, and the project selector, create projects, run a
+> project's members and settings and review who can reach it, edit your profile and password,
+> and choose a light or dark theme. Workspace owners and admins run the workspace from its
+> administration pages, and organization owners and admins run their organization's members and
+> settings from theirs. Requirements, tasks, and test cases come in later slices.
 
 ## Signing in
 
@@ -38,7 +39,8 @@ Every page after sign-in has the same frame:
 - **The sidebar**, on the left: **My work**, then the **project selector**. Open the selector to
   see the current organization's projects and choose one, or choose **All projects** for the
   organization's project list. With more than eight, a filter field narrows the list as you type.
-  Once you're in a project, its pages are listed below the selector (for now, **Home**).
+  Once you're in a project, its pages are listed below the selector: **Home**, **Members**, and,
+  if you may change any of its settings, **Settings**.
 - On a narrow screen the sidebar is behind the **Menu** button in the header, and on a phone the
   header wraps onto more than one line and scrolls away with the page.
 - **Skip to main content** is the first thing the Tab key reaches, and jumps past the header and
@@ -73,15 +75,17 @@ export-controlled**; **Cancel** takes you back to the form. Once created, the pr
 
 A project's home (`/<organization>/projects/<KEY>`) shows its classification at the top, if it
 has one ("Classification: Confidential. Categories: Financial."), then its name, its key, its
-status, and its lead's name ("Deactivated" after it if their account is), or "No lead" if it has none. In the sidebar, under the project, a
-module it has turned on that isn't built yet is listed with "Not available yet". An archived project says "This project is archived. It is
-read-only." at the top. An address with an old organization name or a
-lowercase key takes you to the project's own address. A project you can't see shows "Page not
-found", the same as one that doesn't exist.
+status, and its lead's name ("Deactivated" after it if their account is), or "No lead" if it has
+none. In the sidebar, under the project, a module it has turned on that isn't built yet is listed
+with "Not available yet". An archived project says "This project is archived. It is read-only." at
+the top. An address with an organization's old slug (the part of the address that names it)
+or a lowercase key takes you to the project's own address. A project you can't see shows "Page
+not found", the same as one that doesn't exist.
 
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The
-project's admins (and organization owners and admins, and workspace admins) can also:
+project's admins (and organization owners and admins, workspace owners and admins, and system
+admins) can also:
 
 - **Add member**: search the organization's members and the workspace's staff by name, email,
   or username, choose one, and give them a role.
@@ -117,6 +121,9 @@ project's admins (and organization owners and admins, and workspace admins) can 
   one of its explicit project admins.
 - **Archive** (organization owners and admins): **Archive project**, once confirmed, makes it
   read-only for everyone until **Unarchive project**. Nothing is deleted.
+
+Anyone else who opens a project's **Settings** or **Access review** is told the page is for the
+project's admins, and to ask one of them.
 
 ## Account settings
 
@@ -198,9 +205,9 @@ admins.
   either confirms an existing account or creates one with a temporary password, shown once; a
   row offers **Change role** and **Remove from organization**, which by default also removes the
   person from the organization's projects; and the last owner can't step down or leave until you
-  choose who becomes owner. Only owners grant, change, or remove the owner and admin roles. Rows
-  also offer the account actions and the access review your role covers (see "Account actions"
-  and "Access review" above).
+  choose who becomes owner. Only owners (and workspace owners and admins, and system admins)
+  grant, change, or remove the owner and admin roles. Rows also offer the account actions and the
+  access review your role covers (see "Account actions" and "Access review" above).
 - **Settings** renames the organization and changes its slug, which is in its web addresses
   (organization owners and workspace admins; organization admins see the values). After a slug
   change the page moves to its new address; links with the old slug no longer open it.

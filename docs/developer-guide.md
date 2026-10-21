@@ -4,11 +4,15 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C16d (Review follow-ups (2)) done: `refetchNeeded` also covers `members_changed`
+> **Status:** S1-C17 (Slice verification) built: the "Done when" walked through, the owner's
+> manual keyboard and screen-reader pass (no problems; `docs/reviews/s1/S1-C17-manual-pass.md`),
+> the slice-end agents, and the slice retro (`docs/reviews/s1/S1-retro.md`); Slice 1 is complete
+> once the retro's changes are applied and the owner approves the merge. S1-C16d (Review
+> follow-ups (2)) built: `refetchNeeded` also covers `members_changed`
 > on `confirmed_member_ids`, so project settings' classification save reloads the project when
 > its members changed (DL-120); the create-organization and password-reset dialogs read their
 > last step's text and the temporary password's warning with Done (DL-118, DL-122;
-> `TemporaryPasswordNotice`'s `warningId`); next is S1-C17 (Slice verification). S1-C16c (Review
+> `TemporaryPasswordNotice`'s `warningId`). S1-C16c (Review
 > follow-ups) built `refetchNeeded` (`useFormErrors`), a 403 or a
 > refusal for a project's changed export control, reloads the page's data in the add dialogs and
 > the settings forms (DL-116); the add-person dialog's confirmation steps start on Back (DL-117)
@@ -30,8 +34,8 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > as its own dialog (`ExportControlDialog`, DL-114), which the create dialog opens too;
 > `ConfirmDialog`, a promise-based confirmation; `useSettingsSave`, the settings forms' shared save
 > handling (TD-43); `useProjectPage` and `ProjectHeader`, every project page's loading and header;
-> and `lead_is_active` on the project read and `is_active` on project member rows (DL-113); next
-> is S1-C16b (Web: project members). S1-C16 (Web: projects) built: the create-project dialog (`views/project/`,
+> and `lead_is_active` on the project read and `is_active` on project member rows (DL-113).
+> S1-C16 (Web: projects) built: the create-project dialog (`views/project/`,
 > opened from the project selector's New project), the org project list's status and type
 > filters (`useListQuery`'s `filters`), the project header's lead name (`lead_name` on the
 > project read, DL-111), the classification banner (`ClassificationBanner`), and the sidebar's
@@ -50,8 +54,8 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > and user menu, the sidebar with My work, the project selector, and the project's pages), the
 > System / Light / Dark theme, My work's projects section, account settings, the password
 > requirements list (`GET /api/auth/password-policy`), the no-access page, a minimal project home
-> and org project list (DL-97), `useListQuery`, and the first skeleton loaders (section 7); next
-> is S1-C15 (Web: workspace admin). S1-C14 (Web: foundations & sign-in) built the styling
+> and org project list (DL-97), `useListQuery`, and the first skeleton loaders (section 7).
+> S1-C14 (Web: foundations & sign-in) built the styling
 > foundation, the current-user store, route guards, sign-in, the forced password change, and
 > `wl e2e`. S1-C13a (Demo seed data) built `wl seed --demo` (section 5, "Demo
 > data"). S1-C13 (Classification & export control) built classification. A project's classification is set at creation or with `PUT
@@ -113,18 +117,22 @@ on the Linux filesystem (not under `/mnt/c`).
 
 ### First-time setup
 
-From the repo root:
+Clone the repository, then work from its root:
 
 ```bash
+git clone https://github.com/NickVAN7/waterline.git && cd waterline
 uv sync --all-packages           # root env: the `wl` CLI, its test/lint tools, pre-commit
 uv run wl doctor                 # check the toolchain; fix anything marked ✗ (the pre-commit
                                  # warning clears after `pre-commit install` below)
 uv sync --directory backend      # backend env (backend/.venv)
-npm ci --prefix frontend         # frontend tools (frontend/node_modules); before `wl up`
+npm ci --prefix frontend         # frontend tools (frontend/node_modules). Its
+                                 # vulnerability count includes allowlisted advisories: `wl
+                                 # audit` is the gate; don't run `npm audit fix`
 (cd frontend && npx playwright install chromium)    # the end-to-end tests' browser
 (cd frontend && sudo env "PATH=$PATH" npx playwright install-deps chromium)
-                                 # its system libraries (apt; `env PATH` because sudo resets
-                                 # PATH and won't find an npx installed by fnm or nvm)
+                                 # its system libraries, once per machine (apt; `env PATH`
+                                 # because sudo resets PATH and won't find an npx installed by
+                                 # fnm or nvm); skip it if they're there (see Troubleshooting)
 uv run pre-commit install        # git hooks: ruff, Prettier, ESLint, generated files
 cp .env.example .env             # local settings (never committed); edit if needed
 uv run wl up                     # build and start the stack; applies migrations
@@ -133,15 +141,16 @@ uv run wl check --full           # everything CI runs; should be green on a fres
 
 Then open <http://localhost:5173>: it sends you to sign in. Build the demo data first ("Demo
 data" in section 5) to have someone to sign in as; <http://localhost:5173/status> shows whether
-the API and database are up without signing in.
+the API and database are up without signing in. Without a browser, `curl
+http://localhost:8000/api/health` answers `{"status":"ok","database":"ok"}`.
 
 Nothing is installed on the workstation beyond the tools above: Postgres, the API, the worker,
 and the Vite dev server run in Docker. Tests and the other `wl` tools run on the host and reach
 Postgres on `localhost:${POSTGRES_PORT}`.
 
-Run `npm ci --prefix frontend` before the first `wl up`: the web container mounts `frontend/`,
-and if `frontend/node_modules` doesn't exist yet, Docker creates it owned by root, which breaks
-a later `npm ci` on the host (see Troubleshooting).
+The dev containers run as you, not root (TD-11): `wl` passes your user and group IDs to the
+images (`HOST_UID`, `HOST_GID`), so anything they write into the mounted source is yours, and
+`wl up` creates `frontend/node_modules` before Docker would make that mount point as root.
 
 `wl doctor` exits non-zero if any required tool is missing or too old, and warns (without
 failing) if the pre-commit hooks aren't installed.
@@ -158,7 +167,7 @@ docs/           design, schema, build plan, testing strategy, screen inventory, 
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
-.github/workflows/ci.yml   CI: `wl check` on every push to main and every pull request (section 10)
+.github/workflows/ci.yml   CI: `wl check --full` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
@@ -831,7 +840,8 @@ frontend/src/
   api/schema.d.ts    generated by `wl gen-client`; never edit
   app/               createApp.ts (Pinia, router, PrimeVue, session hook), router.ts, the two
                      layouts (AppLayout is the shell), shell/ (OrgSwitcher, UserMenu,
-                     ProjectSelector, LinkPopover, SidebarLink), labels.ts (display labels),
+                     ProjectSelector, ProjectPages, LinkPopover, SidebarLink), labels.ts
+                     (display labels),
                      routeFocus.ts,
                      session.ts; guards/auth.ts; styles/ (main.css, tokens.css, base.css);
                      theme/preset.ts (PrimeVue's colors)
@@ -839,18 +849,20 @@ frontend/src/
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
                      Pagination, SuccessStatus, PageHeader, SectionNav, ModalDialog,
-                     RowActions, Icon
+                     ConfirmDialog, GroupError, RowActions, Icon
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
-                     useAvailability, useRouteOrg, useSignOut, useTheme, useWorkspace,
+                     useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
+                     useWorkspace,
                      temporaryPassword,
                      allowedActions (`allows()`)
   stores/            Pinia stores: currentUser, currentOrg (the current org and project)
   views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
-                     my_work/, project/ (org project list, project home, the
-                     create dialog, the classification banner), user/ (account
+                     my_work/, project/ (org project list, project home, the create
+                     dialog, the classification banner, settings, members with the
+                     AddMemberDialog picker, the access review, ExportControlDialog), user/ (account
                      settings, access review, the account-action dialogs), workspace/ (staff,
                      orgs, users, settings), org/ (members, settings), roster/ (what staff and
-                     org members share: `RosterPage`, the list with its row menus, and the add
+                     org and project members share: `RosterPage`, the list with its row menus, and the add
                      person, change role, and remove dialogs); plus status/ and errors/ (404,
                      403, no access)
   test/              helpers for the specs: a11y.ts, api.ts (typed responses), projects.ts,
@@ -1068,12 +1080,15 @@ the auth dependencies), never the ones being implemented. It tests a real endpoi
 docs specify it (method, path, error responses) and you've stubbed its route; for any other
 endpoint, write the denial test yourself once it's built, under the sabotage check (DL-32). Its
 files and their `git hash-object` go in the review record ("Spec tests"); a spec test changes only
-with the owner's approval. The rules built so far predate `spec-test-writer` (DL-11): their tests
-were written test-first in S1-C3 by the implementing session, and aren't hash-protected spec tests.
-So far: `identifiers.py` (project keys, slugs and the reserved top-level routes in `RESERVED_SLUGS`,
+with the owner's approval. S1-C3's rules predate `spec-test-writer` (DL-11): their tests were
+written test-first by the implementing session, and aren't hash-protected spec tests; the later
+ones (`suggest_username` in `identifiers.py`, `modules.py`, `classification.py`) came with spec
+tests. The rules: `identifiers.py` (project keys, slugs and the reserved top-level routes in `RESERVED_SLUGS`,
 usernames; each check returns an `IdentifierProblem` for the field error), `password_policy.py`
 (`password_problems(...)`; the caller checks the hash and passes `same_as_current`), and
-`account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships). `app/rules/`
+`account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships),
+`modules.py` (each type's recommended modules), and `classification.py` (the effective
+classification, and the raise and lower rules). `app/rules/`
 and `app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
 plain `uv run pytest` fails below it. A `match` that covers every type of its subject (pyright
 checks: the function's return type would otherwise allow `None`) marks its last `case` with `#
@@ -1092,8 +1107,8 @@ unit tests against each; every mutant must be killed. On a failure, `uv run mutm
 lists the survivors and `uv run mutmut show <name>` shows one: kill it with a new or sharper
 test. Only an equivalent mutant (one that can't change behavior) may be excluded, with
 `# pragma: no mutate` and a comment why. The run starts from a clean `mutants/` (gitignored),
-since mutmut's cached results can be stale. When `app/authz/` gets code, add its unit tests to
-`pytest_add_cli_args_test_selection`.
+since mutmut's cached results can be stale. A new unit-test folder for `app/rules/` or
+`app/authz/` goes in `pytest_add_cli_args_test_selection`.
 
 **Concurrency tests** need real commits on separate connections (parallel transactions, or a
 worker in the same test), so they use the `concurrency` fixture instead: it yields a
@@ -1353,9 +1368,9 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
 | `wl up`: port 5432 is already allocated | Another Postgres is running. Set `POSTGRES_PORT` in `.env` (e.g. 5433) and rerun `wl up`. The same goes for 8000 (`API_PORT`) and 5173 (`WEB_PORT`). |
 | `wl up` fails with `service "migrate" didn't complete successfully` | A migration failed: `docker compose logs migrate` shows why. Fix it (with a new migration if the failing one is committed) and rerun `wl up`. |
 | `wl up`: the `web` build fails at `npm ci` | `frontend/package-lock.json` doesn't match `package.json`: run `npm install --prefix frontend` and commit the lockfile. |
-| `npm ci` on the host fails with `EACCES` in `frontend/node_modules` | `wl up` ran before the host's first `npm ci`, so Docker created the folder as root: `sudo rm -rf frontend/node_modules && npm ci --prefix frontend`. |
+| `npm ci` on the host fails with `EACCES` in `frontend/node_modules` | The folder was created as root by a `wl up` from before the dev containers ran as you (TD-11): `sudo rm -rf frontend/node_modules && npm ci --prefix frontend`. |
 | `wl check` fails at `openapi_export --check` or `check:client` | The API changed without regenerating the client: `uv run wl gen-client` and commit `backend/openapi.json` and `frontend/src/api/schema.d.ts`. |
-| The home page says "Could not reach the server" | The API isn't running or reachable from Vite: `wl logs api`; for a host-run Vite, check `API_PROXY_TARGET`. |
+| The status page (`/status`) says "Could not reach the server" | The API isn't running or reachable from Vite: `wl logs api`; for a host-run Vite, check `API_PROXY_TARGET`. |
 | A job change has no effect | The `worker` doesn't reload: `docker compose restart worker`. |
 | `wl up`: `set POSTGRES_DB in .env` | No `.env` yet: `cp .env.example .env`. |
 | The API fails at startup with a validation error for `postgres_user` | No `.env` (or the variables aren't set): `cp .env.example .env`. |

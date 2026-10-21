@@ -107,3 +107,37 @@ test("a project member who isn't its admin reads the list, with nothing to chang
   ).toBeVisible()
   await expectNoA11yViolations(page)
 })
+
+// Slice 1's "Done when" (build plan): a viewer sees the project but can't change its settings; a
+// workspace admin sees it and has project admin on it. `hana` is a viewer on `PORTAL`, `wendy` the
+// workspace admin, on no project.
+test('a project viewer sees the project but not its settings', async ({ page }) => {
+  await signIn(page, 'hana')
+
+  await page.goto('/acme/projects/PORTAL')
+  await expect(page.getByRole('heading', { level: 1, name: 'Customer Portal' })).toBeVisible()
+  const pages = page.getByRole('navigation', { name: 'Project' })
+  // The pages are there (Members), so no Settings among them is a real absence.
+  await expect(pages.getByRole('link', { name: 'Members' })).toBeVisible()
+  await expect(pages.getByRole('link', { name: 'Settings' })).toHaveCount(0)
+  await page.goto('/acme/projects/PORTAL/settings')
+  await expect(
+    page.getByRole('heading', { level: 1, name: "You can't open this page" }),
+  ).toBeVisible()
+  await expectNoA11yViolations(page)
+})
+
+test('a workspace admin has project admin on a project they are not on', async ({ page }) => {
+  await signIn(page, 'wendy')
+
+  await page.goto('/acme/projects/PORTAL/members')
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Customer Portal members' }),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add member' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Access review' })).toBeVisible()
+  await expect(
+    page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Settings' }),
+  ).toBeVisible()
+  await expectNoA11yViolations(page)
+})

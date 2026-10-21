@@ -12,7 +12,7 @@ be checked for completeness.
 | 4. Cross-cutting views | Boards, search, reports, activity: views spanning entities | |
 | 5. States | Empty, loading, error, permission denied, conflict, archived, module disabled, deactivated user | Loading decided (Oct 5, 2026; "Noted for later steps") |
 | 6. Consolidate | One inventory; page vs. panel vs. dialog vs. inline; mapped to build slices | |
-| 7. Design guide | Tokens, enum → visual mapping, components, patterns | **Done as a draft** (Oct 10, 2026): `docs/ui-design-guide.md` (DL-61) |
+| 7. Design guide | Tokens, enum → visual mapping, components, patterns | **Done** (Oct 10, 2026): `docs/ui-design-guide.md`, the authoritative UI guide (DL-61) |
 
 Early mockups (sprint board, requirement detail, delete-requirement dialog, test case) exist on
 the "Waterline key screens" design canvas. They predate this inventory and will be revisited in

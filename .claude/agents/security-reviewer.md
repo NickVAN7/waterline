@@ -99,7 +99,8 @@ don't reopen a resolution the owner decided.
      last-owner (org and workspace, counting active owners only, and on deactivation too; it
      holds unless a replacement owner is named in the same request, `new_owner_id`, DL-59,
      DL-72, DL-74) and last-system-admin guards; only owners grant owner/admin
-     roles at their level (at the workspace level, system admins too, DL-45), except an admin
+     roles at their level (at the workspace level, system admins too, DL-45; at the org level,
+     workspace owners/admins and system admins too, DL-68), except an admin
      demoting or removing themselves (DL-59); the admin path refuses the actor's own account for the password reset
      and the email change (they use change password, which asks for the current one);
    - adding a project member by user ID accepts only the org's members and the workspace's

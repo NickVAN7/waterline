@@ -267,7 +267,6 @@ named checkpoint when its trigger arrives.
 
 | Trigger | Item |
 |---|---|
-| When the owner chooses | Pulling sign-in and the app shell (S1-C14 and S1-C14a) forward, so a real screen uses the API conventions sooner. Not now (DL-50): they stay in S1-C14 and S1-C14a until the owner pulls them forward, once the UI design guide and the `ui-reviewer` agent exist |
 | After S1-C14a | The `vue-screen` skill, distilled from S1-C14's and S1-C14a's hand-built screens |
 | S1-C17 | The `user-guide-verifier` agent (follows `docs/user-guide.md` literally in a browser against a seeded stack, and walks the "Done when" list) |
 | Start of Slice 2 planning | A slice-planning procedure: the format used for Slice 1's plan (fixes, decisions, conventions), plus a short threat-model pass |
@@ -854,7 +853,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 12 | Project members | The endpoints in "The project members API" (DL-78) and their actions (DL-79), with their spec tests; list (per-row `allowed_actions`; any project member reads it); add from the org's members and workspace staff (picker scope; 404 for anyone else by user ID); email-first add with its four cases (design-doc §4, DL-78; an existing member found by email is a 422 on `email`, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`, as for staff (DL-55); an account outside the org and the staff, `outside_org`, unless confirmed with `join_org: true`, which adds them to the org as a member too; a deactivated account refused before `outside_org`, on either path, `account_inactive`); the add race's `already_member` on the field the request used, in the shared roster (DL-80, TD-23); change role; remove (removing the lead's membership clears `lead_id`, recorded in the `project_member_removed` details, also in archived projects through removal with their projects); the per-project access review (design-doc §5); the email-first add, the create (the user and their org membership through the org service, the project membership through the roster), and the lock order go through the roster (`services/roster.py`; projects have no last-admin guard or stepping down, DL-71), with which the project area registers its `on_member_removed` handler, with API tests across the org, workspace, and project areas of removing a member with their projects; audit events |
 | 13 | Classification & export control | The endpoints and fields in "The classification API" (DL-81) and their actions (DL-82), with their spec tests; `rules/classification.py` (effective classification; the raise and lower rules), test-first (`spec-test-writer`, against stubs) and mutation-tested, with the `authz/` changes' tests from `spec-test-writer` too; setting a project's classification at creation (by its creator, any org member allowed to create it, `export_controlled` included) and in settings (project admins, including inherited, set and raise; lowering or removing a category is project-admin only; removing `export_controlled`, and on an export-controlled project any lowering or removal, needs an explicit project admin); every action in the registry marked content or management (the export-control gate that uses the marking comes in Slice 2); the export-control confirmation on every member-add path (picker, email-first add, creating a user for the project; 422 without it), when marking a project export-controlled, and when creating one; `allowed_actions` reflecting all of it; the audit events (`project_classification_changed`, the classification and confirmation in `project_created`, confirmations in the member-added details); a convention test that every classifiable model uses `ClassificationMixin`; the management/content split in both access reviews, per person and per project (design-doc §5, §3.1; DL-72) |
 | 13a | Demo seed data | `wl seed --demo` (DL-83): only when the `demo_seed_enabled` setting is on (off by default; on in `.env.example`, the local-dev default, and on the `wl e2e` stack, DL-90) and in an empty database (refused once a workspace exists), through the services so every audit event is recorded, its users created as `wl seed` creates the first admin (no `must_change_password`, no actor), except the two forced-change users (DL-87), whom the `ERP` lead creates through the project's create-member path, and their memberships through the org, roster, and project services (DL-88), each step acting as the person who would take it (the system admin creates the orgs, each org's owner adds its members, creates its projects naming their leads, and archives the fifth, each lead adds the project's members, every step under the action its endpoint checks; owner decision, Oct 13, 2026): the workspace and its system admin (its owner), a workspace admin, and two orgs, each with one org admin (its owner) and two projects of different types; each project has a lead (its first admin) and five users (one admin, three members, one viewer), distinct people except one member of each org who is on both its projects; one user in both orgs, on a project in each (the org switcher); two users who must change their password, on one project, one for each theme's run of the forced-change flow (DL-87); one user with no memberships (the no-access page); a fifth project, archived, with a lead and two members (My work leaves it out); one project classified Confidential with the `financial` category (the banner; no export-controlled project and no deactivated user yet); every demo user with one shared known password, which the command prints and the developer guide lists with each user's role; the data `wl e2e` seeds its stack with |
-| 14 | Web: foundations & sign-in | The styling foundation (`docs/ui-design-guide.md`, DL-61): `primevue`, `@primeuix/themes`, `tailwindcss` with `@tailwindcss/vite`, and `tailwindcss-primeui`; the token file (`src/app/styles/tokens.css`) and base rules, the PrimeVue preset (`src/app/theme/preset.ts`), and the token contrast check (`docs/ui/check_contrast.py`, until ported to a Vitest test); first, before any screen, the accessibility tooling (DL-65): one shared helper each for `vitest-axe` and `@axe-core/playwright` (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`) with a deliberately violating fixture each helper rejects, an undersized-target fixture proving `target-size` runs, and `expectFocusNotObscured()`, proven able to fail on a test fixture with a sticky header (DL-89); current-user store (TD-10); route guards (unauthenticated → sign-in; `must_change_password` → change password); error handling (401, 403, 404, 409, 422 with field errors); sign-in; forced password change; My work as the home page, a real `/` route from the first commit (its `h1` and an empty state until S1-C14a's projects section replaces it, DL-65); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation, each end-to-end flow run in light and dark (a flow that creates data uses keys and users unique to the run, DL-87); Playwright (Chromium) with end-to-end sign-in (landing on My work) and forced-change flows; `wl e2e`, run by `wl check` (and so by CI) on its own stack seeded with `wl seed --demo` (DL-65, DL-83, DL-84) |
+| 14 | Web: foundations & sign-in | The styling foundation (`docs/ui-design-guide.md`, DL-61): `primevue`, `@primeuix/themes`, `tailwindcss` with `@tailwindcss/vite`, and `tailwindcss-primeui`; the token file (`src/app/styles/tokens.css`) and base rules, the PrimeVue preset (`src/app/theme/preset.ts`), and the token contrast check (`docs/ui/check_contrast.py`, until ported to a Vitest test); first, before any screen, the accessibility tooling (DL-65): one shared helper each for `vitest-axe` and `@axe-core/playwright` (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`) with a deliberately violating fixture each helper rejects, an undersized-target fixture proving `target-size` runs, and `expectFocusNotObscured()`, proven able to fail on a test fixture with a sticky header (DL-89); current-user store (TD-10); route guards (unauthenticated → sign-in; `must_change_password` → change password); error handling (401, 403, 404, 409, 422 with field errors); sign-in; forced password change; My work as the home page, a real `/` route from the first commit (its `h1` and an empty state until S1-C14a's projects section replaces it, DL-65); the system-status page moved from `/` to `/status` (on the reserved list; the `home/` view folder becomes `status/`, My work's is `my_work/`, matching its backend area; `frontend/CLAUDE.md`, developer and user guides updated); automated accessibility checks with axe-core in component tests (`vitest-axe`) and end-to-end tests (`@axe-core/playwright`), failing on any violation, each end-to-end flow run in light and dark (a flow that creates data uses keys and users unique to the run, DL-87); Playwright (Chromium) with end-to-end sign-in (landing on My work) and forced-change flows; `wl e2e`, run by `wl check --full` (and so by CI; DL-99) on its own stack seeded with `wl seed --demo` (DL-65, DL-83, DL-84) |
 | 14a | Web: app shell | The app shell (ui-design-guide §4): sidebar with project selector, the org switcher, and the user menu with the System / Light / Dark theme choice (UI-TOK-2, DL-85); My work's projects section (design-doc §11); account settings (profile, change password); the password requirements list (`GET /api/auth/password-policy`, a backend endpoint in the `auth` area, with its API tests and `wl gen-client`, and `PasswordRequirements`, on the forced change and account settings' change password; UI-FRM-10, DL-91); no-access page; a minimal project home (`/{org_slug}/projects/{key}`: the project header with name, key, status, and a "No lead" badge; the project pages nav lists only Home) and org project list (`/{org_slug}/projects`, a plain list over `useListQuery`), so the selector and switcher never link to a missing screen (no "New project" until S1-C16), with the 404 handling for an unknown org or a project the user can't see (TD-32) and the redirect of a stale or wrong org slug or a lowercase key (DL-97); reserved top-level routes (a test checks every top-level route in the router against the reserved list exported in the OpenAPI schema); `useListQuery` (list state in the URL); the `allowed_actions` pattern; skeleton loaders for loading states (`frontend/CLAUDE.md`), the first ones; axe-core checks in component and end-to-end tests for each new screen, in light and dark; `expectFocusNotObscured()` on the shell pages (DL-84, DL-89) |
 | 15 | Web: workspace admin | The admin pages' layout (UI-SHL-10, DL-104): the "Administration" entry in the user menu, the section nav, and `PageHeader` (TD-39); the shared pieces S1-C15a reuses: a dialog and confirm dialog (UI-FRM-14), the role select, the temporary-password field (UI-FRM-11), the row actions menu (UI-TBL-4), the email-first add-person flow (UI-FRM-13), the account-action dialogs (deactivate, reactivate, reset password, sign out everywhere, edit email, name, and username), the replacement-owner picker (DL-59), and the D2 removal dialog; workspace pages (staff: add, create, change role (stepping down from one's own row; the last owner's replacement), account actions, remove; orgs: list and create with its first owner; users: account actions, editing a user's email, name, and username, and a read-only system-admin column; workspace settings for owners and system admins); the per-person access review; staff and org member rows gain `is_active` and the `user`-level actions in their `allowed_actions` (backend, with API tests and `wl gen-client`; DL-102), so each row's menu offers only the account actions allowed and a deactivated member shows as such |
 | 15a | Web: org admin | Org settings (rename, change slug, live availability; a slug change moves to the new URL); org members page (the email-first add-person form with a generated temporary password shown once, role changes (stepping down from one's own row; the last owner's replacement-owner picker, DL-59), account actions, the D2 removal dialog with the project-membership option), on S1-C15's shared pieces (DL-103) |
@@ -1434,55 +1433,55 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   change, project creation, adding a project member.
 
 ### Done when
-- [ ] `wl seed` creates the workspace and a system admin who is its owner (interactively and
+- [x] `wl seed` creates the workspace and a system admin who is its owner (interactively and
       with flags); the admin signs in, creates an org, and creates its owner.
-- [ ] `wl seed --demo` builds the demo dataset in an empty database, and refuses one that
+- [x] `wl seed --demo` builds the demo dataset in an empty database, and refuses one that
       already has a workspace and any stack where `demo_seed_enabled` is off; the end-to-end tests run on it.
-- [ ] The owner signs in (forced to change password first), creates a project with a key, type,
+- [x] The owner signs in (forced to change password first), creates a project with a key, type,
       and modules, and adds a project member and a project viewer.
-- [ ] The member sees the project; the viewer sees it but can't change its settings; an org member
+- [x] The member sees the project; the viewer sees it but can't change its settings; an org member
       not on the project, a workspace member not assigned to it, and a user in another org all get a
       404 for it; a workspace admin sees it and has project admin on it.
-- [ ] An org member creates a project and becomes its admin (with a `project_membership` row)
+- [x] An org member creates a project and becomes its admin (with a `project_membership` row)
       and its lead; an org admin creates one naming someone else as first admin and lead;
       removing the lead's membership clears the lead.
-- [ ] An admin changes another user's email under the rank rule: an actor whose roles cover
+- [x] An admin changes another user's email under the rank rule: an actor whose roles cover
       every membership the target holds at an equal or higher rank is allowed, any other actor
       is denied; a taken email is refused; the user's sessions end; one `user_updated` event
       records the change (one per covering org, DL-75).
-- [ ] After sign-in the user lands on My work; the health check is at `/status`.
-- [ ] A project admin creates a new user for the project, who gets an org membership and the
+- [x] After sign-in the user lands on My work; the health check is at `/status`.
+- [x] A project admin creates a new user for the project, who gets an org membership and the
       project membership; adding by user ID someone outside the org's members and the
       workspace's staff returns 404; adding another org's user by email adds them to the org
       and project after confirmation.
-- [ ] Removing an org member offers to remove their project memberships; with it unchecked,
+- [x] Removing an org member offers to remove their project memberships; with it unchecked,
       they keep their projects as a project-only user.
-- [ ] A browser link with a stale org slug redirects to the current one; the same link for a
+- [x] A browser link with a stale org slug redirects to the current one; the same link for a
       project the user can't see is a 404; a reserved slug is rejected.
-- [ ] Deactivating a user ends their active sessions on the next request; `grant-system-admin`
+- [x] Deactivating a user ends their active sessions on the next request; `grant-system-admin`
       and `revoke-system-admin` work, and revoking the last active system admin is refused.
-- [ ] Every checklist item from §4 has a test (cookie attributes, rejected cross-origin and
+- [x] Every checklist item from §4 has a test (cookie attributes, rejected cross-origin and
       missing-`Origin` mutations, token replaced at sign-in and on password change, expiry),
       as do the sign-in responses and the password policy.
-- [ ] The `authorize()` matrix and fail-closed test pass, including personal actions (denied
+- [x] The `authorize()` matrix and fail-closed test pass, including personal actions (denied
       to every admin level); archived projects reject mutations (unarchive and removing a member
       with their projects excepted).
-- [ ] A project can be classified at creation and in settings; marking it export-controlled
+- [x] A project can be classified at creation and in settings; marking it export-controlled
       (at creation or later) and adding a member to it require the confirmation; on an
       export-controlled project, inherited admins keep management access (the project, its
       settings and members), while removing `export_controlled`, lowering the level, or
       removing a category is refused for them and allowed for an explicit project admin;
       classification changes record their audit events. (Hiding content is Slice 2's.)
-- [ ] Last-owner (org and workspace) and last-system-admin guards, and the rank rule for
+- [x] Last-owner (org and workspace) and last-system-admin guards, and the rank rule for
       account actions, are tested.
-- [ ] Every Slice 1 admin and security action records its audit event.
-- [ ] List endpoints follow the API conventions: unknown query parameters return 422, and every
+- [x] Every Slice 1 admin and security action records its audit event.
+- [x] List endpoints follow the API conventions: unknown query parameters return 422, and every
       unique constraint is mapped in the error registry.
-- [ ] `project_counter` concurrency tests pass.
-- [ ] Mutation testing runs in `wl check` and CI with no surviving mutants in `app/rules/` and
-      `app/authz/`.
-- [ ] End-to-end tests run in CI against a seeded stack.
-- [ ] Accessibility: the axe-core checks pass in component and end-to-end tests, and the manual
+- [x] `project_counter` concurrency tests pass.
+- [x] Mutation testing runs in `wl check --full` and CI (and in `wl check` when its inputs
+      changed, DL-99) with no surviving mutants in `app/rules/` and `app/authz/`.
+- [x] End-to-end tests run in CI against a seeded stack.
+- [x] Accessibility: the axe-core checks pass in component and end-to-end tests, and the manual
       keyboard and screen-reader pass found no unresolved problem on the slice's new screens.
 - [ ] CI is green.
 

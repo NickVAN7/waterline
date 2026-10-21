@@ -166,9 +166,9 @@ Entry format:
   host's `npm ci` (documented in the developer guide).
 - **Why:** Dev-only images, no problem seen yet. **Owner decision (S0-C7 review):** undecided;
   kept as a note to revisit.
-- **Fix by:** Slice 1: the owner decides then whether to add a non-root user to the dev images
-  or re-target this entry.
-- **Status:** open
+- **Fix by:** S1-C17 (the owner chose a non-root user in the dev images, built as its own tooling change
+  before S1-C17's commit, DL-18)
+- **Status:** resolved in S1-C17 (the tooling change DC-2026-10-21c, before its commit)
 
 ### TD-12: Password minimum is 8 characters
 - **Added:** S1 planning (Sept 30, 2026)
@@ -277,9 +277,8 @@ Entry format:
   latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
   The vulnerable code only expands glob patterns from the repository's own ESLint
   configuration, never untrusted input, and never ships in the app.
-- **Fix by:** S1-C17 (its tech-debt review; DL-86, still no fixed `braces` on Oct 13, 2026):
-  update once a fixed `braces` (or a `fast-glob`/`micromatch` without it) is published, and
-  remove the allowlist entry; if none is by then, re-target with the owner.
+- **Fix by:** Slice 2's tech-debt review (owner, S1-C17; still no fixed `braces` on Oct 21, 2026, and no
+  Slice 2 feature needs it: it only expands the linter's own globs)
 - **Status:** open
 
 ### TD-20: What the git guard can't see
@@ -461,8 +460,9 @@ Entry format:
   milliseconds and needs a request already in flight.
 - **Why:** the owner decided the classification change in S1-C13 and chose to revisit the rest
   later.
-- **Fix by:** Slice 1 (the owner decides at the slice retro whether the other locked mutations
-  re-read the caller's role too)
+- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
+  the window is milliseconds and needs a request already in flight; fix it when a checkpoint
+  adds a locked mutation where the race would matter
 - **Status:** open
 
 ### TD-32: No page handles a 404 yet
@@ -585,8 +585,9 @@ Entry format:
 - **Why:** removing it needs a separate authorization action for the reset, which `allowed_actions`
   leaves out on one's own row: a design change in `app/authz/` with spec tests, outside S1-C15
   (owner decision, S1-C15 review).
-- **Fix by:** Slice 1's retro (a design change splitting the reset into its own action, e.g.
-  `user.reset_password`; then the check goes)
+- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner re-targeted it at S1-C17 until an
+  account action needs its own authorization action; the split was dropped once already
+  (DL-73), so it comes back only as a design change
 - **Status:** open
 
 ### TD-43: The two settings forms repeat their save handling
@@ -686,4 +687,116 @@ Entry format:
 - **Why:** the owner chose to log the S1-C16d review's findings rather than fix them; DL-122 asked
   for the step's existing text, which it has.
 - **Fix by:** Slice 2 (the owner's UI feedback at its start)
+- **Status:** open
+
+### TD-52: No length limit on names and descriptions
+- **Added:** S1-C17 (repo-auditor)
+- **What:** `name`, `description`, and the user `name` fields in the project, org, workspace, and
+  user schemas have no `max_length`, and nothing caps the request body. Each edit's old and new
+  values go into `audit_event`, which can't be deleted, so a very large value grows it for good.
+- **Why:** the limits aren't in the schema doc; the owner picks them.
+- **Fix by:** Slice 2 (the limits decided, then `Field(max_length=…)` and `wl gen-client`)
+- **Status:** open
+
+### TD-53: The routers' error-response map is written out four times
+- **Added:** S1-C17 (repo-auditor)
+- **What:** `routers/org.py`, `user.py`, `workspace.py`, and `project.py` each define the same
+  `ERRORS` map; one in `routers/deps.py` would do.
+- **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
+- **Fix by:** Slice 2 (the first checkpoint that adds a router)
+- **Status:** open
+
+### TD-54: Re-wrapping a page of rows is repeated five times
+- **Added:** S1-C17 (repo-auditor)
+- **What:** the workspace, roster, project, user, and my-work services each rebuild a `Page`
+  from a `PageResult`; a `PageResult.map(fn)` in `core/lists.py` would do.
+- **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
+- **Fix by:** Slice 2 (the first checkpoint that adds a list)
+- **Status:** open
+
+### TD-55: `anyio` is used by the app but declared only for development
+- **Added:** S1-C17 (repo-auditor)
+- **What:** `core/security.py` hashes passwords through `anyio.to_thread`, but `anyio` is in the
+  dev dependencies; production has it only because Starlette depends on it.
+- **Why:** found at the slice-end audit; harmless while Starlette brings it.
+- **Fix by:** Slice 2 (move it to `[project] dependencies`)
+- **Status:** open
+
+
+### TD-56: A settings save sends every field, undoing another admin's change
+- **Added:** S1-C17 (repo-auditor A1)
+- **What:** `ProjectSettingsView`, `OrgSettingsView`, `WorkspaceSettingsView`, and `ProfileForm`
+  send the whole form on save, so a field the user didn't touch reverts another admin's change
+  made since the page loaded, and the audit event names the saver as its author.
+  `AccountDetailsDialog` already sends only the changed fields.
+- **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
+  to a pre-checkpoint at the start of Slice 2.
+- **Fix by:** S2-C0 (send only the changed fields, as `AccountDetailsDialog` does)
+- **Status:** open
+
+### TD-57: An update's change check reads an unlocked row
+- **Added:** S1-C17 (repo-auditor A2)
+- **What:** the org, workspace, and user services' updates compare the request with a row they
+  haven't locked, so two edits at once can log duplicate events, or a wrong old value, in the
+  append-only `audit_event`.
+- **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
+  to a pre-checkpoint at the start of Slice 2.
+- **Fix by:** S2-C0 (lock and re-read the row before comparing, with a concurrency test for each)
+- **Status:** open
+
+### TD-58: Removing the last row of the last page leaves an empty page
+- **Added:** S1-C17 (repo-auditor A3)
+- **What:** on `RosterPage`, `UsersView`, and `OrgsView`, removing or deactivating the only row on
+  the last page shows an empty page with no Previous; the project list goes back to page 1.
+- **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
+  to a pre-checkpoint at the start of Slice 2.
+- **Fix by:** S2-C0 (the project list's return to page 1, moved into `useListQuery`)
+- **Status:** open
+
+### TD-59: The username suggestion is copied in two dialogs
+- **Added:** S1-C17 (repo-auditor A4)
+- **What:** `AddPersonDialog` and `CreateOrgDialog` each carry the same debounced username
+  suggestion (S1-C16d's timer fix had to go into both).
+- **Why:** found at the slice-end audit; the owner deferred it to a pre-checkpoint at the start
+  of Slice 2.
+- **Fix by:** S2-C0 (one `useUsernameSuggestion` composable)
+- **Status:** open
+
+### TD-60: The docs name per-area policy files; Slice 1 built one registry
+- **Added:** S1-C17 (docs-consistency)
+- **What:** the build plan (the area layout, the feature map), `backend/CLAUDE.md`, and the
+  `new-area` skill put each area's authorization in `authz/policies/<area>.py`; Slice 1 built one
+  registry, `authz/actions.py`.
+- **Why:** the owner decided the fix belongs at the start of Slice 2, before its first new area
+  follows the docs.
+- **Fix by:** S2-C0 (the docs and the registry made to agree, before the first Slice 2 area)
+- **Status:** open
+
+### TD-61: The token contrast check runs only by hand
+- **Added:** S1-C17 (docs-consistency)
+- **What:** `check_contrast.py` (ui-design-guide §9) isn't part of `wl check`, so nothing stops a
+  token change that fails the contrast minimums.
+- **Why:** no token has changed since it was written; the owner's brand values are still to
+  come. The owner revisits whether to port it at Slice 2's end.
+- **Fix by:** Slice 2 (its slice-end tech-debt review decides: port it into `wl check`, or
+  re-target)
+- **Status:** open
+
+### TD-62: Screen inventory steps 2 to 6 aren't done
+- **Added:** S1-C17 (docs-consistency)
+- **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) were never done;
+  Slice 1's screens were designed checkpoint by checkpoint.
+- **Why:** the owner completes the inventory separately, outside the checkpoints.
+- **Fix by:** S2-C0 (the owner's completed inventory checked against the docs and the built
+  screens)
+- **Status:** open
+
+### TD-63: Settings saves are last-save-wins, with no optimistic lock
+- **Added:** S1-C17 (repo-auditor's question)
+- **What:** project, org, and workspace settings have no version check, so when two admins change
+  the same field, the later save wins without either seeing the conflict. (TD-56 covers fields
+  the saver didn't change.)
+- **Why:** the owner judged it not an issue at Slice 1's scale.
+- **Fix by:** Slice 2 (its slice-end tech-debt review revisits it: an optimistic lock, or
+  re-target)
 - **Status:** open
