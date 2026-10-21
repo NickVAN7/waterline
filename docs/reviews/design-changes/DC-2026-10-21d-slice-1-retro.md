@@ -52,5 +52,11 @@
 3. **The `new-area` skill's check.** The build plan has it verified against the `project` area
    "at the start of Slice 2". Should it be part of S2-C0, or Slice 2's first feature checkpoint?
 
+**The owner's answers (Oct 21, 2026):**
+1. Review answers only, as applied.
+2. The owner moved the file to `docs/ui-feedback.md`, committed with these answers; the S2-C0
+   note points there.
+3. In S2-C0 (DL-132).
+
 **Outside the change's scope:** `uv run wl seed --help` doesn't list `--demo`, although the
 developer guide documents it.

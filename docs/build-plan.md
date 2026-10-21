@@ -250,7 +250,7 @@ Everything lives in the repository, version-controlled and present on every work
   entries, every affected doc, `docs-consistency`, and the report.
 - **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
-  verified and corrected against the hand-built `project` area at the start of Slice 2.
+  verified and corrected against the hand-built `project` area in S2-C0 (DL-132).
 - **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
   generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`), committed migrations,
   `.pre-commit-config.yaml` (the owner's to edit, DL-30), and git's own files (anything in `.git/`,
@@ -1508,8 +1508,10 @@ What's decided so far. This is not the slice's plan, which is written when Slice
     `user-guide-verifier` agent, which follows `docs/user-guide.md` literally in a browser
     against a seeded stack and walks the "Done when" list (both scheduled in Slice 1 and missed;
     `docs/reviews/s1/S1-retro.md`);
-  - the owner's UI feedback on Slice 1, in `ui-feedback.md` at the repository root (the owner's
-    file): many of its changes are made here.
+  - the `new-area` skill verified and corrected against the hand-built `project` area (DL-132),
+    before Slice 2's first new area uses it;
+  - the owner's UI feedback on Slice 1, in `docs/ui-feedback.md`: many of its changes are made
+    here.
 
 - **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the
   rank helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual

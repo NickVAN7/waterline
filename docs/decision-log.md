@@ -1709,3 +1709,13 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** `design-change` skill (step 4); build plan ("Design changes outside a
   checkpoint", "Claude configuration"); developer guide (section 11)
 - **Source:** Slice 1 retro, proposal 5 (owner, Oct 21, 2026)
+
+### DL-132: S2-C0 also verifies the `new-area` skill
+- **Date:** 2026-10-21
+- **Decision:** The `new-area` skill's check against the hand-built `project` area, set for "the
+  start of Slice 2", is part of S2-C0 (DL-124). The owner's UI feedback is at
+  `docs/ui-feedback.md`.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Claude configuration", "Slice 2 — notes for planning")
+- **Source:** DC-2026-10-21d docs-consistency decision 3 (owner, Oct 21, 2026)
