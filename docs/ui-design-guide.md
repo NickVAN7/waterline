@@ -531,7 +531,8 @@ render inside the full shell when signed in.
   copy written by us: **403**, "You don't have permission to do that", then refetch the entity
   so `allowed_actions` is current (a 422 `confirmation_required` or `confirmation_not_needed` on
   `export_control_confirmed`, meaning the project's export control changed, refetches it too,
-  DL-116); **409**, a warning alert, "Someone else changed this while
+  DL-116, as does `members_changed` on `confirmed_member_ids`, meaning its explicit members did,
+  DL-120; their alert keeps the server's message, DL-123); **409**, a warning alert, "Someone else changed this while
   you were editing. Reload to see the latest version", with a Reload button, and the typed
   values stay until the user presses it; **network_error**, "We couldn't reach the server", with
   a Retry button; anything else, a generic message with no codes or stack details. The alert has

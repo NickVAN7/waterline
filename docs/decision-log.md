@@ -1580,3 +1580,44 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-SHL-6; the `ui-reviewer` agent's project pages check
 - **Source:** chat session (owner, Oct 21, 2026, at the S1-C16b review)
+
+### DL-120: A classification save refused for a changed member list reloads the project
+- **Date:** 2026-10-21
+- **Decision:** Project settings' classification save, refused with a 422 `members_changed` on
+  `confirmed_member_ids` (the explicit members changed since the confirmation listed them), reloads
+  the project, as DL-116's refusals do, so the next save confirms the current members. Built in
+  S1-C16d.
+- **Supersedes:** none (extends DL-116)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-7; build plan (the S1-C16d row)
+- **Source:** chat session (owner, Oct 21, 2026, answering DC-2026-10-21's docs-consistency question)
+
+### DL-121: The security reviewer's fixed range stays at checkpoints 1 to 16b
+- **Date:** 2026-10-21
+- **Decision:** The checkpoints inserted after S1-C16b (S1-C16c, S1-C16d) don't join the build
+  plan's fixed `security-reviewer` range; they get it only when their diff touches the paths the
+  `checkpoint` skill lists.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (the Slice 1 reviewers paragraph)
+- **Source:** chat session (owner, Oct 21, 2026, answering DC-2026-10-21's docs-consistency question)
+
+### DL-122: The create-organization and password-reset dialogs follow DL-118 in S1-C16d
+- **Date:** 2026-10-21
+- **Decision:** The create-organization dialog's "created" step and the password reset's "shown
+  once" step put their text, and the temporary password's warning, in Done's `aria-describedby`
+  (DL-118), in S1-C16d rather than Slice 2.
+- **Supersedes:** TD-50's Fix by (Slice 2)
+- **Superseded by:** none
+- **Applies to:** build plan (the S1-C16d row); tech debt (TD-50)
+- **Source:** chat session (owner, Oct 21, 2026, at the S1-C16c review)
+
+### DL-123: A refusal for a changed export control or member list shows the server's message
+- **Date:** 2026-10-21
+- **Decision:** The form alert for a 422 `confirmation_required`, `confirmation_not_needed`, or
+  `members_changed` shows the server's message; the page's reload (DL-116, DL-120) shows what
+  changed, as the confirmation appears, goes, or lists the current members. No copy of our own.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-7
+- **Source:** chat session (owner, Oct 21, 2026, answering the S1-C16c review's question U3)

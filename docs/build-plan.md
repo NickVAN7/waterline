@@ -862,6 +862,7 @@ current-user store), TD-11 (Checkpoint 17: the owner decides on a non-root dev u
 | 16a | Web: project settings | Project settings (name, description, type, status, lead, module toggles and warnings, archive/unarchive; a project with no lead flagged), with Settings in the project pages nav; classification in project settings (raising, lowering, and removing categories, with the export-control confirmation dialogs); the create dialog's export-control confirmation moved into its own dialog, the one settings uses (DL-114); `lead_is_active` on the project read and `is_active` on project member rows (backend, with API tests and `wl gen-client`; DL-113), so the header and settings mark a deactivated lead (TD-45) and the lead picker marks deactivated members; the settings forms' shared save handling (TD-43), on S1-C16's pieces (DL-109) |
 | 16b | Web: project members | Project members page (the picker and the email-first add-person form, with the `join_org` confirmation for an account from outside the org, DL-78, and the export-control confirmation on add), with Members in the project pages nav; the per-project access review; the end-to-end membership flow (users unique to the run, DL-87), on S1-C15's roster pieces (DL-109) |
 | 16c | Review follow-ups | From the S1-C16b review (DL-116 to DL-118): an add on the members page, or project settings' classification save, refused with `confirmation_required` or `confirmation_not_needed` on `export_control_confirmed` reloads the project, as a 403 does, so the confirmation appears or goes (TD-48); the add-person dialog's "account exists" and "join the organization" steps start on Back (DL-117), each step's text in the focused control's `aria-describedby` (DL-118) |
+| 16d | Review follow-ups (2) | From the S1-C16c review (DL-120, DL-122): project settings' classification save refused with `members_changed` on `confirmed_member_ids` reloads the project, as DL-116's refusals do; the create-organization dialog's "created" step and the password reset's "shown once" step put their text and the temporary password's warning in Done's `aria-describedby` (DL-118, TD-50) |
 | 17 | Slice verification | "Done when" walked through (as end-to-end tests where practical); a manual keyboard and screen-reader pass on the slice's new screens (`testing-strategy.md`, "Accessibility"); user guide complete for Slice 1; `fresh-clone-verifier`; `docs-consistency`; `repo-auditor` (DL-41); tech-debt review (including the owner's TD-11 decision); the slice retro ("Verification"), including the verdict of the review-tier trial |
 
 **Groups** ("Pull requests"): five review points. Group 1 landed as its own PR
@@ -880,7 +881,8 @@ Checkpoints 7 to 13 add or change `app/authz/` code (the authorization core, the
 policy) or `app/rules/` code, so each starts with `spec-test-writer` (DL-15).
 
 Checkpoints touching authentication, sessions, authorization, or routers get the
-`security-reviewer` as well: every checkpoint from 1 to 16b. The `checkpoint` skill runs it for
+`security-reviewer` as well: every checkpoint from 1 to 16b (the follow-ups inserted after it,
+S1-C16c and S1-C16d, only when their diff calls for it, DL-121). The `checkpoint` skill runs it for
 every checkpoint this paragraph names, and also whenever a diff touches security-relevant code.
 The `ui-reviewer` runs whenever a diff touches `frontend/src/` or `frontend/e2e/` (from S1-C14
 on; DL-62).

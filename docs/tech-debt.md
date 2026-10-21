@@ -674,5 +674,5 @@ Entry format:
   password reset's "shown once" step move focus to Done without its text.
 - **Why:** S1-C16c's row covers the add-person dialog; the others are S1-C15's (DL-106: earlier
   code changed only when needed).
-- **Fix by:** Slice 2 (the first checkpoint that changes either dialog)
+- **Fix by:** S1-C16d (the owner's choice, DL-122)
 - **Status:** open
