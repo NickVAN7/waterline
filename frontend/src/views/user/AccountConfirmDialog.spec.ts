@@ -92,4 +92,31 @@ describe('AccountConfirmDialog', () => {
 
     expect(focusedAtRetry).toBe(wrapper.get('button[type=submit]').element)
   })
+
+  it('tells the page on a 403, so it reloads what the user may do (UI-FRM-7)', async () => {
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    const wrapper = await openDialog('deactivate')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('refused')).toHaveLength(1)
+  })
+
+  it('returns focus to Deactivate when its alert is dismissed (UI-FBK-13)', async () => {
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(503, { code: 'network_error', message: '', details: {} }),
+    )
+    const wrapper = await openDialog('deactivate')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(document.activeElement?.textContent?.trim()).toBe('Deactivate')
+  })
 })

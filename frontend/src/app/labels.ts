@@ -89,6 +89,7 @@ export const ARCHIVED_BANNER = 'This project is archived. It is read-only.'
 
 type WorkspaceRole = components['schemas']['WorkspaceRole']
 type OrgRole = components['schemas']['OrgRole']
+type ProjectRole = components['schemas']['ProjectRole']
 type AccessReason = components['schemas']['AccessReason']
 type AccessKind = components['schemas']['AccessKind']
 
@@ -104,6 +105,13 @@ export const ORG_ROLE: Record<OrgRole, string> = {
   owner: 'Owner',
   admin: 'Admin',
   member: 'Member',
+}
+
+/** Project roles, highest first (design-doc §5). */
+export const PROJECT_ROLE: Record<ProjectRole, string> = {
+  admin: 'Admin',
+  member: 'Member',
+  viewer: 'Viewer',
 }
 
 /** Why someone reaches an org or project, in an access review (design-doc §5, "Access review"). */

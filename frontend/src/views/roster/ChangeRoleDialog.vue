@@ -2,20 +2,23 @@
 // Changing someone's role on a roster, stepping down from one's own row included (DL-59). The last
 // owner can't step down unless someone replaces them: the server's 422 (`last_owner` on `role`)
 // brings up the replacement-owner picker, and the change is sent again with `new_owner_id`. An
-// unchanged role sends nothing, so `new_owner_id` never travels with a no-op (TD-26).
+// unchanged role sends nothing, so `new_owner_id` never travels with a no-op (TD-26). A 403 tells
+// the page (`refused`), so it reloads what the user may do (UI-FRM-7).
 import { nextTick, ref } from 'vue'
+
+import { ApiError } from '@/api/client'
 
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import SelectField from '@/components/SelectField.vue'
-import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 
 import ReplacementOwnerField from './ReplacementOwnerField.vue'
 import type { Roster, RosterPerson } from './roster'
 
-const props = defineProps<{ roster: Roster }>()
-const emit = defineEmits<{ done: [message: string] }>()
+const props = defineProps<{ roster: Roster; fallbackFocus?: () => void }>()
+const emit = defineEmits<{ done: [message: string]; refused: [] }>()
 
 const person = ref<RosterPerson & { role: string }>()
 const values = ref({ role: '', new_owner_id: '' })
@@ -70,6 +73,7 @@ async function submit(): Promise<void> {
   } catch (error) {
     status.value = ''
     const target = errors.apply(error)
+    if (error instanceof ApiError && error.status === 403) emit('refused')
     const lastOwner = errors.fieldProblems.value.role?.find((p) => p.type === 'last_owner')
     if (lastOwner) {
       // The guard's message is shown with the picker, not as a field error on the role.
@@ -85,19 +89,24 @@ async function submit(): Promise<void> {
 
 const formElement = ref<HTMLFormElement>()
 const retry = retryFromSubmit(formElement, submit)
+const dismissed = () => dismissToSubmit(errors, formElement)
 
 defineExpose({ open })
 </script>
 
 <template>
-  <ModalDialog ref="dialog" :title="`Change the role of ${person?.name ?? ''}`">
+  <ModalDialog
+    ref="dialog"
+    :title="`Change the role of ${person?.name ?? ''}`"
+    :fallback-focus="fallbackFocus"
+  >
     <form ref="formElement" novalidate class="flex flex-col gap-4" @submit.prevent="submit">
       <FormAlert
         v-if="errors.alert.value"
         :key="errors.alertKey.value"
         ref="alertBox"
         :alert="errors.alert.value"
-        @dismiss="errors.dismissAlert()"
+        @dismiss="dismissed"
         @retry="retry"
       />
       <p class="m-0 text-sm text-text-muted">
@@ -114,7 +123,7 @@ defineExpose({ open })
         @update:model-value="errors.clearField('role')"
       />
       <ReplacementOwnerField
-        v-if="replacing && person"
+        v-if="replacing && person && roster.everyone"
         id="role-change-owner"
         ref="ownerField"
         v-model="values.new_owner_id"

@@ -79,6 +79,25 @@ read-only." at the top. An address with an old organization name or a
 lowercase key takes you to the project's own address. A project you can't see shows "Page not
 found", the same as one that doesn't exist.
 
+**Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
+its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The
+project's admins (and organization owners and admins, and workspace admins) can also:
+
+- **Add member**: search the organization's members and the workspace's staff by name, email,
+  or username, choose one, and give them a role.
+- **Add by email**: works as **Add person** does under workspace administration (the email
+  first, then either an existing account or a new one with a temporary password, shown once).
+  An account from outside the organization is added only after you confirm adding them to the
+  organization too, as a member.
+- On an export-controlled project, every add first asks you to check that the person is
+  authorized for export-controlled data.
+- A row offers **Change role** and **Remove from project**. A project has no last-admin rule:
+  its admins may change or remove any role, their own included. Removing the lead leaves the
+  project with no lead.
+- **Access review** lists everyone who reaches the project
+  (`/<organization>/projects/<KEY>/access`): their project role, if any, why they reach it (the
+  role, or an admin role above it), and whether they reach its content or only its management.
+
 **Settings**, in the sidebar under the project, is there if you may change any of its settings
 (`/<organization>/projects/<KEY>/settings`). Each part shows only if you may use it:
 

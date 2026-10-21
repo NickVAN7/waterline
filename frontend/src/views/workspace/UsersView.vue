@@ -8,7 +8,7 @@ import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
 import { DEACTIVATED, SYSTEM_ADMIN } from '@/app/labels'
-import { settlePage } from '@/app/routeFocus'
+import { focusHeading, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -20,6 +20,7 @@ import { allows } from '@/composables/allowedActions'
 import { useListQuery } from '@/composables/useListQuery'
 import { useLoad } from '@/composables/useLoad'
 import { useWorkspace } from '@/composables/useWorkspace'
+import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import AccountActions from '@/views/user/AccountActions.vue'
 
@@ -27,6 +28,7 @@ import { WHO_TO_ASK } from './workspaceAdmin'
 import WorkspaceNav from './WorkspaceNav.vue'
 
 const workspace = useWorkspace()
+const store = useCurrentUserStore()
 const list = useListQuery({ limit: 25 })
 const done = ref('')
 const account = ref<InstanceType<typeof AccountActions>>()
@@ -58,6 +60,12 @@ watch(
 function finished(message: string) {
   done.value = message
   void page.run()
+}
+
+// A 403 in a dialog: what the user may do changed, on the rows and the page (UI-FRM-7).
+function refused() {
+  void page.run()
+  store.load().catch(() => {})
 }
 
 const announcement = computed(() => {
@@ -154,6 +162,12 @@ const announcement = computed(() => {
       </template>
     </section>
     <p class="sr-only" aria-live="polite">{{ announcement }}</p>
-    <AccountActions ref="account" :workspace-id="workspace.id" @done="finished" />
+    <AccountActions
+      ref="account"
+      :workspace-id="workspace.id"
+      :fallback-focus="focusHeading"
+      @done="finished"
+      @refused="refused"
+    />
   </div>
 </template>

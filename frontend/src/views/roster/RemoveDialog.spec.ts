@@ -117,4 +117,40 @@ describe('RemoveDialog (D2)', () => {
     expect(document.activeElement).toBe(alert.element)
     expect(wrapper.find('#remove-owner').exists()).toBe(false)
   })
+
+  it('tells the page on a 403, so it reloads what the user may do (UI-FRM-7)', async () => {
+    const { wrapper, roster } = await openDialog()
+    roster.remove.mockRejectedValue(
+      new ApiError(403, { code: 'forbidden', message: '', details: {} }),
+    )
+
+    await submit(wrapper)
+
+    expect(wrapper.emitted('refused')).toHaveLength(1)
+  })
+
+  it('returns focus to Remove person when its alert is dismissed (UI-FBK-13)', async () => {
+    const { wrapper, roster } = await openDialog()
+    roster.remove.mockRejectedValue(
+      new ApiError(503, { code: 'network_error', message: '', details: {} }),
+    )
+    await submit(wrapper)
+
+    await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(document.activeElement?.textContent?.trim()).toBe('Remove person')
+  })
+
+  it("offers no projects option on a project's roster, and removes without it", async () => {
+    const roster = { ...fakeRoster(), projects: undefined }
+    const wrapper = mount(RemoveDialog, { props: { roster }, attachTo: document.body })
+    await wrapper.vm.open(OLGA)
+    await flushPromises()
+
+    expect(wrapper.find('input[type=checkbox]').exists()).toBe(false)
+    await submit(wrapper)
+    expect(roster.remove).toHaveBeenCalledWith('u-olga', false, undefined)
+  })
 })

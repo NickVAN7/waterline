@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
+import { failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
 
 import AccountPasswordDialog from './AccountPasswordDialog.vue'
@@ -66,5 +66,32 @@ describe('AccountPasswordDialog', () => {
     expect(wrapper.get('#reset-password-error').text()).toBe('Use at least 8 characters.')
     expect(wrapper.find('output').exists()).toBe(false)
     expect(document.activeElement?.id).toBe('reset-password')
+  })
+
+  it('tells the page on a 403, so it reloads what the user may do (UI-FRM-7)', async () => {
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    const wrapper = await openDialog()
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('refused')).toHaveLength(1)
+  })
+
+  it('returns focus to Reset password when its alert is dismissed (UI-FBK-13)', async () => {
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(503, { code: 'network_error', message: '', details: {} }),
+    )
+    const wrapper = await openDialog()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(document.activeElement?.textContent?.trim()).toBe('Reset password')
   })
 })

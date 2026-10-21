@@ -24,8 +24,8 @@ function userCheck(exists: boolean, suggestion: string | null = 'jane-doe') {
   }) as never)
 }
 
-async function openDialog() {
-  const roster = fakeRoster()
+async function openDialog(overrides: Partial<ReturnType<typeof fakeRoster>> = {}) {
+  const roster = { ...fakeRoster(), ...overrides }
   const wrapper = mount(AddPersonDialog, { props: { roster }, attachTo: document.body })
   await wrapper.vm.open()
   await flushPromises()
@@ -71,7 +71,10 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
     expect(document.activeElement?.textContent?.trim()).toBe('Add person')
     await button(wrapper, 'Add person').trigger('click')
     await flushPromises()
-    expect(roster.add).toHaveBeenCalledWith('ann@acme.example', 'member')
+    expect(roster.add).toHaveBeenCalledWith('ann@acme.example', 'member', {
+      joinOrg: false,
+      exportControlConfirmed: false,
+    })
     expect(wrapper.emitted('done')).toEqual([["ann@acme.example added to the workspace's staff."]])
     expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
   })
@@ -148,13 +151,16 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(roster.create).toHaveBeenCalledWith({
-      email: 'new@acme.example',
-      role: 'admin',
-      name: 'Jane Doe',
-      username: 'jane-doe',
-      password: 'fake-fake-fake-01',
-    })
+    expect(roster.create).toHaveBeenCalledWith(
+      {
+        email: 'new@acme.example',
+        role: 'admin',
+        name: 'Jane Doe',
+        username: 'jane-doe',
+        password: 'fake-fake-fake-01',
+      },
+      { joinOrg: false, exportControlConfirmed: false },
+    )
     expect(wrapper.get('output').text()).toBe('fake-fake-fake-01')
     expect(document.activeElement?.textContent?.trim()).toBe('Done')
   })
@@ -216,5 +222,167 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
 
     expect(wrapper.get('#add-role-error').text()).toBe('Choose a role you may grant.')
     expect(document.activeElement?.id).toBe('add-role')
+  })
+
+  it("returns focus to the step's action when its alert is dismissed (UI-FBK-13)", async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog()
+    roster.add.mockRejectedValue(
+      new ApiError(503, { code: 'network_error', message: '', details: {} }),
+    )
+    await continueWith(wrapper, 'ann@acme.example')
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(document.activeElement?.textContent?.trim()).toBe('Add person')
+  })
+
+  it('tells the page on a 403, so it reloads what the user may do (UI-FRM-7)', async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog()
+    roster.add.mockRejectedValue(new ApiError(403, { code: 'forbidden', message: '', details: {} }))
+    await continueWith(wrapper, 'ann@acme.example')
+
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('refused')).toHaveLength(1)
+  })
+})
+
+describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
+  it('confirms adding an account from outside the org to the org too, then sends join_org', async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog()
+    roster.add.mockRejectedValueOnce(
+      invalid({
+        loc: ['body', 'email'],
+        message: "This person isn't in the organization. Confirm to add them to it too.",
+        type: 'outside_org',
+      }),
+    )
+    await continueWith(wrapper, 'out@else.example')
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(
+      "This person isn't in the organization. Confirm to add them to it too.",
+    )
+    expect(wrapper.find('#add-email').exists()).toBe(false)
+    expect(document.activeElement?.textContent?.trim()).toBe('Add to both')
+    await button(wrapper, 'Add to both').trigger('click')
+    await flushPromises()
+    expect(roster.add).toHaveBeenLastCalledWith('out@else.example', 'member', {
+      joinOrg: true,
+      exportControlConfirmed: false,
+    })
+    expect(wrapper.emitted('done')).toEqual([["out@else.example added to the workspace's staff."]])
+  })
+
+  it('blocks adding to an export-controlled project until the person is confirmed authorized', async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog({ exportControlled: true })
+    await continueWith(wrapper, 'ann@acme.example')
+
+    const add = button(wrapper, 'Add person')
+    expect(add.attributes('aria-disabled')).toBe('true')
+    expect(wrapper.get(`#${add.attributes('aria-describedby')}`).text()).toBe(
+      'Check the box to continue.',
+    )
+    await add.trigger('click')
+    await flushPromises()
+    expect(roster.add).not.toHaveBeenCalled()
+    await expectNoA11yViolations(wrapper)
+
+    await wrapper.get('input[type=checkbox]').setValue(true)
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+    expect(roster.add).toHaveBeenCalledWith('ann@acme.example', 'member', {
+      joinOrg: false,
+      exportControlConfirmed: true,
+    })
+  })
+
+  it('confirms authorization for a new account on an export-controlled project too', async () => {
+    userCheck(false)
+    const { wrapper, roster } = await openDialog({ exportControlled: true })
+    await continueWith(wrapper, 'new@acme.example')
+    await wrapper.get('#add-name').setValue('Jane Doe')
+    await wrapper.get('#add-username').setValue('jane-doe')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(roster.create).not.toHaveBeenCalled()
+
+    await wrapper.get('input[type=checkbox]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(roster.create).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@acme.example' }),
+      {
+        joinOrg: false,
+        exportControlConfirmed: true,
+      },
+    )
+  })
+
+  it('asks again for the next person after Back: the confirmation was for the first (§3.1)', async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog({ exportControlled: true })
+    await continueWith(wrapper, 'ann@acme.example')
+    await wrapper.get('input[type=checkbox]').setValue(true)
+
+    await button(wrapper, 'Back').trigger('click')
+    await flushPromises()
+    await continueWith(wrapper, 'bob@acme.example')
+
+    expect(wrapper.get<HTMLInputElement>('input[type=checkbox]').element.checked).toBe(false)
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+    expect(roster.add).not.toHaveBeenCalled()
+  })
+
+  it("reads the join step's reason with the button it focuses", async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog()
+    roster.add.mockRejectedValueOnce(
+      invalid({
+        loc: ['body', 'email'],
+        message: "This person isn't in the organization. Confirm to add them to it too.",
+        type: 'outside_org',
+      }),
+    )
+    await continueWith(wrapper, 'out@else.example')
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    const ids = button(wrapper, 'Add to both').attributes('aria-describedby')!.split(' ')
+    expect(ids.map((id) => wrapper.get(`#${id}`).text())).toEqual([
+      "This person isn't in the organization. Confirm to add them to it too.",
+      "Add out@else.example to the organization as a member, and to the workspace's staff?",
+    ])
+  })
+
+  it("doesn't let Retry send an add once the confirmation is unchecked (UI-FRM-15)", async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog({ exportControlled: true })
+    roster.add.mockRejectedValueOnce(
+      new ApiError(503, { code: 'network_error', message: '', details: {} }),
+    )
+    await continueWith(wrapper, 'ann@acme.example')
+    await wrapper.get('input[type=checkbox]').setValue(true)
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('input[type=checkbox]').setValue(false)
+    await button(wrapper, 'Retry').trigger('click')
+    await flushPromises()
+
+    expect(roster.add).toHaveBeenCalledTimes(1)
   })
 })

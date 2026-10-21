@@ -4,17 +4,19 @@
 // sessions end, and they choose their own password at next sign-in.
 import { nextTick, ref } from 'vue'
 
-import { api, client } from '@/api/client'
+import { api, ApiError, client } from '@/api/client'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import TemporaryPasswordField from '@/components/TemporaryPasswordField.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
-import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 
 import type { Person } from './accountActions'
 
-const emit = defineEmits<{ done: [message: string] }>()
+// `refused`: a 403, so the page reloads what the user may do (UI-FRM-7).
+defineProps<{ fallbackFocus?: () => void }>()
+const emit = defineEmits<{ done: [message: string]; refused: [] }>()
 
 const person = ref<Person>({ id: '', email: '', name: '', username: '' })
 const values = ref({ password: '' })
@@ -69,6 +71,7 @@ async function submit(): Promise<void> {
   } catch (error) {
     status.value = ''
     await focus(errors.apply(error))
+    if (error instanceof ApiError && error.status === 403) emit('refused')
   } finally {
     pending.value = false
   }
@@ -76,12 +79,17 @@ async function submit(): Promise<void> {
 
 const formElement = ref<HTMLFormElement>()
 const retry = retryFromSubmit(formElement, submit)
+const dismissed = () => dismissToSubmit(errors, formElement)
 
 defineExpose({ open })
 </script>
 
 <template>
-  <ModalDialog ref="dialog" :title="`Reset the password for ${person.name}`">
+  <ModalDialog
+    ref="dialog"
+    :title="`Reset the password for ${person.name}`"
+    :fallback-focus="fallbackFocus"
+  >
     <template v-if="shown">
       <TemporaryPasswordNotice :password="shown" />
       <div><Button ref="doneButton" @click="dialog?.close()">Done</Button></div>
@@ -99,7 +107,7 @@ defineExpose({ open })
         :key="errors.alertKey.value"
         ref="alertBox"
         :alert="errors.alert.value"
-        @dismiss="errors.dismissAlert()"
+        @dismiss="dismissed"
         @retry="retry"
       />
       <p class="m-0">

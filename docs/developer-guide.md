@@ -4,7 +4,16 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C16a (Web: project settings) done: the project settings page
+> **Status:** S1-C16b (Web: project members) done: a project's members page
+> (`ProjectMembersView`, `/{org_slug}/projects/{key}/members`, Members in the project pages nav
+> for anyone who sees the project) on `RosterPage`, whose `header` and `dialogs` slots the project
+> fills; the picker (`AddMemberDialog`, a PrimeVue `AutoComplete` over `member-candidates`); the
+> email-first add's `join_org` confirmation and the export-control confirmation on every add
+> (`AddPersonDialog`, through `Roster`'s `AddOptions`); the per-project access review
+> (`ProjectAccessView`, `/{org_slug}/projects/{key}/access`, linked from the members page for
+> `project.view_access`); and the roster, account, and create-org dialogs' 403 reload
+> (`refused`, TD-46) and alert dismiss back to the submit button (TD-47); next is S1-C17 (Slice
+> verification). S1-C16a (Web: project settings) built the project settings page
 > (`ProjectSettingsView`, `/{org_slug}/projects/{key}/settings`, Settings in the project pages nav
 > for whoever `hasSettings`), with details, modules (`ModuleFields`, warning when one is turned
 > off), classification (`ClassificationFields`), and archiving; the export-control confirmation
@@ -855,6 +864,10 @@ existence isn't public, UI-FBK-14);
 `/{org_slug}/projects` and `/{org_slug}/projects/{key}` (an org's projects and a
 project's home; a stale org slug or a lowercase key is redirected to the project's own; an org
 page open when its org's slug changes moves to the new URL, `useRouteOrg`);
+`/{org_slug}/projects/{key}/members`, `/{org_slug}/projects/{key}/access`, and
+`/{org_slug}/projects/{key}/settings` (a project's members, for anyone who sees it; its access
+review, for `project.view_access`; its settings, for whoever `hasSettings`; anyone else gets the
+403 page, and the redirects are a project home's, `useProjectPage`);
 anything else, the not-found page. Every top-level segment is on the reserved-slug list
 (`router.spec.ts` checks it against `ReservedSlug` in `backend/openapi.json`).
 

@@ -631,7 +631,7 @@ Entry format:
 - **Why:** found reviewing S1-C16; fixing S1-C15's dialogs isn't this checkpoint's scope
   (DL-106).
 - **Fix by:** S1-C16b (the members page's dialogs are the same roster dialogs)
-- **Status:** open
+- **Status:** resolved in S1-C16b
 
 ### TD-47: The older dialogs' alerts drop focus when dismissed
 - **Added:** S1-C16a
@@ -644,4 +644,17 @@ Entry format:
 - **Why:** found reviewing S1-C16a; S1-C15's and S1-C15a's dialogs aren't this checkpoint's scope
   (DL-106).
 - **Fix by:** S1-C16b (the members page reuses the roster dialogs)
+- **Status:** resolved in S1-C16b
+
+### TD-48: A change to export control made elsewhere isn't picked up by an open add dialog
+- **Added:** S1-C16b (checkpoint review question)
+- **What:** the members page reads whether the project is export-controlled when it loads. If
+  another admin adds or removes `export_controlled` while it's open, an add answers 422
+  `confirmation_required` or `confirmation_not_needed` on `export_control_confirmed`, a field the
+  dialogs don't show: the server's message is the form's alert, and the checkbox appears or goes
+  only after a reload. Project settings' classification form has the same gap.
+- **Why:** rare (two admins changing one project at once), and the server refuses the add, so
+  nothing is recorded wrongly; reloading the project on that 422, as a 403 does, is new
+  behavior for the owner to decide.
+- **Fix by:** Slice 2 (or the owner's choice at the S1-C16b review)
 - **Status:** open

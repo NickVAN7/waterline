@@ -3,7 +3,10 @@
 // whether they're active (DL-102); add (email first) or create a person; change a role, stepping
 // down from your own row (the last owner names a replacement, DL-59); remove (D2, with the
 // project-membership option); and the account actions the rank rule allows. Every action comes
-// from the row's `allowed_actions`; the page gives its endpoints through `roster` and `list`.
+// from the row's `allowed_actions`; the page gives its endpoints through `roster` and `list`. A
+// project's page (S1-C16b) puts its own header in the `header` slot and its own dialogs in
+// `dialogs`. A 403 in a dialog reloads the list and `/me`, and tells the page (`refused`), since
+// what the user may do has changed (UI-FRM-7).
 import { computed, nextTick, ref, watch } from 'vue'
 
 import { DEACTIVATED } from '@/app/labels'
@@ -19,6 +22,7 @@ import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows, type Action } from '@/composables/allowedActions'
 import { useListQuery } from '@/composables/useListQuery'
 import { useLoad } from '@/composables/useLoad'
+import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import AccountActions from '@/views/user/AccountActions.vue'
@@ -50,7 +54,7 @@ const props = defineProps<{
   removeLabel: string
   roleLabels: Record<string, string>
   /** May the user add people (the page-level `manage` action)? */
-  canAdd: boolean
+  canAdd?: boolean
   /** May the user open the page at all? Otherwise, the 403 page naming `whoToAsk` (UI-FBK-14). */
   allowed: boolean
   whoToAsk: string
@@ -61,7 +65,9 @@ const props = defineProps<{
    */
   hidden?: boolean
 }>()
+const emit = defineEmits<{ refused: [] }>()
 
+const store = useCurrentUserStore()
 const query = useListQuery({ limit: 25 })
 const done = ref('')
 const table = ref<HTMLTableElement>()
@@ -127,6 +133,12 @@ function finished(message: string) {
   void page.run()
 }
 
+function forbidden() {
+  void page.run()
+  store.load().catch(() => {})
+  emit('refused')
+}
+
 const announcement = computed(() => {
   if (page.loading.value) return `Loading ${props.thing}…`
   const total = page.data.value?.total
@@ -141,9 +153,11 @@ const announcement = computed(() => {
   <ForbiddenView v-else-if="refused" :who-to-ask="whoToAsk" />
   <div v-else class="flex flex-col gap-6">
     <slot name="nav" />
-    <PageHeader :title="title">
-      <Button v-if="canAdd" @click="adder?.open()">Add person</Button>
-    </PageHeader>
+    <slot name="header" :add="() => adder?.open()">
+      <PageHeader :title="title">
+        <Button v-if="canAdd" @click="adder?.open()">Add person</Button>
+      </PageHeader>
+    </slot>
     <SuccessStatus :message="done" />
     <section
       aria-labelledby="roster-heading"
@@ -212,9 +226,35 @@ const announcement = computed(() => {
       </template>
     </section>
     <p class="sr-only" aria-live="polite">{{ announcement }}</p>
-    <AddPersonDialog ref="adder" :roster="roster" @done="finished" />
-    <ChangeRoleDialog ref="roleChanger" :roster="roster" @done="finished" />
-    <RemoveDialog ref="remover" :roster="roster" :fallback-focus="focusHeading" @done="removed" />
-    <AccountActions ref="account" :workspace-id="roster.workspaceId" @done="finished" />
+    <!-- A 403 reload can take away the control that opened a dialog: focus then goes to the h1. -->
+    <AddPersonDialog
+      ref="adder"
+      :roster="roster"
+      :fallback-focus="focusHeading"
+      @done="finished"
+      @refused="forbidden"
+    />
+    <ChangeRoleDialog
+      ref="roleChanger"
+      :roster="roster"
+      :fallback-focus="focusHeading"
+      @done="finished"
+      @refused="forbidden"
+    />
+    <RemoveDialog
+      ref="remover"
+      :roster="roster"
+      :fallback-focus="focusHeading"
+      @done="removed"
+      @refused="forbidden"
+    />
+    <AccountActions
+      ref="account"
+      :workspace-id="roster.workspaceId"
+      :fallback-focus="focusHeading"
+      @done="finished"
+      @refused="forbidden"
+    />
+    <slot name="dialogs" :done="finished" :refused="forbidden" />
   </div>
 </template>

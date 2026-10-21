@@ -15,8 +15,9 @@ import AccountDetailsDialog from './AccountDetailsDialog.vue'
 import AccountPasswordDialog from './AccountPasswordDialog.vue'
 import type { Person } from './accountActions'
 
-defineProps<{ workspaceId: string }>()
-const emit = defineEmits<{ done: [message: string] }>()
+// `fallbackFocus`: where a dialog's focus goes on close when its row's menu is gone.
+defineProps<{ workspaceId: string; fallbackFocus?: () => void }>()
+const emit = defineEmits<{ done: [message: string]; refused: [] }>()
 
 const store = useCurrentUserStore()
 const details = ref<InstanceType<typeof AccountDetailsDialog>>()
@@ -55,7 +56,23 @@ defineExpose({ actionsFor })
 </script>
 
 <template>
-  <AccountDetailsDialog ref="details" :workspace-id="workspaceId" @done="emit('done', $event)" />
-  <AccountPasswordDialog ref="password" @done="emit('done', $event)" />
-  <AccountConfirmDialog ref="confirm" @done="emit('done', $event)" />
+  <AccountDetailsDialog
+    ref="details"
+    :workspace-id="workspaceId"
+    :fallback-focus="fallbackFocus"
+    @done="emit('done', $event)"
+    @refused="emit('refused')"
+  />
+  <AccountPasswordDialog
+    ref="password"
+    :fallback-focus="fallbackFocus"
+    @done="emit('done', $event)"
+    @refused="emit('refused')"
+  />
+  <AccountConfirmDialog
+    ref="confirm"
+    :fallback-focus="fallbackFocus"
+    @done="emit('done', $event)"
+    @refused="emit('refused')"
+  />
 </template>

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // Removing someone from a roster, confirmed first (UI-FBK-7; design-doc §4, "Removing a member with
 // their projects"): the option to also remove their project memberships there is checked by
-// default; left unchecked, they keep those projects. The last owner can't leave unless someone
-// replaces them: the server's 422 (`last_owner` on the path's `user_id`) brings up the
-// replacement-owner picker (DL-59). The removed row is gone, so focus then goes to `fallbackFocus`.
+// default; left unchecked, they keep those projects. A project's roster has no such option. The
+// last owner can't leave unless someone replaces them: the server's 422 (`last_owner` on the path's
+// `user_id`) brings up the replacement-owner picker (DL-59). The removed row is gone, so focus then
+// goes to `fallbackFocus`. A 403 tells the page (`refused`), so it reloads what the user may do
+// (UI-FRM-7).
 import { nextTick, ref } from 'vue'
 
 import { ApiError } from '@/api/client'
@@ -11,13 +13,13 @@ import { ApiError } from '@/api/client'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
-import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 
 import ReplacementOwnerField from './ReplacementOwnerField.vue'
 import type { Roster, RosterPerson } from './roster'
 
 const props = defineProps<{ roster: Roster; fallbackFocus?: () => void }>()
-const emit = defineEmits<{ done: [message: string] }>()
+const emit = defineEmits<{ done: [message: string]; refused: [] }>()
 
 const person = ref<RosterPerson>()
 const withProjects = ref(true)
@@ -52,7 +54,7 @@ async function submit(): Promise<void> {
   try {
     await props.roster.remove(
       person.value.user_id,
-      withProjects.value,
+      !!props.roster.projects && withProjects.value,
       replacing.value ? newOwner.value : undefined,
     )
     dialog.value?.close()
@@ -65,6 +67,7 @@ async function submit(): Promise<void> {
       return ownerField.value?.focus()
     }
     const target = errors.apply(error)
+    if (error instanceof ApiError && error.status === 403) emit('refused')
     await nextTick()
     if (target === 'new_owner_id') {
       ownerField.value?.focus()
@@ -85,6 +88,7 @@ function lastOwnerRefusal(error: unknown): string | null {
 
 const formElement = ref<HTMLFormElement>()
 const retry = retryFromSubmit(formElement, submit)
+const dismissed = () => dismissToSubmit(errors, formElement)
 
 defineExpose({ open })
 </script>
@@ -101,13 +105,13 @@ defineExpose({ open })
         :key="errors.alertKey.value"
         ref="alertBox"
         :alert="errors.alert.value"
-        @dismiss="errors.dismissAlert()"
+        @dismiss="dismissed"
         @retry="retry"
       />
       <p v-if="replacing" class="m-0 text-sm text-text-muted">
         <span aria-hidden="true" class="font-bold text-danger">*</span> Required field
       </p>
-      <div class="flex items-start gap-2">
+      <div v-if="roster.projects" class="flex items-start gap-2">
         <input
           id="remove-with-projects"
           v-model="withProjects"
@@ -119,7 +123,7 @@ defineExpose({ open })
         </label>
       </div>
       <ReplacementOwnerField
-        v-if="replacing && person"
+        v-if="replacing && person && roster.everyone"
         id="remove-owner"
         ref="ownerField"
         v-model="newOwner"

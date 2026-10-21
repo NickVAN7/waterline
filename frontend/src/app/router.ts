@@ -89,6 +89,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { settlesItself: true },
   },
   {
+    path: '/:orgSlug/projects/:key/members',
+    name: 'project-members',
+    component: () => import('@/views/project/ProjectMembersView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
+    path: '/:orgSlug/projects/:key/access',
+    name: 'project-access',
+    component: () => import('@/views/project/ProjectAccessView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
     path: '/:orgSlug/projects/:key/settings',
     name: 'project-settings',
     component: () => import('@/views/project/ProjectSettingsView.vue'),

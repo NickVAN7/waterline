@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // The selected project's pages in the sidebar (UI-SHL-6): Home, then each enabled module whose
 // slice hasn't shipped (`available` false in module guidance) as plain muted text with "Not
-// available yet", never a link to a broken screen (design-doc §1.1), then Settings for those it
-// offers anything (`hasSettings`). Members joins with its page (S1-C16b; DL-109). A module's
-// link arrives with its slice.
+// available yet", never a link to a broken screen (design-doc §1.1), then Members (`project.view`:
+// anyone who sees the project reads its members), then Settings for those it offers anything (`hasSettings`). A
+// module's link arrives with its slice.
 import { computed, onMounted } from 'vue'
 
 import { api, client } from '@/api/client'
 import { MODULE, NOT_AVAILABLE_YET } from '@/app/labels'
+import { allows } from '@/composables/allowedActions'
 import { useLoad } from '@/composables/useLoad'
 import type { Project } from '@/stores/currentOrg'
 import { hasSettings } from '@/views/project/settings'
@@ -41,6 +42,12 @@ const unavailable = computed(() => {
       {{ MODULE[module] ?? module }}
       <span class="text-sm">{{ NOT_AVAILABLE_YET }}</span>
     </p>
+    <SidebarLink
+      v-if="allows(project, 'project.view')"
+      :to="{ name: 'project-members', params: { orgSlug, key: project.key } }"
+    >
+      Members
+    </SidebarLink>
     <SidebarLink
       v-if="hasSettings(project)"
       :to="{ name: 'project-settings', params: { orgSlug, key: project.key } }"

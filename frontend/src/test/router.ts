@@ -23,6 +23,8 @@ export async function testRouter(path = '/') {
       { path: '/:orgSlug/settings', name: 'org-settings', component: Page },
       { path: '/:orgSlug/projects', name: 'org-projects', component: Page },
       { path: '/:orgSlug/projects/:key', name: 'project-home', component: Page },
+      { path: '/:orgSlug/projects/:key/members', name: 'project-members', component: Page },
+      { path: '/:orgSlug/projects/:key/access', name: 'project-access', component: Page },
       { path: '/:orgSlug/projects/:key/settings', name: 'project-settings', component: Page },
     ],
   })

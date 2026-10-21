@@ -24,7 +24,7 @@ const guidance = (available: boolean) =>
 async function mountWith(
   answer: unknown,
   enabled: ('sprints' | 'github')[] = ['sprints'],
-  allowed: Action[] = [],
+  allowed: Action[] = ['project.view'],
 ) {
   vi.spyOn(client, 'GET').mockResolvedValue(answer as never)
   const router = await testRouter('/')
@@ -40,11 +40,12 @@ async function mountWith(
 }
 
 describe('ProjectPages', () => {
-  it("links Home, and shows an enabled module that hasn't shipped as text, not a link", async () => {
+  it("links Home and Members, and shows an enabled module that hasn't shipped as text, not a link", async () => {
     const wrapper = await mountWith(guidance(false))
 
     expect(wrapper.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
       ['Home', '/acme/projects/ERP'],
+      ['Members', '/acme/projects/ERP/members'],
     ])
     expect(wrapper.get('p').text().replace(/\s+/g, ' ')).toBe('Sprints Not available yet')
     await expectNoA11yViolations(wrapper)
@@ -74,17 +75,24 @@ describe('ProjectPages', () => {
     'project.archive',
     'project.unarchive',
   ])('links Settings for whoever it offers anything: %s', async (action) => {
-    const wrapper = await mountWith(guidance(true), [], [action])
+    const wrapper = await mountWith(guidance(true), [], ['project.view', action])
 
     expect(wrapper.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
       ['Home', '/acme/projects/ERP'],
+      ['Members', '/acme/projects/ERP/members'],
       ['Settings', '/acme/projects/ERP/settings'],
     ])
+  })
+
+  it('links no Members without project.view', async () => {
+    const wrapper = await mountWith(guidance(true), [], [])
+
+    expect(wrapper.findAll('a').map((a) => a.text())).toEqual(['Home'])
   })
 
   it('links no Settings with only project.view', async () => {
     const wrapper = await mountWith(guidance(true), [], ['project.view'])
 
-    expect(wrapper.findAll('a').map((a) => a.text())).toEqual(['Home'])
+    expect(wrapper.findAll('a').map((a) => a.text())).toEqual(['Home', 'Members'])
   })
 })

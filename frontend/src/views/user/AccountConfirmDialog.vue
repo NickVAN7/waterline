@@ -4,17 +4,19 @@
 // refuses deactivating the last active owner or system admin with a 422, shown in the dialog.
 import { computed, nextTick, ref } from 'vue'
 
-import { api, client } from '@/api/client'
+import { api, ApiError, client } from '@/api/client'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
-import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 
 import type { Person } from './accountActions'
 
 export type ConfirmedAction = 'deactivate' | 'reactivate' | 'sign-out'
 
-const emit = defineEmits<{ done: [message: string] }>()
+// `refused`: a 403, so the page reloads what the user may do (UI-FRM-7).
+defineProps<{ fallbackFocus?: () => void }>()
+const emit = defineEmits<{ done: [message: string]; refused: [] }>()
 
 const ACTIONS: Record<
   ConfirmedAction,
@@ -82,6 +84,7 @@ async function submit(): Promise<void> {
     errors.apply(error)
     await nextTick()
     alertBox.value?.focus()
+    if (error instanceof ApiError && error.status === 403) emit('refused')
   } finally {
     pending.value = false
   }
@@ -89,19 +92,20 @@ async function submit(): Promise<void> {
 
 const formElement = ref<HTMLFormElement>()
 const retry = retryFromSubmit(formElement, submit)
+const dismissed = () => dismissToSubmit(errors, formElement)
 
 defineExpose({ open })
 </script>
 
 <template>
-  <ModalDialog ref="dialog" :title="action.title(person.name)">
+  <ModalDialog ref="dialog" :title="action.title(person.name)" :fallback-focus="fallbackFocus">
     <form ref="formElement" novalidate class="flex flex-col gap-4" @submit.prevent="submit">
       <FormAlert
         v-if="errors.alert.value"
         :key="errors.alertKey.value"
         ref="alertBox"
         :alert="errors.alert.value"
-        @dismiss="errors.dismissAlert()"
+        @dismiss="dismissed"
         @retry="retry"
       />
       <p class="m-0">{{ action.text }}</p>

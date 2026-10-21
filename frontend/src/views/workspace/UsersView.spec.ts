@@ -1,10 +1,11 @@
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { failed, ok } from '@/test/api'
+import { failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { cleanUpAfterEach, listPage, mountWorkspaceView, WORKSPACE_ID } from '@/test/workspace'
 
@@ -88,5 +89,35 @@ describe('UsersView', () => {
     expect(wrapper.get('h1').text()).toBe("You can't open this page")
     expect(wrapper.text()).toContain('Error 403')
     expect(wrapper.text()).toContain('Ask one of them if you need it.')
+  })
+
+  it('reloads the rows and /me after a 403 in an account dialog, as what the user may do changed (UI-FRM-7)', async () => {
+    const get = vi
+      .spyOn(client, 'GET')
+      .mockImplementation(((path: string) =>
+        Promise.resolve(path === '/api/auth/me' ? ok(me()) : ok(listPage(USERS)))) as never)
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
+    const lists = () =>
+      get.mock.calls.filter((c) => c[0] === '/api/workspaces/{workspace_id}/users').length
+    expect(lists()).toBe(1)
+    await wrapper.findAll('tbody tr')[1]!.get('button[aria-haspopup=menu]').trigger('click')
+    await flushPromises()
+    ;[...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((e) => e.textContent?.trim() === 'Reactivate')!
+      .click()
+    await flushPromises()
+
+    await wrapper
+      .findAll('dialog')
+      .find((d) => d.attributes('open') !== undefined)!
+      .get('form')
+      .trigger('submit')
+    await flushPromises()
+
+    expect(lists()).toBe(2)
+    expect(get).toHaveBeenCalledWith('/api/auth/me')
   })
 })

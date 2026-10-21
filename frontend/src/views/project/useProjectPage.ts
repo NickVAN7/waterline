@@ -12,7 +12,9 @@ import { focusHeading, redirectInPlace, settlePage } from '@/app/routeFocus'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
 
-export function useProjectPage(routeName: 'project-home' | 'project-settings') {
+export function useProjectPage(
+  routeName: 'project-home' | 'project-members' | 'project-access' | 'project-settings',
+) {
   const route = useRoute()
   const router = useRouter()
   const nav = useCurrentOrgStore()

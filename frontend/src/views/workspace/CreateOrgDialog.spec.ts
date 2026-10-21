@@ -1,9 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createPinia, setActivePinia } from 'pinia'
+
 import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
+import { failed, me, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
 import { listPage } from '@/test/workspace'
 
@@ -23,6 +25,7 @@ async function openDialog() {
   const get = vi.spyOn(client, 'GET').mockImplementation(((path: string) => {
     if (path.endsWith('/users')) return Promise.resolve(ok(listPage([ANN])))
     if (path === '/api/auth/password-policy') return Promise.resolve(ok(PASSWORD_POLICY))
+    if (path === '/api/auth/me') return Promise.resolve(ok(me()))
     return Promise.resolve(ok({ available: true, problem: null }))
   }) as never)
   const wrapper = mount(CreateOrgDialog, { props: { workspaceId: 'ws' }, attachTo: document.body })
@@ -41,7 +44,10 @@ async function submit(wrapper: Awaited<ReturnType<typeof openDialog>>['wrapper']
   await flushPromises()
 }
 
-beforeEach(stubDialog)
+beforeEach(() => {
+  setActivePinia(createPinia())
+  stubDialog()
+})
 afterEach(() => {
   document.body.innerHTML = ''
   vi.restoreAllMocks()
@@ -141,5 +147,35 @@ describe('CreateOrgDialog', () => {
 
     expect(wrapper.get('#org-slug-error').text()).toBe('That slug is taken.')
     expect(document.activeElement?.id).toBe('org-slug')
+  })
+
+  it('reloads /me after a 403, so what the user may do follows (UI-FRM-7)', async () => {
+    const { wrapper, get } = await openDialog()
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    await fillOrg(wrapper)
+    await wrapper.get('#org-owner-id').setValue('u-ann')
+
+    await submit(wrapper)
+
+    expect(wrapper.get('[role="alert"]').text()).toContain("You don't have permission")
+    expect(get).toHaveBeenCalledWith('/api/auth/me')
+  })
+
+  it('returns focus to Create organization when its alert is dismissed (UI-FBK-13)', async () => {
+    const { wrapper } = await openDialog()
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(503, { code: 'network_error', message: '', details: {} }),
+    )
+    await fillOrg(wrapper)
+    await wrapper.get('#org-owner-id').setValue('u-ann')
+    await submit(wrapper)
+
+    await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(document.activeElement?.textContent?.trim()).toBe('Create organization')
   })
 })

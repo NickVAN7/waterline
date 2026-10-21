@@ -5,6 +5,10 @@
 // the name, the username (suggested from the name until the admin edits it, and checked live,
 // UI-FRM-9), and a temporary password, then shows that password once (UI-FRM-11). A 422 on the
 // email (already a member, deactivated) or the role takes the admin back to step 1, under the field.
+// On a project (S1-C16b): an account from outside the org (`outside_org`) is added only after a
+// second confirm that adds them to the org too (`join_org`, DL-78); on an export-controlled project,
+// each add first confirms the person is authorized (design-doc §3.1), its button blocked until then
+// (UI-FRM-15). A 403 tells the page (`refused`), so it reloads what the user may do (UI-FRM-7).
 import { computed, nextTick, ref, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
@@ -16,19 +20,24 @@ import TemporaryPasswordField from '@/components/TemporaryPasswordField.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
 import TextField from '@/components/TextField.vue'
 import { AVAILABILITY_DELAY_MS, useAvailability } from '@/composables/useAvailability'
-import { useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, useFormErrors } from '@/composables/useFormErrors'
 
 import type { Roster } from './roster'
 
-const props = defineProps<{ roster: Roster }>()
-const emit = defineEmits<{ done: [message: string] }>()
+// `fallbackFocus`: where focus goes on close when the opener is gone (a 403 reload hid it).
+const props = defineProps<{ roster: Roster; fallbackFocus?: () => void }>()
+const emit = defineEmits<{ done: [message: string]; refused: [] }>()
 
-type Step = 'email' | 'confirm' | 'create' | 'created'
+type Step = 'email' | 'confirm' | 'join' | 'create' | 'created'
 const step = ref<Step>('email')
 const pending = ref(false)
 const status = ref('')
 const values = ref({ email: '', role: '', name: '', username: '', password: '' })
 const usernameEdited = ref(false)
+const authorized = ref(false)
+// The server's reason the account needs adding to the org too (`outside_org`).
+const joining = ref('')
+const blocked = computed(() => !!props.roster.exportControlled && !authorized.value)
 
 const emailErrors = useFormErrors({ email: 'Email', role: 'Role' })
 const createErrors = useFormErrors({
@@ -48,6 +57,7 @@ const nameField = ref<InstanceType<typeof TextField>>()
 const usernameField = ref<InstanceType<typeof TextField>>()
 const passwordField = ref<InstanceType<typeof TemporaryPasswordField>>()
 const confirmButton = ref<InstanceType<typeof Button>>()
+const joinButton = ref<InstanceType<typeof Button>>()
 const doneButton = ref<InstanceType<typeof Button>>()
 const fields = {
   email: emailField,
@@ -110,6 +120,8 @@ async function open(): Promise<void> {
     password: '',
   }
   usernameEdited.value = false
+  authorized.value = false
+  joining.value = ''
   emailErrors.reset()
   createErrors.reset()
   status.value = ''
@@ -131,8 +143,17 @@ async function run(work: () => Promise<void>, saying: string): Promise<void> {
     status.value = ''
   } catch (error) {
     status.value = ''
-    // An email problem belongs to step 1, where the email can be changed.
     const target = errors.value.apply(error)
+    if (error instanceof ApiError && error.status === 403) emit('refused')
+    const outside = emailErrors.fieldProblems.value.email?.find((p) => p.type === 'outside_org')
+    if (step.value === 'confirm' && outside) {
+      emailErrors.reset()
+      joining.value = outside.message
+      step.value = 'join'
+      await nextTick()
+      return focusAction()
+    }
+    // An email problem belongs to step 1, where the email can be changed.
     if ((target === 'email' || target === 'role') && step.value !== 'email') {
       emailErrors.fieldErrors.value = { [target]: errors.value.fieldErrors.value[target] }
       step.value = 'email'
@@ -155,19 +176,26 @@ async function checkEmail(): Promise<void> {
   }, 'Checking the email…')
 }
 
+function options() {
+  return { joinOrg: step.value === 'join', exportControlConfirmed: authorized.value }
+}
+
 async function addExisting(): Promise<void> {
+  // Retry calls this directly, past the blocked button (UI-FRM-15).
+  if (blocked.value) return
   await run(async () => {
-    await props.roster.add(values.value.email, values.value.role)
+    await props.roster.add(values.value.email, values.value.role, options())
     dialog.value?.close()
     emit('done', `${values.value.email} added to ${props.roster.scope}.`)
   }, 'Adding…')
 }
 
 async function create(): Promise<void> {
+  if (blocked.value) return
   const empty = createErrors.requireFilled(values.value)
   if (empty) return focus(empty)
   await run(async () => {
-    await props.roster.create(values.value)
+    await props.roster.create(values.value, options())
     step.value = 'created'
     emit('done', `${values.value.name} added to ${props.roster.scope}.`)
     await nextTick()
@@ -177,33 +205,52 @@ async function create(): Promise<void> {
 
 async function back(): Promise<void> {
   step.value = 'email'
+  // The confirmation was for that email's person; another email is another person (§3.1).
+  authorized.value = false
   await focus('email')
+}
+
+/** The step's form (step 1 or 2); the confirm steps have none. */
+function stepForm(): HTMLFormElement | undefined {
+  if (step.value !== 'email' && step.value !== 'create') return undefined
+  const first = step.value === 'create' ? 'name' : 'email'
+  return document.querySelector<HTMLInputElement>(`#add-${first}`)?.form ?? undefined
+}
+
+/** The step's own action button: its form's submit, or the confirm step's button. */
+function focusAction() {
+  const button = { confirm: confirmButton, join: joinButton }[step.value as 'confirm' | 'join']
+  if (button) (button.value?.$el as HTMLElement | undefined)?.focus()
+  else stepForm()?.querySelector<HTMLElement>('button[type=submit]')?.focus()
 }
 
 // Retry focuses the step's own action button first (UI-FRM-7), then repeats it.
 function retry() {
-  if (step.value === 'confirm') {
-    ;(confirmButton.value?.$el as HTMLElement | undefined)?.focus()
-    return addExisting()
-  }
-  document
-    .querySelector<HTMLInputElement>(`#add-${step.value === 'create' ? 'name' : 'email'}`)
-    ?.form?.querySelector<HTMLElement>('button[type=submit]')
-    ?.focus()
+  focusAction()
+  if (step.value === 'confirm' || step.value === 'join') return addExisting()
   return step.value === 'create' ? create() : checkEmail()
+}
+
+// The alert held focus: it goes back to the step's action (UI-FBK-13).
+async function dismissed() {
+  const form = stepForm()
+  if (form) return dismissToSubmit(errors.value, { value: form })
+  errors.value.dismissAlert()
+  await nextTick()
+  focusAction()
 }
 
 defineExpose({ open })
 </script>
 
 <template>
-  <ModalDialog ref="dialog" title="Add a person">
+  <ModalDialog ref="dialog" title="Add a person" :fallback-focus="fallbackFocus">
     <FormAlert
       v-if="step !== 'created' && errors.alert.value"
       :key="errors.alertKey.value"
       ref="alertBox"
       :alert="errors.alert.value"
-      @dismiss="errors.dismissAlert()"
+      @dismiss="dismissed"
       @retry="retry"
     />
     <form
@@ -243,9 +290,40 @@ defineExpose({ open })
     </form>
     <div v-else-if="step === 'confirm'" class="flex flex-col gap-4">
       <p class="m-0">An account already exists for {{ values.email }}. Add them?</p>
-      <div class="flex flex-wrap gap-3">
-        <Button ref="confirmButton" :pending="pending" pending-label="Adding…" @click="addExisting"
+      <label v-if="roster.exportControlled" class="flex items-start gap-2">
+        <input v-model="authorized" type="checkbox" class="size-(--target-min) shrink-0" />
+        <span>I confirm this person is authorized for export-controlled data.</span>
+      </label>
+      <div class="flex flex-wrap items-center gap-3">
+        <Button
+          ref="confirmButton"
+          :pending="pending"
+          pending-label="Adding…"
+          :blocked="blocked"
+          :aria-describedby="blocked ? 'add-blocked' : undefined"
+          @click="addExisting"
           >Add person</Button
+        >
+        <Button variant="secondary" @click="back">Back</Button>
+        <p v-if="blocked" id="add-blocked" class="m-0 text-sm text-text-muted">
+          Check the box to continue.
+        </p>
+      </div>
+    </div>
+    <div v-else-if="step === 'join'" class="flex flex-col gap-4">
+      <!-- Read with the button that gets focus: nothing else announces the step. -->
+      <p id="add-join-reason" class="m-0">{{ joining }}</p>
+      <p id="add-join-what" class="m-0">
+        Add {{ values.email }} to the organization as a member, and to {{ roster.scope }}?
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <Button
+          ref="joinButton"
+          :pending="pending"
+          pending-label="Adding…"
+          aria-describedby="add-join-reason add-join-what"
+          @click="addExisting"
+          >Add to both</Button
         >
         <Button variant="secondary" @click="back">Back</Button>
       </div>
@@ -293,9 +371,23 @@ defineExpose({ open })
         :error="createErrors.fieldErrors.value.password"
         @update:model-value="createErrors.clearField('password')"
       />
-      <div class="flex flex-wrap gap-3">
-        <Button type="submit" :pending="pending" pending-label="Creating…">Create account</Button>
+      <label v-if="roster.exportControlled" class="flex items-start gap-2">
+        <input v-model="authorized" type="checkbox" class="size-(--target-min) shrink-0" />
+        <span>I confirm this person is authorized for export-controlled data.</span>
+      </label>
+      <div class="flex flex-wrap items-center gap-3">
+        <Button
+          type="submit"
+          :pending="pending"
+          pending-label="Creating…"
+          :blocked="blocked"
+          :aria-describedby="blocked ? 'add-new-blocked' : undefined"
+          >Create account</Button
+        >
         <Button variant="secondary" @click="back">Back</Button>
+        <p v-if="blocked" id="add-new-blocked" class="m-0 text-sm text-text-muted">
+          Check the box to continue.
+        </p>
       </div>
     </form>
     <template v-else>

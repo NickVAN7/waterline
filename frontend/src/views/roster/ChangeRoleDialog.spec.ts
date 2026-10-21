@@ -1,6 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { ApiError } from '@/api/client'
+
 import { expectNoA11yViolations } from '@/test/a11y'
 import { stubDialog } from '@/test/overlay'
 
@@ -101,5 +103,32 @@ describe('ChangeRoleDialog', () => {
 
     expect(roster.changeRole).toHaveBeenCalledOnce()
     expect(wrapper.get('#role-change-owner-error').text()).toBe('This is required.')
+  })
+
+  it('tells the page on a 403, so it reloads what the user may do (UI-FRM-7)', async () => {
+    const { wrapper, roster } = await openDialog()
+    roster.changeRole.mockRejectedValue(
+      new ApiError(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    await wrapper.get('#role-change').setValue('member')
+
+    await submit(wrapper)
+
+    expect(wrapper.emitted('refused')).toHaveLength(1)
+  })
+
+  it('returns focus to Change role when its alert is dismissed (UI-FBK-13)', async () => {
+    const { wrapper, roster } = await openDialog()
+    roster.changeRole.mockRejectedValue(
+      new ApiError(503, { code: 'network_error', message: '', details: {} }),
+    )
+    await wrapper.get('#role-change').setValue('member')
+    await submit(wrapper)
+
+    await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(document.activeElement?.textContent?.trim()).toBe('Change role')
   })
 })

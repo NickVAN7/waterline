@@ -135,6 +135,15 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).
+- A dialog that may be open while a 403 reloads `allowed_actions` isn't behind a `v-if` on those
+  actions, and every dialog whose opener can vanish (a row's menu, a hidden button) passes
+  `fallbackFocus` (`focusHeading`): otherwise the alert that held focus, or focus on close, drops
+  to `<body>` (UI-FRM-14; S1-C16b review).
+- A dialog's search or lookup that fails says so at its own field, not in the form's alert, whose
+  Retry and dismiss belong to the submit (UI-FRM-7; S1-C16b review).
+- A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets
+  `append-to="self"`: the page behind a `showModal()` dialog is inert, so an overlay appended to
+  `<body>` can't be used (S1-C16b).
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.
@@ -157,6 +166,12 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A page that changes its own URL's path (an org's slug change) is remounted: `App.vue` keys
   `RouterView` on `route.path`. Its spec mounts through a `RouterView` keyed the same way
   (`mountOrgPages`), and an outcome it reports is carried to the new page (S1-C15a review).
+- A spec that picks from an `AutoComplete` types by setting the value and triggering `input`
+  alone (a `change`, as `setValue` sends, makes `force-selection` clear the text), then chooses
+  with ArrowDown and Enter: a click on the option doesn't reach its handler in jsdom (S1-C16b).
+- An e2e step after a dialog closes waits for the dialog to be hidden and focus to be back on
+  its opener before it moves focus: the close event returns focus a task later, and would take
+  it back (S1-C16b).
 - Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
   `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
   not `getByLabel`: the label's text includes the required asterisk, the accessible name

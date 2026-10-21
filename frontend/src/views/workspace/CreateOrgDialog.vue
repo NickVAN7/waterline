@@ -16,10 +16,12 @@ import TemporaryPasswordField from '@/components/TemporaryPasswordField.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
 import TextField from '@/components/TextField.vue'
 import { AVAILABILITY_DELAY_MS, useAvailability } from '@/composables/useAvailability'
-import { retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
+import { useCurrentUserStore } from '@/stores/currentUser'
 
 const props = defineProps<{ workspaceId: string }>()
 const emit = defineEmits<{ done: [message: string] }>()
+const store = useCurrentUserStore()
 
 type Owner = 'existing' | 'new'
 const owner = ref<Owner>('existing')
@@ -213,6 +215,9 @@ async function submit(): Promise<void> {
     }
   } catch (error) {
     status.value = ''
+    // What the user may do changed: `/me`'s workspace actions follow, so Create goes if it must
+    // (UI-FRM-7).
+    if (error instanceof ApiError && error.status === 403) store.load().catch(() => {})
     if (!(error instanceof ApiError) || error.code !== 'validation_error') {
       ownerErrors.reset()
       return focus(orgErrors.apply(error))
@@ -233,6 +238,16 @@ async function submit(): Promise<void> {
 
 const formElement = ref<HTMLFormElement>()
 const retry = retryFromSubmit(formElement, submit)
+const dismissed = () =>
+  dismissToSubmit(
+    {
+      dismissAlert: () => {
+        orgErrors.dismissAlert()
+        ownerErrors.dismissAlert()
+      },
+    },
+    formElement,
+  )
 
 defineExpose({ open })
 </script>
@@ -250,12 +265,7 @@ defineExpose({ open })
         :key="orgErrors.alertKey.value + ownerErrors.alertKey.value"
         ref="alertBox"
         :alert="(orgErrors.alert.value ?? ownerErrors.alert.value)!"
-        @dismiss="
-          () => {
-            orgErrors.dismissAlert()
-            ownerErrors.dismissAlert()
-          }
-        "
+        @dismiss="dismissed"
         @retry="retry"
       />
       <p class="m-0 text-sm text-text-muted">

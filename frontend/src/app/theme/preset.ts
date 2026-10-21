@@ -135,6 +135,9 @@ export const overrides = {
       focusColor: token('text'),
     },
   },
+  // AutoComplete (the member picker, S1-C16b) takes its field, overlay, and option colors from the
+  // semantic `formField`, `overlay.select`, and `list.option` above. Its `dropdown` and `chip`
+  // tokens are still Aura's: map them here before using `dropdown` or `multiple` (UI-STY-6).
   components: {
     button: {
       root: {
