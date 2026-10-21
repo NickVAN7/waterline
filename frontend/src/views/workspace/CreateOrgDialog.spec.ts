@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createPinia, setActivePinia } from 'pinia'
@@ -8,6 +8,7 @@ import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
 import { listPage } from '@/test/workspace'
+import { AVAILABILITY_DELAY_MS } from '@/composables/useAvailability'
 
 import CreateOrgDialog from './CreateOrgDialog.vue'
 
@@ -52,6 +53,9 @@ afterEach(() => {
   document.body.innerHTML = ''
   vi.restoreAllMocks()
 })
+// Registered after the clean-up above, so it runs first: a dialog left mounted would make its
+// delayed requests during the next test.
+enableAutoUnmount(afterEach)
 
 describe('CreateOrgDialog', () => {
   it("offers the workspace's active people as the first owner", async () => {
@@ -184,5 +188,21 @@ describe('CreateOrgDialog', () => {
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(document.activeElement?.textContent?.trim()).toBe('Create organization')
+  })
+
+  it('asks for no username suggestion once the dialog is gone', async () => {
+    const { wrapper, get } = await openDialog()
+    await wrapper.get('input[value=new]').setValue(true)
+    vi.useFakeTimers()
+    await wrapper.get('#org-owner-name').setValue('Ben Ito')
+
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
+    vi.useRealTimers()
+
+    expect(get).not.toHaveBeenCalledWith(
+      '/api/workspaces/{workspace_id}/user-check',
+      expect.objectContaining({ params: expect.objectContaining({ query: { name: 'Ben Ito' } }) }),
+    )
   })
 })

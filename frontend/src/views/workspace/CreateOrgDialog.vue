@@ -5,7 +5,7 @@
 // UI-FRM-11). A taken email or username reports on its field, wherever the server puts it
 // (`new_owner.email` or `email` on a race, TD-25): `useFormErrors` reads the field from the end of
 // `loc`.
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
 import Button from '@/components/Button.vue'
@@ -87,6 +87,8 @@ const { message: usernameAvailability } = useAvailability(
 )
 // The username follows the server's suggestion for the owner's name until it's edited (DL-66).
 let suggesting: ReturnType<typeof setTimeout> | undefined
+// A suggestion still pending when the dialog goes would ask the API for nothing.
+onBeforeUnmount(() => clearTimeout(suggesting))
 watch(
   () => values.value.owner_name,
   (name) => {

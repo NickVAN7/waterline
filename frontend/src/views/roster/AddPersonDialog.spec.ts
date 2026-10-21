@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError, client } from '@/api/client'
@@ -50,6 +50,9 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
+// Registered after the clean-up above, so it runs first: a dialog left mounted would make its
+// delayed requests during the next test.
+enableAutoUnmount(afterEach)
 
 describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
   it('asks for the email and role first, role defaulting to the lowest', async () => {
@@ -125,6 +128,22 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
     await wrapper.get('#add-name').setValue('Jane Q Doe')
     await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
     expect(wrapper.get<HTMLInputElement>('#add-username').element.value).toBe('jdoe')
+  })
+
+  it('asks for no suggestion once the dialog is gone', async () => {
+    const get = userCheck(false, 'jane-doe')
+    const { wrapper } = await openDialog()
+    await continueWith(wrapper, 'new@acme.example')
+    vi.useFakeTimers()
+    await wrapper.get('#add-name').setValue('Jane Doe')
+
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
+
+    expect(get).not.toHaveBeenCalledWith(
+      '/api/workspaces/{workspace_id}/user-check',
+      expect.objectContaining({ params: expect.objectContaining({ query: { name: 'Jane Doe' } }) }),
+    )
   })
 
   it('drops a suggestion still pending when the admin edits the username meanwhile', async () => {

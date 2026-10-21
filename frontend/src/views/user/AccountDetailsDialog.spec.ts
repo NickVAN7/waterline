@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
@@ -31,6 +31,9 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
+// Registered after the clean-up above, so it runs first: a dialog left mounted would make its
+// delayed requests during the next test.
+enableAutoUnmount(afterEach)
 
 describe('AccountDetailsDialog', () => {
   it("opens with the person's email, name, and username, focus on the first", async () => {

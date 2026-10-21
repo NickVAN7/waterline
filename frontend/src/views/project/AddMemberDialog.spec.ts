@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -64,6 +64,9 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
+// Registered after the clean-up above, so it runs first: a dialog left mounted would make its
+// delayed requests during the next test.
+enableAutoUnmount(afterEach)
 
 describe('AddMemberDialog: the picker', () => {
   it('starts on the person, a labelled combobox, with the role defaulting to the lowest', async () => {

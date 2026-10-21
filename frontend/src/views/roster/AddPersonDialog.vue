@@ -11,7 +11,7 @@
 // (UI-FRM-15). A confirmation step starts on Back (DL-117), and each step's text is read with the
 // control that gets focus (DL-118). A 403, or a refusal for a project's changed export control,
 // tells the page (`refused`), so it reloads what the user may do (UI-FRM-7, DL-116).
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
 import Button from '@/components/Button.vue'
@@ -89,6 +89,8 @@ const { message: availability } = useAvailability(
 
 // The username follows the server's suggestion for the name until the admin edits it (DL-66).
 let suggesting: ReturnType<typeof setTimeout> | undefined
+// A suggestion still pending when the dialog goes would ask the API for nothing.
+onBeforeUnmount(() => clearTimeout(suggesting))
 watch(
   () => values.value.name,
   (name) => {

@@ -169,6 +169,10 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A page that changes its own URL's path (an org's slug change) is remounted: `App.vue` keys
   `RouterView` on `route.path`. Its spec mounts through a `RouterView` keyed the same way
   (`mountOrgPages`), and an outcome it reports is carried to the new page (S1-C15a review).
+- A spec whose component makes a delayed request (a debounced check or search) registers
+  `enableAutoUnmount(afterEach)`, and the component clears its timer on unmount: a component left
+  mounted makes its request during the next test, which then sees a call it didn't make (S1-C16d
+  CI).
 - A spec that picks from an `AutoComplete` types by setting the value and triggering `input`
   alone (a `change`, as `setValue` sends, makes `force-selection` clear the text), then chooses
   with ArrowDown and Enter: a click on the option doesn't reach its handler in jsdom (S1-C16b).
