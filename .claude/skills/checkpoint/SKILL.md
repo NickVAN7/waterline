@@ -135,6 +135,10 @@ one pass of it if it had none, given those findings and their resolutions too (D
   (each copy is a clone, with its own `.git`; the rest of the diff was reviewed in pass 1);
 - its previous pass's findings and their resolutions, as recorded in the review record.
 
+**List the siblings** (DL-128): for each fix, the review record says where else the pattern
+lives and what was done there. Before a re-review, run `uv run wl fmt`, and grep the docs for
+the behavior the fix removed.
+
 Two passes per reviewer at most. Findings from the second pass are fixed without another
 pass, logged, or, when a fix would change behavior beyond the finding, put to the owner in the
 report.
@@ -220,13 +224,18 @@ Send the owner:
   repo-auditor) with
   the resolution of each finding (as recorded in `docs/reviews/s<n>/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
-- any open questions from the review;
+- any open questions from the review. Each decision or question says what it is, why it
+  matters, the options, and a recommendation (DL-130); every open question in the review record
+  is in the report;
 - the PR link and its CI result, and whether this checkpoint ends its group (a review point)
   or the slice (so the PR is ready to merge on approval);
 - **a try-it-yourself script**, for any checkpoint with behavior visible through the API or
   the UI: 3–6 numbered steps against the running dev stack (`curl` with a cookie jar and an
   `Origin` header before S1-C14, screens after), each with its expected result, including at
-  least one step that should be denied. Run it once yourself to make sure the steps are right;
+  least one step that should be denied. Its first step sets up or names the state it needs
+  (e.g. `uv run wl seed --demo` on an empty database), and before handing it over, check the
+  owner's dev stack (its users, `.env`), not only the end-to-end stack (DL-127). Run it once
+  yourself to make sure the steps are right;
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
   the owner, which skills and agents never triggered, the verdict of any process trial, and the
@@ -236,14 +245,3 @@ Send the owner:
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.
-
-**Review-tier trial** (`docs/build-plan.md`, "Verification"; S1-C8 to S1-C10 only):
-- **S1-C8 and S1-C9:** after sending the report, go straight on to the next checkpoint without
-  stopping, only if **all** of these hold: `wl check` and CI are green; every reviewer that ran
-  returned no findings, or only findings that were **fixed** (none logged, none rejected); and
-  there are no open questions, no `docs-consistency` Decisions, and no deviations from the docs
-  in the review note. Say in the report that it auto-continued and why. If any condition
-  fails, stop as usual.
-- **S1-C10:** a full stop for the whole group. The report covers S1-C8 to S1-C10, with links to
-  the four review records (S1-C8, S1-C8a, S1-C9, S1-C10; DL-60) and the group's diff range (from S1-C8's base, the last commit
-  before its work started, to the S1-C10 commit).

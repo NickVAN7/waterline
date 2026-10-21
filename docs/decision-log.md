@@ -115,7 +115,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   never renumbered.
 - **Supersedes:** build plan, "Design changes outside a checkpoint" (run `docs-consistency`
   before committing); the root `CLAUDE.md` bullet on design changes from a chat session
-- **Superseded by:** none
+- **Superseded by:** DL-131 (in part: review answers that change built code are bundled)
 - **Applies to:** `.claude/skills/design-change/`; root `CLAUDE.md`; build plan
   ("Verification", "Claude configuration"); developer guide section 11; docs consistency
   parsers (checkpoint IDs with a suffix, order from each slice's checkpoint table)
@@ -240,7 +240,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   design change, after a `checkpoint-reviewer` pass (with its sabotage spot-check) recorded in
   `docs/reviews/DC-<YYYY-MM-DD>.md`. Product code still goes through an inserted checkpoint.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-131 (in part: review answers that change built code are bundled)
 - **Applies to:** `design-change` skill; `checkpoint-reviewer` agent; build plan ("Design
   changes outside a checkpoint"); root `CLAUDE.md`
 - **Source:** chat session (docs-consistency decisions, workflow review)
@@ -553,7 +553,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   change covers. The review ID stays `DC-<YYYY-MM-DD>` (with its letter); existing records were
   moved and renamed without changing their contents.
 - **Supersedes:** DL-18's record path, `docs/reviews/DC-<YYYY-MM-DD>.md`
-- **Superseded by:** none
+- **Superseded by:** DL-126 (in part: which design changes get a record)
 - **Applies to:** `checkpoint` and `design-change` skills; `checkpoint-reviewer` agent; build
   plan ("What every checkpoint delivers", "Design changes outside a checkpoint", "Claude
   configuration", the Slice 0 repository layout, Slice 1's plan reference); developer guide
@@ -1621,3 +1621,91 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-FRM-7
 - **Source:** chat session (owner, Oct 21, 2026, answering the S1-C16c review's question U3)
+
+### DL-124: Slice 2 opens with a pre-checkpoint, S2-C0, for Slice 1's leftovers
+- **Date:** 2026-10-21
+- **Decision:** Slice 2's first checkpoint is S2-C0, before its features. It covers:
+  `repo-auditor`'s Slice 1 majors (TD-56 to TD-59); the docs and the authorization registry made
+  to agree (TD-60); the owner's completed screen inventory checked (TD-62); the `vue-screen`
+  skill and the `user-guide-verifier` agent, moved from the scheduled workflow items; and the
+  owner's UI feedback (`ui-feedback.md`). Slice 2's plan writes its rows.
+- **Supersedes:** the build plan's scheduled triggers for the `vue-screen` skill (after
+  S1-C14a) and the `user-guide-verifier` agent (S1-C17)
+- **Superseded by:** none
+- **Applies to:** build plan ("Workflow items scheduled", "Slice 2 — notes for planning"); tech
+  debt (TD-56 to TD-60, TD-62)
+- **Source:** chat session (owner, Oct 21, 2026, at the S1-C17 review and the Slice 1 retro)
+
+### DL-125: The review-tier trial's verdict: not exercised
+- **Date:** 2026-10-21
+- **Decision:** The review-tier trial (S1-C8 to S1-C10) was not exercised: neither S1-C8 nor
+  S1-C9 met its conditions to auto-continue, and nothing in them needed rework. The S1-C8 and
+  S1-C9 exception is removed from `CLAUDE.md` and the `checkpoint` skill; the build plan keeps
+  the trial's description, with its verdict. Every checkpoint stops for approval.
+- **Supersedes:** none (DL-10's trial ends with this verdict)
+- **Superseded by:** none
+- **Applies to:** `CLAUDE.md` ("How work is done: checkpoints"); `checkpoint` skill ("Report
+  and stop"); build plan ("Verification")
+- **Source:** Slice 1 retro (`docs/reviews/s1/S1-retro.md`; owner, Oct 21, 2026)
+
+### DL-126: Every design change gets a review record
+- **Date:** 2026-10-21
+- **Decision:** Every design change, docs-only or tooling, gets a record in
+  `docs/reviews/design-changes/`, holding its `docs-consistency` pass (and, for tooling,
+  `checkpoint-reviewer`'s passes) with every finding's resolution.
+- **Supersedes:** DL-43's "design-change tooling reviews" as the only design changes with a record
+- **Superseded by:** none
+- **Applies to:** `design-change` skill (steps 7 and 8); `CLAUDE.md` (the docs table); build
+  plan ("Design changes outside a checkpoint", the repository layout); developer guide (section
+  11, the repository layout)
+- **Source:** S1-C17 docs-consistency decision 6 (owner, Oct 21, 2026)
+
+### DL-127: A try-it script is checked against the owner's dev stack
+- **Date:** 2026-10-21
+- **Decision:** A try-it script's first step sets up or names the state it needs (e.g.
+  `uv run wl seed --demo` on an empty database), and the session checks the owner's dev stack
+  (its users, `.env`) before handing the script over, not only the end-to-end stack.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint` skill (step 7)
+- **Source:** Slice 1 retro, proposal 1 (owner, Oct 21, 2026)
+
+### DL-128: A fix lists the siblings it checked
+- **Date:** 2026-10-21
+- **Decision:** For each fix, the review record lists the other places the same pattern lives
+  and what was done there. Before a re-review, a fix runs `wl fmt` and greps the docs for the
+  behavior it removed.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint` skill (step 5)
+- **Source:** Slice 1 retro, proposal 2 (owner, Oct 21, 2026)
+
+### DL-129: A new dependency names its license
+- **Date:** 2026-10-21
+- **Decision:** The commit that adds or upgrades a dependency across a major version names its
+  license, and anything that isn't permissive or needs a key goes to the owner before it's added.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `CLAUDE.md` ("Always")
+- **Source:** Slice 1 retro, proposal 3 (owner, Oct 21, 2026)
+
+### DL-130: Owner decisions are explained in the report, and none is left out
+- **Date:** 2026-10-21
+- **Decision:** Each decision or question for the owner in a report says what it is, why it
+  matters, the options, and a recommendation. A checkpoint isn't committed with an open question
+  that isn't in its report.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `checkpoint` skill (step 7)
+- **Source:** Slice 1 retro, proposal 4 (owner, Oct 21, 2026)
+
+### DL-131: Small follow-ups to built code are bundled
+- **Date:** 2026-10-21
+- **Decision:** Review answers that change built code are collected into the next planned
+  checkpoint, or one follow-up checkpoint per group, rather than a checkpoint per answer.
+- **Supersedes:** DL-8 and DL-18, in part (a new inserted checkpoint for each change to built
+  code, for review answers)
+- **Superseded by:** none
+- **Applies to:** `design-change` skill (step 4); build plan ("Design changes outside a
+  checkpoint", "Claude configuration"); developer guide (section 11)
+- **Source:** Slice 1 retro, proposal 5 (owner, Oct 21, 2026)

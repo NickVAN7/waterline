@@ -19,7 +19,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 | `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
 | `docs/decision-log.md` | Every owner decision that changed or superseded a recorded rule, or set a process (`DL-<n>`) |
-| `docs/reviews/s<n>/<ID>.md`, `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` | Each checkpoint's independent review (one folder per slice), and each design change's tooling review (DL-18, DL-43): every pass, finding, and resolution |
+| `docs/reviews/s<n>/<ID>.md`, `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` | Each checkpoint's independent review (one folder per slice), and each design change's review (DL-18, DL-43, DL-126): every pass, finding, and resolution |
 | `docs/spikes/` | Spike code kept as evidence for a recorded decision (e.g. design-doc §13) |
 
 Read the relevant sections before changing anything. If the code needs to differ from the docs,
@@ -60,9 +60,7 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   with the owner.
 - Never start work while anything is red (run `uv run wl audit` before starting a checkpoint:
   `wl check` leaves it to `--full`, DL-99), and never start the next checkpoint without the
-  owner's explicit approval. One exception, a trial: S1-C8 and S1-C9 go straight on to the next
-  checkpoint when every condition in the build plan's review-tier trial holds ("Verification";
-  the `checkpoint` skill, "Report and stop").
+  owner's explicit approval.
 - Finish every checkpoint with the `checkpoint` skill (gates → docs → independent review by the
   `checkpoint-reviewer` agent, plus the other reviewers when they apply → review record in
   `docs/reviews/s<n>/<ID>.md` → commit → push → report → stop).
@@ -99,6 +97,9 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   snapshot before anything is fixed; each fix goes to every instance of its pattern; code from
   an earlier checkpoint is fixed only when needed, otherwise logged; a re-review covers only the
   fix diff, at most once (the `checkpoint` skill, steps 4 and 5).
+- **A new dependency names its license** (DL-129): the commit that adds one, or upgrades one
+  across a major version, says its license; anything not permissive, or that needs a key, goes
+  to the owner first.
 - Never hand-edit generated files: `backend/openapi.json`, `frontend/src/api/schema.d.ts`.
 - When a review catches a mistake that a rule would have prevented, add that rule to the
   relevant `CLAUDE.md` as part of the fix.

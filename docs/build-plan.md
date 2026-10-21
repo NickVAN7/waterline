@@ -137,6 +137,8 @@ S1-C8a, also in the group, stop for approval as usual: the trial is S1-C8 to S1-
   inserted for a new owner requirement, such as S1-C8a, isn't rework, DL-60). The owner
   records the verdict at the group review and again in the slice retro (S1-C17); either way it
   gets a decision-log entry.
+- **Verdict: not exercised** (DL-125). Neither S1-C8 nor S1-C9 met the conditions to
+  auto-continue, and nothing in them needed rework. Every checkpoint stops for approval.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
@@ -157,10 +159,13 @@ work. Each decision gets a decision-log entry (`docs/decision-log.md`), every do
 old rule is updated, and `docs-consistency` runs (trigger `design-change`) before committing;
 its decisions go to the owner. A change to code already built becomes a new checkpoint,
 inserted with a letter suffix where it runs (`S1-C13a` between `S1-C13` and `S1-C14`);
-existing checkpoints are never renumbered. Developer-tooling and process code (hooks, the `wl`
+existing checkpoints are never renumbered. Review answers that change built code are bundled:
+into the next planned checkpoint, or one follow-up checkpoint per group (DL-131). Developer-tooling and process code (hooks, the `wl`
 CLI, CI, the docs consistency tests) is built in the design change itself, as `chore:` or `ci:`
 commits, after a `checkpoint-reviewer` pass recorded in
-`docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). A checkpoint in progress is parked with `git stash` while a design change is applied,
+`docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). Every design change,
+docs-only or tooling, gets a record there, holding its `docs-consistency` pass (and, for
+tooling, `checkpoint-reviewer`'s passes) (DL-126). A checkpoint in progress is parked with `git stash` while a design change is applied,
 and its review base becomes the design change's last commit (DL-20). Each checkpoint's review
 diffs from the last commit before its work started, so design changes stay out of it (DL-17).
 
@@ -239,7 +244,8 @@ Everything lives in the repository, version-controlled and present on every work
 - **`design-change` skill** (`.claude/skills/design-change/`): applying a design change outside
   a checkpoint's scope ("Design changes outside a checkpoint" above): timing, checking the
   repository, parking a checkpoint in progress (DL-20), classifying each decision (docs only,
-  future checkpoints, a new inserted checkpoint for built product code, or developer-tooling
+  future checkpoints, an inserted checkpoint for built product code (review answers bundled,
+  DL-131), or developer-tooling
   code built in the change and reviewed by `checkpoint-reviewer`, DL-18), the decision-log
   entries, every affected doc, `docs-consistency`, and the report.
 - **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
@@ -267,8 +273,6 @@ named checkpoint when its trigger arrives.
 
 | Trigger | Item |
 |---|---|
-| After S1-C14a | The `vue-screen` skill, distilled from S1-C14's and S1-C14a's hand-built screens |
-| S1-C17 | The `user-guide-verifier` agent (follows `docs/user-guide.md` literally in a browser against a seeded stack, and walks the "Done when" list) |
 | Start of Slice 2 planning | A slice-planning procedure: the format used for Slice 1's plan (fixes, decisions, conventions), plus a short threat-model pass |
 | Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
 
@@ -396,7 +400,7 @@ The sections below describe the content; the table above is the order of work.
 │                                 ui-design-guide.md, ui/ (reference copies of the token file,
 │                                 its contrast check, and the SVAR theme mapping), reviews/
 │                                 (s<n>/: one record per checkpoint; design-changes/: one
-│                                 per tooling review), spikes/ (spike code kept as evidence);
+│                                 per design change, DL-126), spikes/ (spike code kept as evidence);
 │                                 the source of truth (DL-14)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
@@ -1483,13 +1487,29 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 - [x] End-to-end tests run in CI against a seeded stack.
 - [x] Accessibility: the axe-core checks pass in component and end-to-end tests, and the manual
       keyboard and screen-reader pass found no unresolved problem on the slice's new screens.
-- [ ] CI is green.
+- [x] CI is green.
 
 ---
 
 ## Slice 2 — notes for planning
 
 What's decided so far. This is not the slice's plan, which is written when Slice 2 is next.
+
+- **S2-C0, a pre-checkpoint, comes first** (DL-124), before Slice 2's features. Slice 2's plan
+  writes its rows. It covers:
+  - `repo-auditor`'s Slice 1 majors: a settings save sends only the changed fields (TD-56); an
+    update locks and re-reads its row before its change check (TD-57); a list goes back to page 1
+    when its last page empties (TD-58); one username-suggestion composable (TD-59);
+  - the docs and the authorization registry made to agree: per-area `authz/policies/` files, or
+    the docs describing the one `actions.py` registry (TD-60), before Slice 2's first new area;
+  - the owner's completed screen inventory, steps 2 to 6, checked against the docs and the built
+    screens (TD-62);
+  - the `vue-screen` skill, distilled from Slice 1's hand-built screens, and the
+    `user-guide-verifier` agent, which follows `docs/user-guide.md` literally in a browser
+    against a seeded stack and walks the "Done when" list (both scheduled in Slice 1 and missed;
+    `docs/reviews/s1/S1-retro.md`);
+  - the owner's UI feedback on Slice 1, in `ui-feedback.md` at the repository root (the owner's
+    file): many of its changes are made here.
 
 - **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the
   rank helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual

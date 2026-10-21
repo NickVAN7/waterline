@@ -163,7 +163,7 @@ frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, pa
 docs/           design, schema, build plan, testing strategy, screen inventory, UI design
                 guide (ui-design-guide.md, with reference copies in ui/), these guides,
                 tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
-                design-changes/: one per tooling review), spikes/
+                design-changes/: one per design change), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
@@ -1278,10 +1278,13 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   must differ from the docs) use the `design-change` skill: one decision-log entry per decision
   (`docs/decision-log.md`), every affected doc updated, `docs-consistency`, then a `docs:`
   commit. A change to code already built becomes a new checkpoint with a letter suffix
-  (`S1-C13a`); checkpoints are never renumbered. Developer-tooling and process code (hooks, the
+  (`S1-C13a`); checkpoints are never renumbered. Review answers that change built code are
+  bundled into the next planned checkpoint, or one follow-up per group (DL-131). Developer-tooling and process code (hooks, the
   `wl` CLI, CI, the docs consistency tests) is built in the change itself, in `chore:` or `ci:`
   commits, after a `checkpoint-reviewer` pass recorded in
-  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). A checkpoint in progress is parked with `git stash` while a design change is applied,
+  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). Every design change,
+  docs-only or tooling, gets a record there, holding its `docs-consistency` pass (and, for
+  tooling, `checkpoint-reviewer`'s passes) (DL-126). A checkpoint in progress is parked with `git stash` while a design change is applied,
   and its review base becomes the design change's last commit (DL-20).
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
