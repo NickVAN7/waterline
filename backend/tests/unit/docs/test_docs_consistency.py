@@ -933,3 +933,85 @@ def test_config_differences_are_reported_on_both_sides() -> None:
         "agents in .claude/ but not in the doc: ['a']",
         "agents in the doc but not in .claude/: ['c']",
     ]
+
+
+# --- Review records (DL-138, DL-165) ----------------------------------------------------------
+
+
+def test_review_records_include_the_simplicity_audit() -> None:
+    problems = docs.review_record_problems(
+        docs.review_records(), docs.checkpoint_order(), docs.latest_checkpoint()
+    )
+
+    assert problems == [], _report(problems)
+
+
+def _records(*ids: str, text: str = "# Review\n") -> dict[docs.Checkpoint, str]:
+    return {docs.Checkpoint.parse(value): text for value in ids}
+
+
+_SLICE_2 = {2: (docs.Checkpoint(2, 0, "a"), docs.Checkpoint(2, 1), docs.Checkpoint(2, 2))}
+_EARLY = docs.Checkpoint(1, 17)  # before Slice 2, so no record is required
+_AUDITED = "# Review\n\n## simplicity-auditor (Slice 2)\n"
+
+
+def test_a_c1_record_without_a_pre_checkpoint_record_is_reported() -> None:
+    problems = docs.review_record_problems(_records("S2-C1"), _SLICE_2, _EARLY)
+
+    assert problems == ["docs/reviews/s2: S2-C1 has a record but neither S2-C0 nor S2-C0a does"]
+
+
+@pytest.mark.parametrize("first", ["S2-C0", "S2-C0a"])
+def test_a_c0_or_c0a_record_satisfies_the_pre_checkpoint_rule(first: str) -> None:
+    assert docs.review_record_problems(_records(first, "S2-C1"), _SLICE_2, _EARLY) == []
+
+
+def test_slice_1_needs_no_pre_checkpoint_record() -> None:
+    order = {1: (docs.Checkpoint(1, 1), docs.Checkpoint(1, 2))}
+
+    assert docs.review_record_problems(_records("S1-C1", "S1-C2"), order, _EARLY) == []
+
+
+def test_a_slice_end_record_without_the_simplicity_audit_is_reported() -> None:
+    records = _records("S2-C0a", "S2-C1") | _records(
+        "S2-C2", text="## repo-auditor (Slice 2)\nNo overlap with simplicity-auditor.\n"
+    )
+
+    assert docs.review_record_problems(records, _SLICE_2, _EARLY) == [
+        "docs/reviews/s2/S2-C2.md ends Slice 2 but has no `## simplicity-auditor` section"
+    ]
+
+
+def test_a_slice_end_record_with_the_simplicity_audit_passes() -> None:
+    records = _records("S2-C0a", "S2-C1") | _records("S2-C2", text=_AUDITED)
+
+    assert docs.review_record_problems(records, _SLICE_2, _EARLY) == []
+
+
+def test_only_the_slice_end_record_needs_the_simplicity_audit() -> None:
+    assert docs.review_record_problems(_records("S2-C0a", "S2-C1"), _SLICE_2, _EARLY) == []
+
+
+def test_slice_1_end_record_needs_no_simplicity_audit() -> None:
+    order = {1: (docs.Checkpoint(1, 1),)}
+
+    assert docs.review_record_problems(_records("S1-C1"), order, _EARLY) == []
+
+
+def test_review_records_are_read_by_checkpoint_id(tmp_path: Path) -> None:
+    folder = tmp_path / "docs/reviews/s2"
+    folder.mkdir(parents=True)
+    for name in ("S2-C0a.md", "S2-plan.md", "S2-C17-manual-pass.md"):
+        (folder / name).write_text(name, encoding="utf-8")
+
+    assert docs.review_records(tmp_path) == {docs.Checkpoint(2, 0, "a"): "S2-C0a.md"}
+
+
+def test_the_latest_checkpoint_without_a_record_is_reported() -> None:
+    problems = docs.review_record_problems(_records("S2-C0a"), _SLICE_2, docs.Checkpoint(2, 1))
+
+    assert problems == ["docs/reviews/s2/S2-C1.md is missing"]
+
+
+def test_a_slice_1_checkpoint_needs_no_record_here() -> None:
+    assert docs.review_record_problems({}, {}, docs.Checkpoint(1, 17)) == []

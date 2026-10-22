@@ -472,6 +472,55 @@ def status_line_checkpoint() -> Checkpoint:
     return Checkpoint.parse(checkpoint.group(0))
 
 
+# --- Review records ---------------------------------------------------------------------------
+
+REVIEWS = "docs/reviews"
+_FIRST_AUDITED_SLICE = 2  # simplicity-auditor exists from S2-C0a (DL-138)
+
+
+def review_records(root: Path = REPO_ROOT) -> dict[Checkpoint, str]:
+    """Each checkpoint's review record (`docs/reviews/s<n>/<ID>.md`) by its ID; other records in
+    those folders (the plan, the retro, a manual pass) are left out."""
+    return {
+        Checkpoint.parse(path.stem): path.read_text(encoding="utf-8")
+        for path in (root / REVIEWS).glob("s*/S*-C*.md")
+        if _CHECKPOINT_ID.fullmatch(path.stem)
+    }
+
+
+def review_record_problems(
+    records: dict[Checkpoint, str], order: CheckpointOrder, latest: Checkpoint
+) -> list[str]:
+    """From Slice 2 on: the latest checkpoint commit has its record, a slice with a C1 record has
+    a C0 or C0a record (the audit's C0 row ran first; DL-138, DL-165), and the record of the
+    slice's last row has a `## simplicity-auditor` section."""
+    problems: list[str] = []
+    if latest.slice >= _FIRST_AUDITED_SLICE and latest not in records:
+        problems.append(f"{REVIEWS}/s{latest.slice}/{latest}.md is missing")
+    for checkpoint in sorted(records):
+        n = checkpoint.slice
+        if (
+            n >= _FIRST_AUDITED_SLICE
+            and checkpoint == Checkpoint(n, 1)
+            and not {Checkpoint(n, 0), Checkpoint(n, 0, "a")} & records.keys()
+        ):
+            problems.append(
+                f"{REVIEWS}/s{n}: {checkpoint} has a record but neither S{n}-C0 nor S{n}-C0a does"
+            )
+    for n, rows in sorted(order.items()):
+        last = records.get(rows[-1])
+        if (
+            n >= _FIRST_AUDITED_SLICE
+            and last is not None
+            and not re.search(r"^## simplicity-auditor", last, re.MULTILINE)
+        ):
+            problems.append(
+                f"{REVIEWS}/s{n}/{rows[-1]}.md ends Slice {n} but has no "
+                f"`## simplicity-auditor` section"
+            )
+    return problems
+
+
 # --- Tech-debt log ----------------------------------------------------------------------------
 
 TD_FIELDS = ("Added", "What", "Why", "Fix by", "Status")

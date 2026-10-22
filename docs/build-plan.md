@@ -175,8 +175,8 @@ diffs from the last commit before its work started, so design changes stay out o
 **Docs consistency tests** (`backend/tests/unit/docs/`, part of `wl check`) check the mechanical
 part on every run: models vs. schema doc (tables, columns, enum values), one feature-map owner
 per table, the tech-debt log's format, references, and deadlines, the decision log's format and
-references, the developer guide's status line, design-doc § references, and the lists of agents
-and skills.
+references, the developer guide's status line, design-doc § references, the lists of agents
+and skills, and the review records' slice rules (DL-138, DL-165).
 
 ### Claude configuration (in the repo)
 Everything lives in the repository, version-controlled and present on every workstation.
@@ -230,6 +230,19 @@ Everything lives in the repository, version-controlled and present on every work
   concrete case and a smallest fix. It runs no tests. Findings within the slice's scope are
   fixed; the rest are logged or go to the owner as proposed design changes, and all feed the
   slice retro.
+- **`simplicity-auditor` agent** (`.claude/agents/`; DL-138, built in S2-C0a): at the last
+  checkpoint of each slice, after `repo-auditor`, a read-only audit of the whole repository for
+  overengineering, from MIT-licensed prompts vendored into `.claude/audit/` and pinned to a
+  commit (`.claude/audit/SOURCES.md`; Ponytail's whole-repo audit and core skill, and
+  `addyosmani/agent-skills`' `code-simplification`, the Readability & Simplicity and
+  Architecture axes of `code-review-and-quality`, and the red flags and checklist of
+  `api-and-interface-design`), read as plain files. Each finding has evidence, lines saved, and
+  a category (delete, simplify, merge duplicates, process, or "conflicts with DL-n"); bugs,
+  security, and scale stay with `repo-auditor`, which reports any overlap. The owner decides
+  every finding and the next slice's C0 applies the accepted ones. A docs consistency test
+  fails `wl check` when, from Slice 2 on, a slice has a C1 record but no C0 or C0a record, or
+  its last checkpoint's record has no `## simplicity-auditor` section (DL-165). Updating the
+  vendored prompts is a design change that bumps the pinned commit.
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
   sets up a temporary copy of the repository by following the developer guide literally and
   reports every wrong or missing step.
@@ -276,7 +289,6 @@ named checkpoint when its trigger arrives.
 
 | Trigger | Item |
 |---|---|
-| S2-C0a | The `simplicity-auditor` agent (`.claude/agents/simplicity-auditor.md`): a read-only whole-repository audit for overengineering (`backend/`, `frontend/`, `.claude/`), from MIT-licensed prompts vendored into `.claude/audit/` and pinned to a commit (`.claude/audit/SOURCES.md` names each repository, commit, and license): Ponytail's whole-repo audit and core skill (`DietrichGebert/ponytail`, not its hooks), and from `addyosmani/agent-skills` `code-simplification` (whole repository, report only), `code-review-and-quality` (its Architecture and Readability & Simplicity axes only), and `api-and-interface-design` (its red flags and verification checklist only), read as plain files, never as skills. It reads the decision log, the `CLAUDE.md` files, and the build plan first; each finding has evidence, estimated lines saved, and a category (delete, simplify, merge duplicates, process, or "conflicts with DL-n", which the owner decides), ranked as Ponytail ranks them; bugs, security, and scale stay with `repo-auditor` (a finding both would report is reported once, by `repo-auditor`). It runs in each slice's verification checkpoint after `repo-auditor` (the `checkpoint` skill's slice-end list). A docs consistency test fails `wl check` when, from Slice 2 on, a slice has a C1 record but no C0 or C0a record (DL-165), or a slice-end record has no `simplicity-auditor` section. Updating the vendored prompts is a design change that bumps the pinned commit (DL-138) |
 | S2-C0i | The `vue-screen` skill, distilled from S2-C0d to S2-C0h's screens and Slice 1's, and the `user-guide-verifier` agent, which follows `docs/user-guide.md` literally in a browser against a seeded stack and walks the "Done when" list (DL-124) |
 | Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
 
@@ -1556,7 +1568,7 @@ before the features.
 
 | # | Checkpoint | Includes |
 |---|---|---|
-| 0a | Simplicity audit | The `simplicity-auditor` agent and `.claude/audit/` with `SOURCES.md` ("Workflow items scheduled"; DL-138), the docs consistency test for C0 or C0a and slice-end records (DL-165), and the `checkpoint` skill's slice-end step; run on `main` as of `e999564`; recorded in `docs/reviews/s2/S2-C0a.md`; the owner decides each finding, and each accepted fix is assigned to the C0 row that touches that code (DL-131) |
+| 0a | Simplicity audit | The `simplicity-auditor` agent and `.claude/audit/` with `SOURCES.md` ("Claude configuration"; DL-138), the docs consistency test for C0 or C0a and slice-end records (DL-165), and the `checkpoint` skill's slice-end step; run on `main` as of `e999564`; recorded in `docs/reviews/s2/S2-C0a.md`; the owner decides each finding, and each accepted fix is assigned to the C0 row that touches that code (DL-131) |
 | 0b | Tree spike | DL-150: SVAR DataGrid's tree mode against PrimeVue TreeTable on one checklist (tree mode in SVAR's free package; keyboard: arrows to expand and collapse, Tab, focus after a move; `treegrid` semantics: `aria-level`, `aria-expanded`, `aria-rowindex`; a move through our menu with the server mocked to allow and to deny; pointer drag (SVAR); the token theme audit; about 500 rows). Evidence in `docs/spikes/`; the result is a decision-log entry that decides S2-C15 and closes ui-design-guide §10 item 5(g), and, if SVAR wins, widens UI-STY-7, DL-64, and every other statement of SVAR's scope to the tree (DL-167); no product code |
 | 0c | Backend leftovers | TD-57 (lock and re-read before the change check in the org, workspace, and user services, a race test each); TD-55; TD-53 (one `ERRORS` map in `routers/deps.py`); TD-54 (`PageResult.map`); TD-52 for the existing fields (DL-143: project, org, workspace, and user names 100 characters, project description 2,000; `Field(max_length=…)`, `wl gen-client`); TD-44 (DL-152: `GET /api/orgs/{org_id}/first-admin-candidates`, the org's members and the workspace's staff, offset-paged with `?q=`, under `project.assign_first_admin`, and the create dialog's picker on it); TD-60 (DL-151: the docs describe the one registry); the `new-area` skill verified and corrected against the `project` area (DL-132) |
 | 0d | Restriction, export control, modules | DL-134 (the rename in code, schema doc, and API, `wl gen-client`; `restricted` removed; one migration mapping `restricted` to `confidential`, renaming the columns and CHECK constraints, and rewriting the `audit_event` rows' action, with its downgrade; the spec tests changed with the owner's approval, recorded in DL-134; the schema doc, the developer and user guides, and the `.claude/` files that name built code renamed with it); DL-133 (export control hidden on the create dialog and in settings; the access review's Access column only on an export-controlled project); DL-136 (unshipped modules: seeding skips them, 422 `module_unavailable` on `enabled_modules`, a migration removing `sprints` and `github` from every project, disabled checkboxes with "Not available yet" on create and in settings); the restriction badge in the project header replacing the banner (DL-137) |

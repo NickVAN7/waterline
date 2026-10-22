@@ -99,7 +99,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - **Last checkpoint of a slice** (from S2-C0a, which builds it, DL-138): after `repo-auditor`,
   invoke the `simplicity-auditor` agent. It audits the whole repository for overengineering,
   reports only, and its findings feed the retro; the next slice's C0 applies those the owner
-  accepts. The review record gets its own `simplicity-auditor` section.
+  accepts. The review record gets its own `## simplicity-auditor` section (a docs consistency
+  test requires that heading in the slice's last record, DL-165).
 
 ## 5. Resolve every finding
 

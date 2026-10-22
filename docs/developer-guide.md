@@ -4,7 +4,9 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C17 (Slice verification) built: the "Done when" walked through, the owner's
+> **Status:** S2-C0a (Simplicity audit) built: the `simplicity-auditor` agent and its vendored
+> prompts (`.claude/audit/`), the review-record check, and the audit's first run on `main`
+> (`docs/reviews/s2/S2-C0a.md`). S1-C17 (Slice verification) built: the "Done when" walked through, the owner's
 > manual keyboard and screen-reader pass (no problems; `docs/reviews/s1/S1-C17-manual-pass.md`),
 > the slice-end agents, and the slice retro (`docs/reviews/s1/S1-retro.md`); Slice 1 is complete
 > once the retro's changes are applied and the owner approves the merge. S1-C16d (Review
@@ -1201,6 +1203,7 @@ database. They check:
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
 | § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` means a design-doc section, so refer to this guide's sections as "section N". The exceptions: `guide §N` (or `ui-design-guide §N`) names a section of `docs/ui-design-guide.md`; in that guide a bare `§N` is its own section; in `.claude/agents/ui-reviewer.md` a bare `§N` is its own section or the guide's; and in both, `design-doc §N` still means the design doc |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
+| Review records | from Slice 2 on (DL-138, DL-165): the latest `checkpoint(<ID>):` commit has no `docs/reviews/s<n>/<ID>.md`; a slice has an `S<n>-C1` record but no `S<n>-C0` or `S<n>-C0a` record; or the record of the slice's last row has no `## simplicity-auditor` heading |
 
 Fixing a failure: the message names both files and the mismatch. Update whichever side is
 wrong (usually the doc); when the right answer is a design question, ask the owner. A
@@ -1259,7 +1262,7 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
   `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`,
-  `ui-reviewer`.
+  `ui-reviewer`, `simplicity-auditor`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
   changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
   at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
@@ -1268,8 +1271,10 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
   `frontend/e2e/` (read-only: accessibility and frontend conventions against
   `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`, `docs-consistency`, and
-  `repo-auditor` (a whole-repository audit that runs no tests, DL-41) at the last checkpoint of
-  a slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
+  `repo-auditor` (a whole-repository audit that runs no tests, DL-41), then
+  `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored
+  in `.claude/audit/`, whose findings go to the owner, DL-138) at the last checkpoint of a
+  slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
   concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same
   time: they share the test database. `docs-consistency` also runs in every design change, before
   committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
