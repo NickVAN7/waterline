@@ -420,7 +420,8 @@ def checkpoint_order() -> CheckpointOrder:
 
 
 def checkpoint_rows(slice_number: int, cells: list[str], source: str) -> tuple[Checkpoint, ...]:
-    """The checkpoints named by a table's `#` cells, which must start at 1 and run in order."""
+    """The checkpoints named by a table's `#` cells, which must start at 1, or at 0 or 0a for a
+    slice that opens with a pre-checkpoint (S2-C0a, DL-156), and run in order."""
     checkpoints: list[Checkpoint] = []
     for cell in cells:
         if not re.fullmatch(r"\d+[a-z]?", cell):
@@ -428,9 +429,15 @@ def checkpoint_rows(slice_number: int, cells: list[str], source: str) -> tuple[C
                 f"{source}: {cell!r} in the # column is not a checkpoint number (13, or 13a)"
             )
         checkpoints.append(Checkpoint.parse(f"S{slice_number}-C{cell}"))
-    if checkpoints[0] != Checkpoint(slice_number, 1) or checkpoints != sorted(set(checkpoints)):
+    first = {
+        Checkpoint(slice_number, 0),
+        Checkpoint(slice_number, 0, "a"),
+        Checkpoint(slice_number, 1),
+    }
+    if checkpoints[0] not in first or checkpoints != sorted(set(checkpoints)):
         raise DocsStructureError(
-            f"{source}: the # column must start at 1 and run in order, each once; got {cells}"
+            f"{source}: the # column must start at 1, 0, or 0a and run in order, each once; got "
+            f"{cells}"
         )
     return tuple(checkpoints)
 

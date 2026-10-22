@@ -541,6 +541,14 @@ def test_next_checkpoint_is_the_next_row_of_the_slice_table(
     assert {str(checkpoint) for checkpoint in following} == expected
 
 
+def test_next_slice_starts_at_its_pre_checkpoint() -> None:
+    order = _slice(1, "1", "17") | _slice(2, "0a", "0b", "1")
+
+    following = docs.next_checkpoints(docs.Checkpoint(1, 17), order)
+
+    assert {str(checkpoint) for checkpoint in following} == {"S2-C0a"}
+
+
 def test_latest_checkpoint_missing_from_its_slice_table_is_a_structure_error() -> None:
     with pytest.raises(docs.DocsStructureError, match="S1-C15, is not a row"):
         docs.next_checkpoints(docs.Checkpoint(1, 15), _WITH_INSERTED)
@@ -617,14 +625,36 @@ def test_checkpoint_order_comes_from_the_table_rows(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.parametrize(
+    ("numbers", "expected"),
+    [
+        (("0", "1"), ["S1-C0", "S1-C1"]),
+        (("0a", "0b", "1"), ["S1-C0a", "S1-C0b", "S1-C1"]),  # a pre-checkpoint split in rows
+    ],
+)
+def test_checkpoint_table_may_open_with_a_pre_checkpoint(
+    monkeypatch: pytest.MonkeyPatch, numbers: tuple[str, ...], expected: list[str]
+) -> None:
+    monkeypatch.setattr(docs, "read", _build_plan_with_slice_1_rows(*numbers))
+
+    order = docs.checkpoint_order()
+
+    assert [str(c) for c in order[1]] == expected
+
+
+_OUT_OF_ORDER = "must start at 1, 0, or 0a and run in order"
+
+
+@pytest.mark.parametrize(
     ("numbers", "message"),
     [
         (("1", "2A"), "'2A' in the # column is not a checkpoint number"),
         (("1", "C2"), "'C2' in the # column is not a checkpoint number"),
-        (("1", "3", "2"), "must start at 1 and run in order"),  # out of order
-        (("1", "2a", "2"), "must start at 1 and run in order"),  # inserted row before its base
-        (("1", "2", "2"), "must start at 1 and run in order"),  # a number twice
-        (("2", "3"), "must start at 1 and run in order"),
+        (("1", "3", "2"), _OUT_OF_ORDER),  # out of order
+        (("1", "2a", "2"), _OUT_OF_ORDER),  # inserted row before its base
+        (("1", "2", "2"), _OUT_OF_ORDER),  # a number twice
+        (("2", "3"), _OUT_OF_ORDER),
+        (("0b", "1"), _OUT_OF_ORDER),  # a pre-checkpoint table without its 0a
+        (("1a", "2"), _OUT_OF_ORDER),  # an inserted row with no row before it
     ],
 )
 def test_malformed_checkpoint_table_is_a_structure_error(
