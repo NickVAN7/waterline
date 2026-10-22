@@ -86,8 +86,8 @@ Follow the `migration` skill.
 - Every mutation in this order: `authorize()` → change → `log_change()`; the request
   dependency commits. The service never commits (`flush()` only when it needs generated
   values).
-- Numbers only from the numbering service; rank and counters only through the direct-update
-  helper (no `version` bump).
+- Numbers only from the numbering service; rank, counters, and an item's restriction only
+  through the direct-update helper (no `version` bump, DL-168).
 - Check that every referenced entity (parent, phase, sprint, milestone, workstream, requirement)
   belongs to the same project; check cycles where the design calls for it.
 - `log_change()` for every logged field in design-doc §10, with enum members.

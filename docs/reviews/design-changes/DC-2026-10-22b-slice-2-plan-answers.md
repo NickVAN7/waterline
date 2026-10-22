@@ -32,3 +32,6 @@
 2. **Does `POST …/requirements/{number}/approve` take a `version`?** Options: (a) no: it
    approves whatever revision is current; (b) the client sends the `version` it showed (409 when
    stale), so the revision approved is the one on screen.
+
+**The owner's answers** (Oct 22, 2026; applied in `DC-2026-10-22c-version-checks.md`): 1 (b),
+DL-168; 2 (b), DL-169.

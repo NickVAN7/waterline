@@ -264,7 +264,9 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   reload instead of silently overwriting someone else's edit. If the item is **gone** instead
   (deleted, or soft-deleted since the user loaded it), the save returns **404**: there is
   nothing to reload. An item that was already soft-deleted when loaded (e.g. one being
-  restored) isn't "gone", so a conflict there is still 409.
+  restored) isn't "gone", so a conflict there is still 409. Rank (§6), the subtask counter
+  (§3), and an item's restriction (DL-168) don't bump `version`, so none of them causes a 409
+  for someone editing the item's content.
 - **Manual ordering:** `rank` (sortable string, fractional indexing) on task, requirement, and
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
   that row. See §6.
@@ -773,7 +775,8 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   `approved_revision_id` to the current revision, `approved_by` to that admin, and
   `approved_at` to now, and cancels any pending approval request on the requirement (§6.2).
   That action is the only path: a `PATCH` setting `status` to `approved` answers admins 422
-  `validation_error`, type `use_approve` (DL-161).
+  `validation_error`, type `use_approve` (DL-161). It takes the `version` the admin saw, and a
+  stale one is a 409, so the revision approved is the one on screen (DL-169).
   Moving a requirement *out* of `approved` (e.g. to `in_progress`) follows the normal edit
   rules; `approved_revision_id` stays set, so "Approved · modified" (§6.1) and the delete rule
   above still work. Logged like any change (`status` and `approved_revision_id`, §10).

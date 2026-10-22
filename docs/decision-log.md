@@ -2151,3 +2151,23 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   testing strategy, `frontend/CLAUDE.md`, and `.claude/agents/ui-reviewer.md`
 - **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
   design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-168: A restriction change doesn't bump `version`
+- **Date:** 2026-10-22
+- **Decision:** `PUT …/requirements/{number}/restriction` (and later items' equivalents) is a
+  direct update that doesn't bump the item's `version`, as rank writes don't, so a restriction
+  change never causes a 409 for someone editing the item's content.
+- **Supersedes:** none (completes DL-162)
+- **Superseded by:** none
+- **Applies to:** design-doc §2 ("Optimistic locking"); build plan ("Backend architecture",
+  S2-C6); `backend/CLAUDE.md`; `new-area` skill; developer guide (with S2-C6)
+- **Source:** owner, Oct 22, 2026 (`DC-2026-10-22b-slice-2-plan-answers.md`, decision 1)
+
+### DL-169: Approving by hand checks the `version`
+- **Date:** 2026-10-22
+- **Decision:** `POST …/requirements/{number}/approve` takes the `version` the admin saw; a stale
+  one is a 409, so the revision approved is the one on screen.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5; build plan (S2-C11)
+- **Source:** owner, Oct 22, 2026 (`DC-2026-10-22b-slice-2-plan-answers.md`, decision 2)
