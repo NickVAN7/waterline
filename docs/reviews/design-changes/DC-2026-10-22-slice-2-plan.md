@@ -70,3 +70,7 @@
 5. **SVAR for a grid that isn't editable.** If the S2-C0b spike picks SVAR DataGrid, UI-STY-7 and
    DL-64 ("the editable grid") need amending. Options: (a) the spike's DL entry amends them if
    SVAR wins; (b) widen UI-STY-7 now.
+
+**The owner's answers** (Oct 22, 2026; applied in the follow-up design change
+`DC-2026-10-22b-slice-2-plan-answers.md`): 1 (a), DL-164; 2 (a), the cap answered (DL-159);
+3 (a), DL-165; 4 (a), re-evaluated at Slice 2's retro, DL-166; 5 (a), DL-167.

@@ -44,7 +44,7 @@ conventions, threat-model pass, and open questions behind it (DL-139).
 | D19 | TD-60: the docs describe the one registry | DL-151 |
 | D20 | TD-44: a first-admin candidates endpoint | DL-152 |
 | D21 | My work's project fields | DL-153 |
-| D22 | The ranked-view cap, proposed at 2,000 (open question Q1) | DL-154 |
+| D22 | The ranked-view cap, proposed at 2,000 (open question Q1; confirmed, DL-159) | DL-154 |
 | D23 | Slice 3, 4, 7, and v1.5 placements | DL-155 |
 | D24 | S2-C0 becomes rows S2-C0a to S2-C0i | DL-156 |
 | D25 | Two screen-inventory dependencies | DL-157 |
@@ -53,7 +53,7 @@ conventions, threat-model pass, and open questions behind it (DL-139).
 
 | # | Convention |
 |---|---|
-| C1 | Ranked views return complete lists up to a hard cap, with `truncated: true` above it (proposed 2,000, DL-154) |
+| C1 | Ranked views return complete lists up to a hard cap, with `truncated: true` above it (2,000, DL-159) |
 | C2 | Markdown is rendered only in the browser, through one sanitizing renderer; the API carries markdown only; a CSP is the second layer (DL-140, DL-142) |
 | C3 | An item's restriction is set through its own `PUT …/restriction`, as a project's is |
 | C4 | Entities without a number (approval requests) are addressed by UUID, at `/api/approval-requests/{id}` |
@@ -63,12 +63,12 @@ conventions, threat-model pass, and open questions behind it (DL-139).
 
 Proposed names, each registered in `authz/actions.py` (DL-151) and confirmed by its row's spec
 tests. Content actions are denied by the export-control gate to anyone without an explicit
-membership (design-doc §3.1); the org overview's action is open question Q5.
+membership (design-doc §3.1); the org overview's action is `org_member.manage` (Q5, DL-163).
 
 | Row | Endpoints | Action | Allowed to | Kind |
 |---|---|---|---|---|
 | S2-C0c | `GET /api/orgs/{org_id}/first-admin-candidates` | `project.assign_first_admin` (exists) | org owners/admins, workspace admins, system admins | management |
-| S2-C0f | the org overview page (an org read and its project list) | Q5 | — | management |
+| S2-C0f | the org overview page (an org read and its project list) | `org_member.manage` (exists; DL-163) | org owners/admins, workspace admins, system admins | management |
 | S2-C3 | `GET …/requirements/{number}/activity` | `requirement.view` | project viewers and up, inherited admins | content |
 | S2-C5 | `POST …/requirements` | `requirement.create` | project members and up | content |
 | S2-C5 | `GET …/requirements`, `GET …/requirements/{number}` | `requirement.view` (the list scoped by content access) | project viewers and up, inherited admins | content |
@@ -95,12 +95,15 @@ membership (design-doc §3.1); the org overview's action is open question Q5.
 | Deciding someone else's approval | `approval.decide` is a personal action no admin level grants | S2-C11 |
 | Export-controlled content leaking through a list, feed, revision, the trash, or My work | Content scoping in every list query, the gate on every content action, a test per list | S2-C4 onward |
 | Storage growth from huge descriptions times revisions | Length limits (DL-143); a revision only on a real change | S2-C5, S2-C6 |
-| An oversized tree | The ranked-view cap (DL-154) | S2-C5 |
+| An oversized tree | The ranked-view cap (2,000, DL-159) | S2-C5 |
 | Races: a replacement against a decision; a delete against a restore | Row locks in a fixed order, a race test each | S2-C8, S2-C11 to S2-C13 |
-| Names of former members in history | The server resolves names at read time; see Q2 | S2-C3 |
+| Names of former members in history | The server resolves names at read time; former members' names stay (Q2, DL-160) | S2-C3 |
 | A remote image revealing that a Confidential item was opened | Image syntax renders as a link (DL-140) | S2-C16 |
 
 ## Open questions for the owner (answered before S2-C0a starts)
+
+**Answered Oct 22, 2026:** each as recommended: Q1 2,000 (DL-159), Q2 accept (DL-160), Q3 one
+path (DL-161), Q4 no `version` (DL-162), Q5 `org_member.manage` (DL-163).
 
 **Q1. The ranked-view cap (DL-154).** The requirement tree is returned whole (drag needs the full
 list), so a cap stops one huge project from making the page slow or the response unbounded.

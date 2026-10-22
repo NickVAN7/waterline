@@ -772,6 +772,8 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   (DL-148); members get 403 for that transition. Doing so sets
   `approved_revision_id` to the current revision, `approved_by` to that admin, and
   `approved_at` to now, and cancels any pending approval request on the requirement (§6.2).
+  That action is the only path: a `PATCH` setting `status` to `approved` answers admins 422
+  `validation_error`, type `use_approve` (DL-161).
   Moving a requirement *out* of `approved` (e.g. to `in_progress`) follows the normal edit
   rules; `approved_revision_id` stays set, so "Approved · modified" (§6.1) and the delete rule
   above still work. Logged like any change (`status` and `approved_revision_id`, §10).
@@ -899,8 +901,9 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   revision list (cursor-paged: revisions are append-only) and one revision's read; there is no
   compare endpoint.
 - **History** (DL-147): the requirement's detail page has a History tab (its activity entries,
-  §10, in plain language, the server resolving the names of the actor and of user fields) beside
-  a Revisions tab (the list and the compare above).
+  §10, in plain language, the server resolving the names of the actor and of user fields, former
+  members' included, with the "Deactivated" badge where it applies, DL-160) beside a Revisions
+  tab (the list and the compare above).
 - Status and priority changes are *not* revisions — they go to `activity_log`.
 
 ### 6.2 Approvals

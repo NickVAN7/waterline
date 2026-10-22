@@ -443,8 +443,8 @@ render inside the full shell when signed in.
   **Members**, and **Settings** (UI-SHL-10). Past about eight orgs (workspace admins see all of
   them) the popover gains a filter field. With one org and no org admin rights it is plain text,
   not a control. The current org's name is always visible. There is no separate org switcher;
-  the user menu keeps workspace "Administration" only, and its **Sign out** has an icon and the
-  danger tone.
+  the user menu keeps workspace "Administration" only (and, until S2-C0g, the theme choice;
+  DL-164), and its **Sign out** has an icon and the danger tone.
 - **UI-SHL-5** **Sidebar** (`--sidebar-width`), top to bottom: **My work** (an icon, bolder
   text, and a divider below it, so it reads as separate from project navigation); the **project
   selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). **On an admin page**

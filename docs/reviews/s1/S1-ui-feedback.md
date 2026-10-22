@@ -22,7 +22,7 @@ Each item's Slice 2 row follows its arrow (DL-137); S2-C0i checks none was dropp
 - There needs to be a distinction between organizations in the project dropdown on the left-handed menu bar. / → S2-C0e
 
 ### Account Dropdown
-- Move light/dark/mode to account setting screen instead of dropdown. → S2-C0e, S2-C0g
+- Move light/dark/mode to account setting screen instead of dropdown. → S2-C0g
 - Add a symbol next to Sign out, or distinguish it somehow (red color) → S2-C0e
 
 ### User Account settings

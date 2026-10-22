@@ -1798,7 +1798,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   sign-in and project-settings spacing.
 - **Supersedes:** ui-design-guide UI-SHL-4; DL-104, in part (the entry point and section nav);
   DL-85, in part (the theme choice's place)
-- **Superseded by:** none
+- **Superseded by:** DL-164, in part (the row that moves the theme choice)
 - **Applies to:** ui-design-guide (UI-SHL-4, UI-SHL-5, UI-SHL-6, UI-SHL-10, UI-TOK-2,
   UI-FRM-13, UI-FRM-14, UI-FBK-6); design-doc §11; user guide; the feedback file; build plan
   (S2-C0d to S2-C0i)
@@ -1818,7 +1818,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   but no C0a record, or a slice-end record lacks its section. Updating the vendored prompts is a
   design change. Built in S2-C0a, which also runs it first on `main` at `e999564`.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-165, in part (a C0 record also satisfies the test)
 - **Applies to:** build plan ("Workflow items scheduled", S2-C0a, S2-C22); `CLAUDE.md`
   ("Skills, agents, and hooks"); `checkpoint` skill (the slice-end list)
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
@@ -2007,7 +2007,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   tree; above it the response carries `truncated: true` and the page says so, with a tech-debt
   entry to page the tree if a project nears it. The API conventions mark it "proposed".
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-159
 - **Applies to:** build plan ("API conventions", S2-C5); `docs/reviews/s2/S2-plan.md` (open
   questions)
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
@@ -2051,3 +2051,103 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan; the S2 plan record
 - **Source:** owner, Oct 22, 2026 (starting Slice 2)
+
+### DL-159: The ranked-view cap is 2,000
+- **Date:** 2026-10-22
+- **Decision:** Confirmed: 2,000 requirements per project tree; above it the response carries
+  `truncated: true` and the page says so, with a tech-debt entry to page the tree if a project
+  nears it. The owner judged it more than enough and cheap to lower.
+- **Supersedes:** DL-154
+- **Superseded by:** none
+- **Applies to:** build plan ("API conventions", S2-C5); `docs/reviews/s2/S2-plan.md` (Q1)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-160: Former members keep their names in history
+- **Date:** 2026-10-22
+- **Decision:** The History tab shows the actor's name on every entry, including people who have since
+  left the project, with the "Deactivated" badge for a deactivated account.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; build plan (S2-C3); `docs/reviews/s2/S2-plan.md` (Q2)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-161: Approving by hand has one path
+- **Date:** 2026-10-22
+- **Decision:** A requirement is approved by hand only through
+  `POST …/requirements/{number}/approve` (`requirement.approve_manually`). A `PATCH` setting
+  `status` to `approved` answers 403 to members and 422 `validation_error` on `status`, type
+  `use_approve`, to admins.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5; build plan (S2-C6, S2-C11); `docs/reviews/s2/S2-plan.md` (Q3)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-162: A requirement's restriction change takes no `version`
+- **Date:** 2026-10-22
+- **Decision:** `PUT …/requirements/{number}/restriction` takes no `version`, as a project's doesn't:
+  last write wins, and each change is logged.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C6); `docs/reviews/s2/S2-plan.md` (Q4)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-163: The org overview's gate is `org_member.manage`
+- **Date:** 2026-10-22
+- **Decision:** The org overview page is gated by the existing `org_member.manage` action (the
+  holders who already see Members); no new action.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0f); `docs/reviews/s2/S2-plan.md` (Q5)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-164: The theme choice moves in one row
+- **Date:** 2026-10-22
+- **Decision:** S2-C0g removes the theme choice from the user menu as it adds account settings'
+  Appearance section, so there is no checkpoint without a theme override; S2-C0e no longer
+  touches it.
+- **Supersedes:** DL-137, in part (the row that moves the theme choice)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0e, S2-C0g); ui-design-guide UI-SHL-4;
+  `.claude/agents/ui-reviewer.md`; `docs/reviews/s1/S1-ui-feedback.md`
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-165: A slice may open at C0 or C0a
+- **Date:** 2026-10-22
+- **Decision:** DL-138's docs consistency test (built in S2-C0a) accepts either a C0 or a C0a record
+  before a slice's C1 record, matching DL-156's table rule.
+- **Supersedes:** DL-138, in part (the C0a record)
+- **Superseded by:** none
+- **Applies to:** build plan ("Workflow items scheduled", S2-C0a)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-166: `repo-auditor` keeps its lean category, re-evaluated at Slice 2's retro
+- **Date:** 2026-10-22
+- **Decision:** `repo-auditor` keeps "lean" (DL-41) beside `simplicity-auditor`, with the overlap rule
+  (a finding both would report is reported once, by `repo-auditor`). Slice 2's retro reviews
+  whether either reported lean findings and how useful they were, and the owner decides whether
+  to keep, drop, or narrow it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C22)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-167: The tree spike's result amends the SVAR rule
+- **Date:** 2026-10-22
+- **Decision:** If the S2-C0b spike picks SVAR DataGrid for the tree, the spike's decision-log entry
+  also widens UI-STY-7 and DL-64 ("the editable grid") to cover the requirement tree; the rule
+  isn't widened before then.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0b); when SVAR wins, every statement of SVAR's scope:
+  ui-design-guide UI-STY-7, design-doc §2, the build plan's tooling line, screen inventory,
+  testing strategy, `frontend/CLAUDE.md`, and `.claude/agents/ui-reviewer.md`
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)

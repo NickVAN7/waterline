@@ -73,8 +73,8 @@ correct; you decide whether the code does it.
   "Waterline" then the current org's name, which is the menu: links to switch orgs
   (`aria-current` on the current one) and, only when `allowed_actions` allows, Overview,
   Members, and Settings; plain text with one org and no admin rights; never hidden at narrow
-  widths? The user menu holds workspace "Administration" only, and Sign out has an icon and the
-  danger tone? (UI-SHL-4)
+  widths? The user menu holds workspace "Administration" only (and, until S2-C0g, the theme
+  choice; DL-164), and Sign out has an icon and the danger tone? (UI-SHL-4)
 - **Sidebar:** My work, then the project selector, then the selected project's pages; on an
   admin page (from S2-C0f), My work and then that admin area's section nav instead, with no
   section nav inside the page; items hidden through `allowed_actions`; text always visible; a
