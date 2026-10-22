@@ -168,16 +168,17 @@ tested, what each kind of test is for, and the gates every change passes.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
     included) and every project role denied, the relationship rule allowing it only for a user
     with content access to the project, and the relationship without that access denied.
-  - Classification (design-doc §3.1, Slice 1): removing `export_controlled`, and on an
+  - Restriction (design-doc §3.1, Slice 1; named classification until S2-C0d, DL-134):
+    removing `export_controlled`, and on an
     export-controlled project lowering the level or removing any category, is refused for an
     inherited admin and allowed for an explicit project admin; every member-add path (picker,
     email-first add, creating a user for the project), marking a project export-controlled,
     and creating one export-controlled require the confirmation (422 without it);
-    classification changes record their audit event.
+    restriction changes record their audit event.
   - The export-control gate (design-doc §5, Slice 2 onward): on an export-controlled project,
     inherited admins without an explicit membership get 404 for every content action, read or
     mutation, and are allowed management actions; explicit members are allowed.
-  - Effective classification (Hypothesis property): never lower than the project's level, and
+  - Effective restriction (Hypothesis property): never lower than the project's level, and
     its categories are always a superset of the project's.
   - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;
     list endpoints return only the user's accessible projects and orgs.

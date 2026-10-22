@@ -43,7 +43,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   (`src/app/session.ts`); a view never handles them itself.
 - **Requests:** same origin through the Vite proxy (`/api`), `credentials: 'include'`, JSON
   bodies only.
-- **Rendered markdown** is sanitized before display.
+- **Rendered markdown** goes only through `MarkdownView` (from S2-C16): `markdown-it` with raw
+  HTML off, then DOMPurify; never `v-html` on anything else. No remote images, links only
+  `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
+  ui-design-guide UI-MD-1).
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
   slug change to the new URL; a null org is the not-found page.
@@ -60,10 +63,11 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   shown only after about 300 ms (fast loads don't flash), on a region with `aria-busy="true"`,
   with any shimmer off under `prefers-reduced-motion`. Actions such as saving a form show a
   pending state on the control itself, not a skeleton.
-- An enabled module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7)
-  shows its features and links greyed out or disabled (design-doc §1.1), never as broken
-  screens. Whether a module is available comes from the API's module guidance (`available`),
-  never a frontend list.
+- A module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7) can't be
+  enabled (from S2-C0d, DL-136; design-doc §1.1): the API refuses it (422 `module_unavailable`)
+  and the UI shows a disabled checkbox with "Not available yet", never a broken screen. Whether
+  a module is available comes from the API's module guidance (`available`), never a frontend
+  list.
 
 ## UI
 

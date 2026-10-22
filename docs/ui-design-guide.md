@@ -18,7 +18,7 @@ agent cite IDs, and the agent's checklist is keyed to them, so renumbering is a 
 The guide is authoritative; if `frontend/CLAUDE.md` or the agent disagrees, fix them to match.
 
 **Inputs this guide builds on (not reopened here):** WCAG 2.2 AA (design-doc §1); skeleton
-loaders for loading states (screen-inventory step 5); data classification shown as text, never
+loaders for loading states (screen-inventory step 5); data restriction shown as text, never
 color alone (design-doc §3.1); the error body `{code, message, details}` and its handling
 (`frontend/CLAUDE.md`); `allowed_actions` hiding (build plan, "API conventions"); the S1-C14
 list of screens (build plan).
@@ -83,7 +83,7 @@ items in §10. A **second spike** covered the SVAR widgets (§7.1).
   cleanly.)
 - **UI-STY-3** Native elements first: `<button>`, `<a>`, `<input>`, `<fieldset>`, `<table>`, and
   `<dialog>` opened with `showModal()` for modals. PrimeVue is used where no native element does
-  the job: **menu** (user menu, row actions), **popover** (org switcher, project selector),
+  the job: **menu** (user menu, row actions), **popover** (org menu, project selector),
   **select** and **combobox** (fixed choices; searchable pickers for members, staff, and orgs),
   **checkbox** and **input** styling. The **toast** is our own component built to §6.2;
   PrimeVue's Toast is not used unless a check shows it meets UI-FBK-9 and UI-FBK-10. Never
@@ -114,7 +114,7 @@ screen-reader pass at slice verification, **R** the `ui-reviewer` agent.
 
 | WCAG | What it means in Waterline | Rules | Checked by |
 |---|---|---|---|
-| 1.4.1 Use of color | Status, RAG, badges, classification, selection, and form errors always carry text, an icon, or a shape too | UI-FBK-5, UI-FRM-5, UI-TOK-9 | R, M |
+| 1.4.1 Use of color | Status, RAG, badges, restriction, selection, and form errors always carry text, an icon, or a shape too | UI-FBK-5, UI-FRM-5, UI-TOK-9 | R, M |
 | 1.4.3 / 1.4.11 Contrast | Text 4.5:1; component boundaries, icons, and focus ring 3:1, in both themes | UI-TOK-3 | A (browser only), R |
 | 1.4.4 / 1.4.10 / 1.4.12 Resize, reflow, text spacing | rem font sizes; no horizontal page scroll down to 320 CSS px; no fixed heights on text | UI-TOK-4, UI-SHL-7 | M, R |
 | 1.4.13 Content on hover or focus | A hint appears on hover and on keyboard focus, stays while hovered, and Esc dismisses it | UI-FRM-17 | M, R |
@@ -143,7 +143,7 @@ the end-to-end run covers them), or notice a missing alternative to a drag.
 ### 3.1 Colors
 
 Defined once with `light-dark()`, so a token has one definition and the two themes cannot drift
-apart. `color-scheme: light dark` follows the operating system; the account menu can override it
+apart. `color-scheme: light dark` follows the operating system; account settings can override it
 (UI-TOK-2). `light-dark()` is Baseline 2024 "newly available" (working across current browsers since
 May 2024, not yet "widely available") and only takes effect when `color-scheme` includes both
 values, as above. That is fine for the Chromium-only end-to-end runs and an internal tool; if a
@@ -321,9 +321,10 @@ html {
 
 - **UI-TOK-1** Components use semantic tokens only. No raw palette values, and no component
   branches on the theme.
-- **UI-TOK-2** Both themes work on every screen. The default follows the operating system; the
-  account menu offers System / Light / Dark, stored in `localStorage` (wrapped in `try/catch`,
-  since storage can be unavailable) and applied as `data-theme` on `<html>`. The end-to-end axe
+- **UI-TOK-2** Both themes work on every screen. The default follows the operating system;
+  account settings' **Appearance** section offers System / Light / Dark (DL-137; from S2-C0g),
+  stored in `localStorage` (wrapped in `try/catch`, since storage can be unavailable) and applied
+  as `data-theme` on `<html>`. The end-to-end axe
   runs execute in both themes.
 - **UI-TOK-3** Contrast minimums: text 4.5:1 (3:1 for text of 24 px or larger, or 18.66 px and
   bold); component boundaries, icons that carry meaning, and the focus ring 3:1 against the
@@ -405,11 +406,11 @@ cover (found in the spike, to be completed per component as it is adopted, UI-ST
 ┌────────────────────────────────────────────────────────────────────┐
 │ [Skip to main content]    first focusable; visible on focus        │
 ├────────────────────────────────────────────────────────────────────┤
-│ ◉ Waterline                           [Acme Corp ▾]  [Jane D. ▾]   │
+│ ◉ Waterline  [Acme Corp ▾]                            [Jane D. ▾]  │
 ├──────────────┬─────────────────────────────────────────────────────┤
 │ My work      │ <h1>Page title</h1>              [Primary action]   │
-│ ──────────── │ project pages: archived and classification          │
-│ [Waterline ▾]│ banners, project header                             │
+│ ──────────── │ project pages: archived banner; project header      │
+│ [Waterline ▾]│ with its restriction badge                          │
 │  Home        │ ──────────────────────────────────────────          │
 │  Requirements│ content: up to 80rem; forms and settings 40rem      │
 │  Tasks       │                                                     │
@@ -420,7 +421,7 @@ cover (found in the spike, to be completed per component as it is adopted, UI-ST
 ```
 
 Sign-in, forced password change, and the no-access page use a minimal `AuthLayout` (centered
-card, no sidebar or org switcher, still a `main` landmark and a page title). 403 and 404 views
+card, no sidebar or org menu, still a `main` landmark and a page title). 403 and 404 views
 render inside the full shell when signed in.
 
 - **UI-SHL-1** The skip link is the first focusable element and moves focus to `main`.
@@ -435,27 +436,32 @@ render inside the full shell when signed in.
   table's selection toolbar, and only while rows are selected (UI-TBL-8). Any later sticky
   element needs the same `scroll-padding` treatment and an end-to-end focus check
   (UI-FBK-10).
-- **UI-SHL-4** **Org switcher:** in the header, on the **right**, next to the user menu. **It
-  switches organizations and does nothing else.** With several orgs it is a menu button showing
-  the current org's name, listing the orgs as links (`aria-current="true"` on the current one)
-  and opening `/{org_slug}/projects`. With one org it is plain text, not a control. Past about
-  eight orgs (workspace admins see all of them) the popover gains a filter field. The current
-  org's name is always visible. An org's members and settings are **not** here; they are on a
-  separate org admin page (UI-SHL-10).
+- **UI-SHL-4** **Org menu** (DL-137; from S2-C0e and S2-C0f): the header reads "Waterline"
+  followed by the current org's name, and **that name is the org menu**, a menu button listing
+  the orgs to switch to as links (`aria-current="true"` on the current one; each opens
+  `/{org_slug}/projects`) and, when `allowed_actions` allows, the current org's **Overview**,
+  **Members**, and **Settings** (UI-SHL-10). Past about eight orgs (workspace admins see all of
+  them) the popover gains a filter field. With one org and no org admin rights it is plain text,
+  not a control. The current org's name is always visible. There is no separate org switcher;
+  the user menu keeps workspace "Administration" only, and its **Sign out** has an icon and the
+  danger tone.
 - **UI-SHL-5** **Sidebar** (`--sidebar-width`), top to bottom: **My work** (an icon, bolder
   text, and a divider below it, so it reads as separate from project navigation); the **project
-  selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). Organization and
-  workspace administration are **not** in the sidebar. An item shows only when
+  selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). **On an admin page**
+  (UI-SHL-10) the sidebar shows My work and then that admin area's section nav (the org's
+  Overview, Members, and Settings; the workspace's Staff, Orgs, Users, and Settings) in place of
+  the project selector and project pages (DL-137; from S2-C0f). An item shows only when
   `allowed_actions` allows it. Text is always visible; icons only supplement it. Below 48 rem
   the sidebar becomes a "Menu" disclosure button in the header (`aria-expanded`,
   `aria-controls`); nothing depends on hover.
 - **UI-SHL-6** **Project selector and project pages.** The selector is a menu button showing the
-  current project that opens a disclosure popover of **links** (not a Select or listbox), with a
-  filter field past about eight projects, and "All projects" and "New project" (the latter only
-  when allowed). Below it, the selected project's pages are links: Home, Requirements, Tasks,
-  Test cases, Members, Settings. A module that is enabled but not yet shipped (`available:
-  false` from the API) is plain muted text with a visible "Not available yet", never a link to
-  a broken screen. **Only the page you are on has `aria-current="page"`**: "All projects" is
+  current project that opens a disclosure popover of **links** (not a Select or listbox),
+  headed by the current org's name (it lists that org's projects only), with a filter field past
+  about eight projects, and "All projects" (styled apart from the project links) and "New
+  project" (only when allowed; not indented) (DL-137). Below it, the selected project's pages
+  are links: Home, Requirements, Tasks, Test cases, Members, Settings. A module that isn't
+  shipped can't be enabled (DL-136), so a module page appears only once its module has shipped
+  and is enabled. **Only the page you are on has `aria-current="page"`**: "All projects" is
   not current while you are inside a project. The page itself still shows a project header
   (name, key in monospace, status badge, lead, or a "No lead" warning badge); there is no
   separate project sub-nav row. From S1-C16 the header shows the lead's name and the selector has "New project"
@@ -475,15 +481,18 @@ render inside the full shell when signed in.
   `<h1 text> · Waterline` and move focus to the new `h1` (`tabindex="-1"`) once the view has
   rendered. A change that only alters list state through `useListQuery` (sort, filter, page)
   does not move focus; it updates a polite live region instead ("12 projects").
-- **UI-SHL-10** **Admin pages.** Organization administration (members, settings) and workspace
-  administration (staff, orgs, users) are separate pages, not sidebar sections and not part of
-  the org switcher. The entry point is the user menu: an "Administration" item for each admin
-  area the user may open (the workspace, and the current org), shown only when `allowed_actions`
-  allows it (DL-104). Each admin area is its own pages under a section nav of links
-  (`aria-current="page"` on the current one), so every page is linkable and its list state is
-  in the URL (DL-104): workspace administration at `/workspace/staff`, `/workspace/orgs`,
-  `/workspace/users` (a person's access review at `/workspace/users/{user_id}/access`), and
-  `/workspace/settings`; org administration at `/{org_slug}/members` and
+- **UI-SHL-10** **Admin pages.** Organization administration (overview, members, settings) and
+  workspace administration (staff, orgs, users, settings) are separate pages. The entry points
+  (DL-137): the org menu in the header (UI-SHL-4) for the current org's pages, and the user
+  menu's "Administration" item for the workspace's, each shown only when `allowed_actions`
+  allows it. Each admin area's section nav is in the sidebar (UI-SHL-5; links, with
+  `aria-current="page"` on the current one), not in the page, so every page is linkable and its
+  list state is in the URL (DL-104): workspace administration at `/workspace/staff`,
+  `/workspace/orgs`, `/workspace/users` (a person's access review at
+  `/workspace/users/{user_id}/access`), and `/workspace/settings`; org administration at
+  `/{org_slug}/overview` (the landing page: the org's details and its projects, each with its
+  name, key, type, status, and lead, linking to its settings; anyone who opens org admin pages
+  holds inherited project admin, design-doc §5), `/{org_slug}/members`, and
   `/{org_slug}/settings`.
 
 ---
@@ -581,14 +590,18 @@ render inside the full shell when signed in.
 - **UI-FRM-12** **Grouping and choice controls:** related radios or checkboxes sit in a
   `<fieldset>` with a `<legend>`; a single checkbox's label is to its right. Use radios for
   three or four choices and a Select for more fixed choices (type, role). Use the combobox only
-  where the user must search people or orgs.
+  where the user must search people or orgs; a people picker opens its list on focus and filters
+  as the user types (DL-137; from S2-C0h).
 - **UI-FRM-13** **No redundant entry (3.3.7):** a multi-step flow keeps what the user typed. The
   **email-first** add-person flow asks for the email first and checks it (the user check, DL-66).
   If an account exists, a confirm step says only "An account already exists for <email>. Add
   them?" (never the account's name or username) and adds them on confirm; if it is already a
   member, the error says so. This step, and a project's step to add an account from outside the
-  organization to it too (`join_org`), start on Back (DL-117; UI-FRM-14). Otherwise step 2 shows the email read-only and asks for the name, the
-  username, and the temporary password (UI-FRM-11). The username is pre-filled with the server's
+  organization to it too (`join_org`), start on Back (DL-117; UI-FRM-14). Step 1 checks the
+  email's format before the user check. Otherwise step 2 shows the email as an **editable** field,
+  re-checked through the user check when it changes, so a mistyped email is fixed there rather
+  than by going back, and asks for the name, the username, and the temporary password
+  (UI-FRM-11); the email's value is styled apart from its label (DL-137; from S2-C0h). The username is pre-filled with the server's
   suggestion for the name (`jane-doe`) and follows the name until the admin edits it; it is
   checked live (UI-FRM-9). The member table has separate Name and Email columns.
 - **UI-FRM-14** **Dialogs:** native `<dialog>` opened with `showModal()`, so Esc closes and the
@@ -600,8 +613,11 @@ render inside the full shell when signed in.
   explanatory text is in the `aria-describedby` of the control that gets focus, so the reason is
   read with it (DL-118). Focus returns to the control that opened the
   dialog on close; **if that control no longer exists** (a removed row), focus goes to the row
-  now at that position, or to the `h1` if there is none. The confirm button names its action
-  ("Remove member", never "OK"); destructive confirms use the danger button.
+  now at that position, or to the `h1` if there is none. A dialog is **centered** in the
+  viewport, checked by an end-to-end test (DL-137; from S2-C0e). The confirm button names its
+  action ("Remove member", never "OK"); destructive confirms use the danger button. A
+  destructive action on a settings page (archiving a project) sits in a **"Danger zone"**
+  section with a danger-tone border and heading (DL-137; from S2-C0h).
 - **UI-FRM-15** **Buttons:** one primary button per view or dialog. A submit button is
   `type="submit"` and Enter submits; every other button is `type="button"`. Navigation is a
   link, an action is a button. Don't disable a submit button because the form is invalid: users
@@ -660,8 +676,8 @@ render inside the full shell when signed in.
 - **UI-FBK-5** **Status is never color alone.** A badge is an icon, text, and a tone. Stored
   values map to `{label, tone, icon}` in the single display-mapping module that
   `frontend/CLAUDE.md` already requires for labels. Every badge also has a 1 px border in its
-  `-edge` color, which survives forced-colors mode. Proposed mapping for the Slice 1 project
-  status (later enums are mapped as each first appears):
+  `-edge` color, which survives forced-colors mode. Mappings (later enums are mapped as each
+  first appears). The Slice 1 project status:
 
   | Value | Tone | Label |
   |---|---|---|
@@ -671,13 +687,26 @@ render inside the full shell when signed in.
   | `completed` | info | Completed |
   | `cancelled` | neutral | Cancelled |
 
+  The requirement status (DL-148), with "Approved · modified" for an approved requirement
+  edited since (design-doc §6.1):
+
+  | Value | Tone | Label |
+  |---|---|---|
+  | `draft` | neutral | Draft |
+  | `approved` | success | Approved |
+  | (approved, modified) | warning | Approved · modified |
+  | `in_progress` | info | In progress |
+  | `done` | success, with a check icon | Done |
+  | `rejected` | danger | Rejected |
+  | `deferred` | neutral, with a pause icon | Deferred |
+
 - **UI-FBK-6** **Persistent banners** sit at the top of `main` and are text plus icon plus
-  tone: archived project (info tone, "This project is archived. It is read-only."), and the
-  classification banner on every project page (the level and each category as text, with
-  the tone's icon: Internal info, Confidential warning, Restricted danger; categories without a
-  level show "Not classified" in Internal's tone; an unclassified project with no categories has
-  none). **They are not dismissible**: they state what
-  the page is, not that something happened. A "Deactivated" neutral badge follows a deactivated
+  tone: the archived project (info tone, "This project is archived. It is read-only."). **They
+  are not dismissible**: they state what the page is, not that something happened. A project's
+  **restriction** is a badge in the project header, not a banner (DL-137; from S2-C0d): the level
+  and each category as text, with the tone's icon (Internal info, Confidential warning;
+  categories with no level show "No restriction level" in Internal's tone; a project with no
+  level and no categories has none), never color alone. A "Deactivated" neutral badge follows a deactivated
   user's name everywhere it appears.
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
@@ -917,6 +946,29 @@ Not in V1. This is the plan so that V2 starts from decisions, not research.
 7. **Performance:** not tested (the spike used five tasks). Before V2 commits to a task count,
    test the wrapper at the largest project size we expect.
 
+### 7.3 Rendered markdown and revision compare
+
+Markdown is rendered in the browser (design-doc §3, "Markdown"; DL-140). Built in S2-C16, with
+the revision compare in S2-C19.
+
+- **UI-MD-1** **One renderer, `MarkdownView`:** `markdown-it` with raw HTML off, then DOMPurify
+  on its output; never `v-html` on anything else. No remote images (image syntax renders as a
+  link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
+  shifted down one level, so a description never adds a second `h1` (UI-SHL-8); code blocks in
+  the monospace font, with no syntax highlighting. A component test runs a corpus of known XSS
+  payloads (the OWASP cheat sheet's) through it, and an end-to-end test proves a stored payload
+  doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
+- **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
+  **Preview** tabs (a tablist), previewing with `MarkdownView` (DL-141). No WYSIWYG editor; a
+  toolbar may come later if usability calls for it. Hints (such as a template's) sit beside the
+  editor, never as comments in the text.
+- **UI-MD-3** **Revision compare** (design-doc §6.1, DL-145): inline, never side by side (it
+  can't reflow to 320 px); additions in `<ins>` (underlined) and removals in `<del>`
+  (struck through), each with a visually hidden "Added:" or "Removed:", colored with the tone
+  tokens, so meaning never rests on color (UI-FBK-5). Unchanged runs over three lines collapse
+  behind a button ("Show 12 unchanged lines"); a title change is its own field; each side shows
+  its change note and author. The From and To pickers keep the older revision as From.
+
 ---
 
 ## 8. Components to build with S1-C14 to C16b
@@ -989,12 +1041,16 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    selected style (UI-TOK-9). (g) **Tree rows:** the spike used a flat grid. Whether the
    DataGrid's parent and child (tree) mode is in the MIT package, and how it behaves with the
    keyboard, was not tested; it must be before the DataGrid is chosen for the requirement tree
-   (Slice 2).
+   (Slice 2). **Decided by the S2-C0b spike** (DL-150), which compares it with PrimeVue
+   TreeTable; its decision-log entry closes this item.
 6. **My work styling** (UI-SHL-5): revisit once pages are populated; a default the owner
-   accepted for now. (The admin entry point, UI-SHL-10, is confirmed: DL-104.)
-7. **Theme override** (UI-TOK-2): done in S1-C14a, in the user menu (DL-85).
-8. **Enum mappings:** tone and icon for requirement, task, test, and approval statuses and for
-   priority and severity are decided as each first appears (UI-FBK-5).
+   accepted for now. (The admin entry points, UI-SHL-10: the org menu for an org's pages, the user menu for the
+   workspace's, and the section nav in the sidebar; DL-137.)
+7. **Theme override** (UI-TOK-2): done in S1-C14a, in the user menu (DL-85); moves to account
+   settings in S2-C0g (DL-137).
+8. **Enum mappings:** the requirement status is decided (UI-FBK-5, DL-148); tone and icon for
+   task, test, and approval statuses and for priority and severity are decided as each first
+   appears.
 9. **Custom error page:** a more distinctive 404/403 design is planned (UI-FBK-14); content
    only.
 10. **Reconcile with S0-C7:** done in S1-C14 and S1-C14a (DL-84).

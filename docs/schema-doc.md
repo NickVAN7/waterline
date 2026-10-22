@@ -26,6 +26,12 @@ Companion to `design-doc.md` (section references like §6.1 point there).
 
   Effective classification (the stricter level, the union of categories) is computed, never
   stored.
+
+  **Renamed in S2-C0d** (DL-134): "classification" becomes "restriction" (`RestrictionMixin`,
+  `restriction_level`, `restriction_categories`, the `ck_…` CHECK constraints, and
+  `project_classification_changed` → `project_restriction_changed`), and the `restricted` level
+  is removed (existing rows map to `confidential`). This doc names the columns as built until that
+  migration lands; S2-C0d renames them here, on every table below, in the same commit.
 - **Columns added in a later slice.** A column that ships in a later slice than its table (it
   references a table, or belongs to a feature, from that slice) has a Notes cell starting with
   exactly `Added in Slice <n>.`, where `<n>` is the slice that adds it, in any of its
@@ -467,7 +473,7 @@ project's org; design-doc §5).
 | Field | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| name | varchar | the firm; changeable by workspace owners |
+| name | varchar | the firm; changeable by workspace owners; at most 100 characters (DL-143) |
 | slug | varchar | NOT NULL, unique; format below; changeable by workspace owners |
 | created_at / updated_at | timestamptz | |
 
@@ -500,7 +506,7 @@ demotion only; service-layer check, DL-59, DL-72, DL-74).
 |---|---|---|
 | id | UUID (PK) | |
 | workspace_id | UUID (FK → workspace) | NOT NULL |
-| name | varchar | |
+| name | varchar | at most 100 characters (DL-143) |
 | slug | varchar | NOT NULL; same format as the workspace slug; shown in browser URLs (`/{slug}/projects/{key}/…`); renameable, since it only decorates project URLs (design-doc §3). Org-level pages (e.g. `/{slug}/members`) under an old slug 404 after a rename; no slug history is kept |
 | created_at / updated_at | timestamptz | |
 
@@ -514,7 +520,7 @@ installations moved to `github_installation` (an org can have several).
 | id | UUID (PK) | |
 | email | varchar | unique; stored lowercase (`CHECK (email = lower(email))`); changed only by admins, under the rank rule, which signs the user out everywhere (design-doc §4); users can't change their own in v1 |
 | username | varchar | unique app-wide; same format as slugs (lowercase letters, digits, and hyphens, 2–40 characters, starting with a letter), but the reserved-route list doesn't apply (`rules/identifiers.py`); changeable by the user, and by admins under the rank rule |
-| name | varchar | display name; changeable by the user, and by admins under the rank rule |
+| name | varchar | display name; changeable by the user, and by admins under the rank rule; at most 100 characters (DL-143) |
 | hashed_password | varchar | required (email/password is the primary sign-in) |
 | is_active | boolean, default true | false = cannot sign in; sessions deleted and pending approvals replaced on deactivation (design-doc §6.2; not in an archived project) |
 | is_system_admin | boolean, default false | may do anything in any org/project, except personal actions such as deciding another person's approval (design-doc §5) and the content of an export-controlled project without an explicit membership (§3.1); granted and revoked only by app CLI commands |
@@ -575,8 +581,8 @@ leave, be demoted, or be deactivated unless a replacement owner is named in the 
 | organization_id | UUID (FK → organization) | referenced through the composite FK below |
 | workspace_id | UUID (part of the composite FK → organization) | NOT NULL; the org's workspace, copied so keys can be unique per workspace |
 | key | varchar | user-entered; 3–6 chars `^[A-Z][A-Z0-9]{2,5}$`; immutable; unique in the workspace |
-| name | varchar | |
-| description | text, nullable | plain text |
+| name | varchar | at most 100 characters (DL-143) |
+| description | text, nullable | plain text; at most 2,000 characters (DL-143) |
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | status | enum: planning / active / on_hold / completed / cancelled | NOT NULL, default `planning`; informational only: gates nothing, separate from `archived_at` (design-doc §1.1, §7); changed by project admins |
 | lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check; otherwise a 422 field error); defaults to the first admin; set to null by a project admin (`project_updated`, DL-76), or cleared in the same transaction when that membership is removed, recorded in `project_member_removed` and, from Slice 2, as an `activity_log` `lead_id` change (design-doc §1.1) |
@@ -592,8 +598,9 @@ get the same conventional name, `fk_project_organization_id_organization`). Inde
 `organization_id` (an org's projects; Postgres doesn't index a foreign key's columns, DL-34).
 `UNIQUE(workspace_id, key)` (design-doc §3: an ID like `ERP-TA-45` is unambiguous across the
 firm's clients).
-`CHECK (enabled_modules <@ ARRAY[...allowed modules])` — `sprints` and `github` are allowed from
-Slice 1 (design-doc §1.1: the UI disables their features until their slices ship); each v2
+`CHECK (enabled_modules <@ ARRAY[...allowed modules])` — `sprints` and `github` are allowed values
+from Slice 1, but from S2-C0d the API refuses enabling a module before it ships, and S2-C0d's
+migration removes them from every project (design-doc §1.1, DL-136); each v2
 module's value is added when that module ships. Disabling a module hides its data; nothing is deleted.
 `CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii',
 'export_controlled'])`. Set at creation (recorded in `project_created`) or later. Only project
@@ -682,8 +689,8 @@ logged.
 | parent_requirement_id | UUID (FK → requirement), nullable | null = top level; same project; no cycles (service check) |
 | workstream_id | UUID (FK → workstream), nullable | Added in Slice 3. Same project; UI defaults a child to its parent's |
 | reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by project admins; drives delete permission |
-| title | varchar | |
-| description_md | text | markdown; includes `## Acceptance Criteria` from template |
+| title | varchar | at most 200 characters (DL-143) |
+| description_md | text | markdown; includes `## Acceptance Criteria` from template; at most 20,000 characters (DL-143) |
 | status | enum: draft / approved / in_progress / done / rejected / deferred | only a project admin moves it into `approved` by hand (design-doc §5) |
 | priority | enum: critical / high / medium / low | default medium |
 | rank | varchar | fractional index; order among siblings |
@@ -715,7 +722,7 @@ downgrade.
 | revision_number | integer | 1, 2, 3… |
 | title | varchar | snapshot |
 | description_md | text | snapshot |
-| change_note | text, nullable | optional "why" |
+| change_note | text, nullable | optional "why"; at most 500 characters (DL-143) |
 | created_by | UUID (FK → user) | |
 | created_at / updated_at | timestamptz | |
 
@@ -922,7 +929,7 @@ current status; `ix_test_result_assignee_id_status` on `(assignee_id, status)` f
 | entity_id | UUID | polymorphic, no FK; parent verified by service layer |
 | requirement_revision_id | UUID (FK → requirement_revision), nullable | the revision being approved; required for requirements |
 | status | enum: pending / approved / rejected / cancelled | |
-| note | text, nullable | context for approvers |
+| note | text, nullable | context for approvers; at most 2,000 characters (DL-143) |
 | requested_by | UUID (FK → user) | a project admin (including inherited) |
 | completed_at | timestamptz, nullable | set on approved / rejected / cancelled |
 | created_at / updated_at | timestamptz | |
@@ -943,7 +950,7 @@ completes the request (design-doc §6.2).
 | approval_request_id | UUID (FK → approval_request) | |
 | approver_id | UUID (FK → user) | any project role, including viewer; must have project access when the request is created (an explicit membership on an export-controlled project) |
 | decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost the access needed to decide while the row was pending, and the requester still holds project admin; the row keeps its history, and a pending row for the requester is added unless they're already named. If the requester no longer holds project admin, or the project is archived, the row stays `pending` and the request is flagged (design-doc §6.2). Decided rows are never replaced |
-| comment | text, nullable | |
+| comment | text, nullable | at most 2,000 characters (DL-143) |
 | decided_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
 

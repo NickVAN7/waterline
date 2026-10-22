@@ -277,7 +277,7 @@ Entry format:
   latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
   The vulnerable code only expands glob patterns from the repository's own ESLint
   configuration, never untrusted input, and never ships in the app.
-- **Fix by:** Slice 2's tech-debt review (owner, S1-C17; still no fixed `braces` on Oct 21, 2026, and no
+- **Fix by:** S2-C22 (Slice 2's tech-debt review; owner, S1-C17; still no fixed `braces` on Oct 21, 2026, and no
   Slice 2 feature needs it: it only expands the linter's own globs)
 - **Status:** open
 
@@ -460,7 +460,7 @@ Entry format:
   milliseconds and needs a request already in flight.
 - **Why:** the owner decided the classification change in S1-C13 and chose to revisit the rest
   later.
-- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
+- **Fix by:** S2-C22 (Slice 2's tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
   the window is milliseconds and needs a request already in flight; fix it when a checkpoint
   adds a locked mutation where the race would matter
 - **Status:** open
@@ -561,7 +561,7 @@ Entry format:
   failure (UI-FBK-15). With more than one section, that would hide the sections that did load.
 - **Why:** ui-reviewer finding (S1-C14a review, pass 2). Slice 1 has one section, so a
   per-section error state would have nothing beside it.
-- **Fix by:** Slice 2 (My work's approvals section, its second; each section gets its own error
+- **Fix by:** S2-C14 (My work's approvals section, its second; each section gets its own error
   state)
 - **Status:** open
 
@@ -585,7 +585,7 @@ Entry format:
 - **Why:** removing it needs a separate authorization action for the reset, which `allowed_actions`
   leaves out on one's own row: a design change in `app/authz/` with spec tests, outside S1-C15
   (owner decision, S1-C15 review).
-- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner re-targeted it at S1-C17 until an
+- **Fix by:** S2-C22 (Slice 2's tech-debt review re-checks it): the owner re-targeted it at S1-C17 until an
   account action needs its own authorization action; the split was dropped once already
   (DL-73), so it comes back only as a design change
 - **Status:** open
@@ -609,8 +609,8 @@ Entry format:
   `workspace.view`, and `member-candidates` needs an existing project.
 - **Why:** a candidates endpoint for project creation is new API and authorization surface;
   the owner chose the org's members for now (DL-112).
-- **Fix by:** Slice 2 (a `first-admin-candidates` endpoint under `project.assign_first_admin`, or
-  the owner's other choice)
+- **Fix by:** S2-C0c (`GET /api/orgs/{org_id}/first-admin-candidates` under
+  `project.assign_first_admin`, and the create dialog's picker on it; DL-152)
 - **Status:** open
 
 ### TD-45: The project header doesn't mark a deactivated lead
@@ -665,7 +665,7 @@ Entry format:
 - **What:** the members page's actions (Add member, Add by email, Access review) sit in a row
   under `ProjectHeader`, not in a right-hand actions slot as `PageHeader`'s are.
 - **Why:** the owner left the layout as is for now; it may come with their changes in Slice 2.
-- **Fix by:** Slice 2 (the owner's layout changes, or a decision to keep it)
+- **Fix by:** S2-C0g (the actions in the project header, DL-137)
 - **Status:** open
 
 ### TD-50: Two other dialogs' last step isn't read with Done
@@ -686,7 +686,7 @@ Entry format:
   screen reader hears only once the dialog closes.
 - **Why:** the owner chose to log the S1-C16d review's findings rather than fix them; DL-122 asked
   for the step's existing text, which it has.
-- **Fix by:** Slice 2 (the owner's UI feedback at its start)
+- **Fix by:** S2-C0h (the owner's UI feedback, DL-137)
 - **Status:** open
 
 ### TD-52: No length limit on names and descriptions
@@ -695,7 +695,8 @@ Entry format:
   user schemas have no `max_length`, and nothing caps the request body. Each edit's old and new
   values go into `audit_event`, which can't be deleted, so a very large value grows it for good.
 - **Why:** the limits aren't in the schema doc; the owner picks them.
-- **Fix by:** Slice 2 (the limits decided, then `Field(max_length=…)` and `wl gen-client`)
+- **Fix by:** S2-C0c for the existing fields (DL-143: names 100 characters, project description
+  2,000; `Field(max_length=…)` and `wl gen-client`); each Slice 2 field with its row
 - **Status:** open
 
 ### TD-53: The routers' error-response map is written out four times
@@ -703,7 +704,7 @@ Entry format:
 - **What:** `routers/org.py`, `user.py`, `workspace.py`, and `project.py` each define the same
   `ERRORS` map; one in `routers/deps.py` would do.
 - **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
-- **Fix by:** Slice 2 (the first checkpoint that adds a router)
+- **Fix by:** S2-C0c (one `ERRORS` map in `routers/deps.py`)
 - **Status:** open
 
 ### TD-54: Re-wrapping a page of rows is repeated five times
@@ -711,7 +712,7 @@ Entry format:
 - **What:** the workspace, roster, project, user, and my-work services each rebuild a `Page`
   from a `PageResult`; a `PageResult.map(fn)` in `core/lists.py` would do.
 - **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
-- **Fix by:** Slice 2 (the first checkpoint that adds a list)
+- **Fix by:** S2-C0c (`PageResult.map`)
 - **Status:** open
 
 ### TD-55: `anyio` is used by the app but declared only for development
@@ -719,7 +720,7 @@ Entry format:
 - **What:** `core/security.py` hashes passwords through `anyio.to_thread`, but `anyio` is in the
   dev dependencies; production has it only because Starlette depends on it.
 - **Why:** found at the slice-end audit; harmless while Starlette brings it.
-- **Fix by:** Slice 2 (move it to `[project] dependencies`)
+- **Fix by:** S2-C0c (move it to `[project] dependencies`)
 - **Status:** open
 
 
@@ -731,7 +732,7 @@ Entry format:
   `AccountDetailsDialog` already sends only the changed fields.
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
-- **Fix by:** S2-C0 (send only the changed fields, as `AccountDetailsDialog` does)
+- **Fix by:** S2-C0h (send only the changed fields, as `AccountDetailsDialog` does)
 - **Status:** open
 
 ### TD-57: An update's change check reads an unlocked row
@@ -741,7 +742,7 @@ Entry format:
   append-only `audit_event`.
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
-- **Fix by:** S2-C0 (lock and re-read the row before comparing, with a concurrency test for each)
+- **Fix by:** S2-C0c (lock and re-read the row before comparing, with a concurrency test for each)
 - **Status:** open
 
 ### TD-58: Removing the last row of the last page leaves an empty page
@@ -750,7 +751,7 @@ Entry format:
   the last page shows an empty page with no Previous; the project list goes back to page 1.
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
-- **Fix by:** S2-C0 (the project list's return to page 1, moved into `useListQuery`)
+- **Fix by:** S2-C0g (the project list's return to page 1, moved into `useListQuery`)
 - **Status:** open
 
 ### TD-59: The username suggestion is copied in two dialogs
@@ -759,17 +760,19 @@ Entry format:
   suggestion (S1-C16d's timer fix had to go into both).
 - **Why:** found at the slice-end audit; the owner deferred it to a pre-checkpoint at the start
   of Slice 2.
-- **Fix by:** S2-C0 (one `useUsernameSuggestion` composable)
+- **Fix by:** S2-C0h (one `useUsernameSuggestion` composable)
 - **Status:** open
 
 ### TD-60: The docs name per-area policy files; Slice 1 built one registry
 - **Added:** S1-C17 (docs-consistency)
 - **What:** the build plan (the area layout, the feature map), `backend/CLAUDE.md`, and the
   `new-area` skill put each area's authorization in `authz/policies/<area>.py`; Slice 1 built one
-  registry, `authz/actions.py`.
+  registry, `authz/actions.py`. DL-151 kept the one registry and corrected those docs; what's left
+  is S2-C0c's check that the `new-area` skill matches the built `project` area (DL-132).
 - **Why:** the owner decided the fix belongs at the start of Slice 2, before its first new area
   follows the docs.
-- **Fix by:** S2-C0 (the docs and the registry made to agree, before the first Slice 2 area)
+- **Fix by:** S2-C0c (DL-151: the docs now describe the one registry, `authz/actions.py`; S2-C0c's
+  `new-area` check confirms the skill matches)
 - **Status:** open
 
 ### TD-61: The token contrast check runs only by hand
@@ -778,7 +781,7 @@ Entry format:
   token change that fails the contrast minimums.
 - **Why:** no token has changed since it was written; the owner's brand values are still to
   come. The owner revisits whether to port it at Slice 2's end.
-- **Fix by:** Slice 2 (its slice-end tech-debt review decides: port it into `wl check`, or
+- **Fix by:** S2-C22 (Slice 2's slice-end tech-debt review decides: port it into `wl check`, or
   re-target)
 - **Status:** open
 
@@ -787,8 +790,8 @@ Entry format:
 - **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) were never done;
   Slice 1's screens were designed checkpoint by checkpoint.
 - **Why:** the owner completes the inventory separately, outside the checkpoints.
-- **Fix by:** S2-C0 (the owner's completed inventory checked against the docs and the built
-  screens)
+- **Fix by:** S2-C0i (the owner's completed inventory checked against the docs and the built
+  screens; if it isn't committed when S2-C0i starts, the start of the `s2-web` group, DL-157)
 - **Status:** open
 
 ### TD-63: Settings saves are last-save-wins, with no optimistic lock
@@ -797,6 +800,16 @@ Entry format:
   the same field, the later save wins without either seeing the conflict. (TD-56 covers fields
   the saver didn't change.)
 - **Why:** the owner judged it not an issue at Slice 1's scale.
-- **Fix by:** Slice 2 (its slice-end tech-debt review revisits it: an optimistic lock, or
+- **Fix by:** S2-C22 (Slice 2's slice-end tech-debt review revisits it: an optimistic lock, or
   re-target)
+- **Status:** open
+
+### TD-64: One action registry for every area
+- **Added:** DC-2026-10-22 (DL-151)
+- **What:** every area's actions are registered in one file, `authz/actions.py` (263 lines with
+  Slice 1's actions), rather than per-area policy files; it grows with every area.
+- **Why:** the owner kept the one registry Slice 1 built (DL-151), and expects it will likely
+  need splitting as the app grows.
+- **Fix by:** Slice 2 (its slice-end tech-debt review, and each one after: split it into per-area
+  files once it passes about 600 lines or a slice-end audit recommends it)
 - **Status:** open

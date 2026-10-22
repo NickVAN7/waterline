@@ -32,7 +32,7 @@ Conventions: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, design-doc §3–§5 and
 ## 1. Model — `models/<area>.py`
 
 - Base model and the mixins the schema doc calls for (soft delete, `version`,
-  `ClassificationMixin`).
+  `ClassificationMixin`, renamed `RestrictionMixin` in S2-C0d, DL-134).
 - Enums through the enum helper; relationships `lazy="raise"`.
 - Human-readable numbers: an `int number` column with `UNIQUE(project_id, number)`; never
   computed here.
@@ -61,10 +61,11 @@ Follow the `migration` skill.
 - Load explicitly what each use needs (`selectinload`/`joinedload`).
 - Soft-deleted rows are hidden unless the query opts in (trash/restore only).
 
-## 5. Rules and authorization — `rules/<area>.py`, `authz/policies/<area>.py`
+## 5. Rules and authorization — `rules/<area>.py`, `authz/actions.py`
 
 - Pure logic (transition tables, policy decisions) goes in `rules/`, with no database access.
-- Register every action explicitly in the policy, marked content or management (design-doc
+- Register every action explicitly in the one registry, `authz/actions.py` (DL-151), marked
+  content or management (design-doc
   §3.1, §5), and marked personal where the right comes from the user's relationship to the item
   (e.g. `approval.decide`); unknown actions are denied.
 - **Test first**, written by the `spec-test-writer` agent against your stubs (`test-writer`

@@ -96,6 +96,10 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - **Last checkpoint of a slice:** after `docs-consistency`, invoke the `repo-auditor` agent with
   the slice ID and the checkpoint ID (DL-41). It audits the whole repository, not this diff, and
   runs no tests.
+- **Last checkpoint of a slice** (from S2-C0a, which builds it, DL-138): after `repo-auditor`,
+  invoke the `simplicity-auditor` agent. It audits the whole repository for overengineering,
+  reports only, and its findings feed the retro; the next slice's C0 applies those the owner
+  accepts. The review record gets its own `simplicity-auditor` section.
 
 ## 5. Resolve every finding
 
@@ -114,6 +118,9 @@ resolve: leave them undecided and put them in the report (step 7) for the owner.
 scope: fix one only when the fix is within it. Otherwise log it (minor), or put it in the report
 for the owner as a proposed design change (major or blocker). Its questions go to the owner,
 and its findings feed the slice retro.
+
+`simplicity-auditor` findings (from S2-C0a, DL-138) are never fixed in the checkpoint: each goes
+to the owner, who decides it, and feeds the retro; the next slice's C0 applies the accepted ones.
 
 **Fix in one batch** (DL-105, DL-106), once every reviewer has reported:
 - Fix every finding together. Before each fix, grep for the same pattern elsewhere in the diff
@@ -147,7 +154,7 @@ If a finding shows a rule that would have prevented the mistake, add it to the r
 `CLAUDE.md`.
 
 **Record every pass** of every reviewer that ran (checkpoint, security, UI, fresh-clone,
-docs-consistency, repo-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
+docs-consistency, repo-auditor, simplicity-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
 Include the base commit, the totals, the "Spec tests" section (when the checkpoint has one), and
 for each pass its verdict, its findings table in the `S0-C1.md` columns, one row per finding with
 its resolution (fixed / logged with TD number / rejected with evidence / proposed to the owner;
@@ -221,7 +228,7 @@ reviewers, not verification.
 Send the owner:
 - the review note (the commit message body);
 - each reviewer's findings table (checkpoint, security, UI, fresh-clone, docs-consistency,
-  repo-auditor) with
+  repo-auditor, simplicity-auditor) with
   the resolution of each finding (as recorded in `docs/reviews/s<n>/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review. Each decision or question says what it is, why it
@@ -239,7 +246,8 @@ Send the owner:
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
   the owner, which skills and agents never triggered, the verdict of any process trial, and the
-  `repo-auditor` findings left for the owner (with the design changes they propose).
+  `repo-auditor` findings left for the owner (with the design changes they propose), and every
+  `simplicity-auditor` finding for the owner to decide.
   The owner decides what changes; each change gets a decision-log entry and is applied on the
   slice branch before the merge (DL-19);
 - what the next checkpoint will cover.

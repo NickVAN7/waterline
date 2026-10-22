@@ -24,7 +24,8 @@ follows the model; tests prove the database enforces what the doc says.
 ## 2. Change the models
 
 - Use the shared base and mixins (UUIDv7 `id`, `created_at`/`updated_at`, soft delete,
-  `version` for optimistic locking, `ClassificationMixin` where the schema doc calls for it)
+  `version` for optimistic locking, `ClassificationMixin`, renamed `RestrictionMixin` in
+  S2-C0d, DL-134, where the schema doc calls for it)
   rather than declaring those columns by hand.
 - Enums through the enum helper only (`native_enum=False`, `create_constraint=True`); without
   `create_constraint` there is no CHECK.

@@ -18,8 +18,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Models:** tables only; they are the domain entities.
 - **`rules/`:** pure logic with no database access (transition tables, approval policy).
 - Files are named by aggregate and the name repeats in every layer (`models/task.py`,
-  `schemas/task.py`, `repositories/task.py`, `services/task.py`, `routers/task.py`,
-  `authz/policies/task.py`).
+  `schemas/task.py`, `repositories/task.py`, `services/task.py`, `routers/task.py`); every
+  area's actions are registered in the one registry, `authz/actions.py` (DL-151).
 
 ## Cross-area rules
 
@@ -102,7 +102,9 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Soft delete** is filtered globally; opt in explicitly for trash/restore queries.
 - **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
   subtasks.
-- **Markdown** is sanitized on render, never trusted.
+- **Markdown** is stored and returned as-is and never rendered by the backend: the browser
+  renders and sanitizes it (`MarkdownView`, design-doc §3, DL-140). A server-side renderer
+  (`markdown-it-py` and `nh3`) arrives only when something server-side shows content.
 
 ## Models
 

@@ -1075,7 +1075,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `confirmation_not_needed`. Each row of the per-project review, and each project of the per-person
   review, gains `access` (`content` or `management`).
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-134, in part (the names, and the `restricted` level)
 - **Applies to:** build plan ("Classification & export control": the classification API and access
   reviews; "The account API"; "The project members API"; the S1-C13 row)
 - **Source:** chat session (owner, Oct 12, 2026: the proposal at the start of S1-C13; the owner
@@ -1092,7 +1092,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   and lower rules (design-doc §3.1). The registry marks every action content or management; every action so far is
   management.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-134, in part (the actions' names)
 - **Applies to:** build plan ("Classification & export control": the classification actions; the
   S1-C13 row); `app/authz/`
 - **Source:** chat session (owner, Oct 12, 2026, with DL-81; the no-op and unclassified rules:
@@ -1136,7 +1136,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Decision:** The System / Light / Dark choice in the account menu (ui-design-guide UI-TOK-2)
   is built in S1-C14a with the user menu, not deferred.
 - **Supersedes:** ui-design-guide §10 open item 7 ("recommended to ship with S1-C14")
-- **Superseded by:** none
+- **Superseded by:** DL-137, in part (the choice moved to account settings)
 - **Applies to:** build plan (S1-C14a row; "Web screens"); ui-design-guide (§10, item 7)
 - **Source:** chat session (owner, Oct 13, 2026)
 
@@ -1380,7 +1380,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `/{org_slug}/settings`. Every page is linkable and keeps its list state in the URL.
 - **Supersedes:** none (settles UI-SHL-10's "proposed default" entry point and its "internal
   layout is decided when they are built"; closes the guide's open item 6 for the entry point)
-- **Superseded by:** none
+- **Superseded by:** DL-137, in part (the entry point and the section nav)
 - **Applies to:** ui-design-guide (UI-SHL-10); build plan (the S1-C15 row)
 - **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
 
@@ -1495,7 +1495,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   list them to an org admin (TD-44).
 - **Supersedes:** the build plan's "Web screens" picker of "the org's members and the
   workspace's staff", in part
-- **Superseded by:** none
+- **Superseded by:** DL-152
 - **Applies to:** build plan (the S1-C16 row; "Web screens"); tech debt (TD-44, TD-41)
 - **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16: option b, over a new
   candidates endpoint)
@@ -1716,6 +1716,338 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   start of Slice 2", is part of S2-C0 (DL-124). The owner's UI feedback is at
   `docs/ui-feedback.md`.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-158, in part (the feedback file's path)
 - **Applies to:** build plan ("Claude configuration", "Slice 2 — notes for planning")
 - **Source:** DC-2026-10-21d docs-consistency decision 3 (owner, Oct 21, 2026)
+
+### DL-133: Export control is hidden in the UI; the API and Slice 2's gate stay
+- **Date:** 2026-10-21
+- **Decision:** The UI no longer offers `export_controlled`, on the create-project dialog or in
+  project settings; the API keeps accepting it and everything S1-C13 built stays, the member-add
+  confirmations included (reached only on a project made export-controlled through the API). The
+  access review's Access column shows only on an export-controlled project. Slice 2 still builds
+  the export-control gate, content scoping, explicit-only approvers, and the replacement path.
+- **Supersedes:** design-doc §3.1's UI for export control, in part (S1-C16, S1-C16a)
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1; ui-design-guide (UI-FRM-15, the restriction rules); user
+  guide; screen inventory; build plan (S2-C0d)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-134: "Classification" becomes "Restriction", and the Restricted level is removed
+- **Date:** 2026-10-21
+- **Decision:** A full rename in code and docs: `classification_level` and
+  `classification_categories` → `restriction_level` and `restriction_categories`,
+  `ClassificationMixin` → `RestrictionMixin`, `ClassificationLevel`/`ClassificationCategory` →
+  `RestrictionLevel`/`RestrictionCategory`, `rules/classification.py` → `rules/restriction.py`,
+  `PUT /api/projects/{key}/classification` → `PUT /api/projects/{key}/restriction`,
+  `ClassificationUpdate` → `RestrictionUpdate`, the actions `project.raise_classification` and
+  `project.lower_classification` → `project.raise_restriction` and `project.lower_restriction`,
+  the audit event `project_classification_changed` → `project_restriction_changed`, and the
+  activity log's `field_changed` values. The UI label is "Restriction", with the levels None,
+  Internal, and Confidential (None is the null level, treated like Internal for every rule).
+  Restricted is removed, with its two rules (Restricted exports for project admins only; AI never
+  on Restricted). The migration maps `restricted` to `confidential`, renames the columns and
+  CHECK constraints, and rewrites the existing `audit_event` rows' action (dev data only), with a
+  downgrade. This entry is the owner's approval of the spec-test changes the rename needs.
+- **Supersedes:** design-doc §3.1's Restricted level and its rules; DL-81 and DL-82, in part (the
+  names)
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1, §5, §10, §10.1; schema doc; build plan; ui-design-guide;
+  developer guide; user guide; testing strategy; screen inventory; tech debt; the
+  `security-reviewer` and `ui-reviewer` agents; the `checkpoint`, `migration`, and `new-area`
+  skills; built in S2-C0d
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-135: PrimeVue 5 stays, with the owner's license key
+- **Date:** 2026-10-21
+- **Decision:** PrimeVue 5 (`primevue`, `@primevue/*`, `@primeuix/*`) is under the PrimeUI
+  License and needs a key; the owner holds a Community License. The key is a build-time setting
+  in `.env` and a CI secret, never committed, with a placeholder in `.env.example`; it ships in
+  the browser bundle, which is expected. An end-to-end check fails if a license notice renders.
+  `tailwindcss-primeui` stays MIT. Downgrading to 4.5.5 (the last MIT release) was rejected.
+- **Supersedes:** none (records the license DL-129 asks for, for a dependency added before it)
+- **Superseded by:** none
+- **Applies to:** design-doc §2; build plan ("Tooling", S2-C0e); developer guide (setup)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-136: An unshipped module can't be enabled
+- **Date:** 2026-10-21
+- **Decision:** The v1 modules (`sprints`, `github`) follow the v2 modules' rule: seeding skips
+  unshipped modules, the API refuses enabling one (422 `validation_error` on `enabled_modules`,
+  type `module_unavailable`), and the UI shows them as disabled checkboxes with "Not available
+  yet". A migration removes `sprints` and `github` from every project. Slices 4 and 7 each decide
+  whether existing software projects get their module turned on when it ships.
+- **Supersedes:** design-doc §1.1, "The v1 modules can be enabled from the start (Slice 1)"
+- **Superseded by:** none
+- **Applies to:** design-doc §1.1; build plan (the projects API, S2-C0d, "Later slices");
+  ui-design-guide UI-SHL-6; user guide
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-137: The owner's Slice 1 UI feedback, mapped to S2-C0's rows
+- **Date:** 2026-10-21
+- **Decision:** Each item in the owner's UI feedback is assigned an S2-C0 row, with these rule
+  changes: the header reads "Waterline" and the current org's name, which is the org menu
+  (switching orgs and, when allowed, the org's Overview, Members, and Settings), replacing the
+  org switcher; admin pages' sidebars show the admin area's section nav in place of the project
+  selector, and the in-page section nav goes; an org overview page at `/{org_slug}/overview`;
+  the theme choice moves to an "Appearance" section of account settings, and sign-out gets an
+  icon and the danger tone; change password is its own page, `/account/password`; the
+  add-person flow's step 2 can edit the email, and step 1 checks its format; a restriction badge
+  in the project header replaces the banner; project settings' Archive sits in a "Danger zone";
+  the project selector, list, and picker changes; dialogs centered, with an end-to-end check;
+  sign-in and project-settings spacing.
+- **Supersedes:** ui-design-guide UI-SHL-4; DL-104, in part (the entry point and section nav);
+  DL-85, in part (the theme choice's place)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SHL-4, UI-SHL-5, UI-SHL-6, UI-SHL-10, UI-TOK-2,
+  UI-FRM-13, UI-FRM-14, UI-FBK-6); design-doc §11; user guide; the feedback file; build plan
+  (S2-C0d to S2-C0i)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-138: The simplicity audit (`simplicity-auditor`)
+- **Date:** 2026-10-21
+- **Decision:** A read-only agent audits the whole repository for overengineering, from
+  MIT-licensed prompts vendored into `.claude/audit/` and pinned to a commit (Ponytail's
+  whole-repo audit and core skill; `addyosmani/agent-skills`' `code-simplification`, the
+  Architecture and Readability & Simplicity axes of `code-review-and-quality`, and the red flags
+  and checklist of `api-and-interface-design`), read as plain files. Each finding has evidence,
+  lines saved, and a category (delete, simplify, merge duplicates, process, or "conflicts with
+  DL-n"); bugs, security, and scale stay with `repo-auditor`. It runs at every slice's
+  verification checkpoint after `repo-auditor`, before the retro; the next slice's C0 applies the
+  accepted findings. A docs consistency test fails when a slice from Slice 2 on has a C1 record
+  but no C0a record, or a slice-end record lacks its section. Updating the vendored prompts is a
+  design change. Built in S2-C0a, which also runs it first on `main` at `e999564`.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Workflow items scheduled", S2-C0a, S2-C22); `CLAUDE.md`
+  ("Skills, agents, and hooks"); `checkpoint` skill (the slice-end list)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-139: Planning a slice, and sizing its checkpoints
+- **Date:** 2026-10-21
+- **Decision:** Each slice's plan is recorded in `docs/reviews/s<n>/S<n>-plan.md` (fixes,
+  decisions, conventions, a short threat-model pass, and the owner's open questions, answered
+  before C0a). Its C0 rows come first: the accepted audit findings, the retro's code changes, and
+  owner feedback. Sizing: one unit per checkpoint (about 2,000 lines added, tests included);
+  every row lists its endpoints and actions in the plan; web rows stay provisional until the
+  screen inventory covers their screens, and are re-cut before they start (not a split); a shared
+  piece used for the first time gets its own row. The plan's readiness review checks every row.
+- **Supersedes:** none (resolves the "Start of Slice 2 planning" workflow item)
+- **Superseded by:** none
+- **Applies to:** build plan ("Planning a slice", "Workflow items scheduled")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-140: Markdown is rendered in the browser
+- **Date:** 2026-10-21
+- **Decision:** `markdown-it` (MIT) with raw HTML off, then DOMPurify (Apache-2.0 option); the API
+  carries only the markdown. CommonMark plus tables, task-list syntax, strikethrough, and
+  autolinks; no remote images (image syntax renders as a link); links only `http`, `https`, and
+  `mailto`, with `rel="noopener noreferrer"`; headings shifted one level; code blocks in
+  monospace without highlighting. A server-side renderer (`markdown-it-py` and `nh3`) comes only
+  when something server-side shows content. Tests: a component test over a corpus of known XSS
+  payloads, and an end-to-end test that a stored payload doesn't run.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 ("Markdown"); `frontend/CLAUDE.md`; ui-design-guide (UI-MD-1);
+  build plan (S2-C16)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-141: The markdown editor is a textarea with Write and Preview tabs
+- **Date:** 2026-10-21
+- **Decision:** A textarea with Write and Preview tabs, previewing with the saved view's
+  renderer; no WYSIWYG editor. A toolbar can come later if usability calls for it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-MD-2); build plan (S2-C16)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-142: A Content-Security-Policy from Slice 2
+- **Date:** 2026-10-21
+- **Decision:** A CSP behind the sanitizer, scripts only from our own origin. PrimeVue's injected
+  styles need a nonce or `style-src 'unsafe-inline'`; S2-C16 decides which and records it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4; developer guide; build plan (S2-C16)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-143: Length limits
+- **Date:** 2026-10-21
+- **Decision:** Requirement title 200 characters, requirement description 20,000; project, org,
+  workspace, and user names 100; project description 2,000; revision change notes 500;
+  approval-request notes and approver comments 2,000. Enforced with `Field(max_length=…)` and
+  recorded in the schema doc. TD-52's existing fields are built in S2-C0c, the Slice 2 fields
+  with their checkpoints.
+- **Supersedes:** none (TD-52's open decision)
+- **Superseded by:** none
+- **Applies to:** schema doc; build plan (S2-C0c, the Slice 2 rows); tech debt (TD-52)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-144: Item-ID auto-links wait for Slice 3; @mentions for v1.5
+- **Date:** 2026-10-21
+- **Decision:** Auto-linking item IDs (`WTL-RQ-12`) in rendered markdown comes in Slice 3, once
+  there are tasks to link; @mentions come with notifications in v1.5 (design-doc §16 already
+  lists them there).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Later slices — placements decided so far")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-145: Revision compare
+- **Date:** 2026-10-21
+- **Decision:** Computed in the browser with `jsdiff` (`diff`, BSD-3-Clause) on the raw markdown,
+  line by line and then word by word within changed lines, inline; unchanged runs over three
+  lines collapse; a title change is its own field; each side's change note and author shown.
+  Additions `<ins>`, removals `<del>`, each with visually hidden "Added:"/"Removed:" and tone
+  tokens. From/To pickers default to approved vs current when "Approved · modified", otherwise
+  the selected revision vs the one before; the older one is always From. API: the revision list
+  (cursor-paged) and one revision's read; no compare endpoint.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; ui-design-guide (UI-MD-3); build plan (S2-C9, S2-C19)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-146: Trash in Slice 2
+- **Date:** 2026-10-21
+- **Decision:** A project Trash page, linked from the requirements page's header, listing by
+  type (item, deleted by, when, and Restore where allowed); no automatic purge in v1. Restoring a
+  requirement also restores the descendants deleted in the same action (the same `deleted_at`);
+  children deleted separately stay in the trash. A requirement whose parent is still deleted is
+  restored at the top level, with the parent change logged.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C8, S2-C21)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-147: Item history in Slice 2; the project activity feed in Slice 3
+- **Date:** 2026-10-21
+- **Decision:** The requirement detail page has a History tab (activity entries in plain
+  language, names resolved by the server) and a Revisions tab (DL-145). The project activity
+  feed's API and page move to Slice 3, with the filter bar; Slice 2 still logs project status and
+  lead changes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §1.1, §10, §11; build plan (S2-C3, S2-C19, "Later slices")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-148: Requirement status has no transition table
+- **Date:** 2026-10-21
+- **Decision:** Members move a requirement from any status to any other except into `approved`,
+  which stays project-admin only by hand (`requirement.approve_manually`, its own action in
+  `allowed_actions`) or by a completed approval request. New requirements start as `draft`; a
+  completed request moves only a `draft` requirement to `approved`. No parent/child status rules.
+  Badge tones: Draft neutral; Approved success; Approved · modified warning; In progress info;
+  Done success with a check icon; Rejected danger; Deferred neutral with a pause icon.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5, §7; ui-design-guide UI-FBK-5 and §10 item 8; build plan (S2-C6,
+  S2-C11)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-149: Acceptance-criteria templates, one per project type
+- **Date:** 2026-10-21
+- **Decision:** The create form pre-fills the description from a frontend constant chosen by the
+  project's type; the server injects nothing. Software and General: `## Context`,
+  `## Acceptance Criteria`, `1.`; ERP: `## Business Process`, `## Current State`,
+  `## Future State`, `## Acceptance Criteria`, `1.` (revisited in v2). A numbered list, never
+  checkboxes; no placeholder comments (hints go beside the editor). A requirement without an
+  "Acceptance Criteria" heading (any level, case-insensitive) shows a "No acceptance criteria"
+  note, never a block.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 ("Requirement"); build plan (S2-C17, S2-C18)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-150: A spike decides the tree widget
+- **Date:** 2026-10-21
+- **Decision:** S2-C0b compares SVAR DataGrid's tree mode with PrimeVue TreeTable on one
+  checklist (tree mode in SVAR's free package; keyboard; `treegrid` semantics; a move through our
+  menu with the server mocked to allow and deny; pointer drag; the token theme audit; about 500
+  rows). v1's tree needs columns, expand and collapse, and sibling reorder, but no inline editing,
+  and drag is optional. Evidence in `docs/spikes/`; the result is a decision-log entry that
+  decides S2-C15 and closes ui-design-guide §10 item 5(g).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §7.1, §10 item 5(g); build plan (S2-C0b, S2-C15)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-151: One action registry, as built
+- **Date:** 2026-10-21
+- **Decision:** `authz/actions.py` stays the single action registry; the build plan,
+  `backend/CLAUDE.md`, and the `new-area` skill drop `authz/policies/<area>.py`. A tech-debt entry
+  tracks splitting it per area once it passes about 600 lines or a slice-end audit recommends it.
+- **Supersedes:** the per-area `authz/policies/` files in the build plan's area layout
+- **Superseded by:** none
+- **Applies to:** build plan (repository layout, feature map); `backend/CLAUDE.md`; `new-area`
+  skill; tech debt (TD-60, TD-64); built in S2-C0c
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-152: A first-admin candidates endpoint
+- **Date:** 2026-10-21
+- **Decision:** `GET /api/orgs/{org_id}/first-admin-candidates` lists the org's members and the
+  workspace's staff (offset-paged, `?q=`) under `project.assign_first_admin`; the create dialog's
+  picker uses it.
+- **Supersedes:** DL-112
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0c); tech debt (TD-44)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-153: My work's project fields
+- **Date:** 2026-10-21
+- **Decision:** A project item gains `organization_name`, `lead_name`, and `my_access` (the
+  user's explicit project role, or `inherited_admin`), for My work, the project list, and the org
+  overview.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §11; build plan (S2-C0f, S2-C0g)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-154: The ranked-view cap is proposed at 2,000
+- **Date:** 2026-10-21
+- **Decision:** Proposed, for the owner to confirm before S2-C5: 2,000 requirements per project
+  tree; above it the response carries `truncated: true` and the page says so, with a tech-debt
+  entry to page the tree if a project nears it. The API conventions mark it "proposed".
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("API conventions", S2-C5); `docs/reviews/s2/S2-plan.md` (open
+  questions)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-155: Later-slice placements from the Slice 2 plan
+- **Date:** 2026-10-21
+- **Decision:** Slice 3: the project activity feed (DL-147) and item-ID auto-links (DL-144).
+  Slices 4 and 7: whether existing projects get the module turned on when it ships (DL-136).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Later slices — placements decided so far")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-156: S2-C0 becomes rows S2-C0a to S2-C0i
+- **Date:** 2026-10-21
+- **Decision:** DL-124's single pre-checkpoint is planned as nine rows, S2-C0a to S2-C0i (the
+  simplicity audit, the tree spike, backend leftovers, restriction and modules, the shell, org
+  admin, account and lists, forms, tooling and inventory). A slice's checkpoint table may start
+  at 0 or 0a, and the docs consistency tests accept it.
+- **Supersedes:** none (implements DL-124, which left the rows to the plan)
+- **Superseded by:** none
+- **Applies to:** build plan (the Slice 2 section); `backend/tests/support/docs.py`
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning; the table's start at 0
+  confirmed in this design change)
+
+### DL-157: Two screen-inventory dependencies
+- **Date:** 2026-10-21
+- **Decision:** TD-62's check is row S2-C0i. If the owner's completed screen inventory isn't
+  committed when S2-C0i starts, TD-62 moves to the start of `s2-web`, and the web rows stay
+  provisional until it is.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0i, the web rows); screen inventory; tech debt (TD-62)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-158: The owner's UI feedback lives with Slice 1's review records
+- **Date:** 2026-10-22
+- **Decision:** The owner's Slice 1 UI feedback moves from `docs/ui-feedback.md` to
+  `docs/reviews/s1/S1-ui-feedback.md`.
+- **Supersedes:** DL-132, in part (the file's path)
+- **Superseded by:** none
+- **Applies to:** build plan; the S2 plan record
+- **Source:** owner, Oct 22, 2026 (starting Slice 2)

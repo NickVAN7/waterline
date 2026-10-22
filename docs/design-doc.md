@@ -111,10 +111,12 @@ per kind of project.
     their projects") clears `lead_id` in the same transaction (a project admin may also clear it,
     DL-76), recorded in the
     `project_member_removed` event's details and, from Slice 2, as a `lead_id` change in the
-    project activity feed (§10); the UI flags a project with no lead. A
+    activity log (§10; shown in the project activity feed from Slice 3, DL-147); the UI flags a
+    project with no lead. A
     deactivated lead stays the lead and is shown with the "deactivated" badge (§4), for a
     project admin to replace.
-  - Status and lead changes also appear in the project activity feed (§10), from Slice 2.
+  - Status and lead changes are also logged to the activity log from Slice 2, and appear in the
+    project activity feed from Slice 3 (§10, DL-147).
   - **`project.description`** — plain text, optional (as on phases and workstreams).
 
 | Module | Adds | Default on for | Status |
@@ -127,14 +129,14 @@ per kind of project.
 | `data_migration` | Data objects, load cycles, reconciliation | erp | v2 |
 | `cutover` | Cutover runbook and rehearsals | erp | v2 |
 
-The v1 modules (`sprints`, `github`) can be enabled from the start (Slice 1), so software
-projects are seeded with their defaults before those modules' screens exist; until a module's
-slice ships, the UI shows its features and links greyed out or disabled. The API's module
-guidance tells the UI which modules are **available** (shipped), from one place in the backend
-that is updated when a module's slice ships. The v2 (ERP) modules can be enabled only once they
-have shipped. Until then, seeding skips them (an `erp` or `general` project created in v1 starts
-with no modules), while module guidance still lists them as recommended, with `available`
-false.
+**A module can be enabled only once it has shipped** (DL-136), v1 and v2 modules alike. The
+API's module guidance tells the UI which modules are **available** (shipped), from one place in
+the backend that is updated when a module's slice ships. Until then, seeding skips the module
+(every project created before Slice 4 starts with no modules), the API refuses enabling it (422
+`validation_error` on `enabled_modules`, type `module_unavailable`), and the UI shows it as a
+disabled checkbox with "Not available yet", while module guidance still lists it as recommended,
+with `available` false. When `sprints` (Slice 4) and `github` (Slice 7) ship, that slice decides
+whether existing software projects get the module turned on.
 
 - **Disabling a module hides it; it never deletes data.** Re-enabling brings everything back.
   A disabled module's endpoints return 404 for that project.
@@ -160,7 +162,7 @@ false.
 | ORM / Migrations | SQLAlchemy 2.x (plain, not SQLModel) + Alembic | Mature; fits the relational, traceability-heavy model. SQLModel was rejected (build-plan, implementation decision 1) |
 | Database | PostgreSQL | Also hosts the job queue and full-text search — no extra services in v1 |
 | Background jobs | procrastinate (Postgres-backed queue) | No new infrastructure; jobs enqueue in the same transaction as the data they act on |
-| Frontend | Vue 3 + TypeScript; PrimeVue + Tailwind v4 on one token set; SVAR Vue Kanban and DataGrid for the board and editable grids, SVAR Gantt planned for v2 | Existing familiarity; accessible widgets we don't hand-build, one palette (`docs/ui-design-guide.md`) |
+| Frontend | Vue 3 + TypeScript; PrimeVue 5 (PrimeUI License, the owner's Community License key, DL-135) + Tailwind v4 on one token set; SVAR Vue Kanban and DataGrid for the board and editable grids, SVAR Gantt planned for v2 | Existing familiarity; accessible widgets we don't hand-build, one palette (`docs/ui-design-guide.md`) |
 | Local dev | Docker Compose: `api`, `worker`, `web`, `postgres`, plus a one-shot `migrate` | Worker and migrate run the same image as `api` with a different command; `migrate` applies migrations before `api` and `worker` start; `web` is the Vite dev server |
 | Deployment | Self-hosted/local initially | Stateless API + externalized DB keeps it cloud-portable |
 
@@ -266,37 +268,45 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
 - **Manual ordering:** `rank` (sortable string, fractional indexing) on task, requirement, and
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
   that row. See §6.
-- **Markdown:** rendered markdown (descriptions, comments) is sanitized on render to prevent
-  stored XSS.
+- **Markdown** (DL-140): descriptions and comments are stored as markdown (`description_md`)
+  and rendered in the browser, never on the server, with `markdown-it` (raw HTML off) and then
+  DOMPurify on its output, so stored XSS can't run. Supported: CommonMark plus tables, task-list
+  syntax, strikethrough, and autolinks. **No remote images**: image syntax renders as a link,
+  since a remote image tracks who opens the page and leaks that a Confidential item was opened
+  (uploads are v2). Links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`.
+  Headings shift down one level, so a description never adds a second `h1`. Code blocks are
+  monospace, with no syntax highlighting. A server-side renderer (`markdown-it-py` and `nh3`)
+  is added only when something server-side shows content (v1.5 notifications, exports). A
+  Content-Security-Policy is the second layer (§4).
 
-### 3.1 Data classification
+### 3.1 Data restriction
 
-Owner decisions, Oct 5, 2026. Classification labels say how sensitive a project's content is and
-why. In v1 they drive a banner and badges, logging, and the export-control access rules below.
-Columns: `ClassificationMixin` (schema-doc, conventions).
+Owner decisions, Oct 5, 2026; renamed from "classification", with the Restricted level removed,
+Oct 21, 2026 (DL-134). Restriction labels say how sensitive a project's content is and why. In
+v1 they drive badges, logging, and the export-control access rules below. Columns:
+`RestrictionMixin` (schema-doc, conventions).
 
 - **Two parts:**
-  - a **level**, one per entity: empty (unclassified, the default) → **Internal** →
-    **Confidential** → **Restricted**;
+  - a **level**, one per entity: **None** (the default, stored as null) → **Internal** →
+    **Confidential**;
   - **categories**, any number: `financial`, `proprietary`, `pii`, `export_controlled`.
 
   Categories say *why* something is sensitive; the level says *how* sensitive. They're
-  independent (PII can be Confidential or Restricted).
+  independent (PII can be Internal or Confidential).
 - **Levels.** The "Means" text is the UI's description beside each choice:
 
   | Level | Means | Examples |
   |---|---|---|
-  | *(none)* | Not yet classified; treated like Internal for every rule; no banner | — |
+  | None | Not yet restricted; treated like Internal for every rule; no badge | — |
   | Internal | For the firm and the client's project team; not for the public. Disclosure is embarrassing, not damaging | plans, schedules, ordinary tasks |
-  | Confidential | Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement | client financials, pricing, contract terms, proprietary process designs, business-contact PII |
-  | Restricted | Disclosure would cause serious harm or breach a legal or regulatory duty; need-to-know | sensitive PII (government IDs, bank details, payroll, health), unpatched security vulnerabilities, M&A |
+  | Confidential | Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement | client financials, pricing, contract terms, proprietary process designs, PII |
 
-- **What's classified:**
+- **What's restricted:**
   - The **project** sets the floor.
   - **Content items** (requirements, tasks, test cases; later RAID items, status reports, budget
     lines, attachments) can raise the level and add categories, never go below the project's.
-  - **Effective classification** = the stricter of the item's and the project's levels, plus
-    the union of their categories. Unclassified with Internal is Internal (owner decision,
+  - **Effective restriction** = the stricter of the item's and the project's levels, plus
+    the union of their categories. None with Internal is Internal (owner decision,
     Oct 12, 2026).
   - **Everything else inherits:** phases, milestones, workstreams, sprints, and test runs from
     the project; subtasks, comments, and links from their parent; approval requests from what
@@ -304,10 +314,14 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
 - **`export_controlled` is project-only in v1.** Its protection comes from access control,
   which is project-level in v1. Item-level `export_controlled` arrives with v2 per-person
   visibility (§16).
+- **The UI hides export control** (DL-133): the create-project dialog and project settings
+  don't offer `export_controlled`. The API still accepts it, and every rule below holds for a
+  project made export-controlled through the API, including the member-add confirmations and,
+  from Slice 2, the export-control gate.
 - **Who sets it:**
   - A project's level and categories start empty (no seeding by project type). The creator
     (any org member who may create projects, §5) can set them when creating the project,
-    `export_controlled` included, or project admins later.
+    `export_controlled` included (through the API, DL-133), or project admins later.
   - Project admins (including inherited) set and raise them.
   - Members can raise an item's level and add categories.
   - Lowering a level or removing a category is project-admin only.
@@ -319,13 +333,13 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
 - **Export-controlled projects (who sees content).** When a project has `export_controlled`:
   - **Content needs explicit membership.** Inherited admins (system admins, workspace
     owners/admins, org owners/admins) keep **management** access: the project in lists, its
-    settings, members, archive and unarchive, and raising its classification. They lose
+    settings, members, archive and unarchive, and raising its restriction. They lose
     **content** access unless they hold an explicit `project_membership`. Content means
     requirements, tasks, test cases, subtasks, comments, links, approvals, test runs, the
     activity feed, and anything else inside the project. Every content action denied to them,
     read or mutation, is a 404, as elsewhere. `authorize()` applies this as the export-control
     gate (§5), built in Slice 2 with the first content (requirements); the project's own record
-    (`project.view`: name, key, settings, members, classification) is management.
+    (`project.view`: name, key, settings, members, restriction) is management.
   - **Adding a member needs a confirmation.** Adding anyone to the project (picker, email-first
     add, or creating a user for it) requires the admin to confirm the person is authorized for
     export-controlled data (a required field in the request; 422 without it). The confirmation
@@ -346,12 +360,12 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
 
   | Rule | Arrives |
   |---|---|
-  | Banner on project pages and a badge on items: level and categories, as text, never color alone | v1 |
+  | A badge in the project header and on items: level and categories, as text, never color alone (DL-137) | v1 |
   | Changes logged: `audit_event` for projects (§10.1), `activity_log` for items (§10) | v1 |
   | The export-controlled rules above | v1 |
   | Notifications show no content for Confidential and above, only a link | v1.5 |
-  | Exports carry a classification header; Restricted exports for project admins only | when exports exist |
-  | AI features: never Restricted or `export_controlled`; Confidential only through a workspace-approved provider | v2 |
+  | Exports carry a restriction header | when exports exist |
+  | AI features: never `export_controlled`; Confidential only through a workspace-approved provider | v2 |
   | Retention rules per level or category | v2+ |
 
 - **Not in v1** (§16): per-person visibility of items (v2, a separate access table); item-level
@@ -406,7 +420,7 @@ Workspace (the firm: tenant boundary)
     projects. An org membership alone (role member) shows the org, not its projects;
   - only workspace owners/admins (and system admins) see the **workspace pages** (staff, org
     list, users). Workspace members and client users see only their orgs and projects, through
-    the org switcher.
+    the org menu (DL-137).
 - **Client users normally belong to one org.** This is typical, not enforced.
 - **One workspace for the foreseeable future.** It exists mainly to roll up dashboards and
   statistics across clients. Rules that only matter with several workspaces (e.g. users in more
@@ -543,6 +557,10 @@ Workspace (the firm: tenant boundary)
   sessions:** every request re-checks memberships, so the lost access ends at once; a user with no
   memberships left can still sign in and sees a "no access" page. Deactivation is how someone is cut
   off.
+- **Content-Security-Policy** (Slice 2, DL-142): every page is served with a CSP that allows
+  scripts only from our own origin, a second layer behind the markdown sanitizer (§3). PrimeVue's
+  injected styles need a nonce or `style-src 'unsafe-inline'`; S2-C16 decides which and records
+  it here.
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
@@ -745,8 +763,13 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   it out of `approved` to any other status; completing the gate's approval request sets it as
   a system effect. Members change other milestone statuses as usual. `approved` is refused on
   non-gate milestones.
+- **Requirement status** (DL-148): there is no transition table. Members move a requirement
+  from any status to any other, `rejected` and `deferred` included, **except into `approved`**.
+  New requirements always start as `draft`. There are no parent/child status rules.
 - **Requirement approval by hand:** only a project admin (including inherited) moves a
-  requirement into `approved` by hand; members get 403 for that transition. Doing so sets
+  requirement into `approved` by hand, through its own action, `requirement.approve_manually`,
+  which `allowed_actions` carries so the status menu offers Approved only to those who may use it
+  (DL-148); members get 403 for that transition. Doing so sets
   `approved_revision_id` to the current revision, `approved_by` to that admin, and
   `approved_at` to now, and cancels any pending approval request on the requirement (§6.2).
   Moving a requirement *out* of `approved` (e.g. to `in_progress`) follows the normal edit
@@ -836,7 +859,18 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   UI.
 - **Acceptance criteria live in the description** (no separate field). New requirements are
   pre-filled from a template with a `## Acceptance Criteria` heading, so criteria are
-  consistently placed and machine-findable for v2 AI features.
+  consistently placed and machine-findable for v2 AI features. One template per project type
+  (DL-149), a frontend constant chosen by the project's type when the create form opens (the
+  server injects nothing, and changing a project's type later changes no requirement):
+  - Software and General: `## Context`, `## Acceptance Criteria`, `1.`
+  - ERP: `## Business Process`, `## Current State`, `## Future State`, `## Acceptance Criteria`,
+    `1.` (revisited when ERP is designed, v2).
+
+  Criteria are a numbered list (Given/When/Then optional, never enforced), never checkboxes:
+  ticking one would edit the description, create a revision, and flag "Approved · modified".
+  Templates hold no placeholder comments (raw HTML is off, so they'd show); hints sit beside the
+  editor. A requirement with no "Acceptance Criteria" heading (any level, ignoring case) shows a
+  "No acceptance criteria" note on its detail page; nothing blocks it.
 - Revision history and approval tracking — see §6.1 and §6.2.
 
 ### 6.1 Requirement revisions
@@ -855,7 +889,18 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   The status stays `approved`; the UI shows "Approved · modified" with a diff between the two
   revisions. Re-approval is a new approval request for the current revision.
 - **Any two revisions can be compared**, not only the approved one against the current one:
-  the history lets the user pick both sides of the diff.
+  the history lets the user pick both sides of the diff (DL-145). The diff is computed in the
+  browser with `jsdiff` on the **raw markdown**, never rendered HTML: line by line, then word by
+  word within changed lines; inline, not side by side (side by side can't reflow to 320 px);
+  unchanged runs over three lines collapse ("Show 12 unchanged lines"); a title change is shown
+  as its own field; each side's change note and author are shown. The From and To pickers
+  default to approved vs. current when the requirement is "Approved · modified", otherwise to
+  the selected revision vs. the one before it; the older one is always From. The API serves the
+  revision list (cursor-paged: revisions are append-only) and one revision's read; there is no
+  compare endpoint.
+- **History** (DL-147): the requirement's detail page has a History tab (its activity entries,
+  §10, in plain language, the server resolving the names of the actor and of user fields) beside
+  a Revisions tab (the list and the compare above).
 - Status and priority changes are *not* revisions — they go to `activity_log`.
 
 ### 6.2 Approvals
@@ -1066,7 +1111,7 @@ v1 uses **fixed status values per entity** (stored as varchar + CHECK).
 | Entity | Values |
 |---|---|
 | Project | `planning` / `active` / `on_hold` / `completed` / `cancelled` (informational: gates nothing; separate from archiving, §1.1) |
-| Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` (`approved`: set by completing an approval request, or by hand by a project admin only, §5, §6.2) |
+| Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` (any to any, except `approved`: set by completing an approval request, or by hand by a project admin only, §5, §6.2; DL-148) |
 | Task | `todo` / `in_progress` / `blocked` / `in_review` / `done` / `cancelled` |
 | Test run | `planned` / `in_progress` / `completed` / `cancelled` |
 | Test result | `not_run` / `passed` / `failed` / `blocked` / `skipped` |
@@ -1164,6 +1209,15 @@ indirectly what they couldn't delete directly.
 **Restore** follows delete: whoever may delete an item may restore it. The trash view shows each
 user what they can restore; project admins see everything in the project.
 
+**Trash** (DL-146): a project Trash page, linked from the requirements page's header (not a
+project-pages item), lists deleted items by type (requirements from Slice 2; tasks and test
+cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
+`allowed_actions` allows it. Nothing is purged automatically in v1. **Restoring a tree:**
+restoring a requirement also restores the descendants deleted in the same action, identified by
+the same `deleted_at` (one transaction's `now()`); children deleted separately stay in the trash.
+A requirement whose parent is still deleted is restored at the top level, with the parent change
+logged (§10).
+
 **Pending approvals:** deleting a requirement cancels any pending approval request on it,
 logged on the request (§10). Restoring the item does not reopen the request. A gate
 with any approval request (pending or past) can't be deleted: its sign-off history must keep
@@ -1182,7 +1236,7 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
   - **Requirement / task / test case:** `status`, `assignee_id`, `reporter_id`, `reviewer_id`,
     `sprint_id`, `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`,
     `start_date`, `due_date`, `requirement_id`, `parent_requirement_id`, `time_estimate`,
-    `approved_revision_id`, `classification_level`, `classification_categories` (§3.1).
+    `approved_revision_id`, `restriction_level`, `restriction_categories` (§3.1).
   - **Approval request:** `created` when it is made, `status` for every change (`pending`
     → `approved` / `rejected` / `cancelled`, whether cancelled by a project admin, by deleting a
     requirement, by a project admin approving the requirement by hand, or by cancelling a test
@@ -1200,7 +1254,9 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
   - `rank` is deliberately excluded — drag-and-drop would flood the log.
 - `old_value` / `new_value` are text (the table is generic across types). For link events they
   hold the other entity's ID.
-- `project_id` on every row makes the project activity feed a single indexed query.
+- `project_id` on every row makes the project activity feed a single indexed query. The feed's
+  API and page arrive in Slice 3, with the filter bar; Slice 2 logs to the table and shows each
+  requirement's own entries on its History tab (§6.1; DL-147).
 - **Implementation rules:**
   - Only the shared helper `log_change(...)` writes to `activity_log` — never an endpoint
     directly. Endpoints pass enum members; the helper serializes them.
@@ -1222,7 +1278,7 @@ table, `audit_event` (schema-doc, "Audit").
   changed, signed out everywhere, profile edits), system-admin grants and revocations, workspace
   creation (by the seed command) and changes (name, slug), workspace/org/project membership changes
   (added, role changed, removed), org creation and changes, and project creation, changes (name,
-  description, type, status, lead, modules), archiving, unarchiving, and classification changes
+  description, type, status, lead, modules), archiving, unarchiving, and restriction changes
   (§3.1). A project member added to an export-controlled project, a project marked
   export-controlled, and a project created export-controlled (in `project_created`, with its initial
   level and categories) record the admin's export-control confirmation in the event's details.
@@ -1302,7 +1358,9 @@ Journey decisions, Oct 6–7, 2026. **My work is the home page after sign-in for
   pending their decision, and test cases assigned to them in open runs (`not_run` results in
   runs that are `planned` or `in_progress`, §8).
 
-It is scoped like every list endpoint (§5, "Reads are authorized too"), leaves out the
+Each project shows its org, status, lead, and the user's access (their explicit project role,
+or inherited admin; DL-153). It is scoped like every list endpoint (§5, "Reads are authorized
+too"), leaves out the
 content of export-controlled projects where the user has no explicit membership (§3.1), and
 leaves out archived projects. Until notifications (v1.5), it's how people learn that something
 is waiting for them. It lives at the root route (`/`), so it adds nothing to the reserved-slug
@@ -1574,7 +1632,7 @@ its own design pass.
   - size limits and content-type checks (by content, not just extension);
   - files are served as downloads (`Content-Disposition: attachment`), never rendered inline
     from the app's origin.
-- Configurable classification levels and categories per workspace (reference tables on top of
+- Configurable restriction levels and categories per workspace (reference tables on top of
   the columns, §3.1)
 - Automatic `Task.status` changes from GitHub events
 - Approval policies beyond all-must-approve (any-one, quorum); per-org settings for enforced
