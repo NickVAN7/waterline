@@ -170,7 +170,7 @@ tested, what each kind of test is for, and the gates every change passes.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
     included) and every project role denied, the relationship rule allowing it only for a user
     with content access to the project, and the relationship without that access denied.
-  - Restriction (design-doc §3.1, Slice 1; named classification until S2-C0d, DL-134):
+  - Restriction (design-doc §3.1, Slice 1; "classification" until S2-C0d, DL-134):
     removing `export_controlled`, and on an
     export-controlled project lowering the level or removing any category, is refused for an
     inherited admin and allowed for an explicit project admin; every member-add path (picker,

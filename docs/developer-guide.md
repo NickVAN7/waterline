@@ -4,7 +4,14 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0c (Backend leftovers) built: updates through `apply_changes` (TD-57),
+> **Status:** S2-C0d (Restriction, export control, modules) built: "classification" renamed
+> "restriction" throughout (`RestrictionMixin`, `rules/restriction.py`, `PUT
+> /api/projects/{key}/restriction`, `project.raise_restriction`/`project.lower_restriction`,
+> `project_restriction_changed`) with `restricted` removed, one migration for the rename and for
+> removing `sprints` and `github` from every project (DL-134, DL-136); an unshipped module is a 422
+> `module_unavailable` and a disabled checkbox; export control is no longer offered in the UI and
+> `ExportControlDialog` is gone (DL-133); the restriction badge in the project header
+> (`RestrictionBadge`, DL-137). S2-C0c (Backend leftovers) built: updates through `apply_changes` (TD-57),
 > `ValidationFailedError.on`, one `ERRORS` map, `PageResult.with_items`, the DL-143 length limits,
 > `anyio` a runtime dependency, `GET /api/orgs/{org_id}/first-admin-candidates` and the create
 > dialog's picker on it, and the `new-area` skill verified. S2-C0b (Tree spike) built: SVAR DataGrid's tree mode measured against PrimeVue
@@ -487,7 +494,7 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
   target's workspace, DL-68). Each action is marked `access`, content or management (design-doc
   §3.1; the default is content, the closed side, so every management action says so, and every
   action so far does; the export-control gate that reads it comes in Slice 2), and `explicit_when_export_controlled` makes only the explicit project role
-  grant it on an export-controlled project (`project.lower_classification`, DL-82). Real actions
+  grant it on an export-controlled project (`project.lower_restriction`, DL-82). Real actions
   are members of
   `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
   (DL-44); an unregistered action is denied. A project-level action normally sets
@@ -735,16 +742,17 @@ load by ID. It is **not scoped** to the user's orgs and projects: endpoints reac
 entities only through the load-and-authorize dependency, and any other caller authorizes
 before using or returning the row. List and feed queries never use it.
 
-**Classification** (`ClassificationMixin`, design-doc §3.1): adds `classification_level` (enum,
-nullable) and `classification_categories` (`text[]`, default `{}`). The model also adds
-`classification_categories_check(...)` to its `__table_args__` with the categories it allows:
+**Restriction** (`RestrictionMixin`, design-doc §3.1; "classification" until S2-C0d, DL-134):
+adds `restriction_level` (enum `internal` or `confidential`, nullable: null is the None level) and
+`restriction_categories` (`text[]`, default `{}`). The model also adds
+`restriction_categories_check(...)` to its `__table_args__` with the categories it allows:
 `PROJECT_CATEGORIES` on `project`, `CONTENT_ITEM_CATEGORIES` on content items
-(`export_controlled` is project-only in v1). `app/rules/classification.py` has the effective
-classification (`effective(item, project)`) and whether a change raises or lowers it
-(`change(old, new)`; unclassified ranks as Internal). The project service checks an export-control
+(`export_controlled` is project-only in v1). `app/rules/restriction.py` has the effective
+restriction (`effective(item, project)`) and whether a change raises or lowers it
+(`change(old, new)`; None ranks as Internal). The project service checks an export-control
 confirmation with `_confirmation(values, needed=..., members=...)`: the 422s
 `confirmation_required`, `members_changed`, and `confirmation_not_needed`, under the project's row
-lock, with the confirmation returned for the audit event (DL-81). `set_classification` checks its
+lock, with the confirmation returned for the audit event (DL-81). `set_restriction` checks its
 rights after taking the project's lock, against the project and the caller's own project role
 read again under it (`_with_current_role`): a removal takes that lock first, so an explicit admin
 removed meanwhile can't lower (owner decision, S1-C13 review).
@@ -756,9 +764,9 @@ SQL (which async sessions can't do).
 **Convention checks** (`tests/unit/core/test_model_conventions.py`) walk every mapped model and
 fail if a relationship isn't `lazy="raise"`, a model dropped `eager_defaults=True` (for example
 by replacing `__mapper_args__`), a model has a `version` column that isn't checked (for
-example `VersionMixin` listed after `TimestampMixin`), or a classifiable model (`project`,
-`requirement`, `task`, `testcase`, or one with a `classification_*` column) doesn't use
-`ClassificationMixin`.
+example `VersionMixin` listed after `TimestampMixin`), or a restrictable model (`project`,
+`requirement`, `task`, `testcase`, or one with a `restriction_*` column) doesn't use
+`RestrictionMixin`.
 
 ### Migrations
 
@@ -872,8 +880,8 @@ frontend/src/
   stores/            Pinia stores: currentUser, currentOrg (the current org and project)
   views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
                      my_work/, project/ (org project list, project home, the create
-                     dialog, the classification banner, settings, members with the
-                     AddMemberDialog picker, the access review, ExportControlDialog), user/ (account
+                     dialog, the restriction badge and fields, settings, members with
+                     the AddMemberDialog picker, the access review), user/ (account
                      settings, access review, the account-action dialogs), workspace/ (staff,
                      orgs, users, settings), org/ (members, settings), roster/ (what staff and
                      org and project members share: `RosterPage`, the list with its row menus, and the add
@@ -1078,7 +1086,7 @@ value the test depends on explicitly.
 - Text fields get realistic values with `Use(...)` and Faker (`BaseFactory.__faker__`), in the
   formats the rules expect: lowercase emails, slug-format usernames and slugs (`fake_slug`),
   project keys. Nullable fields default to `None` explicitly, so a factory never makes an
-  archived or classified row by chance.
+  archived or restricted row by chance.
 - Every factory user's password is `FACTORY_PASSWORD` (`tests/factories/user.py`), hashed once
   per run.
 - A primary-key column that isn't a foreign key (e.g. `project_counter.prefix`) is only set if
@@ -1096,13 +1104,13 @@ endpoint, write the denial test yourself once it's built, under the sabotage che
 files and their `git hash-object` go in the review record ("Spec tests"); a spec test changes only
 with the owner's approval. S1-C3's rules predate `spec-test-writer` (DL-11): their tests were
 written test-first by the implementing session, and aren't hash-protected spec tests; the later
-ones (`suggest_username` in `identifiers.py`, `modules.py`, `classification.py`) came with spec
+ones (`suggest_username` in `identifiers.py`, `modules.py`, `restriction.py`) came with spec
 tests. The rules: `identifiers.py` (project keys, slugs and the reserved top-level routes in `RESERVED_SLUGS`,
 usernames; each check returns an `IdentifierProblem` for the field error), `password_policy.py`
 (`password_problems(...)`; the caller checks the hash and passes `same_as_current`), and
 `account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships),
-`modules.py` (each type's recommended modules), and `classification.py` (the effective
-classification, and the raise and lower rules). `app/rules/`
+`modules.py` (each type's recommended modules, and the shipped ones it seeds, DL-136), and
+`restriction.py` (the effective restriction, and the raise and lower rules). `app/rules/`
 and `app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
 plain `uv run pytest` fails below it. A `match` that covers every type of its subject (pyright
 checks: the function's return type would otherwise allow `None`) marks its last `case` with `#

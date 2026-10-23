@@ -5,12 +5,12 @@ from pydantic import BaseModel, Field
 from app.authz.actions import Action
 from app.enums import (
     AccessKind,
-    ClassificationCategory,
-    ClassificationLevel,
     ProjectModule,
     ProjectRole,
     ProjectStatus,
     ProjectType,
+    RestrictionCategory,
+    RestrictionLevel,
 )
 from app.schemas.limits import NAME_MAX, PROJECT_DESCRIPTION_MAX
 from app.schemas.user import AccessReason
@@ -26,8 +26,8 @@ class ProjectCreate(BaseModel):
     description: str | None = Field(default=None, max_length=PROJECT_DESCRIPTION_MAX)
     enabled_modules: list[ProjectModule] | None = None
     first_admin_id: uuid.UUID | None = None
-    classification_level: ClassificationLevel | None = None
-    classification_categories: list[ClassificationCategory] = []
+    restriction_level: RestrictionLevel | None = None
+    restriction_categories: list[RestrictionCategory] = []
     # With `export_controlled` only: the first admin is the only explicit member (DL-81).
     export_control_confirmed: bool = False
     confirmed_member_ids: list[uuid.UUID] | None = None
@@ -58,20 +58,20 @@ class ProjectRead(BaseModel):
     lead_is_active: bool | None
     enabled_modules: list[ProjectModule]
     archived: bool
-    classification_level: ClassificationLevel | None
-    classification_categories: list[ClassificationCategory]
+    restriction_level: RestrictionLevel | None
+    restriction_categories: list[RestrictionCategory]
     modules_holding_data: list[ProjectModule]
     allowed_actions: list[Action]
 
 
-class ClassificationUpdate(BaseModel):
-    """`PUT /api/projects/{key}/classification` (DL-81): `level` (null: unclassified) and
+class RestrictionUpdate(BaseModel):
+    """`PUT /api/projects/{key}/restriction` (DL-81): `level` (null: None) and
     `categories` replace the current ones. Adding `export_controlled` also needs
     `export_control_confirmed` and `confirmed_member_ids`, the project's current explicit
     members."""
 
-    level: ClassificationLevel | None
-    categories: list[ClassificationCategory]
+    level: RestrictionLevel | None
+    categories: list[RestrictionCategory]
     export_control_confirmed: bool = False
     confirmed_member_ids: list[uuid.UUID] | None = None
 

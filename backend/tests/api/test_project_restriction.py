@@ -1,7 +1,7 @@
-"""Classification and export control beyond who may call it (design-doc §3.1; build plan, "The
-classification API"; DL-81): the confirmations on create, on a classification change, and on every
+"""Restriction and export control beyond who may call it (design-doc §3.1; build plan, "The
+restriction API"; DL-81): the confirmations on create, on a restriction change, and on every
 member add; their 422s; what each records; and `access` in both access reviews. Who gets
-2xx/403/404 is in tests/api/authz/test_classification.py (spec tests)."""
+2xx/403/404 is in tests/api/authz/test_restriction.py (spec tests)."""
 
 import uuid
 
@@ -10,7 +10,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import AuditAction, ClassificationLevel, OrgRole, ProjectRole, WorkspaceRole
+from app.enums import AuditAction, OrgRole, ProjectRole, RestrictionLevel, WorkspaceRole
 from app.models.audit_event import AuditEvent
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
@@ -22,7 +22,7 @@ from tests.support.authz import Tenancy, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
 
-CLASSIFICATION = "/api/projects/PMT/classification"
+RESTRICTION = "/api/projects/PMT/restriction"
 MEMBERS = "/api/projects/PMT/members"
 EC = "export_controlled"
 OLGA = uuid.UUID("01900000-0000-7000-8000-00000000000a")
@@ -48,7 +48,7 @@ async def admin(client: AsyncClient, t: Tenancy) -> User:
 
 
 async def export_controlled(session: AsyncSession, t: Tenancy) -> None:
-    t.project.classification_categories = [EC]
+    t.project.restriction_categories = [EC]
     await session.flush()
 
 
@@ -60,7 +60,7 @@ async def org_member(t: Tenancy, **user: object) -> User:
 
 async def stored(session: AsyncSession, key: str = "PMT") -> tuple[object, list[str]]:
     statement = (
-        select(Project.classification_level, Project.classification_categories)
+        select(Project.restriction_level, Project.restriction_categories)
         .where(Project.key == key)
         .execution_options(populate_existing=True)
     )
@@ -94,7 +94,7 @@ def new(**values: object) -> dict[str, object]:
     return {"name": "Invoicing", "key": "INV", "type": "software", **values}
 
 
-async def test_a_project_created_classified_stores_and_records_its_classification(
+async def test_a_project_created_with_a_restriction_stores_and_records_its_restriction(
     client: AsyncClient, session: AsyncSession, t: Tenancy
 ) -> None:
     olga = await org_member(t)
@@ -102,25 +102,23 @@ async def test_a_project_created_classified_stores_and_records_its_classificatio
 
     response = await client.post(
         f"/api/orgs/{t.org.id}/projects",
-        json=new(
-            classification_level="confidential", classification_categories=["pii", "financial"]
-        ),
+        json=new(restriction_level="confidential", restriction_categories=["pii", "financial"]),
     )
 
     assert response.status_code == 201
     body = response.json()
-    assert (body["classification_level"], body["classification_categories"]) == (
+    assert (body["restriction_level"], body["restriction_categories"]) == (
         "confidential",
         ["financial", "pii"],
     )
-    assert await stored(session, "INV") == (ClassificationLevel.CONFIDENTIAL, ["financial", "pii"])
+    assert await stored(session, "INV") == (RestrictionLevel.CONFIDENTIAL, ["financial", "pii"])
     assert await events(session) == [
         (
             AuditAction.PROJECT_CREATED,
             None,
             {
-                "classification_level": "confidential",
-                "classification_categories": ["financial", "pii"],
+                "restriction_level": "confidential",
+                "restriction_categories": ["financial", "pii"],
             },
         ),
         (AuditAction.PROJECT_MEMBER_ADDED, olga.id, {"role": "admin"}),
@@ -136,7 +134,7 @@ async def test_a_project_created_export_controlled_records_the_first_admins_conf
     response = await client.post(
         f"/api/orgs/{t.org.id}/projects",
         json=new(
-            classification_categories=[EC],
+            restriction_categories=[EC],
             export_control_confirmed=True,
             confirmed_member_ids=[str(olga.id)],
         ),
@@ -149,8 +147,8 @@ async def test_a_project_created_export_controlled_records_the_first_admins_conf
             AuditAction.PROJECT_CREATED,
             None,
             {
-                "classification_level": None,
-                "classification_categories": [EC],
+                "restriction_level": None,
+                "restriction_categories": [EC],
                 "export_control_confirmed": True,
                 "confirmed_member_ids": [str(olga.id)],
             },
@@ -176,7 +174,7 @@ async def test_confirming_the_creator_instead_of_the_named_first_admin_is_refuse
         f"/api/orgs/{t.org.id}/projects",
         json=new(
             first_admin_id=str(OTTO),
-            classification_categories=[EC],
+            restriction_categories=[EC],
             export_control_confirmed=True,
             confirmed_member_ids=[str(OLGA)],
         ),
@@ -201,7 +199,7 @@ async def test_the_named_first_admins_confirmation_is_recorded(
         f"/api/orgs/{t.org.id}/projects",
         json=new(
             first_admin_id=str(OTTO),
-            classification_categories=[EC],
+            restriction_categories=[EC],
             export_control_confirmed=True,
             confirmed_member_ids=[str(OTTO)],
         ),
@@ -210,8 +208,8 @@ async def test_the_named_first_admins_confirmation_is_recorded(
     assert response.status_code == 201
     assert [e[2] for e in await events(session) if e[0] is AuditAction.PROJECT_CREATED] == [
         {
-            "classification_level": None,
-            "classification_categories": [EC],
+            "restriction_level": None,
+            "restriction_categories": [EC],
             "export_control_confirmed": True,
             "confirmed_member_ids": [str(OTTO)],
         }
@@ -257,7 +255,7 @@ async def test_creating_a_project_export_controlled_needs_the_confirmation(
     await org_member(t, id=OTTO)
 
     response = await client.post(
-        f"/api/orgs/{t.org.id}/projects", json=new(classification_categories=[EC], **confirmation)
+        f"/api/orgs/{t.org.id}/projects", json=new(restriction_categories=[EC], **confirmation)
     )
 
     assert (response.status_code, fields(response.json())) == (422, expected)
@@ -292,60 +290,71 @@ async def test_a_confirmation_on_a_project_created_without_export_control_is_ref
 
     response = await client.post(
         f"/api/orgs/{t.org.id}/projects",
-        json=new(classification_categories=["pii"], **confirmation),
+        json=new(restriction_categories=["pii"], **confirmation),
     )
 
     assert (response.status_code, fields(response.json())) == (422, expected)
     assert await session.scalar(select(Project.id).where(Project.key == "INV")) is None
 
 
-# --- PUT /classification (DL-81) ------------------------------------------------------------------
+# --- PUT /restriction (DL-81) ------------------------------------------------------------------
 
 
-async def test_a_classification_change_stores_and_records_old_and_new(
+async def test_a_restriction_change_stores_and_records_old_and_new(
     client: AsyncClient, session: AsyncSession, t: Tenancy, admin: User
 ) -> None:
-    t.project.classification_level = ClassificationLevel.INTERNAL
-    t.project.classification_categories = ["financial"]
+    t.project.restriction_level = RestrictionLevel.INTERNAL
+    t.project.restriction_categories = ["financial"]
     await session.flush()
 
     response = await client.put(
-        CLASSIFICATION, json={"level": "restricted", "categories": ["pii", "pii"]}
+        RESTRICTION, json={"level": "confidential", "categories": ["pii", "pii"]}
     )
 
     assert response.status_code == 200
     assert (
-        response.json()["classification_level"],
-        response.json()["classification_categories"],
+        response.json()["restriction_level"],
+        response.json()["restriction_categories"],
     ) == (
-        "restricted",
+        "confidential",
         ["pii"],
     )
-    assert await stored(session) == (ClassificationLevel.RESTRICTED, ["pii"])
+    assert await stored(session) == (RestrictionLevel.CONFIDENTIAL, ["pii"])
     assert await events(session) == [
         (
-            AuditAction.PROJECT_CLASSIFICATION_CHANGED,
+            AuditAction.PROJECT_RESTRICTION_CHANGED,
             None,
             {
                 "old": {
-                    "classification_level": "internal",
-                    "classification_categories": ["financial"],
+                    "restriction_level": "internal",
+                    "restriction_categories": ["financial"],
                 },
-                "new": {"classification_level": "restricted", "classification_categories": ["pii"]},
+                "new": {"restriction_level": "confidential", "restriction_categories": ["pii"]},
             },
         )
     ]
 
 
-async def test_the_classification_already_held_records_nothing(
+async def test_the_removed_restricted_level_is_refused(
     client: AsyncClient, session: AsyncSession, t: Tenancy, admin: User
 ) -> None:
-    t.project.classification_level = ClassificationLevel.CONFIDENTIAL
-    t.project.classification_categories = ["pii", "financial"]
+    """DL-134 removed Restricted: an enum still holding it would store it."""
+    response = await client.put(RESTRICTION, json={"level": "restricted", "categories": []})
+
+    assert (response.status_code, fields(response.json())) == (422, [(["body", "level"], "enum")])
+    assert await stored(session) == (None, [])
+    assert await events(session) == []
+
+
+async def test_the_restriction_already_held_records_nothing(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, admin: User
+) -> None:
+    t.project.restriction_level = RestrictionLevel.CONFIDENTIAL
+    t.project.restriction_categories = ["pii", "financial"]
     await session.flush()
 
     response = await client.put(
-        CLASSIFICATION, json={"level": "confidential", "categories": ["financial", "pii"]}
+        RESTRICTION, json={"level": "confidential", "categories": ["financial", "pii"]}
     )
 
     assert response.status_code == 200
@@ -361,7 +370,7 @@ async def test_marking_a_project_export_controlled_records_the_confirmed_members
     )
 
     response = await client.put(
-        CLASSIFICATION,
+        RESTRICTION,
         json={
             "level": None,
             "categories": [EC],
@@ -374,11 +383,11 @@ async def test_marking_a_project_export_controlled_records_the_confirmed_members
     assert await stored(session) == (None, [EC])
     assert await events(session) == [
         (
-            AuditAction.PROJECT_CLASSIFICATION_CHANGED,
+            AuditAction.PROJECT_RESTRICTION_CHANGED,
             None,
             {
-                "old": {"classification_level": None, "classification_categories": []},
-                "new": {"classification_level": None, "classification_categories": [EC]},
+                "old": {"restriction_level": None, "restriction_categories": []},
+                "new": {"restriction_level": None, "restriction_categories": [EC]},
                 "export_control_confirmed": True,
                 "confirmed_member_ids": sorted([str(viv.id), str(admin.id)]),
             },
@@ -424,7 +433,7 @@ async def test_marking_a_project_export_controlled_needs_its_current_members_con
     await UserFactory.create_async(id=OTTO)  # not on the project
 
     response = await client.put(
-        CLASSIFICATION, json={"level": None, "categories": [EC], **confirmation}
+        RESTRICTION, json={"level": None, "categories": [EC], **confirmation}
     )
 
     assert (response.status_code, fields(response.json())) == (422, expected)
@@ -438,11 +447,11 @@ async def test_a_confirmation_where_no_export_control_is_added_is_refused(
 ) -> None:
     """Without `export_controlled`, or keeping it (not adding it)."""
     categories = [EC] if already else []
-    t.project.classification_categories = categories
+    t.project.restriction_categories = categories
     await session.flush()
 
     response = await client.put(
-        CLASSIFICATION,
+        RESTRICTION,
         json={
             "level": "confidential",
             "categories": categories,
@@ -565,7 +574,7 @@ async def test_the_project_review_shows_inherited_admins_as_management_on_export
     categories: list[str],
     expected: list[tuple[str, str]],
 ) -> None:
-    t.project.classification_categories = categories
+    t.project.restriction_categories = categories
     await session.flush()
     olga = await UserFactory.create_async(name="Olga Orgadmin")
     await MembershipFactory.create_async(organization=t.org, user=olga, role=OrgRole.ADMIN)
@@ -591,7 +600,7 @@ async def test_the_person_review_shows_management_on_export_controlled_projects_
     await export_controlled(session, t)
     await ProjectFactory.create_async(organization=t.org, key="LDG", name="Ledger")
     secret = await ProjectFactory.create_async(
-        organization=t.org, key="SEC", name="Secret", classification_categories=[EC]
+        organization=t.org, key="SEC", name="Secret", restriction_categories=[EC]
     )
     olga = await UserFactory.create_async(name="Olga Orgadmin")
     await MembershipFactory.create_async(organization=t.org, user=olga, role=OrgRole.ADMIN)

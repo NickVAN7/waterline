@@ -339,8 +339,8 @@ async def test_the_org_list_holds_only_the_projects_the_caller_can_open(
 
 INHERITED_ON_A_LIVE_PROJECT = [
     "project.archive",
-    "project.lower_classification",
-    "project.raise_classification",
+    "project.lower_restriction",
+    "project.raise_restriction",
     "project.unarchive",
     "project.update",
     "project.view",
@@ -360,8 +360,8 @@ INHERITED_ON_A_LIVE_PROJECT = [
         (
             "project_admin",
             [
-                "project.lower_classification",
-                "project.raise_classification",
+                "project.lower_restriction",
+                "project.raise_restriction",
                 "project.update",
                 "project.view",
                 "project.view_access",

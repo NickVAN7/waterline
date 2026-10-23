@@ -30,7 +30,7 @@ Conventions: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, design-doc §3–§5 and
 ## 1. Model — `models/<area>.py`
 
 - Base model and the mixins the schema doc calls for (soft delete, `version`,
-  `ClassificationMixin`, renamed `RestrictionMixin` in S2-C0d, DL-134).
+  `RestrictionMixin`).
 - Enums through the enum helper; relationships `lazy="raise"`.
 - Human-readable numbers: an `int number` column with `UNIQUE(project_id, number)`; never
   computed here.

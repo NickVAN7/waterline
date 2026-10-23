@@ -451,14 +451,14 @@ Entry format:
 
 ### TD-31: Other locked mutations check rights against the role loaded before the lock
 - **Added:** S1-C13
-- **What:** the `AuthzContext` is loaded at the start of a request. The classification change
+- **What:** the `AuthzContext` is loaded at the start of a request. The restriction change
   re-reads the caller's own project role after taking the project's lock (`_with_current_role`,
   owner decision in the S1-C13 security review), so a role removed while it waits is seen. The
   other mutations that wait on a lock (project update, archive, member adds, role changes and
   removals, and the workspace and org rosters) still check rights against the context as loaded:
   a caller whose role is removed while their request waits can still finish it. The window is
   milliseconds and needs a request already in flight.
-- **Why:** the owner decided the classification change in S1-C13 and chose to revisit the rest
+- **Why:** the owner decided the restriction change in S1-C13 and chose to revisit the rest
   later.
 - **Fix by:** S2-C22 (Slice 2's tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
   the window is milliseconds and needs a request already in flight; fix it when a checkpoint
@@ -653,7 +653,8 @@ Entry format:
   another admin adds or removes `export_controlled` while it's open, an add answers 422
   `confirmation_required` or `confirmation_not_needed` on `export_control_confirmed`, a field the
   dialogs don't show: the server's message is the form's alert, and the checkbox appears or goes
-  only after a reload. Project settings' classification form has the same gap.
+  only after a reload. Project settings' restriction form has the same gap, for a project made export-controlled
+  through the API (DL-133).
 - **Why:** rare (two admins changing one project at once), and the server refuses the add, so
   nothing is recorded wrongly; the owner chose to reload the project on that 422, as a 403 does
   (DL-116).

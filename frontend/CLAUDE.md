@@ -146,6 +146,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A confirmation the client sends (`export_control_confirmed`) comes from the current server state
   as well as the box: a reload can take the box away while it's still ticked (DL-116; S1-C16c
   review).
+- A value a form keeps but doesn't render (project settings' `export_controlled`, DL-133) is sent
+  from the latest server data on every save, never from the form: a reload that keeps what was
+  typed would bring a stale one back, and no control could remove it (S2-C0d review).
 - A dialog's search or lookup that fails says so at its own field, not in the form's alert, whose
   Retry and dismiss belong to the submit (UI-FRM-7; S1-C16b review).
 - A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets

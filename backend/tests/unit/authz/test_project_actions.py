@@ -232,8 +232,8 @@ def test_a_project_action_is_404_to_who_cannot_see_the_project(persona: str, act
 
 INHERITED_ON_A_LIVE_PROJECT = [
     "project.archive",
-    "project.lower_classification",
-    "project.raise_classification",
+    "project.lower_restriction",
+    "project.raise_restriction",
     "project.unarchive",
     "project.update",
     "project.view",
@@ -253,8 +253,8 @@ INHERITED_ON_A_LIVE_PROJECT = [
         (
             "project_admin",
             [
-                "project.lower_classification",
-                "project.raise_classification",
+                "project.lower_restriction",
+                "project.raise_restriction",
                 "project.update",
                 "project.view",
                 "project.view_access",

@@ -64,20 +64,17 @@ filters are in the address, so a link or a reload opens the same list.
 (any member may). Give it a name and a key: 3 to 6 letters or digits, starting with a letter,
 that starts every item's number (`PMT-TA-45`) and can't be changed later; you're told as you type
 if it's taken. Pick its type (Software, ERP implementation, or General), which suggests its
-modules: each is described, and a module that isn't built yet says "Not available yet". You
-become its first admin and lead, unless you're an organization owner or admin, who may name
-someone else instead: any active member of the organization, or of the workspace's staff. You can also classify it: a level (Internal, Confidential, or
-Restricted, each described) and why it's sensitive (Financial, Proprietary, Personal data,
-Export-controlled). An export-controlled project lets only its explicit members see its content,
-so **Create project** first opens a confirmation that explains this and names its first admin:
-check the box that they're authorized for export-controlled data, then **Make
-export-controlled**; **Cancel** takes you back to the form. Once created, the project opens.
+modules: each is described, and a module that isn't built yet can't be turned on: its box is
+greyed out, with "Not available yet". You become its first admin and lead, unless you're an
+organization owner or admin, who may name someone else instead: any active member of the
+organization, or of the workspace's staff. You can also set its restriction: a level (None,
+Internal, or Confidential, each described) and why it's sensitive (Financial, Proprietary,
+Personal data). Once created, the project opens.
 
-A project's home (`/<organization>/projects/<KEY>`) shows its classification at the top, if it
-has one ("Classification: Confidential. Categories: Financial."), then its name, its key, its
-status, and its lead's name ("Deactivated" after it if their account is), or "No lead" if it has
-none. In the sidebar, under the project, a module it has turned on that isn't built yet is listed
-with "Not available yet". An archived project says "This project is archived. It is read-only." at
+A project's home (`/<organization>/projects/<KEY>`) shows its name, its key, its status, its
+restriction as a badge if it has one ("Confidential · Financial"), and its lead's name
+("Deactivated" after it if their account is), or "No lead" if it has none. An archived project
+says "This project is archived. It is read-only." at
 the top. An address with an organization's old slug (the part of the address that names it)
 or a lowercase key takes you to the project's own address. A project you can't see shows "Page
 not found", the same as one that doesn't exist.
@@ -100,7 +97,8 @@ admins) can also:
   project with no lead.
 - **Access review** lists everyone who reaches the project
   (`/<organization>/projects/<KEY>/access`): their project role, if any, why they reach it (the
-  role, or an admin role above it), and whether they reach its content or only its management.
+  role, or an admin role above it), and, on an export-controlled project, whether they reach its
+  content or only its management.
 
 **Settings**, in the sidebar under the project, is there if you may change any of its settings
 (`/<organization>/projects/<KEY>/settings`). Each part shows only if you may use it:
@@ -109,16 +107,15 @@ admins) can also:
   modules, never data or the modules on), status (for information only), lead, and modules,
   then **Save settings**. The lead is one of the project's members, or **No lead**, which is
   flagged. A deactivated member is marked "Deactivated" and can't be named; a deactivated lead
-  stays the lead, marked, until you name someone else. Turning off
+  stays the lead, marked, until you name someone else. A module that isn't built yet is greyed
+  out, with "Not available yet". Turning off
   a module that holds data, or one recommended for the type, warns you what will be hidden;
   nothing is deleted, and turning it back on brings everything back.
-- **Classification** (project admins): the level and categories, then **Save classification**.
-  Marking the project export-controlled first asks you to confirm that every explicit member,
-  each listed, is authorized for export-controlled data; from then on, system, workspace, and
-  organization admins without a membership can manage it but not see its content. Removing
-  export control is confirmed too. On an export-controlled project, an admin without a
-  membership may only raise its classification: lowering the level or removing a category needs
-  one of its explicit project admins.
+- **Restriction** (project admins): the level and categories, then **Save restriction**. Export
+  control isn't offered here; a project is made export-controlled only through the API, and
+  saving keeps it. On an export-controlled project, system, workspace, and organization admins without a membership
+  can manage it but not see its content, and may only raise its restriction: lowering the level
+  or removing a category needs one of its explicit project admins.
 - **Archive** (organization owners and admins): **Archive project**, once confirmed, makes it
   read-only for everyone until **Unarchive project**. Nothing is deleted.
 

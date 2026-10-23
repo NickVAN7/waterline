@@ -37,7 +37,7 @@ test('a project is created from the project selector, and opens', async ({ page 
   await expect(page).toHaveURL(`/acme/projects/${key}`)
   await expect(page.getByRole('heading', { level: 1, name: `Pilot ${key}` })).toBeFocused()
   await expect(page.getByText('Lead: Olivia Ortiz')).toBeVisible()
-  await expect(page.getByText('Classification: Confidential. Categories: Financial.')).toBeVisible()
+  await expect(page.locator('main header').getByText('Confidential · Financial')).toBeVisible()
   await expectNoA11yViolations(page)
   await expectFocusNotObscured(page)
 })

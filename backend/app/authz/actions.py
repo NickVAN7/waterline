@@ -86,8 +86,8 @@ class Action(StrEnum):
     PROJECT_UNARCHIVE = "project.unarchive"
     PROJECT_MEMBER_MANAGE = "project_member.manage"
     PROJECT_VIEW_ACCESS = "project.view_access"
-    PROJECT_RAISE_CLASSIFICATION = "project.raise_classification"
-    PROJECT_LOWER_CLASSIFICATION = "project.lower_classification"
+    PROJECT_RAISE_RESTRICTION = "project.raise_restriction"
+    PROJECT_LOWER_RESTRICTION = "project.lower_restriction"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -244,7 +244,7 @@ REGISTRY: dict[str, ActionSpec] = {
         mutation=False,
     ),
     # Project admins, inherited included (§3.1; DL-82).
-    Action.PROJECT_RAISE_CLASSIFICATION: ActionSpec(
+    Action.PROJECT_RAISE_RESTRICTION: ActionSpec(
         Level.PROJECT,
         access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
@@ -252,7 +252,7 @@ REGISTRY: dict[str, ActionSpec] = {
         project_role=ProjectRole.ADMIN,
     ),
     # The same, but an explicit project admin only on an export-controlled project (DL-82).
-    Action.PROJECT_LOWER_CLASSIFICATION: ActionSpec(
+    Action.PROJECT_LOWER_RESTRICTION: ActionSpec(
         Level.PROJECT,
         access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,

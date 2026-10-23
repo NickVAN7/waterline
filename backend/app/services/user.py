@@ -24,9 +24,9 @@ from app.core.security import hash_password
 from app.enums import (
     AccessKind,
     AuditAction,
-    ClassificationCategory,
     OrgRole,
     ProjectRole,
+    RestrictionCategory,
     WorkspaceRole,
 )
 from app.models.user import User
@@ -578,7 +578,7 @@ class UserService:
                     archived=p.archived_at is not None,
                     reasons=sorted(projects[p.id], key=order.index),
                     access=access_kind(
-                        ClassificationCategory.EXPORT_CONTROLLED in p.classification_categories,
+                        RestrictionCategory.EXPORT_CONTROLLED in p.restriction_categories,
                         explicit=p.id in explicit,
                     ),
                 )

@@ -52,7 +52,7 @@ const roster = computed<Roster>(() => ({
     value,
     label: PROJECT_ROLE[value],
   })),
-  exportControlled: !!loaded.value?.classification_categories.includes('export_controlled'),
+  exportControlled: !!loaded.value?.restriction_categories.includes('export_controlled'),
   workspaceId: workspaceId.value,
   add: (email, role, options) =>
     api(

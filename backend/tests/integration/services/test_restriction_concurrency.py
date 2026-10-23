@@ -1,7 +1,7 @@
-"""Classification changes racing other project changes (DL-81, DL-82). Marking a project
+"""Restriction changes racing other project changes (DL-81, DL-82). Marking a project
 export-controlled while a member is added: both hold the project's row lock, so the confirmation is
 checked against the members that commit with it, and whichever goes second fails (the marking with
-`members_changed`, the add with `confirmation_required`). A classification change checks its
+`members_changed`, the add with `confirmation_required`). A restriction change checks its
 rights under that lock too, against the project and the caller's own role as they commit: a lower
 waiting on a marking, an archive, or the caller's removal is refused. Each sabotage-checked (see
 the S1-C13 review record)."""
@@ -17,9 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.authz.context import AuthzContext, ProjectAccess
 from app.core.db import SessionMaker
 from app.core.errors import AppError, ValidationFailedError
-from app.enums import ClassificationCategory, ClassificationLevel, OrgRole, ProjectRole
+from app.enums import OrgRole, ProjectRole, RestrictionCategory, RestrictionLevel
 from app.models.project import Project, ProjectMembership
-from app.schemas.project import ClassificationUpdate, ProjectMemberAdd
+from app.schemas.project import ProjectMemberAdd, RestrictionUpdate
 from app.services.project import ProjectService
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
@@ -32,7 +32,7 @@ from tests.support.concurrency import (
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security]
 
-EC = ClassificationCategory.EXPORT_CONTROLLED
+EC = RestrictionCategory.EXPORT_CONTROLLED
 TABLES = (
     "audit_event",
     "project_membership",
@@ -99,13 +99,13 @@ async def setup(concurrency: SessionMaker) -> tuple[Project, Change, Change]:
         bob = await UserFactory.create_async()
         await MembershipFactory.create_async(organization=org, user=bob, role=OrgRole.MEMBER)
     ctx = AuthzContext(user_id=admin.id, is_system_admin=True)
-    mark_ec = ClassificationUpdate(
+    mark_ec = RestrictionUpdate(
         level=None, categories=[EC], export_control_confirmed=True, confirmed_member_ids=[ann.id]
     )
 
     async def mark(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).set_classification(ctx, loaded, mark_ec)
+        return await ProjectService(session).set_restriction(ctx, loaded, mark_ec)
 
     async def add(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
@@ -119,7 +119,7 @@ async def setup(concurrency: SessionMaker) -> tuple[Project, Change, Change]:
 async def state(concurrency: SessionMaker, project: Project) -> tuple[list[str], int]:
     async with concurrency() as check:
         categories = await check.scalar(
-            select(Project.classification_categories).where(Project.id == project.id)
+            select(Project.restriction_categories).where(Project.id == project.id)
         )
         members = await check.scalar(
             select(func.count())
@@ -159,12 +159,12 @@ async def test_a_member_add_waiting_on_marking_export_controlled_needs_the_confi
 
 
 def lower_all(ctx: AuthzContext, project: Project) -> Change:
-    """`ctx` sets the project unclassified with no categories."""
+    """`ctx` sets the project's restriction to None with no categories."""
 
     async def lower(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).set_classification(
-            ctx, loaded, ClassificationUpdate(level=None, categories=[])
+        return await ProjectService(session).set_restriction(
+            ctx, loaded, RestrictionUpdate(level=None, categories=[])
         )
 
     return lower
@@ -197,7 +197,7 @@ async def test_an_inherited_admins_change_waiting_on_marking_export_controlled_c
 
 
 @pytest.mark.concurrency(*TABLES)
-async def test_a_classification_change_waiting_on_an_archive_is_denied(
+async def test_a_restriction_change_waiting_on_an_archive_is_denied(
     concurrency: SessionMaker,
     concurrency_engine: AsyncEngine,
     setup: tuple[Project, Change, Change],
@@ -206,7 +206,7 @@ async def test_a_classification_change_waiting_on_an_archive_is_denied(
     async with committing_factories(concurrency):
         admin = await UserFactory.create_async(is_system_admin=True)
     ctx = AuthzContext(user_id=admin.id, is_system_admin=True)
-    raise_to_restricted = ClassificationUpdate(level=ClassificationLevel.RESTRICTED, categories=[])
+    raise_to_confidential = RestrictionUpdate(level=RestrictionLevel.CONFIDENTIAL, categories=[])
 
     async def archive(session: AsyncSession) -> object:
         return await ProjectService(session).archive(
@@ -215,13 +215,13 @@ async def test_a_classification_change_waiting_on_an_archive_is_denied(
 
     async def raise_(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).set_classification(ctx, loaded, raise_to_restricted)
+        return await ProjectService(session).set_restriction(ctx, loaded, raise_to_confidential)
 
     refused = await race(concurrency, concurrency_engine, first=archive, second=raise_)
 
     async with concurrency() as check:
         level = await check.scalar(
-            select(Project.classification_level).where(Project.id == project.id)
+            select(Project.restriction_level).where(Project.id == project.id)
         )
     assert (refused, level) == (["ForbiddenError"], None)
 
@@ -235,9 +235,7 @@ async def test_an_explicit_admin_removed_while_their_change_waits_cannot_remove_
     decision, S1-C13 security review)."""
     async with committing_factories(concurrency):
         org = await OrganizationFactory.create_async()
-        project = await ProjectFactory.create_async(
-            organization=org, classification_categories=[EC]
-        )
+        project = await ProjectFactory.create_async(organization=org, restriction_categories=[EC])
         admin = await UserFactory.create_async(is_system_admin=True)
         ann = await UserFactory.create_async()
         await MembershipFactory.create_async(organization=org, user=ann, role=OrgRole.ADMIN)
@@ -274,9 +272,7 @@ async def test_an_explicit_admin_demoted_while_their_change_waits_cannot_remove_
     review)."""
     async with committing_factories(concurrency):
         org = await OrganizationFactory.create_async()
-        project = await ProjectFactory.create_async(
-            organization=org, classification_categories=[EC]
-        )
+        project = await ProjectFactory.create_async(organization=org, restriction_categories=[EC])
         admin = await UserFactory.create_async(is_system_admin=True)
         ann = await UserFactory.create_async()
         await MembershipFactory.create_async(organization=org, user=ann, role=OrgRole.ADMIN)

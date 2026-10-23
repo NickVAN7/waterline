@@ -62,7 +62,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   - the build plan's section for the slice says the checkpoint gets the security reviewer
     (e.g. Slice 1: "every checkpoint from 1 to 16b"); or
   - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
-    `password_policy.py`, `identifiers.py`, or `classification.py`; session, token, password,
+    `password_policy.py`, `identifiers.py`, or `restriction.py`; session, token, password,
     or cookie code in `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project`
     areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
     `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)

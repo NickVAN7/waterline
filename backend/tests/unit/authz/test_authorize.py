@@ -548,8 +548,8 @@ def test_allowed_actions_on_a_workspace_are_the_real_ones_allowed_sorted_by_name
             PROJECT_TARGET,
             [
                 "project.archive",
-                "project.lower_classification",
-                "project.raise_classification",
+                "project.lower_restriction",
+                "project.raise_restriction",
                 "project.unarchive",
                 "project.update",
                 "project.view",

@@ -15,23 +15,22 @@ Companion to `design-doc.md` (section references like §6.1 point there).
   `fk_<table>_<column>_<referred table>`, `uq_<table>_<columns>`, `ck_<table>_<name>`,
   `ix_<table>_<columns>`.
 - Soft-deleted tables (`deleted_at`) are filtered out globally unless a query opts in.
-- **Classification** (`ClassificationMixin`, design-doc §3.1) on `project`, `requirement`,
+- **Restriction** (`RestrictionMixin`, design-doc §3.1) on `project`, `requirement`,
   `task`, and `testcase`, each getting the columns in its own slice:
-  - `classification_level`: enum internal / confidential / restricted, nullable; null =
-    unclassified;
-  - `classification_categories`: `text[]`, NOT NULL, default `{}`, with a CHECK that the values
+  - `restriction_level`: enum internal / confidential, nullable; null = the None level
+    (design-doc §3.1);
+  - `restriction_categories`: `text[]`, NOT NULL, default `{}`, with a CHECK that the values
     are a subset of the allowed list: on `project`, `financial`, `proprietary`, `pii`,
     `export_controlled`; on content items, `financial`, `proprietary`, `pii` in v1
     (`export_controlled` is project-only).
 
-  Effective classification (the stricter level, the union of categories) is computed, never
+  Effective restriction (the stricter level, the union of categories) is computed, never
   stored.
 
-  **Renamed in S2-C0d** (DL-134): "classification" becomes "restriction" (`RestrictionMixin`,
-  `restriction_level`, `restriction_categories`, the `ck_…` CHECK constraints, and
-  `project_classification_changed` → `project_restriction_changed`), and the `restricted` level
-  is removed (existing rows map to `confidential`). This doc names the columns as built until that
-  migration lands; S2-C0d renames them here, on every table below, in the same commit.
+  Named "classification" until S2-C0d (DL-134), whose migration renamed the columns, the `ck_…`
+  CHECK constraints, and the audit action (`project_classification_changed`, now
+  `project_restriction_changed`, on the existing rows too), and removed the `restricted` level
+  (existing rows mapped to `confidential`).
 - **Columns added in a later slice.** A column that ships in a later slice than its table (it
   references a table, or belongs to a feature, from that slice) has a Notes cell starting with
   exactly `Added in Slice <n>.`, where `<n>` is the slice that adds it, in any of its
@@ -180,8 +179,8 @@ erDiagram
     varchar status
     uuid lead_id FK
     text_array enabled_modules
-    varchar classification_level
-    text_array classification_categories
+    varchar restriction_level
+    text_array restriction_categories
     timestamptz archived_at
   }
   PROJECT_MEMBERSHIP {
@@ -226,8 +225,8 @@ erDiagram
     varchar status
     varchar priority
     varchar rank
-    varchar classification_level
-    text_array classification_categories
+    varchar restriction_level
+    text_array restriction_categories
     uuid current_revision_id FK
     uuid approved_revision_id FK
     uuid approved_by FK
@@ -270,8 +269,8 @@ erDiagram
     uuid workstream_id FK
     numeric time_estimate
     numeric time_taken
-    varchar classification_level
-    text_array classification_categories
+    varchar restriction_level
+    text_array restriction_categories
     int next_subtask_number
     int version
     timestamptz deleted_at
@@ -296,8 +295,8 @@ erDiagram
     varchar test_type
     text expected_result
     varchar automation_ref
-    varchar classification_level
-    text_array classification_categories
+    varchar restriction_level
+    text_array restriction_categories
     int version
     timestamptz deleted_at
   }
@@ -586,9 +585,9 @@ leave, be demoted, or be deactivated unless a replacement owner is named in the 
 | type | enum: software / erp / general | seeds default modules and selects display labels (§1.1); changeable by project admins |
 | status | enum: planning / active / on_hold / completed / cancelled | NOT NULL, default `planning`; informational only: gates nothing, separate from `archived_at` (design-doc §1.1, §7); changed by project admins |
 | lead_id | UUID (FK → user), nullable | who to ask, not a permission; must hold a `project_membership` on the project (service-layer check; otherwise a 422 field error); defaults to the first admin; set to null by a project admin (`project_updated`, DL-76), or cleared in the same transaction when that membership is removed, recorded in `project_member_removed` and, from Slice 2, as an `activity_log` `lead_id` change (design-doc §1.1) |
-| enabled_modules | text[] | NOT NULL, no default: the service always seeds it from `type`; values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
-| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; null = unclassified; the floor for the project's items (design-doc §3.1) |
-| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
+| enabled_modules | text[] | NOT NULL, no default: the service always seeds it from `type`, with only the modules that have shipped (DL-136); values: `sprints`, `github` (v1), later `raid`, `status_reports`, `budget`, `data_migration`, `cutover` |
+| restriction_level | enum: internal / confidential, nullable | `RestrictionMixin`; null = None; the floor for the project's items (design-doc §3.1) |
+| restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
 | archived_at | timestamptz, nullable | archived = read-only, hidden by default |
 | created_at / updated_at | timestamptz | |
 
@@ -602,13 +601,13 @@ firm's clients).
 from Slice 1, but from S2-C0d the API refuses enabling a module before it ships, and S2-C0d's
 migration removes them from every project (design-doc §1.1, DL-136); each v2
 module's value is added when that module ships. Disabling a module hides its data; nothing is deleted.
-`CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii',
+`CHECK (restriction_categories <@ ARRAY['financial', 'proprietary', 'pii',
 'export_controlled'])`. Set at creation (recorded in `project_created`) or later. Only project
 admins lower the level or remove a category; removing `export_controlled` needs an explicit
 project admin (a `project_membership` with role admin), and on an export-controlled project so
 does any lowering or removal. With `export_controlled`, inherited admins keep management access
 but see content only with an explicit membership (design-doc §3.1; the gate is built in Slice
-2). Classification changes are recorded as `project_classification_changed` audit events.
+2). Restriction changes are recorded as `project_restriction_changed` audit events.
 Changes to the name, description, type, status, lead, and modules are recorded in
 `project_updated` (old and new values in its details).
 No visibility flag: access is always explicit project membership (plus inherited admin). The
@@ -694,8 +693,8 @@ logged.
 | status | enum: draft / approved / in_progress / done / rejected / deferred | only a project admin moves it into `approved` by hand (design-doc §5) |
 | priority | enum: critical / high / medium / low | default medium |
 | rank | varchar | fractional index; order among siblings |
-| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin`; members raise it, project admins lower it; never below the project's in effect (design-doc §3.1) |
-| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
+| restriction_level | enum: internal / confidential, nullable | `RestrictionMixin`; members raise it, project admins lower it; never below the project's in effect (design-doc §3.1) |
+| restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | current_revision_id | UUID (FK → requirement_revision), nullable | latest content revision; set to revision 1 in the transaction that creates the requirement, so never null after creation (nullable only because the requirement row is inserted before its first revision: circular FK) |
 | approved_revision_id | UUID (FK → requirement_revision), nullable | revision of the last approval: the request's revision when a request completes, or the current revision when a project admin approves by hand; stays set when the status moves out of `approved` |
 | approved_by | UUID (FK → user), nullable | approver whose decision completed the request (when an approver replacement completed it, the counted approver with the latest `decided_at`), or the project admin who approved by hand |
@@ -706,7 +705,7 @@ logged.
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(project_id, number)`.
-`CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
+`CHECK (restriction_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
 "Changed since approval" is derived: `approved_revision_id IS NOT NULL AND approved_revision_id
 <> current_revision_id`.
 `current_revision_id` and `approved_revision_id` → `requirement_revision`, which references
@@ -768,8 +767,8 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | workstream_id | UUID (FK → workstream), nullable | same project |
 | time_estimate | numeric, nullable | unit-agnostic |
 | time_taken | numeric, nullable | unit-agnostic |
-| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin` (design-doc §3.1) |
-| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
+| restriction_level | enum: internal / confidential, nullable | `RestrictionMixin` (design-doc §3.1) |
+| restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | next_subtask_number | integer, default 1 | subtask counter; incremented by a direct `UPDATE … RETURNING` outside the ORM so it doesn't bump `version` |
 | version | integer | optimistic locking |
 | search_vector | tsvector (generated) | Added in Slice 6. GIN index |
@@ -780,7 +779,7 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 for board and backlog views. For My work (design-doc §11): `ix_task_assignee_id_status` on
 `(assignee_id, status)` (tasks assigned to the user) and `ix_task_reviewer_id_status` on
 `(reviewer_id, status)` (tasks in review with the user as reviewer).
-`CHECK (classification_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
+`CHECK (restriction_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
 
 ### `subtask`
 | Field | Type | Notes |
@@ -860,14 +859,14 @@ are ignored.
 | test_type | enum: unit / integration / e2e / manual / sit / uat / parallel / regression (extendable) | |
 | expected_result | text | |
 | automation_ref | varchar, nullable | e.g. `tests/api/test_auth.py::test_login` |
-| classification_level | enum: internal / confidential / restricted, nullable | `ClassificationMixin` (design-doc §3.1) |
-| classification_categories | text[] | `ClassificationMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
+| restriction_level | enum: internal / confidential, nullable | `RestrictionMixin` (design-doc §3.1) |
+| restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | version | integer | optimistic locking |
 | search_vector | tsvector (generated) | Added in Slice 6. GIN index |
 | deleted_at | timestamptz, nullable | soft delete |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(project_id, number)`. `CHECK (classification_categories <@ ARRAY['financial',
+`UNIQUE(project_id, number)`. `CHECK (restriction_categories <@ ARRAY['financial',
 'proprietary', 'pii'])`. **No `status`** — current status is computed from the latest
 non-`not_run` `test_result`. **No `requirement_id`** — links live in `requirement_testcase`.
 
@@ -981,7 +980,7 @@ approved or rejected (a personal action: no admin or system-admin override, desi
 `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`, `start_date`, `end_date`,
 `due_date`, `target_date`, `baseline_start`, `baseline_end`, `baseline_date`, `requirement_id`,
 `parent_requirement_id`, `time_estimate`, `approved_revision_id`, `approver_id`,
-`classification_level`, `classification_categories`, `lead_id`, `actual_result`.
+`restriction_level`, `restriction_categories`, `lead_id`, `actual_result`.
 `CHECK (action <> 'updated' OR field_changed IS NOT NULL)`.
 Indexes: `(entity_type, entity_id, id)` for item history; `(project_id, id)` for the project
 feed. Feeds page by `id` (UUIDv7, increasing in creation order), not by `changed_at`, which is
@@ -1002,7 +1001,7 @@ for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_classification_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, the removed `role`, `lead_cleared` when it cleared the project's lead, and `via` (`org_member_removed` or `workspace_member_removed`) when an org or staff removal "with their projects" removed it, DL-78); never passwords, hashes, or tokens |
+| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_restriction_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, the removed `role`, `lead_cleared` when it cleared the project's lead, and `via` (`org_member_removed` or `workspace_member_removed`) when an org or staff removal "with their projects" removed it, DL-78); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 
@@ -1013,7 +1012,7 @@ several orgs' roles, DL-75), `system_admin_granted`,
 `system_admin_revoked`, `workspace_updated`, `workspace_member_added`,
 `workspace_member_role_changed`, `workspace_member_removed`, `org_created`, `org_updated`,
 `org_member_added`, `org_member_role_changed`, `org_member_removed`, `project_created`,
-`project_updated`, `project_archived`, `project_unarchived`, `project_classification_changed`,
+`project_updated`, `project_archived`, `project_unarchived`, `project_restriction_changed`,
 `project_member_added`,
 `project_member_role_changed`, `project_member_removed`.
 Indexes: `(workspace_id, id)`, `(organization_id, id)`, `(project_id, id)` (project admins'

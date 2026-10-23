@@ -4,8 +4,8 @@ import type { IconName } from '@/components/Icon.vue'
 
 type ProjectStatus = components['schemas']['ProjectStatus']
 type ProjectType = components['schemas']['ProjectType']
-type ClassificationLevel = components['schemas']['ClassificationLevel']
-type ClassificationCategory = components['schemas']['ClassificationCategory']
+type RestrictionLevel = components['schemas']['RestrictionLevel']
+type RestrictionCategory = components['schemas']['RestrictionCategory']
 export type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
 
 export type BadgeLabel = { label: string; tone: Tone; icon: IconName }
@@ -38,43 +38,46 @@ export const MODULE: Record<string, string> = {
   cutover: 'Cutover',
 }
 
-/** An enabled module whose slice hasn't shipped (design-doc §1.1, UI-SHL-6). */
+/** A module whose slice hasn't shipped, which can't be enabled (design-doc §1.1, DL-136). */
 export const NOT_AVAILABLE_YET = 'Not available yet'
 
-/** Classification levels with the description shown beside each choice (design-doc §3.1, its
- * "Means" column), and the banner's tone (UI-FBK-6; the alert's icon follows the tone). */
-export const CLASSIFICATION_LEVEL: Record<
-  ClassificationLevel,
-  { label: string; description: string; tone: 'info' | 'warning' | 'danger' }
+/** Restriction levels with the description shown beside each choice (design-doc §3.1, its
+ * "Means" column), and the header badge's tone and icon (UI-FBK-6). */
+export const RESTRICTION_LEVEL: Record<
+  RestrictionLevel,
+  BadgeLabel & { tone: 'info' | 'warning'; description: string }
 > = {
   internal: {
     label: 'Internal',
     description:
       "For the firm and the client's project team; not for the public. Disclosure is embarrassing, not damaging.",
     tone: 'info',
+    icon: 'info',
   },
   confidential: {
     label: 'Confidential',
     description:
       'Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement.',
     tone: 'warning',
-  },
-  restricted: {
-    label: 'Restricted',
-    description:
-      'Disclosure would cause serious harm or breach a legal or regulatory duty; need-to-know.',
-    tone: 'danger',
+    icon: 'warning',
   },
 }
 
-/** The unclassified choice (design-doc §3.1): no banner. */
-export const UNCLASSIFIED = {
-  label: 'Not classified',
-  description: 'Not yet classified; treated like Internal for every rule.',
+/** The null level's choice (design-doc §3.1): no badge. */
+export const NO_RESTRICTION = {
+  label: 'None',
+  description: 'Not yet restricted; treated like Internal for every rule.',
+}
+
+/** The badge for categories with no level, in Internal's tone (UI-FBK-6). */
+export const NO_RESTRICTION_LEVEL: BadgeLabel = {
+  label: 'No restriction level',
+  tone: RESTRICTION_LEVEL.internal.tone,
+  icon: RESTRICTION_LEVEL.internal.icon,
 }
 
 /** Why content is sensitive (design-doc §3.1). */
-export const CLASSIFICATION_CATEGORY: Record<ClassificationCategory, string> = {
+export const RESTRICTION_CATEGORY: Record<RestrictionCategory, string> = {
   financial: 'Financial',
   proprietary: 'Proprietary',
   pii: 'Personal data (PII)',

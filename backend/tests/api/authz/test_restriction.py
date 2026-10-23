@@ -1,9 +1,10 @@
-"""Authorization of `PUT /api/projects/{key}/classification` (build plan, "The classification API",
-DL-81, its action column; the actions, DL-82; design-doc §3.1 "Who sets it"; §5):
+"""Authorization of `PUT /api/projects/{key}/restriction` (build plan, "The classification API",
+DL-81, its action column; the actions, DL-82; renamed by DL-134; design-doc §3.1 "Who sets it";
+§5):
 
-- a higher level or an added category needs `project.raise_classification`; a lower level or a
-  removed category `project.lower_classification`; both for a change that does both; either for
-  a change that does neither, the classification already held included. Unclassified ranks as
+- a higher level or an added category needs `project.raise_restriction`; a lower level or a
+  removed category `project.lower_restriction`; both for a change that does both; either for
+  a change that does neither, the restriction already held included. None ranks as
   Internal, so a change between them is neither;
 - both are project admins', inherited included; 403 for a project member or viewer; 404, the
   same as a missing project and naming nothing, for whoever can't see the project; 403 on an
@@ -11,10 +12,10 @@ DL-81, its action column; the actions, DL-82; design-doc §3.1 "Who sets it"; §
 - on an export-controlled project an inherited admin may still raise, but lowering the level or
   removing any category, `export_controlled` included, needs an explicit project admin (403
   otherwise);
-- an allowed change returns 200 with the project's new `classification_level` and
-  `classification_categories`, and stores them.
+- an allowed change returns 200 with the project's new `restriction_level` and
+  `restriction_categories`, and stores them.
 
-On every denial the classification is unchanged and no audit event is recorded. The confirmation
+On every denial the restriction is unchanged and no audit event is recorded. The confirmation
 fields' validation and the audit-event details are tested elsewhere (the main session). Personas
 are relative to workspace "Acme Consulting", org "Bolt Foods" (bolt-foods), and project "Payments"
 (PMT) (tests/support/authz.py, `tenancy`).
@@ -29,7 +30,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import ClassificationLevel, ProjectRole
+from app.enums import ProjectRole, RestrictionLevel
 from app.models.audit_event import AuditEvent
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
@@ -52,15 +53,14 @@ PROJECT_UNSEEN = [
     "nobody",
 ]
 
-URL = "/api/projects/PMT/classification"
-MISSING_URL = "/api/projects/ZZZ/classification"
+URL = "/api/projects/PMT/restriction"
+MISSING_URL = "/api/projects/ZZZ/restriction"
 ARCHIVED_AT = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 IVY = "ivy@bolt.example"
 
 NONE: list[str] = []  # no categories
-INTERNAL = ClassificationLevel.INTERNAL
-CONFIDENTIAL = ClassificationLevel.CONFIDENTIAL
-RESTRICTED = ClassificationLevel.RESTRICTED
+INTERNAL = RestrictionLevel.INTERNAL
+CONFIDENTIAL = RestrictionLevel.CONFIDENTIAL
 
 # (starting level, starting categories) → (body level, body categories), on a project that isn't
 # export-controlled.
@@ -69,24 +69,24 @@ RAISES = [
     pytest.param(
         (CONFIDENTIAL, ["pii"]), ("confidential", ["pii", "financial"]), id="add-category"
     ),
-    pytest.param((None, NONE), ("restricted", ["proprietary"]), id="unclassified-to-restricted"),
+    pytest.param((None, NONE), ("confidential", ["proprietary"]), id="none-to-confidential"),
 ]
 LOWERS = [
-    pytest.param((RESTRICTED, NONE), ("confidential", NONE), id="level-down"),
+    pytest.param((CONFIDENTIAL, NONE), ("internal", NONE), id="level-down"),
     pytest.param((CONFIDENTIAL, ["pii", "financial"]), ("confidential", ["pii"]), id="remove-one"),
-    pytest.param((CONFIDENTIAL, NONE), (None, NONE), id="confidential-to-unclassified"),
+    pytest.param((CONFIDENTIAL, NONE), (None, NONE), id="confidential-to-none"),
 ]
 BOTH_WAYS = [
     pytest.param((CONFIDENTIAL, ["pii"]), ("confidential", ["financial"]), id="swap-category"),
-    pytest.param((INTERNAL, ["pii"]), ("restricted", NONE), id="up-and-remove"),
+    pytest.param((INTERNAL, ["pii"]), ("confidential", NONE), id="up-and-remove"),
 ]
 NEITHER = [
     pytest.param((CONFIDENTIAL, ["pii"]), ("confidential", ["pii"]), id="already-held"),
-    pytest.param((None, NONE), ("internal", NONE), id="unclassified-to-internal"),
-    pytest.param((INTERNAL, NONE), (None, NONE), id="internal-to-unclassified"),
+    pytest.param((None, NONE), ("internal", NONE), id="none-to-internal"),
+    pytest.param((INTERNAL, NONE), (None, NONE), id="internal-to-none"),
 ]
 
-Start = tuple[ClassificationLevel | None, list[str]]
+Start = tuple[RestrictionLevel | None, list[str]]
 Body = tuple[str | None, list[str]]
 
 
@@ -97,11 +97,11 @@ async def signed_in(client: AsyncClient, who: str) -> tuple[Tenancy, User]:
     return t, user
 
 
-async def classify(
-    session: AsyncSession, t: Tenancy, level: ClassificationLevel | None, categories: list[str]
+async def set_restriction(
+    session: AsyncSession, t: Tenancy, level: RestrictionLevel | None, categories: list[str]
 ) -> None:
-    t.project.classification_level = level
-    t.project.classification_categories = categories
+    t.project.restriction_level = level
+    t.project.restriction_categories = categories
     await session.flush()
 
 
@@ -122,7 +122,7 @@ async def ivy(t: Tenancy) -> User:
 async def stored(session: AsyncSession, t: Tenancy) -> tuple[str | None, set[str]]:
     row = (
         await session.execute(
-            select(Project.classification_level, Project.classification_categories).where(
+            select(Project.restriction_level, Project.restriction_categories).where(
                 Project.id == t.project.id
             )
         )
@@ -151,10 +151,10 @@ def assert_forbidden(response: Response) -> None:
     assert (response.status_code, response.json().get("code")) == (403, "forbidden")
 
 
-def assert_classified(response: Response, level: str | None, categories: set[str]) -> None:
+def assert_restricted(response: Response, level: str | None, categories: set[str]) -> None:
     assert response.status_code == 200
     data = response.json()
-    assert (data["classification_level"], set(data["classification_categories"])) == (
+    assert (data["restriction_level"], set(data["restriction_categories"])) == (
         level,
         categories,
     )
@@ -170,11 +170,11 @@ async def test_project_admins_inherited_included_may_raise(
 ) -> None:
     """§3.1: "Project admins (including inherited) set and raise them"."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *start)
+    await set_restriction(session, t, *start)
 
     response = await client.put(URL, json=body(*change))
 
-    assert_classified(response, change[0], set(change[1]))
+    assert_restricted(response, change[0], set(change[1]))
     assert await stored(session, t) == (change[0], set(change[1]))
 
 
@@ -186,11 +186,11 @@ async def test_project_admins_inherited_included_may_lower(
     """§3.1: "Lowering a level or removing a category is project-admin only" (inherited
     included, on a project that isn't export-controlled; DL-82)."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *start)
+    await set_restriction(session, t, *start)
 
     response = await client.put(URL, json=body(*change))
 
-    assert_classified(response, change[0], set(change[1]))
+    assert_restricted(response, change[0], set(change[1]))
     assert await stored(session, t) == (change[0], set(change[1]))
 
 
@@ -201,11 +201,11 @@ async def test_project_admins_may_make_a_change_that_both_raises_and_lowers(
 ) -> None:
     """DL-81: "both for a change that does both"."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *start)
+    await set_restriction(session, t, *start)
 
     response = await client.put(URL, json=body(*change))
 
-    assert_classified(response, change[0], set(change[1]))
+    assert_restricted(response, change[0], set(change[1]))
     assert await stored(session, t) == (change[0], set(change[1]))
 
 
@@ -215,13 +215,14 @@ async def test_project_admins_may_make_a_change_that_neither_raises_nor_lowers(
     client: AsyncClient, session: AsyncSession, who: str, start: Start, change: Body
 ) -> None:
     """DL-81, DL-82: "either for a change that does neither, including the classification
-    already held"; unclassified ranks as Internal, so a change between them is neither."""
+    already held" (the restriction, DL-134); None ranks as Internal, so a change between them is
+    neither."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *start)
+    await set_restriction(session, t, *start)
 
     response = await client.put(URL, json=body(*change))
 
-    assert_classified(response, change[0], set(change[1]))
+    assert_restricted(response, change[0], set(change[1]))
     assert await stored(session, t) == (change[0], set(change[1]))
 
 
@@ -232,7 +233,7 @@ async def test_project_admins_may_mark_a_project_export_controlled_with_the_conf
     """§3.1 and DL-82: adding `export_controlled` is a raise, so inherited admins may too; the
     request carries the confirmation, listing the current explicit members (build plan)."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, INTERNAL, [])
+    await set_restriction(session, t, INTERNAL, [])
     await ivy(t)
     explicit = await session.scalars(
         select(ProjectMembership.user_id).where(ProjectMembership.project_id == t.project.id)
@@ -242,7 +243,7 @@ async def test_project_admins_may_mark_a_project_export_controlled_with_the_conf
         URL, json=body("internal", ["export_controlled"], **confirmation(*explicit))
     )
 
-    assert_classified(response, "internal", {"export_controlled"})
+    assert_restricted(response, "internal", {"export_controlled"})
     assert await stored(session, t) == ("internal", {"export_controlled"})
 
 
@@ -254,11 +255,11 @@ async def test_project_admins_may_mark_a_project_export_controlled_with_the_conf
 async def test_a_project_member_or_viewer_gets_403_for_any_change(
     client: AsyncClient, session: AsyncSession, who: str, start: Start, change: Body
 ) -> None:
-    """§5, "Project roles": classification is not a member's or viewer's to set on the project;
+    """§5, "Project roles": restriction is not a member's or viewer's to set on the project;
     a no-op needs either action too (DL-82). "A change the caller lacks the action for is a
     403" (build plan)."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *start)
+    await set_restriction(session, t, *start)
     before = await audit_events(session)
 
     response = await client.put(URL, json=body(*change))
@@ -278,12 +279,12 @@ async def test_the_change_is_404_naming_nothing_to_who_cannot_see_the_project(
     """§5: failures on entities the user can't see return 404, not 403, so existence isn't
     leaked; the body reads the same as for a project that doesn't exist."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, INTERNAL, ["pii"])
+    await set_restriction(session, t, INTERNAL, ["pii"])
     await ivy(t)
     before = await audit_events(session)
 
-    response = await client.put(URL, json=body("restricted", ["pii", "financial"]))
-    missing = await client.put(MISSING_URL, json=body("restricted", ["pii", "financial"]))
+    response = await client.put(URL, json=body("confidential", ["pii", "financial"]))
+    missing = await client.put(MISSING_URL, json=body("confidential", ["pii", "financial"]))
 
     assert (response.status_code, response.json()["code"]) == (404, "not_found")
     assert response.json() == missing.json()
@@ -307,7 +308,7 @@ async def test_an_archived_project_refuses_every_change_with_403(
     """DL-82: both actions are project-level mutations, so an archived project denies them to
     everyone, system admins included."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *start)
+    await set_restriction(session, t, *start)
     await archive(session, t)
     before = await audit_events(session)
 
@@ -320,34 +321,41 @@ async def test_an_archived_project_refuses_every_change_with_403(
 
 # --- An export-controlled project (§3.1; DL-82) -------------------------------------------------
 
-# Changes from (confidential, [export_controlled, pii]).
+# Changes from (confidential, [export_controlled, pii]), except a level raise, which (with
+# Confidential the highest level, DL-134) starts from Internal.
 EC_START: Start = (CONFIDENTIAL, ["export_controlled", "pii"])
 EC_RAISES = [
-    pytest.param(("restricted", ["export_controlled", "pii"]), id="level-up"),
-    pytest.param(("confidential", ["export_controlled", "pii", "financial"]), id="add-category"),
+    pytest.param(
+        (INTERNAL, ["export_controlled", "pii"]),
+        ("confidential", ["export_controlled", "pii"]),
+        id="level-up",
+    ),
+    pytest.param(
+        EC_START, ("confidential", ["export_controlled", "pii", "financial"]), id="add-category"
+    ),
 ]
 EC_LOWERS = [
     pytest.param(("internal", ["export_controlled", "pii"]), id="level-down"),
-    pytest.param((None, ["export_controlled", "pii"]), id="to-unclassified"),
+    pytest.param((None, ["export_controlled", "pii"]), id="to-none"),
     pytest.param(("confidential", ["export_controlled"]), id="remove-other-category"),
     pytest.param(("confidential", ["pii"]), id="remove-export-controlled"),
-    pytest.param(("restricted", ["pii"]), id="up-and-remove-export-controlled"),
+    pytest.param(("confidential", ["pii", "financial"]), id="add-and-remove-export-controlled"),
     pytest.param(("confidential", ["export_controlled", "financial"]), id="swap-category"),
 ]
 
 
-@pytest.mark.parametrize("change", EC_RAISES)
+@pytest.mark.parametrize(("start", "change"), EC_RAISES)
 @pytest.mark.parametrize("who", PROJECT_ADMINS)
 async def test_every_project_admin_may_still_raise_an_export_controlled_project(
-    client: AsyncClient, session: AsyncSession, who: str, change: Body
+    client: AsyncClient, session: AsyncSession, who: str, start: Start, change: Body
 ) -> None:
-    """§3.1: inherited admins keep management access, "raising its classification" included."""
+    """§3.1: inherited admins keep management access, "raising its restriction" included."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *EC_START)
+    await set_restriction(session, t, *start)
 
     response = await client.put(URL, json=body(*change))
 
-    assert_classified(response, change[0], set(change[1]))
+    assert_restricted(response, change[0], set(change[1]))
     assert await stored(session, t) == (change[0], set(change[1]))
 
 
@@ -359,7 +367,7 @@ async def test_an_inherited_admin_gets_403_lowering_an_export_controlled_project
     """§3.1: "On an export-controlled project, inherited admins without an explicit membership
     may only raise"; "Inherited admins can't remove [`export_controlled`]"."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *EC_START)
+    await set_restriction(session, t, *EC_START)
     before = await audit_events(session)
 
     response = await client.put(URL, json=body(*change))
@@ -376,11 +384,11 @@ async def test_an_explicit_project_admin_may_lower_an_export_controlled_project(
     """§3.1: lowering, or removing any category or `export_controlled`, "needs an explicit
     project admin" (a `project_membership` with role admin)."""
     t, _ = await signed_in(client, "project_admin")
-    await classify(session, t, *EC_START)
+    await set_restriction(session, t, *EC_START)
 
     response = await client.put(URL, json=body(*change))
 
-    assert_classified(response, change[0], set(change[1]))
+    assert_restricted(response, change[0], set(change[1]))
     assert await stored(session, t) == (change[0], set(change[1]))
 
 
@@ -393,11 +401,11 @@ async def test_an_inherited_admin_who_is_also_an_explicit_admin_may_remove_expor
     await ProjectMembershipFactory.create_async(
         project=t.project, user=user, role=ProjectRole.ADMIN
     )
-    await classify(session, t, *EC_START)
+    await set_restriction(session, t, *EC_START)
 
     response = await client.put(URL, json=body("internal", ["pii"]))
 
-    assert_classified(response, "internal", {"pii"})
+    assert_restricted(response, "internal", {"pii"})
     assert await stored(session, t) == ("internal", {"pii"})
 
 
@@ -411,7 +419,7 @@ async def test_an_inherited_admin_with_a_member_role_still_gets_403_lowering(
     await ProjectMembershipFactory.create_async(
         project=t.project, user=user, role=ProjectRole.MEMBER
     )
-    await classify(session, t, *EC_START)
+    await set_restriction(session, t, *EC_START)
 
     response = await client.put(URL, json=body("confidential", ["pii"]))
 
@@ -428,7 +436,7 @@ async def test_an_inherited_admin_with_a_member_role_still_gets_403_lowering(
             id="already-held",
         ),
         pytest.param(
-            (INTERNAL, ["export_controlled"]), (None, ["export_controlled"]), id="to-unclassified"
+            (INTERNAL, ["export_controlled"]), (None, ["export_controlled"]), id="to-none"
         ),
         pytest.param(
             (None, ["export_controlled"]), ("internal", ["export_controlled"]), id="to-internal"
@@ -440,13 +448,13 @@ async def test_an_inherited_admin_may_make_a_change_that_neither_raises_nor_lowe
     client: AsyncClient, session: AsyncSession, who: str, start: Start, change: Body
 ) -> None:
     """DL-82: a change that neither raises nor lowers needs either action, and the raise is
-    theirs; Internal ↔ unclassified is neither (unclassified ranks as Internal), not a lower."""
+    theirs; Internal ↔ None is neither (None ranks as Internal), not a lower."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, *start)
+    await set_restriction(session, t, *start)
 
     response = await client.put(URL, json=body(*change))
 
-    assert_classified(response, change[0], set(change[1]))
+    assert_restricted(response, change[0], set(change[1]))
     assert await stored(session, t) == (change[0], set(change[1]))
 
 
@@ -455,9 +463,11 @@ async def test_a_member_or_viewer_gets_403_raising_an_export_controlled_project(
     client: AsyncClient, session: AsyncSession, who: str
 ) -> None:
     t, _ = await signed_in(client, who)
-    await classify(session, t, *EC_START)
+    await set_restriction(session, t, *EC_START)
 
-    response = await client.put(URL, json=body("restricted", ["export_controlled", "pii"]))
+    response = await client.put(
+        URL, json=body("confidential", ["export_controlled", "pii", "financial"])
+    )
 
     assert_forbidden(response)
     assert await stored(session, t) == ("confidential", {"export_controlled", "pii"})
@@ -490,11 +500,11 @@ async def test_the_project_reads_allowed_actions_follow_the_stored_categories(
     """Build plan, "The classification actions": the project read's `allowed_actions` carries
     them, reflecting the export-controlled rule (S1-C13 row)."""
     t, _ = await signed_in(client, who)
-    await classify(session, t, INTERNAL, categories)
+    await set_restriction(session, t, INTERNAL, categories)
 
     response = await client.get("/api/projects/PMT")
 
     assert response.status_code == 200
     actions = response.json()["allowed_actions"]
-    assert ("project.raise_classification" in actions) is raise_listed
-    assert ("project.lower_classification" in actions) is lower_listed
+    assert ("project.raise_restriction" in actions) is raise_listed
+    assert ("project.lower_restriction" in actions) is lower_listed

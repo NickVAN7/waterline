@@ -20,7 +20,7 @@
 >    `authorize()` (§5). API conventions are in `build-plan.md`.
 > 6. Oct 5, 2026 review: personal actions in `authorize()` (§5), approver eligibility and
 >    replacement (§6.2), manual requirement approval by project admins (§5, §6.2), revision 1 at
->    creation (§6.1), data classification and export control (§3.1), accessibility (WCAG 2.2
+>    creation (§6.1), data restriction and export control (§3.1), accessibility (WCAG 2.2
 >    AA, §1) and loading states (`screen-inventory.md`, step 5), API rate limiting (§4), and
 >    malware scanning for future file uploads (§16).
 > 7. Journey decisions (Oct 6–7, 2026), from the screen-inventory journey work: any org member

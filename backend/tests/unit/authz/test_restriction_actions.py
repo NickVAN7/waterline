@@ -1,10 +1,10 @@
-"""S1-C13's two classification actions (DL-82; build plan, "Classification & export control", "The
-classification actions"; design-doc §3.1, "Who sets it"; §5, "The choke point" and "Role
-capabilities"):
+"""S1-C13's two restriction actions (DL-82, renamed by DL-134; build plan, "Classification &
+export control", "The classification actions"; design-doc §3.1, "Who sets it"; §5, "The choke
+point" and "Role capabilities"):
 
-- `project.raise_classification`: project admins, inherited included (system admins, workspace
+- `project.raise_restriction`: project admins, inherited included (system admins, workspace
   owners/admins, owners/admins of the project's org), on an export-controlled project too;
-- `project.lower_classification`: the same, but on an export-controlled project an explicit
+- `project.lower_restriction`: the same, but on an export-controlled project an explicit
   project admin only (a `project_membership` with role admin), which also covers removing
   `export_controlled`: inherited admins, system admins included, are denied it there unless they
   also hold that explicit membership;
@@ -41,8 +41,8 @@ from tests.support.authz import (
 
 pytestmark = pytest.mark.security
 
-RAISE = "project.raise_classification"
-LOWER = "project.lower_classification"
+RAISE = "project.raise_restriction"
+LOWER = "project.lower_restriction"
 BOTH = [RAISE, LOWER]
 
 PROJECT_ADMINS = {
@@ -129,7 +129,7 @@ def test_both_are_for_project_admins_inherited_included(
 def test_raising_an_export_controlled_project_stays_open_to_inherited_admins(
     persona: str, allowed: bool
 ) -> None:
-    """§3.1: inherited admins keep management access, including "raising its classification"; on
+    """§3.1: inherited admins keep management access, including "raising its restriction"; on
     an export-controlled project they "may only raise"."""
     assert authorize(PERSONAS[persona], RAISE, EXPORT_CONTROLLED_TARGET) is allowed
 
@@ -286,8 +286,8 @@ def _project(categories: list[str]) -> Project:
         type=ProjectType.SOFTWARE,
         enabled_modules=[],
         archived_at=None,
-        classification_level=None,
-        classification_categories=categories,
+        restriction_level=None,
+        restriction_categories=categories,
     )
 
 

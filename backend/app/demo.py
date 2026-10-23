@@ -18,11 +18,11 @@ from app.authz.context import AuthzContext
 from app.authz.target import org_target, project_target, workspace_target
 from app.core.settings import Settings
 from app.enums import (
-    ClassificationCategory,
-    ClassificationLevel,
     OrgRole,
     ProjectRole,
     ProjectType,
+    RestrictionCategory,
+    RestrictionLevel,
     WorkspaceRole,
 )
 from app.models.org import Organization
@@ -96,8 +96,8 @@ class DemoProject:
     type: ProjectType
     lead: str
     members: tuple[tuple[str, ProjectRole], ...]
-    level: ClassificationLevel | None = None
-    categories: tuple[ClassificationCategory, ...] = ()
+    level: RestrictionLevel | None = None
+    categories: tuple[RestrictionCategory, ...] = ()
     archived: bool = False
 
 
@@ -144,8 +144,8 @@ PROJECTS = (
         ProjectType.GENERAL,
         "lucy",
         (("noah", ADMIN), ("omar", MEMBER), ("max", MEMBER), ("priya", MEMBER), ("quinn", VIEWER)),
-        level=ClassificationLevel.CONFIDENTIAL,
-        categories=(ClassificationCategory.FINANCIAL,),
+        level=RestrictionLevel.CONFIDENTIAL,
+        categories=(RestrictionCategory.FINANCIAL,),
     ),
 )
 
@@ -218,8 +218,8 @@ async def build_demo(session: AsyncSession, settings: Settings) -> str:
                 key=spec.key,
                 type=spec.type,
                 first_admin_id=users[spec.lead].id,
-                classification_level=spec.level,
-                classification_categories=list(spec.categories),
+                restriction_level=spec.level,
+                restriction_categories=list(spec.categories),
             ),
         )
         project = cast(tuple[Project, object], await projects.load(spec.key))[0]

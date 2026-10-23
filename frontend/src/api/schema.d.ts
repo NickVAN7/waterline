@@ -689,7 +689,7 @@ export interface paths {
         patch: operations["update_project_api_projects__key__patch"];
         trace?: never;
     };
-    "/api/projects/{key}/classification": {
+    "/api/projects/{key}/restriction": {
         parameters: {
             query?: never;
             header?: never;
@@ -698,13 +698,13 @@ export interface paths {
         };
         get?: never;
         /**
-         * Set Project Classification
-         * @description Set the project's classification level and categories (DL-81): raising needs
-         *     `project.raise_classification`, lowering `project.lower_classification`. 422 on
+         * Set Project Restriction
+         * @description Set the project's restriction level and categories (DL-81): raising needs
+         *     `project.raise_restriction`, lowering `project.lower_restriction`. 422 on
          *     `export_control_confirmed` and `confirmed_member_ids`: `confirmation_required`,
          *     `members_changed`, or `confirmation_not_needed`.
          */
-        put: operations["set_project_classification_api_projects__key__classification_put"];
+        put: operations["set_project_restriction_api_projects__key__restriction_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -975,42 +975,13 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_classification" | "project.lower_classification";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction";
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
             current_password: string;
             /** New Password */
             new_password: string;
-        };
-        /**
-         * ClassificationCategory
-         * @enum {string}
-         */
-        ClassificationCategory: "financial" | "proprietary" | "pii" | "export_controlled";
-        /**
-         * ClassificationLevel
-         * @enum {string}
-         */
-        ClassificationLevel: "internal" | "confidential" | "restricted";
-        /**
-         * ClassificationUpdate
-         * @description `PUT /api/projects/{key}/classification` (DL-81): `level` (null: unclassified) and
-         *     `categories` replace the current ones. Adding `export_controlled` also needs
-         *     `export_control_confirmed` and `confirmed_member_ids`, the project's current explicit
-         *     members.
-         */
-        ClassificationUpdate: {
-            level: components["schemas"]["ClassificationLevel"] | null;
-            /** Categories */
-            categories: components["schemas"]["ClassificationCategory"][];
-            /**
-             * Export Control Confirmed
-             * @default false
-             */
-            export_control_confirmed: boolean;
-            /** Confirmed Member Ids */
-            confirmed_member_ids?: string[] | null;
         };
         /**
          * EmailCheck
@@ -1486,12 +1457,12 @@ export interface components {
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
             /** First Admin Id */
             first_admin_id?: string | null;
-            classification_level?: components["schemas"]["ClassificationLevel"] | null;
+            restriction_level?: components["schemas"]["RestrictionLevel"] | null;
             /**
-             * Classification Categories
+             * Restriction Categories
              * @default []
              */
-            classification_categories: components["schemas"]["ClassificationCategory"][];
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
             /**
              * Export Control Confirmed
              * @default false
@@ -1651,9 +1622,9 @@ export interface components {
             enabled_modules: components["schemas"]["ProjectModule"][];
             /** Archived */
             archived: boolean;
-            classification_level: components["schemas"]["ClassificationLevel"] | null;
-            /** Classification Categories */
-            classification_categories: components["schemas"]["ClassificationCategory"][];
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
             /** Modules Holding Data */
             modules_holding_data: components["schemas"]["ProjectModule"][];
             /** Allowed Actions */
@@ -1689,6 +1660,35 @@ export interface components {
             lead_id?: string | null;
             /** Enabled Modules */
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
+        };
+        /**
+         * RestrictionCategory
+         * @enum {string}
+         */
+        RestrictionCategory: "financial" | "proprietary" | "pii" | "export_controlled";
+        /**
+         * RestrictionLevel
+         * @enum {string}
+         */
+        RestrictionLevel: "internal" | "confidential";
+        /**
+         * RestrictionUpdate
+         * @description `PUT /api/projects/{key}/restriction` (DL-81): `level` (null: None) and
+         *     `categories` replace the current ones. Adding `export_controlled` also needs
+         *     `export_control_confirmed` and `confirmed_member_ids`, the project's current explicit
+         *     members.
+         */
+        RestrictionUpdate: {
+            level: components["schemas"]["RestrictionLevel"] | null;
+            /** Categories */
+            categories: components["schemas"]["RestrictionCategory"][];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
+            /** Confirmed Member Ids */
+            confirmed_member_ids?: string[] | null;
         };
         /** SignInRequest */
         SignInRequest: {
@@ -4173,7 +4173,7 @@ export interface operations {
             };
         };
     };
-    set_project_classification_api_projects__key__classification_put: {
+    set_project_restriction_api_projects__key__restriction_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -4184,7 +4184,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ClassificationUpdate"];
+                "application/json": components["schemas"]["RestrictionUpdate"];
             };
         };
         responses: {

@@ -116,38 +116,40 @@ async def test_a_new_project_makes_its_creator_first_admin_and_lead_and_records_
             olga.id,
             t.org.id,
             None,
-            {"classification_level": None, "classification_categories": []},
+            {"restriction_level": None, "restriction_categories": []},
         ),
         (AuditAction.PROJECT_MEMBER_ADDED, olga.id, t.org.id, olga.id, {"role": "admin"}),
     ]
 
 
-@pytest.mark.parametrize(
-    ("project_type", "modules"),
-    [("software", ["sprints", "github"]), ("erp", []), ("general", [])],
-)
-async def test_a_new_project_is_seeded_with_its_types_modules(
-    client: AsyncClient, session: AsyncSession, t: Tenancy, project_type: str, modules: list[str]
+@pytest.mark.parametrize("project_type", ["software", "erp", "general"])
+async def test_a_new_project_is_seeded_with_no_unshipped_module(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, project_type: str
 ) -> None:
+    """Seeding skips a module that hasn't shipped, `sprints` and `github` included (DL-136)."""
     await signed_in(client, await org_member(t))
 
     response = await client.post(f"/api/orgs/{t.org.id}/projects", json=new(type=project_type))
 
-    assert response.json()["enabled_modules"] == modules
-    assert (await stored(session, "INV")).enabled_modules == modules
+    assert response.json()["enabled_modules"] == []
+    assert (await stored(session, "INV")).enabled_modules == []
 
 
-async def test_modules_chosen_at_creation_replace_the_seed(
-    client: AsyncClient, session: AsyncSession, t: Tenancy
+@pytest.mark.parametrize("modules", [["sprints"], ["github", "github"]])
+async def test_an_unshipped_module_chosen_at_creation_is_refused(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, modules: list[str]
 ) -> None:
     await signed_in(client, await org_member(t))
 
     response = await client.post(
-        f"/api/orgs/{t.org.id}/projects",
-        json=new(enabled_modules=["github", "github"]),
+        f"/api/orgs/{t.org.id}/projects", json=new(enabled_modules=modules)
     )
 
-    assert response.json()["enabled_modules"] == ["github"]
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["body", "enabled_modules"], "module_unavailable")],
+    )
+    assert await session.scalar(select(Project.id).where(Project.key == "INV")) is None
 
 
 async def test_a_module_that_isnt_allowed_yet_is_refused(client: AsyncClient, t: Tenancy) -> None:
@@ -259,17 +261,12 @@ async def test_an_update_changes_and_records_the_fields_sent(
 
     response = await client.patch(
         "/api/projects/pmt",
-        json={"name": "Payments 2", "status": "active", "type": "erp", "enabled_modules": []},
+        json={"name": "Payments 2", "status": "active", "type": "erp"},
     )
 
     assert response.status_code == 200
     project = await stored(session, "PMT")
-    assert (project.name, project.status, project.type, project.enabled_modules) == (
-        "Payments 2",
-        "active",
-        "erp",
-        [],
-    )
+    assert (project.name, project.status, project.type) == ("Payments 2", "active", "erp")
     [(action, actor, org_id, _, details)] = await events(session)
     assert (action, actor, org_id) == (AuditAction.PROJECT_UPDATED, admin.id, t.org.id)
     assert details == {
@@ -277,10 +274,27 @@ async def test_an_update_changes_and_records_the_fields_sent(
             "name": "Payments",
             "status": "planning",
             "type": "software",
-            "enabled_modules": ["sprints", "github"],
         },
-        "new": {"name": "Payments 2", "status": "active", "type": "erp", "enabled_modules": []},
+        "new": {"name": "Payments 2", "status": "active", "type": "erp"},
     }
+
+
+async def test_an_update_enabling_an_unshipped_module_is_refused(
+    client: AsyncClient, session: AsyncSession, t: Tenancy
+) -> None:
+    await admin_of_pmt(client, t)
+
+    response = await client.patch(
+        "/api/projects/pmt", json={"name": "Payments 2", "enabled_modules": ["sprints"]}
+    )
+
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["body", "enabled_modules"], "module_unavailable")],
+    )
+    project = await stored(session, "PMT")
+    assert (project.name, project.enabled_modules) == ("Payments", [])
+    assert await events(session) == []
 
 
 async def test_an_update_that_changes_nothing_records_nothing(

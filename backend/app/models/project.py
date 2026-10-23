@@ -14,7 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.base_model import BaseModel, ClassificationMixin, classification_categories_check
+from app.core.base_model import BaseModel, RestrictionMixin, restriction_categories_check
 from app.core.constraint_errors import user_error
 from app.core.enums import enum_type
 from app.enums import PROJECT_CATEGORIES, ProjectModule, ProjectRole, ProjectStatus, ProjectType
@@ -24,7 +24,7 @@ from app.models.user import User
 _MODULES = ", ".join(f"'{module.value}'" for module in ProjectModule)
 
 
-class Project(ClassificationMixin, BaseModel):
+class Project(RestrictionMixin, BaseModel):
     __tablename__ = "project"
     __table_args__ = (
         # Replaces a plain FK on organization_id: workspace_id must be the org's workspace.
@@ -37,7 +37,7 @@ class Project(ClassificationMixin, BaseModel):
             "workspace_id", "key", info=user_error("key", "taken", "This project key is taken.")
         ),
         CheckConstraint(f"enabled_modules <@ ARRAY[{_MODULES}]::text[]", name="enabled_modules"),
-        classification_categories_check(PROJECT_CATEGORIES),
+        restriction_categories_check(PROJECT_CATEGORIES),
         # An org's projects; Postgres doesn't index a foreign key's columns (DL-34).
         Index(None, "organization_id"),
     )

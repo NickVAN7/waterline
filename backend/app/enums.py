@@ -65,16 +65,15 @@ class NumberPrefix(StrEnum):
     TEST_CASE = "TC"
 
 
-# --- Classification (design-doc §3.1) -----------------------------------------------------------
+# --- Restriction (design-doc §3.1) --------------------------------------------------------------
 
 
-class ClassificationLevel(StrEnum):
+class RestrictionLevel(StrEnum):
     INTERNAL = "internal"
     CONFIDENTIAL = "confidential"
-    RESTRICTED = "restricted"
 
 
-class ClassificationCategory(StrEnum):
+class RestrictionCategory(StrEnum):
     FINANCIAL = "financial"
     PROPRIETARY = "proprietary"
     PII = "pii"
@@ -89,11 +88,11 @@ class AccessKind(StrEnum):
     MANAGEMENT = "management"
 
 
-PROJECT_CATEGORIES = tuple(ClassificationCategory)
+PROJECT_CATEGORIES = tuple(RestrictionCategory)
 CONTENT_ITEM_CATEGORIES = tuple(
     category
-    for category in ClassificationCategory
-    if category is not ClassificationCategory.EXPORT_CONTROLLED
+    for category in RestrictionCategory
+    if category is not RestrictionCategory.EXPORT_CONTROLLED
 )
 
 # --- Admin audit events (design-doc §10.1; schema-doc `audit_event`) ---------------------------
@@ -123,7 +122,7 @@ class AuditAction(StrEnum):
     PROJECT_UPDATED = "project_updated"
     PROJECT_ARCHIVED = "project_archived"
     PROJECT_UNARCHIVED = "project_unarchived"
-    PROJECT_CLASSIFICATION_CHANGED = "project_classification_changed"
+    PROJECT_RESTRICTION_CHANGED = "project_restriction_changed"
     PROJECT_MEMBER_ADDED = "project_member_added"
     PROJECT_MEMBER_ROLE_CHANGED = "project_member_role_changed"
     PROJECT_MEMBER_REMOVED = "project_member_removed"

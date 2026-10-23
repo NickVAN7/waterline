@@ -27,9 +27,9 @@ _SHIPPED: frozenset[str] = frozenset()
 
 
 def seed_modules(project_type: ProjectType) -> list[ProjectModule]:
-    """The modules a new project of this type starts with: its defaults that may be enabled."""
-    allowed = {module.value for module in ProjectModule}
-    return [ProjectModule(m) for m in _DEFAULTS[project_type] if m in allowed]
+    """The modules a new project of this type starts with: its defaults that have shipped
+    (DL-136)."""
+    return [ProjectModule(m) for m in _DEFAULTS[project_type] if is_available(m)]
 
 
 def recommended_modules(project_type: ProjectType) -> list[str]:
