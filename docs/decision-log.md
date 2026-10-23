@@ -2235,3 +2235,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `.claude/agents/ui-reviewer.md`; `docs/spikes/S2-C0b-tree/`
 - **Source:** the S2-C0b spike (`docs/spikes/S2-C0b-tree/results.md`; DL-150), for the
   owner's approval at the checkpoint report
+
+### DL-175: TreeTable approved; the tree opens at the top level
+- **Date:** 2026-10-22
+- **Decision:** The owner approves DL-174. The requirement tree opens with only the top-level
+  rows showing (every branch closed); "Expand all" opens the second level at once and the deeper rows a batch per frame, so
+  the page never freezes (the data is already loaded, DL-159; the cost is drawing rows), and
+  S2-C17 measures it at the 2,000-row cap.
+- **Supersedes:** none (confirms DL-174)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17); `docs/reviews/s2/S2-C0b.md`
+- **Source:** owner, Oct 22, 2026 (answers to S2-C0b's open questions)

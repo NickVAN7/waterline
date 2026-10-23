@@ -65,3 +65,7 @@ and the skipped `moveItem` in tree mode, and checked the results table against
   2.1 s at the 2,000-row cap (0.6 s at 500 rows); with branches closed, 0.2 s. Options: (a) open
   the top level only, with "Expand all"; (b) everything open; (c) remember each user's choice.
   Needed by S2-C17 (the requirements page).
+
+**The owner's answers** (Oct 22, 2026; applied in `DC-2026-10-22f-tree-opening.md`): DL-174
+approved; the tree opens at the top level, with an "Expand all" that opens the deeper levels in
+steps (DL-175).
