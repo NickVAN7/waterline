@@ -2307,3 +2307,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan ("Hidden rows", the org projects API, S2-C0g)
 - **Source:** owner, Oct 23, 2026 (`docs/reviews/design-changes/DC-2026-10-23-owner-review-answers.md`,
   decision 1, option (a))
+
+### DL-182: `archived_only` with `include_archived` is a 422
+- **Date:** 2026-10-23
+- **Decision:** A list request with both `?archived_only=true` and `?include_archived=true` is a 422
+  `validation_error` of type `conflict` on `archived_only`: asking for both is a mistake, said so
+  rather than one silently winning. Built in S2-C0g with DL-181, with its test.
+- **Supersedes:** none (adds to DL-181)
+- **Superseded by:** none
+- **Applies to:** build plan ("Hidden rows", the org projects API, S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/design-changes/DC-2026-10-23b-archived-only-filter.md`,
+  decision 1, option (a))
