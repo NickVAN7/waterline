@@ -9,6 +9,7 @@ or delete (append-only trigger).
 import re
 import uuid
 from collections.abc import Mapping
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -97,6 +98,28 @@ def changed_fields(entity: object, values: Mapping[str, str | None]) -> dict[str
         for key, value in values.items()
         if value is not None and value != getattr(entity, key)
     }
+
+
+async def apply_changes(
+    session: AsyncSession, entity: object, values: Mapping[str, object]
+) -> dict[str, tuple[Any, Any]]:
+    """Lock and re-read `entity`'s row, set each of `values` that differs from it, and flush:
+    `{field: (old, new)}`. The lock (`FOR NO KEY UPDATE`, held until the transaction ends) makes
+    two edits at once compare in turn, so neither logs a change the other already made (TD-57).
+
+    Only for entities without `version`: the re-read reloads it, so the ORM's version check could
+    never refuse a stale save (a versioned update uses `check_version` instead)."""
+    await session.refresh(entity, with_for_update={"key_share": True})
+    changed = {
+        key: (getattr(entity, key), value)
+        for key, value in values.items()
+        if getattr(entity, key) != value
+    }
+    for key, (_, new) in changed.items():
+        setattr(entity, key, new)
+    if changed:
+        await session.flush()
+    return changed
 
 
 def change_details(changed: Mapping[str, tuple[str, str]]) -> dict[str, JsonValue]:

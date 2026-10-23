@@ -8,9 +8,10 @@ from datetime import UTC, datetime
 from typing import cast
 
 from pydantic import BaseModel
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.admin_event import JsonValue, change_details, log_admin_event
+from app.audit.admin_event import JsonValue, apply_changes, change_details, log_admin_event
 from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, ensure
 from app.authz.context import AuthzContext, ProjectAccess
@@ -132,10 +133,6 @@ def module_guidance() -> ModuleGuidance:
 
 def _distinct(modules: list[ProjectModule]) -> list[str]:
     return list(dict.fromkeys(m.value for m in modules))
-
-
-def _field(field: str, message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(("body", field), message, type_)])
 
 
 _CONFIRMED = "export_control_confirmed"
@@ -267,7 +264,9 @@ class ProjectService:
             raise NotFoundError
         user = await UserRepository(self.session).get(first_admin_id)
         if user is None or not user.is_active:
-            raise _field("first_admin_id", "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "first_admin_id"), "This account is deactivated.", "account_inactive"
+            )
         return first_admin_id
 
     async def create(
@@ -407,15 +406,8 @@ class ProjectService:
             if values.lead_id is not None:
                 await self._check_lead(project, values.lead_id)
             changes["lead_id"] = values.lead_id
-        changed = {
-            key: (getattr(project, key), new)
-            for key, new in changes.items()
-            if getattr(project, key) != new
-        }
-        if changed:
-            for key, (_, new) in changed.items():
-                setattr(project, key, new)
-            await self.session.flush()
+        # apply_changes re-reads under its own lock; the one above covers the checks before it.
+        if changed := await apply_changes(self.session, project, changes):
             self._log(
                 AuditAction.PROJECT_UPDATED,
                 ctx.user_id,
@@ -488,10 +480,14 @@ class ProjectService:
 
     async def _check_lead(self, project: Project, lead_id: uuid.UUID) -> None:
         if not await self.repository.is_member(project.id, lead_id):
-            raise _field("lead_id", "The lead must be a member of the project.", "not_member")
+            raise ValidationFailedError.on(
+                ("body", "lead_id"), "The lead must be a member of the project.", "not_member"
+            )
         user = await UserRepository(self.session).get(lead_id)
         if user is None or not user.is_active:
-            raise _field("lead_id", "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "lead_id"), "This account is deactivated.", "account_inactive"
+            )
 
     async def archive(self, ctx: AuthzContext, project: Project) -> None:
         """Read-only until unarchived (`project_archived`). An archived project can't be archived
@@ -552,22 +548,31 @@ class ProjectService:
     ) -> Page[ProjectMemberRead]:
         return await self._members(project).list(ctx, PROJECT_MEMBERS, query)
 
+    async def first_admin_candidates(
+        self, org: Organization, query: object
+    ) -> Page[MemberCandidate]:
+        """The create dialog's picker: the org's active members and the workspace's active staff
+        (DL-152). The caller holds `project.assign_first_admin`."""
+        return await self._candidates(
+            self.repository.first_admin_candidates(org.id, org.workspace_id), query
+        )
+
     async def member_candidates(self, project: Project, query: object) -> Page[MemberCandidate]:
         """The picker: the org's active members and the workspace's staff not yet on it."""
+        return await self._candidates(self.repository.candidates(project), query)
+
+    async def _candidates(self, people: Select[User], query: object) -> Page[MemberCandidate]:
         page = await fetch_page(
             self.session,
-            self.repository.candidates(project),
+            people,
             MEMBER_CANDIDATES,
             query,  # pyright: ignore[reportArgumentType] -- MEMBER_CANDIDATES.query_model
         )
-        return Page[MemberCandidate](
-            items=[
+        return page.with_items(
+            [
                 MemberCandidate(user_id=u.id, email=u.email, username=u.username, name=u.name)
                 for u in page.items
-            ],
-            total=page.total,
-            limit=page.limit,
-            offset=page.offset,
+            ]
         )
 
     async def add_member(
@@ -576,8 +581,8 @@ class ProjectService:
         """Add someone by `user_id` (the picker) or `email` (email first), in DL-78's order of
         checks; `join_org` adds an account from outside the org and the staff to the org too."""
         if (payload.user_id is None) == (payload.email is None):
-            raise ValidationFailedError(
-                [FieldError(("body",), "Send exactly one of user_id or email.", "one_parameter")]
+            raise ValidationFailedError.on(
+                ("body",), "Send exactly one of user_id or email.", "one_parameter"
             )
         # The project's org exists: a foreign key.
         org = cast(Organization, await OrgService(self.session).get(project.organization_id))
@@ -587,8 +592,8 @@ class ProjectService:
             async def admit(user: User) -> dict[str, JsonValue]:
                 if not await self.repository.org_member_or_staff(org, user.id):
                     if not payload.join_org:
-                        raise _field(
-                            "email",
+                        raise ValidationFailedError.on(
+                            ("body", "email"),
                             "This person isn't in the organization. Confirm to add them to it too.",
                             "outside_org",
                         )
@@ -604,11 +609,15 @@ class ProjectService:
             raise NotFoundError
         confirmation = await self._lock_for_add(project, payload)
         if await self.repository.membership(project.id, user_id):
-            raise _field("user_id", _MEMBER_ROSTER.already_member, "already_member")
+            raise ValidationFailedError.on(
+                ("body", "user_id"), _MEMBER_ROSTER.already_member, "already_member"
+            )
         # An org member or staff member has an account.
         user = cast(User, await UserRepository(self.session).get(user_id))
         if not user.is_active:
-            raise _field("user_id", "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "user_id"), "This account is deactivated.", "account_inactive"
+            )
         return await roster.add_user(
             ctx, user, payload.role, loc=("body", "user_id"), details=confirmation
         )

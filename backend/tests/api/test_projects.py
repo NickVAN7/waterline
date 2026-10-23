@@ -563,3 +563,63 @@ async def test_a_section_whose_query_fails_is_unavailable(
         200,
         {"sections": {"projects": {"available": False, "items": [], "total": 0}}},
     )
+
+
+# --- The first-admin picker (DL-152) -------------------------------------------------------------
+
+
+async def test_first_admin_candidates_are_the_orgs_active_members_and_the_staff(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    await signed_in(client, await org_member(t, OrgRole.ADMIN, name="Ada Admin"))
+    await org_member(t, name="Bob Baker")
+    await org_member(t, name="Eve Gone", is_active=False)
+    dan = await UserFactory.create_async(name="Dan Diaz")
+    await WorkspaceMembershipFactory.create_async(
+        workspace=t.workspace, user=dan, role=WorkspaceRole.MEMBER
+    )
+    elsewhere = await OrganizationFactory.create_async(workspace=t.workspace)
+    olly = await UserFactory.create_async(name="Olly Other")
+    await MembershipFactory.create_async(organization=elsewhere, user=olly, role=OrgRole.MEMBER)
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates")
+
+    assert response.status_code == 200
+    assert [c["name"] for c in response.json()["items"]] == ["Ada Admin", "Bob Baker", "Dan Diaz"]
+    assert response.json()["total"] == 3
+
+
+async def test_first_admin_candidates_search_names(client: AsyncClient, t: Tenancy) -> None:
+    await signed_in(client, await org_member(t, OrgRole.ADMIN, name="Ada Admin"))
+    await org_member(t, name="Bob Baker")
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates?q=bob")
+
+    assert [c["name"] for c in response.json()["items"]] == ["Bob Baker"]
+
+
+@pytest.mark.security
+async def test_an_org_member_cant_list_first_admin_candidates(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """Naming a first admin is for org owners and admins (DL-77): a member sees the org, so 403."""
+    await signed_in(client, await org_member(t, OrgRole.MEMBER))
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates")
+
+    assert (response.status_code, response.json()["code"]) == (403, "forbidden")
+
+
+@pytest.mark.security
+async def test_first_admin_candidates_are_404_outside_the_org(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    elsewhere = await OrganizationFactory.create_async(workspace=t.workspace)
+    outsider = await UserFactory.create_async()
+    await MembershipFactory.create_async(organization=elsewhere, user=outsider, role=OrgRole.ADMIN)
+    await signed_in(client, outsider)
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates")
+
+    assert (response.status_code, response.json()["code"]) == (404, "not_found")
+    assert "Bolt Foods" not in response.text

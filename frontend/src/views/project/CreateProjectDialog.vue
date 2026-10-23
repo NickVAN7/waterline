@@ -2,7 +2,8 @@
 // Creating a project in an org (build plan, "The projects API"; design-doc §1.1, §3.1, §5): a
 // name, a key checked live (UI-FRM-9), the type, a description, the modules (the type's
 // recommendations and each module's note, from module guidance), a first admin when the org's
-// entry in `/me` allows naming one (the org's active members, DL-112), and the classification.
+// entry in `/me` allows naming one (the org's active members and the workspace's active staff,
+// DL-152), and the classification.
 // Marking it export-controlled first asks, in its own dialog, for the confirmation that its first
 // admin is authorized (DL-114). Created, the dialog opens the project.
 import { computed, nextTick, ref, watch } from 'vue'
@@ -147,15 +148,15 @@ async function loadGuidance() {
 
 async function loadPeople() {
   try {
-    // shortcut: the org's first 200 members, as the other pickers (TD-41); its staff aren't
-    // listed (TD-44, DL-112).
-    const members = await api(
-      client.GET('/api/orgs/{org_id}/members', {
+    // shortcut: the first 200 candidates, as the other pickers (TD-41). The org's active
+    // members and the workspace's active staff (DL-152).
+    const candidates = await api(
+      client.GET('/api/orgs/{org_id}/first-admin-candidates', {
         params: { path: { org_id: props.org.id }, query: { limit: 200 } },
       }),
     )
-    people.value = members.items
-      .filter((m) => m.is_active && m.user_id !== store.me?.user.id)
+    people.value = candidates.items
+      .filter((m) => m.user_id !== store.me?.user.id)
       .map((m) => ({
         value: m.user_id,
         label: `${m.name} (${m.email})`,
@@ -312,7 +313,7 @@ defineExpose({ open })
         v-model="values.first_admin_id"
         label="First admin"
         :options="[{ value: '', label: `Me (${store.me?.user.name ?? ''})` }, ...people]"
-        help="The project's first admin and lead. You can name another of the organization's members."
+        help="The project's first admin and lead. You can name another of the organization's members or the workspace's staff."
         :error="errors.fieldErrors.value.first_admin_id"
         @update:model-value="errors.clearField('first_admin_id')"
       />

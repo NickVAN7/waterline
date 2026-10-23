@@ -1,10 +1,11 @@
 import uuid
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import AccessKind, WorkspaceRole
+from app.schemas.limits import NAME_MAX
 
 
 class EmailCheck(BaseModel):
@@ -37,7 +38,7 @@ class UserUpdate(BaseModel):
     """An admin's change to a user's profile: any subset of the three (DL-72)."""
 
     email: str | None = None
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=NAME_MAX)
     username: str | None = None
 
 
@@ -45,7 +46,7 @@ class OwnProfileUpdate(BaseModel):
     """The signed-in user's change to their own profile: their email isn't theirs to change in v1
     (design-doc §4)."""
 
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=NAME_MAX)
     username: str | None = None
 
 

@@ -42,9 +42,7 @@ def item(project: Project) -> ProjectItem:
 
 def page_of(page: PageResult[Project]) -> Page[ProjectItem]:
     """A page of projects as list rows."""
-    return Page[ProjectItem](
-        items=[item(p) for p in page.items], total=page.total, limit=page.limit, offset=page.offset
-    )
+    return page.with_items([item(p) for p in page.items])
 
 
 class MyWorkService:

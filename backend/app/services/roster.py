@@ -24,7 +24,7 @@ from app.authz.context import AuthzContext
 from app.authz.target import Target, user_target
 from app.core.base_model import Base
 from app.core.constraint_errors import constraint_registry
-from app.core.errors import FieldError, NotFoundError, ValidationFailedError, violated_constraint
+from app.core.errors import NotFoundError, ValidationFailedError, violated_constraint
 from app.core.lists import ListSpec, Page, fetch_page
 from app.enums import AuditAction, AuditEntityType
 from app.models.user import User
@@ -183,12 +183,8 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             list_spec,
             query,  # pyright: ignore[reportArgumentType] -- list_spec.query_model
         )
-        return Page[Row](
-            items=await self.rows(ctx, page.items),  # pyright: ignore[reportArgumentType] -- rows of M
-            total=page.total,
-            limit=page.limit,
-            offset=page.offset,
-        )
+        rows: list[Row] = await self.rows(ctx, page.items)  # pyright: ignore[reportArgumentType] -- rows of M
+        return page.with_items(rows)
 
     def _ensure_role_change(self, ctx: AuthzContext, *roles: object) -> None:
         """Granting, changing, or removing an owner or admin role also needs `manage_admins`
@@ -235,7 +231,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         except IntegrityError as exc:
             if not _already_member(exc):
                 raise
-            raise _field_error(loc, self.spec.already_member, "already_member") from exc
+            raise ValidationFailedError.on(loc, self.spec.already_member, "already_member") from exc
         self._log(self.spec.added, ctx, user.id, role=role.value, **(details or {}))
         membership.user = user
         return await self._row(ctx, membership)
@@ -256,11 +252,17 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         self._ensure_role_change(ctx, role)
         user = await UserRepository(self.session).get_by_email(email.strip().lower())
         if user is not None and await self.repository.membership(self.scope_id, user.id):
-            raise _email_error(self.spec.already_member, "already_member")
+            raise ValidationFailedError.on(
+                ("body", "email"), self.spec.already_member, "already_member"
+            )
         if user is None:
-            raise _email_error("No account has this email.", "no_account")
+            raise ValidationFailedError.on(
+                ("body", "email"), "No account has this email.", "no_account"
+            )
         if not user.is_active:
-            raise _email_error("This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "email"), "This account is deactivated.", "account_inactive"
+            )
         details = await admit(user) if admit is not None else None
         return await self.add_user(ctx, user, role, details=details)
 
@@ -294,7 +296,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         # request waited may have made someone an owner that the first list couldn't include.
         await self._owners.lock_owners(self.scope_id)
         if await self._owners.active_owners(self.scope_id) == [membership.user_id]:
-            raise ValidationFailedError([FieldError(loc, self.spec.needs_owner, "last_owner")])
+            raise ValidationFailedError.on(loc, self.spec.needs_owner, "last_owner")
 
     def _ensure_change(self, ctx: AuthzContext, membership: M, new_role: R | None) -> None:
         """The owner-only rule for owner and admin roles, except on one's own row for member,
@@ -318,14 +320,14 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         (`not_owner`), the replacement is the target (`same_user`), isn't on the roster
         (`not_member`), or is deactivated (`account_inactive`)."""
         if membership.role != self.spec.owner:
-            raise _field_error(loc, "Only an owner hands over ownership.", "not_owner")
+            raise ValidationFailedError.on(loc, "Only an owner hands over ownership.", "not_owner")
         if new_owner_id == membership.user_id:
-            raise _field_error(loc, "Name someone else as the new owner.", "same_user")
+            raise ValidationFailedError.on(loc, "Name someone else as the new owner.", "same_user")
         successor = await self.repository.membership(self.scope_id, new_owner_id, lock=True)
         if successor is None:
-            raise _field_error(loc, self.spec.successor_not_member, "not_member")
+            raise ValidationFailedError.on(loc, self.spec.successor_not_member, "not_member")
         if not successor.user.is_active:
-            raise _field_error(loc, "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(loc, "This account is deactivated.", "account_inactive")
         # Only a roster with an owner role hands over (the caller acts on an owner's row).
         await self._set_role(ctx, successor, cast(R, self.spec.owner))
 
@@ -395,11 +397,3 @@ def _already_member(exc: IntegrityError) -> bool:
     one-membership-per-person constraint)."""
     error = constraint_registry(Base.metadata).get(violated_constraint(exc) or "")
     return error is not None and error.type == "already_member"
-
-
-def _email_error(message: str, type_: str) -> ValidationFailedError:
-    return _field_error(("body", "email"), message, type_)
-
-
-def _field_error(loc: tuple[str, ...], message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(loc, message, type_)])

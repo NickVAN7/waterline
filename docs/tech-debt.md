@@ -569,7 +569,7 @@ Entry format:
 - **Added:** S1-C15
 - **What:** the replacement-owner picker (the roster's people), the create-org dialog's owner
   picker (the workspace's active users), and the create-project dialog's first-admin picker (the
-  org's active members, from S1-C16, DL-112) each load one page at the API's limit (200) and
+  org's active members and the workspace's active staff, DL-152) each load one page at the API's limit (200) and
   offer those; a roster, workspace, or org with more people shows only the first 200 by name.
 - **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
   would be new API (the lists have no text filter yet).
@@ -611,7 +611,7 @@ Entry format:
   the owner chose the org's members for now (DL-112).
 - **Fix by:** S2-C0c (`GET /api/orgs/{org_id}/first-admin-candidates` under
   `project.assign_first_admin`, and the create dialog's picker on it; DL-152)
-- **Status:** open
+- **Status:** resolved in S2-C0c
 
 ### TD-45: The project header doesn't mark a deactivated lead
 - **Added:** S1-C16
@@ -697,7 +697,7 @@ Entry format:
 - **Why:** the limits aren't in the schema doc; the owner picks them.
 - **Fix by:** S2-C0c for the existing fields (DL-143: names 100 characters, project description
   2,000; `Field(max_length=…)` and `wl gen-client`); each Slice 2 field with its row
-- **Status:** open
+- **Status:** resolved in S2-C0c
 
 ### TD-53: The routers' error-response map is written out four times
 - **Added:** S1-C17 (repo-auditor)
@@ -705,7 +705,7 @@ Entry format:
   `ERRORS` map; one in `routers/deps.py` would do.
 - **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
 - **Fix by:** S2-C0c (one `ERRORS` map in `routers/deps.py`)
-- **Status:** open
+- **Status:** resolved in S2-C0c
 
 ### TD-54: Re-wrapping a page of rows is repeated five times
 - **Added:** S1-C17 (repo-auditor)
@@ -713,7 +713,8 @@ Entry format:
   from a `PageResult`; a `PageResult.map(fn)` in `core/lists.py` would do.
 - **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
 - **Fix by:** S2-C0c (`PageResult.map`)
-- **Status:** open
+- **Status:** resolved in S2-C0c, as `PageResult.with_items(rows)`: the roster builds its rows
+  with one `await` over the page, which a per-item function can't
 
 ### TD-55: `anyio` is used by the app but declared only for development
 - **Added:** S1-C17 (repo-auditor)
@@ -721,7 +722,7 @@ Entry format:
   dev dependencies; production has it only because Starlette depends on it.
 - **Why:** found at the slice-end audit; harmless while Starlette brings it.
 - **Fix by:** S2-C0c (move it to `[project] dependencies`)
-- **Status:** open
+- **Status:** resolved in S2-C0c
 
 
 ### TD-56: A settings save sends every field, undoing another admin's change
@@ -743,7 +744,7 @@ Entry format:
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
 - **Fix by:** S2-C0c (lock and re-read the row before comparing, with a concurrency test for each)
-- **Status:** open
+- **Status:** resolved in S2-C0c
 
 ### TD-58: Removing the last row of the last page leaves an empty page
 - **Added:** S1-C17 (repo-auditor A3)
@@ -773,7 +774,7 @@ Entry format:
   follows the docs.
 - **Fix by:** S2-C0c (DL-151: the docs now describe the one registry, `authz/actions.py`; S2-C0c's
   `new-area` check confirms the skill matches)
-- **Status:** open
+- **Status:** resolved in S2-C0c
 
 ### TD-61: The token contrast check runs only by hand
 - **Added:** S1-C17 (docs-consistency)
@@ -812,4 +813,15 @@ Entry format:
   need splitting as the app grows.
 - **Fix by:** Slice 2 (its slice-end tech-debt review, and each one after: split it into per-area
   files once it passes about 600 lines or a slice-end audit recommends it)
+- **Status:** open
+
+### TD-65: A project update locks its row twice
+- **Added:** S2-C0c (checkpoint-reviewer)
+- **What:** `ProjectService.update` takes the project's `FOR UPDATE` lock first (its archived and
+  lead checks need it), then `apply_changes` re-reads the row under its own lock: one extra query
+  per project edit, with nothing gained.
+- **Why:** splitting `apply_changes` into a locking and a non-locking half is more code than one
+  query costs at v1's load.
+- **Fix by:** Slice 2 retro (keep, or split `apply_changes` if another caller needs the
+  non-locking half)
 - **Status:** open

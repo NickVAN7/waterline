@@ -1,6 +1,6 @@
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import (
@@ -12,6 +12,7 @@ from app.enums import (
     ProjectStatus,
     ProjectType,
 )
+from app.schemas.limits import NAME_MAX, PROJECT_DESCRIPTION_MAX
 from app.schemas.user import AccessReason
 from app.schemas.workspace import NewUser
 
@@ -19,10 +20,10 @@ from app.schemas.workspace import NewUser
 class ProjectCreate(BaseModel):
     """A new project in an org (DL-76). Without `enabled_modules`, it's seeded from the type."""
 
-    name: str
+    name: str = Field(max_length=NAME_MAX)
     key: str
     type: ProjectType
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=PROJECT_DESCRIPTION_MAX)
     enabled_modules: list[ProjectModule] | None = None
     first_admin_id: uuid.UUID | None = None
     classification_level: ClassificationLevel | None = None
@@ -35,8 +36,8 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     """Only the fields sent change; `lead_id: null` clears the lead. The key never changes."""
 
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, max_length=NAME_MAX)
+    description: str | None = Field(default=None, max_length=PROJECT_DESCRIPTION_MAX)
     type: ProjectType | None = None
     status: ProjectStatus | None = None
     lead_id: uuid.UUID | None = None

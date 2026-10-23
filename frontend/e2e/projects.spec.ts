@@ -25,6 +25,10 @@ test('a project is created from the project selector, and opens', async ({ page 
   await dialog.getByRole('textbox', { name: 'Key', exact: true }).fill(key.toLowerCase())
   await expect(dialog.getByText('Key is available')).toBeVisible()
   await dialog.getByRole('combobox', { name: 'Type' }).selectOption('erp')
+  // The first-admin picker offers an org member and a workspace admin outside the org (DL-152).
+  const firstAdmin = dialog.getByRole('combobox', { name: 'First admin' })
+  await expect(firstAdmin.getByRole('option', { name: /^Liam Lewis/ })).toBeAttached()
+  await expect(firstAdmin.getByRole('option', { name: /^Wendy Walsh/ })).toBeAttached()
   await dialog.getByRole('radio', { name: /^Confidential/ }).check()
   await dialog.getByRole('checkbox', { name: 'Financial' }).check()
   await expectNoA11yViolations(page)

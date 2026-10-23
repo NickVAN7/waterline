@@ -66,7 +66,7 @@ that starts every item's number (`PMT-TA-45`) and can't be changed later; you're
 if it's taken. Pick its type (Software, ERP implementation, or General), which suggests its
 modules: each is described, and a module that isn't built yet says "Not available yet". You
 become its first admin and lead, unless you're an organization owner or admin, who may name
-another member instead. You can also classify it: a level (Internal, Confidential, or
+someone else instead: any active member of the organization, or of the workspace's staff. You can also classify it: a level (Internal, Confidential, or
 Restricted, each described) and why it's sensitive (Financial, Proprietary, Personal data,
 Export-controlled). An export-controlled project lets only its explicit members see its content,
 so **Create project** first opens a confirmation that explains this and names its first admin:

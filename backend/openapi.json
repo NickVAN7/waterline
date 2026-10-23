@@ -3153,6 +3153,140 @@
         }
       }
     },
+    "/api/orgs/{org_id}/first-admin-candidates": {
+      "get": {
+        "tags": [
+          "project"
+        ],
+        "summary": "First Admin Candidates",
+        "description": "The create dialog's picker: the org's active members and the workspace's active staff,\noffset-paged with `?q=` (DL-152). Needs `project.assign_first_admin`.",
+        "operationId": "first_admin_candidates_api_orgs__org_id__first_admin_candidates_get",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: name. Default: name",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: name. Default: name"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MemberCandidate_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/orgs/{org_id}/project-key-availability": {
       "get": {
         "tags": [
@@ -5132,6 +5266,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -5297,6 +5432,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -5318,6 +5454,7 @@
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "slug": {
@@ -5463,7 +5600,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -5492,7 +5630,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -5895,6 +6034,7 @@
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "key": {
@@ -5907,7 +6047,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 2000
               },
               {
                 "type": "null"
@@ -6104,6 +6245,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -6413,7 +6555,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -6424,7 +6567,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 2000
               },
               {
                 "type": "null"
@@ -6558,6 +6702,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -6734,7 +6879,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -6903,7 +7049,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"

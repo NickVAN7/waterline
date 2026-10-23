@@ -31,16 +31,16 @@ const GUIDANCE: components['schemas']['ModuleGuidance'] = {
   ],
 }
 
-function member(name: string, overrides: Partial<components['schemas']['MemberRead']> = {}) {
+function candidate(
+  name: string,
+  overrides: Partial<components['schemas']['MemberCandidate']> = {},
+): components['schemas']['MemberCandidate'] {
   const handle = name.toLowerCase().split(' ')[0]!
   return {
     user_id: `u-${handle}`,
     email: `${handle}@acme.example`,
     username: handle,
     name,
-    role: 'member' as const,
-    is_active: true,
-    allowed_actions: [],
     ...overrides,
   }
 }
@@ -49,13 +49,14 @@ async function openDialog(allowed: Action[] = ['project.create']) {
   useCurrentUserStore().me = me()
   const get = vi.spyOn(client, 'GET').mockImplementation(((path: string) => {
     if (path === '/api/module-guidance') return Promise.resolve(ok(GUIDANCE))
-    if (path === '/api/orgs/{org_id}/members')
+    // The org's active members and the workspace's active staff (DL-152): the server filters.
+    if (path === '/api/orgs/{org_id}/first-admin-candidates')
       return Promise.resolve(
         ok(
           listPage([
-            member('Ann Lee'),
-            member('Dee Gone', { is_active: false }),
-            member('Casey Cole', { user_id: ME.id }),
+            candidate('Ann Lee'),
+            candidate('Casey Cole', { user_id: ME.id }),
+            candidate('Sam Staff'),
           ]),
         ),
       )
@@ -199,16 +200,26 @@ describe('CreateProjectDialog', () => {
     const { wrapper, get } = await openDialog(['project.create'])
 
     expect(wrapper.find('#create-project-first-admin-id').exists()).toBe(false)
-    expect(get).not.toHaveBeenCalledWith('/api/orgs/{org_id}/members', expect.anything())
+    expect(get).not.toHaveBeenCalledWith(
+      '/api/orgs/{org_id}/first-admin-candidates',
+      expect.anything(),
+    )
   })
 
-  it("offers the org's other active members as first admin, and names the one chosen", async () => {
-    const { wrapper, post } = await openDialog(['project.create', 'project.assign_first_admin'])
+  it('offers the first-admin candidates other than you, and names the one chosen', async () => {
+    const { wrapper, get, post } = await openDialog([
+      'project.create',
+      'project.assign_first_admin',
+    ])
     await fill(wrapper)
 
+    expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/first-admin-candidates', {
+      params: { path: { org_id: ACME.id }, query: { limit: 200 } },
+    })
     expect(wrapper.findAll('#create-project-first-admin-id option').map((o) => o.text())).toEqual([
       'Me (Casey Cole)',
       'Ann Lee (ann@acme.example)',
+      'Sam Staff (sam@acme.example)',
     ])
     await wrapper.get('#create-project-first-admin-id').setValue('u-ann')
     await submit(wrapper)

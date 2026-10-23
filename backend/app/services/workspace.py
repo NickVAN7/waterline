@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.admin_event import change_details, changed_fields, log_admin_event
+from app.audit.admin_event import apply_changes, change_details, log_admin_event
 from app.authz.actions import Action
 from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext
@@ -27,7 +27,14 @@ from app.schemas.workspace import (
     WorkspaceUpdate,
 )
 from app.services.roster import Roster, RosterSpec
-from app.services.user import UserService, identifier_error, new_user_errors, required_error
+from app.services.user import (
+    UserService,
+    identifier_error,
+    name_and_slug_errors,
+    new_user_errors,
+    rename_values,
+    required_error,
+)
 
 # The entity a workspace endpoint loads, for routers (which never import models).
 type WorkspaceEntity = Workspace
@@ -154,19 +161,12 @@ class WorkspaceService:
     ) -> WorkspaceRead:
         """Rename the workspace or change its slug (`workspace_updated`, old and new values).
         The caller holds `workspace.update`; a taken slug is the constraint's 422."""
-        problems = required_error(payload.name, field="name") if payload.name is not None else []
-        if payload.slug is not None:
-            problems += identifier_error(slug_problem(payload.slug), field="slug")
+        problems = name_and_slug_errors(payload.name, payload.slug)
         if problems:
             raise ValidationFailedError(problems)
-        changed = changed_fields(
-            workspace,
-            {"name": payload.name.strip() if payload.name else None, "slug": payload.slug},
-        )
-        if changed:
-            for key, (_, new) in changed.items():
-                setattr(workspace, key, new)
-            await self.session.flush()
+        if changed := await apply_changes(
+            self.session, workspace, rename_values(payload.name, payload.slug)
+        ):
             log_admin_event(
                 self.session,
                 action=AuditAction.WORKSPACE_UPDATED,
@@ -258,9 +258,4 @@ class WorkspaceService:
             ORGS,
             query,  # pyright: ignore[reportArgumentType] -- ORGS.query_model
         )
-        return Page[OrgListItem](
-            items=[OrgListItem(id=o.id, name=o.name, slug=o.slug) for o in page.items],
-            total=page.total,
-            limit=page.limit,
-            offset=page.offset,
-        )
+        return page.with_items([OrgListItem(id=o.id, name=o.name, slug=o.slug) for o in page.items])

@@ -3,15 +3,15 @@ authorization context, and load-and-authorize (`authorized`)."""
 
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Cookie, Depends, Request
+from fastapi import Cookie, Depends, Request, status
 
 from app.authz.authorize import authorize, ensure, module_enabled
 from app.authz.context import AuthzContext
 from app.authz.target import Target, org_target, workspace_target
 from app.core.db import SessionDep
-from app.core.errors import NotFoundError
+from app.core.errors import ErrorBody, NotFoundError
 from app.core.settings import Settings
 from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
@@ -23,6 +23,17 @@ from app.services.workspace import WorkspaceEntity, WorkspaceService
 # `__Host-`: the browser only accepts it with `Secure`, `Path=/`, and no `Domain` (design-doc
 # §4, "Slice 1 security checklist").
 SESSION_COOKIE = "__Host-session"
+
+# The error responses the area routers document on each endpoint (the OpenAPI `responses`).
+ERRORS: dict[int | str, dict[str, Any]] = {
+    code: {"model": ErrorBody}
+    for code in (
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    )
+}
 
 
 def get_settings_from_app(request: Request) -> Settings:

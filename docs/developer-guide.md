@@ -4,7 +4,10 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0b (Tree spike) built: SVAR DataGrid's tree mode measured against PrimeVue
+> **Status:** S2-C0c (Backend leftovers) built: updates through `apply_changes` (TD-57),
+> `ValidationFailedError.on`, one `ERRORS` map, `PageResult.with_items`, the DL-143 length limits,
+> `anyio` a runtime dependency, `GET /api/orgs/{org_id}/first-admin-candidates` and the create
+> dialog's picker on it, and the `new-area` skill verified. S2-C0b (Tree spike) built: SVAR DataGrid's tree mode measured against PrimeVue
 > TreeTable (`docs/spikes/S2-C0b-tree/results.md`); the tree is TreeTable (DL-174). S2-C0a
 > (Simplicity audit) built: the `simplicity-auditor` agent and its vendored
 > prompts (`.claude/audit/`), the review-record check, and the audit's first run on `main`
@@ -313,7 +316,7 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   |---|---|---|
   | `NotFoundError` | 404 | `not_found` (also for entities the caller may not see: 404, not 403) |
   | `ForbiddenError` | 403 | `forbidden` |
-  | `ValidationFailedError([FieldError(loc, message, type)])` | 422 | `validation_error` (same `details.fields` shape as request validation) |
+  | `ValidationFailedError([FieldError(loc, message, type)])`, or `ValidationFailedError.on(loc, message, type)` for one field | 422 | `validation_error` (same `details.fields` shape as request validation) |
   | `ServiceUnavailableError` | 503 | `service_unavailable` |
 
   Pass a more specific message, `code`, or `details` where the client needs them:
@@ -345,7 +348,8 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   the rollback it looks them up. `direct_update` returning `None` means the
   row is gone too: raise `NotFoundError`. An error whose table can't be read stays 409 (the
   conservative answer; a test using SQLAlchemy's real wording fails if the wording changes).
-- Document an endpoint's error statuses with `responses={404: {"model": ErrorBody}}`.
+- Document an endpoint's error statuses with `responses=ERRORS` (`app/routers/deps.py`: 401,
+  403, 404, and 422, each an `ErrorBody`).
 
 ### Security helpers
 
@@ -433,8 +437,13 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
   compare `active_owners` (both on the workspace and org repositories). A deactivation locks the
   owners of every workspace and org the user belongs to first, so it queues behind a handover
   (TD-27).
-- **Update events** record `change_details(changed_fields(entity, values))`
-  (`app/audit/admin_event.py`): `{"old": {...}, "new": {...}}`, the changed fields only.
+- **Updates** of an entity without `version` go through `apply_changes(session, entity,
+  values)` (`app/audit/admin_event.py`, TD-57; a versioned one uses `check_version`, whose 409
+  the re-read would defeat): it locks and re-reads the row (`FOR NO KEY UPDATE`), sets each value that differs, and
+  flushes, so two edits at once compare in turn. Validate before it; the event records what it
+  returns, `change_details(changed)`: `{"old": {...}, "new": {...}}`, the changed fields only.
+- **Length limits** (DL-143) are `Field(max_length=...)` on the request schemas, from
+  `app/schemas/limits.py`; a value over one is FastAPI's 422 `string_too_long` on the field.
 - **`ReservedSlug`** isn't returned by any route: `create_app` adds it to the OpenAPI schema's
   components (`_add_schema_components`, `app/main.py`).
 - **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
@@ -699,7 +708,8 @@ calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)`
 `next_cursor`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
 some users may filter by) and `include_deleted` (the trash: design-doc §9) apply only when the
 endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
-`not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`.
+`not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`;
+`page.with_items(rows)` turns a `PageResult` into the response with the rows built from it.
 Parameters by filter type: enum, reference, and user `name` (repeat for any of; a user filter
 also takes `me`), `name__not`, `name__is_null`; date `name__lt`, `name__gt`, `name__is_null`;
 text `name__contains`; boolean `name`; number `name__gte`, `name__lte`. Examples:
