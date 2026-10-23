@@ -85,6 +85,8 @@ class ProjectItem(BaseModel):
     type: ProjectType
     status: ProjectStatus
     lead_id: uuid.UUID | None
+    # The lead's name, or null with no lead (DL-153).
+    lead_name: str | None
     organization_id: uuid.UUID
     organization_slug: str
 

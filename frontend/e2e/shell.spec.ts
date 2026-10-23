@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 import { expectFocusNotObscured, expectNoA11yViolations } from './support/a11y'
 import { signIn } from './support/demo'
 
-// `casey` is in both demo orgs, on PORTAL (acme) and INV (globex): the org switcher's user.
+// `casey` is in both demo orgs, on PORTAL (acme) and INV (globex): the org menu's user.
 
 test('My work lists the projects the user can open, in the shell', async ({ page }) => {
   await signIn(page, 'casey')
@@ -16,7 +16,7 @@ test('My work lists the projects the user can open, in the shell', async ({ page
   await expectFocusNotObscured(page)
 })
 
-test('the org switcher opens an org, and the project selector one of its projects', async ({
+test('the org menu opens an org, and the project selector one of its projects', async ({
   page,
 }) => {
   await signIn(page, 'casey')
@@ -54,7 +54,7 @@ test('the org switcher opens an org, and the project selector one of its project
   await expectFocusNotObscured(page)
 })
 
-test('the org switcher and project selector work from the keyboard', async ({ page }) => {
+test('the org menu and project selector work from the keyboard', async ({ page }) => {
   await signIn(page, 'casey')
 
   const switcher = page.getByRole('button', { name: /Organization:/ })

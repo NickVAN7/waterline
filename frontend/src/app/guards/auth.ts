@@ -16,6 +16,9 @@ declare module 'vue-router' {
     layout?: 'auth'
     /** The page sets its title and focus once its data loads (`settlePage()`). */
     settlesItself?: boolean
+    /** An admin page: the sidebar shows this area's pages in place of the project selector
+     * (UI-SHL-5, UI-SHL-10). */
+    adminArea?: 'workspace' | 'org'
   }
 }
 

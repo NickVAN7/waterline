@@ -45,7 +45,7 @@ beforeEach(() => {
 cleanUpAfterEach()
 
 describe('StaffView', () => {
-  it("lists the workspace's staff with their roles, under the section nav", async () => {
+  it("lists the workspace's staff with their roles", async () => {
     const get = staffAnswers()
 
     const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff')
@@ -54,7 +54,8 @@ describe('StaffView', () => {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Workspace staff')
-    expect(wrapper.get('nav').attributes('aria-label')).toBe('Workspace administration')
+    // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
+    expect(wrapper.find('nav').exists()).toBe(false)
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr

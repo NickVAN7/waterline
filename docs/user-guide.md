@@ -3,7 +3,7 @@
 How to use each feature, from an end user's point of view. Kept current at every checkpoint.
 
 > **Status:** Slice 1's features. You can sign in, change a temporary password, find your
-> projects from My work, the org switcher, and the project selector, create projects, run a
+> projects from My work, the org menu, and the project selector, create projects, run a
 > project's members and settings and review who can reach it, edit your profile and password,
 > and choose a light or dark theme. Workspace owners and admins run the workspace from its
 > administration pages, and organization owners and admins run their organization's members and
@@ -34,9 +34,10 @@ can't be reached, a message says so and you stay signed in.
 Every page after sign-in has the same frame:
 
 - **The header**, at the top: Waterline's name (a link to My work) followed by your
-  organization's name, and, at the right, the menu with your name. If you belong to more than one organization, the organization's name is a
-  button: open it and choose another to see its projects. With one organization it's just its
-  name.
+  organization's name, and, at the right, the menu with your name. The organization's name is a
+  menu if you belong to more than one organization or may administer it: open it to choose
+  another organization (to see its projects), or, if you're one of its owners or admins, its
+  **Overview**, **Members**, or **Settings**. Otherwise it's just its name.
 - **The sidebar**, on the left: **My work**, then the **project selector**. Open the selector to
   see the current organization's projects, under its name, and choose one, or choose **All
   projects** (a link below the list) for the organization's project list. With more than eight, a filter field narrows the list as you type.
@@ -156,8 +157,8 @@ still work.
 
 ## Workspace administration
 
-Workspace owners and admins (and system admins) find **Workspace administration** in the account
-menu, at the top right. Its pages are linked along the top: **Staff**, **Organizations**,
+Workspace owners and admins (and system admins) find **Administration** in the account menu, at
+the top right. Its pages are listed in the sidebar, in place of the project selector: **Staff**, **Organizations**,
 **Users**, and **Settings** (workspace admins see the settings; owners and system admins change
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
 its **Actions for …** menu, which lists only what you may do to that person.
@@ -193,10 +194,14 @@ project, whether they reach its content or only its management.
 ## Organization administration
 
 Organization owners and admins (and workspace owners and admins, in every organization) find
-**Organization administration** in the account menu, for the organization they're in (switch
-organizations first to administer another). Its pages are linked along the top: **Members** and
-**Settings**. Anyone else who opens these pages is told to ask the organization's owners or
-admins.
+the organization's pages in the organization menu, the organization's name in the header (switch
+organizations first to administer another). They're listed in the sidebar, in place of the
+project selector: **Overview**, **Members**, and **Settings**. Anyone else who opens these pages
+is told to ask the organization's owners or admins.
+
+- **Overview** (`/<organization>/overview`) shows the organization's name and slug, and its
+  projects with their key, type, status, and lead ("No lead" if there's none); each project's
+  name opens its settings.
 
 - **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
   as **Staff** does under workspace administration: **Add person** asks for the email first, then

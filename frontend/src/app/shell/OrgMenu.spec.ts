@@ -10,14 +10,14 @@ import { ACME, me } from '@/test/api'
 import { stubResizeObserver } from '@/test/overlay'
 import { testRouter } from '@/test/router'
 
-import OrgSwitcher from './OrgSwitcher.vue'
+import OrgMenu from './OrgMenu.vue'
 
 const org = (n: number) => ({ ...ACME, id: `org-${n}`, name: `Org ${n}`, slug: `org-${n}` })
 
-async function mountSwitcher(orgs: (typeof ACME)[]) {
+async function mountMenu(orgs: (typeof ACME)[]) {
   useCurrentUserStore().me = me({ orgs })
   const router = await testRouter('/')
-  return mount(OrgSwitcher, {
+  return mount(OrgMenu, {
     // Real transitions: the overlay's show and hide events fire from them.
     global: { plugins: [router, PrimeVue], stubs: { transition: false } },
     attachTo: document.body,
@@ -33,22 +33,22 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('OrgSwitcher', () => {
-  it("shows a single org's name as plain text, not a control", async () => {
-    const wrapper = await mountSwitcher([ACME])
+describe('OrgMenu', () => {
+  it("shows a single org's name as plain text, not a control, with nothing to manage", async () => {
+    const wrapper = await mountMenu([ACME])
 
     expect(wrapper.text()).toBe('Acme Manufacturing')
     expect(wrapper.find('button').exists()).toBe(false)
   })
 
   it('shows nothing for a user with no orgs', async () => {
-    const wrapper = await mountSwitcher([])
+    const wrapper = await mountMenu([])
 
     expect(wrapper.text()).toBe('')
   })
 
   it('opens a popover of links to each org, marking the current one', async () => {
-    const wrapper = await mountSwitcher([org(1), org(2)])
+    const wrapper = await mountMenu([org(1), org(2)])
     useCurrentOrgStore().enter('org-2')
     await flushPromises()
     const button = wrapper.get('button')
@@ -74,8 +74,43 @@ describe('OrgSwitcher', () => {
     await expectNoA11yViolations(document.body)
   })
 
+  it("adds the org's Overview, Members, and Settings for whoever may manage it, one org or more (UI-SHL-4, DL-163)", async () => {
+    const wrapper = await mountMenu([{ ...ACME, allowed_actions: ['org_member.manage'] }])
+    // The popover's portal mounts a tick later; a click before then skips its enter transition.
+    await flushPromises()
+    const button = wrapper.get('button')
+    expect(button.text()).toContain('Acme Manufacturing')
+
+    await button.trigger('click')
+    await flushPromises()
+
+    const links = [...document.querySelectorAll('[role=dialog] a')]
+    expect(links.map((a) => [a.textContent?.trim(), a.getAttribute('href')])).toEqual([
+      ['Acme Manufacturing', '/acme/projects'],
+      ['Overview', '/acme/overview'],
+      ['Members', '/acme/members'],
+      ['Settings', '/acme/settings'],
+    ])
+    // Named for the org, so the links read as its own after the list of orgs.
+    expect(
+      document.querySelector('[role=dialog] ul[aria-label="Acme Manufacturing administration"]')
+        ?.textContent,
+    ).toMatch(/Overview\s*Members\s*Settings/)
+    await expectNoA11yViolations(document.body)
+  })
+
+  it("offers no admin pages to someone who can't manage the org", async () => {
+    const wrapper = await mountMenu([org(1), org(2)])
+    await flushPromises()
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    const links = [...document.querySelectorAll('[role=dialog] a')]
+    expect(links.map((a) => a.textContent?.trim())).toEqual(['Org 1', 'Org 2'])
+  })
+
   it('adds a filter field past eight orgs', async () => {
-    const wrapper = await mountSwitcher(Array.from({ length: 9 }, (_, i) => org(i + 1)))
+    const wrapper = await mountMenu(Array.from({ length: 9 }, (_, i) => org(i + 1)))
     await wrapper.get('button').trigger('click')
     await flushPromises()
     const filter = document.querySelector<HTMLInputElement>('[role=dialog] input')!

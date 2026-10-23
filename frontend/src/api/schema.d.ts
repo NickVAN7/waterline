@@ -1032,7 +1032,7 @@ export interface components {
         };
         /**
          * MeOrg
-         * @description An org the user sees (design-doc §4, "Visibility"), for the org switcher. `role` is null
+         * @description An org the user sees (design-doc §4, "Visibility"), for the org menu. `role` is null
          *     when the user sees it without an org membership (through a project, or as an admin above
          *     it).
          */
@@ -1489,6 +1489,8 @@ export interface components {
             status: components["schemas"]["ProjectStatus"];
             /** Lead Id */
             lead_id: string | null;
+            /** Lead Name */
+            lead_name: string | null;
             /**
              * Organization Id
              * Format: uuid

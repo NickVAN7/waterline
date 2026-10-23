@@ -27,7 +27,7 @@ FIRST_ITEMS = 10  # each section's items in `GET /api/me/work` (DL-76)
 
 
 def item(project: Project) -> ProjectItem:
-    """A project in a list; its org is loaded."""
+    """A project in a list; its org and lead are loaded."""
     return ProjectItem(
         id=project.id,
         key=project.key,
@@ -35,6 +35,7 @@ def item(project: Project) -> ProjectItem:
         type=project.type,
         status=project.status,
         lead_id=project.lead_id,
+        lead_name=project.lead.name if project.lead else None,
         organization_id=project.organization_id,
         organization_slug=project.organization.slug,
     )

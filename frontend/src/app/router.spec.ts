@@ -7,9 +7,11 @@ import { createMemoryHistory } from 'vue-router'
 
 import { api, client } from '@/api/client'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
+import { useCurrentOrgStore } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { failed, me, noContent, ok } from '@/test/api'
+import { ACME, failed, me, noContent, ok, workspaceEntry } from '@/test/api'
+import { project } from '@/test/projects'
 
 import { createWaterlineApp } from './createApp'
 import { routes } from './router'
@@ -67,6 +69,58 @@ describe('routes', () => {
     // No project selected, so no project navigation (UI-SHL-2).
     expect(root.querySelector('nav[aria-label=Project]')).toBeNull()
     await expectNoA11yViolations(root)
+  })
+
+  it.each([
+    ['/workspace/staff', 'Workspace administration'],
+    ['/acme/overview', 'Organization administration'],
+  ])(
+    "shows an admin page's area in the sidebar in place of the project selector: %s (UI-SHL-5, DL-137)",
+    async (path, label) => {
+      const { root } = await mountAt(path, {
+        user: me({
+          orgs: [{ ...ACME, allowed_actions: ['org_member.manage'] }],
+          workspaces: [workspaceEntry(['workspace.view'])],
+        }),
+      })
+
+      const sidebar = root.querySelector('#sidebar')!
+      expect(sidebar.querySelector(`nav[aria-label="${label}"]`)).not.toBeNull()
+      expect(sidebar.querySelector('nav[aria-label=Main]')?.textContent?.trim()).toBe('My work')
+      expect(sidebar.textContent).not.toContain('Choose a project')
+    },
+  )
+
+  it("drops the selected project's pages from the sidebar on an admin page (UI-SHL-5)", async () => {
+    const { root, pinia, router } = await mountAt('/', {
+      user: me({ orgs: [{ ...ACME, allowed_actions: ['org_member.manage'] }] }),
+    })
+    useCurrentOrgStore(pinia).select(project({ allowed_actions: ['project.view'] }))
+    await flushPromises()
+    expect(root.querySelector('#sidebar nav[aria-label=Project]')).not.toBeNull()
+
+    await router.push('/acme/overview')
+    await flushPromises()
+
+    const sidebar = root.querySelector('#sidebar')!
+    expect(sidebar.querySelector('nav[aria-label=Project]')).toBeNull()
+    expect(sidebar.querySelector('nav[aria-label="Organization administration"]')).not.toBeNull()
+  })
+
+  it("shows no org's admin pages on an org the user doesn't see", async () => {
+    const { root } = await mountAt('/initech/overview', {
+      user: me({ orgs: [{ ...ACME, allowed_actions: ['org_member.manage'] }] }),
+    })
+
+    expect(root.querySelector('h1')?.textContent).toBe('Page not found')
+    expect(root.querySelector('nav[aria-label="Organization administration"]')).toBeNull()
+  })
+
+  it('keeps the project selector off admin pages only', async () => {
+    const { root } = await mountAt('/')
+
+    expect(root.querySelector('#sidebar')?.textContent).toContain('Choose a project')
+    expect(root.querySelector('nav[aria-label$=administration]')).toBeNull()
   })
 
   it('starts with a skip link that moves to main (UI-SHL-1)', async () => {

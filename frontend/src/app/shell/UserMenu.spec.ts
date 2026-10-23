@@ -106,9 +106,9 @@ describe('UserMenu', () => {
     expect(router.currentRoute.value.name).toBe('account')
   })
 
-  it('links to workspace administration for those who may see it (UI-SHL-10, DL-104)', async () => {
+  it('links to the workspace pages, as Administration, for those who may see them (UI-SHL-10, DL-137)', async () => {
     const { router } = await openMenu({ workspaces: [workspaceEntry(['workspace.view'])] })
-    const link = item('Workspace administration').querySelector('a')!
+    const link = item('Administration').querySelector('a')!
     expect(link.getAttribute('href')).toBe('/workspace/staff')
 
     link.click()
@@ -117,22 +117,28 @@ describe('UserMenu', () => {
     expect(router.currentRoute.value.name).toBe('workspace-staff')
   })
 
-  it("has no workspace administration for staff who can't see the workspace pages", async () => {
+  it("has no Administration for staff who can't see the workspace pages", async () => {
     await openMenu({ workspaces: [workspaceEntry([])] })
 
-    expect(items().map((li) => li.textContent?.trim())).not.toContain('Workspace administration')
+    expect(items().map((li) => li.textContent?.trim())).not.toContain('Administration')
   })
 
-  it("links to the current org's administration for those who may manage it (DL-104)", async () => {
-    const globex = { ...ACME, id: 'org-globex', name: 'Globex Retail', slug: 'globex' }
-    await openMenu({ orgs: [ACME, { ...globex, allowed_actions: ['org_member.manage'] }] })
-    expect(items().map((li) => li.textContent?.trim())).not.toContain('Organization administration')
-
-    useCurrentOrgStore().enter('globex')
+  it("leaves an org's administration to the org menu (UI-SHL-4, DL-137)", async () => {
+    await openMenu({
+      orgs: [{ ...ACME, allowed_actions: ['org_member.manage'] }],
+      workspaces: [workspaceEntry(['workspace.view'])],
+    })
+    useCurrentOrgStore().enter('acme')
     await flushPromises()
 
-    const link = item('Organization administration').querySelector('a')!
-    expect(link.getAttribute('href')).toBe('/globex/members')
+    expect(items().map((li) => li.textContent?.trim())).toEqual([
+      'Account settings',
+      'Administration',
+      'System theme',
+      'Light theme',
+      'Dark theme',
+      'Sign out',
+    ])
   })
 
   it('sets Sign out apart with an icon and the danger tone (UI-SHL-4, DL-137)', async () => {

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Select, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager
+from sqlalchemy.orm import contains_eager, selectinload
 
 from app.authz.scoping import Scope
 from app.enums import OrgRole, ProjectRole, WorkspaceRole
@@ -47,11 +47,11 @@ class ProjectRepository:
         )
 
     def visible(self, scope: Scope, *, include_archived: bool = False) -> Select[Project]:
-        """The projects in `scope` (the user's `project_scope`), each with its org loaded."""
+        """The projects in `scope` (the user's `project_scope`), each org and lead loaded."""
         statement = (
             select(Project)
             .join(Organization, Project.organization_id == Organization.id)
-            .options(contains_eager(Project.organization))
+            .options(contains_eager(Project.organization), selectinload(Project.lead))
             .where(scope_clause(scope, Project.id, Project.workspace_id, Project.organization_id))
         )
         return statement if include_archived else statement.where(Project.archived_at.is_(None))

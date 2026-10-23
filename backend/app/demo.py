@@ -102,7 +102,7 @@ class DemoProject:
 
 
 # Five people on each live project; `sam` (Acme) and `max` (Globex) are on both of their org's
-# projects, and `casey` is in both orgs, on a project in each (the org switcher).
+# projects, and `casey` is in both orgs, on a project in each (the org menu).
 PROJECTS = (
     DemoProject(
         "acme",

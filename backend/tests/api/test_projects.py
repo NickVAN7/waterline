@@ -455,6 +455,26 @@ async def test_the_org_list_hides_archived_projects_unless_asked(
     assert every.json()["items"][1]["organization_slug"] == "bolt-foods"
 
 
+async def test_each_listed_project_names_its_lead_or_none(
+    client: AsyncClient, session: AsyncSession, t: Tenancy
+) -> None:
+    """DL-153: the org's list, and My work's (one item model), carry the lead's name."""
+    admin = await admin_of_pmt(client, t)
+    lena = await UserFactory.create_async(name="Lena Lead")
+    await ProjectMembershipFactory.create_async(project=t.project, user=lena)
+    t.project.lead_id = lena.id
+    unled = await ProjectFactory.create_async(organization=t.org, key="NOL", name="No lead")
+    await ProjectMembershipFactory.create_async(project=unled, user=admin, role=ProjectRole.ADMIN)
+    await session.flush()
+
+    org_list = await client.get(f"/api/orgs/{t.org.id}/projects", params={"sort": "key"})
+    my_work = await client.get("/api/me/work/projects", params={"sort": "key"})
+
+    expected = [("NOL", None), ("PMT", "Lena Lead")]
+    assert [(p["key"], p["lead_name"]) for p in org_list.json()["items"]] == expected
+    assert [(p["key"], p["lead_name"]) for p in my_work.json()["items"]] == expected
+
+
 async def test_the_org_list_holds_only_that_orgs_projects(client: AsyncClient, t: Tenancy) -> None:
     """A workspace admin sees every org's projects, but each org's list only its own."""
     admin = await UserFactory.create_async()

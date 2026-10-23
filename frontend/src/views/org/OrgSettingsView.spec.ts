@@ -37,13 +37,14 @@ beforeEach(() => setActivePinia(createPinia()))
 cleanUpAfterEach()
 
 describe('OrgSettingsView', () => {
-  it("shows the org's name and slug to change, under the org's section nav", async () => {
+  it("shows the org's name and slug to change", async () => {
     answers()
 
     const { wrapper } = await mountOrgView(OrgSettingsView, '/acme/settings', OWNER)
 
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing settings')
-    expect(wrapper.get('nav').attributes('aria-label')).toBe('Organization administration')
+    // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
+    expect(wrapper.find('nav').exists()).toBe(false)
     expect(wrapper.get<HTMLInputElement>('#org-name').element.value).toBe('Acme Manufacturing')
     expect(wrapper.get<HTMLInputElement>('#org-slug').element.value).toBe('acme')
     await expectNoA11yViolations(wrapper)

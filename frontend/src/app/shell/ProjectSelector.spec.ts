@@ -23,6 +23,7 @@ const item = (key: string, name: string): Item => ({
   type: 'software',
   status: 'active',
   lead_id: null,
+  lead_name: null,
   organization_id: ACME.id,
   organization_slug: 'acme',
 })

@@ -5025,7 +5025,7 @@
           "allowed_actions"
         ],
         "title": "MeOrg",
-        "description": "An org the user sees (design-doc §4, \"Visibility\"), for the org switcher. `role` is null\nwhen the user sees it without an org membership (through a project, or as an admin above\nit)."
+        "description": "An org the user sees (design-doc §4, \"Visibility\"), for the org menu. `role` is null\nwhen the user sees it without an org membership (through a project, or as an admin above\nit)."
       },
       "MeRead": {
         "properties": {
@@ -6096,6 +6096,17 @@
             ],
             "title": "Lead Id"
           },
+          "lead_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Name"
+          },
           "organization_id": {
             "type": "string",
             "format": "uuid",
@@ -6114,6 +6125,7 @@
           "type",
           "status",
           "lead_id",
+          "lead_name",
           "organization_id",
           "organization_slug"
         ],

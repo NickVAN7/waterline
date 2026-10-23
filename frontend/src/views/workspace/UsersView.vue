@@ -25,7 +25,6 @@ import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import AccountActions from '@/views/user/AccountActions.vue'
 
 import { WHO_TO_ASK } from './workspaceAdmin'
-import WorkspaceNav from './WorkspaceNav.vue'
 
 const workspace = useWorkspace()
 const store = useCurrentUserStore()
@@ -83,7 +82,6 @@ const announcement = computed(() => {
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <WorkspaceNav />
     <PageHeader title="Users" />
     <p class="m-0 text-text-muted">
       People join through Staff or an organization's members; their accounts are managed here.

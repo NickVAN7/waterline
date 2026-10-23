@@ -24,7 +24,6 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 
 import { WHO_TO_ASK } from './workspaceAdmin'
-import WorkspaceNav from './WorkspaceNav.vue'
 
 const workspace = useWorkspace()
 const store = useCurrentUserStore()
@@ -121,7 +120,6 @@ const retry = retryFromSubmit(formElement, submit)
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <WorkspaceNav />
     <PageHeader title="Workspace settings" />
     <section
       aria-labelledby="settings-heading"

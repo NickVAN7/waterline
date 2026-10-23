@@ -983,7 +983,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | Component | Notes |
 |---|---|
 | `AppShell`, `AuthLayout`, `SkipLink`, `PageHeader` | §4 |
-| `Sidebar`, `ProjectSelector`, `OrgSwitcher`, `UserMenu` | Menu and popover from PrimeVue (UI-STY-3); the project selector is a disclosure popover of links |
+| `Sidebar`, `ProjectSelector`, `OrgMenu`, `UserMenu` | Menu and popover from PrimeVue (UI-STY-3); the project selector is a disclosure popover of links |
 | `Button` | Variants: primary, secondary (outline), danger, ghost. Pending state per UI-FRM-8, UI-TOK-10 |
 | `IconButton`, `FieldHint` | `IconButton` requires an accessible-name prop; `--control-height-sm` minimum. `FieldHint` is UI-FRM-17 |
 | `FormField` | Wires label, required asterisk, help, hint, and error ids and `aria-*` for every control inside it |
