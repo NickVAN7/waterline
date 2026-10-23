@@ -1778,7 +1778,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   yet". A migration removes `sprints` and `github` from every project. Slices 4 and 7 each decide
   whether existing software projects get their module turned on when it ships.
 - **Supersedes:** design-doc §1.1, "The v1 modules can be enabled from the start (Slice 1)"
-- **Superseded by:** none
+- **Superseded by:** DL-178, in part (a v2 module is a 422 `enum`)
 - **Applies to:** design-doc §1.1; build plan (the projects API, S2-C0d, "Later slices");
   ui-design-guide UI-SHL-6; user guide
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
@@ -2246,3 +2246,52 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C17); `docs/reviews/s2/S2-C0b.md`
 - **Source:** owner, Oct 22, 2026 (answers to S2-C0b's open questions)
+
+### DL-176: The auth card's pages use a plain, smaller `h1`
+- **Date:** 2026-10-23
+- **Decision:** Sign-in and the forced password change are UI-SHL-8's one exception to "one `h1`,
+  in a `PageHeader`": no actions, and a plain `h1` one size below the app's name, the card's
+  largest text (`text-xl`), as S2-C0e built it.
+- **Supersedes:** ui-design-guide UI-SHL-8, in part (every page's `h1` in a `PageHeader`)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-8; developer guide ("Adding a screen")
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0e.md`, checkpoint-reviewer finding 2)
+
+### DL-177: A person's access review shows Access on export-controlled projects only
+- **Date:** 2026-10-23
+- **Decision:** As DL-133 does for the per-project review's Access column, the per-person review
+  shows a project's Access (content or management) only on an export-controlled project's row; its
+  project rows carry `export_controlled`, and the column shows only when one of them is.
+- **Supersedes:** none (extends DL-133 to the per-person view)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("Access review"); build plan (the per-person access API, S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0d.md`, open question 1)
+
+### DL-178: A v2 module is refused as an unknown value until it ships
+- **Date:** 2026-10-23
+- **Decision:** `enabled_modules` takes only the modules the API knows (the v1 modules until a v2
+  module's slice adds it), so a v2 module is a 422 of type `enum`; `module_unavailable` is for a
+  known module that hasn't shipped. No change to the code built in S2-C0d.
+- **Supersedes:** design-doc §1.1's "the API refuses enabling it (422 `module_unavailable`)" for v2
+  modules, in part (DL-136's wording)
+- **Superseded by:** none
+- **Applies to:** design-doc §1.1
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0d.md`, open question 2)
+
+### DL-179: The restriction badge names itself for screen readers
+- **Date:** 2026-10-23
+- **Decision:** The project header's restriction badge starts with a visually hidden
+  "Restriction: ", so a badge read alone ("Internal") says what it is.
+- **Supersedes:** none (adds to UI-FBK-6, DL-137)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0d.md`, open question 3)
+
+### DL-180: The org overview lists archived projects in their own section
+- **Date:** 2026-10-23
+- **Decision:** The org overview includes the org's archived projects, in a section below its
+  projects headed "Archived", each linking to its settings, where it's unarchived.
+- **Supersedes:** none (adds to UI-SHL-10, DL-137)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-10; build plan (S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0f.md`, open question 1)

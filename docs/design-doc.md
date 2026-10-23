@@ -129,11 +129,13 @@ per kind of project.
 | `data_migration` | Data objects, load cycles, reconciliation | erp | v2 |
 | `cutover` | Cutover runbook and rehearsals | erp | v2 |
 
-**A module can be enabled only once it has shipped** (DL-136), v1 and v2 modules alike. The
+**A module can be enabled only once it has shipped** (DL-136), v1 and v2 modules alike: a known
+module that hasn't shipped is a 422 `module_unavailable`, and a v2 module, which the API doesn't
+know until its slice adds it, a 422 `enum` (DL-178). The
 API's module guidance tells the UI which modules are **available** (shipped), from one place in
 the backend that is updated when a module's slice ships. Until then, seeding skips the module
 (every project created before Slice 4 starts with no modules), the API refuses enabling it (422
-`validation_error` on `enabled_modules`, type `module_unavailable`), and the UI shows it as a
+`validation_error` on `enabled_modules`, as above), and the UI shows it as a
 disabled checkbox with "Not available yet", while module guidance still lists it as recommended,
 with `available` false. When `sprints` (Slice 4) and `github` (Slice 7) ship, that slice decides
 whether existing software projects get the module turned on.
@@ -804,7 +806,8 @@ no schema change.
   **content** access (§3.1), so inherited admins without an explicit membership show as
   management only.
 - **Per person:** every org and project the person can reach, and through what (the same
-  reasons).
+  reasons). Each project says whether it's export-controlled, and only those rows show content
+  or management access (DL-177, as the per-project view does, DL-133).
 - Both views are **management** actions (like the members list, §3.1), so inherited admins
   open them on an export-controlled project too.
 - **Who opens them** (owner decision, Oct 7, 2026): the per-project view, project admins

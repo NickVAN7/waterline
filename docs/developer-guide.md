@@ -17,7 +17,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 > "restriction" throughout (`RestrictionMixin`, `rules/restriction.py`, `PUT
 > /api/projects/{key}/restriction`, `project.raise_restriction`/`project.lower_restriction`,
 > `project_restriction_changed`) with `restricted` removed, one migration for the rename and for
-> removing `sprints` and `github` from every project (DL-134, DL-136); an unshipped module is a 422
+> removing `sprints` and `github` from every project (DL-134, DL-136); an unshipped v1 module is a 422
 > `module_unavailable` and a disabled checkbox; export control is no longer offered in the UI and
 > `ExportControlDialog` is gone (DL-133); the restriction badge in the project header
 > (`RestrictionBadge`, DL-137). S2-C0c (Backend leftovers) built: updates through `apply_changes` (TD-57),

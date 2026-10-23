@@ -87,7 +87,8 @@ correct; you decide whether the code does it.
   S2-C0d can't be enabled (a disabled checkbox with "Not available yet", DL-136)? (Before S1-C16 the project
   pages are Home only, with no "New project" and no lead name in the header, DL-97; Settings joins the pages at S1-C16a and Members at S1-C16b, each with its page, DL-109; the access review is its own page linked from Members, not a pages item, and Members has Add member (primary) and Add by email (secondary), DL-119.) (UI-SHL-6)
 - Does the page use `PageHeader` with its primary action, one `h1`, and, if a help link was
-  added, the user-menu placement? (UI-SHL-8)
+  added, the user-menu placement? (UI-SHL-8; the auth card's pages excepted: a plain `text-xl`
+  `h1`, no `PageHeader`, DL-176)
 - From Slice 2 on: does every drag have a menu alternative ("Move to top", "Move up",
   "Move after…")? (UI-TBL-5) For SVAR widgets the alternative must be ours and outside the
   widget (§2.5).

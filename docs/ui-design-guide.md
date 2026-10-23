@@ -476,7 +476,7 @@ render inside the full shell when signed in.
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
   page's primary action(s) on the right (wrapping below at narrow widths). The one exception is
   the auth card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
-  size below the app's name, the card's largest text (`text-xl`; DL-137). Sections use `h2`
+  size below the app's name, the card's largest text (`text-xl`; DL-176). Sections use `h2`
   and nest in order. If a help or contact link is ever added (3.2.6), it goes in the user menu,
   in the same place on every page.
 - **UI-SHL-9** **Route changes:** on navigation, set `document.title` to
@@ -493,8 +493,9 @@ render inside the full shell when signed in.
   `/workspace/orgs`, `/workspace/users` (a person's access review at
   `/workspace/users/{user_id}/access`), and `/workspace/settings`; org administration at
   `/{org_slug}/overview` (the landing page: the org's details and its projects, each with its
-  name, key, type, status, and lead, linking to its settings; anyone who opens org admin pages
-  holds inherited project admin, design-doc §5), `/{org_slug}/members`, and
+  name, key, type, status, and lead, linking to its settings, its archived projects in a section
+  below headed "Archived" (DL-180; from S2-C0g); anyone who opens org admin pages holds inherited
+  project admin, design-doc §5), `/{org_slug}/members`, and
   `/{org_slug}/settings`.
 
 ---
@@ -708,7 +709,8 @@ render inside the full shell when signed in.
   **restriction** is a badge in the project header, not a banner (DL-137; from S2-C0d): the level
   and each category as text, with the tone's icon (Internal info, Confidential warning;
   categories with no level show "No restriction level" in Internal's tone; a project with no
-  level and no categories has none), never color alone. A "Deactivated" neutral badge follows a deactivated
+  level and no categories has none), never color alone. The badge starts with a visually hidden
+  "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A "Deactivated" neutral badge follows a deactivated
   user's name everywhere it appears.
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
