@@ -2295,3 +2295,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-SHL-10; build plan (S2-C0g)
 - **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0f.md`, open question 1)
+
+### DL-181: An archived-only list filter, `?archived_only=true`
+- **Date:** 2026-10-23
+- **Decision:** A list whose `ListSpec` has an `archived_column` also takes `?archived_only=true`,
+  which returns only its archived rows, so a page can show them in their own paged section; the
+  org overview's "Archived" section (DL-180) uses it. Built in S2-C0g, in `ListSpec`'s archived
+  handling, with API tests and `wl gen-client`.
+- **Supersedes:** none (adds to the build plan's "Hidden rows")
+- **Superseded by:** none
+- **Applies to:** build plan ("Hidden rows", the org projects API, S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/design-changes/DC-2026-10-23-owner-review-answers.md`,
+  decision 1, option (a))
