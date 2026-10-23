@@ -1643,7 +1643,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   S1-C9 exception is removed from `CLAUDE.md` and the `checkpoint` skill; the build plan keeps
   the trial's description, with its verdict. Every checkpoint stops for approval.
 - **Supersedes:** none (DL-10's trial ends with this verdict)
-- **Superseded by:** none
+- **Superseded by:** DL-172, in part (the build plan's description)
 - **Applies to:** `CLAUDE.md` ("How work is done: checkpoints"); `checkpoint` skill ("Report
   and stop"); build plan ("Verification")
 - **Source:** Slice 1 retro (`docs/reviews/s1/S1-retro.md`; owner, Oct 21, 2026)
@@ -2171,3 +2171,39 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §5; build plan (S2-C11)
 - **Source:** owner, Oct 22, 2026 (`DC-2026-10-22b-slice-2-plan-answers.md`, decision 2)
+
+### DL-170: S2-C0a's accepted simplicity findings, mapped to rows
+- **Date:** 2026-10-22
+- **Decision:** Eight of the S2-C0a audit's findings are accepted and assigned to the row that
+  touches their code: 8 (one `apply_changes`, carrying TD-57's lock) and 9
+  (`ValidationFailedError.on`) to S2-C0c; 10 (an `ORG_PROJECTS` spec) to S2-C0g; 4
+  (`NameSlugSettings.vue`) and 5 (`NewAccountFields.vue`) to S2-C0h; 2 (the developer guide's
+  Status section in one line) and 6 (`fresh-clone-verifier` runs the guide's quick checks, not
+  `wl check --full`) to S2-C0i; and 7 (the stale-row 404 or 409 decided once, in `get_session`)
+  to S2-C1, the first row where a versioned model's test can exercise it.
+- **Supersedes:** none (an exception to DL-138's "the next slice's C0 applies the ones the
+  owner accepts", and the S2-C0a row, for finding 7 only)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0c, S2-C0g, S2-C0h, S2-C0i, S2-C1);
+  `docs/reviews/s2/S2-C0a.md`
+- **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
+
+### DL-171: S2-C0a's findings 1 and 3 are decided at Slice 2's retro
+- **Date:** 2026-10-22
+- **Decision:** Finding 1 (replace the git guard with Claude Code permission rules and a hook
+  refusing commits on `main`) is decided at the retro, after a trial of the rules in a scratch
+  session; finding 3 (one list of agents, skills, and hooks, in developer guide section 11) is
+  decided there too. Until then the guard and the three lists stay as they are.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C22); `docs/reviews/s2/S2-C0a.md`
+- **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
+
+### DL-172: The build plan names the review-tier trial in one line
+- **Date:** 2026-10-22
+- **Decision:** The build plan's description of the review-tier trial becomes one line naming
+  it and its verdict (DL-10, DL-125); the rules it describes no longer apply (S2-C0a finding 11).
+- **Supersedes:** DL-125, in part (the build plan keeping the trial's full description)
+- **Superseded by:** none
+- **Applies to:** build plan ("Verification")
+- **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)

@@ -7,7 +7,8 @@
   `ui-reviewer` didn't run (no `frontend/` change).
 - **Totals:** `checkpoint-reviewer`: 3 findings (2 major, 1 minor), all fixed; 1 question,
   answered by a fix. No re-review (the fixes are tests, docs, and one minor finding, DL-105).
-  `simplicity-auditor`: 11 findings, every one for the owner to decide (DL-138).
+  `simplicity-auditor`: 11 findings, every one for the owner to decide (DL-138): 9 accepted, 2
+  deferred to the retro ("Owner decisions").
 - **Gates at close:** `uv run wl check` green; CI on the checkpoint commit.
 
 ---
@@ -80,6 +81,22 @@ session's.
 | 10 | merge duplicates | **The org's project list builds `include_archived` by hand, although `ListSpec.archived_column` does it** (`services/project.py:74-78`, `repositories/project.py:49-57`; about -8 lines). Smaller: an `ORG_PROJECTS` spec with `archived_column`, then `wl gen-client`. | Accept, in S2-C0g, which changes the project list. |
 | 11 | conflicts with DL-125 | **The build plan still describes the review-tier trial in full** (`docs/build-plan.md:116-142`; about -25 lines), though its verdict was "not exercised". Smaller: one line naming the trial and DL-10, DL-125. | Accept, as a docs-only design change before S2-C0b. |
 
+## Owner decisions (Oct 22, 2026)
+
+| # | Decision | Row |
+|---|---|---|
+| 1 | Deferred to Slice 2's retro, after a trial of the permission rules (DL-171) | S2-C22 |
+| 2 | Accepted (DL-170) | S2-C0i |
+| 3 | Deferred to Slice 2's retro (DL-171) | S2-C22 |
+| 4 | Accepted (DL-170) | S2-C0h |
+| 5 | Accepted (DL-170) | S2-C0h |
+| 6 | Accepted (DL-170) | S2-C0i |
+| 7 | Accepted (DL-170) | S2-C1 |
+| 8 | Accepted (DL-170) | S2-C0c |
+| 9 | Accepted (DL-170) | S2-C0c |
+| 10 | Accepted (DL-170) | S2-C0g |
+| 11 | Accepted, applied by a design change (DL-172) | `DC-2026-10-22d-simplicity-decisions.md` |
+
 ## Open questions for the owner
 
-- Each `simplicity-auditor` finding above: accept (and the row it goes to), reject, or defer.
+- None: every finding is decided.
