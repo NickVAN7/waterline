@@ -116,38 +116,40 @@ async def test_a_new_project_makes_its_creator_first_admin_and_lead_and_records_
             olga.id,
             t.org.id,
             None,
-            {"classification_level": None, "classification_categories": []},
+            {"restriction_level": None, "restriction_categories": []},
         ),
         (AuditAction.PROJECT_MEMBER_ADDED, olga.id, t.org.id, olga.id, {"role": "admin"}),
     ]
 
 
-@pytest.mark.parametrize(
-    ("project_type", "modules"),
-    [("software", ["sprints", "github"]), ("erp", []), ("general", [])],
-)
-async def test_a_new_project_is_seeded_with_its_types_modules(
-    client: AsyncClient, session: AsyncSession, t: Tenancy, project_type: str, modules: list[str]
+@pytest.mark.parametrize("project_type", ["software", "erp", "general"])
+async def test_a_new_project_is_seeded_with_no_unshipped_module(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, project_type: str
 ) -> None:
+    """Seeding skips a module that hasn't shipped, `sprints` and `github` included (DL-136)."""
     await signed_in(client, await org_member(t))
 
     response = await client.post(f"/api/orgs/{t.org.id}/projects", json=new(type=project_type))
 
-    assert response.json()["enabled_modules"] == modules
-    assert (await stored(session, "INV")).enabled_modules == modules
+    assert response.json()["enabled_modules"] == []
+    assert (await stored(session, "INV")).enabled_modules == []
 
 
-async def test_modules_chosen_at_creation_replace_the_seed(
-    client: AsyncClient, session: AsyncSession, t: Tenancy
+@pytest.mark.parametrize("modules", [["sprints"], ["github", "github"]])
+async def test_an_unshipped_module_chosen_at_creation_is_refused(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, modules: list[str]
 ) -> None:
     await signed_in(client, await org_member(t))
 
     response = await client.post(
-        f"/api/orgs/{t.org.id}/projects",
-        json=new(enabled_modules=["github", "github"]),
+        f"/api/orgs/{t.org.id}/projects", json=new(enabled_modules=modules)
     )
 
-    assert response.json()["enabled_modules"] == ["github"]
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["body", "enabled_modules"], "module_unavailable")],
+    )
+    assert await session.scalar(select(Project.id).where(Project.key == "INV")) is None
 
 
 async def test_a_module_that_isnt_allowed_yet_is_refused(client: AsyncClient, t: Tenancy) -> None:
@@ -259,17 +261,12 @@ async def test_an_update_changes_and_records_the_fields_sent(
 
     response = await client.patch(
         "/api/projects/pmt",
-        json={"name": "Payments 2", "status": "active", "type": "erp", "enabled_modules": []},
+        json={"name": "Payments 2", "status": "active", "type": "erp"},
     )
 
     assert response.status_code == 200
     project = await stored(session, "PMT")
-    assert (project.name, project.status, project.type, project.enabled_modules) == (
-        "Payments 2",
-        "active",
-        "erp",
-        [],
-    )
+    assert (project.name, project.status, project.type) == ("Payments 2", "active", "erp")
     [(action, actor, org_id, _, details)] = await events(session)
     assert (action, actor, org_id) == (AuditAction.PROJECT_UPDATED, admin.id, t.org.id)
     assert details == {
@@ -277,10 +274,27 @@ async def test_an_update_changes_and_records_the_fields_sent(
             "name": "Payments",
             "status": "planning",
             "type": "software",
-            "enabled_modules": ["sprints", "github"],
         },
-        "new": {"name": "Payments 2", "status": "active", "type": "erp", "enabled_modules": []},
+        "new": {"name": "Payments 2", "status": "active", "type": "erp"},
     }
+
+
+async def test_an_update_enabling_an_unshipped_module_is_refused(
+    client: AsyncClient, session: AsyncSession, t: Tenancy
+) -> None:
+    await admin_of_pmt(client, t)
+
+    response = await client.patch(
+        "/api/projects/pmt", json={"name": "Payments 2", "enabled_modules": ["sprints"]}
+    )
+
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["body", "enabled_modules"], "module_unavailable")],
+    )
+    project = await stored(session, "PMT")
+    assert (project.name, project.enabled_modules) == ("Payments", [])
+    assert await events(session) == []
 
 
 async def test_an_update_that_changes_nothing_records_nothing(
@@ -441,6 +455,26 @@ async def test_the_org_list_hides_archived_projects_unless_asked(
     assert every.json()["items"][1]["organization_slug"] == "bolt-foods"
 
 
+async def test_each_listed_project_names_its_lead_or_none(
+    client: AsyncClient, session: AsyncSession, t: Tenancy
+) -> None:
+    """DL-153: the org's list, and My work's (one item model), carry the lead's name."""
+    admin = await admin_of_pmt(client, t)
+    lena = await UserFactory.create_async(name="Lena Lead")
+    await ProjectMembershipFactory.create_async(project=t.project, user=lena)
+    t.project.lead_id = lena.id
+    unled = await ProjectFactory.create_async(organization=t.org, key="NOL", name="No lead")
+    await ProjectMembershipFactory.create_async(project=unled, user=admin, role=ProjectRole.ADMIN)
+    await session.flush()
+
+    org_list = await client.get(f"/api/orgs/{t.org.id}/projects", params={"sort": "key"})
+    my_work = await client.get("/api/me/work/projects", params={"sort": "key"})
+
+    expected = [("NOL", None), ("PMT", "Lena Lead")]
+    assert [(p["key"], p["lead_name"]) for p in org_list.json()["items"]] == expected
+    assert [(p["key"], p["lead_name"]) for p in my_work.json()["items"]] == expected
+
+
 async def test_the_org_list_holds_only_that_orgs_projects(client: AsyncClient, t: Tenancy) -> None:
     """A workspace admin sees every org's projects, but each org's list only its own."""
     admin = await UserFactory.create_async()
@@ -563,3 +597,63 @@ async def test_a_section_whose_query_fails_is_unavailable(
         200,
         {"sections": {"projects": {"available": False, "items": [], "total": 0}}},
     )
+
+
+# --- The first-admin picker (DL-152) -------------------------------------------------------------
+
+
+async def test_first_admin_candidates_are_the_orgs_active_members_and_the_staff(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    await signed_in(client, await org_member(t, OrgRole.ADMIN, name="Ada Admin"))
+    await org_member(t, name="Bob Baker")
+    await org_member(t, name="Eve Gone", is_active=False)
+    dan = await UserFactory.create_async(name="Dan Diaz")
+    await WorkspaceMembershipFactory.create_async(
+        workspace=t.workspace, user=dan, role=WorkspaceRole.MEMBER
+    )
+    elsewhere = await OrganizationFactory.create_async(workspace=t.workspace)
+    olly = await UserFactory.create_async(name="Olly Other")
+    await MembershipFactory.create_async(organization=elsewhere, user=olly, role=OrgRole.MEMBER)
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates")
+
+    assert response.status_code == 200
+    assert [c["name"] for c in response.json()["items"]] == ["Ada Admin", "Bob Baker", "Dan Diaz"]
+    assert response.json()["total"] == 3
+
+
+async def test_first_admin_candidates_search_names(client: AsyncClient, t: Tenancy) -> None:
+    await signed_in(client, await org_member(t, OrgRole.ADMIN, name="Ada Admin"))
+    await org_member(t, name="Bob Baker")
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates?q=bob")
+
+    assert [c["name"] for c in response.json()["items"]] == ["Bob Baker"]
+
+
+@pytest.mark.security
+async def test_an_org_member_cant_list_first_admin_candidates(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """Naming a first admin is for org owners and admins (DL-77): a member sees the org, so 403."""
+    await signed_in(client, await org_member(t, OrgRole.MEMBER))
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates")
+
+    assert (response.status_code, response.json()["code"]) == (403, "forbidden")
+
+
+@pytest.mark.security
+async def test_first_admin_candidates_are_404_outside_the_org(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    elsewhere = await OrganizationFactory.create_async(workspace=t.workspace)
+    outsider = await UserFactory.create_async()
+    await MembershipFactory.create_async(organization=elsewhere, user=outsider, role=OrgRole.ADMIN)
+    await signed_in(client, outsider)
+
+    response = await client.get(f"/api/orgs/{t.org.id}/first-admin-candidates")
+
+    assert (response.status_code, response.json()["code"]) == (404, "not_found")
+    assert "Bolt Foods" not in response.text

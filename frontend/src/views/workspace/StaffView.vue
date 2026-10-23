@@ -12,7 +12,6 @@ import RosterPage from '@/views/roster/RosterPage.vue'
 import type { Roster } from '@/views/roster/roster'
 
 import { WHO_TO_ASK } from './workspaceAdmin'
-import WorkspaceNav from './WorkspaceNav.vue'
 
 type Role = components['schemas']['WorkspaceRole']
 
@@ -91,6 +90,5 @@ async function list(query: { limit: number; offset: number }) {
     :allowed="allows(workspace, 'workspace.view')"
     :who-to-ask="WHO_TO_ASK"
   >
-    <template #nav><WorkspaceNav /></template>
   </RosterPage>
 </template>

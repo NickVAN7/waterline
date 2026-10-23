@@ -43,7 +43,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   (`src/app/session.ts`); a view never handles them itself.
 - **Requests:** same origin through the Vite proxy (`/api`), `credentials: 'include'`, JSON
   bodies only.
-- **Rendered markdown** is sanitized before display.
+- **Rendered markdown** goes only through `MarkdownView` (from S2-C16): `markdown-it` with raw
+  HTML off, then DOMPurify; never `v-html` on anything else. No remote images, links only
+  `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
+  ui-design-guide UI-MD-1).
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
   slug change to the new URL; a null org is the not-found page.
@@ -60,10 +63,11 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   shown only after about 300 ms (fast loads don't flash), on a region with `aria-busy="true"`,
   with any shimmer off under `prefers-reduced-motion`. Actions such as saving a form show a
   pending state on the control itself, not a skeleton.
-- An enabled module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7)
-  shows its features and links greyed out or disabled (design-doc §1.1), never as broken
-  screens. Whether a module is available comes from the API's module guidance (`available`),
-  never a frontend list.
+- A module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7) can't be
+  enabled (from S2-C0d, DL-136; design-doc §1.1): the API refuses it (422 `module_unavailable`)
+  and the UI shows a disabled checkbox with "Not available yet", never a broken screen. Whether
+  a module is available comes from the API's module guidance (`available`), never a frontend
+  list.
 
 ## UI
 
@@ -142,6 +146,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A confirmation the client sends (`export_control_confirmed`) comes from the current server state
   as well as the box: a reload can take the box away while it's still ticked (DL-116; S1-C16c
   review).
+- A value a form keeps but doesn't render (project settings' `export_controlled`, DL-133) is sent
+  from the latest server data on every save, never from the form: a reload that keeps what was
+  typed would bring a stale one back, and no control could remove it (S2-C0d review).
 - A dialog's search or lookup that fails says so at its own field, not in the form's alert, whose
   Retry and dismiss belong to the submit (UI-FRM-7; S1-C16b review).
 - A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets

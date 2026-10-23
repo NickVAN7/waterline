@@ -75,7 +75,7 @@ beforeEach(() => {
 cleanUpAfterEach()
 
 describe('OrgMembersView', () => {
-  it("lists the org's members with their org roles, under the org's section nav", async () => {
+  it("lists the org's members with their org roles", async () => {
     const get = answers()
 
     const { wrapper } = await mountOrgView(OrgMembersView, '/acme/members', [...ADMIN])
@@ -84,7 +84,8 @@ describe('OrgMembersView', () => {
       params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing members')
-    expect(wrapper.get('nav').attributes('aria-label')).toBe('Organization administration')
+    // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
+    expect(wrapper.find('nav').exists()).toBe(false)
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr

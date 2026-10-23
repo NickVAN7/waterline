@@ -39,7 +39,7 @@ class MeWorkspace(BaseModel):
 
 
 class MeOrg(BaseModel):
-    """An org the user sees (design-doc §4, "Visibility"), for the org switcher. `role` is null
+    """An org the user sees (design-doc §4, "Visibility"), for the org menu. `role` is null
     when the user sees it without an org membership (through a project, or as an admin above
     it)."""
 

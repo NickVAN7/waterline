@@ -4,7 +4,30 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S1-C17 (Slice verification) built: the "Done when" walked through, the owner's
+> **Status:** S2-C0f (Org admin) built: the org menu in the header (the orgs, and for whoever may
+> manage the org its Overview, Members, and Settings; `OrgMenu`), the user menu's one
+> "Administration"; on an admin page (a route's `meta.adminArea`) the sidebar shows that area's
+> pages in place of the project selector (`OrgNav`, `WorkspaceNav`; `SectionNav` is gone); the org
+> overview at `/{org_slug}/overview`; `lead_name` on the project item (DL-137, DL-153, DL-163).
+> S2-C0e (Shell) built: the PrimeUI license key (`VITE_PRIMEUI_LICENSE`, DL-135) and an
+> e2e check that no license notice renders; dialogs centered, with an e2e check; the header's
+> "Waterline" and the org's name; Sign out with an icon and the danger tone; the project selector
+> headed by the org's name, with "All projects" as a link and "New project" in line; the
+> sign-in card's sizes and spacing (DL-137). S2-C0d (Restriction, export control, modules) built: "classification" renamed
+> "restriction" throughout (`RestrictionMixin`, `rules/restriction.py`, `PUT
+> /api/projects/{key}/restriction`, `project.raise_restriction`/`project.lower_restriction`,
+> `project_restriction_changed`) with `restricted` removed, one migration for the rename and for
+> removing `sprints` and `github` from every project (DL-134, DL-136); an unshipped v1 module is a 422
+> `module_unavailable` and a disabled checkbox; export control is no longer offered in the UI and
+> `ExportControlDialog` is gone (DL-133); the restriction badge in the project header
+> (`RestrictionBadge`, DL-137). S2-C0c (Backend leftovers) built: updates through `apply_changes` (TD-57),
+> `ValidationFailedError.on`, one `ERRORS` map, `PageResult.with_items`, the DL-143 length limits,
+> `anyio` a runtime dependency, `GET /api/orgs/{org_id}/first-admin-candidates` and the create
+> dialog's picker on it, and the `new-area` skill verified. S2-C0b (Tree spike) built: SVAR DataGrid's tree mode measured against PrimeVue
+> TreeTable (`docs/spikes/S2-C0b-tree/results.md`); the tree is TreeTable (DL-174). S2-C0a
+> (Simplicity audit) built: the `simplicity-auditor` agent and its vendored
+> prompts (`.claude/audit/`), the review-record check, and the audit's first run on `main`
+> (`docs/reviews/s2/S2-C0a.md`). S1-C17 (Slice verification) built: the "Done when" walked through, the owner's
 > manual keyboard and screen-reader pass (no problems; `docs/reviews/s1/S1-C17-manual-pass.md`),
 > the slice-end agents, and the slice retro (`docs/reviews/s1/S1-retro.md`); Slice 1 is complete
 > once the retro's changes are applied and the owner approves the merge. S1-C16d (Review
@@ -134,7 +157,8 @@ npm ci --prefix frontend         # frontend tools (frontend/node_modules). Its
                                  # because sudo resets PATH and won't find an npx installed by
                                  # fnm or nvm); skip it if they're there (see Troubleshooting)
 uv run pre-commit install        # git hooks: ruff, Prettier, ESLint, generated files
-cp .env.example .env             # local settings (never committed); edit if needed
+cp .env.example .env             # local settings (never committed); edit if needed, and
+                                 # set VITE_PRIMEUI_LICENSE (below)
 uv run wl up                     # build and start the stack; applies migrations
 uv run wl check --full           # everything CI runs; should be green on a fresh clone
 ```
@@ -143,6 +167,12 @@ Then open <http://localhost:5173>: it sends you to sign in. Build the demo data 
 data" in section 5) to have someone to sign in as; <http://localhost:5173/status> shows whether
 the API and database are up without signing in. Without a browser, `curl
 http://localhost:8000/api/health` answers `{"status":"ok","database":"ok"}`.
+
+**The PrimeUI license key** (DL-135): PrimeVue 5 needs the owner's Community License key, or every
+page shows an "Invalid PrimeUI License" notice and `wl e2e` (so `wl check --full`) fails on it.
+Ask the owner for the key and put it in `.env` as `VITE_PRIMEUI_LICENSE` (never committed; CI has
+it as the repository secret of the same name). Vite builds it into the app, so `wl up` after
+changing it; it ships in the browser bundle, which is expected.
 
 Nothing is installed on the workstation beyond the tools above: Postgres, the API, the worker,
 and the Vite dev server run in Docker. Tests and the other `wl` tools run on the host and reach
@@ -309,7 +339,7 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   |---|---|---|
   | `NotFoundError` | 404 | `not_found` (also for entities the caller may not see: 404, not 403) |
   | `ForbiddenError` | 403 | `forbidden` |
-  | `ValidationFailedError([FieldError(loc, message, type)])` | 422 | `validation_error` (same `details.fields` shape as request validation) |
+  | `ValidationFailedError([FieldError(loc, message, type)])`, or `ValidationFailedError.on(loc, message, type)` for one field | 422 | `validation_error` (same `details.fields` shape as request validation) |
   | `ServiceUnavailableError` | 503 | `service_unavailable` |
 
   Pass a more specific message, `code`, or `details` where the client needs them:
@@ -341,7 +371,8 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   the rollback it looks them up. `direct_update` returning `None` means the
   row is gone too: raise `NotFoundError`. An error whose table can't be read stays 409 (the
   conservative answer; a test using SQLAlchemy's real wording fails if the wording changes).
-- Document an endpoint's error statuses with `responses={404: {"model": ErrorBody}}`.
+- Document an endpoint's error statuses with `responses=ERRORS` (`app/routers/deps.py`: 401,
+  403, 404, and 422, each an `ErrorBody`).
 
 ### Security helpers
 
@@ -429,8 +460,13 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
   compare `active_owners` (both on the workspace and org repositories). A deactivation locks the
   owners of every workspace and org the user belongs to first, so it queues behind a handover
   (TD-27).
-- **Update events** record `change_details(changed_fields(entity, values))`
-  (`app/audit/admin_event.py`): `{"old": {...}, "new": {...}}`, the changed fields only.
+- **Updates** of an entity without `version` go through `apply_changes(session, entity,
+  values)` (`app/audit/admin_event.py`, TD-57; a versioned one uses `check_version`, whose 409
+  the re-read would defeat): it locks and re-reads the row (`FOR NO KEY UPDATE`), sets each value that differs, and
+  flushes, so two edits at once compare in turn. Validate before it; the event records what it
+  returns, `change_details(changed)`: `{"old": {...}, "new": {...}}`, the changed fields only.
+- **Length limits** (DL-143) are `Field(max_length=...)` on the request schemas, from
+  `app/schemas/limits.py`; a value over one is FastAPI's 422 `string_too_long` on the field.
 - **`ReservedSlug`** isn't returned by any route: `create_app` adds it to the OpenAPI schema's
   components (`_add_schema_components`, `app/main.py`).
 - **Error codes:** sign-in returns 401 `invalid_credentials` for an unknown email or a wrong
@@ -474,7 +510,7 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
   target's workspace, DL-68). Each action is marked `access`, content or management (design-doc
   §3.1; the default is content, the closed side, so every management action says so, and every
   action so far does; the export-control gate that reads it comes in Slice 2), and `explicit_when_export_controlled` makes only the explicit project role
-  grant it on an export-controlled project (`project.lower_classification`, DL-82). Real actions
+  grant it on an export-controlled project (`project.lower_restriction`, DL-82). Real actions
   are members of
   `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
   (DL-44); an unregistered action is denied. A project-level action normally sets
@@ -695,7 +731,8 @@ calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)`
 `next_cursor`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
 some users may filter by) and `include_deleted` (the trash: design-doc §9) apply only when the
 endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
-`not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`.
+`not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`;
+`page.with_items(rows)` turns a `PageResult` into the response with the rows built from it.
 Parameters by filter type: enum, reference, and user `name` (repeat for any of; a user filter
 also takes `me`), `name__not`, `name__is_null`; date `name__lt`, `name__gt`, `name__is_null`;
 text `name__contains`; boolean `name`; number `name__gte`, `name__lte`. Examples:
@@ -721,16 +758,17 @@ load by ID. It is **not scoped** to the user's orgs and projects: endpoints reac
 entities only through the load-and-authorize dependency, and any other caller authorizes
 before using or returning the row. List and feed queries never use it.
 
-**Classification** (`ClassificationMixin`, design-doc §3.1): adds `classification_level` (enum,
-nullable) and `classification_categories` (`text[]`, default `{}`). The model also adds
-`classification_categories_check(...)` to its `__table_args__` with the categories it allows:
+**Restriction** (`RestrictionMixin`, design-doc §3.1; "classification" until S2-C0d, DL-134):
+adds `restriction_level` (enum `internal` or `confidential`, nullable: null is the None level) and
+`restriction_categories` (`text[]`, default `{}`). The model also adds
+`restriction_categories_check(...)` to its `__table_args__` with the categories it allows:
 `PROJECT_CATEGORIES` on `project`, `CONTENT_ITEM_CATEGORIES` on content items
-(`export_controlled` is project-only in v1). `app/rules/classification.py` has the effective
-classification (`effective(item, project)`) and whether a change raises or lowers it
-(`change(old, new)`; unclassified ranks as Internal). The project service checks an export-control
+(`export_controlled` is project-only in v1). `app/rules/restriction.py` has the effective
+restriction (`effective(item, project)`) and whether a change raises or lowers it
+(`change(old, new)`; None ranks as Internal). The project service checks an export-control
 confirmation with `_confirmation(values, needed=..., members=...)`: the 422s
 `confirmation_required`, `members_changed`, and `confirmation_not_needed`, under the project's row
-lock, with the confirmation returned for the audit event (DL-81). `set_classification` checks its
+lock, with the confirmation returned for the audit event (DL-81). `set_restriction` checks its
 rights after taking the project's lock, against the project and the caller's own project role
 read again under it (`_with_current_role`): a removal takes that lock first, so an explicit admin
 removed meanwhile can't lower (owner decision, S1-C13 review).
@@ -742,9 +780,9 @@ SQL (which async sessions can't do).
 **Convention checks** (`tests/unit/core/test_model_conventions.py`) walk every mapped model and
 fail if a relationship isn't `lazy="raise"`, a model dropped `eager_defaults=True` (for example
 by replacing `__mapper_args__`), a model has a `version` column that isn't checked (for
-example `VersionMixin` listed after `TimestampMixin`), or a classifiable model (`project`,
-`requirement`, `task`, `testcase`, or one with a `classification_*` column) doesn't use
-`ClassificationMixin`.
+example `VersionMixin` listed after `TimestampMixin`), or a restrictable model (`project`,
+`requirement`, `task`, `testcase`, or one with a `restriction_*` column) doesn't use
+`RestrictionMixin`.
 
 ### Migrations
 
@@ -839,7 +877,7 @@ frontend/src/
   api/client.ts      the configured openapi-fetch `client`, `api()`, `ApiError`, the session hook
   api/schema.d.ts    generated by `wl gen-client`; never edit
   app/               createApp.ts (Pinia, router, PrimeVue, session hook), router.ts, the two
-                     layouts (AppLayout is the shell), shell/ (OrgSwitcher, UserMenu,
+                     layouts (AppLayout is the shell), shell/ (OrgMenu, UserMenu,
                      ProjectSelector, ProjectPages, LinkPopover, SidebarLink), labels.ts
                      (display labels),
                      routeFocus.ts,
@@ -848,7 +886,7 @@ frontend/src/
   components/        shared UI components: Button, Alert, FormAlert, FormField, TextField,
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
-                     Pagination, SuccessStatus, PageHeader, SectionNav, ModalDialog,
+                     Pagination, SuccessStatus, PageHeader, ModalDialog,
                      ConfirmDialog, GroupError, RowActions, Icon
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
                      useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
@@ -858,10 +896,10 @@ frontend/src/
   stores/            Pinia stores: currentUser, currentOrg (the current org and project)
   views/<area>/      screens by backend area name, singular: auth/ (sign-in, change password),
                      my_work/, project/ (org project list, project home, the create
-                     dialog, the classification banner, settings, members with the
-                     AddMemberDialog picker, the access review, ExportControlDialog), user/ (account
+                     dialog, the restriction badge and fields, settings, members with
+                     the AddMemberDialog picker, the access review), user/ (account
                      settings, access review, the account-action dialogs), workspace/ (staff,
-                     orgs, users, settings), org/ (members, settings), roster/ (what staff and
+                     orgs, users, settings), org/ (overview, members, settings), roster/ (what staff and
                      org and project members share: `RosterPage`, the list with its row menus, and the add
                      person, change role, and remove dialogs); plus status/ and errors/ (404,
                      403, no access)
@@ -956,7 +994,7 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
 - **Allowed actions:** `allows(entity, 'project.create')` (`@/composables/allowedActions`)
   hides an action the user may never take; the server still checks.
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
-  menu button with a popover of links that the org switcher and project selector share; opening
+  menu button with a popover of links that the org menu and project selector share; opening
   it moves focus inside (the popover sits at the end of `<body>`, out of the Tab order). A spec
   that opens one stubs `ResizeObserver` (`stubResizeObserver()`, `@/test/overlay`), turns
   transitions back on (`stubs: { transition: false }`, so the overlay's `show` and `hide` events
@@ -983,7 +1021,7 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
 - **Adding a screen:** a view in `src/views/<area>/`, a route in `src/app/router.ts` (above the
   not-found route, which must stay last), and a `*.spec.ts` next to it that calls
   `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
-  page's primary actions (UI-SHL-8): navigation sets the title
+  page's primary actions (UI-SHL-8; the auth card's pages use a plain, smaller `h1`): navigation sets the title
   to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
   `src/views/project/ProjectHomeView.vue`).
@@ -1064,7 +1102,7 @@ value the test depends on explicitly.
 - Text fields get realistic values with `Use(...)` and Faker (`BaseFactory.__faker__`), in the
   formats the rules expect: lowercase emails, slug-format usernames and slugs (`fake_slug`),
   project keys. Nullable fields default to `None` explicitly, so a factory never makes an
-  archived or classified row by chance.
+  archived or restricted row by chance.
 - Every factory user's password is `FACTORY_PASSWORD` (`tests/factories/user.py`), hashed once
   per run.
 - A primary-key column that isn't a foreign key (e.g. `project_counter.prefix`) is only set if
@@ -1082,13 +1120,13 @@ endpoint, write the denial test yourself once it's built, under the sabotage che
 files and their `git hash-object` go in the review record ("Spec tests"); a spec test changes only
 with the owner's approval. S1-C3's rules predate `spec-test-writer` (DL-11): their tests were
 written test-first by the implementing session, and aren't hash-protected spec tests; the later
-ones (`suggest_username` in `identifiers.py`, `modules.py`, `classification.py`) came with spec
+ones (`suggest_username` in `identifiers.py`, `modules.py`, `restriction.py`) came with spec
 tests. The rules: `identifiers.py` (project keys, slugs and the reserved top-level routes in `RESERVED_SLUGS`,
 usernames; each check returns an `IdentifierProblem` for the field error), `password_policy.py`
 (`password_problems(...)`; the caller checks the hash and passes `same_as_current`), and
 `account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships),
-`modules.py` (each type's recommended modules), and `classification.py` (the effective
-classification, and the raise and lower rules). `app/rules/`
+`modules.py` (each type's recommended modules, and the shipped ones it seeds, DL-136), and
+`restriction.py` (the effective restriction, and the raise and lower rules). `app/rules/`
 and `app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
 plain `uv run pytest` fails below it. A `match` that covers every type of its subject (pyright
 checks: the function's return type would otherwise allow `None`) marks its last `case` with `#
@@ -1201,6 +1239,7 @@ database. They check:
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
 | § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` means a design-doc section, so refer to this guide's sections as "section N". The exceptions: `guide §N` (or `ui-design-guide §N`) names a section of `docs/ui-design-guide.md`; in that guide a bare `§N` is its own section; in `.claude/agents/ui-reviewer.md` a bare `§N` is its own section or the guide's; and in both, `design-doc §N` still means the design doc |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
+| Review records | from Slice 2 on (DL-138, DL-165): the latest `checkpoint(<ID>):` commit has no `docs/reviews/s<n>/<ID>.md`; a slice has an `S<n>-C1` record but no `S<n>-C0` or `S<n>-C0a` record; or the record of the slice's last row has no `## simplicity-auditor` heading |
 
 Fixing a failure: the message names both files and the mismatch. Update whichever side is
 wrong (usually the doc); when the right answer is a design question, ask the owner. A
@@ -1259,7 +1298,7 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   `design-change`.
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
   `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`,
-  `ui-reviewer`.
+  `ui-reviewer`, `simplicity-auditor`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
   changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
   at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
@@ -1268,8 +1307,10 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
   `frontend/e2e/` (read-only: accessibility and frontend conventions against
   `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`, `docs-consistency`, and
-  `repo-auditor` (a whole-repository audit that runs no tests, DL-41) at the last checkpoint of
-  a slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
+  `repo-auditor` (a whole-repository audit that runs no tests, DL-41), then
+  `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored
+  in `.claude/audit/`, whose findings go to the owner, DL-138) at the last checkpoint of a
+  slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
   concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same
   time: they share the test database. `docs-consistency` also runs in every design change, before
   committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and

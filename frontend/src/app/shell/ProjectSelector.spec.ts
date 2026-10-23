@@ -23,6 +23,7 @@ const item = (key: string, name: string): Item => ({
   type: 'software',
   status: 'active',
   lead_id: null,
+  lead_name: null,
   organization_id: ACME.id,
   organization_slug: 'acme',
 })
@@ -79,6 +80,17 @@ describe('ProjectSelector', () => {
     expect(dialog().textContent).not.toContain('New project')
     expect(document.activeElement?.closest('[role=dialog]')).toBe(dialog())
     await expectNoA11yViolations(document.body)
+  })
+
+  it("heads the list with the org's name, so it's clear whose projects they are (DL-137)", async () => {
+    await openSelector()
+
+    const heading = dialog().querySelector('p')!
+    expect(heading.textContent).toBe(ACME.name)
+    expect(
+      heading.compareDocumentPosition(dialog().querySelector('ul')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('shows the selected project on the button and marks it in the list', async () => {

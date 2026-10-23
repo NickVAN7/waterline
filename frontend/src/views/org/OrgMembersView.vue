@@ -13,7 +13,6 @@ import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RosterPage from '@/views/roster/RosterPage.vue'
 import type { Roster } from '@/views/roster/roster'
 
-import OrgNav from './OrgNav.vue'
 import { WHO_TO_ASK } from './orgAdmin'
 
 type Role = components['schemas']['OrgRole']
@@ -103,6 +102,5 @@ async function list(query: { limit: number; offset: number }) {
     :who-to-ask="WHO_TO_ASK"
     hidden
   >
-    <template #nav><OrgNav :org-slug="org.slug" /></template>
   </RosterPage>
 </template>

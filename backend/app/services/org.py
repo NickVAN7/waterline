@@ -6,7 +6,7 @@ from typing import cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.admin_event import change_details, changed_fields, log_admin_event
+from app.audit.admin_event import apply_changes, change_details, log_admin_event
 from app.authz.actions import Action
 from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext
@@ -30,7 +30,7 @@ from app.schemas.org import (
 )
 from app.schemas.workspace import SlugAvailability
 from app.services.roster import Roster, RosterSpec
-from app.services.user import UserService, identifier_error, required_error
+from app.services.user import UserService, name_and_slug_errors, rename_values
 
 # The entity an org endpoint loads, for routers (which never import models).
 type OrgEntity = Organization
@@ -42,13 +42,6 @@ MEMBERS = ListSpec(
     default_sort=("name",),
     filters=(Filter("role", Membership.role, FilterType.ENUM, enum=OrgRole),),  # pyright: ignore[reportArgumentType]
 )
-
-
-def _name_and_slug_errors(name: str | None, slug: str | None) -> list[FieldError]:
-    return [
-        *(required_error(name, field="name") if name is not None else []),
-        *(identifier_error(slug_problem(slug), field="slug") if slug is not None else []),
-    ]
 
 
 class OrgService:
@@ -72,7 +65,7 @@ class OrgService:
         a 404, a deactivated one a 422 `account_inactive`) or `new_owner` (a new account,
         `user_created`). Records `org_created` and `org_member_added`. The caller holds
         `org.create` on the workspace; a taken slug is the constraint's 422."""
-        problems = _name_and_slug_errors(payload.name, payload.slug)
+        problems = name_and_slug_errors(payload.name, payload.slug)
         if (payload.owner_id is None) == (payload.new_owner is None):
             problems.append(
                 FieldError(
@@ -93,12 +86,8 @@ class OrgService:
             if found is None:
                 raise NotFoundError
             if not found.is_active:
-                raise ValidationFailedError(
-                    [
-                        FieldError(
-                            ("body", "owner_id"), "This account is deactivated.", "account_inactive"
-                        )
-                    ]
+                raise ValidationFailedError.on(
+                    ("body", "owner_id"), "This account is deactivated.", "account_inactive"
                 )
             owner = found
         org = Organization(workspace_id=workspace.id, name=payload.name.strip(), slug=payload.slug)
@@ -132,16 +121,12 @@ class OrgService:
     async def update(self, ctx: AuthzContext, org: Organization, payload: OrgUpdate) -> OrgRead:
         """Rename the org or change its slug (`org_updated`, old and new values). The caller
         holds `org.update`; a taken slug is the constraint's 422."""
-        problems = _name_and_slug_errors(payload.name, payload.slug)
+        problems = name_and_slug_errors(payload.name, payload.slug)
         if problems:
             raise ValidationFailedError(problems)
-        changed = changed_fields(
-            org, {"name": payload.name.strip() if payload.name else None, "slug": payload.slug}
-        )
-        if changed:
-            for key, (_, value) in changed.items():
-                setattr(org, key, value)
-            await self.session.flush()
+        if changed := await apply_changes(
+            self.session, org, rename_values(payload.name, payload.slug)
+        ):
             log_admin_event(
                 self.session,
                 action=AuditAction.ORG_UPDATED,

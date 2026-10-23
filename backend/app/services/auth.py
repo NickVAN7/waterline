@@ -11,7 +11,6 @@ from app.authz.context import AuthzContext
 from app.authz.scoping import org_scope
 from app.authz.target import org_target, workspace_target
 from app.core.errors import (
-    FieldError,
     ForbiddenError,
     NotFoundError,
     UnauthorizedError,
@@ -157,8 +156,8 @@ class AuthService:
         session's new token (the other sessions are deleted). 422 on `current_password`
         (`incorrect`) or on `new_password` (the password policy's problems)."""
         if not await verify_password(user.hashed_password, current_password):
-            raise ValidationFailedError(
-                [FieldError(("body", "current_password"), "This isn't your password.", "incorrect")]
+            raise ValidationFailedError.on(
+                ("body", "current_password"), "This isn't your password.", "incorrect"
             )
         problems = password_errors(
             new_password,
@@ -290,7 +289,11 @@ class AuthService:
             # Locked like a revocation, so two deactivations can't remove the last one.
             active = await UserRepository(self.session).lock_active_system_admins()
             if active == [user.id]:
-                raise _on_user_id("This is the last active system admin.", "last_system_admin")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"),
+                    "This is the last active system admin.",
+                    "last_system_admin",
+                )
         # The row last (owners, system admins, then the user, as a revocation takes them), and
         # read again: a deactivation that committed meanwhile leaves nothing to do or record.
         await UserRepository(self.session).lock(user)
@@ -316,10 +319,14 @@ class AuthService:
         user_id = subject.user.id
         for workspace_id in workspace_ids:
             if await workspaces.active_owners(workspace_id) == [user_id]:
-                raise _on_user_id("The workspace needs another owner first.", "last_owner")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"), "The workspace needs another owner first.", "last_owner"
+                )
         for org_id in org_ids:
             if await orgs.active_owners(org_id) == [user_id]:
-                raise _on_user_id("The organization needs another owner first.", "last_owner")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"), "The organization needs another owner first.", "last_owner"
+                )
 
     async def reset_password(
         self, ctx: AuthzContext, subject: AccountSubject, password: str
@@ -350,10 +357,6 @@ class AuthService:
         await UserRepository(self.session).lock(subject.user)
         await self.repository.delete_all(subject.user.id)
         UserService(self.session).log_account_event(ctx, AuditAction.SIGNED_OUT_EVERYWHERE, subject)
-
-
-def _on_user_id(message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(("path", "user_id"), message, type_)])
 
 
 async def _end_sessions(session: AsyncSession, user: User) -> None:

@@ -235,8 +235,8 @@ def _references(
 ) -> list[uuid.UUID]:
     """The IDs a reference filter names, with `me` replaced by the current user."""
     if ME in values and current_user_id is None:
-        raise ValidationFailedError(
-            [FieldError(("query", name), "`me` needs a signed-in user.", "me_unavailable")]
+        raise ValidationFailedError.on(
+            ("query", name), "`me` needs a signed-in user.", "me_unavailable"
         )
     return [current_user_id if value == ME else value for value in values]  # type: ignore[misc]
 
@@ -353,9 +353,7 @@ def order_by(spec: ListSpec, sort: str | None) -> list[ColumnElement[Any]]:
         key = name.removeprefix("-")
         if key not in spec.sorts or key in seen:
             problem = "is repeated" if key in seen else f"isn't one of: {spec.sort_names}"
-            raise ValidationFailedError(
-                [FieldError(("query", "sort"), f"`{key}` {problem}.", "invalid_sort")]
-            )
+            raise ValidationFailedError.on(("query", "sort"), f"`{key}` {problem}.", "invalid_sort")
         seen.add(key)
         column = spec.sorts[key]
         columns.append(column.desc() if name.startswith("-") else column.asc())
@@ -372,6 +370,11 @@ class PageResult[T]:
     total: int
     limit: int
     offset: int
+
+    def with_items[U](self, items: list[U]) -> Page[U]:
+        """This page as the response, with `items` (the rows built from this page's) in place
+        of its own."""
+        return Page[U](items=items, total=self.total, limit=self.limit, offset=self.offset)
 
 
 @dataclass(frozen=True)

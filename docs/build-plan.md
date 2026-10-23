@@ -1,9 +1,9 @@
 # Waterline — Build Plan
 
 Companion to `design-doc.md`, `schema-doc.md`, and `testing-strategy.md` (section references
-like §3 point to the design doc). This document covers **Slice 0 (skeleton)** and **Slice 1 (auth, tenancy, projects)**, plus
-notes already decided for Slice 2 and placements for later slices. Later slices get the
-same treatment when they're next up.
+like §3 point to the design doc). This document covers **Slice 0 (skeleton)**, **Slice 1 (auth,
+tenancy, projects)**, and **Slice 2 (requirements and approvals)**, plus placements for later
+slices. Later slices get the same treatment when they're next up.
 
 ## How slices work
 
@@ -26,7 +26,7 @@ marked for the slice is in the model (the `checkpoint` skill, step 2).
 |---|---|
 | **0** | Skeleton: stack, shared conventions, CI, app shell. No features. |
 | **1** | Auth, tenancy (workspace, organizations, workspace/org/project memberships), projects (types, modules, keys, status, lead), number allocation, `authorize()`, admin audit events, the API conventions (lists, errors, allowed actions, identifiers), access review, and My work as the home page (its projects section). |
-| 2 | Requirements: tree, `RQ` numbering, rank (the helper and its tests, first used for the requirement tree), revisions (any two compared), approvals (My work's approvals section), `log_change()` and the activity log. Starts by verifying the `new-area` skill (drafted earlier) against Slice 1's `project` area and correcting it where they differ. |
+| **2** | Requirements & approvals: Slice 1's leftovers and the owner's UI feedback first (S2-C0a to S2-C0i); requirements (tree, `RQ` numbering, rank, revisions compared, item history, delete and trash), approvals with named approvers and their replacement (My work's approvals section), `log_change()` and the activity log, the export-control gate, rendered markdown and the CSP. |
 | 3 | Tasks and subtasks, phases, workstreams, transition rules, rank for tasks; backlog and board (the board is SVAR Kanban through a wrapper, ui-design-guide §7.1; DL-64); copy branch name; My work's task sections (assigned, awaiting review). |
 | 4 | Sprints (module), including completing a sprint with unfinished tasks; milestones/gates. |
 | 5 | Test cases, runs, results (with assignees), ad-hoc runs, re-running failed cases; My work's test-case section. |
@@ -116,36 +116,18 @@ each verification claim with who verified it (e.g. "sabotage-checked by checkpoi
    against the running dev stack, with at least one step that should be denied; the owner's
    run is the check.
 
-**Review-tier trial (`s1-workspace` group: S1-C8, S1-C9, S1-C10; S1-C7a (DL-51), S1-C7b, and
-S1-C8a, also in the group, stop for approval as usual: the trial is S1-C8 to S1-C10)**
-(DL-10). A trial, not yet the rule; every other checkpoint keeps the full stop for approval.
-- **S1-C8 and S1-C9 auto-continue:** after its report, the session goes straight on to the next
-  checkpoint, without stopping for approval, only if **all** of these hold:
-  - `wl check` and CI are green;
-  - every reviewer that ran returned no findings, or only findings that were **fixed** (none
-    logged as tech debt, none rejected);
-  - there are no open questions, no `docs-consistency` Decisions, and no deviations from the
-    docs in the review note.
-
-  If any of them fails, the checkpoint stops as usual.
-- **S1-C10 is a full stop for the whole group:** its report covers S1-C8 to S1-C10, with links
-  to the four review records (S1-C8, S1-C8a, S1-C9, S1-C10; DL-60) and the group's diff range,
-  and the owner reviews all four.
-- **What counts as failure:** the trial fails if the owner finds at the group review anything
-  in S1-C8 or S1-C9 that should have stopped it (a defect, a scope miss, or doc drift the
-  reviewers didn't flag), or if a later checkpoint has to rework their output (a checkpoint
-  inserted for a new owner requirement, such as S1-C8a, isn't rework, DL-60). The owner
-  records the verdict at the group review and again in the slice retro (S1-C17); either way it
-  gets a decision-log entry.
-- **Verdict: not exercised** (DL-125). Neither S1-C8 nor S1-C9 met the conditions to
-  auto-continue, and nothing in them needed rework. Every checkpoint stops for approval.
+**Review-tier trial** (S1-C8 to S1-C10, DL-10): not exercised (DL-125). Every checkpoint stops
+for approval.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
 the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
 `CLAUDE.md` file, and `.claude/` file against the others, and then the `repo-auditor` agent
 audits the whole repository, not one diff: bugs, security, scale against the expected load,
-risky code without a test, slowness, and lean (DL-41). The slice's last checkpoint ends with
+risky code without a test, slowness, and lean (DL-41). From S2-C0a, the `simplicity-auditor`
+agent follows `repo-auditor`, auditing the whole repository for overengineering, so its
+findings feed the retro; the next slice's C0 applies the ones the owner accepts (DL-138). The
+slice's last checkpoint ends with
 a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
 skills and agents never triggered, the verdict of any process trial, and the auditor's findings
 left for the owner. The owner decides what
@@ -172,8 +154,8 @@ diffs from the last commit before its work started, so design changes stay out o
 **Docs consistency tests** (`backend/tests/unit/docs/`, part of `wl check`) check the mechanical
 part on every run: models vs. schema doc (tables, columns, enum values), one feature-map owner
 per table, the tech-debt log's format, references, and deadlines, the decision log's format and
-references, the developer guide's status line, design-doc § references, and the lists of agents
-and skills.
+references, the developer guide's status line, design-doc § references, the lists of agents
+and skills, and the review records' slice rules (DL-138, DL-165).
 
 ### Claude configuration (in the repo)
 Everything lives in the repository, version-controlled and present on every workstation.
@@ -209,7 +191,7 @@ Everything lives in the repository, version-controlled and present on every work
     checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
     every time, then `ui-reviewer` when the diff touches `frontend/src/` or `frontend/e2e/`
     (DL-62), and at the end of a slice `fresh-clone-verifier`, `docs-consistency`, and
-    `repo-auditor`;
+    `repo-auditor` (then `simplicity-auditor`, from S2-C0a, DL-138);
   - resolving every finding, and the review record in `docs/reviews/s<n>/<ID>.md`;
   - one commit with the review note, pushed to the slice branch;
   - the report, and stopping for approval.
@@ -227,6 +209,19 @@ Everything lives in the repository, version-controlled and present on every work
   concrete case and a smallest fix. It runs no tests. Findings within the slice's scope are
   fixed; the rest are logged or go to the owner as proposed design changes, and all feed the
   slice retro.
+- **`simplicity-auditor` agent** (`.claude/agents/`; DL-138, built in S2-C0a): at the last
+  checkpoint of each slice, after `repo-auditor`, a read-only audit of the whole repository for
+  overengineering, from MIT-licensed prompts vendored into `.claude/audit/` and pinned to a
+  commit (`.claude/audit/SOURCES.md`; Ponytail's whole-repo audit and core skill, and
+  `addyosmani/agent-skills`' `code-simplification`, the Readability & Simplicity and
+  Architecture axes of `code-review-and-quality`, and the red flags and checklist of
+  `api-and-interface-design`), read as plain files. Each finding has evidence, lines saved, and
+  a category (delete, simplify, merge duplicates, process, or "conflicts with DL-n"); bugs,
+  security, and scale stay with `repo-auditor`, which reports any overlap. The owner decides
+  every finding and the next slice's C0 applies the accepted ones. A docs consistency test
+  fails `wl check` when, from Slice 2 on, a slice has a C1 record but no C0 or C0a record, or
+  its last checkpoint's record has no `## simplicity-auditor` section (DL-165). Updating the
+  vendored prompts is a design change that bumps the pinned commit.
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
   sets up a temporary copy of the repository by following the developer guide literally and
   reports every wrong or missing step.
@@ -250,7 +245,7 @@ Everything lives in the repository, version-controlled and present on every work
   entries, every affected doc, `docs-consistency`, and the report.
 - **`new-area` skill** (`.claude/skills/new-area/`): the recipe for adding an aggregate through
   every layer, or an endpoint to an existing one. Drafted before Slice 1 from the design docs;
-  verified and corrected against the hand-built `project` area in S2-C0 (DL-132).
+  verified and corrected against the hand-built `project` area in S2-C0c (DL-132, DL-156).
 - **Hooks** (`.claude/settings.json`, `.claude/hooks/`): block Claude's file tools from editing
   generated files (`backend/openapi.json`, `frontend/src/api/schema.d.ts`), committed migrations,
   `.pre-commit-config.yaml` (the owner's to edit, DL-30), and git's own files (anything in `.git/`,
@@ -273,8 +268,30 @@ named checkpoint when its trigger arrives.
 
 | Trigger | Item |
 |---|---|
-| Start of Slice 2 planning | A slice-planning procedure: the format used for Slice 1's plan (fixes, decisions, conventions), plus a short threat-model pass |
+| S2-C0i | The `vue-screen` skill, distilled from S2-C0d to S2-C0h's screens and Slice 1's, and the `user-guide-verifier` agent, which follows `docs/user-guide.md` literally in a browser against a seeded stack and walks the "Done when" list (DL-124) |
 | Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
+
+### Planning a slice
+Each slice is planned before its first checkpoint (DL-139):
+- **The plan record:** `docs/reviews/s<n>/S<n>-plan.md`, in `S1-plan.md`'s format (fixes,
+  decisions, conventions), plus a short threat-model pass (each threat, its control, and the row
+  that builds it) and the open questions the owner answers before the slice's first checkpoint
+  starts.
+- **C0 rows first:** the previous slice boundary's accepted `repo-auditor` and
+  `simplicity-auditor` findings, the retro's code changes, and any owner feedback, ahead of the
+  features, as rows `S<n>-C0a`, `S<n>-C0b`, … (a slice's table may start at 0 or 0a, DL-156).
+- **Sizing** (Slice 1's four splits were all web rows written before their screens were
+  specified; its backend rows held):
+  1. **One unit per checkpoint:** in the backend, one aggregate's endpoints or one cross-cutting
+     piece; in the web app, one page with its dialogs, or about eight small edits to existing
+     screens. Rough target: about 2,000 lines added, tests included (S1-C16's three rows were
+     1.5k–2.1k).
+  2. **Specified before sized:** every row lists its endpoints and actions in the plan, not just
+     before the checkpoint. Web rows stay **provisional** until the screen inventory covers their
+     screens, and are re-cut before they start; a re-cut before a row starts isn't a split.
+  3. **A shared piece used for the first time gets its own row** (a widget wrapper, the markdown
+     view and editor).
+- The plan's readiness review checks every row against these rules.
 
 ### Where the work happens
 Code is written and run on the owner's workstation(s) in the `waterline` repository (the working
@@ -518,7 +535,8 @@ Calls flow one way: **routers → services → repositories → models**. Servic
 
 The organizing unit is the **aggregate**: one main entity plus the child rows that exist only
 through it. Each aggregate has one file name, repeated in every layer (`models/`, `schemas/`,
-`repositories/`, `services/`, `routers/`, and `authz/policies/`). That area **owns** its tables:
+`repositories/`, `services/`, and `routers/`; its actions go in the one registry,
+`authz/actions.py`, DL-151). That area **owns** its tables:
 it is the only place that writes them, apart from the roster, which writes the membership rows
 when the owning service calls it (DL-70).
 
@@ -608,7 +626,8 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 
 **Naming**
 - Schemas: `TaskCreate`, `TaskUpdate`, `TaskRead`, `TaskListItem`.
-- Classes: `TaskService`, `TaskRepository`; authorization policies in `authz/policies/task.py`.
+- Classes: `TaskService`, `TaskRepository`; the area's actions are registered in
+  `authz/actions.py`, the one action registry (DL-151).
 - Project items' URLs are nested under the project and use the human-readable key and number:
   `/api/projects/{key}/tasks/{number}`, subtasks at
   `/api/projects/{key}/tasks/{number}/subtasks/{n}`. This is safe because project keys are immutable
@@ -624,7 +643,9 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   `pytest` with `anyio`, `pytest-cov`, `polyfactory` + Faker (fixed seed), Hypothesis,
   import-linter.
 - Frontend: Vite, Vue Router, Pinia, ESLint + Prettier, `vue-tsc`, Vitest + Vue Test Utils;
-  PrimeVue and Tailwind v4 from S1-C14 (DL-61); SVAR Vue widgets from the first checkpoint that
+  PrimeVue and Tailwind v4 from S1-C14 (DL-61; PrimeVue 5 is under the PrimeUI License, with the
+  owner's Community License key as a build-time setting in `.env` and a CI secret, never
+  committed, from S2-C0e, DL-135); SVAR Vue widgets from the first checkpoint that
   ships a board or an editable grid (DL-64);
   Playwright from Slice 1 (Chromium only in v1; implementation decision 9).
 - `pre-commit` for local hooks; `wl check --full` runs everything CI runs, and `wl check` the
@@ -666,8 +687,9 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   `include_deleted=True`).
 - **Optimistic locking:** a mixin with `version_id_col`; a stale save is **409**, or **404** when
   the row is gone (deleted, or soft-deleted since it was loaded; design-doc §3).
-- **Direct-update helper** for writes that must not bump `version` (rank, subtask counter);
-  each call says whether `updated_at` moves (rank writes: no; counters: yes).
+- **Direct-update helper** for writes that must not bump `version` (rank, subtask counter, an
+  item's restriction, DL-168); each call says whether `updated_at` moves (rank writes: no;
+  counters: yes; restriction: decided before S2-C6).
 - **One transaction per request:** a FastAPI dependency that opens a session, commits on
   success, rolls back on any exception.
 
@@ -694,9 +716,10 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   `{items, next_cursor}`. UUIDv7 IDs sort by creation time, so the ID is the cursor, and they
   also order the entries one request writes (which share one timestamp, the transaction's
   start). Feed indexes are `(scope, id)` (schema-doc, `audit_event` and `activity_log`).
-- **Ranked views** (backlog, board, requirement tree) return complete lists with a hard cap
-  (set in Slice 2, with the requirement tree, the first ranked view), because drag-and-drop
-  needs the whole list.
+- **Ranked views** (backlog, board, requirement tree) return complete lists with a hard cap,
+  because drag-and-drop needs the whole list: 2,000 items per view (the requirement tree: per
+  project; DL-159); above it the response carries `truncated: true` and the page says so, with a
+  tech-debt entry to page the view if a project nears it.
 - **Sorting:** `?sort=name,-created_at`, from a per-endpoint allowlist; `id` is always the last
   tiebreaker, so order is deterministic and offsets never skip or repeat rows. Each endpoint
   documents its default sort.
@@ -720,7 +743,10 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 - **Free-text search:** `?q=`, a simple name/title match until Slice 6 swaps in full-text
   search behind the same parameter.
 - **Hidden rows:** `?include_archived=true` (projects, workstreams) and `?include_deleted=true`
-  (soft-deleted items).
+  (soft-deleted items); `?archived_only=true` returns only the archived rows (from S2-C0g,
+  DL-181), for a page's own archived section, on any list whose `ListSpec` has an
+  `archived_column`; sending it with `include_archived=true` is a 422 of type `conflict` on
+  `archived_only` (DL-182).
 - **Unknown query parameters → 422** (query-parameter models with `extra="forbid"`), so a typo
   never silently returns an unfiltered list.
 - **Scoping before paging:** access scoping applies first, so `total` counts only rows the user
@@ -1209,7 +1235,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | `POST /api/users/{user_id}/sign-out-everywhere` | delete the user's sessions (`signed_out_everywhere`) | `user.manage` |
   | `PATCH /api/users/{user_id}` | change `email`, `name`, `username` (any subset); one `user_updated` event with the changed fields (per covering org, "Audit scope" below); an email change deletes the user's sessions through `on_email_changed` | `user.manage` |
   | `PATCH /api/me` | the signed-in user's own `name` and `username` (`user_updated`) | signed in |
-  | `GET /api/users/{user_id}/access` | the per-person access review: the person (`id`, `email`, `username`, `name`, `is_active`, `is_system_admin`, `workspace_role`), every org they can reach and every project they can reach, each with its `reasons` | `user.view_access` |
+  | `GET /api/users/{user_id}/access` | the per-person access review: the person (`id`, `email`, `username`, `name`, `is_active`, `is_system_admin`, `workspace_role`), every org they can reach and every project they can reach, each with its `reasons` (and each project its `export_controlled`, from S2-C0g, DL-177) | `user.view_access` |
 
   The two `PATCH`es return the user: `PATCH /api/users/{user_id}` as a users-list row, `PATCH
   /api/me` as `GET /api/auth/me` returns it (`user`); the four `POST`s return 204. **Who sees whom:** a user target the actor can't see is
@@ -1268,6 +1294,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   export-controlled project. Project admins (including inherited) open it.
 - Key is immutable: no endpoint accepts a key change. Key availability is checked live
   (`taken`, in the "Errors from constraints" shape of "API conventions").
+- **Unshipped modules:** from S2-C0d, seeding skips them and the API refuses enabling one (422
+  `module_unavailable` for `sprints` and `github`; a v2 module, unknown to the API until its slice,
+  is a 422 `enum`; DL-136, DL-178); the rows below describe Slice 1
+  as built.
 - **Module guidance** from `GET /api/module-guidance` (DL-76): the recommended modules per type, a
   best-practice note per module, and each module's `available` flag (shipped or not; `sprints` and
   `github` are not yet), so the UI greys out unavailable modules; with `modules_holding_data` on the
@@ -1279,14 +1309,15 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | Endpoint | Does | Action |
   |---|---|---|
   | `POST /api/orgs/{org_id}/projects` | create: `name`, `key` (uppercased as typed), `type`, optional `description`, optional `enabled_modules` (else seeded from the type: its v1 modules, so a software project gets `sprints` and `github`, design-doc §1.1), optional `first_admin_id`; `status` `planning`; the first admin (the creator, or `first_admin_id`) gets an explicit admin `project_membership` and becomes the lead (`project_created`, `project_member_added`); 201 with the project | `project.create`; `first_admin_id` also `project.assign_first_admin` |
-  | `GET /api/orgs/{org_id}/projects` | the org's projects the caller can open (offset paging, `ListSpec`: sort by name or key, filter by `status` and `type`; archived hidden unless `include_archived=true`) | `org.view` |
+  | `GET /api/orgs/{org_id}/projects` | the org's projects the caller can open (offset paging, `ListSpec`: sort by name or key, filter by `status` and `type`; archived hidden unless `include_archived=true`, and only archived with `archived_only=true`, from S2-C0g, DL-181; both at once a 422, DL-182) | `org.view` |
+  | `GET /api/orgs/{org_id}/first-admin-candidates?q=` | the create dialog's picker: the org's active members and the workspace's active staff (offset paging, sort by name, `q` over name, email, and username; DL-152) | `project.assign_first_admin` |
   | `GET /api/orgs/{org_id}/project-key-availability?key=` | `{available, problem}`: the key, uppercased as create does, with the key rule's problem or `taken` (anywhere in the workspace) | `project.create` |
   | `GET /api/projects/{key}` | the project (`id`, `key`, `name`, `description`, `type`, `status`, `lead_id`, `lead_name` (the lead's name, or null with no lead; from S1-C16, DL-111), `lead_is_active` (whether the lead's account is active, or null with no lead; from S1-C16a, DL-113), `enabled_modules`, `archived`, `organization_id`) with its `allowed_actions` and `modules_holding_data` (each module's has-data hook; empty until a module's slice implements it) | `project.view` |
   | `PATCH /api/projects/{key}` | change `name`, `description`, `type`, `status`, `lead_id` (null clears it), `enabled_modules` (`project_updated`, the changed fields); a `key` is ignored like any unknown field | `project.update` |
   | `POST /api/projects/{key}/archive` | set `archived_at` (`project_archived`); 204 | `project.archive` |
   | `POST /api/projects/{key}/unarchive` | clear it (`project_unarchived`); already unarchived changes and records nothing; 204 | `project.unarchive` |
   | `GET /api/module-guidance` | for each type, the recommended modules; for each module in design-doc §1.1's table, v2 included (`available` false, so its names aren't typed by `ProjectModule`), a best-practice note and `available` (static, for the create dialog before a project exists) | signed in |
-  | `GET /api/me/work`, `GET /api/me/work/projects` | My work (design-doc §11): `{sections: {projects: {available, items, total}}}`, the first 10 items of each section (a section whose query failed is `{available: false}`); `/projects` is the section as an offset-paged list. A project item: `id`, `key`, `name`, `type`, `status`, `lead_id`, `organization_id`, `organization_slug`, sorted by name; the projects the user can open, archived left out | signed in |
+  | `GET /api/me/work`, `GET /api/me/work/projects` | My work (design-doc §11): `{sections: {projects: {available, items, total}}}`, the first 10 items of each section (a section whose query failed is `{available: false}`); `/projects` is the section as an offset-paged list. A project item: `id`, `key`, `name`, `type`, `status`, `lead_id`, `lead_name` (from S2-C0f, DL-153), `organization_id`, `organization_slug`, sorted by name; the projects the user can open, archived left out | signed in |
 
   `/me`'s org entries carry their org-level `allowed_actions` (`project.create`,
   `project.assign_first_admin`, …). **Errors:** 422 on `key` (the key rule's problems, `taken`);
@@ -1330,6 +1361,10 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   people; not a mutation), both project level.
 
 ### Classification & export control (§3.1; Checkpoint 13)
+As built in Slice 1. S2-C0d renames classification to restriction throughout (endpoint,
+fields, actions, audit event) and removes the `restricted` level (DL-134), and the UI stops
+offering export control (DL-133).
+
 - `rules/classification.py`: effective classification (the stricter level, the union of
   categories) and the raise and lower rules, test-first (`spec-test-writer`) and
   mutation-tested.
@@ -1395,8 +1430,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   sections. It lives at `/`, so it adds nothing to the reserved list. The system-status page
   (the S0 home page's health check) moves to `/status`, which joins the reserved list.
 - Project list; create-project dialog with live key validation, type selection, module
-  selection showing the recommendations and notes, and a first-admin picker (the org's members; the
-  workspace's staff aren't listed yet, TD-44, DL-112) shown only when the org's entry in `/me` includes
+  selection showing the recommendations and notes, and a first-admin picker (the org's active members and the
+  workspace's active staff, `first-admin-candidates`, DL-152) shown only when the org's entry in `/me` includes
   `project.assign_first_admin`; project settings with name, description, type, status,
   lead (a project with no lead flagged), module toggles and warnings; archive/unarchive.
 - Org settings: rename, change slug.
@@ -1491,88 +1526,131 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
 ---
 
-## Slice 2 — notes for planning
+## Slice 2 — Requirements & approvals
 
-What's decided so far. This is not the slice's plan, which is written when Slice 2 is next.
+**Goal:** requirements can be created, nested, ordered, edited with revisions, compared, deleted
+and restored, and approved through named approvers; every content change is logged;
+export-controlled content is hidden from anyone without an explicit membership; and the owner's
+Slice 1 feedback is in.
 
-- **S2-C0, a pre-checkpoint, comes first** (DL-124), before Slice 2's features. Slice 2's plan
-  writes its rows. It covers:
-  - `repo-auditor`'s Slice 1 majors: a settings save sends only the changed fields (TD-56); an
-    update locks and re-reads its row before its change check (TD-57); a list goes back to page 1
-    when its last page empties (TD-58); one username-suggestion composable (TD-59);
-  - the docs and the authorization registry made to agree: per-area `authz/policies/` files, or
-    the docs describing the one `actions.py` registry (TD-60), before Slice 2's first new area;
-  - the owner's completed screen inventory, steps 2 to 6, checked against the docs and the built
-    screens (TD-62);
-  - the `vue-screen` skill, distilled from Slice 1's hand-built screens, and the
-    `user-guide-verifier` agent, which follows `docs/user-guide.md` literally in a browser
-    against a seeded stack and walks the "Done when" list (both scheduled in Slice 1 and missed;
-    `docs/reviews/s1/S1-retro.md`);
-  - the `new-area` skill verified and corrected against the hand-built `project` area (DL-132),
-    before Slice 2's first new area uses it;
-  - the owner's UI feedback on Slice 1, in `docs/ui-feedback.md`: many of its changes are made
-    here.
+**Before starting:** the plan record's open questions (`docs/reviews/s2/S2-plan.md`) answered by
+the owner before S2-C0a (done, DL-159 to DL-163); `uv run wl audit` green; the web rows (S2-C15 to S2-C21) stay
+provisional until the owner's screen inventory covers their screens (DL-157), and are re-cut
+before they start (DL-139).
 
-- **Rank is built in Slice 2** (DL-4). Requirements are ordered by `rank` among siblings, so the
-  rank helper (fractional indexing, server-computed from neighbor IDs; design-doc §6, "Manual
-  ordering") and its Hypothesis tests come with the requirement tree. Slice 3 keeps rank for tasks,
-  the backlog, and the board.
-- **SVAR widgets** (DL-64; ui-design-guide §7.1): the requirement tree (an editable or ordered
-  list) and Slice 3's board are planned on SVAR Vue widgets (DataGrid, Kanban), used only
-  through our wrappers. The packages (`@svar-ui/*`, MIT, exact pins: vue-kanban 2.6.0, vue-grid
-  2.7.5, vue-gantt 2.7.4, vue-core 2.6.1) arrive in the first checkpoint that ships a board or an
-  editable grid, with its wrapper, its entries in `src/app/theme/svar-theme.css` (from the
-  reference copy in `docs/ui/`), the theme-audit and keyboard/move specs, any
-  `e2e/svar-known-issues.ts` entries, and the per-list choice recorded in `screen-inventory.md`
-  (UI-SVR-2); which checkpoint that is gets decided when Slices 2 and 3 are planned. Before the
-  DataGrid is chosen for the requirement tree, its tree mode is checked (ui-design-guide §10).
-  Rank fits the wrappers: a move goes through `api.intercept`, the client sends neighbor IDs,
-  and the server computes rank (UI-SVR-5).
-- **The requirement delete dialog grows by slice** (design-doc §9):
-  - Slice 2: child requirements (promote or delete), and cancelling a pending approval request;
-  - Slice 3: linked tasks;
-  - Slice 5: linked test cases.
+**Carry-in tech debt** (Fix by: Slice 2 or S2-C0, `tech-debt.md`): TD-19 (S2-C22, the tech-debt
+review), TD-31 (S2-C22), TD-40 (S2-C14), TD-42 (S2-C22), TD-44 (S2-C0c), TD-49 (S2-C0g), TD-51
+(S2-C0h), TD-52 (S2-C0c for the existing fields; each Slice 2 field with its row), TD-53
+(S2-C0c), TD-54 (S2-C0c), TD-55 (S2-C0c), TD-56 (S2-C0h), TD-57 (S2-C0c), TD-58 (S2-C0g), TD-59
+(S2-C0h), TD-60 (S2-C0c), TD-61 (S2-C22), TD-62 (S2-C0i), TD-63 (S2-C22), TD-64 (S2-C22).
 
-  Reviewers shouldn't flag the Slice 2 dialog as incomplete.
+### Checkpoints
+
+S2-C0 (DL-124) is planned as rows 0a to 0i (DL-156): Slice 1's leftovers and the owner's UI
+feedback (`docs/reviews/s1/S1-ui-feedback.md`, each item marked with its row, DL-137, DL-158),
+before the features.
+
+| # | Checkpoint | Includes |
+|---|---|---|
+| 0a | Simplicity audit | The `simplicity-auditor` agent and `.claude/audit/` with `SOURCES.md` ("Claude configuration"; DL-138), the docs consistency test for C0 or C0a and slice-end records (DL-165), and the `checkpoint` skill's slice-end step; run on `main` as of `e999564`; recorded in `docs/reviews/s2/S2-C0a.md`; the owner decides each finding, and each accepted fix is assigned to the C0 row that touches that code (DL-131) |
+| 0b | Tree spike | DL-150: SVAR DataGrid's tree mode against PrimeVue TreeTable on one checklist (tree mode in SVAR's free package; keyboard: arrows to expand and collapse, Tab, focus after a move; `treegrid` semantics: `aria-level`, `aria-expanded`, `aria-rowindex`; a move through our menu with the server mocked to allow and to deny; pointer drag (SVAR); the token theme audit; about 500 rows). Evidence in `docs/spikes/`; the result is a decision-log entry that decides S2-C15 and closes ui-design-guide §10 item 5(g), and, if SVAR wins, widens UI-STY-7, DL-64, and every other statement of SVAR's scope to the tree (DL-167); no product code |
+| 0c | Backend leftovers | TD-57 (lock and re-read before the change check in the org, workspace, and user services, a race test each), through one `apply_changes` beside `changed_fields` used by the org, workspace, user, and project services, with org's `_name_and_slug_errors` shared with workspace (S2-C0a finding 8, DL-170); TD-55; TD-53 (one `ERRORS` map in `routers/deps.py`), with `ValidationFailedError.on(loc, message, type)` replacing the three one-field helpers (finding 9, DL-170); TD-54 (`PageResult.with_items`, built for `PageResult.map`: the roster builds its rows with one `await`); TD-52 for the existing fields (DL-143: project, org, workspace, and user names 100 characters, project description 2,000; `Field(max_length=…)`, `wl gen-client`); TD-44 (DL-152: `GET /api/orgs/{org_id}/first-admin-candidates`, the org's members and the workspace's staff, offset-paged with `?q=`, under `project.assign_first_admin`, and the create dialog's picker on it); TD-60 (DL-151: the docs describe the one registry); the `new-area` skill verified and corrected against the `project` area (DL-132) |
+| 0d | Restriction, export control, modules | DL-134 (the rename in code, schema doc, and API, `wl gen-client`; `restricted` removed; one migration mapping `restricted` to `confidential`, renaming the columns and CHECK constraints, and rewriting the `audit_event` rows' action, with its downgrade; the spec tests changed with the owner's approval, recorded in DL-134; the schema doc, the developer and user guides, and the `.claude/` files that name built code renamed with it); DL-133 (export control hidden on the create dialog and in settings; the access review's Access column only on an export-controlled project); DL-136 (unshipped modules: seeding skips them, 422 `module_unavailable` on `enabled_modules`, a migration removing `sprints` and `github` from every project, disabled checkboxes with "Not available yet" on create and in settings); the restriction badge in the project header replacing the banner (DL-137) |
+| 0e | Shell | DL-135 (the license key as a build-time setting, the CI secret, a placeholder in `.env.example`, an end-to-end check that no license notice renders); dialogs centered, with an end-to-end check that an open dialog is centered in the viewport; the header's "Waterline" and the org's name; the user menu (sign-out with an icon and the danger tone); the project selector ("New project" not indented, "All projects" distinct, the popover headed by the org's name); sign-in spacing (DL-137) |
+| 0f | Org admin | The org menu in the header (UI-SHL-4); the org and workspace admin sidebars (UI-SHL-5, UI-SHL-10); the org overview page, `/{org_slug}/overview` (the org's details and projects: name, key, type, status, lead, each linking to its settings; under `org_member.manage`, DL-163), with `lead_name` on the project item (DL-153, `wl gen-client`) |
+| 0g | Account & lists | Account settings' Appearance section, with the theme choice removed from the user menu (UI-TOK-2, DL-164); `/account/password`; My work and the project list (status right-aligned; the org and the user's access on My work; the type on the project list; `organization_name` and `my_access` on the project item, DL-153, `wl gen-client`); the workspace users' Role and Status columns; the access review's title and sentence; TD-49 (project pages' actions in the header); TD-58 (`useListQuery` returns to page 1); the org's project list on an `ORG_PROJECTS` spec with `archived_column` in place of the hand-built `include_archived` (S2-C0a finding 10, DL-170); the org overview's archived projects in a section below headed "Archived" (DL-180), from `?archived_only=true` on `ListSpec`'s archived handling (DL-181; with `include_archived=true` too, a 422, DL-182; with API tests and `wl gen-client`); `export_controlled` on the per-person access review's project rows, and its Access shown only on those rows (DL-177; backend, with API tests and `wl gen-client`); the restriction badge's visually hidden "Restriction: " (DL-179) |
+| 0h | Forms | Add-person (the email's format checked on step 1, an editable email on step 2 re-checked on change, the email styled apart from its label; UI-FRM-13); the add-member picker opens its list on focus; project settings (spacing, the Danger zone, the danger confirm; UI-FRM-14); TD-51; TD-56 (settings send only changed fields), with org and workspace settings merged into one `NameSlugSettings.vue` (S2-C0a finding 4, DL-170); TD-59 (`useUsernameSuggestion`), with the add-person and create-org dialogs' new-account fields in one `NewAccountFields.vue` on it (finding 5, DL-170) |
+| 0i | Tooling & inventory | The `vue-screen` skill and the `user-guide-verifier` agent ("Workflow items scheduled"; the agent's first run on S2-C0's changes); every item in `S1-ui-feedback.md` checked done or logged; TD-62 (DL-157); the developer guide's Status section cut to one line (S2-C0a finding 2, DL-170); `fresh-clone-verifier`'s step 5 runs the guide's quick checks (`wl doctor`, `wl up`, the health check, plain `wl check`), not `wl check --full` (finding 6, DL-170), and the guide's first-time setup ends with plain `wl check`, naming `wl check --full` as what CI runs (DL-173) |
+| 1 | Models & migration | `requirement`, `requirement_revision`, `approval_request`, `approval`, `activity_log` (schema-doc), one migration; the circular foreign keys with `use_alter`, hand-reviewed, downgrade tested; constraint tests; factories; `RestrictionMixin` on `requirement`; the columns marked for later slices not built; the stale-row 404 or 409 decided once, in `get_session`, with `stale_data_handler` and `is_version_conflict` deleted and a test through a stale `requirement` write (S2-C0a finding 7, DL-170) |
+| 2 | Rank helper | `rules/rank.py`: a fractional index from the neighbors' IDs (design-doc §6, "Manual ordering"), test-first (`spec-test-writer`), with Hypothesis, mutation-tested; `direct_update` with `touch_updated_at=False` |
+| 3 | Change log & item history | `log_change()` (design-doc §10), the only writer to `activity_log`; `GET /api/projects/{key}/requirements/{number}/activity` (cursor-paged, names resolved server-side, former members' included, DL-147, DL-160); the project service logs `status` and `lead_id` changes, including a lead cleared by a member removal on any path |
+| 4 | Content access | The export-control gate in `authorize()` (design-doc §5 order); content scoping for lists (`scoping.py`); personal actions checked for content access; matrix rows (inherited admins denied content and allowed management; explicit members allowed); test-first; tested through a test-only content router until S2-C5's routes exist |
+| 5 | Requirements: create, read, list | `POST /api/projects/{key}/requirements` (the `RQ` number from the numbering service, revision 1 in the same transaction, `draft`, reporter = creator, restriction at creation, a parent in the same project; title and description limits, DL-143); `GET /api/projects/{key}/requirements` (the ranked tree view, complete up to the cap, DL-159); `GET /api/projects/{key}/requirements/{number}` (with `allowed_actions`); the `requirement.*` actions in the registry |
+| 6 | Requirements: update | `PATCH /api/projects/{key}/requirements/{number}` (`version`, 409 when stale; a new revision only when the title or description changes, with `change_note`; status any to any except `approved` (403 to members, 422 `use_approve` to admins, DL-148, DL-161); priority; reporter, admins only); `PUT /api/projects/{key}/requirements/{number}/restriction` (no `version`, and a direct update that doesn't bump it, DL-162, DL-168, with the developer guide's "Direct updates" paragraph; members raise, admins lower, never below the project's); every logged field through `log_change()` |
+| 7 | Tree operations | `POST /api/projects/{key}/requirements/{number}/move` (`parent_id` or null, `after_id` or `before_id`; same-project and cycle checks; the parent change logged; rank from S2-C2) |
+| 8 | Delete, restore & trash | `DELETE /api/projects/{key}/requirements/{number}?children=promote\|delete` (design-doc §9: the delete rules; children the user can't delete only promotable; a pending approval request cancelled and logged); `POST /api/projects/{key}/requirements/{number}/restore` (DL-146's tree rules); `GET /api/projects/{key}/trash` (offset-paged, a `type` filter, what the user may restore) |
+| 9 | Revisions | `GET /api/projects/{key}/requirements/{number}/revisions` (cursor-paged) and `GET /api/projects/{key}/requirements/{number}/revisions/{revision_number}` (DL-145) |
+| 10 | Approval requests | `POST /api/projects/{key}/requirements/{number}/approval-requests` (approvers by UUID; eligibility per §6.2 and export control; bound to the current revision; one pending per entity); `GET /api/projects/{key}/requirements/{number}/approval-requests`; `GET /api/approval-requests/{id}`; `POST /api/approval-requests/{id}/cancel`; logged per §10 |
+| 11 | Decisions & completion | `POST /api/approval-requests/{id}/decision` (`approval.decide`, a personal action no admin level grants); the all-must-approve policy in `rules/` (test-first); completion through the requirement's registered `on_approved` handler; `POST /api/projects/{key}/requirements/{number}/approve` (`requirement.approve_manually`, `version`, 409 when stale, DL-169; cancelling a pending request; the only path to `approved` by hand, DL-148, DL-161); the stale-revision warning field |
+| 12 | Approver replacement: project paths | Design-doc §6.2's replacement for: a project membership removed directly; the project marked export-controlled; an explicit membership removed on an export-controlled project; the archived-project flag instead of replacement; a replacement that completes a request; an API test per path |
+| 13 | Approver replacement: other paths | The org and workspace removals (with their projects); an org or workspace role change or removal that took inherited admin away; `revoke-system-admin` (`changed_by` null); deactivation; the call sites in the layer order ("Notes" below); an API test per path |
+| 14 | My work: approvals | The approvals section (`GET /api/me/work`, `GET /api/me/work/approvals`; the `(approver_id, decision)` index; export-controlled content left out); TD-40 (each section its own error state, backend and page) |
+| 15 | Tree widget *(provisional)* | The `RequirementsTree` wrapper on PrimeVue TreeTable (DL-174), with the move menu: the table's name through `pt.table`, the expand button `aria-hidden`, Right on a closed row only opening it, a move splicing the node objects in place, `treetable` in the preset (its border on `--color-border-subtle`), and the keyboard, axe, theme-audit, and move specs (`docs/spikes/S2-C0b-tree/results.md`) |
+| 16 | Markdown view & editor *(provisional)* | DL-140, DL-141, DL-142: `MarkdownView`, `MarkdownEditor`, the CSP, the XSS corpus, and the end-to-end payload test |
+| 17 | Requirements page *(provisional)* | The tree (S2-C15), opening with only the top-level rows showing (every branch closed) and an "Expand all" that opens the second level at once and the deeper rows a batch per frame, so the page never freezes, measured at the 2,000-row cap (DL-175); the create dialog (the template by type, DL-149), Move up, down, to top, after…, and "Move to…", the Trash link |
+| 18 | Requirement detail *(provisional)* | View and edit (S2-C16), 409 handling, the status menu and badges (DL-148), the restriction badge, the "No acceptance criteria" note, "Approved · modified" |
+| 19 | History & revisions *(provisional)* | The History and Revisions tabs (DL-145, DL-147) |
+| 20 | Approvals UI *(provisional)* | The request dialog (approver picker), the decide panel, cancel, approve by hand, the flagged-request state, My work's approvals section |
+| 21 | Delete dialog & trash *(provisional)* | The delete dialog (children promote or delete, the pending-request note), the Trash page and restore (DL-146) |
+| 22 | Slice verification | As S1-C17, plus `simplicity-auditor` after `repo-auditor` (DL-138); "Done when" walked through; a manual keyboard and screen-reader pass; the tech-debt review (TD-19, TD-31, TD-42, TD-61, TD-63, TD-64); the retro, including whether `repo-auditor` keeps its lean category (DL-166), and S2-C0a's findings 1 (the git guard against Claude Code permission rules, after a trial in a scratch session) and 3 (one list of agents, skills, and hooks) (DL-171) |
+
+**Groups** ("Pull requests"): five review points, on the `s2` branch with one PR.
+
+| Group | Name | Checkpoints |
+|---|---|---|
+| 1 | `s2-prep` | 0a–0i (audit, spike, Slice 1's leftovers, the owner's UI feedback, tooling) |
+| 2 | `s2-foundations` | 1–4 (models, rank, change log, content access) |
+| 3 | `s2-requirements` | 5–9 (requirements, tree, delete and trash, revisions) |
+| 4 | `s2-approvals` | 10–14 (requests, decisions, replacement, My work) |
+| 5 | `s2-web` | 15–22 (the web screens and slice verification) |
+
+Checkpoints 0d, 2, 4, 5, 6, 8, 10, 11, 12, and 13 add or change `app/rules/` or `app/authz/`
+code, so each starts with `spec-test-writer` (DL-15); each row confirms it against its content
+when it starts. The `security-reviewer` runs on every checkpoint from 0c to 14, and on 16. The
+`ui-reviewer` runs whenever a diff touches `frontend/src/` or `frontend/e2e/` (DL-62).
+
+The sections below describe the content; the table above is the order of work. The plan's
+fixes, decisions, conventions, each row's actions, threat-model pass, and open questions are in
+`docs/reviews/s2/S2-plan.md`.
+
+### Requirements (§6, §6.1, §7, §9)
+- **Rank** (DL-4): requirements are ordered by `rank` among siblings, so the rank helper
+  (fractional indexing, computed by the server from the neighbors' IDs; design-doc §6, "Manual
+  ordering") and its Hypothesis tests come with the tree. Slice 3 uses it for tasks, the backlog,
+  and the board.
+- **Status** (DL-148): any status to any other, except into `approved` (a project admin by hand,
+  `requirement.approve_manually`, or a completed request); new requirements start as `draft`.
+- **Revisions:** revision 1 at creation (§6.1); a new one only when an explicit save changes the
+  title or description. Any two revisions can be compared, not only the approved one against the
+  current one (§6.1, DL-145).
+- **Acceptance-criteria templates** by project type, in the frontend (DL-149).
+- **Restriction:** requirements get `RestrictionMixin`; members raise an item's level and add
+  categories, project admins lower them; item changes are logged (`restriction_level`,
+  `restriction_categories`; design-doc §3.1, §10).
+- **The delete dialog grows by slice** (design-doc §9): Slice 2, child requirements (promote or
+  delete) and cancelling a pending approval request; Slice 3, linked tasks; Slice 5, linked test
+  cases. Reviewers shouldn't flag the Slice 2 dialog as incomplete.
+- **Trash and restore** (DL-146): one page per project, listing by type; restoring a requirement
+  restores the descendants deleted with it.
 - **Circular foreign keys.** `requirement.current_revision_id` and `approved_revision_id` →
-  `requirement_revision`, which references `requirement`. The migration needs `use_alter` (or
-  the FKs added after both tables exist). Autogenerate gets this wrong, so review it by hand,
+  `requirement_revision`, which references `requirement`. The migration needs `use_alter` (or the
+  foreign keys added after both tables exist). Autogenerate gets this wrong, so review it by hand,
   and test the downgrade.
 - **Columns from later slices:** `requirement.workstream_id` (Slice 3) and `search_vector`
-  (Slice 6) aren't built in Slice 2. They carry the schema doc's `Added in Slice <n>.` marker
-  (schema-doc conventions).
-- **Classification:** requirements get `ClassificationMixin`; members raise an item's level and
-  add categories, project admins lower them; item changes are logged (`classification_level`,
-  `classification_categories`; design-doc §3.1, §10).
-- **The export-control gate** (design-doc §5, §3.1) is built here, with requirements as the
-  first content: on an export-controlled project, every content action (read or mutation) by a
-  user without an explicit membership is a 404, whatever their admin level; management actions
-  pass. Matrix rows: inherited admins denied content and allowed management; explicit members
-  allowed. The Done-when gets the Slice 1 item's other half: content hidden from an inherited
-  admin who isn't a member, and shown once they're added with the confirmation.
-- **Approver eligibility** on export-controlled projects: explicit members only (§3.1, §6.2).
-- **Revision comparison:** any two revisions of a requirement can be compared, not only the
-  approved one against the current one (§6.1).
-- **My work** gains its approvals section in the `my_work` area: approvals pending the user's
-  decision (§11), using the `approval` index on `(approver_id, decision)`.
-- **Project status and lead in the activity feed:** with `log_change()`, the project service
-  also logs `status` and `lead_id` changes to `activity_log` (`entity_type = project`; §10),
-  besides their `project_updated` audit event. That includes a lead cleared because the lead's
-  membership was removed (by any path, archived projects included), alongside its
-  `project_member_removed` event.
+  (Slice 6) aren't built in Slice 2. They carry the schema doc's `Added in Slice <n>.` marker.
+- **Length limits** (DL-143): requirement title 200 characters, description 20,000; revision
+  change notes 500; approval-request notes and approver comments 2,000.
+
+### Content access and export control (§3.1, §5)
+- **The export-control gate** (design-doc §5, §3.1) is built here, with requirements as the first
+  content: on an export-controlled project, every content action (read or mutation) by a user
+  without an explicit membership is a 404, whatever their admin level; management actions pass.
+  Matrix rows: inherited admins denied content and allowed management; explicit members allowed.
+  The "Done when" gets the Slice 1 item's other half: content hidden from an inherited admin who
+  isn't a member, and shown once they're added with the confirmation. The UI no longer offers
+  export control (DL-133), so the tests and the try-it script mark a project through the API.
 - **Personal actions and export control:** the personal-action matrix rows for an
-  export-controlled project (the relationship without an explicit membership denied) are
-  tested here, with the gate and `approval.decide` (§5).
-- **No replacement in an archived project** (§6.2): the requester-admin check below never
-  runs there, so it needn't get past the archived step of `authorize()`.
-- **Decided:**
-  - manual approval by project admins, which cancels a pending request (design-doc §5,
-    "Requirement approval by hand"; §6.2);
-  - revision 1 at creation (§6.1);
-  - `approval.decide` is a personal action, allowed only to a named approver with content
-    access to the project (§5, "The choke point");
-  - approver eligibility and replacement, including a replacement that completes a request
-    (§6.2).
+  export-controlled project (the relationship without an explicit membership denied) are tested
+  here, with the gate and `approval.decide` (§5).
+
+### Approvals (§6.2)
+- **Decided:** manual approval by project admins, which cancels a pending request (design-doc
+  §5, "Requirement approval by hand"; §6.2); `approval.decide` is a personal action, allowed only
+  to a named approver with content access to the project (§5, "The choke point"); approver
+  eligibility and replacement, including a replacement that completes a request (§6.2).
+- **Approver eligibility** on export-controlled projects: explicit members only (§3.1, §6.2).
+- **No replacement in an archived project** (§6.2): the requester-admin check below never runs
+  there, so it needn't get past the archived step of `authorize()`.
 - **Approver replacement touches Slice 1 flows.** Every path that takes away the access needed
   to decide (§6.2) gets the replacement: removing a project membership (directly, or with an org
   or workspace removal); removing or changing the org or workspace membership or role that gave
@@ -1581,9 +1659,75 @@ What's decided so far. This is not the slice's plan, which is written when Slice
   export-controlled, or removing an explicit membership on one; deactivating a user. Services in
   layers 2–3 (auth, workspace, org, project) call the approval service (layer 1) directly, which
   the layer order allows. To decide whether the requester still holds project admin, the
-  approval service builds the requester's authorization context and calls `authorize(requester,
-  "approval_request.create", project)`, so the export-control rule is applied in one place, with
-  no upward call. The Slice 2 plan decides the exact call sites, with an API test for each path.
+  approval service builds the requester's authorization context and calls
+  `authorize(requester, "approval_request.create", project)`, so the export-control rule is
+  applied in one place, with no upward call. S2-C12 and S2-C13 fix the exact call sites, with an
+  API test for each path.
+
+### Change log (§10)
+- `log_change()` is the only writer to `activity_log`. The requirement detail page's History tab
+  reads it (DL-147); the project activity feed's API and page come in Slice 3.
+- **Project status and lead:** the project service also logs `status` and `lead_id` changes to
+  `activity_log` (`entity_type = project`; §10), besides their `project_updated` audit event,
+  including a lead cleared because the lead's membership was removed (by any path, archived
+  projects included), alongside its `project_member_removed` event.
+
+### My work (§11)
+- My work gains its approvals section in the `my_work` area: approvals pending the user's
+  decision, using the `approval` index on `(approver_id, decision)`; each section gets its own
+  error state (TD-40). Its project items gain `organization_name`, `lead_name`, and `my_access`
+  (DL-153).
+
+### Web screens
+- **S2-C0's screens** (DL-137, the rules in ui-design-guide §4 to §6): the org menu in the header,
+  the admin sidebars, the org overview page, account settings' Appearance section and the change
+  password page, My work and the project list's fields, the workspace users' columns, the
+  add-person and add-member changes, project settings' Danger zone, the restriction badge, and
+  centered dialogs.
+- **The tree widget** (DL-174, from the S2-C0b spike): the requirement tree is PrimeVue
+  TreeTable, so Slice 2 adds no SVAR package; SVAR arrives with the board in Slice 3 (DL-64).
+  Rank fits the wrapper: a move goes through our menu, the client sends neighbor IDs, and the
+  server computes rank (UI-SVR-5).
+- **Rendered markdown** (DL-140, DL-141, DL-142; ui-design-guide UI-MD-1 and UI-MD-2): one
+  `MarkdownView` and one `MarkdownEditor`, built once in S2-C16 and reused by comments in
+  Slice 6.
+- The requirements page, requirement detail (with History and Revisions), the approvals UI, the
+  delete dialog, and the Trash page (S2-C17 to S2-C21), provisional until the screen inventory
+  covers them (DL-157).
+- End-to-end tests (Playwright, Chromium): creating and editing a requirement; requesting and
+  deciding an approval; a stored XSS payload that doesn't run; deleting and restoring a tree.
+
+### Done when
+- [ ] A member creates a requirement (an `RQ` number, `draft`, revision 1, the type's template),
+      edits it (a new revision only when the title or description changes; 409 on a stale
+      version), nests, reorders, and moves it ("Move to…" refuses a cycle and another project's
+      parent).
+- [ ] Members move any status to any other except into Approved; a project admin approves by
+      hand, which records the approved revision and cancels a pending request.
+- [ ] An admin requests approval from named approvers (a viewer allowed; someone without access
+      is a 404); each approver decides only their own row, and no admin level (system admin
+      included) can decide for them; when all approve, the requirement records the request's
+      revision; a later edit shows "Approved · modified", and the compare view shows the change.
+- [ ] Every approver-replacement path in design-doc §6.2 has an API test; in an archived project
+      the request is flagged instead.
+- [ ] Deleting offers promote or delete for children and cancels a pending request; restoring
+      brings back the descendants deleted with it; the trash shows each user what they may
+      restore.
+- [ ] On a project marked export-controlled through the API, an inherited admin without an
+      explicit membership gets a 404 for every requirement read and list, revisions, history,
+      approvals, and the trash, and My work leaves it out; management still works; once added
+      (with the confirmation) they see the content.
+- [ ] My work's approvals section lists pending approvals, and a failing section doesn't fail the
+      page.
+- [ ] A stored XSS payload in a description doesn't execute (component and end-to-end tests), and
+      the CSP header is present.
+- [ ] No `classification` remains in the API or UI; Restricted is gone; an unshipped module can't
+      be enabled.
+- [ ] S2-C0a's audit record exists with every finding decided, and every item in
+      `S1-ui-feedback.md` is done or logged.
+- [ ] The accessibility checks pass and the manual keyboard and screen-reader pass found nothing
+      unresolved; mutation testing has no survivors in `app/rules/` and `app/authz/`; CI is
+      green.
 
 ---
 
@@ -1595,6 +1739,10 @@ notes for each slice's planning, not plans.
 - **Slice 3:** "copy branch name" on tasks (design-doc §6, Task); My work's task sections:
   tasks assigned to the user and tasks awaiting their review, with `ix_task_assignee_id_status`
   and `ix_task_reviewer_id_status` (schema-doc, `task`).
+- **Slice 3** (DL-155): the project activity feed's API and page, with the filter bar (DL-147);
+  item IDs (`WTL-RQ-12`) auto-linked in rendered markdown, once there are tasks to link (DL-144).
+- **Slices 4 and 7** (DL-155): when `sprints` (Slice 4) or `github` (Slice 7) ships, whether
+  existing software projects get it turned on (DL-136).
 - **Slice 4:** completing a sprint with unfinished tasks moves them to the next planned sprint
   (earliest `start_date`) or the backlog, in one request, each `sprint_id` change logged (design-doc
   §6, Sprint).

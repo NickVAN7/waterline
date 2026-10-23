@@ -14,6 +14,11 @@ be checked for completeness.
 | 6. Consolidate | One inventory; page vs. panel vs. dialog vs. inline; mapped to build slices | |
 | 7. Design guide | Tokens, enum → visual mapping, components, patterns | **Done** (Oct 10, 2026): `docs/ui-design-guide.md`, the authoritative UI guide (DL-61) |
 
+**Slice 2 depends on steps 2 to 6** (DL-157): the owner is completing them in a separate session.
+S2-C0i checks the completed inventory against the docs and the built screens (TD-62); if it isn't
+committed when S2-C0i starts, that check moves to the start of the `s2-web` group, and Slice 2's
+web rows (S2-C15 to S2-C21) stay provisional until it is.
+
 Early mockups (sprint board, requirement detail, delete-requirement dialog, test case) exist on
 the "Waterline key screens" design canvas. They predate this inventory and will be revisited in
 step 6.
@@ -132,7 +137,8 @@ Workspace (the firm: tenant boundary)
   CSS pixels, sticky headers and toasts never covering the focused element, a single-pointer
   alternative to every drag, and password fields that allow paste and password managers; and
   bulk selection (UI-TBL-6 to UI-TBL-8).
-- **Data classification** (design-doc §3.1): a banner on project pages and a badge on items
-  showing the level and categories as text, never color alone; the export-control
-  confirmation dialogs (adding a member to an export-controlled project; marking a project
-  export-controlled, listing its explicit members; and creating a project export-controlled).
+- **Data restriction** (design-doc §3.1; DL-134): a badge in the project header and on items
+  showing the level (None, Internal, Confidential) and categories as text, never color alone
+  (DL-137); the export-control confirmation dialogs, which the UI reaches only on a project made
+  export-controlled through the API (adding a member to it), since the UI no longer offers
+  export control (DL-133).

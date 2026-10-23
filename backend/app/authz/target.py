@@ -5,7 +5,7 @@ user's memberships for the rank rule)."""
 import uuid
 from dataclasses import dataclass, field
 
-from app.enums import ClassificationCategory
+from app.enums import RestrictionCategory
 from app.models.org import Organization
 from app.models.project import Project
 from app.models.workspace import Workspace
@@ -50,8 +50,8 @@ def project_target(project: Project, entity: object = None) -> Target:
         archived=project.archived_at is not None,
         enabled_modules=frozenset(project.enabled_modules),
         # An unsaved project has no categories until the database default fills them.
-        export_controlled=ClassificationCategory.EXPORT_CONTROLLED
-        in (project.classification_categories or ()),
+        export_controlled=RestrictionCategory.EXPORT_CONTROLLED
+        in (project.restriction_categories or ()),
         entity=entity,
     )
 

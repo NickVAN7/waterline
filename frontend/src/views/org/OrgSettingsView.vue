@@ -30,7 +30,6 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
-import OrgNav from './OrgNav.vue'
 import { WHO_TO_ASK } from './orgAdmin'
 
 const org = useRouteOrg()
@@ -153,7 +152,6 @@ const retry = retryFromSubmit(formElement, submit)
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <OrgNav :org-slug="org.slug" />
     <PageHeader :title="`${org.name} settings`" />
     <section
       aria-labelledby="settings-heading"

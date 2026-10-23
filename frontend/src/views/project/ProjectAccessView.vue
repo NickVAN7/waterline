@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // A project's access review (`/{org_slug}/projects/{key}/access`; design-doc §5, "Access review";
 // build plan, "The project members API"): everyone who reaches the project, why (their explicit
-// role, or the admin role it's inherited through), and whether they reach its content or only its
-// management (design-doc §3.1). For the project's admins (`project.view_access`); anyone else who
+// role, or the admin role it's inherited through), and, on an export-controlled project only,
+// whether they reach its content or only its management (design-doc §3.1, DL-133). For the project's admins (`project.view_access`); anyone else who
 // sees the project gets the 403 page. Loading, the not-found page, and the redirect are
 // `useProjectPage`'s.
 import { computed, watch } from 'vue'
@@ -26,6 +26,9 @@ const WHO_TO_ASK = "The access review is for the project's admins. Ask one of th
 const { key, project, notFound, retry } = useProjectPage('project-access')
 const loaded = computed(() => project.data.value)
 const allowed = computed(() => allows(loaded.value, 'project.view_access'))
+const exportControlled = computed(
+  () => !!loaded.value?.restriction_categories.includes('export_controlled'),
+)
 
 const review = useLoad(() =>
   api(client.GET('/api/projects/{key}/access', { params: { path: { key: loaded.value!.key } } })),
@@ -95,7 +98,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
                 <th scope="col" class="p-2">Email</th>
                 <th scope="col" class="p-2">Project role</th>
                 <th scope="col" class="p-2">Why they reach it</th>
-                <th scope="col" class="p-2">Access</th>
+                <th v-if="exportControlled" scope="col" class="p-2">Access</th>
               </tr>
             </thead>
             <tbody>
@@ -118,7 +121,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
                 <td class="p-2">{{ entry.user.email }}</td>
                 <td class="p-2">{{ entry.role ? PROJECT_ROLE[entry.role] : 'None' }}</td>
                 <td class="p-2">{{ reasons(entry.reasons) }}</td>
-                <td class="p-2">{{ ACCESS_KIND[entry.access] }}</td>
+                <td v-if="exportControlled" class="p-2">{{ ACCESS_KIND[entry.access] }}</td>
               </tr>
             </tbody>
           </table>

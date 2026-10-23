@@ -10,7 +10,7 @@ Clients branch on `code`, never on `message`.
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Self, cast
 
 from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
@@ -128,6 +128,11 @@ class ValidationFailedError(AppError):
                 ]
             },
         )
+
+    @classmethod
+    def on(cls, loc: tuple[str | int, ...], message: str, type_: str) -> Self:
+        """The error for one invalid field."""
+        return cls([FieldError(loc, message, type_)])
 
 
 class ServiceUnavailableError(AppError):

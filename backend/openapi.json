@@ -3153,6 +3153,140 @@
         }
       }
     },
+    "/api/orgs/{org_id}/first-admin-candidates": {
+      "get": {
+        "tags": [
+          "project"
+        ],
+        "summary": "First Admin Candidates",
+        "description": "The create dialog's picker: the org's active members and the workspace's active staff,\noffset-paged with `?q=` (DL-152). Needs `project.assign_first_admin`.",
+        "operationId": "first_admin_candidates_api_orgs__org_id__first_admin_candidates_get",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: name. Default: name",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: name. Default: name"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MemberCandidate_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/orgs/{org_id}/project-key-availability": {
       "get": {
         "tags": [
@@ -3390,14 +3524,14 @@
         }
       }
     },
-    "/api/projects/{key}/classification": {
+    "/api/projects/{key}/restriction": {
       "put": {
         "tags": [
           "project"
         ],
-        "summary": "Set Project Classification",
-        "description": "Set the project's classification level and categories (DL-81): raising needs\n`project.raise_classification`, lowering `project.lower_classification`. 422 on\n`export_control_confirmed` and `confirmed_member_ids`: `confirmation_required`,\n`members_changed`, or `confirmation_not_needed`.",
-        "operationId": "set_project_classification_api_projects__key__classification_put",
+        "summary": "Set Project Restriction",
+        "description": "Set the project's restriction level and categories (DL-81): raising needs\n`project.raise_restriction`, lowering `project.lower_restriction`. 422 on\n`export_control_confirmed` and `confirmed_member_ids`: `confirmation_required`,\n`members_changed`, or `confirmation_not_needed`.",
+        "operationId": "set_project_restriction_api_projects__key__restriction_put",
         "parameters": [
           {
             "name": "key",
@@ -3414,7 +3548,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClassificationUpdate"
+                "$ref": "#/components/schemas/RestrictionUpdate"
               }
             }
           }
@@ -4746,8 +4880,8 @@
           "project.unarchive",
           "project_member.manage",
           "project.view_access",
-          "project.raise_classification",
-          "project.lower_classification"
+          "project.raise_restriction",
+          "project.lower_restriction"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
@@ -4770,73 +4904,6 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest"
-      },
-      "ClassificationCategory": {
-        "type": "string",
-        "enum": [
-          "financial",
-          "proprietary",
-          "pii",
-          "export_controlled"
-        ],
-        "title": "ClassificationCategory"
-      },
-      "ClassificationLevel": {
-        "type": "string",
-        "enum": [
-          "internal",
-          "confidential",
-          "restricted"
-        ],
-        "title": "ClassificationLevel"
-      },
-      "ClassificationUpdate": {
-        "properties": {
-          "level": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ClassificationLevel"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "categories": {
-            "items": {
-              "$ref": "#/components/schemas/ClassificationCategory"
-            },
-            "type": "array",
-            "title": "Categories"
-          },
-          "export_control_confirmed": {
-            "type": "boolean",
-            "title": "Export Control Confirmed",
-            "default": false
-          },
-          "confirmed_member_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Confirmed Member Ids"
-          }
-        },
-        "type": "object",
-        "required": [
-          "level",
-          "categories"
-        ],
-        "title": "ClassificationUpdate",
-        "description": "`PUT /api/projects/{key}/classification` (DL-81): `level` (null: unclassified) and\n`categories` replace the current ones. Adding `export_controlled` also needs\n`export_control_confirmed` and `confirmed_member_ids`, the project's current explicit\nmembers."
       },
       "EmailCheck": {
         "properties": {
@@ -4958,7 +5025,7 @@
           "allowed_actions"
         ],
         "title": "MeOrg",
-        "description": "An org the user sees (design-doc §4, \"Visibility\"), for the org switcher. `role` is null\nwhen the user sees it without an org membership (through a project, or as an admin above\nit)."
+        "description": "An org the user sees (design-doc §4, \"Visibility\"), for the org menu. `role` is null\nwhen the user sees it without an org membership (through a project, or as an admin above\nit)."
       },
       "MeRead": {
         "properties": {
@@ -5132,6 +5199,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -5297,6 +5365,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -5318,6 +5387,7 @@
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "slug": {
@@ -5463,7 +5533,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -5492,7 +5563,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -5895,6 +5967,7 @@
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "key": {
@@ -5907,7 +5980,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 2000
               },
               {
                 "type": "null"
@@ -5941,22 +6015,22 @@
             ],
             "title": "First Admin Id"
           },
-          "classification_level": {
+          "restriction_level": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ClassificationLevel"
+                "$ref": "#/components/schemas/RestrictionLevel"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "classification_categories": {
+          "restriction_categories": {
             "items": {
-              "$ref": "#/components/schemas/ClassificationCategory"
+              "$ref": "#/components/schemas/RestrictionCategory"
             },
             "type": "array",
-            "title": "Classification Categories",
+            "title": "Restriction Categories",
             "default": []
           },
           "export_control_confirmed": {
@@ -6022,6 +6096,17 @@
             ],
             "title": "Lead Id"
           },
+          "lead_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Name"
+          },
           "organization_id": {
             "type": "string",
             "format": "uuid",
@@ -6040,6 +6125,7 @@
           "type",
           "status",
           "lead_id",
+          "lead_name",
           "organization_id",
           "organization_slug"
         ],
@@ -6104,6 +6190,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -6326,22 +6413,22 @@
             "type": "boolean",
             "title": "Archived"
           },
-          "classification_level": {
+          "restriction_level": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ClassificationLevel"
+                "$ref": "#/components/schemas/RestrictionLevel"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "classification_categories": {
+          "restriction_categories": {
             "items": {
-              "$ref": "#/components/schemas/ClassificationCategory"
+              "$ref": "#/components/schemas/RestrictionCategory"
             },
             "type": "array",
-            "title": "Classification Categories"
+            "title": "Restriction Categories"
           },
           "modules_holding_data": {
             "items": {
@@ -6372,8 +6459,8 @@
           "lead_is_active",
           "enabled_modules",
           "archived",
-          "classification_level",
-          "classification_categories",
+          "restriction_level",
+          "restriction_categories",
           "modules_holding_data",
           "allowed_actions"
         ],
@@ -6413,7 +6500,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -6424,7 +6512,8 @@
           "description": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 2000
               },
               {
                 "type": "null"
@@ -6482,6 +6571,72 @@
         "type": "object",
         "title": "ProjectUpdate",
         "description": "Only the fields sent change; `lead_id: null` clears the lead. The key never changes."
+      },
+      "RestrictionCategory": {
+        "type": "string",
+        "enum": [
+          "financial",
+          "proprietary",
+          "pii",
+          "export_controlled"
+        ],
+        "title": "RestrictionCategory"
+      },
+      "RestrictionLevel": {
+        "type": "string",
+        "enum": [
+          "internal",
+          "confidential"
+        ],
+        "title": "RestrictionLevel"
+      },
+      "RestrictionUpdate": {
+        "properties": {
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "export_control_confirmed": {
+            "type": "boolean",
+            "title": "Export Control Confirmed",
+            "default": false
+          },
+          "confirmed_member_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed Member Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "categories"
+        ],
+        "title": "RestrictionUpdate",
+        "description": "`PUT /api/projects/{key}/restriction` (DL-81): `level` (null: None) and\n`categories` replace the current ones. Adding `export_controlled` also needs\n`export_control_confirmed` and `confirmed_member_ids`, the project's current explicit\nmembers."
       },
       "SignInRequest": {
         "properties": {
@@ -6558,6 +6713,7 @@
           },
           "name": {
             "type": "string",
+            "maxLength": 100,
             "title": "Name"
           },
           "password": {
@@ -6734,7 +6890,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"
@@ -6903,7 +7060,8 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 100
               },
               {
                 "type": "null"

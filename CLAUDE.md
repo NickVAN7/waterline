@@ -117,7 +117,8 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   names the checkpoint for it, or the diff touches security-relevant code), then
   `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a temporary copy), then
   `ui-reviewer` (when the diff touches `frontend/src/` or `frontend/e2e/`), then
-  `fresh-clone-verifier`, `docs-consistency`, and `repo-auditor` (last checkpoint of a slice).
+  `fresh-clone-verifier`, `docs-consistency`, and `repo-auditor` (last checkpoint of a slice),
+  then `simplicity-auditor` (DL-138).
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).

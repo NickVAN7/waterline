@@ -5,10 +5,8 @@ description: Use when adding a new Waterline aggregate (a new entry in the build
 
 # Adding an area (and endpoints within one)
 
-> **Status: draft.** Written before Slice 1 from the design docs. At the start of Slice 2,
-> verify every step against the hand-built `project` area and correct this skill wherever they
-> differ. After that, the `project` area is the reference implementation: open its file in each
-> layer before writing the new one.
+Verified against the hand-built `project` area in S2-C0c (DL-132). The `project` area is the
+reference implementation: open its file in each layer before writing the new one.
 
 Architecture and naming: `docs/build-plan.md` ("Backend architecture", "Feature map").
 Conventions: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, design-doc §3–§5 and §10.
@@ -32,7 +30,7 @@ Conventions: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, design-doc §3–§5 and
 ## 1. Model — `models/<area>.py`
 
 - Base model and the mixins the schema doc calls for (soft delete, `version`,
-  `ClassificationMixin`).
+  `RestrictionMixin`).
 - Enums through the enum helper; relationships `lazy="raise"`.
 - Human-readable numbers: an `int number` column with `UNIQUE(project_id, number)`; never
   computed here.
@@ -43,7 +41,10 @@ Follow the `migration` skill.
 
 ## 3. Schemas — `schemas/<area>.py`
 
-- `<Area>Create`, `<Area>Update`, `<Area>Read`, `<Area>ListItem`.
+- `<Area>Create`, `<Area>Update`, `<Area>Read`, and the list row, `<Area>Item`
+  (`ProjectItem`).
+- Every free-text request field has its DL-143 limit, `Field(max_length=...)` from
+  `app/schemas/limits.py`, with the schema doc saying so.
 - **Create/Update never accept server-owned or immutable fields**: `id`, `number`, `rank`,
   `project_id` (or `task_id` for subtasks), `reporter_id` on create, `deleted_at`, timestamps,
   approval fields. Rank changes go through a reorder endpoint that takes neighbor IDs.
@@ -54,17 +55,21 @@ Follow the `migration` skill.
 
 ## 4. Repository — `repositories/<area>.py`
 
-- Extend the base repository; add methods only for non-trivial queries.
+- A plain class taking the session (`ProjectRepository(session)`), using the shared helpers in
+  `repositories/base.py` (`get_by_id`, `direct_update`, `scope_clause`); add methods only for
+  non-trivial queries. A list query is a method returning a `Select` for a `ListSpec`
+  (`ProjectRepository.candidates`).
 - Every lookup is access-scoped: only projects (and orgs) the caller can see (design-doc §4,
   "Visibility"). Lookups by URL use `(project key, number)` within an accessible project, never
   a bare number.
 - Load explicitly what each use needs (`selectinload`/`joinedload`).
 - Soft-deleted rows are hidden unless the query opts in (trash/restore only).
 
-## 5. Rules and authorization — `rules/<area>.py`, `authz/policies/<area>.py`
+## 5. Rules and authorization — `rules/<area>.py`, `authz/actions.py`
 
 - Pure logic (transition tables, policy decisions) goes in `rules/`, with no database access.
-- Register every action explicitly in the policy, marked content or management (design-doc
+- Register every action explicitly in the one registry, `authz/actions.py` (DL-151), marked
+  content or management (design-doc
   §3.1, §5), and marked personal where the right comes from the user's relationship to the item
   (e.g. `approval.decide`); unknown actions are denied.
 - **Test first**, written by the `spec-test-writer` agent against your stubs (`test-writer`
@@ -85,8 +90,8 @@ Follow the `migration` skill.
 - Every mutation in this order: `authorize()` → change → `log_change()`; the request
   dependency commits. The service never commits (`flush()` only when it needs generated
   values).
-- Numbers only from the numbering service; rank and counters only through the direct-update
-  helper (no `version` bump).
+- Numbers only from the numbering service; rank, counters, and an item's restriction only
+  through the direct-update helper (no `version` bump, DL-168).
 - Check that every referenced entity (parent, phase, sprint, milestone, workstream, requirement)
   belongs to the same project; check cycles where the design calls for it.
 - `log_change()` for every logged field in design-doc §10, with enum members.
@@ -96,6 +101,12 @@ Follow the `migration` skill.
   registered handler, as the approval service does.
 - Add the new service module to the import-linter layers contract in `backend/pyproject.toml`
   (in its layer, as an optional `(module)` entry) if it isn't listed there already.
+- An update to an entity **without** `version` goes through `apply_changes`
+  (`app/audit/admin_event.py`): it locks and re-reads the row, sets what differs, and flushes, so
+  the event's old values are true under concurrent edits (TD-57); validate before it, log what it
+  returns. A versioned entity never uses it (its re-read would reload `version` and defeat the
+  409): it calls `check_version` and lets the ORM's version check refuse a stale save.
+- A one-field 422 is `ValidationFailedError.on(loc, message, type)`.
 - Stale saves raise the optimistic-locking error that maps to 409.
 
 ## 7. Router — `routers/<area>.py`
@@ -104,9 +115,11 @@ Follow the `migration` skill.
   schema.
 - URLs nested under the project with human-readable IDs:
   `/api/projects/{key}/<areas>/{number}`.
-- Single-entity endpoints use the load-and-authorize dependency, so there is no way to get the
-  entity without the check; list endpoints use the access-scoping helper. Invisible entities
-  return **404**, never 403.
+- Single-entity endpoints use the load-and-authorize dependency
+  (`Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_VIEW))]`), so there
+  is no way to get the entity without the check; list endpoints use the access-scoping helper
+  (`project_scope`). Invisible entities return **404**, never 403.
+- Every endpoint documents its error responses with `responses=ERRORS` (`routers/deps.py`).
 - Module-gated areas pass `module=` to `authorized(...)` (DL-47).
 - Register the router in `main.py`.
 

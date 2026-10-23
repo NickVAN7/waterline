@@ -3,7 +3,7 @@
 How to use each feature, from an end user's point of view. Kept current at every checkpoint.
 
 > **Status:** Slice 1's features. You can sign in, change a temporary password, find your
-> projects from My work, the org switcher, and the project selector, create projects, run a
+> projects from My work, the org menu, and the project selector, create projects, run a
 > project's members and settings and review who can reach it, edit your profile and password,
 > and choose a light or dark theme. Workspace owners and admins run the workspace from its
 > administration pages, and organization owners and admins run their organization's members and
@@ -25,20 +25,22 @@ to a particular page, you land on that page once you're signed in; otherwise you
   "Your session ended. Sign in again." Sign in and you return to the page you were on. Reloading
   the page also asks you to sign in.
 
-To sign out, open the menu with your name at the top right and choose **Sign out**. If the server
+To sign out, open the menu with your name at the top right and choose **Sign out** (in red, with
+an icon). If the server
 can't be reached, a message says so and you stay signed in.
 
 ## Getting around
 
 Every page after sign-in has the same frame:
 
-- **The header**, at the top: Waterline's name (a link to My work), your organization, and the
-  menu with your name. If you belong to more than one organization, the organization's name is a
-  button: open it and choose another to see its projects. With one organization it's just its
-  name.
+- **The header**, at the top: Waterline's name (a link to My work) followed by your
+  organization's name, and, at the right, the menu with your name. The organization's name is a
+  menu if you belong to more than one organization or may administer it: open it to choose
+  another organization (to see its projects), or, if you're one of its owners or admins, its
+  **Overview**, **Members**, or **Settings**. Otherwise it's just its name.
 - **The sidebar**, on the left: **My work**, then the **project selector**. Open the selector to
-  see the current organization's projects and choose one, or choose **All projects** for the
-  organization's project list. With more than eight, a filter field narrows the list as you type.
+  see the current organization's projects, under its name, and choose one, or choose **All
+  projects** (a link below the list) for the organization's project list. With more than eight, a filter field narrows the list as you type.
   Once you're in a project, its pages are listed below the selector: **Home**, **Members**, and,
   if you may change any of its settings, **Settings**.
 - On a narrow screen the sidebar is behind the **Menu** button in the header, and on a phone the
@@ -64,20 +66,17 @@ filters are in the address, so a link or a reload opens the same list.
 (any member may). Give it a name and a key: 3 to 6 letters or digits, starting with a letter,
 that starts every item's number (`PMT-TA-45`) and can't be changed later; you're told as you type
 if it's taken. Pick its type (Software, ERP implementation, or General), which suggests its
-modules: each is described, and a module that isn't built yet says "Not available yet". You
-become its first admin and lead, unless you're an organization owner or admin, who may name
-another member instead. You can also classify it: a level (Internal, Confidential, or
-Restricted, each described) and why it's sensitive (Financial, Proprietary, Personal data,
-Export-controlled). An export-controlled project lets only its explicit members see its content,
-so **Create project** first opens a confirmation that explains this and names its first admin:
-check the box that they're authorized for export-controlled data, then **Make
-export-controlled**; **Cancel** takes you back to the form. Once created, the project opens.
+modules: each is described, and a module that isn't built yet can't be turned on: its box is
+greyed out, with "Not available yet". You become its first admin and lead, unless you're an
+organization owner or admin, who may name someone else instead: any active member of the
+organization, or of the workspace's staff. You can also set its restriction: a level (None,
+Internal, or Confidential, each described) and why it's sensitive (Financial, Proprietary,
+Personal data). Once created, the project opens.
 
-A project's home (`/<organization>/projects/<KEY>`) shows its classification at the top, if it
-has one ("Classification: Confidential. Categories: Financial."), then its name, its key, its
-status, and its lead's name ("Deactivated" after it if their account is), or "No lead" if it has
-none. In the sidebar, under the project, a module it has turned on that isn't built yet is listed
-with "Not available yet". An archived project says "This project is archived. It is read-only." at
+A project's home (`/<organization>/projects/<KEY>`) shows its name, its key, its status, its
+restriction as a badge if it has one ("Confidential · Financial"), and its lead's name
+("Deactivated" after it if their account is), or "No lead" if it has none. An archived project
+says "This project is archived. It is read-only." at
 the top. An address with an organization's old slug (the part of the address that names it)
 or a lowercase key takes you to the project's own address. A project you can't see shows "Page
 not found", the same as one that doesn't exist.
@@ -100,7 +99,8 @@ admins) can also:
   project with no lead.
 - **Access review** lists everyone who reaches the project
   (`/<organization>/projects/<KEY>/access`): their project role, if any, why they reach it (the
-  role, or an admin role above it), and whether they reach its content or only its management.
+  role, or an admin role above it), and, on an export-controlled project, whether they reach its
+  content or only its management.
 
 **Settings**, in the sidebar under the project, is there if you may change any of its settings
 (`/<organization>/projects/<KEY>/settings`). Each part shows only if you may use it:
@@ -109,16 +109,15 @@ admins) can also:
   modules, never data or the modules on), status (for information only), lead, and modules,
   then **Save settings**. The lead is one of the project's members, or **No lead**, which is
   flagged. A deactivated member is marked "Deactivated" and can't be named; a deactivated lead
-  stays the lead, marked, until you name someone else. Turning off
+  stays the lead, marked, until you name someone else. A module that isn't built yet is greyed
+  out, with "Not available yet". Turning off
   a module that holds data, or one recommended for the type, warns you what will be hidden;
   nothing is deleted, and turning it back on brings everything back.
-- **Classification** (project admins): the level and categories, then **Save classification**.
-  Marking the project export-controlled first asks you to confirm that every explicit member,
-  each listed, is authorized for export-controlled data; from then on, system, workspace, and
-  organization admins without a membership can manage it but not see its content. Removing
-  export control is confirmed too. On an export-controlled project, an admin without a
-  membership may only raise its classification: lowering the level or removing a category needs
-  one of its explicit project admins.
+- **Restriction** (project admins): the level and categories, then **Save restriction**. Export
+  control isn't offered here; a project is made export-controlled only through the API, and
+  saving keeps it. On an export-controlled project, system, workspace, and organization admins without a membership
+  can manage it but not see its content, and may only raise its restriction: lowering the level
+  or removing a category needs one of its explicit project admins.
 - **Archive** (organization owners and admins): **Archive project**, once confirmed, makes it
   read-only for everyone until **Unarchive project**. Nothing is deleted.
 
@@ -158,8 +157,8 @@ still work.
 
 ## Workspace administration
 
-Workspace owners and admins (and system admins) find **Workspace administration** in the account
-menu, at the top right. Its pages are linked along the top: **Staff**, **Organizations**,
+Workspace owners and admins (and system admins) find **Administration** in the account menu, at
+the top right. Its pages are listed in the sidebar, in place of the project selector: **Staff**, **Organizations**,
 **Users**, and **Settings** (workspace admins see the settings; owners and system admins change
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
 its **Actions for …** menu, which lists only what you may do to that person.
@@ -195,10 +194,14 @@ project, whether they reach its content or only its management.
 ## Organization administration
 
 Organization owners and admins (and workspace owners and admins, in every organization) find
-**Organization administration** in the account menu, for the organization they're in (switch
-organizations first to administer another). Its pages are linked along the top: **Members** and
-**Settings**. Anyone else who opens these pages is told to ask the organization's owners or
-admins.
+the organization's pages in the organization menu, the organization's name in the header (switch
+organizations first to administer another). They're listed in the sidebar, in place of the
+project selector: **Overview**, **Members**, and **Settings**. Anyone else who opens these pages
+is told to ask the organization's owners or admins.
+
+- **Overview** (`/<organization>/overview`) shows the organization's name and slug, and its
+  projects with their key, type, status, and lead ("No lead" if there's none); each project's
+  name opens its settings.
 
 - **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
   as **Staff** does under workspace administration: **Add person** asks for the email first, then

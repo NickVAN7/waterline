@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Select, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager
+from sqlalchemy.orm import contains_eager, selectinload
 
 from app.authz.scoping import Scope
 from app.enums import OrgRole, ProjectRole, WorkspaceRole
@@ -47,11 +47,11 @@ class ProjectRepository:
         )
 
     def visible(self, scope: Scope, *, include_archived: bool = False) -> Select[Project]:
-        """The projects in `scope` (the user's `project_scope`), each with its org loaded."""
+        """The projects in `scope` (the user's `project_scope`), each org and lead loaded."""
         statement = (
             select(Project)
             .join(Organization, Project.organization_id == Organization.id)
-            .options(contains_eager(Project.organization))
+            .options(contains_eager(Project.organization), selectinload(Project.lead))
             .where(scope_clause(scope, Project.id, Project.workspace_id, Project.organization_id))
         )
         return statement if include_archived else statement.where(Project.archived_at.is_(None))
@@ -122,22 +122,26 @@ class ProjectRepository:
         )
         return set(rows)
 
-    def candidates(self, project: Project) -> Select[User]:
-        """The picker: active org members and staff of the project's workspace not yet on the
-        project (for a `ListSpec`)."""
+    def first_admin_candidates(
+        self, organization_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> Select[User]:
+        """The create dialog's picker: the org's active members and its workspace's active
+        staff, whom a first admin may be chosen from (design-doc §5; DL-152; for a `ListSpec`)."""
         org_members = select(Membership.user_id).where(
-            Membership.organization_id == project.organization_id
+            Membership.organization_id == organization_id
         )
         staff = select(WorkspaceMembership.user_id).where(
-            WorkspaceMembership.workspace_id == project.workspace_id
+            WorkspaceMembership.workspace_id == workspace_id
         )
+        return select(User).where(User.is_active, or_(User.id.in_(org_members), User.id.in_(staff)))
+
+    def candidates(self, project: Project) -> Select[User]:
+        """The members picker: the same people for the project's org, less those already on it."""
         on_project = select(ProjectMembership.user_id).where(
             ProjectMembership.project_id == project.id
         )
-        return select(User).where(
-            User.is_active,
-            or_(User.id.in_(org_members), User.id.in_(staff)),
-            User.id.not_in(on_project),
+        return self.first_admin_candidates(project.organization_id, project.workspace_id).where(
+            User.id.not_in(on_project)
         )
 
     async def memberships_in(

@@ -95,9 +95,12 @@ afterEach(() => {
 })
 
 describe('ProjectAccessView', () => {
-  it('lists everyone who reaches the project, why, and whether it is content or management only', async () => {
+  it('lists everyone who reaches an export-controlled project, why, and whether it is content or management only', async () => {
     const { wrapper } = await mountAt(
-      project({ allowed_actions: ['project.view', 'project.view_access'] }),
+      project({
+        allowed_actions: ['project.view', 'project.view_access'],
+        restriction_categories: ['export_controlled'],
+      }),
     )
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout access review')
@@ -122,6 +125,29 @@ describe('ProjectAccessView', () => {
       ],
       ['Wes Admin', 'wes@harbor.example', 'None', 'Workspace admin, Org owner', 'Management only'],
     ])
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('has no Access column on a project that is not export-controlled (DL-133)', async () => {
+    const { wrapper } = await mountAt(
+      project({
+        allowed_actions: ['project.view', 'project.view_access'],
+        restriction_categories: ['pii'],
+      }),
+    )
+
+    expect(wrapper.findAll('th').map((h) => h.text())).toEqual([
+      'Name',
+      'Email',
+      'Project role',
+      'Why they reach it',
+    ])
+    expect(
+      wrapper
+        .findAll('tbody tr')[2]!
+        .findAll('td')
+        .map((c) => c.text().trim()),
+    ).toEqual(['Wes Admin', 'wes@harbor.example', 'None', 'Workspace admin, Org owner'])
     await expectNoA11yViolations(wrapper)
   })
 

@@ -18,8 +18,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Models:** tables only; they are the domain entities.
 - **`rules/`:** pure logic with no database access (transition tables, approval policy).
 - Files are named by aggregate and the name repeats in every layer (`models/task.py`,
-  `schemas/task.py`, `repositories/task.py`, `services/task.py`, `routers/task.py`,
-  `authz/policies/task.py`).
+  `schemas/task.py`, `repositories/task.py`, `services/task.py`, `routers/task.py`); every
+  area's actions are registered in the one registry, `authz/actions.py` (DL-151).
 
 ## Cross-area rules
 
@@ -97,12 +97,15 @@ Calls flow **routers → services → repositories → models**. Services also u
   literals.
 - **Numbers** come only from the numbering service (`project_counter`,
   `task.next_subtask_number`). Never compute `MAX(number)+1`.
-- **Rank and counter writes bypass optimistic locking** via the direct-update helper; content
-  edits go through the ORM so `version` is checked (stale → 409, or 404 if the row is gone).
+- **Rank, counter, and restriction writes bypass optimistic locking** via the direct-update
+  helper (DL-168); content edits go through the ORM so `version` is checked (stale → 409, or
+  404 if the row is gone).
 - **Soft delete** is filtered globally; opt in explicitly for trash/restore queries.
 - **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
   subtasks.
-- **Markdown** is sanitized on render, never trusted.
+- **Markdown** is stored and returned as-is and never rendered by the backend: the browser
+  renders and sanitizes it (`MarkdownView`, design-doc §3, DL-140). A server-side renderer
+  (`markdown-it-py` and `nh3`) arrives only when something server-side shows content.
 
 ## Models
 
@@ -117,8 +120,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   `BaseModel` (`class Task(VersionMixin, SoftDeleteMixin, BaseModel)`). Enum columns use
   `enum_type(MyEnum, "<column>")`, with the `StrEnum` defined outside SQLAlchemy code.
 - Every update to a versioned entity calls `check_version(entity, payload.version)` before
-  changing it. Rank and counter writes use `direct_update` (no version bump), passing
-  `touch_updated_at=False` for rank writes and `True` for counters.
+  changing it, except a restriction change (DL-168). Rank, counter, and restriction writes use
+  `direct_update` (no version bump), passing `touch_updated_at=False` for rank writes and `True`
+  for counters (restriction writes: decided before S2-C6).
 - Trash/restore queries opt in with `.execution_options(include_deleted=True)`; nothing else
   does.
 
