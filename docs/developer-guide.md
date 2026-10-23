@@ -4,7 +4,11 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0d (Restriction, export control, modules) built: "classification" renamed
+> **Status:** S2-C0e (Shell) built: the PrimeUI license key (`VITE_PRIMEUI_LICENSE`, DL-135) and an
+> e2e check that no license notice renders; dialogs centered, with an e2e check; the header's
+> "Waterline" and the org's name; Sign out with an icon and the danger tone; the project selector
+> headed by the org's name, with "All projects" as a link and "New project" in line; the
+> sign-in card's sizes and spacing (DL-137). S2-C0d (Restriction, export control, modules) built: "classification" renamed
 > "restriction" throughout (`RestrictionMixin`, `rules/restriction.py`, `PUT
 > /api/projects/{key}/restriction`, `project.raise_restriction`/`project.lower_restriction`,
 > `project_restriction_changed`) with `restricted` removed, one migration for the rename and for
@@ -148,7 +152,8 @@ npm ci --prefix frontend         # frontend tools (frontend/node_modules). Its
                                  # because sudo resets PATH and won't find an npx installed by
                                  # fnm or nvm); skip it if they're there (see Troubleshooting)
 uv run pre-commit install        # git hooks: ruff, Prettier, ESLint, generated files
-cp .env.example .env             # local settings (never committed); edit if needed
+cp .env.example .env             # local settings (never committed); edit if needed, and
+                                 # set VITE_PRIMEUI_LICENSE (below)
 uv run wl up                     # build and start the stack; applies migrations
 uv run wl check --full           # everything CI runs; should be green on a fresh clone
 ```
@@ -157,6 +162,12 @@ Then open <http://localhost:5173>: it sends you to sign in. Build the demo data 
 data" in section 5) to have someone to sign in as; <http://localhost:5173/status> shows whether
 the API and database are up without signing in. Without a browser, `curl
 http://localhost:8000/api/health` answers `{"status":"ok","database":"ok"}`.
+
+**The PrimeUI license key** (DL-135): PrimeVue 5 needs the owner's Community License key, or every
+page shows an "Invalid PrimeUI License" notice and `wl e2e` (so `wl check --full`) fails on it.
+Ask the owner for the key and put it in `.env` as `VITE_PRIMEUI_LICENSE` (never committed; CI has
+it as the repository secret of the same name). Vite builds it into the app, so `wl up` after
+changing it; it ships in the browser bundle, which is expected.
 
 Nothing is installed on the workstation beyond the tools above: Postgres, the API, the worker,
 and the Vite dev server run in Docker. Tests and the other `wl` tools run on the host and reach
@@ -1005,7 +1016,7 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
 - **Adding a screen:** a view in `src/views/<area>/`, a route in `src/app/router.ts` (above the
   not-found route, which must stay last), and a `*.spec.ts` next to it that calls
   `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
-  page's primary actions (UI-SHL-8): navigation sets the title
+  page's primary actions (UI-SHL-8; the auth card's pages use a plain, smaller `h1`): navigation sets the title
   to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
   `src/views/project/ProjectHomeView.vue`).

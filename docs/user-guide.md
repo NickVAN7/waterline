@@ -25,20 +25,21 @@ to a particular page, you land on that page once you're signed in; otherwise you
   "Your session ended. Sign in again." Sign in and you return to the page you were on. Reloading
   the page also asks you to sign in.
 
-To sign out, open the menu with your name at the top right and choose **Sign out**. If the server
+To sign out, open the menu with your name at the top right and choose **Sign out** (in red, with
+an icon). If the server
 can't be reached, a message says so and you stay signed in.
 
 ## Getting around
 
 Every page after sign-in has the same frame:
 
-- **The header**, at the top: Waterline's name (a link to My work), your organization, and the
-  menu with your name. If you belong to more than one organization, the organization's name is a
+- **The header**, at the top: Waterline's name (a link to My work) followed by your
+  organization's name, and, at the right, the menu with your name. If you belong to more than one organization, the organization's name is a
   button: open it and choose another to see its projects. With one organization it's just its
   name.
 - **The sidebar**, on the left: **My work**, then the **project selector**. Open the selector to
-  see the current organization's projects and choose one, or choose **All projects** for the
-  organization's project list. With more than eight, a filter field narrows the list as you type.
+  see the current organization's projects, under its name, and choose one, or choose **All
+  projects** (a link below the list) for the organization's project list. With more than eight, a filter field narrows the list as you type.
   Once you're in a project, its pages are listed below the selector: **Home**, **Members**, and,
   if you may change any of its settings, **Settings**.
 - On a narrow screen the sidebar is behind the **Menu** button in the header, and on a phone the

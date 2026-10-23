@@ -474,7 +474,9 @@ render inside the full shell when signed in.
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
-  page's primary action(s) on the right (wrapping below at narrow widths). Sections use `h2`
+  page's primary action(s) on the right (wrapping below at narrow widths). The one exception is
+  the auth card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
+  size below the app's name, the card's largest text (`text-xl`; DL-137). Sections use `h2`
   and nest in order. If a help or contact link is ever added (3.2.6), it goes in the user menu,
   in the same place on every page.
 - **UI-SHL-9** **Route changes:** on navigation, set `document.title` to
@@ -1004,7 +1006,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 
 | Check | When | How |
 |---|---|---|
-| Token contrast | Whenever `tokens.css` changes, and in `wl check` once ported | `check_contrast.py` reads every `light-dark()` pair and checks it against §3.1's minimums in both themes (136 checks today); a new token pair is added to its list in the same change (UI-TOK-3) |
+| Token contrast | Whenever `tokens.css` changes, and in `wl check` once ported | `check_contrast.py` reads every `light-dark()` pair and checks it against §3.1's minimums in both themes (140 checks today); a new token pair is added to its list in the same change (UI-TOK-3) |
 | axe in component tests | Every view and shared component spec | `vitest-axe` through one shared `expectNoA11yViolations()`. Use the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`. axe-core's only WCAG 2.2 rule, `target-size` (tag `wcag22aa`), is **disabled by default** and must be opted into, so the shared setup proves it is running with a deliberately undersized-target fixture that must fail. axe does not automate Focus Not Obscured (2.4.11), which is why `expectFocusNotObscured()` below exists. jsdom has no layout, so contrast and target size are not really checked here: axe reports contrast as "incomplete" there, so treat `incomplete` as unchecked, not as a pass |
 | axe in end-to-end tests | Every screen each flow visits, **once in light and once in dark** (`colorScheme` emulation) | `@axe-core/playwright` with the same tags. This is where contrast and target size are actually checked |
 | Focus not obscured | A sticky-header fixture (S1-C14), then the shell pages (from S1-C14a), a page with a toast showing, and a table with rows selected | End-to-end helper `expectFocusNotObscured()`: press Tab through the page; after each press, `document.elementFromPoint` at the centre of the focused element's box must return that element or a descendant. With a sticky selection toolbar showing, scroll so a row sits at the top edge and Tab to it; it must not be under the toolbar. Proven able to fail on a test fixture with a sticky header (S1-C14, DL-89) |

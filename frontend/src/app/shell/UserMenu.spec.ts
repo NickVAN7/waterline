@@ -135,6 +135,15 @@ describe('UserMenu', () => {
     expect(link.getAttribute('href')).toBe('/globex/members')
   })
 
+  it('sets Sign out apart with an icon and the danger tone (UI-SHL-4, DL-137)', async () => {
+    await openMenu()
+
+    const label = item('Sign out').querySelector('.text-danger')!
+    expect(label.textContent?.trim()).toBe('Sign out')
+    expect(label.querySelector('svg')).not.toBeNull()
+    expect(item('Account settings').querySelector('.text-danger')).toBeNull()
+  })
+
   it('asks the shell to sign out', async () => {
     const { wrapper } = await openMenu()
 

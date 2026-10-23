@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // The user menu (UI-SHL-8, UI-TOK-2): account settings, the System / Light / Dark theme (radio
-// items, so the choice is announced as checked), and sign out. PrimeVue's Menu (UI-STY-3); its
-// pass-through options give the theme items their radio role. "Workspace administration" leads to
-// the workspace's admin pages for those who may see them (`workspace.view`; UI-SHL-10, DL-104), and
-// "Organization administration" to the current org's (`org_member.manage`).
+// items, so the choice is announced as checked), and sign out, with an icon in the danger tone.
+// PrimeVue's Menu (UI-STY-3); its pass-through options give the theme items their radio role.
+// "Workspace administration" leads to the workspace's admin pages for those who may see them
+// (`workspace.view`; UI-SHL-10, DL-104), and "Organization administration" to the current org's
+// (`org_member.manage`).
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { computed, ref } from 'vue'
@@ -54,7 +55,8 @@ const items = computed<MenuItem[]>(() => [
     command: () => choose(theme.value),
   })),
   { separator: true },
-  { label: 'Sign out', command: () => emit('signOut') },
+  // An icon and the danger tone set it apart (UI-SHL-4, DL-137).
+  { label: 'Sign out', danger: true, command: () => emit('signOut') },
 ])
 
 // Theme items are radio items: role and checked state on the item itself. PrimeVue also sets
@@ -97,6 +99,12 @@ const pt = {
       <RouterLink v-if="item.route" v-slot="{ href, navigate }" :to="item.route" custom>
         <a :href="href" v-bind="itemProps.action" @click="navigate">{{ item.label }}</a>
       </RouterLink>
+      <a v-else-if="item.danger" v-bind="itemProps.action">
+        <!-- Our own content takes the tone: PrimeVue's colors are the preset's (UI-STY-2). -->
+        <span class="inline-flex items-center gap-2 text-danger"
+          ><Icon name="sign-out" />{{ item.label }}</span
+        >
+      </a>
       <a v-else v-bind="itemProps.action">
         <Icon v-if="item.checked !== undefined" :name="item.checked ? 'check' : 'circle'" />
         {{ item.label }}

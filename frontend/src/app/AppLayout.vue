@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// The app shell (docs/ui-design-guide.md §4): the skip link, a sticky header with the org switcher
-// and user menu, the sidebar (My work, the project selector, the selected project's pages), and
-// `main`. Below 40rem the header wraps and scrolls with the page (DL-98); below 48rem the sidebar
-// is behind a "Menu" disclosure in the header. Signed out (the status and not-found pages), the
-// header has only the app name and Sign in.
+// The app shell (docs/ui-design-guide.md §4): the skip link, a sticky header ("Waterline", then
+// the current org's name, which is the org switcher, UI-SHL-4, DL-137; the user menu at the end),
+// the sidebar (My work, the project selector, the selected project's pages), and `main`. Below
+// 40rem the header wraps and scrolls with the page (DL-98); below 48rem the sidebar is behind a
+// "Menu" disclosure in the header. Signed out (the status and not-found pages), the header has
+// only the app name and Sign in.
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -57,11 +58,9 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
         <Icon name="menu" />Menu
       </button>
       <RouterLink to="/" class="text-lg font-semibold text-text no-underline">Waterline</RouterLink>
+      <OrgSwitcher v-if="store.me" />
       <div class="flex-1" />
-      <template v-if="store.me">
-        <OrgSwitcher />
-        <UserMenu ref="userMenu" @sign-out="signOut" />
-      </template>
+      <UserMenu v-if="store.me" ref="userMenu" @sign-out="signOut" />
       <RouterLink v-else :to="{ name: 'sign-in' }">Sign in</RouterLink>
     </header>
     <div class="flex flex-1 flex-col md:flex-row">

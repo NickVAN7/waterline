@@ -81,6 +81,17 @@ describe('ProjectSelector', () => {
     await expectNoA11yViolations(document.body)
   })
 
+  it("heads the list with the org's name, so it's clear whose projects they are (DL-137)", async () => {
+    await openSelector()
+
+    const heading = dialog().querySelector('p')!
+    expect(heading.textContent).toBe(ACME.name)
+    expect(
+      heading.compareDocumentPosition(dialog().querySelector('ul')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
   it('shows the selected project on the button and marks it in the list', async () => {
     const { wrapper } = await openSelector()
 

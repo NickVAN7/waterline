@@ -44,6 +44,7 @@ async function mountAt(path: string, { signedIn = true, user = me() } = {}) {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   mounted?.unmount()
   document.body.innerHTML = ''
   delete document.documentElement.dataset.theme
@@ -57,6 +58,11 @@ describe('routes', () => {
     expect(root.querySelector('h1')?.textContent).toBe('My work')
     expect(root.querySelector('header')?.textContent).toContain('Casey Cole')
     expect(root.querySelector('header')?.textContent).toContain('Acme Manufacturing')
+    // The header reads "Waterline", then the org's name, then the account menu (UI-SHL-4, DL-137):
+    // text in document order.
+    const text = root.querySelector('header')!.textContent!
+    expect(text.indexOf('Waterline')).toBeLessThan(text.indexOf('Acme Manufacturing'))
+    expect(text.indexOf('Acme Manufacturing')).toBeLessThan(text.indexOf('Casey Cole'))
     expect(root.querySelector('nav[aria-label=Main]')?.textContent).toContain('My work')
     // No project selected, so no project navigation (UI-SHL-2).
     expect(root.querySelector('nav[aria-label=Project]')).toBeNull()
@@ -130,6 +136,14 @@ describe('routes', () => {
 })
 
 describe('the app', () => {
+  it('gives PrimeVue the license key from the build-time setting (DL-135)', () => {
+    vi.stubEnv('VITE_PRIMEUI_LICENSE', 'the-owners-key')
+
+    const { app } = createWaterlineApp(createMemoryHistory())
+
+    expect(app.config.globalProperties.$primevue.config.license).toBe('the-owners-key')
+  })
+
   it('resolves the current-user store through the Pinia instance it installs (TD-10)', async () => {
     const { pinia } = await mountAt('/')
 
