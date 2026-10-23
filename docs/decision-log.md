@@ -2207,3 +2207,13 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Verification")
 - **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
+
+### DL-173: The developer guide's setup ends with plain `wl check`
+- **Date:** 2026-10-22
+- **Decision:** The first-time setup in the developer guide ends with plain `uv run wl check`,
+  naming `wl check --full` as what CI runs, so `fresh-clone-verifier`, following the guide,
+  runs the quick checks DL-170 gives it. Built in S2-C0i.
+- **Supersedes:** none (completes DL-170, finding 6)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0i); developer guide (section 1, with S2-C0i)
+- **Source:** owner, Oct 22, 2026 (`DC-2026-10-22d-simplicity-decisions.md`, decision 1)

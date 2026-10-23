@@ -28,3 +28,6 @@
    `uv run wl check --full`. Options: (a) S2-C0i changes the guide's setup to plain `wl check`,
    naming `--full` as what CI runs; (b) the guide keeps `--full`, and the agent names its own
    checks; (c) the guide gets a named "quick checks" list both use. Needed before S2-C0i.
+
+**The owner's answer** (Oct 22, 2026; applied in `DC-2026-10-22e-setup-check.md`): 1 (a),
+DL-173.
