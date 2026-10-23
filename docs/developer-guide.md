@@ -4,7 +4,9 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0a (Simplicity audit) built: the `simplicity-auditor` agent and its vendored
+> **Status:** S2-C0b (Tree spike) built: SVAR DataGrid's tree mode measured against PrimeVue
+> TreeTable (`docs/spikes/S2-C0b-tree/results.md`); the tree is TreeTable (DL-174). S2-C0a
+> (Simplicity audit) built: the `simplicity-auditor` agent and its vendored
 > prompts (`.claude/audit/`), the review-record check, and the audit's first run on `main`
 > (`docs/reviews/s2/S2-C0a.md`). S1-C17 (Slice verification) built: the "Done when" walked through, the owner's
 > manual keyboard and screen-reader pass (no problems; `docs/reviews/s1/S1-C17-manual-pass.md`),

@@ -852,8 +852,10 @@ alternative.**
   §9 first, because 2.8.0 of the Gantt is broken.
 - **UI-SVR-2** **Which component for which list.** A list that is read, filtered, sorted,
   paged, and bulk-actioned uses a native `<table>` or PrimeVue's DataTable (UI-TBL-1 to 8). The
-  SVAR DataGrid is for lists where **inline cell editing or manual row order is the point**.
-  The task board is SVAR Kanban. The choice for each Task and Requirements list is written in
+  SVAR DataGrid is for lists where **inline cell editing or manual row order is the point**,
+  except the requirement tree, which is PrimeVue's TreeTable: SVAR's free tree mode has no drag
+  and no move of its own (DL-174). The tree still follows UI-SVR-5 (the server decides each move)
+  and UI-SVR-6 (the move menu sits outside the widget). The task board is SVAR Kanban. The choice for each Task and Requirements list is written in
   `screen-inventory.md` when that screen is specified, and **one list never ships with two
   implementations**. (The spike did not decide the per-list split; that is the owner's call
   per list.)
@@ -870,7 +872,8 @@ alternative.**
   `--color-focus` on every focusable SVAR element; SVAR draws 1 px or nothing) and the 24 px
   minimum for the card menu button (UI-TOK-6). The reference file is `svar-theme.css`.
 - **UI-SVR-4** **One wrapper per widget; nothing else imports `@svar-ui/*`.** The wrappers
-  (`TaskBoard`, `RequirementsGrid`, later `ScheduleChart`) are the only place SVAR is used, and
+  (`TaskBoard`, a DataGrid wrapper for any editable grid a screen specifies, later
+  `ScheduleChart`) are the only place SVAR is used, and
   each one: gives the widget our accessible name and description (Kanban's default region name
   is the English "Kanban board"); passes props correctly (Kanban takes its card options as
   `card`, not `cardShape`); **returns focus to the cell** when an editor closes (the grid drops
@@ -991,7 +994,8 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | `Skeleton` | §6.3 |
 | `EmptyState`, `ErrorState`, `ForbiddenView`, `NotFoundView`, `NoAccessView` | §6.1, UI-FBK-8, UI-FBK-14, UI-FBK-15 |
 | `DataTable`, `SelectionToolbar`, `Pagination` | §7 |
-| `TaskBoard`, `RequirementsGrid`, `MoveToMenu` | SVAR Kanban and DataGrid wrappers and the shared non-drag "Move to…" menu (UI-SVR-4, UI-SVR-6). The only files that import `@svar-ui/*` |
+| `TaskBoard`, `MoveToMenu` | The SVAR Kanban wrapper and the non-drag "Move to…" menu it shares with `RequirementsTree` (UI-SVR-4, UI-SVR-6); `TaskBoard` and any DataGrid wrapper are the only files that import `@svar-ui/*` |
+| `RequirementsTree` | The PrimeVue TreeTable wrapper for the requirement tree, with `MoveToMenu` (DL-174; UI-SVR-5, UI-SVR-6) |
 | `ScheduleChart`, `ScheduleTable` (V2) | SVAR Gantt wrapper and the table that always stands beside it (§7.2, UI-SVR-9) |
 
 ---
@@ -1040,9 +1044,9 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    (f) The Kanban card shows no visible change when selected, so the wrapper needs its own
    selected style (UI-TOK-9). (g) **Tree rows:** the spike used a flat grid. Whether the
    DataGrid's parent and child (tree) mode is in the MIT package, and how it behaves with the
-   keyboard, was not tested; it must be before the DataGrid is chosen for the requirement tree
-   (Slice 2). **Decided by the S2-C0b spike** (DL-150), which compares it with PrimeVue
-   TreeTable; its decision-log entry closes this item.
+   keyboard, was not tested. **Closed by the S2-C0b spike** (DL-174): the tree mode is in the MIT
+   package but turns off row drag and its own move, so the requirement tree is PrimeVue's
+   TreeTable (`docs/spikes/S2-C0b-tree/results.md`).
 6. **My work styling** (UI-SHL-5): revisit once pages are populated; a default the owner
    accepted for now. (The admin entry points, UI-SHL-10: the org menu for an org's pages, the user menu for the
    workspace's, and the section nav in the sidebar; DL-137.)

@@ -223,8 +223,8 @@ correct; you decide whether the code does it.
 
 ### 2.5 SVAR widgets: Kanban, DataGrid, Gantt (UI-SVR, UI-STY-7)
 Skip this section when nothing imports `@svar-ui/*`. Otherwise, in the diff:
-- **Where it is imported.** Does any file other than the wrappers (`TaskBoard`,
-  `RequirementsGrid`, `ScheduleChart`) import `@svar-ui/*`? Are the packages the MIT
+- **Where it is imported.** Does any file other than the wrappers (`TaskBoard`, a DataGrid
+  wrapper, `ScheduleChart`) import `@svar-ui/*`? Are the packages the MIT
   `@svar-ui/*` ones at the exact pinned versions, with the Gantt not on 2.8.0? (UI-SVR-1,
   UI-SVR-4)
 - **Which component.** Is the SVAR DataGrid used for a list that is only read, filtered, and

@@ -2217,3 +2217,21 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C0i); developer guide (section 1, with S2-C0i)
 - **Source:** owner, Oct 22, 2026 (`DC-2026-10-22d-simplicity-decisions.md`, decision 1)
+
+### DL-174: The requirement tree is PrimeVue TreeTable
+- **Date:** 2026-10-22
+- **Decision:** S2-C15 builds the requirement tree on PrimeVue TreeTable, in a
+  `RequirementsTree` wrapper with the move menu, not on SVAR DataGrid's tree mode. SVAR's MIT
+  tree mode turns off row drag and its own move (the store sets `reorder` false when `tree` is
+  set, and `move-item` skips the move), its arrow keys move between columns rather than opening
+  and closing rows, and it has a critical axe defect; TreeTable follows the WAI treegrid
+  keyboard pattern and passes axe with the wrapper fixes the spike found. TreeTable's first
+  render with every branch open is 2.1 s at the 2,000-row cap (0.2 s with branches closed).
+- **Supersedes:** ui-design-guide UI-SVR-2, in part (manual row order means the SVAR DataGrid,
+  except for the requirement tree)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SVR-2, UI-SVR-4, the component list, §10 item 5(g));
+  build plan (S2-C15, "Web screens"); testing strategy (the wrapper specs);
+  `.claude/agents/ui-reviewer.md`; `docs/spikes/S2-C0b-tree/`
+- **Source:** the S2-C0b spike (`docs/spikes/S2-C0b-tree/results.md`; DL-150), for the
+  owner's approval at the checkpoint report

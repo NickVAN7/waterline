@@ -143,7 +143,7 @@ tested, what each kind of test is for, and the gates every change passes.
   - end-to-end tests run inside `wl check --full` (`wl e2e`, on an isolated seeded stack; DL-65,
     DL-99), which CI runs;
   - for each SVAR widget wrapper (from the first checkpoint that ships a board or an editable
-    grid; DL-64): a theme audit in both themes and in the interactive states that fails on any
+    grid; DL-64) and for `RequirementsTree`, the TreeTable wrapper (DL-174): a theme audit in both themes and in the interactive states that fails on any
     color that is not one of our tokens, and keyboard and move/cancel specs that drive the
     non-drag alternative with the server mocked to allow and to deny (ui-design-guide §7.1, §9);
   - a manual keyboard and screen-reader pass on each slice's new screens at slice

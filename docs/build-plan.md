@@ -1570,7 +1570,7 @@ before the features.
 | 12 | Approver replacement: project paths | Design-doc §6.2's replacement for: a project membership removed directly; the project marked export-controlled; an explicit membership removed on an export-controlled project; the archived-project flag instead of replacement; a replacement that completes a request; an API test per path |
 | 13 | Approver replacement: other paths | The org and workspace removals (with their projects); an org or workspace role change or removal that took inherited admin away; `revoke-system-admin` (`changed_by` null); deactivation; the call sites in the layer order ("Notes" below); an API test per path |
 | 14 | My work: approvals | The approvals section (`GET /api/me/work`, `GET /api/me/work/approvals`; the `(approver_id, decision)` index; export-controlled content left out); TD-40 (each section its own error state, backend and page) |
-| 15 | Tree widget *(provisional)* | Per S2-C0b: the SVAR DataGrid wrapper (its theme entries, theme audit, keyboard and move specs, known issues; UI-SVR rules) or the TreeTable wrapper with the move menu |
+| 15 | Tree widget *(provisional)* | The `RequirementsTree` wrapper on PrimeVue TreeTable (DL-174), with the move menu: the table's name through `pt.table`, the expand button `aria-hidden`, Right on a closed row only opening it, a move splicing the node objects in place, `treetable` in the preset (its border on `--color-border-subtle`), and the keyboard, axe, theme-audit, and move specs (`docs/spikes/S2-C0b-tree/results.md`) |
 | 16 | Markdown view & editor *(provisional)* | DL-140, DL-141, DL-142: `MarkdownView`, `MarkdownEditor`, the CSP, the XSS corpus, and the end-to-end payload test |
 | 17 | Requirements page *(provisional)* | The tree (S2-C15), the create dialog (the template by type, DL-149), Move up, down, to top, after…, and "Move to…", the Trash link |
 | 18 | Requirement detail *(provisional)* | View and edit (S2-C16), 409 handling, the status menu and badges (DL-148), the restriction badge, the "No acceptance criteria" note, "Approved · modified" |
@@ -1679,14 +1679,10 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
   password page, My work and the project list's fields, the workspace users' columns, the
   add-person and add-member changes, project settings' Danger zone, the restriction badge, and
   centered dialogs.
-- **SVAR widgets** (DL-64; ui-design-guide §7.1): the requirement tree's widget is decided by the
-  S2-C0b spike (DL-150): SVAR DataGrid's tree mode or PrimeVue TreeTable. If SVAR, its packages
-  (`@svar-ui/*`, MIT, exact pins: vue-grid 2.7.5, vue-core 2.6.1) arrive in S2-C15 with the
-  wrapper, its entries in `src/app/theme/svar-theme.css` (from the reference copy in `docs/ui/`),
-  the theme-audit and keyboard/move specs, any `e2e/svar-known-issues.ts` entries, and the
-  per-list choice recorded in `screen-inventory.md` (UI-SVR-2). Either way, rank fits the
-  wrapper: a move goes through our menu (and `api.intercept` for a SVAR drag), the client sends
-  neighbor IDs, and the server computes rank (UI-SVR-5). The board stays Slice 3's.
+- **The tree widget** (DL-174, from the S2-C0b spike): the requirement tree is PrimeVue
+  TreeTable, so Slice 2 adds no SVAR package; SVAR arrives with the board in Slice 3 (DL-64).
+  Rank fits the wrapper: a move goes through our menu, the client sends neighbor IDs, and the
+  server computes rank (UI-SVR-5).
 - **Rendered markdown** (DL-140, DL-141, DL-142; ui-design-guide UI-MD-1 and UI-MD-2): one
   `MarkdownView` and one `MarkdownEditor`, built once in S2-C16 and reused by comments in
   Slice 6.
