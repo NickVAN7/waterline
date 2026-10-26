@@ -60,7 +60,8 @@ be loaded, **Try again** loads it again.
 ## Projects
 
 An organization's project list (`/<organization>/projects`) shows its projects that you can
-see, each with its key, type, and status, 25 to a page, with **Previous page** and **Next page** links when there are more. **Status**
+see, each with its key, type, and status, 25 to a page (archived projects are left out:
+organization owners and admins find them in the Overview's **Archived** list), with **Previous page** and **Next page** links when there are more. **Status**
 and **Type** narrow the list; **Clear filters** shows them all again. The page you're on and the
 filters are in the address, so a link or a reload opens the same list.
 
@@ -72,8 +73,8 @@ modules: each is described, and a module that isn't built yet can't be turned on
 greyed out, with "Not available yet". You become its first admin and lead, unless you're an
 organization owner or admin, who may name someone else instead: any active member of the
 organization, or of the workspace's staff. You can also set its restriction: a level (None,
-Internal, or Confidential, each described) and why it's sensitive (Financial, Proprietary,
-Personal data). Once created, the project opens.
+Internal, or Confidential, each described) and its **Categories**, why it's sensitive (Financial,
+Proprietary, Personal data (PII)). Once created, the project opens.
 
 A project's home (`/<organization>/projects/<KEY>`) shows its name, its key, its status, its
 restriction as a badge if it has one ("Confidential · Financial"), and its lead's name
@@ -174,7 +175,7 @@ them). Anyone else who opens these pages is told to ask a workspace owner or adm
 its **Actions for …** menu, which lists only what you may do to that person.
 
 - **Staff** lists the workspace's staff and their roles. **Add person** asks for the email first,
-  and tells you at once if it isn't an email address. If the email already has an account, you
+  and, when you press **Continue**, tells you if it isn't an email address. If the email already has an account, you
   confirm adding that person (you're shown only the email). If not, you create the account: the
   email, which you can still correct there (a changed email is checked again, and if it turns out
   to have an account you're asked to confirm adding that person instead), name, username
@@ -189,9 +190,9 @@ its **Actions for …** menu, which lists only what you may do to that person.
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
   existing person, or a new account with a temporary password, shown once.
 - **Users** lists everyone in the workspace. **Role** shows their workspace role (**Owner**,
-  **Admin**, or **Member**), or **User** if they have none, with a **System admin** badge for
-  system admins (granted outside the app, so you can read it but not change it); **Status** shows
-  **Active** or **Deactivated**.
+  **Admin**, or **Member**) and a **System admin** badge for system admins (granted outside the
+  app, so you can read it but not change it); someone with neither shows **User**. **Status**
+  shows **Active** or **Deactivated**.
 - **Settings** renames the workspace and changes its slug (workspace owners and system admins).
 
 **Account actions.** Where your role covers someone (the rank rule: you can act on people at your

@@ -792,8 +792,8 @@ Entry format:
 - **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) were never done;
   Slice 1's screens were designed checkpoint by checkpoint.
 - **Why:** the owner completes the inventory separately, outside the checkpoints.
-- **Fix by:** S2-C0i (the owner's completed inventory checked against the docs and the built
-  screens; if it isn't committed when S2-C0i starts, the start of the `s2-web` group, DL-157)
+- **Fix by:** S2-C15, the start of the `s2-web` group (the owner's completed inventory checked
+  against the docs and the built screens; it wasn't committed when S2-C0i started, DL-157)
 - **Status:** open
 
 ### TD-63: Settings saves are last-save-wins, with no optimistic lock

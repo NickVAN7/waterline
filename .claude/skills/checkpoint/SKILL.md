@@ -30,7 +30,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 3. Update the docs
 
 - `docs/developer-guide.md`: anything a developer now needs (setup steps, commands, conventions,
-  how-tos, troubleshooting).
+  how-tos, troubleshooting). Its Status stays one line, the checkpoint and the next one; what was
+  built goes in the commit and the review record, not there (DL-170).
 - `docs/user-guide.md`: any user-visible behavior.
 - `docs/design-doc.md`, `docs/schema-doc.md`, `docs/build-plan.md`: any drift between the docs
   and what was built (approved changes only; unapproved divergence goes back to the owner).
@@ -89,7 +90,11 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
   (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
   absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
-  any other finding. Run `uv run wl up` again afterwards.
+  any other finding.
+- **Last checkpoint of a slice:** with the dev stack still down, invoke the `user-guide-verifier`
+  agent with the repository's absolute path, the checkpoint ID, and the slice whose "Done when"
+  list to walk (DL-124). Its findings are fixed in `docs/user-guide.md`, or in the app when the
+  app is what's wrong, like any other finding. Run `uv run wl up` again afterwards.
 - **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
   agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
   (the root commit for Slice 0). It reports **Fixes** and **Decisions**.

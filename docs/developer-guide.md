@@ -4,143 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0h (Forms) built: add-person's email checked for its format on step 1
-> (`useFormErrors`' `invalidate`) and editable on step 2, checked again on Create account if changed (DL-185), a 422 on it
-> staying there (UI-FRM-13); the new-account fields in one `NewAccountFields` (add-person and
-> create-org) on `useUsernameSuggestion` (TD-59, S2-C0a finding 5); the add-member picker's list
-> opening on focus; project settings' Danger zone and its danger confirm (UI-FRM-14); the
-> password reset's last step read with Done (TD-51); settings saves sending only the changed
-> fields (TD-56), with org and workspace settings on one `NameSlugSettings` (finding 4);
-> `workspace_role` on the users list's rows and its Role column (DL-183); the per-person access
-> review's hidden "Not export-controlled" (DL-184); `expectFocusNotObscured` probing the
-> on-screen part of a focused element taller than the viewport. S2-C0g (Account & lists) built: account settings' Appearance section, with the theme
-> choice gone from the user menu (DL-164), and change password as its own page,
-> `/account/password` (`AccountPasswordView`); `organization_name` and `my_access` on the project
-> item, shown on My work, and the type on the org's project list (`ProjectList`'s `withAccess`
-> and `withType`, the status right-aligned; DL-153); the workspace users' Role and Status
-> columns; the project access review's title and sentence; the project header's actions slot
-> (TD-49); `useListQuery`'s `returnWhenEmpty` (TD-58) and `offsetKey`; the org's project list on
-> `ORG_PROJECTS` (DL-170); `?archived_only=true` on any `ListSpec` with an `archived_column`,
-> a 422 `conflict` with `include_archived` (DL-181, DL-182), and the org overview's "Archived"
-> section on it (DL-180); `export_controlled` on the per-person access review's project rows,
-> with Access shown only on those (DL-177); the restriction badge's hidden "Restriction: "
-> (DL-179). S2-C0f (Org admin) built: the org menu in the header (the orgs, and for whoever may
-> manage the org its Overview, Members, and Settings; `OrgMenu`), the user menu's one
-> "Administration"; on an admin page (a route's `meta.adminArea`) the sidebar shows that area's
-> pages in place of the project selector (`OrgNav`, `WorkspaceNav`; `SectionNav` is gone); the org
-> overview at `/{org_slug}/overview`; `lead_name` on the project item (DL-137, DL-153, DL-163).
-> S2-C0e (Shell) built: the PrimeUI license key (`VITE_PRIMEUI_LICENSE`, DL-135) and an
-> e2e check that no license notice renders; dialogs centered, with an e2e check; the header's
-> "Waterline" and the org's name; Sign out with an icon and the danger tone; the project selector
-> headed by the org's name, with "All projects" as a link and "New project" in line; the
-> sign-in card's sizes and spacing (DL-137). S2-C0d (Restriction, export control, modules) built: "classification" renamed
-> "restriction" throughout (`RestrictionMixin`, `rules/restriction.py`, `PUT
-> /api/projects/{key}/restriction`, `project.raise_restriction`/`project.lower_restriction`,
-> `project_restriction_changed`) with `restricted` removed, one migration for the rename and for
-> removing `sprints` and `github` from every project (DL-134, DL-136); an unshipped v1 module is a 422
-> `module_unavailable` and a disabled checkbox; export control is no longer offered in the UI and
-> `ExportControlDialog` is gone (DL-133); the restriction badge in the project header
-> (`RestrictionBadge`, DL-137). S2-C0c (Backend leftovers) built: updates through `apply_changes` (TD-57),
-> `ValidationFailedError.on`, one `ERRORS` map, `PageResult.with_items`, the DL-143 length limits,
-> `anyio` a runtime dependency, `GET /api/orgs/{org_id}/first-admin-candidates` and the create
-> dialog's picker on it, and the `new-area` skill verified. S2-C0b (Tree spike) built: SVAR DataGrid's tree mode measured against PrimeVue
-> TreeTable (`docs/spikes/S2-C0b-tree/results.md`); the tree is TreeTable (DL-174). S2-C0a
-> (Simplicity audit) built: the `simplicity-auditor` agent and its vendored
-> prompts (`.claude/audit/`), the review-record check, and the audit's first run on `main`
-> (`docs/reviews/s2/S2-C0a.md`). S1-C17 (Slice verification) built: the "Done when" walked through, the owner's
-> manual keyboard and screen-reader pass (no problems; `docs/reviews/s1/S1-C17-manual-pass.md`),
-> the slice-end agents, and the slice retro (`docs/reviews/s1/S1-retro.md`); Slice 1 is complete
-> once the retro's changes are applied and the owner approves the merge. S1-C16d (Review
-> follow-ups (2)) built: `refetchNeeded` also covers `members_changed`
-> on `confirmed_member_ids`, so project settings' classification save reloads the project when
-> its members changed (DL-120); the create-organization and password-reset dialogs read their
-> last step's text and the temporary password's warning with Done (DL-118, DL-122;
-> `TemporaryPasswordNotice`'s `warningId`). S1-C16c (Review
-> follow-ups) built `refetchNeeded` (`useFormErrors`), a 403 or a
-> refusal for a project's changed export control, reloads the page's data in the add dialogs and
-> the settings forms (DL-116); the add-person dialog's confirmation steps start on Back (DL-117)
-> and each step's text is in the focused control's `aria-describedby` (DL-118; `TextField`'s
-> `describedBy`). S1-C16b (Web: project members) built a
-> project's members page
-> (`ProjectMembersView`, `/{org_slug}/projects/{key}/members`, Members in the project pages nav
-> for anyone who sees the project) on `RosterPage`, whose `header` and `dialogs` slots the project
-> fills; the picker (`AddMemberDialog`, a PrimeVue `AutoComplete` over `member-candidates`); the
-> email-first add's `join_org` confirmation and the export-control confirmation on every add
-> (`AddPersonDialog`, through `Roster`'s `AddOptions`); the per-project access review
-> (`ProjectAccessView`, `/{org_slug}/projects/{key}/access`, linked from the members page for
-> `project.view_access`); and the roster, account, and create-org dialogs' 403 reload
-> (`refused`, TD-46) and alert dismiss back to the submit button (TD-47). S1-C16a (Web: project
-> settings) built the project settings page
-> (`ProjectSettingsView`, `/{org_slug}/projects/{key}/settings`, Settings in the project pages nav
-> for whoever `hasSettings`), with details, modules (`ModuleFields`, warning when one is turned
-> off), classification (`ClassificationFields`), and archiving; the export-control confirmation
-> as its own dialog (`ExportControlDialog`, DL-114), which the create dialog opens too;
-> `ConfirmDialog`, a promise-based confirmation; `useSettingsSave`, the settings forms' shared save
-> handling (TD-43); `useProjectPage` and `ProjectHeader`, every project page's loading and header;
-> and `lead_is_active` on the project read and `is_active` on project member rows (DL-113).
-> S1-C16 (Web: projects) built: the create-project dialog (`views/project/`,
-> opened from the project selector's New project), the org project list's status and type
-> filters (`useListQuery`'s `filters`), the project header's lead name (`lead_name` on the
-> project read, DL-111), the classification banner (`ClassificationBanner`), and the sidebar's
-> greyed-out unshipped modules (`app/shell/ProjectPages.vue`). S1-C15a (Web: org admin) built an org's members and settings pages
-> (`/{org_slug}/members`, `/{org_slug}/settings`), reached from the user menu's "Organization
-> administration" (DL-104); `RosterPage` (`views/roster/`), the roster list both the staff and the
-> org members pages are built on; and `useRouteOrg`, an org page's org from its URL, which follows
-> a slug change to the new URL. S1-C15 (Web: workspace admin)
-> built the workspace administration pages (staff, orgs,
-> users, settings, and a person's access review, reached from the user menu, DL-104), the shared
-> admin pieces (`ModalDialog`, the roster dialogs in `views/roster/`, the account
-> action dialogs in `views/user/`, the temporary-password field and notice, `RowActions`,
-> `useAvailability`), `PageHeader` on every page, and staff and org member rows carrying
-> `is_active` and the account actions (DL-102). S1-C14a (Web:
-> app shell) built the shell (skip link, header with the org switcher
-> and user menu, the sidebar with My work, the project selector, and the project's pages), the
-> System / Light / Dark theme, My work's projects section, account settings, the password
-> requirements list (`GET /api/auth/password-policy`), the no-access page, a minimal project home
-> and org project list (DL-97), `useListQuery`, and the first skeleton loaders (section 7).
-> S1-C14 (Web: foundations & sign-in) built the styling
-> foundation, the current-user store, route guards, sign-in, the forced password change, and
-> `wl e2e`. S1-C13a (Demo seed data) built `wl seed --demo` (section 5, "Demo
-> data"). S1-C13 (Classification & export control) built classification. A project's classification is set at creation or with `PUT
-> /api/projects/{key}/classification` (`project.raise_classification`,
-> `project.lower_classification`), export control needs a confirmation on every member add and
-> when it's added, and both access reviews show `access` (`content` or `management`; build plan,
-> "Classification & export control"). S1-C12 (Project members) built the members: they are listed, picked, added by user ID or email (with `join_org` for someone from
-> outside the org), created, re-roled, and removed at `/api/projects/{key}/members`, and the
-> per-project access review is at `/api/projects/{key}/access` (build plan, "The project members
-> API"). S1-C11 (Projects) built the projects themselves. Projects are created in an
-> org (`POST /api/orgs/{id}/projects`, the first admin becoming the lead), listed, read and updated
-> at `/api/projects/{key}`, archived and unarchived; `GET /api/module-guidance` and My work's
-> projects section (`GET /api/me/work`) are built (build plan, "The projects API"). S1-C10 (Account
-> actions & profile) closed the `s1-workspace` group. Admins deactivate, reactivate, reset the password of, sign out
-> everywhere, and edit the email, name, and username of users under the rank rule
-> (`/api/users/{id}/…`, `user.manage`); users edit their own name and username (`PATCH /api/me`);
-> the workspace users list (`GET /api/workspaces/{id}/users`) and the per-person access review
-> (`GET /api/users/{id}/access`, `user.view_access`) are built (build plan, "The account API"). Every
-> last-owner guard counts active owners (DL-74). An org's members work like the workspace's staff, through one shared
-> roster (`app/services/roster.py`): email-first add, create, roles with the owner-only rule,
-> stepping down, removal, and the last owner's handover (`new_owner_id`). The user check
-> (`GET /api/workspaces/{id}/user-check`) answers whether an email has an account, whether a
-> username is free, or suggests one from a name. The workspace and org API is built: the
-> workspace, its staff, and orgs with their first owner (build plan, "The workspace and org API",
-> "The org members API"). Every check goes through `authorize()`
-> ("Authorization" below); `/me` carries each workspace's `allowed_actions`. Sign-in, sign-out,
-> change password, and `GET /api/auth/me` work over a server-side session in the `__Host-session`
-> cookie, a forced password change blocks every other endpoint, and every mutating request passes
-> the `Origin` and JSON-only checks first ("Authentication" below). `wl seed` creates the workspace
-> and its first system admin, and `wl admin` grants and revokes the system-admin flag. The tenancy,
-> project, and audit tables exist (models, migrations, constraint tests, a factory per model;
-> `audit_event` is append-only), with the domain enums in `app/enums.py`, get-by-ID in the base
-> repository, and `NumberingService.allocate_number`. Race tests have a harness (`run_in_parallel`).
-> The pure rules (identifiers, password policy, account rank) are in `app/rules/`, held to 100%
-> coverage and mutation-tested (`wl backend mutate`). The API conventions are in place: list helpers
-> (`app/core/lists.py`), constraint errors as field errors (`app/core/constraint_errors.py`), and
-> `log_admin_event()`. The backend has its database core (Postgres, async SQLAlchemy, Alembic, the
-> base model and its mixins), a test harness with a `concurrency` fixture, background jobs on
-> procrastinate, the model conventions (enums, soft delete, optimistic locking with 409,
-> `direct_update`), the standard error format (including a catch-all 500), and the password and
-> token helpers; `GET /api/health` checks the database. Docker Compose runs the whole stack
-> (postgres, migrate, api, worker, web). CI runs `wl check --full` on every push to `main` and every pull request.
+> **Status:** S2-C0i (Tooling & inventory) built; next is S2-C1 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -180,7 +44,8 @@ uv run pre-commit install        # git hooks: ruff, Prettier, ESLint, generated 
 cp .env.example .env             # local settings (never committed); edit if needed, and
                                  # set VITE_PRIMEUI_LICENSE (below)
 uv run wl up                     # build and start the stack; applies migrations
-uv run wl check --full           # everything CI runs; should be green on a fresh clone
+uv run wl check                  # the commit gate; should be green on a fresh clone
+                                 # (`wl check --full` is what CI runs, section 10)
 ```
 
 Then open <http://localhost:5173>: it sends you to sign in. Build the demo data first ("Demo
@@ -221,9 +86,10 @@ docker-compose.yml   the local stack: postgres, migrate, api, worker, web (secti
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
 .claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
-                design-change), agents (checkpoint-reviewer, security-reviewer,
-                fresh-clone-verifier, docs-consistency, spec-test-writer,
-                repo-auditor, ui-reviewer),
+                design-change, vue-screen), agents (checkpoint-reviewer,
+                security-reviewer, fresh-clone-verifier, user-guide-verifier,
+                docs-consistency, spec-test-writer, repo-auditor, ui-reviewer,
+                simplicity-auditor),
                 hooks (see section 11)
 ```
 
@@ -1320,10 +1186,10 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
 The repository's Claude Code setup lives in `.claude/` and is version-controlled.
 
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
-  `design-change`.
+  `design-change`, `vue-screen` (the recipe for a screen or dialog).
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
-  `fresh-clone-verifier`, `docs-consistency`, `spec-test-writer`, `repo-auditor`,
-  `ui-reviewer`, `simplicity-auditor`.
+  `fresh-clone-verifier`, `user-guide-verifier`, `docs-consistency`, `spec-test-writer`,
+  `repo-auditor`, `ui-reviewer`, `simplicity-auditor`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
   changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
   at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
@@ -1331,7 +1197,8 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   two or three behaviors in a temporary copy, and reviews a design change's tooling code under
   a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
   `frontend/e2e/` (read-only: accessibility and frontend conventions against
-  `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`, `docs-consistency`, and
+  `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`,
+  `user-guide-verifier` (the user guide followed in a browser, DL-124), `docs-consistency`, and
   `repo-auditor` (a whole-repository audit that runs no tests, DL-41), then
   `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored
   in `.claude/audit/`, whose findings go to the owner, DL-138) at the last checkpoint of a

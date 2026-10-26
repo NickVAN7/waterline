@@ -121,7 +121,8 @@ for approval.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
-the guide. After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
+the guide. The `user-guide-verifier` agent then follows `docs/user-guide.md` literally in a
+browser against a seeded copy of the stack and walks the slice's "Done when" list (DL-124). After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
 `CLAUDE.md` file, and `.claude/` file against the others, and then the `repo-auditor` agent
 audits the whole repository, not one diff: bugs, security, scale against the expected load,
 risky code without a test, slowness, and lean (DL-41). From S2-C0a, the `simplicity-auditor`
@@ -190,7 +191,8 @@ Everything lives in the repository, version-controlled and present on every work
   - the reviewers, one at a time: `security-reviewer` when the slice's section names the
     checkpoint for it or the diff touches security-relevant code, then `checkpoint-reviewer`
     every time, then `ui-reviewer` when the diff touches `frontend/src/` or `frontend/e2e/`
-    (DL-62), and at the end of a slice `fresh-clone-verifier`, `docs-consistency`, and
+    (DL-62), and at the end of a slice `fresh-clone-verifier`, `user-guide-verifier`,
+    `docs-consistency`, and
     `repo-auditor` (then `simplicity-auditor`, from S2-C0a, DL-138);
   - resolving every finding, and the review record in `docs/reviews/s<n>/<ID>.md`;
   - one commit with the review note, pushed to the slice branch;
@@ -225,6 +227,14 @@ Everything lives in the repository, version-controlled and present on every work
 - **`fresh-clone-verifier` agent** (`.claude/agents/`): at the last checkpoint of each slice,
   sets up a temporary copy of the repository by following the developer guide literally and
   reports every wrong or missing step.
+- **`user-guide-verifier` agent** (`.claude/agents/`; DL-124, built in S2-C0i): at the last
+  checkpoint of each slice, after `fresh-clone-verifier`, follows the user guide literally in a
+  browser (Playwright scripts) as the demo data's people, on its own Compose project
+  (`waterline-guide`), and walks the slice's "Done when" list; reports every wrong or missing
+  step, and anything the app does other than what the guide says.
+- **`vue-screen` skill** (`.claude/skills/`; DL-124, built in S2-C0i): the recipe for a screen or
+  dialog, distilled from the built ones: which screen to copy, the page states in order, the
+  checks, and the spec's minimum.
 - **`docs-consistency` agent** (`.claude/agents/`): a read-only reviewer that checks the docs,
   `CLAUDE.md` files, and `.claude/` against each other (contradictions, superseded rules, stale
   status, broken references, gaps). It reports clear-cut **fixes** (citing the recorded
@@ -268,7 +278,6 @@ named checkpoint when its trigger arrives.
 
 | Trigger | Item |
 |---|---|
-| S2-C0i | The `vue-screen` skill, distilled from S2-C0d to S2-C0h's screens and Slice 1's, and the `user-guide-verifier` agent, which follows `docs/user-guide.md` literally in a browser against a seeded stack and walks the "Done when" list (DL-124) |
 | Later (no slice yet) | A CI smoke step that builds the images, starts the stack, and checks `/api/health` |
 
 ### Planning a slice
@@ -408,9 +417,10 @@ The sections below describe the content; the table above is the order of work.
 │   │                                   hook_paths.py (shared helpers)
 │   ├── agents/                         checkpoint-reviewer.md, security-reviewer.md,
 │   │                                   fresh-clone-verifier.md, docs-consistency.md,
-│   │                                   spec-test-writer.md, repo-auditor.md, ui-reviewer.md
+│   │                                   spec-test-writer.md, repo-auditor.md, ui-reviewer.md,
+│   │                                   simplicity-auditor.md, user-guide-verifier.md
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
-│                                       design-change/
+│                                       design-change/, vue-screen/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide.md,
 │                                 tech-debt.md, decision-log.md, screen-inventory.md,
@@ -1543,7 +1553,7 @@ before they start (DL-139).
 review), TD-31 (S2-C22), TD-40 (S2-C14), TD-42 (S2-C22), TD-44 (S2-C0c), TD-49 (S2-C0g), TD-51
 (S2-C0h), TD-52 (S2-C0c for the existing fields; each Slice 2 field with its row), TD-53
 (S2-C0c), TD-54 (S2-C0c), TD-55 (S2-C0c), TD-56 (S2-C0h), TD-57 (S2-C0c), TD-58 (S2-C0g), TD-59
-(S2-C0h), TD-60 (S2-C0c), TD-61 (S2-C22), TD-62 (S2-C0i), TD-63 (S2-C22), TD-64 (S2-C22).
+(S2-C0h), TD-60 (S2-C0c), TD-61 (S2-C22), TD-62 (S2-C15, DL-157), TD-63 (S2-C22), TD-64 (S2-C22).
 
 ### Checkpoints
 

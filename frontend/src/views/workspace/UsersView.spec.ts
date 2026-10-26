@@ -40,6 +40,16 @@ const USERS: Row[] = [
     workspace_role: null,
     allowed_actions: ['user.manage'],
   },
+  {
+    id: 'u-ola',
+    email: 'ola@harbor.example',
+    username: 'ola',
+    name: 'Ola Root',
+    is_active: true,
+    is_system_admin: true,
+    workspace_role: null,
+    allowed_actions: [],
+  },
 ]
 
 beforeEach(() => {
@@ -91,6 +101,8 @@ describe('UsersView', () => {
       // The staff role beside the badge; "User" with none (DL-183).
       ['Sam Admin', 'sam@harbor.example', 'sam', 'Admin System admin', 'Active'],
       ['Dee Gone', 'dee@harbor.example', 'dee', 'User', 'Deactivated'],
+      // A system admin with no workspace role: the badge alone, not "User" (DL-187).
+      ['Ola Root', 'ola@harbor.example', 'ola', 'System admin', 'Active'],
     ])
     expect(wrapper.get('table').findAll('input, select')).toHaveLength(0)
     await expectNoA11yViolations(wrapper)

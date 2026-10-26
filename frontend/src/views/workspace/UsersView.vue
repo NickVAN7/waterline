@@ -126,9 +126,15 @@ const announcement = computed(() => {
                 <td class="p-2">{{ user.email }}</td>
                 <td class="p-2 font-mono">{{ user.username }}</td>
                 <td class="p-2">
-                  <!-- The staff role, or "User", beside the System admin badge (DL-183). -->
+                  <!-- The staff role beside the System admin badge (DL-183); "User" with neither (DL-187). -->
                   <span class="flex flex-wrap items-center gap-2">
-                    {{ user.workspace_role ? WORKSPACE_ROLE[user.workspace_role] : USER }}
+                    {{
+                      user.workspace_role
+                        ? WORKSPACE_ROLE[user.workspace_role]
+                        : user.is_system_admin
+                          ? ''
+                          : USER
+                    }}
                     <Badge
                       v-if="user.is_system_admin"
                       :tone="SYSTEM_ADMIN.tone"
