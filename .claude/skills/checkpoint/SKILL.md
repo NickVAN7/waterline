@@ -141,8 +141,8 @@ to the owner, who decides it, and feeds the retro; the next slice's C0 applies t
 findings, tests, or docs alone don't trigger one. Only `checkpoint-reviewer`,
 `security-reviewer`, and `ui-reviewer` are re-reviewed; the other agents' findings are fixed
 without another pass (DL-108), except that a code fix for a major or blocker finding from
-`repo-auditor` or `fresh-clone-verifier` is covered by `checkpoint-reviewer`'s re-review, or by
-one pass of it if it had none, given those findings and their resolutions too (DL-110). The re-review gets, besides the usual inputs:
+`repo-auditor`, `fresh-clone-verifier`, or `user-guide-verifier` is covered by `checkpoint-reviewer`'s re-review, or by
+one pass of it if it had none, given those findings and their resolutions too (DL-110, DL-190). The re-review gets, besides the usual inputs:
 - the fix diff: take `uv run wl review-copy <dir>/reviewed-2` and pass the reviewer
   `diff -ruN -x .git <dir>/reviewed-1 <dir>/reviewed-2`, saved to a file, as what to review
   (each copy is a clone, with its own `.git`; the rest of the diff was reviewed in pass 1);

@@ -2383,3 +2383,24 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide UI-FBK-6; build plan (the account bullet, the users list's
   endpoint row, S2-C0j, the `s2-prep` group)
 - **Source:** owner, Oct 26, 2026 (chat session, at the S2-C0i report)
+
+### DL-189: The per-person access review shows system admin as text too
+- **Date:** 2026-10-26
+- **Decision:** The per-person access review shows system admin as text, as the users list does
+  (DL-188), not a badge: beside the workspace role ("Owner, System admin"), or alone for a system
+  admin with no workspace role; "None" stays for a person with neither. Built in S2-C0j.
+- **Supersedes:** none (extends DL-188)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (S2-C0j)
+- **Source:** owner, Oct 26, 2026
+  (`docs/reviews/design-changes/DC-2026-10-26b-users-role-text.md`, Decision 1)
+
+### DL-190: `user-guide-verifier`'s app fixes are re-reviewed
+- **Date:** 2026-10-26
+- **Decision:** A code fix for a major or blocker finding from `user-guide-verifier` is covered by
+  `checkpoint-reviewer`'s re-review, as `repo-auditor`'s and `fresh-clone-verifier`'s are
+  (DL-110).
+- **Supersedes:** none (extends DL-110)
+- **Superseded by:** none
+- **Applies to:** `.claude/skills/checkpoint/SKILL.md` (step 5); `.claude/agents/checkpoint-reviewer.md`
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0i.md`, open question 1)

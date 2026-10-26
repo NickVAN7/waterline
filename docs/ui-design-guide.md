@@ -719,7 +719,8 @@ render inside the full shell when signed in.
   user's name everywhere it appears, except the workspace users list, where it is in the Status
   column (DL-137, from S2-C0g), and whose Role column shows the workspace role and system
   admin as text ("Owner, System admin", "System admin", "Admin"), or "User" for neither, with
-  system admins who have no workspace role listed last (DL-183, DL-188; from S2-C0j).
+  system admins who have no workspace role listed last (DL-183, DL-188; from S2-C0j); the
+  per-person access review shows system admin as text too (DL-189, from S2-C0j).
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
 - **UI-FBK-8** **Empty states** distinguish two cases. *Nothing exists yet:* a heading ("No members
