@@ -23,7 +23,7 @@ describe('RestrictionBadge', () => {
     async (level, label, tone, path) => {
       const wrapper = badge(level, ['financial', 'pii'])
 
-      expect(wrapper.text()).toBe(`${label} · Financial, Personal data (PII)`)
+      expect(wrapper.text()).toBe(`Restriction: ${label} · Financial, Personal data (PII)`)
       expect(wrapper.get('span').classes()).toContain(`text-tone-${tone}-fg`)
       expect(wrapper.find(`path[d="${path}"]`).exists()).toBe(true)
       await expectNoA11yViolations(wrapper)
@@ -33,7 +33,7 @@ describe('RestrictionBadge', () => {
   it('reads categories without a level as No restriction level, in the Internal tone', () => {
     const wrapper = badge(null, ['proprietary'])
 
-    expect(wrapper.text()).toBe('No restriction level · Proprietary')
+    expect(wrapper.text()).toBe('Restriction: No restriction level · Proprietary')
     expect(wrapper.get('span').classes()).toContain('text-tone-info-fg')
   })
 
@@ -42,6 +42,10 @@ describe('RestrictionBadge', () => {
   })
 
   it('names no categories when there are none', () => {
-    expect(badge('confidential').text()).toBe('Confidential')
+    expect(badge('confidential').text()).toBe('Restriction: Confidential')
+  })
+
+  it('says what it is to a screen reader only (DL-179)', () => {
+    expect(badge('internal').get('.sr-only').text()).toBe('Restriction:')
   })
 })

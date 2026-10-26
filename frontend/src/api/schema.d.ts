@@ -607,7 +607,8 @@ export interface paths {
         };
         /**
          * List Projects
-         * @description The org's projects the caller can open; archived ones only with `include_archived`.
+         * @description The org's projects the caller can open; archived ones with `include_archived`, or alone
+         *     with `archived_only`.
          */
         get: operations["list_projects_api_orgs__org_id__projects_get"];
         put?: never;
@@ -1498,6 +1499,10 @@ export interface components {
             organization_id: string;
             /** Organization Slug */
             organization_slug: string;
+            /** Organization Name */
+            organization_name: string;
+            /** My Access */
+            my_access: components["schemas"]["ProjectRole"] | "inherited_admin";
         };
         /**
          * ProjectMemberAdd
@@ -1590,6 +1595,8 @@ export interface components {
             organization_id: string;
             /** Archived */
             archived: boolean;
+            /** Export Controlled */
+            export_controlled: boolean;
             /** Reasons */
             reasons: components["schemas"]["AccessReason"][];
             access: components["schemas"]["AccessKind"];
@@ -3806,13 +3813,14 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: key, name. Default: name */
                 sort?: string | null;
+                include_archived?: boolean;
+                archived_only?: boolean;
                 status?: components["schemas"]["ProjectStatus"][] | null;
                 status__not?: components["schemas"]["ProjectStatus"][] | null;
                 status__is_null?: boolean | null;
                 type?: components["schemas"]["ProjectType"][] | null;
                 type__not?: components["schemas"]["ProjectType"][] | null;
                 type__is_null?: boolean | null;
-                include_archived?: boolean;
             };
             header?: never;
             path: {

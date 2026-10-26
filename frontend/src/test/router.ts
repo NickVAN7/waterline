@@ -13,6 +13,7 @@ export async function testRouter(path = '/') {
       { path: '/account/change-password', name: 'change-password', component: Page },
       { path: '/status', name: 'status', component: Page },
       { path: '/account', name: 'account', component: Page },
+      { path: '/account/password', name: 'account-password', component: Page },
       { path: '/account/no-access', name: 'no-access', component: Page },
       { path: '/workspace/staff', name: 'workspace-staff', component: Page },
       { path: '/workspace/orgs', name: 'workspace-orgs', component: Page },

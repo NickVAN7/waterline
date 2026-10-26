@@ -9,7 +9,7 @@ import { ANNOUNCE_DELAY_MS, FORM_MESSAGES } from '@/composables/useFormErrors'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok, validationFailed } from '@/test/api'
 import { acme, mountOrgPages, mountOrgView } from '@/test/org'
-import { cleanUpAfterEach } from '@/test/workspace'
+import { cleanUpAfterEach, listPage } from '@/test/workspace'
 
 import OrgSettingsView from './OrgSettingsView.vue'
 
@@ -29,6 +29,7 @@ function answers(allowed: Action[] = OWNER, saved: { name?: string; slug?: strin
       return Promise.resolve(ok({ available: false, problem: 'taken' }))
     if (path === '/api/auth/me')
       return Promise.resolve(ok(me({ orgs: [{ ...acme(OWNER), ...saved }] })))
+    if (path === '/api/orgs/{org_id}/members') return Promise.resolve(ok(listPage([])))
     return Promise.resolve(ok(org(allowed)))
   }) as never)
 }

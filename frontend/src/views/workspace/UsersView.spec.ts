@@ -7,7 +7,13 @@ import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
-import { cleanUpAfterEach, listPage, mountWorkspaceView, WORKSPACE_ID } from '@/test/workspace'
+import {
+  cleanUpAfterEach,
+  emptyPastTheFirst,
+  listPage,
+  mountWorkspaceView,
+  WORKSPACE_ID,
+} from '@/test/workspace'
 
 import UsersView from './UsersView.vue'
 
@@ -42,7 +48,16 @@ beforeEach(() => {
 cleanUpAfterEach()
 
 describe('UsersView', () => {
-  it('lists the users by name, the system-admin flag read-only, a deactivated one marked', async () => {
+  it('goes back to the first page when a later one loads empty (TD-58)', async () => {
+    emptyPastTheFirst(listPage(USERS))
+
+    const { router } = await mountWorkspaceView(UsersView, '/workspace/users?offset=25')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/users')
+  })
+
+  it('lists the users by name, with a Role and a Status column (DL-137)', async () => {
     const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(USERS)))
 
     const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
@@ -53,16 +68,26 @@ describe('UsersView', () => {
         query: { limit: 25, offset: 0, sort: 'name' },
       },
     })
+    expect(wrapper.findAll('th').map((th) => th.text())).toEqual([
+      'Name',
+      'Email',
+      'Username',
+      'Role',
+      'Status',
+      'Actions',
+    ])
+    // The system-admin flag is read-only, a badge in Role; "Deactivated" is in Status, not
+    // after the name.
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr
           .findAll('td')
-          .slice(0, 4)
+          .slice(0, 5)
           .map((td) => td.text()),
       ),
     ).toEqual([
-      ['Sam Admin', 'sam@harbor.example', 'sam', 'System admin'],
-      ['Dee Gone Deactivated', 'dee@harbor.example', 'dee', 'No'],
+      ['Sam Admin', 'sam@harbor.example', 'sam', 'System admin', 'Active'],
+      ['Dee Gone', 'dee@harbor.example', 'dee', 'User', 'Deactivated'],
     ])
     expect(wrapper.get('table').findAll('input, select')).toHaveLength(0)
     await expectNoA11yViolations(wrapper)

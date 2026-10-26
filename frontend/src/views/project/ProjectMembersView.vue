@@ -152,11 +152,7 @@ async function refused() {
       @refused="refused"
     >
       <template #header="{ add }">
-        <ProjectHeader :project="loaded" :title="`${loaded.name} members`" />
-        <div
-          v-if="canManage || allows(loaded, 'project.view_access')"
-          class="flex flex-wrap items-center gap-3"
-        >
+        <ProjectHeader :project="loaded" :title="`${loaded.name} members`">
           <Button v-if="canManage" @click="picker?.open()">Add member</Button>
           <Button v-if="canManage && workspaceId" variant="secondary" @click="add()"
             >Add by email</Button
@@ -169,7 +165,7 @@ async function refused() {
             }"
             >Access review</RouterLink
           >
-        </div>
+        </ProjectHeader>
       </template>
       <template #dialogs="{ done, refused: reload }">
         <!-- Mounted whatever the actions: a 403 reload mustn't take it away while it's open. -->

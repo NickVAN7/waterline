@@ -1317,7 +1317,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | `POST /api/projects/{key}/archive` | set `archived_at` (`project_archived`); 204 | `project.archive` |
   | `POST /api/projects/{key}/unarchive` | clear it (`project_unarchived`); already unarchived changes and records nothing; 204 | `project.unarchive` |
   | `GET /api/module-guidance` | for each type, the recommended modules; for each module in design-doc §1.1's table, v2 included (`available` false, so its names aren't typed by `ProjectModule`), a best-practice note and `available` (static, for the create dialog before a project exists) | signed in |
-  | `GET /api/me/work`, `GET /api/me/work/projects` | My work (design-doc §11): `{sections: {projects: {available, items, total}}}`, the first 10 items of each section (a section whose query failed is `{available: false}`); `/projects` is the section as an offset-paged list. A project item: `id`, `key`, `name`, `type`, `status`, `lead_id`, `lead_name` (from S2-C0f, DL-153), `organization_id`, `organization_slug`, sorted by name; the projects the user can open, archived left out | signed in |
+  | `GET /api/me/work`, `GET /api/me/work/projects` | My work (design-doc §11): `{sections: {projects: {available, items, total}}}`, the first 10 items of each section (a section whose query failed is `{available: false}`); `/projects` is the section as an offset-paged list. A project item: `id`, `key`, `name`, `type`, `status`, `lead_id`, `lead_name` (from S2-C0f, DL-153), `organization_id`, `organization_slug`, and, from S2-C0g, `organization_name` and `my_access` (the user's explicit project role, or `inherited_admin`; DL-153), sorted by name; the projects the user can open, archived left out | signed in |
 
   `/me`'s org entries carry their org-level `allowed_actions` (`project.create`,
   `project.assign_first_admin`, …). **Errors:** 422 on `key` (the key rule's problems, `taken`);
@@ -1582,7 +1582,7 @@ before the features.
 | 19 | History & revisions *(provisional)* | The History and Revisions tabs (DL-145, DL-147) |
 | 20 | Approvals UI *(provisional)* | The request dialog (approver picker), the decide panel, cancel, approve by hand, the flagged-request state, My work's approvals section |
 | 21 | Delete dialog & trash *(provisional)* | The delete dialog (children promote or delete, the pending-request note), the Trash page and restore (DL-146) |
-| 22 | Slice verification | As S1-C17, plus `simplicity-auditor` after `repo-auditor` (DL-138); "Done when" walked through; a manual keyboard and screen-reader pass; the tech-debt review (TD-19, TD-31, TD-42, TD-61, TD-63, TD-64); the retro, including whether `repo-auditor` keeps its lean category (DL-166), and S2-C0a's findings 1 (the git guard against Claude Code permission rules, after a trial in a scratch session) and 3 (one list of agents, skills, and hooks) (DL-171) |
+| 22 | Slice verification | As S1-C17, plus `simplicity-auditor` after `repo-auditor` (DL-138); "Done when" walked through; a manual keyboard and screen-reader pass; the tech-debt review (TD-19, TD-31, TD-42, TD-61, TD-63, TD-64, TD-66); the retro, including whether `repo-auditor` keeps its lean category (DL-166), and S2-C0a's findings 1 (the git guard against Claude Code permission rules, after a trial in a scratch session) and 3 (one list of agents, skills, and hooks) (DL-171) |
 
 **Groups** ("Pull requests"): five review points, on the `s2` branch with one PR.
 

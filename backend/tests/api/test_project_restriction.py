@@ -610,8 +610,10 @@ async def test_the_person_review_shows_management_on_export_controlled_projects_
     response = await client.get(f"/api/users/{olga.id}/access")
 
     assert response.status_code == 200
-    assert [(p["key"], p["access"]) for p in response.json()["projects"]] == [
-        ("LDG", "content"),
-        ("PMT", "management"),
-        ("SEC", "content"),
+    assert [
+        (p["key"], p["export_controlled"], p["access"]) for p in response.json()["projects"]
+    ] == [
+        ("LDG", False, "content"),
+        ("PMT", True, "management"),
+        ("SEC", True, "content"),
     ]

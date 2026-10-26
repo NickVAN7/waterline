@@ -7,7 +7,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { DEACTIVATED, SYSTEM_ADMIN } from '@/app/labels'
+import { ACTIVE, DEACTIVATED, SYSTEM_ADMIN, USER } from '@/app/labels'
 import { focusHeading, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -49,6 +49,7 @@ watch(
   },
   { immediate: true },
 )
+list.returnWhenEmpty(page.data)
 watch(
   () => page.error.value?.status === 404,
   (gone) => {
@@ -110,7 +111,8 @@ const announcement = computed(() => {
                 <th scope="col" class="p-2">Name</th>
                 <th scope="col" class="p-2">Email</th>
                 <th scope="col" class="p-2">Username</th>
-                <th scope="col" class="p-2">System admin</th>
+                <th scope="col" class="p-2">Role</th>
+                <th scope="col" class="p-2">Status</th>
                 <th scope="col" class="p-2"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -120,17 +122,7 @@ const announcement = computed(() => {
                 :key="user.id"
                 class="border-b border-border-subtle"
               >
-                <td class="p-2">
-                  <span class="flex flex-wrap items-center gap-2">
-                    {{ user.name }}
-                    <Badge
-                      v-if="!user.is_active"
-                      :tone="DEACTIVATED.tone"
-                      :icon="DEACTIVATED.icon"
-                      >{{ DEACTIVATED.label }}</Badge
-                    >
-                  </span>
-                </td>
+                <td class="p-2">{{ user.name }}</td>
                 <td class="p-2">{{ user.email }}</td>
                 <td class="p-2 font-mono">{{ user.username }}</td>
                 <td class="p-2">
@@ -140,7 +132,13 @@ const announcement = computed(() => {
                     :icon="SYSTEM_ADMIN.icon"
                     >{{ SYSTEM_ADMIN.label }}</Badge
                   >
-                  <span v-else>No</span>
+                  <template v-else>{{ USER }}</template>
+                </td>
+                <td class="p-2">
+                  <Badge v-if="!user.is_active" :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{
+                    DEACTIVATED.label
+                  }}</Badge>
+                  <template v-else>{{ ACTIVE }}</template>
                 </td>
                 <td class="p-2 text-right">
                   <RowActions :name="user.name" :actions="account?.actionsFor(user) ?? []" />

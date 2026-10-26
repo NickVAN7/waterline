@@ -4,8 +4,8 @@ How to use each feature, from an end user's point of view. Kept current at every
 
 > **Status:** Slice 1's features. You can sign in, change a temporary password, find your
 > projects from My work, the org menu, and the project selector, create projects, run a
-> project's members and settings and review who can reach it, edit your profile and password,
-> and choose a light or dark theme. Workspace owners and admins run the workspace from its
+> project's members and settings and review who can reach it, edit your profile, change your
+> password, and choose a light or dark theme. Workspace owners and admins run the workspace from its
 > administration pages, and organization owners and admins run their organization's members and
 > settings from theirs. Requirements, tasks, and test cases come in later slices.
 
@@ -51,14 +51,16 @@ Every page after sign-in has the same frame:
 ## My work
 
 My work is your home page (`/`). Its **Projects** section lists the projects you can open,
-with each one's key and status; archived projects are left out. If you're on more than 10, it
+with each one's key, its organization, your access (your role on it, or "Admin (inherited)" if
+you administer it through its organization or the workspace), and its status, on the right;
+archived projects are left out. If you're on more than 10, it
 says how many there are, and each organization's project list has the rest. If the list can't
 be loaded, **Try again** loads it again.
 
 ## Projects
 
 An organization's project list (`/<organization>/projects`) shows its projects that you can
-see, 25 to a page, with **Previous page** and **Next page** links when there are more. **Status**
+see, each with its key, type, and status, 25 to a page, with **Previous page** and **Next page** links when there are more. **Status**
 and **Type** narrow the list; **Clear filters** shows them all again. The page you're on and the
 filters are in the address, so a link or a reload opens the same list.
 
@@ -97,8 +99,9 @@ admins) can also:
 - A row offers **Change role** and **Remove from project**. A project has no last-admin rule:
   its admins may change or remove any role, their own included. Removing the lead leaves the
   project with no lead.
-- **Access review** lists everyone who reaches the project
-  (`/<organization>/projects/<KEY>/access`): their project role, if any, why they reach it (the
+- **Access review**, at the top beside the add buttons, opens the project's access review
+  (`/<organization>/projects/<KEY>/access`): everyone who can open the project, with their
+  project role, if any, why they reach it (the
   role, or an admin role above it), and, on an export-controlled project, whether they reach its
   content or only its management.
 
@@ -131,8 +134,10 @@ Open the menu with your name and choose **Account settings**.
 - **Profile:** change your name or username, then **Save profile**. A username someone else has
   is refused with a message under the field. Your email is shown but can't be changed here; ask
   an administrator.
-- **Password:** enter your current password and a new one, then **Change password**. Changing it
-  signs you out everywhere else.
+- **Appearance:** choose **System** (follow your device), **Light**, or **Dark**. It applies at
+  once and is remembered in this browser.
+- **Password:** **Change password** opens its own page (`/account/password`): enter your current
+  password and a new one, then **Change password**. Changing it signs you out everywhere else.
 
 ## Choosing a password
 
@@ -175,8 +180,9 @@ its **Actions for …** menu, which lists only what you may do to that person.
 - **Organizations** lists the workspace's organizations. **Create organization** asks for its
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
   existing person, or a new account with a temporary password, shown once.
-- **Users** lists everyone in the workspace, with a **System admin** column you can read but not
-  change (system admins are granted outside the app).
+- **Users** lists everyone in the workspace. **Role** shows **System admin** for system admins
+  (granted outside the app, so you can read it but not change it), and **User** for everyone
+  else; **Status** shows **Active** or **Deactivated**.
 - **Settings** renames the workspace and changes its slug (workspace owners and system admins).
 
 **Account actions.** Where your role covers someone (the rank rule: you can act on people at your
@@ -189,7 +195,8 @@ deactivated.
 
 **Access review.** A person's row offers **Access review** to those who may see it: every
 organization and project they can reach, why (their role, or a role above it), and, for each
-project, whether they reach its content or only its management.
+export-controlled project, whether they reach its content or only its management (the **Access**
+column shows only when one of their projects is export-controlled).
 
 ## Organization administration
 
@@ -201,7 +208,8 @@ is told to ask the organization's owners or admins.
 
 - **Overview** (`/<organization>/overview`) shows the organization's name and slug, and its
   projects with their key, type, status, and lead ("No lead" if there's none); each project's
-  name opens its settings.
+  name opens its settings. Archived projects are listed below, under **Archived**; open one's
+  settings to unarchive it.
 
 - **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
   as **Staff** does under workspace administration: **Add person** asks for the email first, then
@@ -226,6 +234,6 @@ the system status.
 
 ## Light and dark
 
-Waterline follows your device's light or dark setting. To choose one yourself, open the menu
-with your name and pick **Light theme** or **Dark theme**; **System theme** goes back to
-following your device. The choice is remembered in this browser.
+Waterline follows your device's light or dark setting. To choose one yourself, open
+**Account settings** and pick **Light** or **Dark** under **Appearance**; **System** goes back
+to following your device. The choice is remembered in this browser.

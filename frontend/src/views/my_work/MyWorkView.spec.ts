@@ -59,6 +59,30 @@ describe('MyWorkView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it("shows each project's org and the user's access, with the status last (DL-153)", async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      work({
+        available: true,
+        items: [
+          projectItem('ERP', { organization_name: 'Bolt Foods', my_access: 'viewer' }),
+          projectItem('PORTAL', { my_access: 'inherited_admin' }),
+        ],
+        total: 2,
+      }),
+    )
+
+    const wrapper = await mountView()
+
+    const rows = wrapper.findAll('section li')
+    expect(rows.map((li) => li.findAll(':scope > span').map((s) => s.text()))).toEqual([
+      ['ERP', 'Organization: Bolt Foods', 'Your access: Viewer', 'Active'],
+      ['PORTAL', 'Organization: Acme Manufacturing', 'Your access: Admin (inherited)', 'Active'],
+    ])
+    // Right-aligned (DL-137): the badge takes the row's free space before it.
+    expect(rows[0]!.findAll(':scope > span').at(-1)!.classes()).toContain('ml-auto')
+    expect(rows[0]!.text()).not.toContain('Software')
+  })
+
   it('is busy, saying so, while the projects load', async () => {
     vi.spyOn(client, 'GET').mockReturnValue(new Promise(() => {}) as never)
 

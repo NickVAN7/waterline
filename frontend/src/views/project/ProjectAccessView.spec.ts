@@ -103,8 +103,12 @@ describe('ProjectAccessView', () => {
       }),
     )
 
-    expect(wrapper.get('h1').text()).toBe('ERP rollout access review')
-    expect(document.title).toBe('ERP rollout access review · Waterline')
+    expect(wrapper.get('h1').text()).toBe('ERP rollout project access review')
+    expect(document.title).toBe('ERP rollout project access review · Waterline')
+    // What the page is for, said under its title (DL-137).
+    expect(wrapper.get('header + p').text()).toBe(
+      'Everyone who can open this project, and why: their own role on it, or an admin role they inherit from the organization or the workspace.',
+    )
     expect(wrapper.findAll('th').map((h) => h.text())).toEqual([
       'Name',
       'Email',

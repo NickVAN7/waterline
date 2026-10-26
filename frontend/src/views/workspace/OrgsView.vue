@@ -43,6 +43,7 @@ watch(
   },
   { immediate: true },
 )
+list.returnWhenEmpty(page.data)
 watch(
   () => page.error.value?.status === 404,
   (gone) => {

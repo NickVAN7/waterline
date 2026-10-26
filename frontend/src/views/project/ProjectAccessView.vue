@@ -68,7 +68,11 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
       <Skeleton v-else :rows="4" />
     </div>
     <template v-else>
-      <ProjectHeader :project="loaded" :title="`${loaded.name} access review`" />
+      <ProjectHeader :project="loaded" :title="`${loaded.name} project access review`" />
+      <p class="m-0 text-text-muted">
+        Everyone who can open this project, and why: their own role on it, or an admin role they
+        inherit from the organization or the workspace.
+      </p>
       <section
         aria-labelledby="access-heading"
         :aria-busy="review.loading.value ? 'true' : 'false'"

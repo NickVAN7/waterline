@@ -4,20 +4,24 @@
  * move focus (UI-SHL-9). Paging, and the fixed filters a list names (the org's project list's
  * status and type, S1-C16); sorting comes with the first sortable list (Slice 3).
  */
-import { computed } from 'vue'
-import { type RouteLocationRaw, useRoute } from 'vue-router'
+import { computed, type Ref, watch } from 'vue'
+import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
 
 export function useListQuery<F extends string = never>({
   limit,
   filters = [],
+  offsetKey = 'offset',
 }: {
   limit: number
   filters?: readonly F[]
+  // The URL's name for this list's offset: a page with two paged lists names one apart.
+  offsetKey?: string
 }) {
   const route = useRoute()
+  const router = useRouter()
 
   const offset = computed(() => {
-    const value = Number(route.query.offset)
+    const value = Number(route.query[offsetKey])
     return Number.isInteger(value) && value > 0 ? value : 0
   })
 
@@ -42,17 +46,25 @@ export function useListQuery<F extends string = never>({
 
   /** Where the list is at `next`: the same page's query with the new offset. */
   function linkTo(next: number): RouteLocationRaw {
-    return { query: { ...route.query, offset: next > 0 ? String(next) : undefined } }
+    return { query: { ...route.query, [offsetKey]: next > 0 ? String(next) : undefined } }
   }
 
   /** The list with these filters changed ('' clears one), from its first page. */
   function filtered(changes: Partial<Record<F, string>>): RouteLocationRaw {
-    const query: Record<string, unknown> = { ...route.query, offset: undefined }
+    const query: Record<string, unknown> = { ...route.query, [offsetKey]: undefined }
     for (const [name, value] of Object.entries(changes)) query[name] = value || undefined
     return { query } as RouteLocationRaw
   }
 
   const filtering = computed(() => Object.keys(active.value).length > 0)
 
-  return { params, offset, limit, linkTo, filter, filtered, filtering }
+  /** A loaded page past the end (an old link, or the last page's last row removed) goes back to
+   * the first (TD-58). */
+  function returnWhenEmpty(page: Ref<{ items: readonly unknown[] } | undefined>) {
+    watch(page, (loaded) => {
+      if (loaded && !loaded.items.length && offset.value > 0) void router.replace(linkTo(0))
+    })
+  }
+
+  return { params, offset, limit, linkTo, filter, filtered, filtering, returnWhenEmpty }
 }

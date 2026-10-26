@@ -1,14 +1,14 @@
 <script setup lang="ts">
 // An org's overview (`/{org_slug}/overview`; UI-SHL-10, DL-137): org administration's landing
-// page, with the org's details and its projects (name, key, type, status, and lead), each linking
-// to its settings, a page at a time from the URL (`useListQuery`). For whoever may manage the org
-// (`org_member.manage`, DL-163), who holds inherited project admin on each (design-doc §5).
+// page, with the org's details, its projects (name, key, type, status, and lead), each linking
+// to its settings, and below them its archived projects, headed "Archived" (DL-180, from
+// `archived_only`, DL-181), where each is unarchived. Each list is a page at a time from the URL
+// (`useListQuery`). For whoever may manage the org (`org_member.manage`, DL-163), who holds
+// inherited project admin on each (design-doc §5).
 import { computed, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { NO_LEAD, PROJECT_STATUS, PROJECT_TYPE } from '@/app/labels'
 import { settlePage } from '@/app/routeFocus'
-import Badge from '@/components/Badge.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -21,50 +21,80 @@ import { useRouteOrg } from '@/composables/useRouteOrg'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
+import OverviewProjectTable from './OverviewProjectTable.vue'
 import { WHO_TO_ASK } from './orgAdmin'
 
 const org = useRouteOrg()
-const list = useListQuery({ limit: 25 })
 const allowed = computed(() => allows(org.value, 'org_member.manage'))
 
-const page = useLoad(() =>
-  api(
-    client.GET('/api/orgs/{org_id}/projects', {
-      params: { path: { org_id: org.value!.id }, query: list.params.value },
-    }),
-  ),
-)
-watch(
-  [org, list.params],
-  () => {
-    if (org.value && allowed.value) void page.run()
+/** One paged list of the org's projects, live or archived, loaded while the user may see it. */
+function projectList(archived: boolean) {
+  const list = useListQuery({ limit: 25, offsetKey: archived ? 'archived_offset' : 'offset' })
+  const page = useLoad(() =>
+    api(
+      client.GET('/api/orgs/{org_id}/projects', {
+        params: {
+          path: { org_id: org.value!.id },
+          query: { ...list.params.value, ...(archived ? { archived_only: true } : {}) },
+        },
+      }),
+    ),
+  )
+  watch(
+    [org, list.params],
+    () => {
+      if (org.value && allowed.value) void page.run()
+    },
+    { immediate: true },
+  )
+  list.returnWhenEmpty(page.data)
+  return { list, page }
+}
+
+const live = projectList(false)
+const archived = projectList(true)
+const SECTIONS = [
+  {
+    id: 'overview-projects-heading',
+    heading: 'Projects',
+    emptyHeading: 'No projects yet',
+    thing: 'the projects',
+    empty: 'Projects created in this organization will appear here.',
+    ...live,
   },
-  { immediate: true },
-)
+  {
+    id: 'overview-archived-heading',
+    heading: 'Archived',
+    emptyHeading: 'No archived projects',
+    thing: 'the archived projects',
+    empty: 'Archived projects will appear here.',
+    ...archived,
+  },
+]
+
+const status = computed(() => live.page.error.value?.status ?? archived.page.error.value?.status)
 // The not-found or 403 page replaces this one after it loaded: its title and `h1` focus.
 watch(
-  () => page.error.value?.status === 404 || page.error.value?.status === 403,
+  () => status.value === 404 || status.value === 403,
   (replaced) => {
     if (replaced) void settlePage()
   },
 )
 
+const count = (total: number, thing: string) => `${total} ${thing}${total === 1 ? '' : 's'}`
 const announcement = computed(() => {
-  if (page.loading.value) return 'Loading projects…'
-  const total = page.data.value?.total
-  if (total === undefined) return ''
-  return total === 1 ? '1 project' : `${total} projects`
+  if (live.page.loading.value || archived.page.loading.value) return 'Loading projects…'
+  const [projects, gone] = [live.page.data.value?.total, archived.page.data.value?.total]
+  if (projects === undefined || gone === undefined) return ''
+  return `${count(projects, 'project')}, ${count(gone, 'archived project')}`
 })
 </script>
 
 <template>
   <!-- An org the user doesn't see, or one they've lost since `/me` loaded (UI-FBK-14). -->
-  <NotFoundView v-if="!org || page.error.value?.status === 404" />
+  <NotFoundView v-if="!org || status === 404" />
   <!-- For whoever may manage the org: the user sees the org, so may know it's here. -->
-  <ForbiddenView
-    v-else-if="!allowed || page.error.value?.status === 403"
-    :who-to-ask="WHO_TO_ASK"
-  />
+  <ForbiddenView v-else-if="!allowed || status === 403" :who-to-ask="WHO_TO_ASK" />
   <div v-else class="flex flex-col gap-6">
     <PageHeader :title="`${org.name} overview`" />
     <dl class="m-0 flex flex-col gap-1">
@@ -78,85 +108,43 @@ const announcement = computed(() => {
       </div>
     </dl>
     <section
-      aria-labelledby="overview-projects-heading"
-      :aria-busy="page.loading.value ? 'true' : 'false'"
+      v-for="section in SECTIONS"
+      :key="section.id"
+      :aria-labelledby="section.id"
+      :aria-busy="section.page.loading.value ? 'true' : 'false'"
       class="flex flex-col gap-3"
     >
-      <h2 id="overview-projects-heading" class="m-0 text-xl font-semibold">Projects</h2>
+      <h2 :id="section.id" class="m-0 text-xl font-semibold">{{ section.heading }}</h2>
       <ErrorState
-        v-if="page.error.value"
-        :key="page.failures.value"
-        :live="page.failures.value > 1"
-        thing="the projects"
-        :pending="page.loading.value"
-        @retry="page.retry"
+        v-if="section.page.error.value"
+        :key="section.page.failures.value"
+        :live="section.page.failures.value > 1"
+        :thing="section.thing"
+        :pending="section.page.loading.value"
+        @retry="section.page.retry"
       />
-      <Skeleton v-else-if="!page.data.value" />
-      <EmptyState v-else-if="!page.data.value.total" heading="No projects yet">
-        Projects created in this organization will appear here.
+      <Skeleton v-else-if="!section.page.data.value" />
+      <EmptyState v-else-if="!section.page.data.value.total" :heading="section.emptyHeading">
+        {{ section.empty }}
       </EmptyState>
       <template v-else>
-        <div
-          role="region"
-          aria-labelledby="overview-projects-heading"
-          tabindex="0"
-          class="overflow-x-auto"
-        >
-          <table aria-labelledby="overview-projects-heading" class="w-full border-collapse text-sm">
-            <thead>
-              <tr class="border-b border-border text-left">
-                <th scope="col" class="p-2">Name</th>
-                <th scope="col" class="p-2">Key</th>
-                <th scope="col" class="p-2">Type</th>
-                <th scope="col" class="p-2">Status</th>
-                <th scope="col" class="p-2">Lead</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="project in page.data.value.items"
-                :key="project.id"
-                class="border-b border-border-subtle"
-              >
-                <td class="p-2">
-                  <RouterLink
-                    :to="{
-                      name: 'project-settings',
-                      params: { orgSlug: org.slug, key: project.key },
-                    }"
-                    >{{ project.name }}<span class="sr-only"> settings</span></RouterLink
-                  >
-                </td>
-                <td class="p-2 font-mono">{{ project.key }}</td>
-                <td class="p-2">{{ PROJECT_TYPE[project.type] }}</td>
-                <td class="p-2">
-                  <Badge
-                    :tone="PROJECT_STATUS[project.status].tone"
-                    :icon="PROJECT_STATUS[project.status].icon"
-                    >{{ PROJECT_STATUS[project.status].label }}</Badge
-                  >
-                </td>
-                <td class="p-2">
-                  <template v-if="project.lead_name">{{ project.lead_name }}</template>
-                  <Badge v-else :tone="NO_LEAD.tone" :icon="NO_LEAD.icon">{{
-                    NO_LEAD.label
-                  }}</Badge>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <OverviewProjectTable
+          :projects="section.page.data.value.items"
+          :org-slug="org.slug"
+          :labelled-by="section.id"
+        />
         <Pagination
-          v-if="page.data.value.total > list.limit"
-          :offset="list.offset.value"
-          :limit="list.limit"
-          :total="page.data.value.total"
-          :count="page.data.value.items.length"
-          :link-to="list.linkTo"
+          v-if="section.page.data.value.total > section.list.limit"
+          :offset="section.list.offset.value"
+          :limit="section.list.limit"
+          :total="section.page.data.value.total"
+          :count="section.page.data.value.items.length"
+          :link-to="section.list.linkTo"
+          :label="`${section.heading} pagination`"
         />
       </template>
     </section>
-    <!-- Outside the busy region, where a screen reader holds changes back until it's done. -->
+    <!-- Outside the busy regions, where a screen reader holds changes back until they're done. -->
     <p class="sr-only" aria-live="polite">{{ announcement }}</p>
   </div>
 </template>

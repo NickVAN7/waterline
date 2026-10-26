@@ -2921,7 +2921,7 @@
           "project"
         ],
         "summary": "List Projects",
-        "description": "The org's projects the caller can open; archived ones only with `include_archived`.",
+        "description": "The org's projects the caller can open; archived ones with `include_archived`, or alone\nwith `archived_only`.",
         "operationId": "list_projects_api_orgs__org_id__projects_get",
         "parameters": [
           {
@@ -2975,6 +2975,26 @@
               "title": "Sort"
             },
             "description": "Comma-separated, `-` for descending: key, name. Default: name"
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Archived"
+            }
+          },
+          {
+            "name": "archived_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived Only"
+            }
           },
           {
             "name": "status",
@@ -3086,16 +3106,6 @@
                 }
               ],
               "title": "Type  Is Null"
-            }
-          },
-          {
-            "name": "include_archived",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Include Archived"
             }
           }
         ],
@@ -6115,6 +6125,22 @@
           "organization_slug": {
             "type": "string",
             "title": "Organization Slug"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name"
+          },
+          "my_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectRole"
+              },
+              {
+                "type": "string",
+                "const": "inherited_admin"
+              }
+            ],
+            "title": "My Access"
           }
         },
         "type": "object",
@@ -6127,7 +6153,9 @@
           "lead_id",
           "lead_name",
           "organization_id",
-          "organization_slug"
+          "organization_slug",
+          "organization_name",
+          "my_access"
         ],
         "title": "ProjectItem",
         "description": "A project in a list: the org's projects, and My work's projects section."
@@ -6308,6 +6336,10 @@
             "type": "boolean",
             "title": "Archived"
           },
+          "export_controlled": {
+            "type": "boolean",
+            "title": "Export Controlled"
+          },
           "reasons": {
             "items": {
               "$ref": "#/components/schemas/AccessReason"
@@ -6326,6 +6358,7 @@
           "name",
           "organization_id",
           "archived",
+          "export_controlled",
           "reasons",
           "access"
         ],

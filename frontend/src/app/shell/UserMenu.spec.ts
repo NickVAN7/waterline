@@ -43,8 +43,6 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = ''
-  localStorage.clear()
-  delete document.documentElement.dataset.theme
 })
 
 // Registered after the clean-up above, so it runs first (after-hooks run last to first): each
@@ -62,37 +60,8 @@ describe('UserMenu', () => {
     expect(document.querySelector('#user-menu [role=menu]')?.getAttribute('aria-label')).toBe(
       'Account menu',
     )
-    expect(items().map((li) => li.textContent?.trim())).toEqual([
-      'Account settings',
-      'System theme',
-      'Light theme',
-      'Dark theme',
-      'Sign out',
-    ])
+    expect(items().map((li) => li.textContent?.trim())).toEqual(['Account settings', 'Sign out'])
     await expectNoA11yViolations(document.body)
-  })
-
-  it('offers the themes as radio items, System checked by default', async () => {
-    await openMenu()
-
-    const themes = items().filter((li) => li.getAttribute('role') === 'menuitemradio')
-    expect(themes.map((li) => [li.textContent?.trim(), li.getAttribute('aria-checked')])).toEqual([
-      ['System theme', 'true'],
-      ['Light theme', 'false'],
-      ['Dark theme', 'false'],
-    ])
-  })
-
-  it('applies a chosen theme and checks it', async () => {
-    const { wrapper } = await openMenu()
-
-    await choose('Dark theme')
-
-    expect(document.documentElement.dataset.theme).toBe('dark')
-    await wrapper.get('button').trigger('click')
-    await flushPromises()
-    expect(item('Dark theme').getAttribute('aria-checked')).toBe('true')
-    expect(item('System theme').getAttribute('aria-checked')).toBe('false')
   })
 
   it('links to account settings', async () => {
@@ -134,9 +103,6 @@ describe('UserMenu', () => {
     expect(items().map((li) => li.textContent?.trim())).toEqual([
       'Account settings',
       'Administration',
-      'System theme',
-      'Light theme',
-      'Dark theme',
       'Sign out',
     ])
   })

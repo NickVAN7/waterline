@@ -7,7 +7,13 @@ import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
-import { cleanUpAfterEach, listPage, mountWorkspaceView, WORKSPACE_ID } from '@/test/workspace'
+import {
+  cleanUpAfterEach,
+  emptyPastTheFirst,
+  listPage,
+  mountWorkspaceView,
+  WORKSPACE_ID,
+} from '@/test/workspace'
 
 import StaffView from './StaffView.vue'
 
@@ -45,6 +51,14 @@ beforeEach(() => {
 cleanUpAfterEach()
 
 describe('StaffView', () => {
+  it('goes back to the first page when a later one loads empty (TD-58)', async () => {
+    emptyPastTheFirst(listPage([OLGA]))
+
+    const { router } = await mountWorkspaceView(StaffView, '/workspace/staff?offset=25')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/staff')
+  })
   it("lists the workspace's staff with their roles", async () => {
     const get = staffAnswers()
 

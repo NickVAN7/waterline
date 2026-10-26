@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -76,6 +77,9 @@ class RestrictionUpdate(BaseModel):
     confirmed_member_ids: list[uuid.UUID] | None = None
 
 
+INHERITED_ADMIN: Literal["inherited_admin"] = "inherited_admin"
+
+
 class ProjectItem(BaseModel):
     """A project in a list: the org's projects, and My work's projects section."""
 
@@ -89,6 +93,9 @@ class ProjectItem(BaseModel):
     lead_name: str | None
     organization_id: uuid.UUID
     organization_slug: str
+    organization_name: str
+    # The user's explicit project role, or `inherited_admin` without one (DL-153).
+    my_access: ProjectRole | Literal["inherited_admin"]
 
 
 class ModuleNote(BaseModel):

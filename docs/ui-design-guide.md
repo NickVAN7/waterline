@@ -443,8 +443,8 @@ render inside the full shell when signed in.
   **Members**, and **Settings** (UI-SHL-10). Past about eight orgs (workspace admins see all of
   them) the popover gains a filter field. With one org and no org admin rights it is plain text,
   not a control. The current org's name is always visible. There is no separate org switcher;
-  the user menu keeps workspace "Administration" only (and, until S2-C0g, the theme choice;
-  DL-164), and its **Sign out** has an icon and the danger tone.
+  the user menu keeps workspace "Administration" only (the theme choice moved to account
+  settings in S2-C0g, DL-164), and its **Sign out** has an icon and the danger tone.
 - **UI-SHL-5** **Sidebar** (`--sidebar-width`), top to bottom: **My work** (an icon, bolder
   text, and a divider below it, so it reads as separate from project navigation); the **project
   selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). **On an admin page**
@@ -474,7 +474,8 @@ render inside the full shell when signed in.
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
-  page's primary action(s) on the right (wrapping below at narrow widths). The one exception is
+  page's primary action(s) on the right (wrapping below at narrow widths); a project page's
+  `ProjectHeader` holds them the same way (from S2-C0g, TD-49). The one exception is
   the auth card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
   size below the app's name, the card's largest text (`text-xl`; DL-176). Sections use `h2`
   and nest in order. If a help or contact link is ever added (3.2.6), it goes in the user menu,
@@ -711,7 +712,8 @@ render inside the full shell when signed in.
   categories with no level show "No restriction level" in Internal's tone; a project with no
   level and no categories has none), never color alone. The badge starts with a visually hidden
   "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A "Deactivated" neutral badge follows a deactivated
-  user's name everywhere it appears.
+  user's name everywhere it appears, except the workspace users list, where it is in the Status
+  column (DL-137, from S2-C0g).
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
 - **UI-FBK-8** **Empty states** distinguish two cases. *Nothing exists yet:* a heading ("No members
@@ -1054,8 +1056,8 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 6. **My work styling** (UI-SHL-5): revisit once pages are populated; a default the owner
    accepted for now. (The admin entry points, UI-SHL-10: the org menu for an org's pages, the user menu for the
    workspace's, and the section nav in the sidebar; DL-137.)
-7. **Theme override** (UI-TOK-2): done in S1-C14a, in the user menu (DL-85); moves to account
-   settings in S2-C0g (DL-137).
+7. **Theme override** (UI-TOK-2): done in S1-C14a, in the user menu (DL-85); moved to account
+   settings in S2-C0g (DL-137, DL-164).
 8. **Enum mappings:** the requirement status is decided (UI-FBK-5, DL-148); tone and icon for
    task, test, and approval statuses and for priority and severity are decided as each first
    appears.

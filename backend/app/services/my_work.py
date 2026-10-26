@@ -11,7 +11,7 @@ from app.core.lists import Filter, FilterType, ListSpec, Page, PageResult, fetch
 from app.enums import ProjectStatus, ProjectType
 from app.models.project import Project
 from app.repositories.project import ProjectRepository
-from app.schemas.project import MyWork, ProjectItem, WorkSection, WorkSections
+from app.schemas.project import INHERITED_ADMIN, MyWork, ProjectItem, WorkSection, WorkSections
 
 PROJECTS = ListSpec(
     name="Project",
@@ -26,8 +26,10 @@ PROJECTS = ListSpec(
 FIRST_ITEMS = 10  # each section's items in `GET /api/me/work` (DL-76)
 
 
-def item(project: Project) -> ProjectItem:
-    """A project in a list; its org and lead are loaded."""
+def item(ctx: AuthzContext, project: Project) -> ProjectItem:
+    """A project in a list; its org and lead are loaded. A project the user sees without a
+    membership is one they administer by inheritance (`project_scope`)."""
+    membership = ctx.projects.get(project.id)
     return ProjectItem(
         id=project.id,
         key=project.key,
@@ -38,12 +40,14 @@ def item(project: Project) -> ProjectItem:
         lead_name=project.lead.name if project.lead else None,
         organization_id=project.organization_id,
         organization_slug=project.organization.slug,
+        organization_name=project.organization.name,
+        my_access=membership.role if membership else INHERITED_ADMIN,
     )
 
 
-def page_of(page: PageResult[Project]) -> Page[ProjectItem]:
+def page_of(ctx: AuthzContext, page: PageResult[Project]) -> Page[ProjectItem]:
     """A page of projects as list rows."""
-    return page.with_items([item(p) for p in page.items])
+    return page.with_items([item(ctx, p) for p in page.items])
 
 
 class MyWorkService:
@@ -65,4 +69,5 @@ class MyWorkService:
     async def projects(self, ctx: AuthzContext, query: object) -> Page[ProjectItem]:
         """The projects the user can open, archived left out."""
         statement = ProjectRepository(self.session).visible(project_scope(ctx))
-        return page_of(await fetch_page(self.session, statement, PROJECTS, query))  # pyright: ignore[reportArgumentType] -- PROJECTS.query_model
+        statement = statement.where(Project.archived_at.is_(None))
+        return page_of(ctx, await fetch_page(self.session, statement, PROJECTS, query))  # pyright: ignore[reportArgumentType] -- PROJECTS.query_model

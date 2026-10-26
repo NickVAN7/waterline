@@ -4,7 +4,18 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0f (Org admin) built: the org menu in the header (the orgs, and for whoever may
+> **Status:** S2-C0g (Account & lists) built: account settings' Appearance section, with the theme
+> choice gone from the user menu (DL-164), and change password as its own page,
+> `/account/password` (`AccountPasswordView`); `organization_name` and `my_access` on the project
+> item, shown on My work, and the type on the org's project list (`ProjectList`'s `withAccess`
+> and `withType`, the status right-aligned; DL-153); the workspace users' Role and Status
+> columns; the project access review's title and sentence; the project header's actions slot
+> (TD-49); `useListQuery`'s `returnWhenEmpty` (TD-58) and `offsetKey`; the org's project list on
+> `ORG_PROJECTS` (DL-170); `?archived_only=true` on any `ListSpec` with an `archived_column`,
+> a 422 `conflict` with `include_archived` (DL-181, DL-182), and the org overview's "Archived"
+> section on it (DL-180); `export_controlled` on the per-person access review's project rows,
+> with Access shown only on those (DL-177); the restriction badge's hidden "Restriction: "
+> (DL-179). S2-C0f (Org admin) built: the org menu in the header (the orgs, and for whoever may
 > manage the org its Overview, Members, and Settings; `OrgMenu`), the user menu's one
 > "Administration"; on an admin page (a route's `meta.adminArea`) the sidebar shows that area's
 > pages in place of the project selector (`OrgNav`, `WorkspaceNav`; `SectionNav` is gone); the org
@@ -723,8 +734,9 @@ object if the session has it loaded, so it stays readable without a lazy load.
 `ListSpec` per list: sortable fields (an allowlist; `id` is always the last tiebreaker), the
 default sort, filters (`Filter(name, column, FilterType.ENUM, enum=...)`, or `CustomFilter` for
 a filter on another table, written with `EXISTS`, never a join, so no item repeats: DL-35),
-`search` columns for `?q=`, `archived_column`, `soft_deleted`, and `paging="cursor"`
-for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
+`search` columns for `?q=`, `archived_column` (archived rows hidden, with `?include_archived=true`
+or alone with `?archived_only=true`; both at once is a 422 `conflict`, DL-181, DL-182),
+`soft_deleted`, and `paging="cursor"` for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
 parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
 the service; the **repository** builds a statement already scoped to what the user may see and
 calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)` (newest first,
@@ -911,8 +923,9 @@ frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
 ```
 
 **Routes:** `/` My work; `/sign-in` (signed out only); `/account` (account settings);
-`/account/change-password` (the forced change); `/account/no-access` (a user with no
-memberships, who is sent there from everything but account settings); `/status` (open to
+`/account/password` (change password, from account settings); `/account/change-password` (the
+forced change); `/account/no-access` (a user with no memberships, who is sent there from
+everything but account settings and change password); `/status` (open to
 anyone); `/workspace/staff`, `/workspace/orgs`, `/workspace/users`,
 `/workspace/users/{user_id}/access`, and `/workspace/settings` (workspace administration, DL-104;
 `/workspace` goes to staff; anyone without `workspace.view`, or whom the API refuses, gets the
@@ -976,8 +989,8 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `docs/ui/tokens.css`; a new color pair goes in `docs/ui/check_contrast.py`, run as
   `python3 docs/ui/check_contrast.py frontend/src/app/styles/tokens.css`). PrimeVue reads the
   same tokens through `src/app/theme/preset.ts`. Dark mode follows the system;
-  `data-theme="light"`/`"dark"` on `<html>` overrides it: the user menu's theme choice sets it
-  (`useTheme`, kept in `localStorage`, applied by `main.ts` before mounting).
+  `data-theme="light"`/`"dark"` on `<html>` overrides it: account settings' Appearance section
+  sets it (`useTheme`, kept in `localStorage`, applied by `main.ts` before mounting).
 - **Loading a region:** `useLoad(() => api(...))` gives `data`, `error`, `loading`, and `retry`.
   Show `Skeleton` while there's no data (it appears after 300 ms), `ErrorState` (Try again) on
   an error, mark the region `aria-busy` while loading, and announce "Loading …" and the result
@@ -987,7 +1000,10 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `linkTo(offset)` is the location of another page, which `Pagination` links to (a
   `nav aria-label="Pagination"` whose Previous and Next stay focusable, `aria-disabled`, at the
   ends). A query-only navigation moves neither focus nor the title (`routeFocus.ts`), so the list
-  announces its new count instead. Put the polite live region outside the `aria-busy` region:
+  announces its new count instead. `returnWhenEmpty(page.data)` sends a page that loads empty
+  past the first (an old link, or its last row removed) back to the first (TD-58); a page with
+  two paged lists names the second's offset apart (`offsetKey`, the org overview's
+  `archived_offset`) and each `Pagination` after its list (`label`). Put the polite live region outside the `aria-busy` region:
   screen readers hold back changes inside a busy one. See `src/views/project/OrgProjectsView.vue`.
 - **A success with no other visible trace** (a saved profile) shows `SuccessStatus` under the
   form's buttons, which is visible and polite.

@@ -17,6 +17,8 @@ export function projectItem(key: string, overrides: Partial<Item> = {}): Item {
     lead_name: null,
     organization_id: ACME.id,
     organization_slug: ACME.slug,
+    organization_name: ACME.name,
+    my_access: 'admin',
     ...overrides,
   }
 }

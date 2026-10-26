@@ -14,6 +14,7 @@ const ROUTES: RouteRecordRaw[] = [
   { path: '/projects', name: 'projects', component: Page },
   { path: '/sign-in', name: 'sign-in', component: Page, meta: { guest: true } },
   { path: '/account', name: 'account', component: Page },
+  { path: '/account/password', name: 'account-password', component: Page },
   { path: '/account/change-password', name: 'change-password', component: Page },
   { path: '/account/no-access', name: 'no-access', component: Page },
   { path: '/status', name: 'status', component: Page, meta: { public: true } },
@@ -130,10 +131,10 @@ describe('no memberships left', () => {
     expect(await landAt(path)).toBe('/account/no-access')
   })
 
-  it('can still open account settings', async () => {
+  it.each(['/account', '/account/password'])('can still open %s', async (path) => {
     vi.spyOn(client, 'GET').mockResolvedValue(ok(NOBODY))
 
-    expect(await landAt('/account')).toBe('/account')
+    expect(await landAt(path)).toBe(path)
   })
 
   it.each([

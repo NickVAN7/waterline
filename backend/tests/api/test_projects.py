@@ -455,6 +455,55 @@ async def test_the_org_list_hides_archived_projects_unless_asked(
     assert every.json()["items"][1]["organization_slug"] == "bolt-foods"
 
 
+async def test_archived_only_lists_the_orgs_archived_projects_alone(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-181: the org overview's "Archived" section."""
+    await admin_of_pmt(client, t)
+    await ProjectFactory.create_async(
+        organization=t.org, key="ARC", name="Archive", archived_at=datetime.now(UTC)
+    )
+
+    response = await client.get(f"/api/orgs/{t.org.id}/projects", params={"archived_only": "true"})
+
+    assert [p["key"] for p in response.json()["items"]] == ["ARC"]
+
+
+async def test_the_org_list_refuses_archived_only_with_include_archived(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-182, through the real endpoint."""
+    await admin_of_pmt(client, t)
+
+    response = await client.get(
+        f"/api/orgs/{t.org.id}/projects",
+        params={"archived_only": "true", "include_archived": "true"},
+    )
+
+    assert response.status_code == 422
+    (field,) = response.json()["details"]["fields"]
+    assert (field["loc"], field["type"]) == (["query", "archived_only"], "conflict")
+
+
+async def test_each_listed_project_names_its_org_and_the_users_access(
+    client: AsyncClient, session: AsyncSession, t: Tenancy
+) -> None:
+    """DL-153: the explicit role where the user has one, else `inherited_admin`, on the org's
+    list and My work's (one item model)."""
+    admin = await admin_of_pmt(client, t)
+    viewed = await ProjectFactory.create_async(organization=t.org, key="VWR", name="Viewed")
+    await ProjectMembershipFactory.create_async(project=viewed, user=admin, role=ProjectRole.VIEWER)
+    await session.flush()
+
+    org_list = await client.get(f"/api/orgs/{t.org.id}/projects", params={"sort": "key"})
+    my_work = await client.get("/api/me/work/projects", params={"sort": "key"})
+
+    expected = [("PMT", "Bolt Foods", "inherited_admin"), ("VWR", "Bolt Foods", "viewer")]
+    fields = ("key", "organization_name", "my_access")
+    assert [tuple(p[f] for f in fields) for p in org_list.json()["items"]] == expected
+    assert [tuple(p[f] for f in fields) for p in my_work.json()["items"]] == expected
+
+
 async def test_each_listed_project_names_its_lead_or_none(
     client: AsyncClient, session: AsyncSession, t: Tenancy
 ) -> None:

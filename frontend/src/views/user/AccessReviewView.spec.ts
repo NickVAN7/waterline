@@ -27,10 +27,20 @@ const REVIEW: components['schemas']['AccessReview'] = {
       name: 'ERP rollout',
       organization_id: 'o-acme',
       archived: false,
+      export_controlled: false,
       reasons: ['project_member'],
       access: 'content',
     },
   ],
+}
+const EXPORT_CONTROLLED = {
+  ...REVIEW.projects[0]!,
+  id: 'p-sec',
+  key: 'SEC',
+  name: 'Secret',
+  export_controlled: true,
+  reasons: ['org_admin' as const],
+  access: 'management' as const,
 }
 
 beforeEach(() => setActivePinia(createPinia()))
@@ -56,8 +66,31 @@ describe('AccessReviewView', () => {
         .findAll('tbody tr')
         .map((tr) => tr.findAll('td').map((td) => td.text()))
     expect(rows('Organizations')).toEqual([['Acme Manufacturing', 'Org member']])
-    expect(rows('Projects')).toEqual([
-      ['ERP ERP rollout', 'Acme Manufacturing', 'Project member', 'Content and management'],
+    // No export-controlled project, so no Access column (DL-177).
+    expect(rows('Projects')).toEqual([['ERP ERP rollout', 'Acme Manufacturing', 'Project member']])
+    expect(wrapper.findAll('th').map((th) => th.text())).not.toContain('Access')
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('shows Access, on the export-controlled projects only, when one is (DL-177)', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      ok({ ...REVIEW, projects: [...REVIEW.projects, EXPORT_CONTROLLED] }),
+    )
+
+    const { wrapper } = await mountWorkspaceView(AccessReviewView, '/workspace/users/u-sam/access')
+
+    const projects = wrapper.findAll('table')[1]!
+    expect(projects.findAll('th').map((th) => th.text())).toEqual([
+      'Project',
+      'Organization',
+      'Why they reach it',
+      'Access',
+    ])
+    expect(
+      projects.findAll('tbody tr').map((tr) => tr.findAll('td').map((td) => td.text())),
+    ).toEqual([
+      ['ERP ERP rollout', 'Acme Manufacturing', 'Project member', ''],
+      ['SEC Secret', 'Acme Manufacturing', 'Org admin', 'Management only'],
     ])
     await expectNoA11yViolations(wrapper)
   })

@@ -34,8 +34,8 @@ from app.schemas.workspace import SlugAvailability
 from app.services.org import OrgEntity
 from app.services.project import (
     MEMBER_CANDIDATES,
+    ORG_PROJECTS,
     PROJECT_MEMBERS,
-    OrgProjectQuery,
     ProjectEntity,
     ProjectService,
     module_guidance,
@@ -59,7 +59,7 @@ AccessViewed = Annotated[
     ProjectEntity,
     Depends(authorized(load_project, Action.PROJECT_VIEW_ACCESS, hide_denial=True)),
 ]
-ProjectQuery = Annotated[OrgProjectQuery, Query()]  # pyright: ignore[reportInvalidTypeForm]
+ProjectQuery = Annotated[ORG_PROJECTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 MemberQuery = Annotated[PROJECT_MEMBERS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 CandidateQuery = Annotated[MEMBER_CANDIDATES.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
@@ -90,7 +90,8 @@ async def list_projects(
     ctx: AuthzContextDep,
     session: SessionDep,
 ) -> Page[ProjectItem]:
-    """The org's projects the caller can open; archived ones only with `include_archived`."""
+    """The org's projects the caller can open; archived ones with `include_archived`, or alone
+    with `archived_only`."""
     return await ProjectService(session).list_in_org(ctx, org, query)
 
 

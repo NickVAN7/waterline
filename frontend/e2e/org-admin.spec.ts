@@ -41,6 +41,13 @@ test("org administration opens from the org menu, by keyboard, on the org's over
     'href',
     '/acme/projects/ERP/settings',
   )
+  await expect(projects.getByRole('row', { name: /Legacy Cleanup/ })).toHaveCount(0)
+  // Archived projects in their own section below, each linking to its settings (DL-180).
+  const archived = page.getByRole('table', { name: 'Archived' })
+  await expect(archived.getByRole('link', { name: /^Legacy Cleanup/ })).toHaveAttribute(
+    'href',
+    '/acme/projects/LEGACY/settings',
+  )
   // The sidebar holds the area's pages, not the project selector (UI-SHL-5).
   const nav = page.getByRole('navigation', { name: 'Organization administration' })
   await expect(nav.getByRole('link')).toHaveText(['Overview', 'Members', 'Settings'])

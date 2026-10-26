@@ -39,7 +39,16 @@ MAX_OFFSET = 2**63 - 1
 
 # Parameters every list has, which no filter may reuse.
 _BUILT_IN = frozenset(
-    {"limit", "offset", "sort", "before", "q", "include_archived", "include_deleted"}
+    {
+        "limit",
+        "offset",
+        "sort",
+        "before",
+        "q",
+        "include_archived",
+        "archived_only",
+        "include_deleted",
+    }
 )
 
 # A mapped attribute (`Task.status`), or any SQL expression usable in WHERE and ORDER BY.
@@ -156,6 +165,7 @@ class ListSpec:
             fields["q"] = (str | None, Field(None, min_length=1, max_length=MAX_TEXT_LENGTH))
         if self.archived_column is not None:
             fields["include_archived"] = (bool, False)
+            fields["archived_only"] = (bool, False)
         if self.soft_deleted:
             fields[INCLUDE_DELETED] = (bool, False)
         for declared in self.filters:
@@ -312,11 +322,26 @@ def apply_filters(
     text = _value(query, "q")
     if text is not None:
         statement = statement.where(or_(*(_contains(column, text) for column in spec.search)))
-    if spec.archived_column is not None and not _value(query, "include_archived"):
-        statement = statement.where(spec.archived_column.is_(None))
+    if spec.archived_column is not None:
+        statement = _apply_archived(statement, spec.archived_column, query)
     if spec.soft_deleted and _value(query, INCLUDE_DELETED):
         statement = statement.execution_options(**{INCLUDE_DELETED_OPTION: True})
     return statement
+
+
+def _apply_archived(statement: Select[Any], column: Column, query: BaseModel) -> Select[Any]:
+    """Archived rows hidden, included with `include_archived`, or alone with `archived_only`
+    (DL-181); asking for both is a mistake, not one silently winning (DL-182)."""
+    include, only = _value(query, "include_archived"), _value(query, "archived_only")
+    if include and only:
+        raise ValidationFailedError.on(
+            ("query", "archived_only"),
+            "`archived_only` can't be sent with `include_archived`.",
+            "conflict",
+        )
+    if only:
+        return statement.where(column.is_not(None))
+    return statement if include else statement.where(column.is_(None))
 
 
 def _used_parameters(declared: Filter | CustomFilter, query: BaseModel) -> list[str]:

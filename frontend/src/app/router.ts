@@ -33,6 +33,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/user/AccountView.vue'),
   },
   {
+    path: '/account/password',
+    name: 'account-password',
+    component: () => import('@/views/user/AccountPasswordView.vue'),
+  },
+  {
     path: '/account/no-access',
     name: 'no-access',
     component: () => import('@/views/errors/NoAccessView.vue'),

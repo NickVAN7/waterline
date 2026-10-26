@@ -72,11 +72,12 @@ from app.services.user import (
 type ProjectEntity = Project
 
 
-class OrgProjectQuery(PROJECTS.query_model):  # pyright: ignore[reportGeneralTypeIssues, reportUntypedBaseClass] -- built by ListSpec
-    """The org's project list also takes `include_archived` (FastAPI reads a query model only as
-    an endpoint's sole query parameter)."""
-
-    include_archived: bool = False
+# My work's list, with archived projects on request (DL-181).
+ORG_PROJECTS = dataclasses.replace(
+    PROJECTS,
+    name="OrgProject",
+    archived_column=Project.archived_at,  # pyright: ignore[reportArgumentType]
+)
 
 
 PROJECT_MEMBERS = ListSpec(
@@ -346,13 +347,14 @@ class ProjectService:
         return await self.read(ctx, project)
 
     async def list_in_org(
-        self, ctx: AuthzContext, org: Organization, query: OrgProjectQuery
+        self, ctx: AuthzContext, org: Organization, query: object
     ) -> Page[ProjectItem]:
-        """The org's projects the caller can open; archived ones only with `include_archived`."""
-        statement = self.repository.visible(
-            project_scope(ctx), include_archived=query.include_archived
-        ).where(Project.organization_id == org.id)
-        return page_of(await fetch_page(self.session, statement, PROJECTS, query))  # pyright: ignore[reportArgumentType] -- the query model
+        """The org's projects the caller can open; archived ones with `include_archived`, or
+        alone with `archived_only`."""
+        statement = self.repository.visible(project_scope(ctx)).where(
+            Project.organization_id == org.id
+        )
+        return page_of(ctx, await fetch_page(self.session, statement, ORG_PROJECTS, query))  # pyright: ignore[reportArgumentType] -- the query model
 
     async def key_availability(self, org: Organization, key: str) -> SlugAvailability:
         """Whether `key`, uppercased as create does, could be a new project's key."""

@@ -293,15 +293,11 @@ describe('the app', () => {
     expect(said).not.toContain('Signing out…')
   })
 
-  it('applies the stored theme the user chose', async () => {
-    const { root } = await mountAt('/')
-    root.querySelector<HTMLButtonElement>('header button[aria-haspopup=menu]')?.click()
-    await flushPromises()
+  it('applies the theme the user chooses in account settings (UI-TOK-2, DL-164)', async () => {
+    const { root } = await mountAt('/account')
+    const dark = await vi.waitFor(() => root.querySelector<HTMLInputElement>('input[value=dark]')!)
 
-    const dark = [...document.querySelectorAll('#user-menu [role=menuitemradio]')].find(
-      (li) => li.textContent?.trim() === 'Dark theme',
-    )
-    dark?.querySelector<HTMLElement>('[data-pc-section=itemcontent]')?.click()
+    dark.click()
     await flushPromises()
 
     expect(document.documentElement.dataset.theme).toBe('dark')

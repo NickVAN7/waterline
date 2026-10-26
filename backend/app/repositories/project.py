@@ -46,15 +46,15 @@ class ProjectRepository:
             )
         )
 
-    def visible(self, scope: Scope, *, include_archived: bool = False) -> Select[Project]:
-        """The projects in `scope` (the user's `project_scope`), each org and lead loaded."""
-        statement = (
+    def visible(self, scope: Scope) -> Select[Project]:
+        """The projects in `scope` (the user's `project_scope`), archived included, each org and
+        lead loaded."""
+        return (
             select(Project)
             .join(Organization, Project.organization_id == Organization.id)
             .options(contains_eager(Project.organization), selectinload(Project.lead))
             .where(scope_clause(scope, Project.id, Project.workspace_id, Project.organization_id))
         )
-        return statement if include_archived else statement.where(Project.archived_at.is_(None))
 
     async def org_member_or_staff(self, org: Organization, user_id: uuid.UUID) -> bool:
         """Whether the user is a member of the org or staff of its workspace: the people a first

@@ -57,7 +57,7 @@ const announcement = computed(() => {
         Projects you're added to will appear here.
       </EmptyState>
       <template v-else-if="projects">
-        <ProjectList :projects="projects.items" />
+        <ProjectList :projects="projects.items" with-access />
         <!-- shortcut: no "see all" list yet (TD-37); the org's project list shows the rest. -->
         <p v-if="projects.total > projects.items.length" class="m-0 text-sm text-text-muted">
           Showing {{ projects.items.length }} of {{ projects.total }} projects. Each organization's

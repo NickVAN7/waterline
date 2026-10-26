@@ -156,6 +156,13 @@ describe('ProjectMembersView', () => {
     expect(pageButton(wrapper, 'Add member')).toBeDefined()
     expect(pageButton(wrapper, 'Add by email')).toBeDefined()
     expect(wrapper.get('a[href="/acme/projects/ERP/access"]').text()).toBe('Access review')
+    // In the header, beside the `h1`, as a page's actions are (TD-49, UI-SHL-8).
+    const actions = wrapper.get('header h1 + div')
+    expect(actions.findAll('button, a').map((el) => el.text())).toEqual([
+      'Add member',
+      'Add by email',
+      'Access review',
+    ])
   })
 
   it('adds by email with join_org once an account from outside the org is confirmed (DL-78)', async () => {

@@ -10,23 +10,14 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { projectItem } from '@/test/projects'
 import { testRouter } from '@/test/router'
 
 import ProjectSelector from './ProjectSelector.vue'
 
 type Item = components['schemas']['ProjectItem']
 
-const item = (key: string, name: string): Item => ({
-  id: `project-${key}`,
-  key,
-  name,
-  type: 'software',
-  status: 'active',
-  lead_id: null,
-  lead_name: null,
-  organization_id: ACME.id,
-  organization_slug: 'acme',
-})
+const item = (key: string, name: string): Item => projectItem(key, { id: `project-${key}`, name })
 
 const page = (items: Item[]) => ok({ items, total: items.length, limit: 200, offset: 0 })
 

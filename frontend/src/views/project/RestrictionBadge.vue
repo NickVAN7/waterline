@@ -2,7 +2,8 @@
 // A project's restriction badge in the project header (design-doc §3.1, UI-FBK-6, DL-137): its
 // level and categories as text, with the level's tone and icon, never color alone. None for a
 // project with no level and no categories; categories with no level show "No restriction level"
-// in Internal's tone, as every rule treats it as Internal.
+// in Internal's tone, as every rule treats it as Internal. A visually hidden "Restriction: " says
+// what the badge is when it's read alone (DL-179).
 import { computed } from 'vue'
 
 import type { components } from '@/api/schema'
@@ -28,6 +29,7 @@ const categories = computed(() =>
 
 <template>
   <Badge v-if="project.restriction_level || categories" :tone="level.tone" :icon="level.icon"
-    >{{ level.label }}<template v-if="categories"> · {{ categories }}</template></Badge
+    ><span class="sr-only">Restriction: </span>{{ level.label
+    }}<template v-if="categories"> · {{ categories }}</template></Badge
   >
 </template>

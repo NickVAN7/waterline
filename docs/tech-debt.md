@@ -667,7 +667,7 @@ Entry format:
   under `ProjectHeader`, not in a right-hand actions slot as `PageHeader`'s are.
 - **Why:** the owner left the layout as is for now; it may come with their changes in Slice 2.
 - **Fix by:** S2-C0g (the actions in the project header, DL-137)
-- **Status:** open
+- **Status:** resolved in S2-C0g (`ProjectHeader`'s actions slot, beside the `h1`)
 
 ### TD-50: Two other dialogs' last step isn't read with Done
 - **Added:** S1-C16c (DL-118)
@@ -754,7 +754,7 @@ Entry format:
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
 - **Fix by:** S2-C0g (the project list's return to page 1, moved into `useListQuery`)
-- **Status:** open
+- **Status:** resolved in S2-C0g (`useListQuery`'s `returnWhenEmpty`, on every paged list)
 
 ### TD-59: The username suggestion is copied in two dialogs
 - **Added:** S1-C17 (repo-auditor A4)
@@ -825,4 +825,14 @@ Entry format:
   query costs at v1's load.
 - **Fix by:** Slice 2 retro (keep, or split `apply_changes` if another caller needs the
   non-locking half)
+- **Status:** open
+
+### TD-66: "None" for a missing role is written in two views
+- **Added:** S2-C0g (ui-reviewer finding 3's siblings)
+- **What:** the per-person access review's workspace role and the per-project access review's
+  project role show "None" for a missing role as a literal in the template, not from
+  `src/app/labels.ts` (frontend `CLAUDE.md`, "Display labels").
+- **Why:** both are S1-C15 and S1-C12 code that S2-C0g didn't need to change (DL-106); S2-C0g's
+  own Role and Status values are in `labels.ts`.
+- **Fix by:** S2-C22 (the tech-debt review)
 - **Status:** open

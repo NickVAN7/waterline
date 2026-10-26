@@ -80,6 +80,7 @@ watch(
   },
   { immediate: true },
 )
+query.returnWhenEmpty(page.data)
 const status = computed(() => page.error.value?.status)
 const notFound = computed(() => props.hidden && status.value === 404)
 const refused = computed(() => !props.allowed || status.value === 404 || status.value === 403)

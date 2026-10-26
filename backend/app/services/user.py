@@ -29,6 +29,7 @@ from app.enums import (
     RestrictionCategory,
     WorkspaceRole,
 )
+from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.user import UserRepository
@@ -198,6 +199,10 @@ def access_kind(export_controlled: bool, *, explicit: bool) -> AccessKind:
     """What someone who reaches a project has there (the access reviews, design-doc §5): on an
     export-controlled project, management only without an explicit membership (§3.1; DL-81)."""
     return AccessKind.MANAGEMENT if export_controlled and not explicit else AccessKind.CONTENT
+
+
+def _export_controlled(project: Project) -> bool:
+    return RestrictionCategory.EXPORT_CONTROLLED in project.restriction_categories
 
 
 # The entity a user endpoint loads, for routers (which never import models).
@@ -576,11 +581,9 @@ class UserService:
                     name=p.name,
                     organization_id=p.organization_id,
                     archived=p.archived_at is not None,
+                    export_controlled=_export_controlled(p),
                     reasons=sorted(projects[p.id], key=order.index),
-                    access=access_kind(
-                        RestrictionCategory.EXPORT_CONTROLLED in p.restriction_categories,
-                        explicit=p.id in explicit,
-                    ),
+                    access=access_kind(_export_controlled(p), explicit=p.id in explicit),
                 )
                 for p in sorted(seen.projects, key=lambda p: p.key)
                 if p.id in projects

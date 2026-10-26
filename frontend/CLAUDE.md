@@ -136,6 +136,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   keyed by id: names aren't unique (UI-FBK-6; S1-C16a review).
 - A dialog component is mounted once per page: two copies share their fields' ids, so each label
   names both fields (S1-C16).
+- A page with more than one paged list names each `Pagination` after its list (`label`,
+  "Archived pagination"): two landmarks never share a name (UI-TBL-3; S2-C0g review).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).

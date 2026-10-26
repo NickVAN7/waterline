@@ -1,14 +1,22 @@
 <script setup lang="ts">
 // A person's access review (`/workspace/users/{user_id}/access`; design-doc §5, "Access review";
-// build plan, "The account API"): every org and project they can reach, and why, each project with
-// whether they reach its content or only its management (design-doc §3.1). For workspace owners and
+// build plan, "The account API"): every org and project they can reach, and why, and on an
+// export-controlled project, whether they reach its content or only its management (design-doc
+// §3.1; the column only when one is, DL-177). For workspace owners and
 // admins, system admins, the person themselves, and admins whose rank covers them; anyone else gets
 // the not-found page (`user.view_access` is a 404 on any denial).
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { api, client } from '@/api/client'
-import { ACCESS_KIND, ACCESS_REASON, DEACTIVATED, SYSTEM_ADMIN, WORKSPACE_ROLE } from '@/app/labels'
+import {
+  ACCESS_KIND,
+  ACCESS_REASON,
+  ACTIVE,
+  DEACTIVATED,
+  SYSTEM_ADMIN,
+  WORKSPACE_ROLE,
+} from '@/app/labels'
 import { settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -36,6 +44,7 @@ const data = computed(() => review.data.value)
 const orgNames = computed(
   () => new Map((data.value?.orgs ?? []).map((org) => [org.id, org.name] as const)),
 )
+const exportControlled = computed(() => !!data.value?.projects.some((p) => p.export_controlled))
 const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
   list.map((reason) => ACCESS_REASON[reason]).join(', ')
 </script>
@@ -73,7 +82,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
             <Badge v-if="!data.user.is_active" :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{
               DEACTIVATED.label
             }}</Badge>
-            <span v-else>Active</span>
+            <span v-else>{{ ACTIVE }}</span>
             <Badge
               v-if="data.user.is_system_admin"
               :tone="SYSTEM_ADMIN.tone"
@@ -130,7 +139,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
                   <th scope="col" class="p-2">Project</th>
                   <th scope="col" class="p-2">Organization</th>
                   <th scope="col" class="p-2">Why they reach it</th>
-                  <th scope="col" class="p-2">Access</th>
+                  <th v-if="exportControlled" scope="col" class="p-2">Access</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,7 +154,11 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
                   </td>
                   <td class="p-2">{{ orgNames.get(project.organization_id) ?? '' }}</td>
                   <td class="p-2">{{ reasons(project.reasons) }}</td>
-                  <td class="p-2">{{ ACCESS_KIND[project.access] }}</td>
+                  <td v-if="exportControlled" class="p-2">
+                    <template v-if="project.export_controlled">{{
+                      ACCESS_KIND[project.access]
+                    }}</template>
+                  </td>
                 </tr>
               </tbody>
             </table>

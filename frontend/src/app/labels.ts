@@ -117,6 +117,12 @@ export const PROJECT_ROLE: Record<ProjectRole, string> = {
   viewer: 'Viewer',
 }
 
+/** The user's own access to a project in a list (DL-153): their role, or admin by inheritance. */
+export const MY_ACCESS: Record<components['schemas']['ProjectItem']['my_access'], string> = {
+  ...PROJECT_ROLE,
+  inherited_admin: 'Admin (inherited)',
+}
+
 /** Why someone reaches an org or project, in an access review (design-doc §5, "Access review"). */
 export const ACCESS_REASON: Record<AccessReason, string> = {
   system_admin: 'System admin',
@@ -136,6 +142,11 @@ export const ACCESS_KIND: Record<AccessKind, string> = {
   content: 'Content and management',
   management: 'Management only',
 }
+
+/** An active account's status, and a user who isn't a system admin, in the users list's Status
+ * and Role columns (DL-137). */
+export const ACTIVE = 'Active'
+export const USER = 'User'
 
 /** The badge after a deactivated user's name, everywhere it appears (UI-FBK-6). */
 export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', icon: 'x' }

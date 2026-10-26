@@ -94,6 +94,8 @@ class ProjectReach(BaseModel):
     name: str
     organization_id: uuid.UUID
     archived: bool
+    # Access is shown on export-controlled projects only (DL-177).
+    export_controlled: bool
     reasons: list[AccessReason]
     # `management`: reached as an inherited admin without an explicit membership on an
     # export-controlled project (design-doc §3.1; DL-81).
