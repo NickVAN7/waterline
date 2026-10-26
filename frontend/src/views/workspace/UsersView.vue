@@ -7,7 +7,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { ACTIVE, DEACTIVATED, SYSTEM_ADMIN, USER, WORKSPACE_ROLE } from '@/app/labels'
+import { ACTIVE, DEACTIVATED, USER, workspaceRoleText } from '@/app/labels'
 import { focusHeading, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -126,22 +126,8 @@ const announcement = computed(() => {
                 <td class="p-2">{{ user.email }}</td>
                 <td class="p-2 font-mono">{{ user.username }}</td>
                 <td class="p-2">
-                  <!-- The staff role beside the System admin badge (DL-183); "User" with neither (DL-187). -->
-                  <span class="flex flex-wrap items-center gap-2">
-                    {{
-                      user.workspace_role
-                        ? WORKSPACE_ROLE[user.workspace_role]
-                        : user.is_system_admin
-                          ? ''
-                          : USER
-                    }}
-                    <Badge
-                      v-if="user.is_system_admin"
-                      :tone="SYSTEM_ADMIN.tone"
-                      :icon="SYSTEM_ADMIN.icon"
-                      >{{ SYSTEM_ADMIN.label }}</Badge
-                    >
-                  </span>
+                  <!-- The staff role and system admin as text, or "User" with neither (DL-188). -->
+                  {{ workspaceRoleText(user.workspace_role, user.is_system_admin, USER) }}
                 </td>
                 <td class="p-2">
                   <Badge v-if="!user.is_active" :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{

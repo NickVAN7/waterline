@@ -32,7 +32,7 @@ from app.enums import (
 from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.repositories.user import UserRepository
+from app.repositories.user import NO_ROLE_SYSTEM_ADMIN, UserRepository
 from app.repositories.workspace import WorkspaceRepository
 from app.rules.account_rank import Account, WorkspaceRoleHeld, covering_orgs
 from app.rules.identifiers import (
@@ -213,6 +213,7 @@ USERS = ListSpec(
     id_column=User.id,  # pyright: ignore[reportArgumentType]
     sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
     default_sort=("name",),
+    sort_first=(NO_ROLE_SYSTEM_ADMIN,),
     filters=(Filter("is_active", User.is_active, FilterType.BOOLEAN),),  # pyright: ignore[reportArgumentType]
 )
 

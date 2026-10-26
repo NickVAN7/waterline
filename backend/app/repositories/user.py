@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Collection
 from dataclasses import dataclass
 
-from sqlalchemy import Select, or_, select, union
+from sqlalchemy import Select, and_, exists, or_, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.authz.context import AuthzContext, ProjectAccess
@@ -35,6 +35,13 @@ class Reach:
     project_roles: list[tuple[uuid.UUID, ProjectRole]]
     orgs: list[Organization]
     projects: list[Project]
+
+
+# A system admin with no workspace role (one workspace, design-doc §4): the users list's
+# `sort_first`, false before true, so they're listed last (DL-188).
+NO_ROLE_SYSTEM_ADMIN = and_(
+    User.is_system_admin, ~exists().where(WorkspaceMembership.user_id == User.id)
+)
 
 
 class UserRepository:

@@ -190,9 +190,10 @@ its **Actions for …** menu, which lists only what you may do to that person.
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
   existing person, or a new account with a temporary password, shown once.
 - **Users** lists everyone in the workspace. **Role** shows their workspace role (**Owner**,
-  **Admin**, or **Member**) and a **System admin** badge for system admins (granted outside the
-  app, so you can read it but not change it); someone with neither shows **User**. **Status**
-  shows **Active** or **Deactivated**.
+  **Admin**, or **Member**) and **System admin** for system admins (**Owner, System admin**;
+  granted outside the app, so you can read it but not change it); someone with neither shows
+  **User**. System admins with no workspace role are listed last. **Status** shows **Active** or
+  **Deactivated**.
 - **Settings** renames the workspace and changes its slug (workspace owners and system admins).
 
 **Account actions.** Where your role covers someone (the rank rule: you can act on people at your
@@ -203,8 +204,9 @@ sign in until reactivated; their work stays). A deactivated person shows a **Dea
 and is offered **Reactivate** instead. The last active owner, or the last system admin, can't be
 deactivated.
 
-**Access review.** A person's row offers **Access review** to those who may see it: every
-organization and project they can reach, why (their role, or a role above it), and, for each
+**Access review.** A person's row offers **Access review** to those who may see it: their
+workspace role as the users list shows it (**None** with neither), then every organization and
+project they can reach, why (their role, or a role above it), and, for each
 export-controlled project, whether they reach its content or only its management (the **Access**
 column shows only when one of their projects is export-controlled).
 

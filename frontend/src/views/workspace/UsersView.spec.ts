@@ -88,8 +88,8 @@ describe('UsersView', () => {
       'Status',
       'Actions',
     ])
-    // The system-admin flag is read-only, a badge in Role; "Deactivated" is in Status, not
-    // after the name.
+    // The system-admin flag is read-only, text in Role; "Deactivated" is in Status, not after
+    // the name.
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr
@@ -98,10 +98,10 @@ describe('UsersView', () => {
           .map((td) => td.text()),
       ),
     ).toEqual([
-      // The staff role beside the badge; "User" with none (DL-183).
-      ['Sam Admin', 'sam@harbor.example', 'sam', 'Admin System admin', 'Active'],
+      // The staff role and system admin as text; "User" with neither (DL-188).
+      ['Sam Admin', 'sam@harbor.example', 'sam', 'Admin, System admin', 'Active'],
       ['Dee Gone', 'dee@harbor.example', 'dee', 'User', 'Deactivated'],
-      // A system admin with no workspace role: the badge alone, not "User" (DL-187).
+      // A system admin with no workspace role: "System admin", not "User" (DL-188).
       ['Ola Root', 'ola@harbor.example', 'ola', 'System admin', 'Active'],
     ])
     expect(wrapper.get('table').findAll('input, select')).toHaveLength(0)

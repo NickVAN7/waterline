@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0i (Tooling & inventory) built; next is S2-C0j (history: `docs/reviews/`).
+> **Status:** S2-C0j (Users list's Role) built; next is S2-C1 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -607,7 +607,8 @@ object if the session has it loaded, so it stays readable without a lazy load.
 
 **List endpoints** (`app/core/lists.py`; build plan, "API conventions", "Lists"). Declare a
 `ListSpec` per list: sortable fields (an allowlist; `id` is always the last tiebreaker), the
-default sort, filters (`Filter(name, column, FilterType.ENUM, enum=...)`, or `CustomFilter` for
+default sort, `sort_first` (a fixed order ahead of the requested sort, built in the repository
+module: the users list's system admins with no workspace role last, DL-188), filters (`Filter(name, column, FilterType.ENUM, enum=...)`, or `CustomFilter` for
 a filter on another table, written with `EXISTS`, never a join, so no item repeats: DL-35),
 `search` columns for `?q=`, `archived_column` (archived rows hidden, with `?include_archived=true`
 or alone with `?archived_only=true`; both at once is a 422 `conflict`, DL-181, DL-182),

@@ -144,9 +144,10 @@ export const ACCESS_KIND: Record<AccessKind, string> = {
 }
 
 /** An active account's status, and someone with no workspace role, in the users list's Status
- * and Role columns (DL-137, DL-183). */
+ * and Role columns (DL-137, DL-183); the access review's no-role text. */
 export const ACTIVE = 'Active'
 export const USER = 'User'
+export const NO_ROLE = 'None'
 
 /** A per-person access review's Access cell on a project that isn't export-controlled, read by
  * screen readers only (DL-184). */
@@ -155,8 +156,16 @@ export const NOT_EXPORT_CONTROLLED = 'Not export-controlled'
 /** The badge after a deactivated user's name, everywhere it appears (UI-FBK-6). */
 export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', icon: 'x' }
 
-/** The badge on a system admin, read-only on the users page (design-doc §4). */
-export const SYSTEM_ADMIN: BadgeLabel = { label: 'System admin', tone: 'info', icon: 'check' }
+/** A person's workspace role and system admin as text ("Owner, System admin"), or `none` with
+ * neither: the users list's Role ("User") and the access review's ("None") (DL-188, DL-189). */
+export function workspaceRoleText(
+  role: WorkspaceRole | null | undefined,
+  isSystemAdmin: boolean,
+  none: string,
+): string {
+  const parts = [role && WORKSPACE_ROLE[role], isSystemAdmin && ACCESS_REASON.system_admin]
+  return parts.filter(Boolean).join(', ') || none
+}
 
 /** What a live availability check says about a slug or username (UI-FRM-9), after the field's
  * name: the identifier rule's problems (design-doc §3, §4) and `taken`. */

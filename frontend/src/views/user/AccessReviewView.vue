@@ -14,9 +14,9 @@ import {
   ACCESS_REASON,
   ACTIVE,
   DEACTIVATED,
+  NO_ROLE,
   NOT_EXPORT_CONTROLLED,
-  SYSTEM_ADMIN,
-  WORKSPACE_ROLE,
+  workspaceRoleText,
 } from '@/app/labels'
 import { settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
@@ -76,7 +76,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
           <dd class="m-0 font-mono">{{ data.user.username }}</dd>
           <dt class="font-medium">Workspace role</dt>
           <dd class="m-0">
-            {{ data.user.workspace_role ? WORKSPACE_ROLE[data.user.workspace_role] : 'None' }}
+            {{ workspaceRoleText(data.user.workspace_role, data.user.is_system_admin, NO_ROLE) }}
           </dd>
           <dt class="font-medium">Status</dt>
           <dd class="m-0 flex flex-wrap gap-2">
@@ -84,12 +84,6 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
               DEACTIVATED.label
             }}</Badge>
             <span v-else>{{ ACTIVE }}</span>
-            <Badge
-              v-if="data.user.is_system_admin"
-              :tone="SYSTEM_ADMIN.tone"
-              :icon="SYSTEM_ADMIN.icon"
-              >{{ SYSTEM_ADMIN.label }}</Badge
-            >
           </dd>
         </dl>
 

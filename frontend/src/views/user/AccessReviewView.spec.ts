@@ -97,6 +97,30 @@ describe('AccessReviewView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it.each([
+    [null, false, 'None'],
+    ['owner', true, 'Owner, System admin'],
+    [null, true, 'System admin'],
+    ['member', false, 'Member'],
+  ] as const)(
+    'shows the workspace role %s with system admin %s as text: %s (DL-189)',
+    async (role, isSystemAdmin, shown) => {
+      const user = { ...REVIEW.user, workspace_role: role, is_system_admin: isSystemAdmin }
+      vi.spyOn(client, 'GET').mockResolvedValue(ok({ ...REVIEW, user }))
+
+      const { wrapper } = await mountWorkspaceView(
+        AccessReviewView,
+        '/workspace/users/u-sam/access',
+      )
+
+      const terms = wrapper.findAll('dt').map((dt) => dt.text())
+      const details = wrapper.findAll('dd').map((dd) => dd.text())
+      expect(details[terms.indexOf('Workspace role')]).toBe(shown)
+      // System admin is no longer a badge beside the status.
+      expect(details[terms.indexOf('Status')]).toBe('Deactivated')
+    },
+  )
+
   it('says so when they reach nothing', async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(ok({ ...REVIEW, orgs: [], projects: [] }))
 

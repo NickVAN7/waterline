@@ -106,14 +106,17 @@ class ListSpec:
     """One list endpoint's declared query: everything a client may ask for, and nothing else.
 
     `sorts` maps a sort name to its column; `default_sort` uses the same names, `-` for
-    descending. `id` is always the last tiebreaker. `paging="cursor"` is for append-only feeds:
-    newest first, by `id` (UUIDv7, so creation order), with no sort parameter.
+    descending. `id` is always the last tiebreaker. `sort_first` is a fixed order ahead of the
+    requested one (the users list's system admins with no workspace role last, DL-188).
+    `paging="cursor"` is for append-only feeds: newest first, by `id` (UUIDv7, so creation
+    order), with no sort parameter.
     """
 
     name: str
     id_column: Column
     sorts: Mapping[str, Column] = field(default_factory=dict[str, Column])
     default_sort: tuple[str, ...] = ()
+    sort_first: tuple[ColumnElement[Any], ...] = ()
     filters: tuple[Filter | CustomFilter, ...] = ()
     search: tuple[Column, ...] = ()
     archived_column: Column | None = None
@@ -372,7 +375,7 @@ def check_permitted(spec: ListSpec, query: BaseModel, permitted: Collection[str]
 def order_by(spec: ListSpec, sort: str | None) -> list[ColumnElement[Any]]:
     """The ORDER BY for `?sort=` (or the default), from the spec's allowlist, with `id` last."""
     names = [part.strip() for part in sort.split(",")] if sort else list(spec.default_sort)
-    columns: list[ColumnElement[Any]] = []
+    columns: list[ColumnElement[Any]] = list(spec.sort_first)
     seen: set[str] = set()
     for name in names:
         key = name.removeprefix("-")
