@@ -2404,3 +2404,13 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** `.claude/skills/checkpoint/SKILL.md` (step 5); `.claude/agents/checkpoint-reviewer.md`
 - **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0i.md`, open question 1)
+
+### DL-191: The access review's role term is "Role"
+- **Date:** 2026-10-26
+- **Decision:** The per-person access review's "Workspace role" term is renamed "Role", the users
+  list's column name, since it can now hold "System admin" (DL-189), which isn't a workspace role.
+  Bundled into S2-C1 (DL-131).
+- **Supersedes:** none (extends DL-189)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C1)
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0j.md`, open question 1)
