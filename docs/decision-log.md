@@ -2028,7 +2028,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   admin, account and lists, forms, tooling and inventory). A slice's checkpoint table may start
   at 0 or 0a, and the docs consistency tests accept it.
 - **Supersedes:** none (implements DL-124, which left the rows to the plan)
-- **Superseded by:** none
+- **Superseded by:** DL-188, in part (a tenth row, S2-C0j)
 - **Applies to:** build plan (the Slice 2 section); `backend/tests/support/docs.py`
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning; the table's start at 0
   confirmed in this design change)
@@ -2325,7 +2325,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   Owner, Admin, or Member, or "User" with none, plus the "System admin" badge for a system admin;
   each user row carries `workspace_role`. Built in S2-C0h, with API tests and `wl gen-client`.
 - **Supersedes:** none (S2-C0g built Role as "System admin" or "User", DL-137)
-- **Superseded by:** DL-187, in part
+- **Superseded by:** DL-187 and DL-188, in part
 - **Applies to:** build plan (the account API's users list, S2-C0h); ui-design-guide UI-FBK-6
 - **Source:** owner, Oct 25, 2026 (`docs/reviews/s2/S2-C0g.md`, open question 1)
 
@@ -2366,7 +2366,20 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   neither. "No workspace role" stays "User" in the users list and "None" in the per-person
   access review. Built in S2-C0i.
 - **Supersedes:** DL-183, in part ("User" beside the badge)
-- **Superseded by:** none
+- **Superseded by:** DL-188
 - **Applies to:** ui-design-guide UI-FBK-6; build plan (the account bullet, S2-C0i)
 - **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0h.md`, open question 4;
   `docs/reviews/design-changes/DC-2026-10-25-c0g-review-answers.md`, Decisions 1 and 2)
+
+### DL-188: System admin is text in the users list's Role, and system admins with no role sort last
+- **Date:** 2026-10-26
+- **Decision:** The workspace users list's Role column shows system admin as text, not a badge:
+  "Owner, System admin" for a system admin with a workspace role, "System admin" for one with
+  none, the workspace role alone otherwise, and "User" for neither. The list (`GET
+  /api/workspaces/{workspace_id}/users`) puts system admins with no workspace role after
+  everyone else, in the chosen sort's order, across pages. Built in S2-C0j.
+- **Supersedes:** DL-187; DL-183, in part (the badge); DL-156, in part (the row count)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (the account bullet, the users list's
+  endpoint row, S2-C0j, the `s2-prep` group)
+- **Source:** owner, Oct 26, 2026 (chat session, at the S2-C0i report)

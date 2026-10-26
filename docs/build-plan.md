@@ -26,7 +26,7 @@ marked for the slice is in the model (the `checkpoint` skill, step 2).
 |---|---|
 | **0** | Skeleton: stack, shared conventions, CI, app shell. No features. |
 | **1** | Auth, tenancy (workspace, organizations, workspace/org/project memberships), projects (types, modules, keys, status, lead), number allocation, `authorize()`, admin audit events, the API conventions (lists, errors, allowed actions, identifiers), access review, and My work as the home page (its projects section). |
-| **2** | Requirements & approvals: Slice 1's leftovers and the owner's UI feedback first (S2-C0a to S2-C0i); requirements (tree, `RQ` numbering, rank, revisions compared, item history, delete and trash), approvals with named approvers and their replacement (My work's approvals section), `log_change()` and the activity log, the export-control gate, rendered markdown and the CSP. |
+| **2** | Requirements & approvals: Slice 1's leftovers and the owner's UI feedback first (S2-C0a to S2-C0j); requirements (tree, `RQ` numbering, rank, revisions compared, item history, delete and trash), approvals with named approvers and their replacement (My work's approvals section), `log_change()` and the activity log, the export-control gate, rendered markdown and the CSP. |
 | 3 | Tasks and subtasks, phases, workstreams, transition rules, rank for tasks; backlog and board (the board is SVAR Kanban through a wrapper, ui-design-guide §7.1; DL-64); copy branch name; My work's task sections (assigned, awaiting review). |
 | 4 | Sprints (module), including completing a sprint with unfinished tasks; milestones/gates. |
 | 5 | Test cases, runs, results (with assignees), ad-hoc runs, re-running failed cases; My work's test-case section. |
@@ -1228,8 +1228,8 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   records one `user_updated` event with the old and new value of every changed field (an admin's,
   one per covering org when they act through several orgs' roles, DL-75).
 - The workspace users list shows which users hold system admin (read-only; granting and
-  revoking stay in the CLI), in its Role column beside their workspace role (from S2-C0h, DL-183),
-  the badge alone for a system admin with no workspace role (from S2-C0i, DL-187).
+  revoking stay in the CLI), as text in its Role column with their workspace role ("Owner,
+  System admin"), and lists system admins with no workspace role last (from S2-C0j, DL-188).
 - **Access review, per person** (design-doc §5, "Access review"): every org and project the
   person can reach and through what, derived from memberships. Workspace owners/admins and
   system admins open it for anyone, org owners/admins for a person within their rank scope
@@ -1239,7 +1239,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
   | Endpoint | Does | Action |
   |---|---|---|
-  | `GET /api/workspaces/{workspace_id}/users` | the users list: everyone with a membership in the workspace (staff, org members, project members) and every account with no memberships; each row `id`, `email`, `username`, `name`, `is_active`, `is_system_admin` (read-only), `workspace_role` (the person's staff role, or null; from S2-C0h, DL-183), and its `allowed_actions` (offset paging, `ListSpec`: sort by name or email, filter by `is_active`) | `workspace.view` |
+  | `GET /api/workspaces/{workspace_id}/users` | the users list: everyone with a membership in the workspace (staff, org members, project members) and every account with no memberships; each row `id`, `email`, `username`, `name`, `is_active`, `is_system_admin` (read-only), `workspace_role` (the person's staff role, or null; from S2-C0h, DL-183), and its `allowed_actions` (offset paging, `ListSpec`: sort by name or email, with system admins who have no workspace role after everyone else, from S2-C0j, DL-188; filter by `is_active`) | `workspace.view` |
   | `POST /api/users/{user_id}/deactivate` | set `is_active` false and delete the user's sessions (`user_deactivated`); already inactive changes and records nothing | `user.manage` |
   | `POST /api/users/{user_id}/reactivate` | set `is_active` true (`user_reactivated`); already active changes and records nothing | `user.manage` |
   | `POST /api/users/{user_id}/reset-password` | `password` (the temporary password the form generates, under the password policy): set it and `must_change_password`, and delete the user's sessions (`password_reset`) | `user.manage` |
@@ -1557,7 +1557,7 @@ review), TD-31 (S2-C22), TD-40 (S2-C14), TD-42 (S2-C22), TD-44 (S2-C0c), TD-49 (
 
 ### Checkpoints
 
-S2-C0 (DL-124) is planned as rows 0a to 0i (DL-156): Slice 1's leftovers and the owner's UI
+S2-C0 (DL-124) is planned as rows 0a to 0j (DL-156; 0j inserted, DL-188): Slice 1's leftovers and the owner's UI
 feedback (`docs/reviews/s1/S1-ui-feedback.md`, each item marked with its row, DL-137, DL-158),
 before the features.
 
@@ -1572,6 +1572,7 @@ before the features.
 | 0g | Account & lists | Account settings' Appearance section, with the theme choice removed from the user menu (UI-TOK-2, DL-164); `/account/password`; My work and the project list (status right-aligned; the org and the user's access on My work; the type on the project list; `organization_name` and `my_access` on the project item, DL-153, `wl gen-client`); the workspace users' Role and Status columns; the access review's title and sentence; TD-49 (project pages' actions in the header); TD-58 (`useListQuery` returns to page 1); the org's project list on an `ORG_PROJECTS` spec with `archived_column` in place of the hand-built `include_archived` (S2-C0a finding 10, DL-170); the org overview's archived projects in a section below headed "Archived" (DL-180), from `?archived_only=true` on `ListSpec`'s archived handling (DL-181; with `include_archived=true` too, a 422, DL-182; with API tests and `wl gen-client`); `export_controlled` on the per-person access review's project rows, and its Access shown only on those rows (DL-177; backend, with API tests and `wl gen-client`); the restriction badge's visually hidden "Restriction: " (DL-179) |
 | 0h | Forms | Add-person (the email's format checked on step 1, an editable email on step 2 checked again on Create account if it changed (DL-185), the email styled apart from its label; UI-FRM-13); the add-member picker opens its list on focus; project settings (spacing, the Danger zone, the danger confirm; UI-FRM-14); TD-51; TD-56 (settings send only changed fields), with org and workspace settings merged into one `NameSlugSettings.vue` (S2-C0a finding 4, DL-170); TD-59 (`useUsernameSuggestion`), with the add-person and create-org dialogs' new-account fields in one `NewAccountFields.vue` on it (finding 5, DL-170); from S2-C0g's review: the workspace users' Role column with the workspace role (`workspace_role` on the user row, DL-183; backend, with API tests and `wl gen-client`), and a visually hidden "Not export-controlled" in the per-person access review's blank Access cells (DL-184) |
 | 0i | Tooling & inventory | The `vue-screen` skill and the `user-guide-verifier` agent ("Workflow items scheduled"; the agent's first run on S2-C0's changes); every item in `S1-ui-feedback.md` checked done or logged; TD-62 (DL-157); the developer guide's Status section cut to one line (S2-C0a finding 2, DL-170); `fresh-clone-verifier`'s step 5 runs the guide's quick checks (`wl doctor`, `wl up`, the health check, plain `wl check`), not `wl check --full` (finding 6, DL-170), and the guide's first-time setup ends with plain `wl check`, naming `wl check --full` as what CI runs (DL-173); from S2-C0h's review: the users list's Role shows the "System admin" badge alone for a system admin with no workspace role (DL-187) |
+| 0j | Users list's Role | DL-188: the workspace users list's Role column shows system admin as text ("Owner, System admin", "System admin"), not a badge; `GET /api/workspaces/{workspace_id}/users` sorts system admins with no workspace role after everyone else, across pages (backend, with API tests; `wl gen-client` if the schema changes); the user guide's Users text |
 | 1 | Models & migration | `requirement`, `requirement_revision`, `approval_request`, `approval`, `activity_log` (schema-doc), one migration; the circular foreign keys with `use_alter`, hand-reviewed, downgrade tested; constraint tests; factories; `RestrictionMixin` on `requirement`; the columns marked for later slices not built; the stale-row 404 or 409 decided once, in `get_session`, with `stale_data_handler` and `is_version_conflict` deleted and a test through a stale `requirement` write (S2-C0a finding 7, DL-170) |
 | 2 | Rank helper | `rules/rank.py`: a fractional index from the neighbors' IDs (design-doc §6, "Manual ordering"), test-first (`spec-test-writer`), with Hypothesis, mutation-tested; `direct_update` with `touch_updated_at=False` |
 | 3 | Change log & item history | `log_change()` (design-doc §10), the only writer to `activity_log`; `GET /api/projects/{key}/requirements/{number}/activity` (cursor-paged, names resolved server-side, former members' included, DL-147, DL-160); the project service logs `status` and `lead_id` changes, including a lead cleared by a member removal on any path |
@@ -1599,7 +1600,7 @@ before the features.
 
 | Group | Name | Checkpoints |
 |---|---|---|
-| 1 | `s2-prep` | 0a–0i (audit, spike, Slice 1's leftovers, the owner's UI feedback, tooling) |
+| 1 | `s2-prep` | 0a–0j (audit, spike, Slice 1's leftovers, the owner's UI feedback, tooling) |
 | 2 | `s2-foundations` | 1–4 (models, rank, change log, content access) |
 | 3 | `s2-requirements` | 5–9 (requirements, tree, delete and trash, revisions) |
 | 4 | `s2-approvals` | 10–14 (requests, decisions, replacement, My work) |
