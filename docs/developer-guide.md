@@ -5,7 +5,7 @@ if a step here is wrong, fixing it is part of the work. The *why* behind the rul
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
 > **Status:** S2-C0h (Forms) built: add-person's email checked for its format on step 1
-> (`useFormErrors`' `invalidate`) and editable on step 2, checked again when changed, a 422 on it
+> (`useFormErrors`' `invalidate`) and editable on step 2, checked again on Create account if changed (DL-185), a 422 on it
 > staying there (UI-FRM-13); the new-account fields in one `NewAccountFields` (add-person and
 > create-org) on `useUsernameSuggestion` (TD-59, S2-C0a finding 5); the add-member picker's list
 > opening on focus; project settings' Danger zone and its danger confirm (UI-FRM-14); the

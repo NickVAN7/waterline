@@ -2325,7 +2325,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   Owner, Admin, or Member, or "User" with none, plus the "System admin" badge for a system admin;
   each user row carries `workspace_role`. Built in S2-C0h, with API tests and `wl gen-client`.
 - **Supersedes:** none (S2-C0g built Role as "System admin" or "User", DL-137)
-- **Superseded by:** none
+- **Superseded by:** DL-187, in part
 - **Applies to:** build plan (the account API's users list, S2-C0h); ui-design-guide UI-FBK-6
 - **Source:** owner, Oct 25, 2026 (`docs/reviews/s2/S2-C0g.md`, open question 1)
 
@@ -2338,3 +2338,35 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §5 ("Access review"); build plan (S2-C0h)
 - **Source:** owner, Oct 25, 2026 (`docs/reviews/s2/S2-C0g.md`, open question 2)
+
+### DL-185: Add-person's step 2 checks a changed email on Create account
+- **Date:** 2026-10-26
+- **Decision:** In the email-first add-person flow, step 2's edited email goes through the user
+  check when the admin submits Create account, and only if it changed since the last check; an
+  existing account opens the same confirm step as step 1. It isn't checked as it's typed. As
+  built in S2-C0h.
+- **Supersedes:** UI-FRM-13's "re-checked through the user check when it changes" (DL-137)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-13
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0h.md`, open question 1)
+
+### DL-186: An archived project's Unarchive stays in the Danger zone
+- **Date:** 2026-10-26
+- **Decision:** Project settings keep one "Danger zone" section for Archive and Unarchive: the one
+  button changes in place, so focus stays on it. As built in S2-C0h.
+- **Supersedes:** none (adds to UI-FRM-14)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-14
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0h.md`, open question 3)
+
+### DL-187: A system admin with no workspace role shows the badge alone
+- **Date:** 2026-10-26
+- **Decision:** In the workspace users list's Role column, a system admin with no workspace role
+  shows only the "System admin" badge, not "User" beside it; "User" stays for an account with
+  neither. "No workspace role" stays "User" in the users list and "None" in the per-person
+  access review. Built in S2-C0i.
+- **Supersedes:** DL-183, in part ("User" beside the badge)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (the account bullet, S2-C0i)
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0h.md`, open question 4;
+  `docs/reviews/design-changes/DC-2026-10-25-c0g-review-answers.md`, Decisions 1 and 2)

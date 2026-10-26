@@ -605,7 +605,8 @@ render inside the full shell when signed in.
   member, the error says so. This step, and a project's step to add an account from outside the
   organization to it too (`join_org`), start on Back (DL-117; UI-FRM-14). Step 1 checks the
   email's format before the user check. Otherwise step 2 shows the email as an **editable** field,
-  re-checked through the user check when it changes, so a mistyped email is fixed there rather
+  checked again through the user check on Create account if it changed since the last check (an
+  existing account opens the same confirm step; DL-185), so a mistyped email is fixed there rather
   than by going back, and asks for the name, the username, and the temporary password
   (UI-FRM-11); being a field, the email's value stands apart from its label (DL-137; from S2-C0h). The username is pre-filled with the server's
   suggestion for the name (`jane-doe`) and follows the name until the admin edits it; it is
@@ -623,7 +624,8 @@ render inside the full shell when signed in.
   viewport, checked by an end-to-end test (DL-137; from S2-C0e). The confirm button names its
   action ("Remove member", never "OK"); destructive confirms use the danger button. A
   destructive action on a settings page (archiving a project) sits in a **"Danger zone"**
-  section with a danger-tone border and heading (DL-137; from S2-C0h).
+  section with a danger-tone border and heading (DL-137; from S2-C0h). An archived project's
+  Unarchive stays there, the one button changing in place so focus stays on it (DL-186).
 - **UI-FRM-15** **Buttons:** one primary button per view or dialog. A submit button is
   `type="submit"` and Enter submits; every other button is `type="button"`. Navigation is a
   link, an action is a button. Don't disable a submit button because the form is invalid: users
@@ -716,7 +718,8 @@ render inside the full shell when signed in.
   "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A "Deactivated" neutral badge follows a deactivated
   user's name everywhere it appears, except the workspace users list, where it is in the Status
   column (DL-137, from S2-C0g), and whose Role column shows the workspace role beside the
-  "System admin" badge (DL-183, from S2-C0h).
+  "System admin" badge (DL-183, from S2-C0h), or "User" for neither; a system admin with no
+  workspace role shows the badge alone (DL-187, from S2-C0i).
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
 - **UI-FBK-8** **Empty states** distinguish two cases. *Nothing exists yet:* a heading ("No members
