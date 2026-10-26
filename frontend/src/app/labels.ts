@@ -143,10 +143,14 @@ export const ACCESS_KIND: Record<AccessKind, string> = {
   management: 'Management only',
 }
 
-/** An active account's status, and a user who isn't a system admin, in the users list's Status
- * and Role columns (DL-137). */
+/** An active account's status, and someone with no workspace role, in the users list's Status
+ * and Role columns (DL-137, DL-183). */
 export const ACTIVE = 'Active'
 export const USER = 'User'
+
+/** A per-person access review's Access cell on a project that isn't export-controlled, read by
+ * screen readers only (DL-184). */
+export const NOT_EXPORT_CONTROLLED = 'Not export-controlled'
 
 /** The badge after a deactivated user's name, everywhere it appears (UI-FBK-6). */
 export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', icon: 'x' }

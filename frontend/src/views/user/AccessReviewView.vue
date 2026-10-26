@@ -14,6 +14,7 @@ import {
   ACCESS_REASON,
   ACTIVE,
   DEACTIVATED,
+  NOT_EXPORT_CONTROLLED,
   SYSTEM_ADMIN,
   WORKSPACE_ROLE,
 } from '@/app/labels'
@@ -158,6 +159,8 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
                     <template v-if="project.export_controlled">{{
                       ACCESS_KIND[project.access]
                     }}</template>
+                    <!-- Blank to the eye; says why to a screen reader (DL-184). -->
+                    <span v-else class="sr-only">{{ NOT_EXPORT_CONTROLLED }}</span>
                   </td>
                 </tr>
               </tbody>

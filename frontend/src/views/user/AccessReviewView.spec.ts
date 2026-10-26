@@ -89,9 +89,11 @@ describe('AccessReviewView', () => {
     expect(
       projects.findAll('tbody tr').map((tr) => tr.findAll('td').map((td) => td.text())),
     ).toEqual([
-      ['ERP ERP rollout', 'Acme Manufacturing', 'Project member', ''],
+      // Blank to the eye, explained to a screen reader (DL-184).
+      ['ERP ERP rollout', 'Acme Manufacturing', 'Project member', 'Not export-controlled'],
       ['SEC Secret', 'Acme Manufacturing', 'Org admin', 'Management only'],
     ])
+    expect(projects.get('tbody td:last-child span').classes()).toContain('sr-only')
     await expectNoA11yViolations(wrapper)
   })
 

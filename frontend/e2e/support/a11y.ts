@@ -26,9 +26,11 @@ export async function expectNoA11yViolations(page: Page): Promise<void> {
 
 /**
  * Focus Not Obscured (WCAG 2.4.11), which axe doesn't automate: Tab forward through the page and
- * then back, and after each press the element at the centre of the focused element's box must be
- * that element or inside it, never a sticky header or toast drawn over it. Going back matters:
- * scrolling up is what puts an element at the top edge, under a sticky header.
+ * then back, and after each press the element at the centre of the focused element's box, as
+ * much of it as is in the viewport, must be that element or inside it, never a sticky header or
+ * toast drawn over it. Going back matters: scrolling up is what puts an element at the top edge,
+ * under a sticky header. (A table region taller than the viewport has its whole box's centre
+ * off-screen, under nothing: S2-C0h.)
  */
 export async function expectFocusNotObscured(page: Page, maxPresses = 100): Promise<void> {
   const covered: string[] = []
@@ -39,7 +41,9 @@ export async function expectFocusNotObscured(page: Page, maxPresses = 100): Prom
         const element = document.activeElement
         if (!element || element === document.body) return undefined
         const box = element.getBoundingClientRect()
-        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+        const top = Math.max(box.top, 0)
+        const bottom = Math.min(box.bottom, window.innerHeight)
+        const hit = document.elementFromPoint(box.left + box.width / 2, (top + bottom) / 2)
         const name = element.outerHTML.slice(0, 80)
         return { name, clear: hit !== null && (hit === element || element.contains(hit)) }
       })

@@ -519,10 +519,12 @@ render inside the full shell when signed in.
   uses a hint instead (UI-FRM-17).
 - **UI-FRM-4** The server is the validator. The client checks only that a required field is not
   empty; every other rule (format, uniqueness, policy) comes back as a 422 and is shown as the
-  server wrote it. Do not copy business rules into the UI (`frontend/CLAUDE.md`). Two exceptions:
+  server wrote it. Do not copy business rules into the UI (`frontend/CLAUDE.md`). Exceptions:
   the password requirements list (UI-FRM-10) checks the requirements the server publishes as the
   user types; the server still decides on submit (DL-91); and a 422 on a listed requirement is
-  shown as that line's own label with a "Not met:" cue, not the server's message (DL-95).
+  shown as that line's own label with a "Not met:" cue, not the server's message (DL-95). And
+  the add-person flow checks an email's shape before its user check, on step 1 and on step 2's
+  editable email (UI-FRM-13, DL-137; from S2-C0h); the server still decides.
 - **UI-FRM-5** **Field errors from a 422** (`details.fields[]` with `loc`, `message`, `type`):
   the last element of `loc` names the field. Show the message directly under the field with an
   error icon and text in `--color-tone-danger-fg`, give the control a thicker (2 px)
@@ -605,7 +607,7 @@ render inside the full shell when signed in.
   email's format before the user check. Otherwise step 2 shows the email as an **editable** field,
   re-checked through the user check when it changes, so a mistyped email is fixed there rather
   than by going back, and asks for the name, the username, and the temporary password
-  (UI-FRM-11); the email's value is styled apart from its label (DL-137; from S2-C0h). The username is pre-filled with the server's
+  (UI-FRM-11); being a field, the email's value stands apart from its label (DL-137; from S2-C0h). The username is pre-filled with the server's
   suggestion for the name (`jane-doe`) and follows the name until the admin edits it; it is
   checked live (UI-FRM-9). The member table has separate Name and Email columns.
 - **UI-FRM-14** **Dialogs:** native `<dialog>` opened with `showModal()`, so Esc closes and the

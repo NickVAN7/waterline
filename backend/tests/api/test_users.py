@@ -134,6 +134,23 @@ async def test_the_users_list_shows_who_holds_system_admin_and_filters_by_active
     assert [r["name"] for r in inactive.json()["items"]] == ["Dee Gone"]
 
 
+async def test_each_listed_user_carries_their_workspace_role_or_none(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-183: the staff role for the Role column; null for anyone who isn't staff."""
+    await signed_in(client, await staff(t, WorkspaceRole.OWNER, name="Ada Owner"))
+    await staff(t, WorkspaceRole.MEMBER, name="Mo Member")
+    await org_member(t, OrgRole.ADMIN, name="Olga Orgadmin")
+
+    response = await client.get(f"/api/workspaces/{t.workspace.id}/users")
+
+    assert [(r["name"], r["workspace_role"]) for r in response.json()["items"]] == [
+        ("Ada Owner", "owner"),
+        ("Mo Member", "member"),
+        ("Olga Orgadmin", None),
+    ]
+
+
 @pytest.mark.security
 @pytest.mark.parametrize(
     ("make", "role"),

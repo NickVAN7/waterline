@@ -27,6 +27,7 @@ const USERS: Row[] = [
     name: 'Sam Admin',
     is_active: true,
     is_system_admin: true,
+    workspace_role: 'admin',
     allowed_actions: [],
   },
   {
@@ -36,6 +37,7 @@ const USERS: Row[] = [
     name: 'Dee Gone',
     is_active: false,
     is_system_admin: false,
+    workspace_role: null,
     allowed_actions: ['user.manage'],
   },
 ]
@@ -86,7 +88,8 @@ describe('UsersView', () => {
           .map((td) => td.text()),
       ),
     ).toEqual([
-      ['Sam Admin', 'sam@harbor.example', 'sam', 'System admin', 'Active'],
+      // The staff role beside the badge; "User" with none (DL-183).
+      ['Sam Admin', 'sam@harbor.example', 'sam', 'Admin System admin', 'Active'],
       ['Dee Gone', 'dee@harbor.example', 'dee', 'User', 'Deactivated'],
     ])
     expect(wrapper.get('table').findAll('input, select')).toHaveLength(0)

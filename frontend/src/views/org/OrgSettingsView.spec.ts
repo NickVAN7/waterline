@@ -64,7 +64,8 @@ describe('OrgSettingsView', () => {
 
     expect(patch).toHaveBeenCalledWith('/api/orgs/{org_id}', {
       params: { path: { org_id: ACME.id } },
-      body: { name: 'Acme Industries', slug: 'acme' },
+      // Only what changed, so another admin's slug change stands (TD-56).
+      body: { name: 'Acme Industries' },
     })
     expect(wrapper.text()).toContain('Settings saved.')
     expect(wrapper.get('h1').text()).toBe('Acme Industries settings')

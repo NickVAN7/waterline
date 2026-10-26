@@ -31,6 +31,8 @@ class UserRow(BaseModel):
     name: str
     is_active: bool
     is_system_admin: bool
+    # The person's staff role in the workspace, or null (DL-183).
+    workspace_role: WorkspaceRole | None
     allowed_actions: list[Action]
 
 

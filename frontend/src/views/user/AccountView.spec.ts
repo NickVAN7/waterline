@@ -100,6 +100,26 @@ describe('AccountView', () => {
     expect(wrapper.get<HTMLInputElement>('input[value=light]').element.checked).toBe(true)
   })
 
+  it("sends only the field changed, so an admin's change to the other stands (TD-56)", async () => {
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok({ ...me().user, name: 'Casey C' }))
+    const wrapper = await mountView()
+
+    await saveProfile(wrapper, 'Casey C', 'casey')
+
+    expect(patch).toHaveBeenCalledWith('/api/me', { body: { name: 'Casey C' } })
+  })
+
+  it('sends no name a /me reload brought in after the form was filled (TD-56)', async () => {
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok({ ...me().user, username: 'cc' }))
+    const wrapper = await mountView()
+    // An admin renamed them meanwhile; a reload of `/me` carries it, the form still shows the old.
+    useCurrentUserStore().me = me({ user: { ...me().user, name: 'Casey Renamed' } })
+
+    await saveProfile(wrapper, 'Casey Cole', 'cc')
+
+    expect(patch).toHaveBeenCalledWith('/api/me', { body: { username: 'cc' } })
+  })
+
   it('saves the profile and shows the new name to the rest of the app', async () => {
     const patch = vi
       .spyOn(client, 'PATCH')

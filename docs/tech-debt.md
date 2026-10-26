@@ -688,7 +688,7 @@ Entry format:
 - **Why:** the owner chose to log the S1-C16d review's findings rather than fix them; DL-122 asked
   for the step's existing text, which it has.
 - **Fix by:** S2-C0h (the owner's UI feedback, DL-137)
-- **Status:** open
+- **Status:** resolved in S2-C0h ("Password reset for <name>." read with Done)
 
 ### TD-52: No length limit on names and descriptions
 - **Added:** S1-C17 (repo-auditor)
@@ -735,7 +735,7 @@ Entry format:
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
 - **Fix by:** S2-C0h (send only the changed fields, as `AccountDetailsDialog` does)
-- **Status:** open
+- **Status:** resolved in S2-C0h (`NameSlugSettings`, `ProfileForm`, and project settings' details send only what changed)
 
 ### TD-57: An update's change check reads an unlocked row
 - **Added:** S1-C17 (repo-auditor A2)
@@ -763,7 +763,7 @@ Entry format:
 - **Why:** found at the slice-end audit; the owner deferred it to a pre-checkpoint at the start
   of Slice 2.
 - **Fix by:** S2-C0h (one `useUsernameSuggestion` composable)
-- **Status:** open
+- **Status:** resolved in S2-C0h (`useUsernameSuggestion`, in `NewAccountFields`)
 
 ### TD-60: The docs name per-area policy files; Slice 1 built one registry
 - **Added:** S1-C17 (docs-consistency)

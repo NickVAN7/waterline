@@ -4,7 +4,16 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0g (Account & lists) built: account settings' Appearance section, with the theme
+> **Status:** S2-C0h (Forms) built: add-person's email checked for its format on step 1
+> (`useFormErrors`' `invalidate`) and editable on step 2, checked again when changed, a 422 on it
+> staying there (UI-FRM-13); the new-account fields in one `NewAccountFields` (add-person and
+> create-org) on `useUsernameSuggestion` (TD-59, S2-C0a finding 5); the add-member picker's list
+> opening on focus; project settings' Danger zone and its danger confirm (UI-FRM-14); the
+> password reset's last step read with Done (TD-51); settings saves sending only the changed
+> fields (TD-56), with org and workspace settings on one `NameSlugSettings` (finding 4);
+> `workspace_role` on the users list's rows and its Role column (DL-183); the per-person access
+> review's hidden "Not export-controlled" (DL-184); `expectFocusNotObscured` probing the
+> on-screen part of a focused element taller than the viewport. S2-C0g (Account & lists) built: account settings' Appearance section, with the theme
 > choice gone from the user menu (DL-164), and change password as its own page,
 > `/account/password` (`AccountPasswordView`); `organization_name` and `my_access` on the project
 > item, shown on My work, and the type on the org's project list (`ProjectList`'s `withAccess`
@@ -899,10 +908,10 @@ frontend/src/
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
                      Pagination, SuccessStatus, PageHeader, ModalDialog,
-                     ConfirmDialog, GroupError, RowActions, Icon
+                     ConfirmDialog, GroupError, RowActions, Icon, NameSlugSettings
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
                      useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
-                     useWorkspace,
+                     useUsernameSuggestion, useWorkspace,
                      temporaryPassword,
                      allowedActions (`allows()`)
   stores/            Pinia stores: currentUser, currentOrg (the current org and project)

@@ -88,8 +88,9 @@ its members and their roles (Admin, Member, Viewer); anyone on the project can s
 project's admins (and organization owners and admins, workspace owners and admins, and system
 admins) can also:
 
-- **Add member**: search the organization's members and the workspace's staff by name, email,
-  or username, choose one, and give them a role.
+- **Add member**: the list of the organization's members and the workspace's staff opens as soon
+  as you're in the field; type a name, email, or username to narrow it, choose one, and give them
+  a role.
 - **Add by email**: works as **Add person** does under workspace administration (the email
   first, then either an existing account or a new one with a temporary password, shown once).
   An account from outside the organization is added only after you confirm adding them to the
@@ -121,8 +122,12 @@ admins) can also:
   saving keeps it. On an export-controlled project, system, workspace, and organization admins without a membership
   can manage it but not see its content, and may only raise its restriction: lowering the level
   or removing a category needs one of its explicit project admins.
-- **Archive** (organization owners and admins): **Archive project**, once confirmed, makes it
-  read-only for everyone until **Unarchive project**. Nothing is deleted.
+- **Danger zone** (organization owners and admins), set apart at the bottom: **Archive
+  project**, once confirmed with the red **Archive project** button, makes it read-only for
+  everyone until **Unarchive project**. Nothing is deleted.
+
+Each save sends only what you changed, so it never undoes a change someone else made to another
+field since you opened the page.
 
 Anyone else who opens a project's **Settings** or **Access review** is told the page is for the
 project's admins, and to ask one of them.
@@ -168,10 +173,13 @@ the top right. Its pages are listed in the sidebar, in place of the project sele
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
 its **Actions for …** menu, which lists only what you may do to that person.
 
-- **Staff** lists the workspace's staff and their roles. **Add person** asks for the email first.
-  If the email already has an account, you confirm adding that person (you're shown only the
-  email). If not, you create the account: name, username (suggested from the name; you're told
-  if it's taken), and a temporary password, generated for you, which you can replace. Once it's
+- **Staff** lists the workspace's staff and their roles. **Add person** asks for the email first,
+  and tells you at once if it isn't an email address. If the email already has an account, you
+  confirm adding that person (you're shown only the email). If not, you create the account: the
+  email, which you can still correct there (a changed email is checked again, and if it turns out
+  to have an account you're asked to confirm adding that person instead), name, username
+  (suggested from the name; you're told if it's taken), and a temporary password, generated for
+  you, which you can replace. Once it's
   saved, the password is shown once: copy it and give it to the person, who must change it when
   they first sign in. From a row you can **Change role** (stepping down yourself included) and
   **Remove from staff**, which by default also removes them from the workspace's projects; clear
@@ -180,9 +188,10 @@ its **Actions for …** menu, which lists only what you may do to that person.
 - **Organizations** lists the workspace's organizations. **Create organization** asks for its
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
   existing person, or a new account with a temporary password, shown once.
-- **Users** lists everyone in the workspace. **Role** shows **System admin** for system admins
-  (granted outside the app, so you can read it but not change it), and **User** for everyone
-  else; **Status** shows **Active** or **Deactivated**.
+- **Users** lists everyone in the workspace. **Role** shows their workspace role (**Owner**,
+  **Admin**, or **Member**), or **User** if they have none, with a **System admin** badge for
+  system admins (granted outside the app, so you can read it but not change it); **Status** shows
+  **Active** or **Deactivated**.
 - **Settings** renames the workspace and changes its slug (workspace owners and system admins).
 
 **Account actions.** Where your role covers someone (the rank rule: you can act on people at your

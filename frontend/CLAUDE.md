@@ -33,9 +33,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   `schema.d.ts` by hand.
 - **The server is authoritative.** The UI may hide actions a user can't take, but never assumes
   it's enforcing permissions. Don't duplicate business rules; e.g. rank is computed by the
-  server (send neighbor IDs, not rank values), and transitions are validated by the server. One
-  exception: the `PasswordRequirements` list checks the requirements the server publishes as the
-  user types (DL-91).
+  server (send neighbor IDs, not rank values), and transitions are validated by the server. Two
+  exceptions: the `PasswordRequirements` list checks the requirements the server publishes as the
+  user types (DL-91), and the add-person flow checks an email's shape before its user check
+  (`useFormErrors`' `invalidate`; UI-FRM-4, UI-FRM-13).
 - **Handle the error format** (`{code, message, details}`) consistently: 409 → prompt to
   reload; 404 → `NotFoundView` in place (see `ProjectHomeView`); 422 → field errors from `details.fields`
   (`loc`, `message`, `type` per field). Forms use `useFormErrors` for all of this. A 401 and a
@@ -148,11 +149,23 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A confirmation the client sends (`export_control_confirmed`) comes from the current server state
   as well as the box: a reload can take the box away while it's still ticked (DL-116; S1-C16c
   review).
+- A save that sends only the changed fields compares them with the values the form was filled
+  from, never with data loaded since (another section's save, a background reload, a `/me`
+  reload): a field the form still shows the old value of would undo the newer one (TD-56; S2-C0h
+  review).
+- State that outlives a step of a multi-step dialog (an edited username, a confirmation box) is
+  the dialog's, reset in `open()`, not a child's that a `v-if` unmounts; a confirmation is
+  cleared whenever the identity it confirms changes, the email included (UI-FRM-13, design-doc
+  §3.1; S2-C0h review).
 - A value a form keeps but doesn't render (project settings' `export_controlled`, DL-133) is sent
   from the latest server data on every save, never from the form: a reload that keeps what was
   typed would bring a stale one back, and no control could remove it (S2-C0d review).
 - A dialog's search or lookup that fails says so at its own field, not in the form's alert, whose
   Retry and dismiss belong to the submit (UI-FRM-7; S1-C16b review).
+- A PrimeVue list that can scroll (an `AutoComplete` opened on focus) scrolls its listbox, the
+  element the combobox controls (`scroll-height="none"`, and `pt.list`'s `max-h-56
+overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not PrimeVue's
+  unnamed container (S2-C0h e2e).
 - A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets
   `append-to="self"`: the page behind a `showModal()` dialog is inert, so an overlay appended to
   `<body>` can't be used (S1-C16b).

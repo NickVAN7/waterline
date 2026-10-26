@@ -85,7 +85,12 @@ const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 const loaded = computed(() => project.data.value)
 
+// The project the details form was filled from: a save sends what differs from it, never from a
+// project loaded since (another section's save, a background reload), whose newer values the form
+// doesn't show and would undo (TD-56).
+let detailsBase: Project | undefined
 function fillDetails(data: Project) {
+  detailsBase = data
   values.value = {
     name: data.name,
     description: data.description ?? '',
@@ -253,19 +258,27 @@ function saved(data: Project) {
 async function saveDetails(): Promise<void> {
   const current = loaded.value
   if (!current) return
+  const base = detailsBase ?? current
   await details.save({ name: values.value.name }, async () => {
+    // Only what changed since the project was read, so another admin's change stands (TD-56).
+    const next = {
+      name: values.value.name,
+      description: values.value.description || null,
+      type: values.value.type,
+      status: values.value.status,
+      lead_id: values.value.lead_id || null,
+    }
+    const body: components['schemas']['ProjectUpdate'] = {}
+    for (const field of Object.keys(next) as (keyof typeof next)[]) {
+      if (next[field] !== base[field]) Object.assign(body, { [field]: next[field] })
+    }
+    const modules = values.value.enabled_modules
+    const modulesChanged =
+      modules.length !== base.enabled_modules.length ||
+      modules.some((m) => !base.enabled_modules.includes(m))
+    if (guidance.value && modulesChanged) body.enabled_modules = modules
     const data = await api(
-      client.PATCH('/api/projects/{key}', {
-        params: { path: { key: current.key } },
-        body: {
-          name: values.value.name,
-          description: values.value.description || null,
-          type: values.value.type,
-          status: values.value.status,
-          lead_id: values.value.lead_id || null,
-          ...(guidance.value ? { enabled_modules: values.value.enabled_modules } : {}),
-        },
-      }),
+      client.PATCH('/api/projects/{key}', { params: { path: { key: current.key } }, body }),
     )
     saved(data)
     fillDetails(data)
@@ -341,6 +354,8 @@ async function toggleArchive(): Promise<void> {
       title: `Archive ${current.name}?`,
       text: "It becomes read-only for everyone until it's unarchived. Nothing is deleted.",
       button: 'Archive project',
+      // A destructive confirm uses the danger button (UI-FRM-14, DL-137).
+      variant: 'danger',
     }))
   )
     return
@@ -586,12 +601,16 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
             allows(loaded, 'project.unarchive') ||
             archiveErrors.alert.value
           "
-          aria-labelledby="project-archive-heading"
-          class="flex max-w-(--content-narrow) flex-col gap-4"
+          aria-labelledby="project-danger-heading"
+          class="flex max-w-(--content-narrow) flex-col gap-4 rounded-lg border border-tone-danger-edge p-4"
         >
-          <h2 id="project-archive-heading" class="m-0 text-xl font-semibold">
-            {{ loaded.archived ? 'Unarchive' : 'Archive' }}
+          <!-- Archiving sits apart, in a Danger zone (UI-FRM-14, DL-137). -->
+          <h2 id="project-danger-heading" class="m-0 text-xl font-semibold text-danger">
+            Danger zone
           </h2>
+          <h3 id="project-archive-heading" class="m-0 text-lg font-semibold">
+            {{ loaded.archived ? 'Unarchive' : 'Archive' }}
+          </h3>
           <FormAlert
             v-if="archiveErrors.alert.value"
             :key="archiveErrors.alertKey.value"

@@ -6886,6 +6886,16 @@
             "type": "boolean",
             "title": "Is System Admin"
           },
+          "workspace_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "allowed_actions": {
             "items": {
               "$ref": "#/components/schemas/Action"
@@ -6902,6 +6912,7 @@
           "name",
           "is_active",
           "is_system_admin",
+          "workspace_role",
           "allowed_actions"
         ],
         "title": "UserRow",

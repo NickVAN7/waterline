@@ -160,14 +160,8 @@ describe('ProjectSettingsView', () => {
     await wrapper.get('#project-settings-status').setValue('on_hold')
     await submitForm(wrapper, 0)
 
-    expect(body(patch)).toEqual({
-      name: 'Billing',
-      description: null,
-      type: 'software',
-      status: 'on_hold',
-      lead_id: LEAD,
-      enabled_modules: ['sprints'],
-    })
+    // Only what changed, so another admin's change to the rest stands (TD-56).
+    expect(body(patch)).toEqual({ name: 'Billing', status: 'on_hold' })
     expect(wrapper.text()).toContain('Settings saved.')
     expect(wrapper.get('h1').text()).toBe('Billing settings')
     expect(useCurrentOrgStore().project?.name).toBe('Billing')
@@ -275,6 +269,33 @@ describe('ProjectSettingsView', () => {
       wrapper.get<HTMLInputElement>('input[type=checkbox][value=github]').element.disabled,
     ).toBe(false)
     await expectNoA11yViolations(wrapper)
+  })
+
+  it('sends the modules only when they changed, and then alone (TD-56)', async () => {
+    const { wrapper } = await mountAt(
+      project({ enabled_modules: ['sprints'], allowed_actions: ADMIN }),
+    )
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok(project()))
+
+    await wrapper.get('input[type=checkbox][value=sprints]').setValue(false)
+    await submitForm(wrapper, 0)
+
+    expect(body(patch)).toEqual({ enabled_modules: [] })
+  })
+
+  it("sends no field another section's save brought in, only what was typed (TD-56)", async () => {
+    const shown = project({ status: 'active', allowed_actions: ADMIN })
+    const { wrapper } = await mountAt(shown)
+    // Another admin put it on hold meanwhile; the restriction save's answer carries that.
+    vi.spyOn(client, 'PUT').mockResolvedValue(ok({ ...shown, status: 'on_hold' }))
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok(shown))
+    await wrapper.get('input[type=radio][value=confidential]').setValue(true)
+    await submitForm(wrapper, 1)
+
+    await wrapper.get('#project-settings-name').setValue('Billing')
+    await submitForm(wrapper, 0)
+
+    expect(body(patch)).toEqual({ name: 'Billing' })
   })
 
   it('warns about no module that was off, or an unrecommended one without data', async () => {
@@ -424,6 +445,24 @@ describe('ProjectSettingsView', () => {
     expect(wrapper.text()).toContain('This project is archived. It is read-only.')
     expect(archive.text()).toBe('Unarchive project')
     expect(document.activeElement).toBe(archive.element)
+  })
+
+  it('puts archiving in a Danger zone, its confirm on the danger button (UI-FRM-14, DL-137)', async () => {
+    const { wrapper } = await mountAt(
+      project({ allowed_actions: ['project.view', 'project.archive'] }),
+    )
+
+    const zone = wrapper.get('section[aria-labelledby=project-danger-heading]')
+    expect(zone.get('h2').text()).toBe('Danger zone')
+    expect(zone.get('h3').text()).toBe('Archive')
+    expect(zone.classes()).toContain('border-tone-danger-edge')
+    const archive = button(wrapper, 'Archive project')
+    await archive.element.closest('form')!.dispatchEvent(new Event('submit'))
+    await flushPromises()
+    const confirm = openDialog(wrapper)!
+    const confirmButton = confirm.findAll('button').find((b) => b.text() === 'Archive project')!
+    expect(confirmButton.classes()).toContain('bg-danger')
+    await expectNoA11yViolations(wrapper)
   })
 
   it('unarchives without asking', async () => {

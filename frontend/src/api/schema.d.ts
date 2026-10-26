@@ -1797,6 +1797,7 @@ export interface components {
             is_active: boolean;
             /** Is System Admin */
             is_system_admin: boolean;
+            workspace_role: components["schemas"]["WorkspaceRole"] | null;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };

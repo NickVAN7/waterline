@@ -34,7 +34,7 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.user import UserRepository
 from app.repositories.workspace import WorkspaceRepository
-from app.rules.account_rank import Account, covering_orgs
+from app.rules.account_rank import Account, WorkspaceRoleHeld, covering_orgs
 from app.rules.identifiers import (
     SLUG_MAX,
     SLUG_MIN,
@@ -383,6 +383,12 @@ class UserService:
     def row(self, ctx: AuthzContext, subject: AccountSubject) -> UserRow:
         """A users-list row, with the account actions the caller may take on the user."""
         user = subject.user
+        # The staff role, from the memberships the rank rule already loaded (DL-183).
+        staff = (
+            held.role
+            for held in subject.account.memberships
+            if isinstance(held, WorkspaceRoleHeld) and held.workspace_id == subject.workspace_id
+        )
         return UserRow(
             id=user.id,
             email=user.email,
@@ -390,6 +396,7 @@ class UserService:
             name=user.name,
             is_active=user.is_active,
             is_system_admin=user.is_system_admin,
+            workspace_role=next(staff, None),
             allowed_actions=allowed_actions(
                 ctx, user_target(subject.workspace_id, user.id, subject.account)
             ),
