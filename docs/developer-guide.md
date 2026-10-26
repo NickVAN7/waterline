@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C0j (Users list's Role) built; next is S2-C1 (history: `docs/reviews/`).
+> **Status:** S2-C1 (Models & migration) built; next is S2-C2 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -252,9 +252,11 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   and 404 `not_found` when it's gone: deleted, or soft-deleted since this request loaded it (a
   row already soft-deleted when loaded, e.g. one being restored, isn't gone). On a
   non-versioned table a stale row can only mean it's gone. On a versioned table SQLAlchemy
-  can't tell the two apart, so `get_session` checks: a `before_flush` hook records the
-  versioned rows each flush writes (and whether each was soft-deleted when loaded), and after
-  the rollback it looks them up. `direct_update` returning `None` means the
+  can't tell the two apart, so `get_session` decides, in one place (`stale_row_error`): a
+  `before_flush` hook records the versioned rows each flush writes (and whether each was
+  soft-deleted when loaded), and after the rollback it looks them up, then raises
+  `StaleRowError` (409) or `NotFoundError` (404). A `StaleDataError` raised outside a
+  `SessionDep` request has no handler: it's a 500. `direct_update` returning `None` means the
   row is gone too: raise `NotFoundError`. An error whose table can't be read stays 409 (the
   conservative answer; a test using SQLAlchemy's real wording fails if the wording changes).
 - Document an endpoint's error statuses with `responses=ERRORS` (`app/routers/deps.py`: 401,
@@ -593,7 +595,7 @@ class Task(VersionMixin, SoftDeleteMixin, BaseModel): ...
 Every ORM update checks and increments `version`. Update schemas carry the version the client
 loaded, and the service calls `check_version(task, payload.version)` before changing anything;
 the ORM's own check then catches a write between this request's load and its commit. Both raise
-`StaleDataError`, which the API returns as **409** `{"code": "stale_version", ...}` (see
+`StaleDataError`, which `get_session` turns into **409** `{"code": "stale_version", ...}` (see
 "Errors" in section 4); the UI prompts a reload.
 
 **Direct updates** (`app/repositories/base.py`). Rank moves and counters use `direct_update`,

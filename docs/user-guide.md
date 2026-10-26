@@ -205,7 +205,7 @@ and is offered **Reactivate** instead. The last active owner, or the last system
 deactivated.
 
 **Access review.** A person's row offers **Access review** to those who may see it: their
-workspace role as the users list shows it (**None** with neither), then every organization and
+**Role** as the users list shows it (**None** with neither), then every organization and
 project they can reach, why (their role, or a role above it), and, for each
 export-controlled project, whether they reach its content or only its management (the **Access**
 column shows only when one of their projects is export-controlled).

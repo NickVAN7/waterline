@@ -114,7 +114,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 - A model that defines `__mapper_args__` must merge `TimestampMixin.__mapper_args__`
   (`{**TimestampMixin.__mapper_args__, ...}`); replacing it drops `eager_defaults`.
 - Leave constraint `name=` off (the naming convention names them), except a short name for
-  CHECK constraints. Import every model module in `app/models/__init__.py`.
+  CHECK constraints, and a name the convention would make longer than Postgres's 63
+  characters (a test fails on one). Import every model module in `app/models/__init__.py`.
 - A new parent and child added without a `relationship()` between them: flush the parent first.
 - Mixins: `SoftDeleteMixin` for `deleted_at`, `VersionMixin` for `version` — listed **before**
   `BaseModel` (`class Task(VersionMixin, SoftDeleteMixin, BaseModel)`). Enum columns use

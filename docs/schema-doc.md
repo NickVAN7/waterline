@@ -936,6 +936,8 @@ current status; `ix_test_result_assignee_id_status` on `(assignee_id, status)` f
 | created_at / updated_at | timestamptz | |
 
 `CHECK (entity_type <> 'requirement' OR requirement_revision_id IS NOT NULL)`.
+The `requirement_revision_id` foreign key is named `fk_approval_request_requirement_revision_id`:
+the convention's name is over Postgres's 63-character limit.
 Partial unique index: `UNIQUE(entity_type, entity_id) WHERE status = 'pending'` — one pending
 request per entity.
 Index `(entity_type, entity_id, created_at)`; index `(project_id, status)`: a project's pending

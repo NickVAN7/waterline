@@ -2,13 +2,12 @@
 foundations").
 
 Services and repositories raise an `AppError` subclass; the handlers registered here turn it,
-FastAPI's request validation errors, Starlette's own HTTP errors (unknown route, wrong method),
-and SQLAlchemy's stale-row errors into that shape; anything else becomes a 500 in the same shape.
+FastAPI's request validation errors, and Starlette's own HTTP errors (unknown route, wrong
+method) into that shape; anything else becomes a 500 in the same shape.
 Clients branch on `code`, never on `message`.
 """
 
 import logging
-import re
 from dataclasses import dataclass
 from typing import Any, ClassVar, Self, cast
 
@@ -18,11 +17,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm.exc import StaleDataError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-
-from app.core.base_model import StaleVersionError, VersionMixin
 
 logger = logging.getLogger(__name__)
 
@@ -141,42 +137,15 @@ class ServiceUnavailableError(AppError):
     message = "The service is temporarily unavailable."
 
 
-# --- Stale rows: 409 for a version conflict, 404 for a row that's gone -------------------------
-
-STALE_VERSION_MESSAGE = (
-    "This item was changed by someone else after you loaded it. Reload it and try again."
-)
-
-# SQLAlchemy's wording when an UPDATE or DELETE by primary key matches fewer rows than expected.
-_STALE_TABLE = re.compile(r"^(?:UPDATE|DELETE) statement on table '([^']+)' expected to")
+# --- Stale rows: 409 for a version conflict, 404 for a row that's gone (decided in get_session) --
 
 
-def stale_table(exc: StaleDataError) -> str | None:
-    """The table named in SQLAlchemy's stale-row error, or None if the wording can't be read."""
-    match = _STALE_TABLE.match(str(exc))
-    return match.group(1) if match else None
+class StaleRowError(AppError):
+    """Someone else saved the item after this client loaded it."""
 
-
-def versioned_class_for(table: str) -> type[VersionMixin] | None:
-    """The `VersionMixin` model mapped to `table`, if any."""
-    pending: list[type] = [VersionMixin]
-    while pending:
-        cls = pending.pop()
-        pending.extend(cls.__subclasses__())
-        mapped = getattr(cls, "__table__", None)
-        if mapped is not None and mapped.name == table:
-            return cls
-    return None
-
-
-def is_version_conflict(exc: StaleDataError) -> bool:
-    """True when the stale row is on a versioned table (someone saved it after this client
-    loaded it); False when a non-versioned row matched nothing, i.e. it's gone (e.g. hard-deleted
-    meanwhile). An error whose table can't be read is treated as a version conflict."""
-    if isinstance(exc, StaleVersionError):
-        return True
-    table = stale_table(exc)
-    return table is None or versioned_class_for(table) is not None
+    status_code = status.HTTP_409_CONFLICT
+    code = "stale_version"
+    message = "This item was changed by someone else after you loaded it. Reload it and try again."
 
 
 # --- Handlers ---------------------------------------------------------------------------------
@@ -184,13 +153,6 @@ def is_version_conflict(exc: StaleDataError) -> bool:
 
 async def app_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     return app_error_handler_response(cast(AppError, exc))  # registered for AppError only
-
-
-async def stale_data_handler(_request: Request, exc: Exception) -> JSONResponse:
-    exc = cast(StaleDataError, exc)
-    if is_version_conflict(exc):
-        return error_response(status.HTTP_409_CONFLICT, "stale_version", STALE_VERSION_MESSAGE)
-    return error_response(status.HTTP_404_NOT_FOUND, NotFoundError.code, NotFoundError.message)
 
 
 def violated_constraint(exc: IntegrityError) -> str | None:
@@ -294,7 +256,6 @@ class UnhandledErrorMiddleware:
 
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
-    app.add_exception_handler(StaleDataError, stale_data_handler)
     app.add_exception_handler(IntegrityError, integrity_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)

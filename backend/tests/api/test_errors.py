@@ -11,11 +11,14 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from httpx import AsyncClient
 from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.base_model import check_version
 from app.core.db import SessionDep, SessionMaker
 from app.core.errors import ForbiddenError, NotFoundError, register_error_handlers
+from app.models.requirement import Requirement
+from tests.factories.requirement import RequirementFactory
 from tests.support.api import api_client
 from tests.support.models import Document, Widget
 
@@ -269,3 +272,32 @@ async def test_exception_after_the_response_started_is_reraised_not_replaced(
     # The 200 and first chunk are already sent; a 500 body can't follow them.
     with pytest.raises(RuntimeError, match="failed after the response started"):
         await client.get("/boom-mid-stream")
+
+
+async def test_stale_requirement_save_is_409_and_changes_nothing(
+    sessionmaker: SessionMaker, session: AsyncSession
+) -> None:
+    """The first real versioned table (S2-C0a finding 7, DL-170): `get_session` decides the 409."""
+    requirement = await RequirementFactory.create_async(title="original")
+    app = FastAPI()
+    app.state.sessionmaker = sessionmaker
+    register_error_handlers(app)
+
+    @app.put("/requirements/{requirement_id}")
+    async def retitle_while_someone_else_saves(
+        requirement_id: uuid.UUID, request_session: SessionDep
+    ) -> None:
+        loaded = await request_session.get_one(Requirement, requirement_id)
+        await request_session.execute(
+            text("UPDATE requirement SET version = version + 1 WHERE id = :id"),
+            {"id": requirement_id},
+        )
+        loaded.title = "lost update"
+        await request_session.flush()
+
+    async with api_client(app) as c:
+        response = await c.put(f"/requirements/{requirement.id}")
+
+    assert (response.status_code, response.json()) == (409, STALE)
+    stored = await session.scalar(select(Requirement.title).where(Requirement.id == requirement.id))
+    assert stored == "original"

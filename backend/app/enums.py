@@ -133,3 +133,97 @@ class AuditEntityType(StrEnum):
     ORGANIZATION = "organization"
     PROJECT = "project"
     USER = "user"
+
+
+# --- Requirements (design-doc §6; schema-doc "Requirements") ----------------------------------
+
+
+class RequirementStatus(StrEnum):
+    DRAFT = "draft"
+    APPROVED = "approved"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+    REJECTED = "rejected"
+    DEFERRED = "deferred"
+
+
+class Priority(StrEnum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+# --- Approvals (design-doc §6.2; schema-doc "Approvals") --------------------------------------
+
+
+class ApprovalEntityType(StrEnum):
+    REQUIREMENT = "requirement"
+    MILESTONE = "milestone"
+    TEST_RUN = "test_run"
+
+
+class ApprovalRequestStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+
+class ApprovalDecision(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    REPLACED = "replaced"
+
+
+# --- Change log (design-doc §10; schema-doc `activity_log`) -----------------------------------
+
+
+class ActivityEntityType(StrEnum):
+    REQUIREMENT = "requirement"
+    TASK = "task"
+    TESTCASE = "testcase"
+    PHASE = "phase"
+    MILESTONE = "milestone"
+    APPROVAL_REQUEST = "approval_request"
+    TEST_RESULT = "test_result"
+    PROJECT = "project"
+
+
+class ActivityAction(StrEnum):
+    CREATED = "created"
+    UPDATED = "updated"
+    DELETED = "deleted"
+    RESTORED = "restored"
+    LINKED = "linked"
+    UNLINKED = "unlinked"
+
+
+class ActivityField(StrEnum):
+    STATUS = "status"
+    ASSIGNEE_ID = "assignee_id"
+    REPORTER_ID = "reporter_id"
+    REVIEWER_ID = "reviewer_id"
+    SPRINT_ID = "sprint_id"
+    MILESTONE_ID = "milestone_id"
+    PHASE_ID = "phase_id"
+    WORKSTREAM_ID = "workstream_id"
+    PRIORITY = "priority"
+    SEVERITY = "severity"
+    START_DATE = "start_date"
+    END_DATE = "end_date"
+    DUE_DATE = "due_date"
+    TARGET_DATE = "target_date"
+    BASELINE_START = "baseline_start"
+    BASELINE_END = "baseline_end"
+    BASELINE_DATE = "baseline_date"
+    REQUIREMENT_ID = "requirement_id"
+    PARENT_REQUIREMENT_ID = "parent_requirement_id"
+    TIME_ESTIMATE = "time_estimate"
+    APPROVED_REVISION_ID = "approved_revision_id"
+    APPROVER_ID = "approver_id"
+    RESTRICTION_LEVEL = "restriction_level"
+    RESTRICTION_CATEGORIES = "restriction_categories"
+    LEAD_ID = "lead_id"
+    ACTUAL_RESULT = "actual_result"

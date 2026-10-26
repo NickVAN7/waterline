@@ -74,7 +74,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
           <dd class="m-0">{{ data.user.email }}</dd>
           <dt class="font-medium">Username</dt>
           <dd class="m-0 font-mono">{{ data.user.username }}</dd>
-          <dt class="font-medium">Workspace role</dt>
+          <dt class="font-medium">Role</dt>
           <dd class="m-0">
             {{ workspaceRoleText(data.user.workspace_role, data.user.is_system_admin, NO_ROLE) }}
           </dd>
