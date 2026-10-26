@@ -244,7 +244,7 @@ Entry format:
 - **Added:** S1-C1 (security review of the append-only follow-up)
 - **What:** The app and Alembic use the same database URL, so the running app is the owner of
   every table (in Compose, `POSTGRES_USER`, a superuser). The `audit_event` append-only trigger
-  stops ordinary `UPDATE` and `DELETE`, but SQL on the app's own connection could disable or
+  (and, from S2-C3, `activity_log`'s, DL-193) stops ordinary `UPDATE` and `DELETE`, but SQL on the app's own connection could disable or
   drop the trigger first (or `TRUNCATE` the table), so the guard doesn't hold against, say, an
   injection.
 - **Why:** v1 runs locally for a few users; splitting roles needs deployment-time setup
@@ -252,7 +252,7 @@ Entry format:
 - **Fix by:** Slice 7 (before the first non-local deployment, with TD-14; re-target if
   deployment moves later): migrations run as the owner, the app as a role with only data rights
   on the app's tables (no `ALTER`, `DROP`, or `TRUNCATE`), with a test that the app's role can't
-  disable the trigger.
+  disable the triggers.
 - **Status:** open
 
 ### TD-18: No property-based test for number allocation yet

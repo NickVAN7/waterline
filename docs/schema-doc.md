@@ -991,6 +991,9 @@ Indexes: `(entity_type, entity_id, id)` for item history; `(project_id, id)` for
 feed. Feeds page by `id` (UUIDv7, increasing in creation order), not by `changed_at`, which is
 the transaction's start time and so ties for every entry one request writes; `changed_at` is
 for display (build plan, "API conventions"; owner decision, Oct 6, 2026).
+Append-only, enforced in the database (DL-193): the trigger `tr_activity_log_append_only`
+(function `activity_log_append_only()`) rejects every `UPDATE` and `DELETE`, as `audit_event`'s
+does (below), with the same limits.
 **Write path:** only via `log_change(...)`, in the same transaction as the change (design-doc
 §10).
 

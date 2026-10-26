@@ -2427,3 +2427,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** schema-doc (`requirement`, `approval_request`); build plan (S2-C1)
 - **Source:** owner, Oct 26, 2026 (asked at the start of S2-C1, DL-37;
   `docs/reviews/design-changes/DC-2026-10-26e-requirement-approval-indexes.md`)
+
+### DL-193: `activity_log` is append-only in the database
+- **Date:** 2026-10-26
+- **Decision:** A trigger rejects every `UPDATE` and `DELETE` on `activity_log`, a copy of
+  `audit_event`'s (`tr_activity_log_append_only`, function `activity_log_append_only()`), since
+  the change log is the record behind sign-offs. Built in S2-C3 with `log_change()`: a migration
+  and a test. TD-17's runtime role covers both triggers.
+- **Supersedes:** none (`activity_log` was append-only by convention only)
+- **Superseded by:** none
+- **Applies to:** design-doc §4, §10; schema-doc (`activity_log`); build plan (S2-C3, "Change
+  log"); TD-17
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C1.md`, open question 1)

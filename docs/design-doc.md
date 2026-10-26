@@ -635,8 +635,8 @@ Workspace (the firm: tenant boundary)
   - Local HTTPS for the dev server, and end-to-end tests beyond Chromium.
   - A screen for the admin audit events (§10.1).
   - Separate database roles: migrations run as the owner; the app runs as a role with only data
-    rights (no `ALTER`, `DROP`, or `TRUNCATE`), so the `audit_event` append-only trigger can't
-    be disabled from the app's own connection (§10.1).
+    rights (no `ALTER`, `DROP`, or `TRUNCATE`), so the `audit_event` and `activity_log`
+    append-only triggers can't be disabled from the app's own connection (§10, §10.1).
   - General API rate limiting, beyond sign-in throttling: per IP at the reverse proxy, and per
     user in the app for expensive endpoints (search, exports, later AI features). A limited
     request gets 429 with a `Retry-After` header and the standard error body (code
@@ -1272,6 +1272,8 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
     directly. Endpoints pass enum members; the helper serializes them.
   - `log_change()` does **not** commit; it adds the row to the request's session, so the change
     and its log entry commit (or roll back) together.
+  - Append-only, in the database (DL-193): a trigger rejects every `UPDATE` and `DELETE` on
+    `activity_log`, as on `audit_event` (§10.1), since the log is the record behind sign-offs.
 - Content history for requirements lives in `requirement_revision`, not the log (§6.1).
   Approval decisions live in the `approval` rows (§6.2); their effect on a requirement is logged
   through `approved_revision_id`.
