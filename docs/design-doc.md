@@ -807,7 +807,8 @@ no schema change.
   management only.
 - **Per person:** every org and project the person can reach, and through what (the same
   reasons). Each project says whether it's export-controlled, and only those rows show content
-  or management access (DL-177, as the per-project view does, DL-133).
+  or management access (DL-177, as the per-project view does, DL-133); the others' blank cell
+  says "Not export-controlled" to a screen reader (DL-184).
 - Both views are **management** actions (like the members list, §3.1), so inherited admins
   open them on an export-controlled project too.
 - **Who opens them** (owner decision, Oct 7, 2026): the per-project view, project admins

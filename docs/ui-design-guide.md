@@ -713,7 +713,8 @@ render inside the full shell when signed in.
   level and no categories has none), never color alone. The badge starts with a visually hidden
   "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A "Deactivated" neutral badge follows a deactivated
   user's name everywhere it appears, except the workspace users list, where it is in the Status
-  column (DL-137, from S2-C0g).
+  column (DL-137, from S2-C0g), and whose Role column shows the workspace role beside the
+  "System admin" badge (DL-183, from S2-C0h).
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
 - **UI-FBK-8** **Empty states** distinguish two cases. *Nothing exists yet:* a heading ("No members

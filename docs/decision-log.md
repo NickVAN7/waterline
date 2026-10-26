@@ -2318,3 +2318,23 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan ("Hidden rows", the org projects API, S2-C0g)
 - **Source:** owner, Oct 23, 2026 (`docs/reviews/design-changes/DC-2026-10-23b-archived-only-filter.md`,
   decision 1, option (a))
+
+### DL-183: The workspace users list's Role shows the workspace role
+- **Date:** 2026-10-25
+- **Decision:** The workspace users list's Role column shows each person's workspace (staff) role,
+  Owner, Admin, or Member, or "User" with none, plus the "System admin" badge for a system admin;
+  each user row carries `workspace_role`. Built in S2-C0h, with API tests and `wl gen-client`.
+- **Supersedes:** none (S2-C0g built Role as "System admin" or "User", DL-137)
+- **Superseded by:** none
+- **Applies to:** build plan (the account API's users list, S2-C0h); ui-design-guide UI-FBK-6
+- **Source:** owner, Oct 25, 2026 (`docs/reviews/s2/S2-C0g.md`, open question 1)
+
+### DL-184: A blank Access cell says why to a screen reader
+- **Date:** 2026-10-25
+- **Decision:** In the per-person access review, a project row that isn't export-controlled,
+  whose Access cell is blank (DL-177), holds a visually hidden "Not export-controlled". Built in
+  S2-C0h.
+- **Supersedes:** none (adds to DL-177)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("Access review"); build plan (S2-C0h)
+- **Source:** owner, Oct 25, 2026 (`docs/reviews/s2/S2-C0g.md`, open question 2)
