@@ -2414,3 +2414,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C1)
 - **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0j.md`, open question 1)
+
+### DL-192: Indexes on `requirement.parent_requirement_id` and `approval_request (project_id, status)`
+- **Date:** 2026-10-26
+- **Decision:** `requirement.parent_requirement_id` gets an index: a move, a delete (promote or
+  delete the children), and a restore look rows up by it, so they don't rely on the project
+  filter and the 2,000 cap to stay cheap. `approval_request` gets an index on
+  `(project_id, status)`: approver replacement when a project is marked export-controlled
+  (S2-C12) finds the project's pending requests, and requests are never deleted (DL-37).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** schema-doc (`requirement`, `approval_request`); build plan (S2-C1)
+- **Source:** owner, Oct 26, 2026 (asked at the start of S2-C1, DL-37;
+  `docs/reviews/design-changes/DC-2026-10-26e-requirement-approval-indexes.md`)

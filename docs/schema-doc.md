@@ -706,6 +706,8 @@ logged.
 
 `UNIQUE(project_id, number)`.
 `CHECK (restriction_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
+Index `(parent_requirement_id)`: a requirement's children, for a move, a delete, and a restore
+(DL-192).
 "Changed since approval" is derived: `approved_revision_id IS NOT NULL AND approved_revision_id
 <> current_revision_id`.
 `current_revision_id` and `approved_revision_id` → `requirement_revision`, which references
@@ -936,7 +938,8 @@ current status; `ix_test_result_assignee_id_status` on `(assignee_id, status)` f
 `CHECK (entity_type <> 'requirement' OR requirement_revision_id IS NOT NULL)`.
 Partial unique index: `UNIQUE(entity_type, entity_id) WHERE status = 'pending'` — one pending
 request per entity.
-Index `(entity_type, entity_id, created_at)`. Never deleted; cancelled instead (including when a
+Index `(entity_type, entity_id, created_at)`; index `(project_id, status)`: a project's pending
+requests (DL-192). Never deleted; cancelled instead (including when a
 project admin approves the requirement by hand, design-doc §6.2).
 **Policy (v1):** `replaced` rows don't count: approved when every other `approval` row is
 approved; rejected on the first rejection. A replacement that leaves every counted row approved
