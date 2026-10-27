@@ -836,3 +836,36 @@ Entry format:
   own Role and Status values are in `labels.ts`.
 - **Fix by:** S2-C22 (the tech-debt review)
 - **Status:** open
+
+### TD-67: A drop between two tied ranks has no rank to take
+- **Added:** S2-C2 (spec-test-writer question)
+- **What:** two items can share a rank after simultaneous drops (design-doc §6, "Ties"), and
+  `rules/rank.py` raises `ValueError` for equal neighbors, since no rank sorts between them. A
+  move between two tied items would be a 500 until the endpoint handles it.
+- **Why:** the rule can't decide it alone; the move endpoint loads the neighbors and is built in
+  S2-C7.
+- **Fix by:** S2-C7 (the move endpoint decides what a drop between tied neighbors does)
+- **Status:** open
+
+### TD-68: mutmut segfaults on one shape of `rules/rank.py`
+- **Added:** S2-C2
+- **What:** with mutmut 3.8.0 on Python 3.14.4, `wl backend mutate` crashed with a segmentation
+  fault (exit 139, inside mutmut's trampoline reading `os.environ`, with `setproctitle` loaded)
+  every time `rank_between` unpacked `_split(after)` into two names; calling `_split(after)`
+  twice, as the module does now, passes. The crash is in the tool, not the code under test.
+- **Why:** not worth chasing inside a checkpoint; the gate passes on the committed code.
+- **Fix by:** S2-C22 (the tech-debt review): retry on the then-current mutmut, and report it
+  upstream if it still crashes
+- **Status:** open
+
+### TD-69: Ranks have no maximum length
+- **Added:** S2-C2 (security-reviewer finding 1)
+- **What:** drops into one gap lengthen a rank about one character every six moves (10,000
+  drops just after one rank: about 1,700 characters), and nothing rebalances in v1 (design-doc
+  §6). Past about 2,700 bytes Postgres refuses the btree entry for `task`'s
+  `(project_id, status, rank)` index, so a scripted run of drops would make further drops into
+  that gap fail. `rules/rank.py` no longer crashes on long ranks (a loop, not recursion).
+- **Why:** a limit, and what a drop does when it's reached (a 4xx, or rewriting that gap's
+  ranks), is the owner's decision, and only the move endpoint can act on it.
+- **Fix by:** S2-C7 (the move endpoint; the owner decides the limit before it starts)
+- **Status:** open

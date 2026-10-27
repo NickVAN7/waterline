@@ -70,6 +70,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   or staff may join a project) holds that row `FOR SHARE` until commit, taken before the
   target's lock, with a race test against the change that removes it (S1-C12 review: three
   passes found an add slipping past a removal "with their projects").
+- **No recursion that deepens with input length** (a string a user can lengthen, a tree a
+  user can deepen): Python stops at about 1,000 levels, so a long enough input is a 500. Use a
+  loop (S2-C2 security review: the rank midpoint).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
 - **`app/authz/` never queries.** It decides from the `AuthzContext` and the `Target`; loading

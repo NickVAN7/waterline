@@ -1093,6 +1093,15 @@ requirement approval.
 - **Mechanics:**
   - **The server computes rank.** The client sends the neighbors ("after X, before Y" as IDs);
     the server derives the new fractional-index value. Clients never write rank strings.
+  - **Rank strings** (`rules/rank.py`) use only digits and lowercase letters, the characters
+    the database's `en_US.utf8` collation sorts in the same order as Python's string
+    comparison (it doesn't for mixed case: `'aB' < 'ab'` is false in the database). A rank sorts
+    strictly between its neighbors; with no neighbor on one side it sorts before or after the
+    other, and with neither it's the first rank. Ranks stay short however many items are added
+    at the top or bottom: 10,000 in a row stay under 10 characters. Neighbors that aren't in
+    strictly increasing order, equal ones included, raise `ValueError`: no rank sorts between
+    two equal ones. Equal neighbors can happen after a tie (below), so the move endpoint
+    handles that case (TD-67); any other out-of-order pair is a programming error.
   - **Rank writes bypass optimistic locking.** Rank is updated with a direct `UPDATE` that does
     not bump `version`, so reordering never causes a 409 for someone editing the item's content
     (same approach as the subtask counter, §3). A rank write also leaves `updated_at` alone: a
