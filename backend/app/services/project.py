@@ -12,6 +12,7 @@ from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.admin_event import JsonValue, apply_changes, change_details, log_admin_event
+from app.audit.change_log import log_change
 from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, ensure
 from app.authz.context import AuthzContext, ProjectAccess
@@ -20,6 +21,9 @@ from app.authz.target import Target, org_target, project_target
 from app.core.errors import FieldError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
 from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    ActivityField,
     AuditAction,
     AuditEntityType,
     OrgRole,
@@ -420,7 +424,32 @@ class ProjectService:
                 project,
                 details=change_details(_json(changed)),
             )
+            # The activity feed shows these two (design-doc §10); the rest are audit events only.
+            for field in (ActivityField.STATUS, ActivityField.LEAD_ID):
+                if field.value in changed:
+                    old, new = changed[field.value]
+                    self._log_change(project, field, ctx.user_id, old, new)
         return await self.read(ctx, project)
+
+    def _log_change(
+        self,
+        project: Project,
+        field: ActivityField,
+        actor_id: uuid.UUID,
+        old: object,
+        new: object,
+    ) -> None:
+        log_change(
+            self.session,
+            project_id=project.id,
+            entity_type=ActivityEntityType.PROJECT,
+            entity_id=project.id,
+            action=ActivityAction.UPDATED,
+            changed_by=actor_id,
+            field=field,
+            old=old,
+            new=new,
+        )
 
     async def _with_current_role(self, ctx: AuthzContext, project: Project) -> AuthzContext:
         """`ctx` with the caller's role on `project` read again, for a check made under the
@@ -687,6 +716,7 @@ class ProjectService:
         if project.lead_id == membership.user_id:
             project.lead_id = None
             details["lead_cleared"] = True
+            self._log_change(project, ActivityField.LEAD_ID, actor_id, membership.user_id, None)
         if via is not None:
             details["via"] = via.value
         await self.session.flush()

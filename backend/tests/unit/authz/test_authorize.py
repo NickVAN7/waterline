@@ -555,6 +555,7 @@ def test_allowed_actions_on_a_workspace_are_the_real_ones_allowed_sorted_by_name
                 "project.view",
                 "project.view_access",
                 "project_member.manage",
+                "requirement.view",
             ],
         ),
     ],

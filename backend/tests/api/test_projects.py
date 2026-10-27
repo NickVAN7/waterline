@@ -11,7 +11,15 @@ from sqlalchemy import Select, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.authz.scoping import Scope
-from app.enums import AuditAction, OrgRole, ProjectRole, WorkspaceRole
+from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    ActivityField,
+    AuditAction,
+    OrgRole,
+    ProjectRole,
+    WorkspaceRole,
+)
 from app.models.audit_event import AuditEvent
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
@@ -20,6 +28,7 @@ from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceMembershipFactory
+from tests.support.activity import activity
 from tests.support.authz import Tenancy, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.usefixtures("session")]
@@ -277,6 +286,18 @@ async def test_an_update_changes_and_records_the_fields_sent(
         },
         "new": {"name": "Payments 2", "status": "active", "type": "erp"},
     }
+    # Only status and lead go to the activity feed (design-doc §10); name and type don't.
+    assert await activity(session) == [
+        (
+            ActivityEntityType.PROJECT,
+            t.project.id,
+            ActivityAction.UPDATED,
+            ActivityField.STATUS,
+            "planning",
+            "active",
+            admin.id,
+        )
+    ]
 
 
 async def test_an_update_enabling_an_unshipped_module_is_refused(
@@ -302,10 +323,13 @@ async def test_an_update_that_changes_nothing_records_nothing(
 ) -> None:
     await admin_of_pmt(client, t)
 
-    response = await client.patch("/api/projects/PMT", json={"name": "Payments", "key": "NEW"})
+    response = await client.patch(
+        "/api/projects/PMT", json={"name": "Payments", "status": "planning", "key": "NEW"}
+    )
 
     assert (response.status_code, response.json()["key"]) == (200, "PMT")
     assert await events(session) == []
+    assert await activity(session) == []
 
 
 async def test_the_project_read_names_its_lead_and_none_without_one(
@@ -366,7 +390,7 @@ async def test_the_lead_must_be_a_project_member(
 async def test_a_member_becomes_lead_and_null_clears_the_lead(
     client: AsyncClient, session: AsyncSession, t: Tenancy
 ) -> None:
-    await admin_of_pmt(client, t)
+    admin = await admin_of_pmt(client, t)
     pia = await UserFactory.create_async(name="Pia Park")
     await ProjectMembershipFactory.create_async(project=t.project, user=pia)
 
@@ -380,6 +404,11 @@ async def test_a_member_becomes_lead_and_null_clears_the_lead(
     assert [details for *_, details in await events(session)] == [
         {"old": {"lead_id": None}, "new": {"lead_id": str(pia.id)}},
         {"old": {"lead_id": str(pia.id)}, "new": {"lead_id": None}},
+    ]
+    lead = (ActivityEntityType.PROJECT, t.project.id, ActivityAction.UPDATED, ActivityField.LEAD_ID)
+    assert await activity(session) == [
+        (*lead, None, str(pia.id), admin.id),
+        (*lead, str(pia.id), None, admin.id),
     ]
 
 

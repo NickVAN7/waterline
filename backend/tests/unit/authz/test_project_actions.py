@@ -239,6 +239,7 @@ INHERITED_ON_A_LIVE_PROJECT = [
     "project.view",
     "project.view_access",
     "project_member.manage",
+    "requirement.view",
 ]
 
 
@@ -259,10 +260,11 @@ INHERITED_ON_A_LIVE_PROJECT = [
                 "project.view",
                 "project.view_access",
                 "project_member.manage",
+                "requirement.view",
             ],
         ),
-        ("project_member", ["project.view"]),
-        ("project_viewer", ["project.view"]),
+        ("project_member", ["project.view", "requirement.view"]),
+        ("project_viewer", ["project.view", "requirement.view"]),
         ("org_member", []),
         ("other_project_admin", []),
         ("nobody", []),
@@ -275,11 +277,20 @@ def test_allowed_actions_on_a_project(persona: str, expected: list[str]) -> None
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("workspace_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("org_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("project_admin", ["project.view", "project.view_access"]),
-        ("project_viewer", ["project.view"]),
+        (
+            "system_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "workspace_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "org_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        ("project_admin", ["project.view", "project.view_access", "requirement.view"]),
+        ("project_viewer", ["project.view", "requirement.view"]),
         ("org_member", []),
     ],
 )

@@ -4758,6 +4758,119 @@
           }
         }
       }
+    },
+    "/api/projects/{key}/requirements/{number}/activity": {
+      "get": {
+        "tags": [
+          "activity"
+        ],
+        "summary": "Requirement Activity",
+        "description": "The requirement's history, newest first (`?before=` the previous page's `next_cursor`).",
+        "operationId": "requirement_activity_api_projects__key__requirements__number__activity_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `next_cursor` of the previous page",
+              "title": "Before"
+            },
+            "description": "The `next_cursor` of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed_ActivityEntry_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4891,10 +5004,200 @@
           "project_member.manage",
           "project.view_access",
           "project.raise_restriction",
-          "project.lower_restriction"
+          "project.lower_restriction",
+          "requirement.view"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
+      },
+      "ActivityAction": {
+        "type": "string",
+        "enum": [
+          "created",
+          "updated",
+          "deleted",
+          "restored",
+          "linked",
+          "unlinked"
+        ],
+        "title": "ActivityAction"
+      },
+      "ActivityEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ActivityAction"
+          },
+          "field_changed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityField"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "old_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value"
+          },
+          "new_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          },
+          "changed_by_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed By Id"
+          },
+          "changed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed By Name"
+          },
+          "changed_by_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed By Is Active"
+          },
+          "old_value_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value Name"
+          },
+          "old_value_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value Is Active"
+          },
+          "new_value_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value Name"
+          },
+          "new_value_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "field_changed",
+          "old_value",
+          "new_value",
+          "changed_at",
+          "changed_by_id",
+          "changed_by_name",
+          "changed_by_is_active",
+          "old_value_name",
+          "old_value_is_active",
+          "new_value_name",
+          "new_value_is_active"
+        ],
+        "title": "ActivityEntry",
+        "description": "One change, newest first in its feed. Names are resolved by the server at read time, so a\nformer member's name stays; `*_is_active` false shows the \"Deactivated\" badge. `changed_by_*`\nis null when an app CLI command made the change. `old_value_*` and `new_value_*` name the\nuser in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`),\nand are null for any other field."
+      },
+      "ActivityField": {
+        "type": "string",
+        "enum": [
+          "status",
+          "assignee_id",
+          "reporter_id",
+          "reviewer_id",
+          "sprint_id",
+          "milestone_id",
+          "phase_id",
+          "workstream_id",
+          "priority",
+          "severity",
+          "start_date",
+          "end_date",
+          "due_date",
+          "target_date",
+          "baseline_start",
+          "baseline_end",
+          "baseline_date",
+          "requirement_id",
+          "parent_requirement_id",
+          "time_estimate",
+          "approved_revision_id",
+          "approver_id",
+          "restriction_level",
+          "restriction_categories",
+          "lead_id",
+          "actual_result"
+        ],
+        "title": "ActivityField"
       },
       "ChangePasswordRequest": {
         "properties": {
@@ -4958,6 +5261,35 @@
         ],
         "title": "ErrorBody",
         "description": "The body of every error response. `details` depends on `code` (e.g. `fields` for\n`validation_error`)."
+      },
+      "Feed_ActivityEntry_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityEntry"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Feed[ActivityEntry]"
       },
       "HTTPValidationError": {
         "properties": {

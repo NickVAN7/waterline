@@ -51,6 +51,13 @@ class UserRepository:
     async def get(self, user_id: uuid.UUID) -> User | None:
         return await get_by_id(self.session, User, user_id)
 
+    async def get_many(self, user_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, User]:
+        """The users with these IDs, by ID (deactivated included)."""
+        if not user_ids:
+            return {}
+        users = await self.session.scalars(select(User).where(User.id.in_(user_ids)))
+        return {user.id: user for user in users}
+
     async def get_by_email(self, email: str) -> User | None:
         """The user with exactly this email; callers lowercase it first (emails are stored
         lowercase)."""

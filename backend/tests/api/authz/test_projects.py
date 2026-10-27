@@ -346,6 +346,7 @@ INHERITED_ON_A_LIVE_PROJECT = [
     "project.view",
     "project.view_access",
     "project_member.manage",
+    "requirement.view",
 ]
 
 
@@ -366,10 +367,11 @@ INHERITED_ON_A_LIVE_PROJECT = [
                 "project.view",
                 "project.view_access",
                 "project_member.manage",
+                "requirement.view",
             ],
         ),
-        ("project_member", ["project.view"]),
-        ("project_viewer", ["project.view"]),
+        ("project_member", ["project.view", "requirement.view"]),
+        ("project_viewer", ["project.view", "requirement.view"]),
     ],
 )
 async def test_the_project_is_returned_with_the_callers_actions(
@@ -402,11 +404,20 @@ async def test_the_project_is_404_to_whoever_cannot_see_it(client: AsyncClient, 
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
-        ("system_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("workspace_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("org_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("project_admin", ["project.view", "project.view_access"]),
-        ("project_viewer", ["project.view"]),
+        (
+            "system_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "workspace_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "org_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        ("project_admin", ["project.view", "project.view_access", "requirement.view"]),
+        ("project_viewer", ["project.view", "requirement.view"]),
     ],
 )
 async def test_an_archived_project_is_still_readable_with_only_unarchive_left(

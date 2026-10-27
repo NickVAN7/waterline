@@ -28,6 +28,7 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c13_actions() -> None:
         "project.view",
         "project.view_access",
         "project_member.manage",
+        "requirement.view",
         "user.check",
         "user.manage",
         "user.view_access",
@@ -61,6 +62,7 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c13_actions() -> None:
         ("project.unarchive", Level.PROJECT),
         ("project_member.manage", Level.PROJECT),
         ("project.view_access", Level.PROJECT),
+        ("requirement.view", Level.PROJECT),
     ],
 )
 def test_each_real_action_is_registered_at_its_level(action: str, level: Level) -> None:

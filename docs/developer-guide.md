@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C2 (Rank helper) built; next is S2-C3 (history: `docs/reviews/`).
+> **Status:** S2-C3 (Change log & item history) built; next is S2-C4 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -633,6 +633,16 @@ calls `log_admin_event(session, action=..., actor_id=..., workspace_id=..., ...)
 request. It adds the row to the session (no flush, no commit), so the event and the change
 commit together; the database refuses any later edit. `details` must never hold a password,
 hash, or token: a key that names one raises `SecretInDetailsError`.
+
+**Change log** (`app/audit/change_log.py`, design-doc §10): after changing an item, call
+`log_change(session, project_id=..., entity_type=..., entity_id=..., action=...,
+changed_by=..., field=..., old=..., new=...)` for each logged field (design-doc §10 lists them;
+`field` is required for `updated`). Pass enum members, IDs, and dates as they are: the helper
+stores them as text; for link events `old`/`new` are the other entity's ID. `changed_by` is None
+only when an app CLI command made the change, and `changed_at` is the database's. Like admin
+events, it adds the row without flushing or committing, and the database refuses any later edit
+or delete (DL-193). An item's history is read through `ActivityService` (names resolved at read
+time, DL-160).
 
 **Numbers** (`app/services/numbering.py`, design-doc §3): requirements, tasks, and test cases
 get their per-project number from `NumberingService(session).allocate_number(project,

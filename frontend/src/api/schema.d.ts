@@ -923,6 +923,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/requirements/{number}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Activity
+         * @description The requirement's history, newest first (`?before=` the previous page's `next_cursor`).
+         */
+        get: operations["requirement_activity_api_projects__key__requirements__number__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -976,7 +996,57 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view";
+        /**
+         * ActivityAction
+         * @enum {string}
+         */
+        ActivityAction: "created" | "updated" | "deleted" | "restored" | "linked" | "unlinked";
+        /**
+         * ActivityEntry
+         * @description One change, newest first in its feed. Names are resolved by the server at read time, so a
+         *     former member's name stays; `*_is_active` false shows the "Deactivated" badge. `changed_by_*`
+         *     is null when an app CLI command made the change. `old_value_*` and `new_value_*` name the
+         *     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`),
+         *     and are null for any other field.
+         */
+        ActivityEntry: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            action: components["schemas"]["ActivityAction"];
+            field_changed: components["schemas"]["ActivityField"] | null;
+            /** Old Value */
+            old_value: string | null;
+            /** New Value */
+            new_value: string | null;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Changed By Id */
+            changed_by_id: string | null;
+            /** Changed By Name */
+            changed_by_name: string | null;
+            /** Changed By Is Active */
+            changed_by_is_active: boolean | null;
+            /** Old Value Name */
+            old_value_name: string | null;
+            /** Old Value Is Active */
+            old_value_is_active: boolean | null;
+            /** New Value Name */
+            new_value_name: string | null;
+            /** New Value Is Active */
+            new_value_is_active: boolean | null;
+        };
+        /**
+         * ActivityField
+         * @enum {string}
+         */
+        ActivityField: "status" | "assignee_id" | "reporter_id" | "reviewer_id" | "sprint_id" | "milestone_id" | "phase_id" | "workstream_id" | "priority" | "severity" | "start_date" | "end_date" | "due_date" | "target_date" | "baseline_start" | "baseline_end" | "baseline_date" | "requirement_id" | "parent_requirement_id" | "time_estimate" | "approved_revision_id" | "approver_id" | "restriction_level" | "restriction_categories" | "lead_id" | "actual_result";
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -1008,6 +1078,13 @@ export interface components {
             details: {
                 [key: string]: unknown;
             };
+        };
+        /** Feed[ActivityEntry] */
+        Feed_ActivityEntry_: {
+            /** Items */
+            items: components["schemas"]["ActivityEntry"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -4915,6 +4992,69 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_activity_api_projects__key__requirements__number__activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_ActivityEntry_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
