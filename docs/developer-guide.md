@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C3 (Change log & item history) built; next is S2-C4 (history: `docs/reviews/`).
+> **Status:** S2-C4 (Content access) built; next is S2-C5 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -396,9 +396,12 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
   who can see the target, e.g. `org.view` for a project member with no org role), and a targeted
   `rule(ctx, target)` checked after the roles (e.g. `user.check`: an admin role anywhere in the
   target's workspace, DL-68). Each action is marked `access`, content or management (design-doc
-  §3.1; the default is content, the closed side, so every management action says so, and every
-  action so far does; the export-control gate that reads it comes in Slice 2), and `explicit_when_export_controlled` makes only the explicit project role
-  grant it on an export-controlled project (`project.lower_restriction`, DL-82). Real actions
+  §3.1; the default is content, the closed side, so every management action says so). The
+  export-control gate reads it: a content action on an export-controlled project needs an
+  explicit `project_membership`, whatever the user's admin level, and `ensure()` makes that
+  denial a 404; a personal action needs content access too.
+  `explicit_when_export_controlled` makes only the explicit project role grant it on an
+  export-controlled project (`project.lower_restriction`, DL-82). Real actions
   are members of
   `Action` (exported as an OpenAPI enum). An area registers its actions in its own checkpoint
   (DL-44); an unregistered action is denied. A project-level action normally sets
@@ -413,7 +416,8 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
   themselves, the workspace's owners/admins and system admins, and anyone with a membership of
   theirs in scope (`in_scope`, `app/rules/account_rank.py`); otherwise a 404.
 - **Checks:** `authorize(ctx, action, target)` → bool; `ensure(...)` raises 404 when the user
-  can't see the target, 403 when they can but may not act; `allowed_actions(ctx, target)` for a
+  can't see the target or, on an export-controlled project, its content without an explicit
+  membership, and 403 when they can but may not act; `allowed_actions(ctx, target)` for a
   single-entity read; `module_enabled(target, module)`.
 - **Endpoints on one entity** take `authorized(loader, action, module=...)`
   (`app/routers/deps.py`): `loader` is a dependency returning `(entity, target)` or None; the
@@ -421,9 +425,13 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
   module, then 403). `hide_denial=True` makes every denial a 404 (the access review).
 - **Lists** scope their query: `project_scope(ctx)` / `org_scope(ctx)` give the `Scope`, and
   `scope_clause(scope, id_column, workspace_column, org_column)` (`app/repositories/base.py`)
-  the `WHERE`.
+  the `WHERE`. A list of content across projects (My work's approvals) takes
+  `content_scope(ctx)` instead, and passes `scope_clause` the row's project's
+  `export_controlled=` expression (as `ProjectRepository.visible` does): an export-controlled
+  project's rows are then reached only through an explicit membership.
 - **Tests:** `tests/support/authz.py` has the personas, test-only actions
-  (`register_test_actions(monkeypatch)`), a test-only router, and `sign_in_as`.
+  (`register_test_actions(monkeypatch)`), a test-only router, and `sign_in_as`;
+  `tests/support/content.py` a test-only content router (`register_content_actions`).
 
 ### Import rules (enforced)
 

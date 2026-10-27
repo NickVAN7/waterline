@@ -84,7 +84,8 @@ Calls flow **routers → services → repositories → models**. Services also u
   → visible actions (anyone who sees the target; never a project content action, DL-58) → system
   admin → workspace owner/admin → org role (owner/admin; member only for `project.create`) → project
   role → targeted rules. From S1-C13, every registered action is marked content or management; the
-  export-control gate that uses the marking is built in Slice 2 (design-doc §3.1). **Personal
+  export-control gate in `authorize()` uses the marking (design-doc §3.1; S2-C4), and a list of
+  content across projects takes `content_scope(ctx)`. **Personal
   actions** (e.g. `approval.decide`) are checked before the admin levels and never granted by them:
   only the relationship rule (e.g. the named approver) allows one, and only for a user with content
   access to the project.

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from app.authz.scoping import Scope
-from app.enums import OrgRole, ProjectRole, WorkspaceRole
+from app.enums import OrgRole, ProjectRole, RestrictionCategory, WorkspaceRole
 from app.models.org import Membership, Organization
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
@@ -47,13 +47,23 @@ class ProjectRepository:
         )
 
     def visible(self, scope: Scope) -> Select[Project]:
-        """The projects in `scope` (the user's `project_scope`), archived included, each org and
-        lead loaded."""
+        """The projects in `scope` (the user's `project_scope`, or `content_scope`), archived
+        included, each org and lead loaded."""
         return (
             select(Project)
             .join(Organization, Project.organization_id == Organization.id)
             .options(contains_eager(Project.organization), selectinload(Project.lead))
-            .where(scope_clause(scope, Project.id, Project.workspace_id, Project.organization_id))
+            .where(
+                scope_clause(
+                    scope,
+                    Project.id,
+                    Project.workspace_id,
+                    Project.organization_id,
+                    export_controlled=Project.restriction_categories.contains(
+                        [RestrictionCategory.EXPORT_CONTROLLED]
+                    ),
+                )
+            )
         )
 
     async def org_member_or_staff(self, org: Organization, user_id: uuid.UUID) -> bool:

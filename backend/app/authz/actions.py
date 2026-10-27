@@ -43,9 +43,9 @@ class ActionSpec:
       of the roles above: e.g. `org.view`, for a project member who has no org role.
     - `rule`: a targeted rule granting it on top of the roles above, from the whole context
       (e.g. `user.check`: an admin role anywhere in the target's workspace, DL-68).
-    - `access`: content or management (design-doc §3.1, §5); the export-control gate that uses
-      it comes in Slice 2. The default is content, the closed side: an action someone forgets to
-      mark is never let past the gate (S1-C13 security review).
+    - `access`: content or management (design-doc §3.1, §5), read by the export-control gate.
+      The default is content, the closed side: an action someone forgets to mark is never let
+      past the gate (S1-C13 security review).
     - `explicit_when_export_controlled`: on an export-controlled project, only the project role
       grants it, so an inherited admin without an explicit membership is denied (DL-82).
     """
