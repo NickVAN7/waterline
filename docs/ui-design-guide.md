@@ -459,7 +459,9 @@ render inside the full shell when signed in.
   headed by the current org's name (it lists that org's projects only), with a filter field past
   about eight projects, and "All projects" (styled apart from the project links) and "New
   project" (only when allowed; not indented) (DL-137). Below it, the selected project's pages
-  are links: Home, Requirements, Tasks, Test cases, Members, Settings. A module that isn't
+  are links, flat, in this order (DL-202): Home, Requirements, Tasks (Board and Backlog as tabs),
+  Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash last. Each
+  appears once its feature is built, and a turned-off or unshipped module's page is left out. A module that isn't
   shipped can't be enabled (DL-136), so a module page appears only once its module has shipped
   and is enabled. **Only the page you are on has `aria-current="page"`**: "All projects" is
   not current while you are inside a project. The page itself still shows a project header
@@ -498,6 +500,18 @@ render inside the full shell when signed in.
   below headed "Archived" (DL-180; from S2-C0g); anyone who opens org admin pages holds inherited
   project admin, design-doc §5), `/{org_slug}/members`, and
   `/{org_slug}/settings`.
+- **UI-SHL-11** **Opening an item** (a requirement, task, test case, or test run) from a list or
+  the board opens a **side panel** over the list, so the list keeps its place, with **Open full
+  page** (DL-202). The panel has its own URL, the list's route with the item open (e.g.
+  `?open=TA-45`), so Back closes it and the address can be shared. A direct link to an item, and
+  **Copy link**, use the full-page route.
+- **UI-SHL-12** **Creating an item** is a dialog with the essential fields that the user can
+  **expand into a full page**, keeping what they typed; after creating, they land on the new
+  item to fill in the rest (DL-202).
+- **UI-SHL-13** **A turned-off module's page** (a bookmark to Sprints after the module was turned
+  off) is an explanatory page inside the project, not a 404: "The Sprints module is turned off
+  for this project. Contact your administrator for questions.", with the module's name. A module
+  that hasn't shipped has no page at all (DL-200).
 
 ---
 
@@ -720,7 +734,11 @@ render inside the full shell when signed in.
   column (DL-137, from S2-C0g), and whose Role column shows the workspace role and system
   admin as text ("Owner, System admin", "System admin", "Admin"), or "User" for neither, with
   system admins who have no workspace role listed last (DL-183, DL-188; from S2-C0j); the
-  per-person access review shows system admin as text too (DL-189, from S2-C0j).
+  per-person access review shows system admin as text too (DL-189, from S2-C0j). **Deactivated
+  users are left out** of every picker and of the member and user lists (org members, project
+  members, workspace staff and users); that scope's admins get a "Show deactivated" filter on
+  those lists, and the badge and Status column apply there (DL-200; the built Slice 1 lists
+  change in a checkpoint the owner places). Items still assigned to them are highlighted.
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
 - **UI-FBK-8** **Empty states** distinguish two cases. *Nothing exists yet:* a heading ("No members

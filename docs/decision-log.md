@@ -1353,7 +1353,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   account actions from the row alone (no per-user read), show a deactivated person as such, and
   can explain the last-active-owner guard (DL-74) before the server's 422.
 - **Supersedes:** none (settles the two questions DL-75 left for S1-C15)
-- **Superseded by:** none
+- **Superseded by:** DL-200 (in part: deactivated people are left out of the lists)
 - **Applies to:** build plan ("The workspace and org API", "The org members API", the S1-C15 row)
 - **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
 
@@ -1510,7 +1510,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the server refuses as lead (`account_inactive`).
 - **Supersedes:** DL-111, in part (the project read's fields); the build plan's project member
   row fields ("The project members API")
-- **Superseded by:** none
+- **Superseded by:** DL-200 (in part: deactivated members are left out of the lead picker)
 - **Applies to:** build plan ("The projects API", "The project members API", the S1-C16a row)
 - **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16a: option a, over the flag
   on the read only, or neither)
@@ -1914,7 +1914,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   children deleted separately stay in the trash. A requirement whose parent is still deleted is
   restored at the top level, with the parent change logged.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-202 (in part: where Trash is linked)
 - **Applies to:** design-doc §9; build plan (S2-C8, S2-C21)
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
 
@@ -2439,3 +2439,189 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §4, §10; schema-doc (`activity_log`); build plan (S2-C3, "Change
   log"); TD-17
 - **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C1.md`, open question 1)
+
+### DL-194: Archiving a project cancels its pending approval requests
+- **Date:** 2026-10-27
+- **Decision:** Archiving a project cancels every pending approval request in it, each logged on
+  the request (`status`), in the archive's transaction; unarchiving doesn't reopen them, and a
+  project admin re-requests. An archived project therefore has no pending rows for approver
+  replacement to act on, and nothing is flagged there. Built in S2-C10, with approval requests:
+  the project service's archive calls the approval service (layer 1).
+- **Supersedes:** design-doc §6.2 "Not in an archived project" (owner decision, Oct 6, 2026:
+  rows stay pending and the request is flagged)
+- **Superseded by:** none
+- **Applies to:** design-doc §4, §6.2, §11; schema-doc (`approval_request`, `approval`); build
+  plan (S2-C10, S2-C12, Slice 2 "Approvals", "Done when"); testing-strategy "Approvals"
+- **Source:** owner, Oct 26–27, 2026 (screen inventory Piece 6, chat session; handoff decision 1)
+
+### DL-195: Approval decisions are final; re-opening an approved item
+- **Date:** 2026-10-27
+- **Decision:** There is no "unapprove". A project admin re-opens an approved item by starting a
+  new request on it: a requirement whose status is `approved` and that isn't "Approved ·
+  modified", or a gate whose milestone is `approved`. The status doesn't change while it's
+  pending; approved, the approval is updated as usual; rejected, the item moves off approved (a
+  requirement back to `draft`, a gate's milestone back to `in_progress`), logged. Re-approving
+  an "Approved · modified" requirement isn't a re-open: its rejection changes nothing. A
+  `released` milestone can't be re-opened. What a rejected re-open round does to a completed
+  test run's exit sign-off is still open (decided before Slice 5).
+- **Supersedes:** design-doc §6.2 "A rejected request changes nothing on the entity" (in part:
+  it still holds for every round but a re-open)
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; schema-doc (`approval_request`); build plan (S2-C10, S2-C11,
+  S2-C20, Slice 2 "Approvals", "Later slices": Slice 4); testing-strategy "Approvals";
+  screen-inventory Piece 6
+- **Source:** owner, Oct 26–27, 2026 (handoff decision 2; open question A and the meaning of
+  "release milestone" answered in chat, Oct 27, 2026)
+
+### DL-196: The approver's review, the reject prompt, and what's left out
+- **Date:** 2026-10-27
+- **Decision:** The approver's review shows the item's associated tasks and subtasks with their
+  statuses (from Slice 3) and its comments (from Slice 6), beside the other approvers' decisions
+  and comments. Rejecting prompts for a comment; it isn't required, but submitting without one
+  asks the approver to confirm. No project-level approvals page in v1 (the project home's
+  pending-approvals number and each list's filter bar cover it). Approval delegation is v2.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2, §16; build plan (S2-C20, "Later slices": Slices 3 and 6);
+  screen-inventory Pieces 6 and step 3
+- **Source:** owner, Oct 26, 2026 (screen inventory Piece 6; handoff decisions 3 to 6)
+
+### DL-197: Everyone's v1 features from the inventory's Pieces 7 and 8
+- **Date:** 2026-10-27
+- **Decision:** In v1: CSV export of the current list (its filters and columns) for tasks,
+  requirements, test cases, and test results, a whole-project export staying v2; My work as the
+  cross-project view (a portfolio view when it outgrows it); a self-service session list in
+  Account settings (sign out of the others); saved filters, a named filter-bar setup per user per
+  list, personal only (sharing v2), renamable and deletable, with the filters in the URL;
+  comments edited and soft-deleted by their authors with an "edited" marker
+  (`comment.edited_at`), project admins deleting any; favorite projects on My work (items
+  v1.5+, no "recently viewed"); a Documentation item in the user menu rendering the user guide;
+  a header search bar with a results page (Slice 6). GitHub stays in Slice 7. The slices for the
+  session list, saved filters, CSV export, favorites, and Documentation are the owner's to
+  place; the saved-filter and favorite tables are designed with them.
+- **Supersedes:** design-doc §4 "Active-sessions page" before the first non-local deployment
+  (now v1); design-doc §14 "Saved filters / views are later"
+- **Superseded by:** none
+- **Applies to:** design-doc §4, §11, §14, §16; schema-doc (`comment`); build plan ("Later
+  slices": Slice 6); screen-inventory Pieces 7 and 8, step 6
+- **Source:** owner, Oct 26, 2026 (screen inventory Pieces 7 and 8; handoff decisions 7, 9 to 16)
+
+### DL-198: Status reports in v1.5, and export to a deck or document
+- **Date:** 2026-10-27
+- **Decision:** A published status report summarizes a finished period (a sprint, phase, or
+  iteration). A simplified version is targeted for v1.5, the full version by v2 with the PMO
+  dashboard and ERP. Export of a view or period to a slide deck or document is a v1.5 candidate
+  (v1 if it's cheap).
+- **Supersedes:** none (status reports were a v2 ERP module only)
+- **Superseded by:** none
+- **Applies to:** design-doc §16; screen-inventory Piece 7, "Noted for later steps"
+- **Source:** owner, Oct 26, 2026 (screen inventory Piece 7; handoff decision 8)
+
+### DL-199: Sprints page, Timeline, releases, and traceability
+- **Date:** 2026-10-27
+- **Decision:** A Sprints page (Slice 4) lists planned, active, and completed sprints, and a
+  completed sprint's summary is reconstructed from `activity_log` until sprint snapshots exist.
+  A planned sprint can be hard deleted (its tasks return to the backlog); active and completed
+  ones can't. The Timeline is a dated table of phases and milestones with baseline vs. current
+  dates and slippage: a basic page holding phases in Slice 3, milestones and slippage in Slice 4;
+  the Gantt chart stays v2. Releases get no page in v1: a milestone filter on lists and the
+  board, and a progress bar on each milestone. Traceability is coverage columns on the
+  requirement tree (task count and progress, test-case count, latest result, approval state),
+  filled in as Slices 3 and 5 ship, with no separate matrix page.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 (Requirement, Sprint, Milestone), §9; build plan ("Later
+  slices": Slices 3, 4, 5); screen-inventory steps 3, 4, 6
+- **Source:** owner, Oct 26–27, 2026 (handoff decisions 17, 18, 20 to 22; the basic Timeline in
+  Slice 3 answered in chat, Oct 27, 2026)
+
+### DL-200: States: turned-off modules, deleted links, archived projects, deactivated users
+- **Date:** 2026-10-27
+- **Decision:** A turned-off module's page is an explanatory page inside the project ("The
+  Sprints module is turned off for this project. Contact your administrator for questions.");
+  an unshipped module has no page, and the API stays a 404. A link to a deleted item is the
+  standard 404 for everyone; Trash is the way back. My work leaves out every item of an archived
+  project. Deactivated users are left out of every picker and of the member and user lists,
+  whose admins get a "Show deactivated" filter; their existing work keeps their name with the
+  badge, and items still assigned to them are highlighted. Link attachments aren't edited
+  (remove and re-add). The change to the built Slice 1 lists, and the turned-off module page, go
+  in checkpoints the owner places.
+- **Supersedes:** ui-design-guide UI-FBK-6 (in part: deactivated people listed with a badge in
+  every list); DL-102 (in part: the staff and org member lists showing deactivated people);
+  DL-113 (in part: the lead picker marking deactivated members)
+- **Superseded by:** none
+- **Applies to:** design-doc §1.1, §4, §9, §11; ui-design-guide UI-FBK-6, UI-SHL-13;
+  screen-inventory step 5
+- **Source:** owner, Oct 27, 2026 (screen inventory step 5; handoff decisions 19, 23 to 26)
+
+### DL-201: The Get started checklist
+- **Date:** 2026-10-27
+- **Decision:** A new project's home page shows three items, each linking to where it's done and
+  ticked automatically from the project's data: Invite your team (a member besides the creator),
+  Compile your plan (a phase or milestone with a date; hidden until phases and milestones ship),
+  and Start your project (a requirement, a test case, and a task, each part shown once its
+  feature ships). The ticks are loose. It's shown only to the project's admins, disappears when
+  all three are ticked, and a project admin can hide it sooner, through a per-project flag
+  designed with its slice (the owner's to place). GitHub isn't part of it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §11; screen-inventory step 5, step 6
+- **Source:** owner, Oct 27, 2026 (handoff decision 27; who sees it and the loose ticks answered
+  in chat, Oct 27, 2026)
+
+### DL-202: Item side panels, expandable create dialogs, and flat project navigation
+- **Date:** 2026-10-27
+- **Decision:** Opening a requirement, task, test case, or test run from a list or the board
+  opens a side panel with its own URL (Back closes it) and Open full page; direct links and Copy
+  link use the full page. Create dialogs can expand into a full page, keeping typed values, and
+  land on the new item. Project navigation stays flat: Home, Requirements, Tasks (Board and
+  Backlog tabs), Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash
+  last, leaving out turned-off and unshipped modules.
+- **Supersedes:** DL-146 (in part: Trash linked from the requirements page's header)
+- **Superseded by:** none
+- **Applies to:** design-doc §9; ui-design-guide UI-SHL-6, UI-SHL-11, UI-SHL-12; build plan
+  (S2-C17, S2-C21); screen-inventory step 6
+- **Source:** owner, Oct 27, 2026 (handoff decisions 28 to 30; test runs opening like the other
+  items answered in chat, Oct 27, 2026)
+
+### DL-203: The screen inventory is complete
+- **Date:** 2026-10-27
+- **Decision:** `docs/screen-inventory.md` steps 2 to 6 are done. Step 6's consolidated table
+  (screen, type, proposed route, slice, built or not) is the list S2-C15's TD-62 check runs
+  against; routes for unbuilt screens are proposals each slice's planning confirms.
+- **Supersedes:** none (completes DL-157's condition)
+- **Superseded by:** none
+- **Applies to:** screen-inventory; build plan (Slice 2 "Before starting", "Web screens");
+  TD-62
+- **Source:** owner, Oct 26–27, 2026 (handoff decision 31)
+
+### DL-204: Rank length cap, with a rewrite of the gap's siblings
+- **Date:** 2026-10-27
+- **Decision:** A rank is capped at 255 characters. A drop whose new rank would exceed the cap
+  rewrites the ranks of that gap's siblings in one transaction, the drop's, instead of failing;
+  the order is unchanged. Built in S2-C7 (the move endpoint), resolving TD-69.
+- **Supersedes:** design-doc §6 "No locking or periodic rebalancing in v1" (in part: the cap's
+  rewrite is the one exception)
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7); TD-69
+- **Source:** owner, Oct 27, 2026 (`docs/reviews/s2/S2-C2.md`, option A for the length limit)
+
+### DL-205: An integration test pins the rank collation
+- **Date:** 2026-10-27
+- **Decision:** S2-C7 adds an integration test that sorts generated ranks with the database's
+  `ORDER BY` and compares the order with Python's, so a change of collation, or of the rank
+  alphabet, fails a test instead of silently misordering items.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7)
+- **Source:** owner, Oct 27, 2026 (`docs/reviews/s2/S2-C2.md`, option A for the collation)
+
+### DL-206: No history from Trash in v1
+- **Date:** 2026-10-27
+- **Decision:** A deleted requirement's history is a 404, like everything else about a deleted
+  item: Trash shows what was deleted, by whom, and when, and restoring brings the history back.
+  S2-C8 adds a test pinning the 404.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C8, "Done when")
+- **Source:** owner, Oct 27, 2026 (`docs/reviews/s2/S2-C3.md`, open question 1)

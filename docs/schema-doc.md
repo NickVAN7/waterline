@@ -942,7 +942,9 @@ Partial unique index: `UNIQUE(entity_type, entity_id) WHERE status = 'pending'` 
 request per entity.
 Index `(entity_type, entity_id, created_at)`; index `(project_id, status)`: a project's pending
 requests (DL-192). Never deleted; cancelled instead (including when a
-project admin approves the requirement by hand, design-doc §6.2).
+project admin approves the requirement by hand, and when the project is archived, DL-194;
+design-doc §6.2). A request on an approved item re-opens it; a rejected re-open round moves the
+item off approved (DL-195).
 **Policy (v1):** `replaced` rows don't count: approved when every other `approval` row is
 approved; rejected on the first rejection. A replacement that leaves every counted row approved
 completes the request (design-doc §6.2).
@@ -953,7 +955,7 @@ completes the request (design-doc §6.2).
 | id | UUID (PK) | |
 | approval_request_id | UUID (FK → approval_request) | |
 | approver_id | UUID (FK → user) | any project role, including viewer; must have project access when the request is created (an explicit membership on an export-controlled project) |
-| decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost the access needed to decide while the row was pending, and the requester still holds project admin; the row keeps its history, and a pending row for the requester is added unless they're already named. If the requester no longer holds project admin, or the project is archived, the row stays `pending` and the request is flagged (design-doc §6.2). Decided rows are never replaced |
+| decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost the access needed to decide while the row was pending, and the requester still holds project admin; the row keeps its history, and a pending row for the requester is added unless they're already named. If the requester no longer holds project admin, the row stays `pending` and the request is flagged (design-doc §6.2); an archived project has no pending requests (archiving cancels them, DL-194). Decided rows are never replaced |
 | comment | text, nullable | at most 2,000 characters (DL-143) |
 | decided_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
@@ -1051,6 +1053,7 @@ to other project members.
 | entity_id | UUID | polymorphic; parent verified by service layer |
 | author_id | UUID (FK → user) | viewers may comment |
 | body_md | text | markdown, sanitized on render; flat (no threading) |
+| edited_at | timestamptz, nullable | set when its author edits the body; drives the "edited" marker (DL-197) |
 | deleted_at | timestamptz, nullable | shown as "comment deleted" |
 | created_at / updated_at | timestamptz | |
 
@@ -1176,7 +1179,7 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 | `notification` (user_id, type, entity_type, entity_id, actor_id, created_at, read_at) | v1.5 |
 | `api_token` (user_id, name, token_hash, prefix, last_used_at, expires_at, revoked_at) | first need |
 | `login_attempt` (sign-in throttling per account and per IP, design-doc §4) | before the first non-local deployment |
-| `session.user_agent`, `session.ip_address` columns (active-sessions page, design-doc §4) | before the first non-local deployment |
+| `session.user_agent`, `session.ip_address` columns (the active-sessions list, design-doc §4) | v1, its slice to be placed (DL-197) |
 | ERP modules, design pending: `raid_item`, `entity_link`, `status_report`, `budget_line`, `cost_entry`, `data_object`, `load_cycle`, `data_load`, runbook step / rehearsal tables | v2 (design-doc §16) |
 | ERP portfolio and team tables, design pending: project portfolio fields and templates (PMO dashboard), workspace teams (resourcing), workstream members | v2 (design-doc §16) |
 | `invitation`, `time_entry`, `sprint_project`, `sprint_snapshot`, file attachments | v2+ (`time_entry` may move up with the budget module) |

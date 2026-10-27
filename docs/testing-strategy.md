@@ -84,10 +84,13 @@ tested, what each kind of test is for, and the gates every change passes.
   (second save gets 409), the one-active-sprint rule, and approval completion.
 - **Approvals** (Slice 2 for requirements, Slices 4–5 for gates and test runs):
   - completion moves a requirement to `approved`, a gate to `approved`, and a test run to
-    `completed`; a rejection changes nothing on the entity;
+    `completed`; a rejection changes nothing on the entity, except a rejected re-open round,
+    which moves an approved requirement back to `draft` (a gate's milestone back to
+    `in_progress`), while a rejected re-approval of an "Approved · modified" requirement
+    changes nothing (DL-195);
   - requests log `created` and every status change, including a cancellation caused by
-    deleting a requirement, by a project admin approving the requirement by hand, or by
-    cancelling a test run;
+    deleting a requirement, by a project admin approving the requirement by hand, by archiving
+    the project (every pending request, DL-194), or by cancelling a test run;
   - manual requirement approval (design-doc §5): a project admin (including inherited) moving
     a requirement into `approved` sets `approved_revision_id` to the current revision,
     `approved_by` to that admin, and `approved_at`, and cancels a pending request; members get
@@ -106,11 +109,8 @@ tested, what each kind of test is for, and the gates every change passes.
     when the requester no longer holds project admin; decided rows are never replaced;
     `replaced` rows don't count toward the policy; the change is logged (`approver_id`, old and
     new user IDs, `changed_by` the actor, null from the CLI);
-  - no replacement in an archived project, on each path that still takes access away there
-    (removal from the org or workspace with their projects; an org or workspace role change or
-    removal; `revoke-system-admin`; deactivation): the access is removed, the approver's row
-    stays pending, and the request is flagged; removing a project member directly is still
-    denied there;
+  - archiving a project cancels its pending requests (DL-194), and unarchiving doesn't
+    reopen them; removing a project member directly is still denied in an archived project;
   - a replacement that leaves every counted row approved completes the request (`approved_by`
     the counted approver with the latest `decided_at`; the `status` change logged; the
     entity's `on_approved` effect applied);

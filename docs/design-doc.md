@@ -141,7 +141,10 @@ with `available` false. When `sprints` (Slice 4) and `github` (Slice 7) ship, th
 whether existing software projects get the module turned on.
 
 - **Disabling a module hides it; it never deletes data.** Re-enabling brings everything back.
-  A disabled module's endpoints return 404 for that project.
+  A disabled module's endpoints return 404 for that project. In the UI, a turned-off module's
+  page (from a bookmark, say) is an explanatory page inside the project instead of a 404: "The
+  Sprints module is turned off for this project. Contact your administrator for questions.",
+  with the module's name. An unshipped module has no page at all (DL-200).
 - **UI guidance on module choice.** Module selection (at project creation and in project
   settings) shows, for the project's type, which modules are recommended and a short
   best-practice note for each. Examples:
@@ -356,8 +359,8 @@ v1 they drive badges, logging, and the export-control access rules below. Column
     the only explicit member is then its first admin (§5, "Org roles"), and the confirmation is
     recorded in `project_created`.
   - **Approvers on an export-controlled project** must be explicit members; an approver who
-    loses that (including when the project is marked export-controlled) is replaced, except in
-    an archived project (§6.2).
+    loses that (including when the project is marked export-controlled) is replaced (§6.2; an
+    archived project has no pending requests, DL-194).
     Approver replacement goes to the requester only if they're an explicit project admin;
     otherwise the request is flagged.
 - **What the labels control:**
@@ -447,8 +450,12 @@ Workspace (the firm: tenant boundary)
 - `is_active` — an inactive user **cannot sign in at all**; deactivation deletes their sessions
   immediately. Their past work (tasks, comments, log entries) still references them and is shown
   with a "deactivated" badge. Their open tasks stay assigned; the UI highlights them for manual
-  reassignment. Their pending approvals are replaced (§6.2; in an archived project the rows stay
-  pending and the requests are flagged).
+  reassignment. Their pending approvals are replaced (§6.2; an archived project has none,
+  DL-194). They're left out of every picker (assignee, reviewer, approver, lead, member) and of
+  the member and user lists (org members, project members, workspace staff and users), which
+  show active people only; that scope's admins get a "Show deactivated" filter on those lists,
+  which is how they find someone to reactivate, and no one else sees deactivated people listed
+  (DL-200).
 - `is_system_admin` — may perform any action in any workspace, org, or project, except
   personal actions such as deciding another person's approval (§5) and the content of an
   export-controlled project they aren't an explicit member of (§3.1). Workspaces and orgs
@@ -614,12 +621,13 @@ Workspace (the firm: tenant boundary)
     `last_seen_at` written at most every 5 minutes.
   - The same cookie settings in every environment, dev and test included (build plan,
     implementation decision 9).
+- **Active sessions in Account settings** (v1, DL-197; its slice is the owner's to place): the
+  user sees their active sessions and signs out of the others (adds `user_agent` and
+  `ip_address` to `session`). (Admin "sign out everywhere" is built in Slice 1, under the rank
+  rule in "Account management".)
 - **Before the first non-local deployment** (features, not design questions):
   - Sign-in throttling per account and per IP, with progressive delays and no permanent
     lockout (`login_attempt` table).
-  - Active-sessions page (adds `user_agent` and `ip_address` to `session`) with per-session
-    revoke. (Admin "sign out everywhere" is built in Slice 1, under the rank rule in "Account
-    management".)
   - Password re-entry for sensitive actions (an admin changing a user's email;
     linking/unlinking GitHub; admin password resets).
   - Nightly worker job deleting expired sessions.
@@ -881,6 +889,9 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   editor. A requirement with no "Acceptance Criteria" heading (any level, ignoring case) shows a
   "No acceptance criteria" note on its detail page; nothing blocks it.
 - Revision history and approval tracking — see §6.1 and §6.2.
+- **Traceability in v1** is coverage columns on the requirement tree: task count and progress,
+  test-case count, latest result, and approval state, filled in as Slices 3 and 5 ship. There is
+  no separate requirement × test case matrix page (DL-199).
 
 ### 6.1 Requirement revisions
 - **Creating a requirement creates revision 1**, in the same transaction, and sets
@@ -964,14 +975,9 @@ requirement approval.
     in the same transaction: `approved_by` is the counted approver with the latest
     `decided_at`, the completion time is now, the request's `status` change is logged with the
     replacement's `changed_by`, and the entity's `on_approved` handler runs.
-  - **Not in an archived project** (owner decision, Oct 6, 2026). The paths that can still
-    take access away there (removal from the org or workspace "with their projects", which the
-    archived check exempts, §5; and changes that aren't project mutations: an org or workspace
-    role change or removal, `revoke-system-admin`, deactivation) don't replace the approver:
-    their row stays pending and the request is flagged, for a project admin to cancel or
-    re-request once the project is unarchived. So no request completes in an archived project
-    either. (Removing a project member directly, or marking the project export-controlled, is a
-    project mutation and is denied there anyway.)
+  - **Never in an archived project:** archiving cancels its pending requests (below), so the
+    paths that can still take access away there (removal "with their projects", role changes,
+    `revoke-system-admin`, deactivation) find no pending row to replace (DL-194).
   - It's a system effect, not an action anyone takes on the approver's behalf, so it doesn't
     conflict with `approval.decide` being a personal action.
   - **Approvals only.** Tasks keep their rule: a deactivated user's tasks stay assigned and are
@@ -980,6 +986,9 @@ requirement approval.
   without a request (§5, "Requirement approval by hand"), e.g. to record a sign-off made
   outside the app. A pending approval request on the requirement is then moot, so it is
   cancelled, logged on the request (`status`, §10).
+- **Archiving a project cancels all its pending approval requests** (DL-194), each logged on the
+  request (`status`, §10), in the archive's transaction. Unarchiving doesn't reopen them; a
+  project admin re-requests.
 - **v2:** the RAID module adds change requests and decisions as approvable entities, so the
   steering committee (project viewers named as approvers) can sign them off.
 - **Completing a requirement request** sets `approved_revision_id` to the request's revision,
@@ -991,8 +1000,25 @@ requirement approval.
   a project admin can also set it or move it out of `approved` by hand (§5; logged like any
   status change), so a gate signed off outside the app can still be recorded. **Completing a test-run
   request** moves the run to `completed` (if it isn't already).
-- **A rejected request changes nothing** on the entity, for every entity type; the request's
-  status and the `approval` rows record the rejection, and a new round is a new request.
+- **A rejected request changes nothing** on the entity, for every entity type, except a
+  re-open round (below); the request's status and the `approval` rows record the rejection, and
+  a new round is a new request.
+- **Decisions are final** (no "unapprove", DL-195). A project admin **re-opens** an approved
+  item by starting a new request on it: a requirement whose status is `approved` and that isn't
+  "Approved · modified" (the request is bound to its approved revision), or a gate whose
+  milestone is `approved`. The item's status doesn't change while the request is pending. If
+  it's approved, the approval is updated as usual; if it's rejected, the item moves off
+  approved, logged like any status change (§10): a requirement back to `draft`, a gate's
+  milestone back to `in_progress`. Re-approving an "Approved · modified" requirement isn't a
+  re-open: its rejection changes nothing. A `released` milestone can't be re-opened. What a
+  rejected re-open round does to a completed test run's exit sign-off is decided before Slice 5.
+- **Deciding, in the UI** (DL-196): the approver's review shows, besides the bound revision (or
+  the gate's milestone, or the run's results) and the other approvers' decisions and comments,
+  the item's associated tasks and subtasks with their statuses (from Slice 3) and its comments
+  (from Slice 6). Rejecting prompts for a comment; it isn't required, but submitting without one
+  asks the approver to confirm. There's no project-level approvals page in v1: the project
+  home's pending-approvals number and each list's filter bar cover it. Delegating one's
+  approvals is v2 (§16).
 - **Cancelling a test run** (status `cancelled`) cancels any pending exit sign-off request on
   it, logged on the request (§10). Cancelled runs are left out of metrics and default lists.
 - **Stale requests:** because a request is bound to its revision, approving it after a newer
@@ -1072,6 +1098,10 @@ requirement approval.
   where they go: the next planned sprint (the `planned` sprint with the earliest
   `start_date`, then the lowest `id`), or the backlog (`sprint_id` cleared). It is one
   request; each task's `sprint_id` change is logged as usual (§10).
+- **The Sprints page** (Slice 4, DL-199) lists planned, active, and completed sprints; a
+  completed sprint's summary (what finished, what rolled over) is reconstructed from
+  `activity_log` until sprint snapshots exist. A `planned` sprint can be hard deleted, its
+  tasks returning to the backlog; active and completed sprints can't be deleted (§9).
 
 ### Milestone
 - Flat, separate from the requirement tree; a point in time for cross-cutting groupings.
@@ -1081,6 +1111,11 @@ requirement approval.
 - Optional `phase_id` (see Phase above).
 - Task links to a milestone independently of its requirement. Test runs can reference a
   milestone (§8); test cases do not.
+- **Releases** have no page of their own in v1: lists and the board filter by milestone, and
+  each milestone shows a progress bar (DL-199).
+- **The Timeline page** is a dated table of phases and milestones, baseline vs. current dates
+  and slippage: a basic version holding phases in Slice 3, milestones and slippage in Slice 4.
+  The Gantt chart is v2 (DL-199).
 
 ### Manual ordering (rank)
 - One rank per task (not per view). The backlog shows tasks in rank order; a board column shows
@@ -1101,14 +1136,20 @@ requirement approval.
     at the top or bottom: 10,000 in a row stay under 10 characters. Neighbors that aren't in
     strictly increasing order, equal ones included, raise `ValueError`: no rank sorts between
     two equal ones. Equal neighbors can happen after a tie (below), so the move endpoint
-    handles that case (TD-67); any other out-of-order pair is a programming error.
+    handles that case (TD-67); any other out-of-order pair is a programming error. An
+    integration test pins the collation: generated ranks sorted by the database's `ORDER BY`
+    come back in Python's order (DL-205; S2-C7).
+  - **Rank length is capped at 255 characters** (DL-204). Drops into one gap lengthen a rank
+    (about one character every six drops), so a drop whose new rank would exceed the cap
+    rewrites the ranks of that gap's siblings in one transaction, the drop's, instead of
+    failing; the order is unchanged.
   - **Rank writes bypass optimistic locking.** Rank is updated with a direct `UPDATE` that does
     not bump `version`, so reordering never causes a 409 for someone editing the item's content
     (same approach as the subtask counter, §3). A rank write also leaves `updated_at` alone: a
     display-order change isn't an edit (the subtask counter does move it).
   - **Ties:** every ordered query sorts by `(rank, id)`, so two items that receive the same rank
-    in a simultaneous drop still order deterministically. No locking or periodic rebalancing in
-    v1.
+    in a simultaneous drop still order deterministically. No locking, and no periodic
+    rebalancing in v1: the only rewrite is the length cap's (above).
   - **Cross-column drop** on a board changes status and rank in one request. The status change
     goes through the transition rules in `authorize()` (§5); if denied, the card snaps back with
     a short message and nothing is saved.
@@ -1202,6 +1243,7 @@ written after a bug); it is flagged in the UI, not blocked.
 | Approval request | never deleted; cancelled instead |
 | Test run, recorded test result | not deleted in v1: a run is completed or cancelled, never removed; a result with an outcome is permanent. A result still `not_run` (a case only planned into a run) can be removed from the run |
 | Subtask | hard delete |
+| Sprint | hard delete while `planned`, its tasks returning to the backlog; active and completed sprints can't be deleted (DL-199) |
 
 **Deleting a task:** its subtasks, comments, tags, attachments, and GitHub links are left in
 place and hidden with it — restoring the task restores everything. Dependencies involving it are
@@ -1228,8 +1270,8 @@ indirectly what they couldn't delete directly.
 **Restore** follows delete: whoever may delete an item may restore it. The trash view shows each
 user what they can restore; project admins see everything in the project.
 
-**Trash** (DL-146): a project Trash page, linked from the requirements page's header (not a
-project-pages item), lists deleted items by type (requirements from Slice 2; tasks and test
+**Trash** (DL-146): a project Trash page, the last item of the project's navigation (DL-202),
+lists deleted items by type (requirements from Slice 2; tasks and test
 cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
 `allowed_actions` allows it. Nothing is purged automatically in v1. **Restoring a tree:**
 restoring a requirement also restores the descendants deleted in the same action, identified by
@@ -1243,6 +1285,11 @@ with any approval request (pending or past) can't be deleted: its sign-off histo
 pointing at a real milestone. Cancel the gate instead (status `cancelled`).
 
 **Comments** are soft-deleted and shown as "comment deleted" so threads stay readable.
+
+**A link to a deleted item** (from a comment, history, or a bookmark) is the standard 404 for
+everyone, as for an item that doesn't exist (§5); Trash is the way back (DL-200). **A deleted
+requirement's history** (§6.1) is a 404 too: there is no history from Trash in v1, which shows
+what was deleted, by whom, and when, and restoring the item brings its history back (DL-206).
 
 ## 10. Audit — ActivityLog
 
@@ -1332,7 +1379,8 @@ table, `audit_event` (schema-doc, "Audit").
 ### Comments
 - Flat list (threading is v2), on **tasks and requirements**. Markdown body.
 - Viewers can comment. Authors edit their own comments (a personal action, §5) and delete
-  them; project admins can delete any.
+  them; project admins can delete any. An edited comment shows an "edited" marker
+  (`comment.edited_at`, DL-197).
 - Soft-deleted.
 
 ### Tags
@@ -1363,6 +1411,14 @@ table, `audit_event` (schema-doc, "Audit").
 ### Link attachments
 - URL + label on tasks, requirements, and test cases. Real file uploads are v2+ (§16; needs a storage
   backend decision, e.g. MinIO → S3/R2).
+- Not edited: a wrong link is removed and added again (DL-200).
+
+### Lists: saved filters and CSV export
+- **Saved filters** (DL-197): a user saves a filter-bar setup by name, per list, and reapplies,
+  renames, or deletes it. Personal only in v1 (sharing is v2, §16). The filters also live in the
+  URL, so a filtered list can be bookmarked or shared. Its table is designed with its slice.
+- **CSV export** (DL-197) of the current list, with its filters and columns as shown, for tasks,
+  requirements, test cases, and test results. Exporting a whole project stays v2 (§16).
 
 ### Polymorphic tables
 `comment`, `entity_tag`, `link_attachment`, and `approval_request` reference their parent by
@@ -1383,8 +1439,13 @@ Each project shows its org, status, lead, and the user's access (their explicit 
 or inherited admin; DL-153). It is scoped like every list endpoint (§5, "Reads are authorized
 too"), leaves out the
 content of export-controlled projects where the user has no explicit membership (§3.1), and
-leaves out archived projects. Until notifications (v1.5), it's how people learn that something
-is waiting for them. It lives at the root route (`/`), so it adds nothing to the reserved-slug
+leaves out archived projects and every item in them (tasks, reviews, test cases; archiving
+cancels their approval requests, §6.2; DL-200), which stay visible inside the project. Until
+notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
+projects** (DL-197): a star on a project row keeps it at the top, per user (its table is
+designed with its slice); favoriting items is v1.5 or later, and there's no "recently viewed".
+My work is the cross-project view in v1; a portfolio view comes when it outgrows the page
+(§16). It lives at the root route (`/`), so it adds nothing to the reserved-slug
 list (§3); a top-level route of its own would have to join it. Each section arrives with its
 feature: projects in Slice 1, approvals in Slice 2, tasks in Slice 3, test cases in Slice 5.
 Schema: the assignee and reviewer indexes on `task` and `test_result` (schema-doc).
@@ -1399,6 +1460,19 @@ through the other areas' repositories and calls no service (build plan, "Feature
   rest still show.
 - `GET /api/me/work/{section}`: one section as an ordinary offset-paged list (build plan,
   "API conventions"), for "see all".
+
+### Project home: Get started checklist
+DL-201. A new project's home page shows three items, each linking to where it's done and ticked
+automatically from the project's data: **Invite your team** (ticked once the project has a
+member besides its creator), **Compile your plan** (once it has a phase or milestone with a
+date; the item is hidden until phases and milestones ship), and **Start your project** (a
+requirement, a test case, and a task, each part shown once its feature ships). The ticks are
+loose: a step started counts. It's shown only to the project's admins, disappears when all three
+are ticked, and a project admin can hide it sooner (a per-project flag, designed with its slice).
+GitHub is not part of it.
+
+### Documentation
+The user menu's **Documentation** item renders the user guide inside the app (DL-197).
 
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).
@@ -1545,7 +1619,9 @@ dependency; procrastinate 3.10.0, SQLAlchemy 2.1.1, psycopg 3.3.6, Postgres 18.6
 - Postgres full-text search over title + description of requirements, tasks, and test cases:
   a generated `search_vector` (`tsvector`) column with a GIN index on each table.
 - Typing an exact ID (`PMT-TA-45`, or `PMT-TA-45.2` for a subtask) jumps directly to that item.
-- Saved filters / views are later.
+- A **search bar in the header**, with a results page, limited to what the user can see (§5;
+  DL-197).
+- Saved filters are a list feature (§11).
 
 ## 15. Open Implementation Decisions
 
@@ -1576,6 +1652,13 @@ corrected. *Decided Oct 6–7, 2026:* a planned case can
 - **In-app notifications** (`notification` table, bell icon, polling): assigned to you, review
   requested, approval requested, status changes on tasks you're involved in, @mentions (via
   `username`). Generated by a worker job queued from `log_change()`.
+- **Status reports, simplified** (DL-198): a published status report summarizes a finished
+  period (a sprint, phase, or iteration). The full version comes by v2, with the PMO dashboard
+  and ERP (below).
+- **Export to a slide deck or document** (a candidate, DL-198; v1 if it's cheap): a
+  stakeholder-ready summary of a view or period.
+- **Favoriting items** (requirements, tasks, test cases), beside v1's favorite projects
+  (DL-197).
 
 ### v2 — ERP implementations
 v1 is built for software projects (§1); v2 adds what ERP implementations need. Each item needs
@@ -1587,7 +1670,7 @@ its own design pass.
    cost and schedule impact for change requests; a generic `entity_link` to connect items to
    requirements, tasks, and defects.
 2. **Status reports** (`status_reports`) — per-period overall and per-workstream RAG, narrative,
-   frozen key metrics; immutable once published.
+   frozen key metrics; immutable once published (the full version of v1.5's, DL-198).
 3. **Budget & actuals** (`budget`) — budget lines (category, workstream, planned, forecast),
    cost entries (vendor, invoice/PO reference), money as `numeric(14,2)` with a project
    currency; approved change requests draw down contingency; possible import of actuals from
@@ -1618,6 +1701,9 @@ its own design pass.
 
 **Planning and setup** (journey decisions, Oct 6–7, 2026):
 - **Project templates** and **bulk import/export** (requirements, tasks, test cases).
+- **Approval delegation** (DL-196): an approver hands their pending approvals to someone else
+  while away.
+- **Shared saved filters** (DL-197).
 - A **needs-attention view**; in v1 the filter bar covers it.
 - **Sprint load views**.
 
@@ -1662,6 +1748,5 @@ its own design pass.
 - Commit-message ID detection; requirement (`RQ`) linking from PRs
 - Project key rename with old key kept as an alias; moving items between projects (or subtasks
   between tasks) with old IDs kept as aliases
-- Saved filters/views
 - Redis, if caching / rate limiting / real-time needs appear
 - AI-assisted features (requirements drafting, task breakdown, test-case generation)

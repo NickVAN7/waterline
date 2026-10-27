@@ -1546,8 +1546,8 @@ Slice 1 feedback is in.
 
 **Before starting:** the plan record's open questions (`docs/reviews/s2/S2-plan.md`) answered by
 the owner before S2-C0a (done, DL-159 to DL-163); `uv run wl audit` green; the web rows (S2-C15 to S2-C21) stay
-provisional until the owner's screen inventory covers their screens (DL-157), and are re-cut
-before they start (DL-139).
+provisional until the owner's screen inventory covers their screens (DL-157; complete, DL-203),
+and are re-cut before they start (DL-139).
 
 **Carry-in tech debt** (Fix by: Slice 2 or S2-C0, `tech-debt.md`): TD-19 (S2-C22, the tech-debt
 review), TD-31 (S2-C22), TD-40 (S2-C14), TD-42 (S2-C22), TD-44 (S2-C0c), TD-49 (S2-C0g), TD-51
@@ -1579,21 +1579,21 @@ before the features.
 | 4 | Content access | The export-control gate in `authorize()` (design-doc §5 order); content scoping for lists (`scoping.py`); personal actions checked for content access; matrix rows (inherited admins denied content and allowed management; explicit members allowed); test-first; tested through a test-only content router until S2-C5's routes exist |
 | 5 | Requirements: create, read, list | `POST /api/projects/{key}/requirements` (the `RQ` number from the numbering service, revision 1 in the same transaction, `draft`, reporter = creator, restriction at creation, a parent in the same project; title and description limits, DL-143); `GET /api/projects/{key}/requirements` (the ranked tree view, complete up to the cap, DL-159); `GET /api/projects/{key}/requirements/{number}` (with `allowed_actions`); the `requirement.*` actions in the registry |
 | 6 | Requirements: update | `PATCH /api/projects/{key}/requirements/{number}` (`version`, 409 when stale; a new revision only when the title or description changes, with `change_note`; status any to any except `approved` (403 to members, 422 `use_approve` to admins, DL-148, DL-161); priority; reporter, admins only); `PUT /api/projects/{key}/requirements/{number}/restriction` (no `version`, and a direct update that doesn't bump it, DL-162, DL-168, with the developer guide's "Direct updates" paragraph; members raise, admins lower, never below the project's); every logged field through `log_change()` |
-| 7 | Tree operations | `POST /api/projects/{key}/requirements/{number}/move` (`parent_id` or null, `after_id` or `before_id`; same-project and cycle checks; the parent change logged; rank from S2-C2) |
-| 8 | Delete, restore & trash | `DELETE /api/projects/{key}/requirements/{number}?children=promote\|delete` (design-doc §9: the delete rules; children the user can't delete only promotable; a pending approval request cancelled and logged); `POST /api/projects/{key}/requirements/{number}/restore` (DL-146's tree rules); `GET /api/projects/{key}/trash` (offset-paged, a `type` filter, what the user may restore) |
+| 7 | Tree operations | `POST /api/projects/{key}/requirements/{number}/move` (`parent_id` or null, `after_id` or `before_id`; same-project and cycle checks; the parent change logged; rank from S2-C2; a rank that would pass 255 characters rewrites the ranks of that gap's siblings in the move's transaction, DL-204, TD-69; an integration test sorting generated ranks with `ORDER BY` against Python's order, DL-205) |
+| 8 | Delete, restore & trash | `DELETE /api/projects/{key}/requirements/{number}?children=promote\|delete` (design-doc §9: the delete rules; children the user can't delete only promotable; a pending approval request cancelled and logged); `POST /api/projects/{key}/requirements/{number}/restore` (DL-146's tree rules); `GET /api/projects/{key}/trash` (offset-paged, a `type` filter, what the user may restore); a deleted requirement's history is a 404, with a test (DL-206) |
 | 9 | Revisions | `GET /api/projects/{key}/requirements/{number}/revisions` (cursor-paged) and `GET /api/projects/{key}/requirements/{number}/revisions/{revision_number}` (DL-145) |
-| 10 | Approval requests | `POST /api/projects/{key}/requirements/{number}/approval-requests` (approvers by UUID; eligibility per §6.2 and export control; bound to the current revision; one pending per entity); `GET /api/projects/{key}/requirements/{number}/approval-requests`; `GET /api/approval-requests/{id}`; `POST /api/approval-requests/{id}/cancel`; logged per §10 |
-| 11 | Decisions & completion | `POST /api/approval-requests/{id}/decision` (`approval.decide`, a personal action no admin level grants); the all-must-approve policy in `rules/` (test-first); completion through the requirement's registered `on_approved` handler; `POST /api/projects/{key}/requirements/{number}/approve` (`requirement.approve_manually`, `version`, 409 when stale, DL-169; cancelling a pending request; the only path to `approved` by hand, DL-148, DL-161); the stale-revision warning field |
-| 12 | Approver replacement: project paths | Design-doc §6.2's replacement for: a project membership removed directly; the project marked export-controlled; an explicit membership removed on an export-controlled project; the archived-project flag instead of replacement; a replacement that completes a request; an API test per path |
+| 10 | Approval requests | `POST /api/projects/{key}/requirements/{number}/approval-requests` (approvers by UUID; eligibility per §6.2 and export control; bound to the current revision; one pending per entity); `GET /api/projects/{key}/requirements/{number}/approval-requests`; `GET /api/approval-requests/{id}`; `POST /api/approval-requests/{id}/cancel`; logged per §10; a request on an approved requirement re-opens it (DL-195); archiving a project cancels its pending requests, each logged (DL-194: the project service's archive calls the approval service, layer 1), with an API test |
+| 11 | Decisions & completion | `POST /api/approval-requests/{id}/decision` (`approval.decide`, a personal action no admin level grants); the all-must-approve policy in `rules/` (test-first); completion through the requirement's registered `on_approved` handler; a rejected re-open round moving the requirement back to `draft`, logged, and a rejected re-approval of an "Approved · modified" requirement changing nothing (DL-195; in the `rules/` policy, test-first); `POST /api/projects/{key}/requirements/{number}/approve` (`requirement.approve_manually`, `version`, 409 when stale, DL-169; cancelling a pending request; the only path to `approved` by hand, DL-148, DL-161); the stale-revision warning field |
+| 12 | Approver replacement: project paths | Design-doc §6.2's replacement for: a project membership removed directly; the project marked export-controlled; an explicit membership removed on an export-controlled project; a replacement that completes a request; an API test per path (an archived project has no pending requests to replace, DL-194) |
 | 13 | Approver replacement: other paths | The org and workspace removals (with their projects); an org or workspace role change or removal that took inherited admin away; `revoke-system-admin` (`changed_by` null); deactivation; the call sites in the layer order ("Notes" below); an API test per path |
 | 14 | My work: approvals | The approvals section (`GET /api/me/work`, `GET /api/me/work/approvals`; the `(approver_id, decision)` index; export-controlled content left out); TD-40 (each section its own error state, backend and page) |
 | 15 | Tree widget *(provisional)* | The `RequirementsTree` wrapper on PrimeVue TreeTable (DL-174), with the move menu: the table's name through `pt.table`, the expand button `aria-hidden`, Right on a closed row only opening it, a move splicing the node objects in place, `treetable` in the preset (its border on `--color-border-subtle`), and the keyboard, axe, theme-audit, and move specs (`docs/spikes/S2-C0b-tree/results.md`) |
 | 16 | Markdown view & editor *(provisional)* | DL-140, DL-141, DL-142: `MarkdownView`, `MarkdownEditor`, the CSP, the XSS corpus, and the end-to-end payload test |
-| 17 | Requirements page *(provisional)* | The tree (S2-C15), opening with only the top-level rows showing (every branch closed) and an "Expand all" that opens the second level at once and the deeper rows a batch per frame, so the page never freezes, measured at the 2,000-row cap (DL-175); the create dialog (the template by type, DL-149), Move up, down, to top, after…, and "Move to…", the Trash link |
+| 17 | Requirements page *(provisional)* | The tree (S2-C15), opening with only the top-level rows showing (every branch closed) and an "Expand all" that opens the second level at once and the deeper rows a batch per frame, so the page never freezes, measured at the 2,000-row cap (DL-175); the create dialog (the template by type, DL-149), Move up, down, to top, after…, and "Move to…" |
 | 18 | Requirement detail *(provisional)* | View and edit (S2-C16), 409 handling, the status menu and badges (DL-148), the restriction badge, the "No acceptance criteria" note, "Approved · modified" |
 | 19 | History & revisions *(provisional)* | The History and Revisions tabs (DL-145, DL-147) |
-| 20 | Approvals UI *(provisional)* | The request dialog (approver picker), the decide panel, cancel, approve by hand, the flagged-request state, My work's approvals section |
-| 21 | Delete dialog & trash *(provisional)* | The delete dialog (children promote or delete, the pending-request note), the Trash page and restore (DL-146) |
+| 20 | Approvals UI *(provisional)* | The request dialog (approver picker), re-open on an approved requirement (DL-195), the decide panel (rejecting prompts for a comment and asks to confirm without one, DL-196), cancel, approve by hand, the flagged-request state, My work's approvals section |
+| 21 | Delete dialog & trash *(provisional)* | The delete dialog (children promote or delete, the pending-request note), the Trash page, the last item of the project navigation (DL-202), and restore (DL-146) |
 | 22 | Slice verification | As S1-C17, plus `simplicity-auditor` after `repo-auditor` (DL-138); "Done when" walked through; a manual keyboard and screen-reader pass; the tech-debt review (TD-19, TD-31, TD-42, TD-61, TD-63, TD-64, TD-66); the retro, including whether `repo-auditor` keeps its lean category (DL-166), and S2-C0a's findings 1 (the git guard against Claude Code permission rules, after a trial in a scratch session) and 3 (one list of agents, skills, and hooks) (DL-171) |
 
 **Groups** ("Pull requests"): five review points, on the `s2` branch with one PR.
@@ -1661,8 +1661,11 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
   to a named approver with content access to the project (§5, "The choke point"); approver
   eligibility and replacement, including a replacement that completes a request (§6.2).
 - **Approver eligibility** on export-controlled projects: explicit members only (§3.1, §6.2).
-- **No replacement in an archived project** (§6.2): the requester-admin check below never runs
-  there, so it needn't get past the archived step of `authorize()`.
+- **Archiving cancels pending requests** (DL-194, §6.2), so there's no replacement in an
+  archived project: the requester-admin check below never runs there, and needn't get past the
+  archived step of `authorize()`.
+- **Re-opening** (DL-195, §6.2): decisions are final; a project admin re-opens an approved
+  requirement with a new request, and only a rejected re-open round moves it back to `draft`.
 - **Approver replacement touches Slice 1 flows.** Every path that takes away the access needed
   to decide (§6.2) gets the replacement: removing a project membership (directly, or with an org
   or workspace removal); removing or changing the org or workspace membership or role that gave
@@ -1705,8 +1708,8 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
   `MarkdownView` and one `MarkdownEditor`, built once in S2-C16 and reused by comments in
   Slice 6.
 - The requirements page, requirement detail (with History and Revisions), the approvals UI, the
-  delete dialog, and the Trash page (S2-C17 to S2-C21), provisional until the screen inventory
-  covers them (DL-157).
+  delete dialog, and the Trash page (S2-C17 to S2-C21), re-cut against the completed screen
+  inventory before they start (DL-139, DL-203).
 - End-to-end tests (Playwright, Chromium): creating and editing a requirement; requesting and
   deciding an approval; a stored XSS payload that doesn't run; deleting and restoring a tree.
 
@@ -1721,11 +1724,11 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
       is a 404); each approver decides only their own row, and no admin level (system admin
       included) can decide for them; when all approve, the requirement records the request's
       revision; a later edit shows "Approved · modified", and the compare view shows the change.
-- [ ] Every approver-replacement path in design-doc §6.2 has an API test; in an archived project
-      the request is flagged instead.
+- [ ] Every approver-replacement path in design-doc §6.2 has an API test; archiving a project
+      cancels its pending requests.
 - [ ] Deleting offers promote or delete for children and cancels a pending request; restoring
       brings back the descendants deleted with it; the trash shows each user what they may
-      restore.
+      restore, and a deleted requirement's history is a 404.
 - [ ] On a project marked export-controlled through the API, an inherited admin without an
       explicit membership gets a 404 for every requirement read and list, revisions, history,
       approvals, and the trash, and My work leaves it out; management still works; once added
@@ -1754,6 +1757,15 @@ notes for each slice's planning, not plans.
   and `ix_task_reviewer_id_status` (schema-doc, `task`).
 - **Slice 3** (DL-155): the project activity feed's API and page, with the filter bar (DL-147);
   item IDs (`WTL-RQ-12`) auto-linked in rendered markdown, once there are tasks to link (DL-144).
+- **Slice 3** (DL-199): a basic Timeline page holding phases; the requirement tree's task
+  coverage columns (task count and progress); the approver's review panel gains the item's tasks
+  and subtasks (DL-196). **Slice 5:** its test coverage columns (test-case
+  count, latest result).
+- **Slice 4** (DL-199): the Sprints page and a completed sprint's summary (from `activity_log`);
+  hard-deleting a planned sprint (its tasks back to the backlog); the Timeline's milestones and
+  slippage; releases as a milestone filter on lists and the board, with a progress bar on each
+  milestone; re-opening a gate (DL-195: a rejected round moves the milestone back to
+  `in_progress`; a `released` milestone can't be re-opened).
 - **Slices 4 and 7** (DL-155): when `sprints` (Slice 4) or `github` (Slice 7) ships, whether
   existing software projects get it turned on (DL-136).
 - **Slice 4:** completing a sprint with unfinished tasks moves them to the next planned sprint
@@ -1767,6 +1779,9 @@ notes for each slice's planning, not plans.
   `test_result`).
 - **Slice 6:** sending a task back from review prompts for an optional comment (design-doc §5,
   "Targeted rules — Task status transitions").
+- **Slice 6** (DL-197): comment edit and delete by their authors, with the "edited" marker
+  (`comment.edited_at`), and project admins deleting any; the header search bar and its results
+  page; the approver's review panel gains the item's comments (DL-196).
 - **Slice 7:** the system-admin operations screen: a failure indicator and a read-only list of
   failed jobs and webhook deliveries, failed jobs read through a wrapped helper in
   `app/jobs/`, and a `wl admin` command to retry a failed job (design-doc §13, "Operations

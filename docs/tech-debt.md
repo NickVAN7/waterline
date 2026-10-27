@@ -197,8 +197,7 @@ Entry format:
 ### TD-14: The pre-deployment items in design-doc §4 have no slice
 - **Added:** S1 planning (Sept 30, 2026)
 - **What:** Design-doc §4, "Before the first non-local deployment", lists work with no slice
-  of its own: sign-in throttling (`login_attempt`), the active-sessions page, password
-  re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
+  of its own: sign-in throttling (`login_attempt`), password re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
   lengths, the reverse proxy forwarding `Host`, re-evaluating the `Origin` check against an
   allowed-origins setting, the admin audit-event screen, general API rate limiting (per IP at
   the reverse proxy, per user in the app for expensive endpoints; 429 `rate_limited` with
@@ -787,13 +786,15 @@ Entry format:
   re-target)
 - **Status:** open
 
-### TD-62: Screen inventory steps 2 to 6 aren't done
+### TD-62: The completed screen inventory isn't checked against the docs and built screens
 - **Added:** S1-C17 (docs-consistency)
-- **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) were never done;
-  Slice 1's screens were designed checkpoint by checkpoint.
+- **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) are done (DL-203),
+  but Slice 1's screens were designed checkpoint by checkpoint, and step 6's table hasn't been
+  checked against the docs and the built screens.
 - **Why:** the owner completes the inventory separately, outside the checkpoints.
-- **Fix by:** S2-C15, the start of the `s2-web` group (the owner's completed inventory checked
-  against the docs and the built screens; it wasn't committed when S2-C0i started, DL-157)
+- **Fix by:** S2-C15, the start of the `s2-web` group: the completed inventory (committed at the
+  `s2-foundations` boundary, DL-203), its step 6 table checked against the docs and the built
+  screens (it wasn't committed when S2-C0i started, DL-157)
 - **Status:** open
 
 ### TD-63: Settings saves are last-save-wins, with no optimistic lock
@@ -865,7 +866,8 @@ Entry format:
   §6). Past about 2,700 bytes Postgres refuses the btree entry for `task`'s
   `(project_id, status, rank)` index, so a scripted run of drops would make further drops into
   that gap fail. `rules/rank.py` no longer crashes on long ranks (a loop, not recursion).
-- **Why:** a limit, and what a drop does when it's reached (a 4xx, or rewriting that gap's
-  ranks), is the owner's decision, and only the move endpoint can act on it.
-- **Fix by:** S2-C7 (the move endpoint; the owner decides the limit before it starts)
+- **Why:** a limit, and what a drop does when it's reached, was the owner's decision, and only
+  the move endpoint can act on it. Decided (DL-204): a 255-character cap, and a drop that would
+  pass it rewrites the ranks of that gap's siblings in one transaction.
+- **Fix by:** S2-C7 (the move endpoint)
 - **Status:** open
