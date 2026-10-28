@@ -367,10 +367,11 @@ def test_an_inherited_admins_allowed_actions_on_an_ec_project_are_management_onl
                 "project.view",
                 "project.view_access",
                 "project_member.manage",
+                "requirement.create",
                 "requirement.view",
             ],
         ),
-        ("project_member", ["project.view", "requirement.view"]),
+        ("project_member", ["project.view", "requirement.create", "requirement.view"]),
         ("project_viewer", ["project.view", "requirement.view"]),
     ],
 )
@@ -393,6 +394,7 @@ def test_an_inherited_admin_with_a_viewer_membership_keeps_content_in_allowed_ac
         "project.view",
         "project.view_access",
         "project_member.manage",
+        "requirement.create",
         "requirement.view",
     ]
 

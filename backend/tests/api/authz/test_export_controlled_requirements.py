@@ -163,10 +163,11 @@ INHERITED_ON_AN_EC_PROJECT = [
                 "project.view",
                 "project.view_access",
                 "project_member.manage",
+                "requirement.create",
                 "requirement.view",
             ],
         ),
-        ("project_member", ["project.view", "requirement.view"]),
+        ("project_member", ["project.view", "requirement.create", "requirement.view"]),
         ("project_viewer", ["project.view", "requirement.view"]),
     ],
 )
@@ -196,7 +197,11 @@ async def test_an_inherited_admin_with_a_viewer_membership_gets_content_actions_
     response = await client.get("/api/projects/PMT")
 
     assert response.status_code == 200
-    assert response.json()["allowed_actions"] == [*INHERITED_ON_AN_EC_PROJECT, "requirement.view"]
+    assert response.json()["allowed_actions"] == [
+        *INHERITED_ON_AN_EC_PROJECT,
+        "requirement.create",
+        "requirement.view",
+    ]
 
 
 @pytest.mark.parametrize("who", ["system_admin", "workspace_admin", "org_admin"])

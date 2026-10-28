@@ -323,12 +323,15 @@ def test_a_project_target_carries_export_controlled_beside_its_other_facts() -> 
 # --- The registry's content/management marking (DL-82; §5) --------------------------------------
 
 
-def test_every_action_so_far_is_marked_management_but_requirement_view() -> None:
+def test_every_action_so_far_is_marked_management_but_the_requirement_actions() -> None:
     """DL-82: "The registry marks every action content or management; every action so far is
-    management"; S2-C3 adds the first content action, `requirement.view` (S2-plan, "Actions per
-    row")."""
+    management"; S2-C3 adds the first content action, `requirement.view`, and S2-C5
+    `requirement.create` (S2-plan, "Actions per row")."""
     assert {
         action: REGISTRY[action].access
         for action in Action
         if REGISTRY[action].access is not AccessKind.MANAGEMENT
-    } == {Action.REQUIREMENT_VIEW: AccessKind.CONTENT}
+    } == {
+        Action.REQUIREMENT_VIEW: AccessKind.CONTENT,
+        Action.REQUIREMENT_CREATE: AccessKind.CONTENT,
+    }

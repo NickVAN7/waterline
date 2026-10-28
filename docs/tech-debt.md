@@ -871,3 +871,26 @@ Entry format:
   pass it rewrites the ranks of that gap's siblings in one transaction.
 - **Fix by:** S2-C7 (the move endpoint)
 - **Status:** open
+
+### TD-70: The requirement tree stops at 2,000 rows
+- **Added:** S2-C5
+- **What:** `GET /api/projects/{key}/requirements` returns at most 2,000 requirements in
+  `(rank, id)` order, with `truncated: true` above it (DL-159). The cut is by rank across every
+  level, so a truncated tree can hold a child whose parent was left out.
+- **Why:** the tree is a ranked view, returned whole for drag-and-drop (build plan, "API
+  conventions"); the owner judged 2,000 more than enough for v1 (DL-159).
+- **Fix by:** S2-C22 (the tech-debt review): reviewed there, then paged when a project nears
+  2,000 requirements (DL-159)
+- **Status:** open
+
+### TD-71: Creating a child doesn't hold its parent
+- **Added:** S2-C5
+- **What:** `POST /api/projects/{key}/requirements` checks that `parent_id` is a live
+  requirement in the project, then inserts the child, without holding the parent `FOR SHARE`
+  (backend `CLAUDE.md`, "A check that *another* row exists…"). A delete of the parent committing
+  in between would leave a live child under a deleted parent.
+- **Why:** nothing deletes a requirement until S2-C8, so there's no race to test yet, and a lock
+  with no race test against it is unproven code.
+- **Fix by:** S2-C8 (the delete endpoint): hold the parent `FOR SHARE` on create, with a race
+  test against a delete
+- **Status:** open

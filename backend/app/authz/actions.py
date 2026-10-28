@@ -89,6 +89,7 @@ class Action(StrEnum):
     PROJECT_RAISE_RESTRICTION = "project.raise_restriction"
     PROJECT_LOWER_RESTRICTION = "project.lower_restriction"
     REQUIREMENT_VIEW = "requirement.view"
+    REQUIREMENT_CREATE = "requirement.create"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -268,5 +269,12 @@ REGISTRY: dict[str, ActionSpec] = {
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.VIEWER,
         mutation=False,
+    ),
+    # Project members and up, inherited admins included (S2-plan, actions; §5 Role capabilities).
+    Action.REQUIREMENT_CREATE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.MEMBER,
     ),
 }

@@ -4871,6 +4871,242 @@
           }
         }
       }
+    },
+    "/api/projects/{key}/requirements": {
+      "post": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Create Requirement",
+        "description": "Create a requirement: the next `RQ` number, `draft`, revision 1, at the bottom of its\nsiblings. 404 for a `parent_id` outside the project; 422 on `title` (`missing`) and on\n`restriction_categories` (`project_only`: `export_controlled` is set on the project).",
+        "operationId": "create_requirement_api_projects__key__requirements_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Requirement Tree",
+        "description": "The project's requirements for the tree, siblings in rank order: complete up to 2,000,\nwith `truncated` above it (DL-159).",
+        "operationId": "requirement_tree_api_projects__key__requirements_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementTree"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/requirements/{number}": {
+      "get": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Get Requirement",
+        "description": "The requirement, with the actions the caller may take on it.",
+        "operationId": "get_requirement_api_projects__key__requirements__number__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5005,7 +5241,8 @@
           "project.view_access",
           "project.raise_restriction",
           "project.lower_restriction",
-          "requirement.view"
+          "requirement.view",
+          "requirement.create"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
@@ -6218,6 +6455,16 @@
         "title": "PasswordReset",
         "description": "The temporary password an admin sets; the user must change it at next sign-in."
       },
+      "Priority": {
+        "type": "string",
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low"
+        ],
+        "title": "Priority"
+      },
       "ProjectAccessEntry": {
         "properties": {
           "user": {
@@ -6936,6 +7183,331 @@
         "type": "object",
         "title": "ProjectUpdate",
         "description": "Only the fields sent change; `lead_id: null` clears the lead. The key never changes."
+      },
+      "RequirementCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title"
+          },
+          "description_md": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Description Md",
+            "default": ""
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority",
+            "default": "medium"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Restriction Categories",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RequirementCreate",
+        "description": "A new requirement: `draft`, reported by the caller, at the bottom of its siblings.\n`parent_id` is a requirement in the same project (anything else is a 404); the restriction\nmay raise the item's level and add categories (design-doc §3.1; `export_controlled` is\nproject-only)."
+      },
+      "RequirementItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequirementStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Restriction Categories"
+          },
+          "current_revision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Revision Id"
+          },
+          "approved_revision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Revision Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "parent_id",
+          "title",
+          "status",
+          "priority",
+          "restriction_level",
+          "restriction_categories",
+          "current_revision_id",
+          "approved_revision_id"
+        ],
+        "title": "RequirementItem",
+        "description": "A row of the requirement tree."
+      },
+      "RequirementRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description_md": {
+            "type": "string",
+            "title": "Description Md"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequirementStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "reporter_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reporter Id"
+          },
+          "reporter_name": {
+            "type": "string",
+            "title": "Reporter Name"
+          },
+          "restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Restriction Categories"
+          },
+          "current_revision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Revision Id"
+          },
+          "approved_revision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Revision Id"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "parent_id",
+          "title",
+          "description_md",
+          "status",
+          "priority",
+          "reporter_id",
+          "reporter_name",
+          "restriction_level",
+          "restriction_categories",
+          "current_revision_id",
+          "approved_revision_id",
+          "approved_at",
+          "version",
+          "created_at",
+          "updated_at",
+          "allowed_actions"
+        ],
+        "title": "RequirementRead",
+        "description": "One requirement, with the actions the caller may take on it. \"Approved · modified\" is\nderived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1)."
+      },
+      "RequirementStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "approved",
+          "in_progress",
+          "done",
+          "rejected",
+          "deferred"
+        ],
+        "title": "RequirementStatus"
+      },
+      "RequirementTree": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "RequirementTree",
+        "description": "The project's requirements in `(rank, id)` order, siblings in rank order (the client\nnests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159)."
       },
       "RestrictionCategory": {
         "type": "string",

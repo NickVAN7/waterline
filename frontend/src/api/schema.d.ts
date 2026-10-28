@@ -943,6 +943,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Tree
+         * @description The project's requirements for the tree, siblings in rank order: complete up to 2,000,
+         *     with `truncated` above it (DL-159).
+         */
+        get: operations["requirement_tree_api_projects__key__requirements_get"];
+        put?: never;
+        /**
+         * Create Requirement
+         * @description Create a requirement: the next `RQ` number, `draft`, revision 1, at the bottom of its
+         *     siblings. 404 for a `parent_id` outside the project; 422 on `title` (`missing`) and on
+         *     `restriction_categories` (`project_only`: `export_controlled` is set on the project).
+         */
+        post: operations["create_requirement_api_projects__key__requirements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Requirement
+         * @description The requirement, with the actions the caller may take on it.
+         */
+        get: operations["get_requirement_api_projects__key__requirements__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -996,7 +1043,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create";
         /**
          * ActivityAction
          * @enum {string}
@@ -1484,6 +1531,11 @@ export interface components {
             password: string;
         };
         /**
+         * Priority
+         * @enum {string}
+         */
+        Priority: "critical" | "high" | "medium" | "low";
+        /**
          * ProjectAccessEntry
          * @description One person who reaches the project: their explicit role, if any, and why they reach it.
          */
@@ -1746,6 +1798,126 @@ export interface components {
             lead_id?: string | null;
             /** Enabled Modules */
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
+        };
+        /**
+         * RequirementCreate
+         * @description A new requirement: `draft`, reported by the caller, at the bottom of its siblings.
+         *     `parent_id` is a requirement in the same project (anything else is a 404); the restriction
+         *     may raise the item's level and add categories (design-doc §3.1; `export_controlled` is
+         *     project-only).
+         */
+        RequirementCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Description Md
+             * @default
+             */
+            description_md: string;
+            /** @default medium */
+            priority: components["schemas"]["Priority"];
+            /** Parent Id */
+            parent_id?: string | null;
+            restriction_level?: components["schemas"]["RestrictionLevel"] | null;
+            /**
+             * Restriction Categories
+             * @default []
+             */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * RequirementItem
+         * @description A row of the requirement tree.
+         */
+        RequirementItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Title */
+            title: string;
+            status: components["schemas"]["RequirementStatus"];
+            priority: components["schemas"]["Priority"];
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Current Revision Id */
+            current_revision_id: string | null;
+            /** Approved Revision Id */
+            approved_revision_id: string | null;
+        };
+        /**
+         * RequirementRead
+         * @description One requirement, with the actions the caller may take on it. "Approved · modified" is
+         *     derived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1).
+         */
+        RequirementRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Title */
+            title: string;
+            /** Description Md */
+            description_md: string;
+            status: components["schemas"]["RequirementStatus"];
+            priority: components["schemas"]["Priority"];
+            /**
+             * Reporter Id
+             * Format: uuid
+             */
+            reporter_id: string;
+            /** Reporter Name */
+            reporter_name: string;
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Current Revision Id */
+            current_revision_id: string | null;
+            /** Approved Revision Id */
+            approved_revision_id: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * RequirementStatus
+         * @enum {string}
+         */
+        RequirementStatus: "draft" | "approved" | "in_progress" | "done" | "rejected" | "deferred";
+        /**
+         * RequirementTree
+         * @description The project's requirements in `(rank, id)` order, siblings in rank order (the client
+         *     nests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159).
+         */
+        RequirementTree: {
+            /** Items */
+            items: components["schemas"]["RequirementItem"][];
+            /** Truncated */
+            truncated: boolean;
         };
         /**
          * RestrictionCategory
@@ -5033,6 +5205,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Feed_ActivityEntry_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_tree_api_projects__key__requirements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementTree"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_requirement_api_projects__key__requirements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_requirement_api_projects__key__requirements__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
                 };
             };
             /** @description Unauthorized */

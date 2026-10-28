@@ -14,7 +14,17 @@ from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.errors import register_error_handlers
 from app.core.request_guard import RequestGuardMiddleware
 from app.core.settings import Settings, get_settings
-from app.routers import activity, auth, health, my_work, org, project, user, workspace
+from app.routers import (
+    activity,
+    auth,
+    health,
+    my_work,
+    org,
+    project,
+    requirement,
+    user,
+    workspace,
+)
 from app.rules.identifiers import RESERVED_SLUGS
 
 API_PREFIX = "/api"
@@ -62,6 +72,7 @@ def create_app(
     app.include_router(project.router, prefix=API_PREFIX)
     app.include_router(my_work.router, prefix=API_PREFIX)
     app.include_router(activity.router, prefix=API_PREFIX)
+    app.include_router(requirement.router, prefix=API_PREFIX)
     _add_schema_components(app)
     return app
 

@@ -346,6 +346,7 @@ INHERITED_ON_A_LIVE_PROJECT = [
     "project.view",
     "project.view_access",
     "project_member.manage",
+    "requirement.create",
     "requirement.view",
 ]
 
@@ -367,10 +368,11 @@ INHERITED_ON_A_LIVE_PROJECT = [
                 "project.view",
                 "project.view_access",
                 "project_member.manage",
+                "requirement.create",
                 "requirement.view",
             ],
         ),
-        ("project_member", ["project.view", "requirement.view"]),
+        ("project_member", ["project.view", "requirement.create", "requirement.view"]),
         ("project_viewer", ["project.view", "requirement.view"]),
     ],
 )
