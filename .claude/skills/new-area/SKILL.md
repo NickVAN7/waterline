@@ -90,9 +90,9 @@ Follow the `migration` skill.
 - Every mutation in this order: `authorize()` → change → `log_change()`; the request
   dependency commits. The service never commits (`flush()` only when it needs generated
   values).
-- Numbers only from the numbering service; rank, counters, an item's restriction, and a new
-  item's first revision pointer only through the direct-update helper (no `version` bump, so a
-  new item starts at `version` 1; DL-168, DL-207).
+- Numbers only from the numbering service; rank, counters, an item's restriction, a move's
+  parent change, and a new item's first revision pointer only through the direct-update helper
+  (no `version` bump, so a new item starts at `version` 1; DL-168, DL-207, DL-214).
 - An item's restriction level is null or at least the project's: a lower one is a 422
   `validation_error` of type `below_project` on the level field (DL-208). Raising a project's
   level lifts this item type's live rows stored below the new level (register a handler with

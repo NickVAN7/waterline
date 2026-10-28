@@ -1148,8 +1148,9 @@ requirement approval.
     other, and with neither it's the first rank. Ranks stay short however many items are added
     at the top or bottom: 10,000 in a row stay under 10 characters. Neighbors that aren't in
     strictly increasing order, equal ones included, raise `ValueError`: no rank sorts between
-    two equal ones. Equal neighbors can happen after a tie (below), so the move endpoint
-    handles that case (TD-67); any other out-of-order pair is a programming error. An
+    two equal ones. A drop between two equal neighbors (a tie, below) rewrites that gap's
+    siblings as the length cap does (DL-213); any other out-of-order pair is a programming
+    error. An
     integration test pins the collation: generated ranks sorted by the database's `ORDER BY`
     come back in Python's order (DL-205; S2-C7).
   - **Rank length is capped at 255 characters** (DL-204). Drops into one gap lengthen a rank
@@ -1161,8 +1162,12 @@ requirement approval.
     (same approach as the subtask counter, §3). A rank write also leaves `updated_at` alone: a
     display-order change isn't an edit (the subtask counter does move it).
   - **Ties:** every ordered query sorts by `(rank, id)`, so two items that receive the same rank
-    in a simultaneous drop still order deterministically. No locking, and no periodic
-    rebalancing in v1: the only rewrite is the length cap's (above).
+    still order deterministically. No periodic rebalancing in v1: the only rewrites are a drop
+    past the length cap and a drop between tied neighbors (above, DL-213).
+  - **Requirement moves run one at a time per project** (DL-214): a move takes the project's tree lock
+    first (`FOR NO KEY UPDATE` on the project row, which doesn't block creates), so two moves
+    at once can't make a parent cycle that neither saw. A reorder leaves `updated_at` alone; a
+    parent change is logged and moves it. Neither bumps `version`.
   - **Cross-column drop** on a board changes status and rank in one request. The status change
     goes through the transition rules in `authorize()` (§5); if denied, the card snaps back with
     a short message and nothing is saved.

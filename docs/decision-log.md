@@ -2707,3 +2707,27 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C6, S2-C11); `docs/reviews/s2/S2-plan.md` (actions table)
 - **Source:** owner, Oct 28, 2026 (chat, before S2-C6)
+
+### DL-213: A drop between tied ranks rewrites the gap's siblings
+- **Date:** 2026-10-28
+- **Decision:** A move whose neighbors share a rank (no rank sorts between them) rewrites the
+  ranks of that parent's children in their order, with the moved item placed, in the move's
+  transaction: the same rewrite as a drop past the length cap (DL-204). Built in S2-C7,
+  resolving TD-67.
+- **Supersedes:** design-doc §6 "Ties": "the only rewrite is the length cap's"
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7); TD-67
+- **Source:** owner, Oct 28, 2026 (chat, during S2-C7)
+
+### DL-214: Moves run one at a time per project
+- **Date:** 2026-10-28
+- **Decision:** A requirement move takes the project's tree lock first (`FOR NO KEY UPDATE`
+  on the project row, so creates' foreign-key checks still pass), then the item's row, so two
+  moves at once can't build a parent cycle that each passed alone. A reorder leaves
+  `updated_at` alone; a parent change is logged and moves it; neither bumps `version`. Built in
+  S2-C7.
+- **Supersedes:** design-doc §6 "Ties": "No locking"
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7); developer guide
+  ("Direct updates"); `backend/CLAUDE.md`; `new-area` skill
+- **Source:** owner, Oct 28, 2026 (chat, during S2-C7)

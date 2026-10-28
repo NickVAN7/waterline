@@ -845,7 +845,8 @@ Entry format:
   move between two tied items would be a 500 until the endpoint handles it.
 - **Why:** the rule can't decide it alone; the move endpoint loads the neighbors and is built in
   S2-C7.
-- **Fix by:** S2-C7 (the move endpoint decides what a drop between tied neighbors does)
+- **Fix by:** S2-C7 (the move endpoint decides what a drop between tied neighbors does): it
+  rewrites the gap's siblings, as the length cap does (DL-213)
 - **Status:** open
 
 ### TD-68: mutmut segfaults on one shape of `rules/rank.py`
