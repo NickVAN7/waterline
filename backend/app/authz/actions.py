@@ -90,6 +90,11 @@ class Action(StrEnum):
     PROJECT_LOWER_RESTRICTION = "project.lower_restriction"
     REQUIREMENT_VIEW = "requirement.view"
     REQUIREMENT_CREATE = "requirement.create"
+    REQUIREMENT_UPDATE = "requirement.update"
+    REQUIREMENT_REASSIGN_REPORTER = "requirement.reassign_reporter"
+    REQUIREMENT_RAISE_RESTRICTION = "requirement.raise_restriction"
+    REQUIREMENT_LOWER_RESTRICTION = "requirement.lower_restriction"
+    REQUIREMENT_APPROVE_MANUALLY = "requirement.approve_manually"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -276,5 +281,41 @@ REGISTRY: dict[str, ActionSpec] = {
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.MEMBER,
+    ),
+    Action.REQUIREMENT_UPDATE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.MEMBER,
+    ),
+    # Members raise an item's restriction (§3.1, "Who sets it").
+    Action.REQUIREMENT_RAISE_RESTRICTION: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.MEMBER,
+    ),
+    # Project admins, inherited included (S2-plan, actions; DL-211).
+    Action.REQUIREMENT_REASSIGN_REPORTER: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    # Lowering is project-admin only, and on an export-controlled project an explicit project
+    # admin's (§3.1, as for the project's own, DL-82).
+    Action.REQUIREMENT_LOWER_RESTRICTION: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        explicit_when_export_controlled=True,
+    ),
+    # Approving by hand (§5; registered here for the PATCH's 403/422 split, DL-212).
+    Action.REQUIREMENT_APPROVE_MANUALLY: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
     ),
 }

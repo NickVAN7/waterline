@@ -6,6 +6,7 @@ database rejects any later edit or delete (append-only trigger, DL-193).
 """
 
 import uuid
+from typing import cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +16,9 @@ from app.models.audit import ActivityLog
 
 def _text(value: object) -> str | None:
     """A value as the log stores it: enum members by value (a `StrEnum`'s `str`), IDs and dates
-    as their text."""
+    as their text, a list as its members' text, comma-separated (`[]` is "")."""
+    if isinstance(value, list):
+        return ",".join(map(str, cast(list[object], value)))
     return None if value is None else str(value)
 
 
@@ -34,7 +37,8 @@ def log_change(
     """Record a change in the request's transaction (no commit, no flush).
 
     `field` is required for `updated` (the database checks it). `old` and `new` are serialized:
-    pass enum members, IDs, and dates as they are; for link events, the other entity's ID.
+    pass enum members, IDs, dates, and lists of them as they are; for link events, the other
+    entity's ID.
     `changed_by` is None only when an app CLI command caused the change. `changed_at` is the
     database's (the transaction's start time).
     """

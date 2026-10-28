@@ -95,7 +95,9 @@ Follow the `migration` skill.
   new item starts at `version` 1; DL-168, DL-207).
 - An item's restriction level is null or at least the project's: a lower one is a 422
   `validation_error` of type `below_project` on the level field (DL-208). Raising a project's
-  level lifts this item type's live rows stored below the new level (no `include_deleted`),
+  level lifts this item type's live rows stored below the new level (register a handler with
+  `register_on_restriction_changed()` in `services/project.py`, as the requirement area does;
+  no `include_deleted`),
   each logged, with `direct_update(..., touch_updated_at=False)`; restoring a row stored below
   its project's level raises it to the project's level, logged by the restoring user, and moves
   its `updated_at` (DL-209, DL-210).

@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C5 (Requirements: create, read, list) built; next is S2-C6 (history: `docs/reviews/`).
+> **Status:** S2-C6 (Requirements: update) built; next is S2-C7 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -323,6 +323,11 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
   (`ProjectService.remove_with_projects`): it removes the person's memberships on the org's (or
   workspace's) projects, archived ones included, clearing a lead, with `via` in each event. Tests
   of what the roster passes stand in for it with the `removals` fixture (`tests/api/conftest.py`).
+- **Changing a project's restriction** calls the handlers registered with
+  `register_on_restriction_changed()` (`app/services/project.py`), each given the project (its
+  new level already set) and the actor. Each item area registers one that lifts its live rows
+  stored below the project's level (`RequirementService.lift_to_project`, DL-208 to DL-210), so a
+  lower lifts nothing.
 - **The user check** (`GET /api/workspaces/{id}/user-check`, DL-66) answers one of `email`,
   `username`, or `name`; `suggest_username()` (`app/rules/identifiers.py`) builds the name's
   username, and `UserService.check` adds `-2`, `-3`, … while it's taken.
@@ -606,12 +611,14 @@ the ORM's own check then catches a write between this request's load and its com
 `StaleDataError`, which `get_session` turns into **409** `{"code": "stale_version", ...}` (see
 "Errors" in section 4); the UI prompts a reload.
 
-**Direct updates** (`app/repositories/base.py`). Rank moves and counters use `direct_update`,
-which runs `UPDATE … RETURNING` outside the unit of work, so it doesn't bump `version` (someone
-editing the item's content at the same time doesn't get a 409). Every call says whether
-`updated_at` moves, with the required `touch_updated_at` keyword: a rank write passes `False`
-(a display-order change isn't an edit), a counter write such as adding a subtask passes
-`True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
+**Direct updates** (`app/repositories/base.py`). Rank moves, counters, an item's restriction
+(DL-168), and a new item's first revision pointer (DL-207) use `direct_update`, which runs
+`UPDATE … RETURNING` outside the unit of work, so it doesn't bump `version` (someone editing the
+item's content at the same time doesn't get a 409; a new requirement starts at `version` 1).
+Every call says whether `updated_at` moves, with the required `touch_updated_at` keyword
+(DL-210): a rank write passes `False` (a display-order change isn't an edit), as do the first
+revision pointer and items lifted by a project raise (nobody edited them); a counter write such
+as adding a subtask, and an item's own restriction change, pass `True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
 works as a counter), or `None` if no row has that id, and writes every changed column onto the
 object if the session has it loaded, so it stays readable without a lazy load.
 

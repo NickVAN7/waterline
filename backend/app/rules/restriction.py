@@ -47,3 +47,9 @@ def change(old: Restriction, new: Restriction) -> Change:
         raises=_RANK[new.level] > _RANK[old.level] or bool(new.categories - old.categories),
         lowers=_RANK[new.level] < _RANK[old.level] or bool(old.categories - new.categories),
     )
+
+
+def levels_below(project: RestrictionLevel | None) -> frozenset[RestrictionLevel]:
+    """The levels an item may not store on a project at `project`: those ranking below it
+    (DL-208). An item's null level inherits the project's, so it's never below."""
+    return frozenset(level for level in RestrictionLevel if _RANK[level] < _RANK[project])

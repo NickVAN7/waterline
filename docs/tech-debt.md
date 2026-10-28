@@ -894,3 +894,17 @@ Entry format:
 - **Fix by:** S2-C8 (the delete endpoint): hold the parent `FOR SHARE` on create, with a race
   test against a delete
 - **Status:** open
+
+### TD-72: The reporter and the restriction floor are checked without a lock
+- **Added:** S2-C6
+- **What:** `PATCH …/requirements/{number}` checks that a new reporter may create requirements in
+  the project (DL-211) without holding their membership `FOR SHARE`, so a removal committing in
+  between leaves a reporter who no longer qualifies. Creating a requirement and its restriction
+  `PUT` check the level against the project's (DL-208) without holding the project row `FOR
+  SHARE`, so a project raise committing in between can leave the item below the new floor (the
+  raise lifts only the rows it sees).
+- **Why:** the same lock-and-race-test work as TD-71, done once in S2-C8; the effective level
+  stays correct meanwhile (the stricter level wins), so nothing is exposed.
+- **Fix by:** S2-C8: hold the reporter's membership and the project row `FOR SHARE`, with a
+  race test each
+- **Status:** open

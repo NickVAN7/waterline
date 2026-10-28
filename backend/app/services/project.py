@@ -3,7 +3,7 @@ API"; DL-76, DL-78)."""
 
 import dataclasses
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import cast
 
@@ -223,6 +223,17 @@ def _restriction_json(restriction: Restriction) -> dict[str, JsonValue]:
         "restriction_level": level.value if level else None,
         "restriction_categories": list[JsonValue](_stored(restriction.categories)),
     }
+
+
+type RestrictionChangedHandler = Callable[[AsyncSession, Project, uuid.UUID], Awaitable[None]]
+
+# Registered by the item areas (requirements, S2-C6), which this module never imports: each lifts
+# its live items stored below the project's new level (DL-208, DL-209).
+_ON_RESTRICTION_CHANGED: list[RestrictionChangedHandler] = []
+
+
+def register_on_restriction_changed(handler: RestrictionChangedHandler) -> None:
+    _ON_RESTRICTION_CHANGED.append(handler)
 
 
 class ProjectService:
@@ -501,6 +512,9 @@ class ProjectService:
             project.restriction_level = new.level
             project.restriction_categories = _stored(new.categories)
             await self.session.flush()
+            # Each lifts only what's now below the floor, so a lower lifts nothing (DL-208).
+            for handler in _ON_RESTRICTION_CHANGED:
+                await handler(self.session, project, ctx.user_id)
             self._log(
                 AuditAction.PROJECT_RESTRICTION_CHANGED,
                 ctx.user_id,

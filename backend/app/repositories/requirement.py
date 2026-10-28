@@ -1,11 +1,14 @@
 """Requirements (schema-doc "Requirements"; design-doc §6)."""
 
 import uuid
+from collections.abc import Collection
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.requirement import Requirement
+from app.enums import RestrictionLevel
+from app.models.requirement import Requirement, RequirementRevision
 
 
 class RequirementRepository:
@@ -55,3 +58,27 @@ class RequirementRepository:
             .limit(limit)
         )
         return list(rows)
+
+    async def lock(self, requirement: Requirement) -> None:
+        """Re-read the requirement's row and hold it until the transaction ends."""
+        await self.session.refresh(requirement, with_for_update=True)
+
+    async def revision_number(self, revision_id: uuid.UUID) -> int:
+        """The number of a revision that exists (the current one)."""
+        number = await self.session.scalar(
+            select(RequirementRevision.revision_number).where(RequirementRevision.id == revision_id)
+        )
+        return cast(int, number)
+
+    async def lock_stored_at(
+        self, project_id: uuid.UUID, levels: Collection[RestrictionLevel]
+    ) -> list[tuple[uuid.UUID, RestrictionLevel]]:
+        """The project's live requirements stored at one of `levels`, locked, in id order (so
+        two raises lock rows in the same order)."""
+        rows = await self.session.execute(
+            select(Requirement.id, Requirement.restriction_level)
+            .where(Requirement.project_id == project_id, Requirement.restriction_level.in_(levels))
+            .order_by(Requirement.id)
+            .with_for_update()
+        )
+        return [(id_, RestrictionLevel(level)) for id_, level in rows]

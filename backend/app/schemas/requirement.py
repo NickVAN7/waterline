@@ -7,7 +7,11 @@ from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import Priority, RequirementStatus, RestrictionCategory, RestrictionLevel
-from app.schemas.limits import REQUIREMENT_DESCRIPTION_MAX, REQUIREMENT_TITLE_MAX
+from app.schemas.limits import (
+    CHANGE_NOTE_MAX,
+    REQUIREMENT_DESCRIPTION_MAX,
+    REQUIREMENT_TITLE_MAX,
+)
 
 
 class RequirementCreate(BaseModel):
@@ -22,6 +26,29 @@ class RequirementCreate(BaseModel):
     parent_id: uuid.UUID | None = None
     restriction_level: RestrictionLevel | None = None
     restriction_categories: list[RestrictionCategory] = []
+
+
+class RequirementUpdate(BaseModel):
+    """Only the fields sent change. `version` is the one the caller read (a stale one is a
+    409). A new revision, with `change_note`, only when `title` or `description_md` changes
+    (design-doc §6.1). `status` may not be `approved` (DL-161); `reporter_id` needs
+    `requirement.reassign_reporter` (DL-211)."""
+
+    version: int
+    title: str | None = Field(default=None, max_length=REQUIREMENT_TITLE_MAX)
+    description_md: str | None = Field(default=None, max_length=REQUIREMENT_DESCRIPTION_MAX)
+    change_note: str | None = Field(default=None, max_length=CHANGE_NOTE_MAX)
+    status: RequirementStatus | None = None
+    priority: Priority | None = None
+    reporter_id: uuid.UUID | None = None
+
+
+class RequirementRestrictionUpdate(BaseModel):
+    """`PUT …/requirements/{number}/restriction` (DL-162): `level` (null: inherit the project's)
+    and `categories` replace the current ones. No `version` (DL-168)."""
+
+    level: RestrictionLevel | None
+    categories: list[RestrictionCategory]
 
 
 class RequirementRead(BaseModel):

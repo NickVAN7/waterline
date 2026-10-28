@@ -987,6 +987,35 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /**
+         * Update Requirement
+         * @description Change the fields sent. 409 on a stale `version`; a new revision only when the title or
+         *     description changes. `status` `approved`: 403 without `requirement.approve_manually`, else
+         *     422 `use_approve`; `reporter_id` needs `requirement.reassign_reporter`, 422
+         *     `account_inactive` or `not_member`.
+         */
+        patch: operations["update_requirement_api_projects__key__requirements__number__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/restriction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Requirement Restriction
+         * @description Set the requirement's restriction level and categories (no `version`, DL-162): raising
+         *     needs `requirement.raise_restriction`, lowering `requirement.lower_restriction`. 422 on
+         *     `level` (`below_project`) and on `categories` (`project_only`).
+         */
+        put: operations["set_requirement_restriction_api_projects__key__requirements__number__restriction_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -1043,7 +1072,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually";
         /**
          * ActivityAction
          * @enum {string}
@@ -1904,6 +1933,16 @@ export interface components {
             allowed_actions: components["schemas"]["Action"][];
         };
         /**
+         * RequirementRestrictionUpdate
+         * @description `PUT …/requirements/{number}/restriction` (DL-162): `level` (null: inherit the project's)
+         *     and `categories` replace the current ones. No `version` (DL-168).
+         */
+        RequirementRestrictionUpdate: {
+            level: components["schemas"]["RestrictionLevel"] | null;
+            /** Categories */
+            categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
          * RequirementStatus
          * @enum {string}
          */
@@ -1918,6 +1957,27 @@ export interface components {
             items: components["schemas"]["RequirementItem"][];
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * RequirementUpdate
+         * @description Only the fields sent change. `version` is the one the caller read (a stale one is a
+         *     409). A new revision, with `change_note`, only when `title` or `description_md` changes
+         *     (design-doc §6.1). `status` may not be `approved` (DL-161); `reporter_id` needs
+         *     `requirement.reassign_reporter` (DL-211).
+         */
+        RequirementUpdate: {
+            /** Version */
+            version: number;
+            /** Title */
+            title?: string | null;
+            /** Description Md */
+            description_md?: string | null;
+            /** Change Note */
+            change_note?: string | null;
+            status?: components["schemas"]["RequirementStatus"] | null;
+            priority?: components["schemas"]["Priority"] | null;
+            /** Reporter Id */
+            reporter_id?: string | null;
         };
         /**
          * RestrictionCategory
@@ -5376,6 +5436,132 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_requirement_api_projects__key__requirements__number__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    set_requirement_restriction_api_projects__key__requirements__number__restriction_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementRestrictionUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -556,10 +556,10 @@ when the owning service calls it (DL-70).
 | `auth` | session; user_identity (added in Slice 7) | 1 | user (registers `on_email_changed` with it); approval (approver replacement, from Slice 2) |
 | `workspace` | workspace, workspace_membership | 1 | user; roster (its staff rules); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
 | `org` | organization, membership | 1 | user; roster (its member rules); tag (copies the default tags into a new org, from Slice 6); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
-| `project` | project (incl. modules and module guidance), project_membership | 1 | org, workspace; roster (its member rules: the email-first add and create, the lock order, and registering `on_member_removed`, DL-71); user (creating a user for the project goes through the org service); approval (approver replacement, from Slice 2) |
+| `project` | project (incl. modules and module guidance), project_membership | 1 | org, workspace; roster (its member rules: the email-first add and create, the lock order, and registering `on_member_removed`, DL-71); user (creating a user for the project goes through the org service); approval (approver replacement, from Slice 2); requirement (only through its registered `on_restriction_changed` handler, from S2-C6, DL-208) |
 | `roster` *(service only; no tables)* | none (writes the workspace, org, and (from S1-C12) project areas' membership rows only when their services call it: the membership rules they share, DL-70, DL-71) | 1 | user |
 | `numbering` *(service + repository only)* | project_counter; `task.next_subtask_number` | 1 | — |
-| `requirement` | requirement, requirement_revision | 2 | numbering, approval, task, testcase |
+| `requirement` | requirement, requirement_revision | 2 | numbering, approval, task, testcase; project (registers `on_restriction_changed` with it, from S2-C6) |
 | `approval` | approval_request, approval | 2 | approvable areas via registered handlers only |
 | `audit` *(`log_change()` in `app/audit/`; not a service)* | activity_log | 2 | — |
 | `audit_event` *(`log_admin_event()` in `app/audit/`; not a service)* | audit_event | 1 | — |

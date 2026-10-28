@@ -163,11 +163,25 @@ INHERITED_ON_AN_EC_PROJECT = [
                 "project.view",
                 "project.view_access",
                 "project_member.manage",
+                "requirement.approve_manually",
                 "requirement.create",
+                "requirement.lower_restriction",
+                "requirement.raise_restriction",
+                "requirement.reassign_reporter",
+                "requirement.update",
                 "requirement.view",
             ],
         ),
-        ("project_member", ["project.view", "requirement.create", "requirement.view"]),
+        (
+            "project_member",
+            [
+                "project.view",
+                "requirement.create",
+                "requirement.raise_restriction",
+                "requirement.update",
+                "requirement.view",
+            ],
+        ),
         ("project_viewer", ["project.view", "requirement.view"]),
     ],
 )
@@ -199,7 +213,11 @@ async def test_an_inherited_admin_with_a_viewer_membership_gets_content_actions_
     assert response.status_code == 200
     assert response.json()["allowed_actions"] == [
         *INHERITED_ON_AN_EC_PROJECT,
+        "requirement.approve_manually",
         "requirement.create",
+        "requirement.raise_restriction",
+        "requirement.reassign_reporter",
+        "requirement.update",
         "requirement.view",
     ]
 

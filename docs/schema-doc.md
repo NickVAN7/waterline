@@ -977,8 +977,8 @@ approved or rejected (a personal action: no admin or system-admin override, desi
 | entity_id | UUID | polymorphic, no FK (log outlives its subject) |
 | action | enum: created / updated / deleted / restored / linked / unlinked | |
 | field_changed | enum, nullable | required when `action = updated`; values below |
-| old_value | text, nullable | serialized; for link events, the other entity's ID |
-| new_value | text, nullable | serialized; for link events, the other entity's ID |
+| old_value | text, nullable | serialized (a list, such as `restriction_categories`, as its values comma-separated; none is the empty string); for link events, the other entity's ID |
+| new_value | text, nullable | serialized (a list as `old_value`'s); for link events, the other entity's ID |
 | changed_by | UUID (FK → user), nullable | the user whose action made the change; null only when an app CLI command caused it (e.g. an approver replaced after `revoke-system-admin`, design-doc §6.2, §10) |
 | changed_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_change()` never sets it |
 | created_at / updated_at | timestamptz | |

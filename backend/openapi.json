@@ -5106,6 +5106,188 @@
             "description": "Unprocessable Content"
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Update Requirement",
+        "description": "Change the fields sent. 409 on a stale `version`; a new revision only when the title or\ndescription changes. `status` `approved`: 403 without `requirement.approve_manually`, else\n422 `use_approve`; `reporter_id` needs `requirement.reassign_reporter`, 422\n`account_inactive` or `not_member`.",
+        "operationId": "update_requirement_api_projects__key__requirements__number__patch",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/requirements/{number}/restriction": {
+      "put": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Set Requirement Restriction",
+        "description": "Set the requirement's restriction level and categories (no `version`, DL-162): raising\nneeds `requirement.raise_restriction`, lowering `requirement.lower_restriction`. 422 on\n`level` (`below_project`) and on `categories` (`project_only`).",
+        "operationId": "set_requirement_restriction_api_projects__key__requirements__number__restriction_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementRestrictionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
       }
     }
   },
@@ -5242,7 +5424,12 @@
           "project.raise_restriction",
           "project.lower_restriction",
           "requirement.view",
-          "requirement.create"
+          "requirement.create",
+          "requirement.update",
+          "requirement.reassign_reporter",
+          "requirement.raise_restriction",
+          "requirement.lower_restriction",
+          "requirement.approve_manually"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
@@ -7475,6 +7662,34 @@
         "title": "RequirementRead",
         "description": "One requirement, with the actions the caller may take on it. \"Approved · modified\" is\nderived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1)."
       },
+      "RequirementRestrictionUpdate": {
+        "properties": {
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Categories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "categories"
+        ],
+        "title": "RequirementRestrictionUpdate",
+        "description": "`PUT …/requirements/{number}/restriction` (DL-162): `level` (null: inherit the project's)\nand `categories` replace the current ones. No `version` (DL-168)."
+      },
       "RequirementStatus": {
         "type": "string",
         "enum": [
@@ -7508,6 +7723,88 @@
         ],
         "title": "RequirementTree",
         "description": "The project's requirements in `(rank, id)` order, siblings in rank order (the client\nnests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159)."
+      },
+      "RequirementUpdate": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description_md": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Md"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequirementStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Priority"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reporter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporter Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "RequirementUpdate",
+        "description": "Only the fields sent change. `version` is the one the caller read (a stale one is a\n409). A new revision, with `change_note`, only when `title` or `description_md` changes\n(design-doc §6.1). `status` may not be `approved` (DL-161); `reporter_id` needs\n`requirement.reassign_reporter` (DL-211)."
       },
       "RestrictionCategory": {
         "type": "string",

@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, status
 from app.authz.actions import Action
 from app.core.db import SessionDep
 from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_project, load_requirement
-from app.schemas.requirement import RequirementCreate, RequirementRead, RequirementTree
+from app.schemas.requirement import (
+    RequirementCreate,
+    RequirementRead,
+    RequirementRestrictionUpdate,
+    RequirementTree,
+    RequirementUpdate,
+)
 from app.services.project import ProjectEntity
 from app.services.requirement import RequirementEntity, RequirementService
 
@@ -19,6 +25,9 @@ ProjectContentViewed = Annotated[
 ]
 Viewed = Annotated[
     RequirementEntity, Depends(authorized(load_requirement, Action.REQUIREMENT_VIEW))
+]
+Updated = Annotated[
+    RequirementEntity, Depends(authorized(load_requirement, Action.REQUIREMENT_UPDATE))
 ]
 
 
@@ -45,3 +54,27 @@ async def get_requirement(
 ) -> RequirementRead:
     """The requirement, with the actions the caller may take on it."""
     return await RequirementService(session).read(ctx, requirement)
+
+
+@router.patch("/projects/{key}/requirements/{number}", responses=ERRORS)
+async def update_requirement(
+    requirement: Updated, body: RequirementUpdate, ctx: AuthzContextDep, session: SessionDep
+) -> RequirementRead:
+    """Change the fields sent. 409 on a stale `version`; a new revision only when the title or
+    description changes. `status` `approved`: 403 without `requirement.approve_manually`, else
+    422 `use_approve`; `reporter_id` needs `requirement.reassign_reporter`, 422
+    `account_inactive` or `not_member`."""
+    return await RequirementService(session).update(ctx, requirement, body)
+
+
+@router.put("/projects/{key}/requirements/{number}/restriction", responses=ERRORS)
+async def set_requirement_restriction(
+    requirement: Viewed,
+    body: RequirementRestrictionUpdate,
+    ctx: AuthzContextDep,
+    session: SessionDep,
+) -> RequirementRead:
+    """Set the requirement's restriction level and categories (no `version`, DL-162): raising
+    needs `requirement.raise_restriction`, lowering `requirement.lower_restriction`. 422 on
+    `level` (`below_project`) and on `categories` (`project_only`)."""
+    return await RequirementService(session).set_restriction(ctx, requirement, body)
