@@ -127,7 +127,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 - Every update to a versioned entity calls `check_version(entity, payload.version)` before
   changing it, except a restriction change (DL-168). Rank, counter, and restriction writes, and
   the first revision pointer set at creation (DL-207), use `direct_update` (no version bump), passing `touch_updated_at=False` for rank writes and `True`
-  for counters (restriction writes: decided before S2-C6).
+  for counters and an item's own restriction change, `False` for items lifted by a project
+  raise and for the first revision pointer (DL-210).
 - Trash/restore queries opt in with `.execution_options(include_deleted=True)`; nothing else
   does.
 

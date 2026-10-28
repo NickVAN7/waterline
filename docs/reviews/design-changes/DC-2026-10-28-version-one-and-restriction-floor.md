@@ -43,6 +43,8 @@
 Both are left for the owner, undecided; neither blocks this change, since S2-C6 builds the
 cascade.
 
-## Open questions for the owner
+## Owner decisions
 
-- The two decisions above, due before S2-C6.
+- Oct 28, 2026: option (b) for both. The raise skips items in the trash and restore raises
+  them (DL-209); a raise doesn't move the lifted items' `updated_at`, and an item's own
+  restriction change does (DL-210). Recorded in `DC-2026-10-28b-restriction-raise-details.md`.

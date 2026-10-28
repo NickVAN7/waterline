@@ -2653,3 +2653,31 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §3.1 "What's restricted"; schema-doc `requirement`
   (`restriction_level`); build plan (S2-C6); `new-area` skill
 - **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C5.md`, open question 2)
+
+### DL-209: A project raise skips the trash; restore raises the item
+- **Date:** 2026-10-28
+- **Decision:** Raising a project's level lifts only its live items stored below it (no
+  `include_deleted` query). Restoring an item stored below its project's level raises it to the
+  project's level, logged as a `restriction_level` change by the user restoring it. Built in
+  S2-C6 (the raise) and S2-C8 (the restore).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1 "What's restricted", §9 "Restore"; build plan (S2-C6, S2-C8);
+  `new-area` skill
+- **Source:** owner, Oct 28, 2026
+  (`docs/reviews/design-changes/DC-2026-10-28-version-one-and-restriction-floor.md`, decision 1,
+  option b)
+
+### DL-210: `updated_at` on restriction writes
+- **Date:** 2026-10-28
+- **Decision:** An item's own restriction change (the restriction PUT, a restore's raise)
+  moves its `updated_at`; items lifted by a project raise don't (`touch_updated_at=False`),
+  since nobody edited them. Neither bumps `version` (DL-168). The first revision pointer set at
+  creation (DL-207) doesn't either: the row was just inserted.
+- **Supersedes:** build plan and `backend/CLAUDE.md` "restriction writes: decided before S2-C6"
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1; build plan (the direct-update helper, S2-C6);
+  `backend/CLAUDE.md`; `new-area` skill
+- **Source:** owner, Oct 28, 2026
+  (`docs/reviews/design-changes/DC-2026-10-28-version-one-and-restriction-floor.md`, decision 2,
+  option b; the item's own change moving `updated_at` was the recommendation given with it)

@@ -315,8 +315,11 @@ v1 they drive badges, logging, and the export-control access rules below. Column
     lines, attachments) can raise the level and add categories, never go below the project's
     (DL-208): an item's stored level is none (it inherits the project's) or at least the
     project's. A level below it, at creation or in a restriction change, is a 422
-    `validation_error` of type `below_project` on the level field. Raising a project's level raises every item stored below the new level to
-    it, logged on each item (`restriction_level`, by the admin who raised the project).
+    `validation_error` of type `below_project` on the level field. Raising a project's level
+    raises every live item stored below the new level to it, logged on each item
+    (`restriction_level`, by the admin who raised the project), without moving the item's
+    `updated_at` (nobody edited it); items in the trash are raised when restored instead
+    (DL-209). A restriction change made on the item itself moves `updated_at` (DL-210).
   - **Effective restriction** = the stricter of the item's and the project's levels, plus
     the union of their categories. None with Internal is Internal (owner decision,
     Oct 12, 2026).
@@ -1282,7 +1285,9 @@ cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
 restoring a requirement also restores the descendants deleted in the same action, identified by
 the same `deleted_at` (one transaction's `now()`); children deleted separately stay in the trash.
 A requirement whose parent is still deleted is restored at the top level, with the parent change
-logged (§10).
+logged (§10). A restored item whose stored restriction level is below its project's (the project
+was raised while it was in the trash, which the raise skips) is raised to the project's level,
+logged (DL-209).
 
 **Pending approvals:** deleting a requirement cancels any pending approval request on it,
 logged on the request (§10). Restoring the item does not reopen the request. A gate

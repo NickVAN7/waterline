@@ -94,9 +94,11 @@ Follow the `migration` skill.
   item's first revision pointer only through the direct-update helper (no `version` bump, so a
   new item starts at `version` 1; DL-168, DL-207).
 - An item's restriction level is null or at least the project's: a lower one is a 422
-  `validation_error` of type `below_project` on the level field, and raising a project's level
-  must also raise this item type's rows stored below the new level, logging `restriction_level`
-  on each (DL-208).
+  `validation_error` of type `below_project` on the level field (DL-208). Raising a project's
+  level lifts this item type's live rows stored below the new level (no `include_deleted`),
+  each logged, with `direct_update(..., touch_updated_at=False)`; restoring a row stored below
+  its project's level raises it to the project's level, logged by the restoring user, and moves
+  its `updated_at` (DL-209, DL-210).
 - Check that every referenced entity (parent, phase, sprint, milestone, workstream, requirement)
   belongs to the same project; check cycles where the design calls for it.
 - `log_change()` for every logged field in design-doc §10, with enum members.
