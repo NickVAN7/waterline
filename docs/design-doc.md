@@ -878,7 +878,12 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   approach as task dependencies).
 - `priority` (critical/high/medium/low), markdown `description_md`, `rank` among siblings.
 - `reporter_id` (NOT NULL, set to the creator; project admins can reassign it). Drives delete
-  permission (§5). Distinct from any ERP "business owner" role, which is covered by approvals
+  permission (§5). A reassigned reporter is an active user who may create requirements in the
+  project: a project member or admin, or an inherited project admin with content access (on an
+  export-controlled project, an explicit membership). On `reporter_id`, a deactivated user is a
+  422 `validation_error` of type `account_inactive`, anyone else outside that set `not_member`,
+  and an unchanged `reporter_id` is no change, so a deactivated reporter never blocks a save,
+  as for a project's lead (DL-211). Distinct from any ERP "business owner" role, which is covered by approvals
   (§6.2).
 - `workstream_id` (nullable). A new child requirement defaults to its parent's workstream in the
   UI.

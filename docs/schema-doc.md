@@ -687,7 +687,7 @@ logged.
 | number | integer | displayed `{KEY}-RQ-n`; never reused |
 | parent_requirement_id | UUID (FK → requirement), nullable | null = top level; same project; no cycles (service check) |
 | workstream_id | UUID (FK → workstream), nullable | Added in Slice 3. Same project; UI defaults a child to its parent's |
-| reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by project admins; drives delete permission |
+| reporter_id | UUID (FK → user) | NOT NULL, set to creator; reassignable by project admins, to someone who may create requirements in the project (DL-211); drives delete permission |
 | title | varchar | at most 200 characters (DL-143) |
 | description_md | text | markdown; includes `## Acceptance Criteria` from template; at most 20,000 characters (DL-143) |
 | status | enum: draft / approved / in_progress / done / rejected / deferred | only a project admin moves it into `approved` by hand (design-doc §5) |

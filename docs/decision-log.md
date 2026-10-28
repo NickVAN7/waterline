@@ -2681,3 +2681,29 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Source:** owner, Oct 28, 2026
   (`docs/reviews/design-changes/DC-2026-10-28-version-one-and-restriction-floor.md`, decision 2,
   option b; the item's own change moving `updated_at` was the recommendation given with it)
+
+### DL-211: Who may be a requirement's reporter
+- **Date:** 2026-10-28
+- **Decision:** A project admin may reassign a requirement's reporter only to an active user
+  who may create requirements in the project: a project member or admin, or an inherited
+  project admin with content access (on an export-controlled project, an explicit membership).
+  On `reporter_id`, a deactivated user is a 422 `validation_error` of type `account_inactive`,
+  anyone else outside that set `not_member`, and an unchanged `reporter_id` is no change, so a
+  deactivated reporter never blocks a save (the project lead's convention). Viewers are left
+  out: they can't create requirements, and the reporter may delete one.
+- **Supersedes:** none (the docs named no rule)
+- **Superseded by:** none
+- **Applies to:** design-doc §6 (`reporter_id`); build plan (S2-C6)
+- **Source:** owner, Oct 28, 2026 (chat, before S2-C6)
+
+### DL-212: `requirement.approve_manually` is registered in S2-C6
+- **Date:** 2026-10-28
+- **Decision:** S2-C6 registers `requirement.approve_manually` (project admins, inherited
+  included; content), so its `PATCH` can answer a status of `approved` with 403 to those who
+  may not approve by hand and 422 `use_approve` to those who may (DL-161). S2-C11 adds the
+  endpoint. Until then `allowed_actions` lists the action with no endpoint behind it; no
+  screen reads it before S2-C18.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C6, S2-C11); `docs/reviews/s2/S2-plan.md` (actions table)
+- **Source:** owner, Oct 28, 2026 (chat, before S2-C6)

@@ -83,7 +83,7 @@ membership (design-doc §3.1); the org overview's action is `org_member.manage` 
 | S2-C10 | `GET …/approval-requests`, `GET /api/approval-requests/{id}` | `requirement.view` on the approved entity (approval requests inherit, design-doc §3.1) | project viewers and up, inherited admins | content |
 | S2-C10 | `POST /api/approval-requests/{id}/cancel` | `approval_request.cancel` | project admins | content |
 | S2-C11 | `POST /api/approval-requests/{id}/decision` | `approval.decide` (personal) | the named approver, with content access | content |
-| S2-C11 | `POST …/requirements/{number}/approve` | `requirement.approve_manually` | project admins | content |
+| S2-C11 | `POST …/requirements/{number}/approve` | `requirement.approve_manually` (registered in S2-C6, DL-212) | project admins | content |
 | S2-C14 | `GET /api/me/work/approvals` | signed in (scoped to the user's pending rows and content access) | — | — |
 
 ## Threat-model pass
