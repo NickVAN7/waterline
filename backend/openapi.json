@@ -5289,6 +5289,98 @@
           }
         }
       }
+    },
+    "/api/projects/{key}/requirements/{number}/move": {
+      "post": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Move Requirement",
+        "description": "Move the requirement under `parent_id` (null: the top level), just after `after_id` or\njust before `before_id`, or to the bottom. 404 for a parent outside the project; 422 on\n`parent_id` (`cycle`), `after_id` or `before_id` (`not_sibling`), and `before_id` with both\n(`conflict`).",
+        "operationId": "move_requirement_api_projects__key__requirements__number__move_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementMove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7516,6 +7608,52 @@
         ],
         "title": "RequirementItem",
         "description": "A row of the requirement tree."
+      },
+      "RequirementMove": {
+        "properties": {
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parent_id"
+        ],
+        "title": "RequirementMove",
+        "description": "`POST …/requirements/{number}/move`: under `parent_id` (null: the top level), just after\nthe sibling `after_id` or just before `before_id`, or with neither at the bottom of the\nparent's children (design-doc §6, \"Manual ordering\")."
       },
       "RequirementRead": {
         "properties": {

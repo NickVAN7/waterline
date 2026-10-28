@@ -51,6 +51,16 @@ class RequirementRestrictionUpdate(BaseModel):
     categories: list[RestrictionCategory]
 
 
+class RequirementMove(BaseModel):
+    """`POST …/requirements/{number}/move`: under `parent_id` (null: the top level), just after
+    the sibling `after_id` or just before `before_id`, or with neither at the bottom of the
+    parent's children (design-doc §6, "Manual ordering")."""
+
+    parent_id: uuid.UUID | None
+    after_id: uuid.UUID | None = None
+    before_id: uuid.UUID | None = None
+
+
 class RequirementRead(BaseModel):
     """One requirement, with the actions the caller may take on it. "Approved · modified" is
     derived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1)."""

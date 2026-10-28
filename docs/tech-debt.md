@@ -847,7 +847,7 @@ Entry format:
   S2-C7.
 - **Fix by:** S2-C7 (the move endpoint decides what a drop between tied neighbors does): it
   rewrites the gap's siblings, as the length cap does (DL-213)
-- **Status:** open
+- **Status:** resolved in S2-C7
 
 ### TD-68: mutmut segfaults on one shape of `rules/rank.py`
 - **Added:** S2-C2
@@ -871,7 +871,7 @@ Entry format:
   the move endpoint can act on it. Decided (DL-204): a 255-character cap, and a drop that would
   pass it rewrites the ranks of that gap's siblings in one transaction.
 - **Fix by:** S2-C7 (the move endpoint)
-- **Status:** open
+- **Status:** resolved in S2-C7
 
 ### TD-70: The requirement tree stops at 2,000 rows
 - **Added:** S2-C5
@@ -908,4 +908,16 @@ Entry format:
   stays correct meanwhile (the stricter level wins), so nothing is exposed.
 - **Fix by:** S2-C8: hold the reporter's membership and the project row `FOR SHARE`, with a
   race test each
+- **Status:** open
+
+### TD-73: The rank rewrite sends one UPDATE per sibling
+- **Added:** S2-C7 (checkpoint-reviewer finding 4)
+- **What:** a move with no rank between its neighbors (a tie or the 255-character cap, DL-204,
+  DL-213) rewrites the parent's children with one `direct_update` each, so a rewrite among the
+  tree's cap of 2,000 top-level requirements is about 2,000 round trips under the project's
+  tree lock (DL-214), holding up other moves in that project for a second or two.
+- **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
+  statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
+  helper that does it now.
+- **Fix by:** S2-C22 (Slice 2's tech-debt review): one statement, if the timing matters
 - **Status:** open

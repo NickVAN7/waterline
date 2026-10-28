@@ -34,6 +34,7 @@ from app.rules.restriction import Restriction, change, levels_below
 from app.schemas.requirement import (
     RequirementCreate,
     RequirementItem,
+    RequirementMove,
     RequirementRead,
     RequirementRestrictionUpdate,
     RequirementTree,
@@ -47,6 +48,8 @@ type RequirementEntity = Requirement
 
 # The ranked-view cap (DL-159; build plan, "API conventions").
 TREE_CAP = 2_000
+# The rank length cap: a drop past it rewrites the gap's siblings (design-doc §6; DL-204).
+RANK_MAX = 255
 
 
 def _categories(requirement: Requirement) -> list[RestrictionCategory]:
@@ -301,6 +304,89 @@ class RequirementService:
             )
         for field, before, after in logged:
             self._log(requirement, ctx.user_id, ActivityAction.UPDATED, field, before, after)
+        return await self.read(ctx, requirement)
+
+    async def move(
+        self, ctx: AuthzContext, requirement: Requirement, values: RequirementMove
+    ) -> RequirementRead:
+        """Put the requirement under `parent_id` (null: the top level), just after `after_id` or
+        just before `before_id` among its siblings, or at the bottom (design-doc §6). 404 for a
+        parent outside the project; 422 on `parent_id` (`cycle`: itself or a descendant), on
+        `after_id` or `before_id` (`not_sibling`: not another child of that parent), and on
+        `before_id` with both (`conflict`). A drop with no rank between its neighbors (a tie, or
+        past 255 characters) rewrites the ranks of that parent's children in order (DL-204).
+        No `version` bump; a parent change is logged and moves `updated_at`, a reorder doesn't."""
+        if values.after_id is not None and values.before_id is not None:
+            raise ValidationFailedError.on(
+                ("body", "before_id"), "Give after_id or before_id, not both.", "conflict"
+            )
+        project = await self._project(requirement)
+        # Moves in a project run one at a time, so two at once can't make a cycle neither saw.
+        # The tree first, then the row: a new parent's foreign-key check waits on that parent's
+        # row, which another move may hold.
+        await self.repository.lock_tree(project.id)
+        await self.repository.lock(requirement)
+        parent_id, old_parent_id = values.parent_id, requirement.parent_requirement_id
+        reparented = parent_id != old_parent_id
+        if parent_id is not None:
+            if await self.repository.get_in_project(project.id, parent_id) is None:
+                raise NotFoundError
+            if await self.repository.is_in_ancestry(requirement.id, of=parent_id):
+                raise ValidationFailedError.on(
+                    ("body", "parent_id"),
+                    "A requirement can't move under itself or one of its children.",
+                    "cycle",
+                )
+        siblings = await self.repository.siblings(project.id, parent_id, excluding=requirement.id)
+        ids = [id_ for id_, _ in siblings]
+        position = len(ids)
+        for field, anchor, offset in (
+            ("after_id", values.after_id, 1),
+            ("before_id", values.before_id, 0),
+        ):
+            if anchor is None:
+                continue
+            if anchor not in ids:
+                raise ValidationFailedError.on(
+                    ("body", field), "That requirement isn't a sibling here.", "not_sibling"
+                )
+            position = ids.index(anchor) + offset
+        before = siblings[position - 1][1] if position > 0 else None
+        after = siblings[position][1] if position < len(ids) else None
+        rank = None if before is not None and before == after else rank_between(before, after)
+        if rank is not None and len(rank) <= RANK_MAX:
+            await direct_update(
+                self.session,
+                Requirement,
+                requirement.id,
+                {"rank": rank, "parent_requirement_id": parent_id},
+                touch_updated_at=reparented,
+            )
+        else:
+            # Fresh ranks in the same order: short again, and ties broken.
+            order = [*ids[:position], requirement.id, *ids[position:]]
+            fresh: str | None = None
+            for id_ in order:
+                fresh = rank_between(fresh, None)
+                moved = id_ == requirement.id
+                await direct_update(
+                    self.session,
+                    Requirement,
+                    id_,
+                    {"rank": fresh, "parent_requirement_id": parent_id}
+                    if moved
+                    else {"rank": fresh},
+                    touch_updated_at=moved and reparented,
+                )
+        if reparented:
+            self._log(
+                requirement,
+                ctx.user_id,
+                ActivityAction.UPDATED,
+                ActivityField.PARENT_REQUIREMENT_ID,
+                old_parent_id,
+                parent_id,
+            )
         return await self.read(ctx, requirement)
 
     async def lift_to_project(self, project: Project, actor_id: uuid.UUID) -> None:

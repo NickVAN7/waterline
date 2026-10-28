@@ -1019,6 +1019,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/requirements/{number}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Requirement
+         * @description Move the requirement under `parent_id` (null: the top level), just after `after_id` or
+         *     just before `before_id`, or to the bottom. 404 for a parent outside the project; 422 on
+         *     `parent_id` (`cycle`), `after_id` or `before_id` (`not_sibling`), and `before_id` with both
+         *     (`conflict`).
+         */
+        post: operations["move_requirement_api_projects__key__requirements__number__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1879,6 +1902,20 @@ export interface components {
             current_revision_id: string | null;
             /** Approved Revision Id */
             approved_revision_id: string | null;
+        };
+        /**
+         * RequirementMove
+         * @description `POST …/requirements/{number}/move`: under `parent_id` (null: the top level), just after
+         *     the sibling `after_id` or just before `before_id`, or with neither at the bottom of the
+         *     parent's children (design-doc §6, "Manual ordering").
+         */
+        RequirementMove: {
+            /** Parent Id */
+            parent_id: string | null;
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
         };
         /**
          * RequirementRead
@@ -5560,6 +5597,69 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RequirementRestrictionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_requirement_api_projects__key__requirements__number__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementMove"];
             };
         };
         responses: {

@@ -9,6 +9,7 @@ from app.core.db import SessionDep
 from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_project, load_requirement
 from app.schemas.requirement import (
     RequirementCreate,
+    RequirementMove,
     RequirementRead,
     RequirementRestrictionUpdate,
     RequirementTree,
@@ -78,3 +79,14 @@ async def set_requirement_restriction(
     needs `requirement.raise_restriction`, lowering `requirement.lower_restriction`. 422 on
     `level` (`below_project`) and on `categories` (`project_only`)."""
     return await RequirementService(session).set_restriction(ctx, requirement, body)
+
+
+@router.post("/projects/{key}/requirements/{number}/move", responses=ERRORS)
+async def move_requirement(
+    requirement: Updated, body: RequirementMove, ctx: AuthzContextDep, session: SessionDep
+) -> RequirementRead:
+    """Move the requirement under `parent_id` (null: the top level), just after `after_id` or
+    just before `before_id`, or to the bottom. 404 for a parent outside the project; 422 on
+    `parent_id` (`cycle`), `after_id` or `before_id` (`not_sibling`), and `before_id` with both
+    (`conflict`)."""
+    return await RequirementService(session).move(ctx, requirement, body)

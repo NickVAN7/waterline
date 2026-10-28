@@ -4,10 +4,11 @@ import uuid
 from collections.abc import Collection
 from typing import cast
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import RestrictionLevel
+from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
 
 
@@ -82,3 +83,44 @@ class RequirementRepository:
             .with_for_update()
         )
         return [(id_, RestrictionLevel(level)) for id_, level in rows]
+
+    async def siblings(
+        self, project_id: uuid.UUID, parent_id: uuid.UUID | None, *, excluding: uuid.UUID
+    ) -> list[tuple[uuid.UUID, str]]:
+        """The parent's other children (top level with None), `(id, rank)` in `(rank, id)`
+        order."""
+        rows = await self.session.execute(
+            select(Requirement.id, Requirement.rank)
+            .where(
+                Requirement.project_id == project_id,
+                Requirement.parent_requirement_id.is_(None)
+                if parent_id is None
+                else Requirement.parent_requirement_id == parent_id,
+                Requirement.id != excluding,
+            )
+            .order_by(Requirement.rank, Requirement.id)
+        )
+        return [(id_, rank) for id_, rank in rows]
+
+    async def is_in_ancestry(self, requirement_id: uuid.UUID, of: uuid.UUID) -> bool:
+        """Whether `requirement_id` is `of` or one of its ancestors (a recursive query, so the
+        depth a user can build never reaches Python's recursion limit)."""
+        chain = (
+            select(Requirement.id, Requirement.parent_requirement_id)
+            .where(Requirement.id == of)
+            .cte(recursive=True)
+        )
+        chain = chain.union_all(
+            select(Requirement.id, Requirement.parent_requirement_id).join(
+                chain, Requirement.id == chain.c.parent_requirement_id
+            )
+        )
+        return bool(await self.session.scalar(select(exists().where(chain.c.id == requirement_id))))
+
+    async def lock_tree(self, project_id: uuid.UUID) -> None:
+        """Hold the project's requirement tree until the transaction ends, so moves in it run one
+        at a time. `FOR NO KEY UPDATE` on the project row: creates' foreign-key checks
+        (`FOR KEY SHARE`) still pass."""
+        await self.session.execute(
+            select(Project.id).where(Project.id == project_id).with_for_update(key_share=True)
+        )
