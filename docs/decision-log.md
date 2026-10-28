@@ -2731,3 +2731,28 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7); developer guide
   ("Direct updates"); `backend/CLAUDE.md`; `new-area` skill
 - **Source:** owner, Oct 28, 2026 (chat, during S2-C7)
+
+### DL-215: Every requirement parent change follows the move's rules
+- **Date:** 2026-10-28
+- **Decision:** Promoting children when a requirement is deleted, and restoring a requirement at
+  the top level because its parent is still in the trash, change a parent as a move does
+  (DL-214): the project's tree lock first, then the rows; no `version` bump; `updated_at`
+  moved; the parent change logged. Built in S2-C8.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Optimistic locking", §6 "Manual ordering", §9; build plan
+  (the direct-update helper, S2-C8); developer guide ("Direct updates"); `backend/CLAUDE.md`;
+  `new-area` skill
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C7.md`, open question 1, option a)
+
+### DL-216: Tasks' rank rewrites and move lock are decided in Slice 3 planning
+- **Date:** 2026-10-28
+- **Decision:** The tie and cap rewrites (DL-204, DL-213) and the move lock (DL-214) are the
+  requirement tree's. Which items a task rewrite covers (a board column, a sprint section, or the
+  project's whole task order) and whether task moves run one at a time are decided in Slice 3
+  planning.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering"; build plan ("Later
+  slices")
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C7.md`, open question 2)

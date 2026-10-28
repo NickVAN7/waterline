@@ -101,9 +101,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   literals.
 - **Numbers** come only from the numbering service (`project_counter`,
   `task.next_subtask_number`). Never compute `MAX(number)+1`.
-- **Rank, counter, and restriction writes, a move's parent change, and a new item's first
-  revision pointer, bypass optimistic locking** via the direct-update helper (DL-168, DL-207,
-  DL-214); content edits go through the ORM so `version` is checked (stale → 409, or 404 if the
+- **Rank, counter, and restriction writes, a requirement's parent change (a move, a delete's
+  promote, a restore at the top level), and a new item's first revision pointer, bypass
+  optimistic locking** via the direct-update helper (DL-168, DL-207, DL-214, DL-215); content edits go through the ORM so `version` is checked (stale → 409, or 404 if the
   row is gone).
 - **Soft delete** is filtered globally; opt in explicitly for trash/restore queries.
 - **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
@@ -127,9 +127,10 @@ Calls flow **routers → services → repositories → models**. Services also u
   `enum_type(MyEnum, "<column>")`, with the `StrEnum` defined outside SQLAlchemy code.
 - Every update to a versioned entity calls `check_version(entity, payload.version)` before
   changing it, except a restriction change (DL-168). Rank, counter, and restriction writes, and
-  the first revision pointer set at creation (DL-207), and a move's parent change (DL-214), use
+  the first revision pointer set at creation (DL-207), and a requirement's parent change (DL-214,
+  DL-215), use
   `direct_update` (no version bump), passing `touch_updated_at=False` for rank writes and `True`
-  for counters, an item's own restriction change, and a move that changes the parent, `False`
+  for counters, an item's own restriction change, and a parent change, `False`
   for items lifted by a project raise and for the first revision pointer (DL-210, DL-214).
 - Trash/restore queries opt in with `.execution_options(include_deleted=True)`; nothing else
   does.

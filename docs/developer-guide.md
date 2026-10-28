@@ -611,16 +611,15 @@ the ORM's own check then catches a write between this request's load and its com
 `StaleDataError`, which `get_session` turns into **409** `{"code": "stale_version", ...}` (see
 "Errors" in section 4); the UI prompts a reload.
 
-**Direct updates** (`app/repositories/base.py`). Rank moves (with a move's parent change,
-DL-214), counters, an item's restriction (DL-168), and a new item's first revision pointer
+**Direct updates** (`app/repositories/base.py`). Rank moves (with a requirement's parent change,
+by a move, a delete's promote, or a restore at the top level, DL-214, DL-215), counters, an item's restriction (DL-168), and a new item's first revision pointer
 (DL-207) use `direct_update`, which runs
 `UPDATE … RETURNING` outside the unit of work, so it doesn't bump `version` (someone editing the
 item's content at the same time doesn't get a 409; a new requirement starts at `version` 1).
 Every call says whether `updated_at` moves, with the required `touch_updated_at` keyword
 (DL-210): a rank write passes `False` (a display-order change isn't an edit), as do the first
 revision pointer and items lifted by a project raise (nobody edited them); a counter write such
-as adding a subtask, an item's own restriction change, and a move that changes the parent pass
-`True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
+as adding a subtask, an item's own restriction change, and a parent change pass `True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
 works as a counter), or `None` if no row has that id, and writes every changed column onto the
 object if the session has it loaded, so it stays readable without a lazy load.
 

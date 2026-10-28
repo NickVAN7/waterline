@@ -270,12 +270,14 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   (deleted, or soft-deleted since the user loaded it), the save returns **404**: there is
   nothing to reload. An item that was already soft-deleted when loaded (e.g. one being
   restored) isn't "gone", so a conflict there is still 409. Rank (§6), the subtask counter
-  (§3), and an item's restriction (DL-168) don't bump `version`, so none of them causes a 409
-  for someone editing the item's content. A new item starts at `version` 1: setting its first
+  (§3), an item's restriction (DL-168), and a requirement's parent change (a move, a delete's
+  promote, a restore at the top level; DL-214, DL-215) don't bump `version`, so none of them
+  causes a 409 for someone editing the item's content. A new item starts at `version` 1: setting its first
   revision pointer in the creating transaction doesn't bump it either (DL-207).
 - **Manual ordering:** `rank` (sortable string, fractional indexing) on task, requirement, and
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
-  that row. See §6.
+  that row, except a drop past the length cap or between tied neighbors, which rewrites that
+  gap's siblings (requirements, DL-204, DL-213; tasks decided in Slice 3, DL-216). See §6.
 - **Markdown** (DL-140): descriptions and comments are stored as markdown (`description_md`)
   and rendered in the browser, never on the server, with `markdown-it` (raw HTML off) and then
   DOMPurify on its output, so stored XSS can't run. Supported: CommonMark plus tables, task-list
@@ -1163,8 +1165,12 @@ requirement approval.
     display-order change isn't an edit (the subtask counter does move it).
   - **Ties:** every ordered query sorts by `(rank, id)`, so two items that receive the same rank
     still order deterministically. No periodic rebalancing in v1: the only rewrites are a drop
-    past the length cap and a drop between tied neighbors (above, DL-213).
-  - **Requirement moves run one at a time per project** (DL-214): a move takes the project's tree lock
+    past the length cap and a drop between tied neighbors (above, DL-213). These rewrites and
+    the move lock below are the requirement tree's; which items a task rewrite covers, and
+    whether task moves run one at a time, is decided in Slice 3 planning (DL-216).
+  - **Requirement moves run one at a time per project** (DL-214; every requirement parent
+    change, a delete's promote and a restore at the top level included, DL-215): a move takes
+    the project's tree lock
     first (`FOR NO KEY UPDATE` on the project row, which doesn't block creates), so two moves
     at once can't make a parent cycle that neither saw. A reorder leaves `updated_at` alone; a
     parent change is logged and moves it. Neither bumps `version`.
@@ -1297,7 +1303,9 @@ the same `deleted_at` (one transaction's `now()`); children deleted separately s
 A requirement whose parent is still deleted is restored at the top level, with the parent change
 logged (§10). A restored item whose stored restriction level is below its project's (the project
 was raised while it was in the trash, which the raise skips) is raised to the project's level,
-logged (DL-209).
+logged (DL-209). Promoting children on delete and restoring at the top level change a parent as
+a move does (§6, DL-215): the project's tree lock first, no `version` bump, `updated_at` moved,
+the parent change logged.
 
 **Pending approvals:** deleting a requirement cancels any pending approval request on it,
 logged on the request (§10). Restoring the item does not reopen the request. A gate
