@@ -2625,3 +2625,31 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §9; build plan (S2-C8, "Done when")
 - **Source:** owner, Oct 27, 2026 (`docs/reviews/s2/S2-C3.md`, open question 1)
+
+### DL-207: A new item starts at version 1
+- **Date:** 2026-10-28
+- **Decision:** Creating a requirement (and later a task or test case) sets its first revision
+  pointer, `current_revision_id`, with `direct_update` in the creating transaction, so the
+  write doesn't bump `version` and a new item starts at 1. Nobody else can have read the row's
+  version before its transaction commits, so skipping the bump hides no concurrent edit. Built
+  in S2-C6 (S2-C5 starts it at 2).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Optimistic locking"; schema-doc `requirement`
+  (`current_revision_id`); build plan (the direct-update helper, S2-C6); `backend/CLAUDE.md`;
+  `new-area` skill
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C5.md`, open question 1, option b)
+
+### DL-208: An item's stored level is never below the project's
+- **Date:** 2026-10-28
+- **Decision:** An item's stored restriction level is null (it inherits the project's) or at
+  least the project's. A lower level, at creation or in a restriction change, is a 422
+  `below_project`. Raising a project's level raises every item stored below the new level to
+  it, logged on each item as a `restriction_level` change by the admin who raised the
+  project. Built in S2-C6.
+- **Supersedes:** schema-doc `requirement.restriction_level` "never below the project's in
+  effect" (the stored level could be lower)
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1 "What's restricted"; schema-doc `requirement`
+  (`restriction_level`); build plan (S2-C6); `new-area` skill
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C5.md`, open question 2)

@@ -271,7 +271,8 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   nothing to reload. An item that was already soft-deleted when loaded (e.g. one being
   restored) isn't "gone", so a conflict there is still 409. Rank (§6), the subtask counter
   (§3), and an item's restriction (DL-168) don't bump `version`, so none of them causes a 409
-  for someone editing the item's content.
+  for someone editing the item's content. A new item starts at `version` 1: setting its first
+  revision pointer in the creating transaction doesn't bump it either (DL-207).
 - **Manual ordering:** `rank` (sortable string, fractional indexing) on task, requirement, and
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
   that row. See §6.
@@ -311,7 +312,11 @@ v1 they drive badges, logging, and the export-control access rules below. Column
 - **What's restricted:**
   - The **project** sets the floor.
   - **Content items** (requirements, tasks, test cases; later RAID items, status reports, budget
-    lines, attachments) can raise the level and add categories, never go below the project's.
+    lines, attachments) can raise the level and add categories, never go below the project's
+    (DL-208): an item's stored level is none (it inherits the project's) or at least the
+    project's. A level below it, at creation or in a restriction change, is a 422
+    `validation_error` of type `below_project` on the level field. Raising a project's level raises every item stored below the new level to
+    it, logged on each item (`restriction_level`, by the admin who raised the project).
   - **Effective restriction** = the stricter of the item's and the project's levels, plus
     the union of their categories. None with Internal is Internal (owner decision,
     Oct 12, 2026).

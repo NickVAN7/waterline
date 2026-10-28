@@ -101,8 +101,8 @@ Calls flow **routers → services → repositories → models**. Services also u
   literals.
 - **Numbers** come only from the numbering service (`project_counter`,
   `task.next_subtask_number`). Never compute `MAX(number)+1`.
-- **Rank, counter, and restriction writes bypass optimistic locking** via the direct-update
-  helper (DL-168); content edits go through the ORM so `version` is checked (stale → 409, or
+- **Rank, counter, and restriction writes, and a new item's first revision pointer, bypass
+  optimistic locking** via the direct-update helper (DL-168, DL-207); content edits go through the ORM so `version` is checked (stale → 409, or
   404 if the row is gone).
 - **Soft delete** is filtered globally; opt in explicitly for trash/restore queries.
 - **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
@@ -125,8 +125,8 @@ Calls flow **routers → services → repositories → models**. Services also u
   `BaseModel` (`class Task(VersionMixin, SoftDeleteMixin, BaseModel)`). Enum columns use
   `enum_type(MyEnum, "<column>")`, with the `StrEnum` defined outside SQLAlchemy code.
 - Every update to a versioned entity calls `check_version(entity, payload.version)` before
-  changing it, except a restriction change (DL-168). Rank, counter, and restriction writes use
-  `direct_update` (no version bump), passing `touch_updated_at=False` for rank writes and `True`
+  changing it, except a restriction change (DL-168). Rank, counter, and restriction writes, and
+  the first revision pointer set at creation (DL-207), use `direct_update` (no version bump), passing `touch_updated_at=False` for rank writes and `True`
   for counters (restriction writes: decided before S2-C6).
 - Trash/restore queries opt in with `.execution_options(include_deleted=True)`; nothing else
   does.

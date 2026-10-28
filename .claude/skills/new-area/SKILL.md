@@ -90,8 +90,13 @@ Follow the `migration` skill.
 - Every mutation in this order: `authorize()` → change → `log_change()`; the request
   dependency commits. The service never commits (`flush()` only when it needs generated
   values).
-- Numbers only from the numbering service; rank, counters, and an item's restriction only
-  through the direct-update helper (no `version` bump, DL-168).
+- Numbers only from the numbering service; rank, counters, an item's restriction, and a new
+  item's first revision pointer only through the direct-update helper (no `version` bump, so a
+  new item starts at `version` 1; DL-168, DL-207).
+- An item's restriction level is null or at least the project's: a lower one is a 422
+  `validation_error` of type `below_project` on the level field, and raising a project's level
+  must also raise this item type's rows stored below the new level, logging `restriction_level`
+  on each (DL-208).
 - Check that every referenced entity (parent, phase, sprint, milestone, workstream, requirement)
   belongs to the same project; check cycles where the design calls for it.
 - `log_change()` for every logged field in design-doc §10, with enum members.

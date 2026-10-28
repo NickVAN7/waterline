@@ -693,9 +693,9 @@ logged.
 | status | enum: draft / approved / in_progress / done / rejected / deferred | only a project admin moves it into `approved` by hand (design-doc §5) |
 | priority | enum: critical / high / medium / low | default medium |
 | rank | varchar | fractional index; order among siblings |
-| restriction_level | enum: internal / confidential, nullable | `RestrictionMixin`; members raise it, project admins lower it; never below the project's in effect (design-doc §3.1) |
+| restriction_level | enum: internal / confidential, nullable | `RestrictionMixin`; members raise it, project admins lower it; null (inherits the project's) or at least the project's level, never below it (design-doc §3.1, DL-208) |
 | restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
-| current_revision_id | UUID (FK → requirement_revision), nullable | latest content revision; set to revision 1 in the transaction that creates the requirement, so never null after creation (nullable only because the requirement row is inserted before its first revision: circular FK) |
+| current_revision_id | UUID (FK → requirement_revision), nullable | latest content revision; set to revision 1 in the transaction that creates the requirement, so never null after creation (nullable only because the requirement row is inserted before its first revision: circular FK); written with `direct_update`, so a new requirement starts at `version` 1 (DL-207) |
 | approved_revision_id | UUID (FK → requirement_revision), nullable | revision of the last approval: the request's revision when a request completes, or the current revision when a project admin approves by hand; stays set when the status moves out of `approved` |
 | approved_by | UUID (FK → user), nullable | approver whose decision completed the request (when an approver replacement completed it, the counted approver with the latest `decided_at`), or the project admin who approved by hand |
 | approved_at | timestamptz, nullable | when the request completed, or when the project admin approved by hand |
