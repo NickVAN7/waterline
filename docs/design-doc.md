@@ -952,8 +952,9 @@ requirement approval.
   requirement request is bound to a specific revision. At most one request per entity is
   pending at a time: another is a 422 `pending_exists` (DL-225), checked with the requirement
   locked, so two at once can't both pass (DL-229). Only a pending request can be cancelled or
-  decided (otherwise a 422 `not_pending`), and a deleted requirement's requests are a 404, as
-  its history is (DL-228, DL-230).
+  decided (otherwise a 422 `not_pending`; a request's read offers Cancel only while it's
+  pending, and Decide only while the caller's own row is, DL-231, DL-233), and a deleted requirement's requests are a 404, as its history is (DL-228,
+  DL-230).
 - **Policy (v1): every named approver must approve.** Any rejection rejects the whole request;
   a further round is a new request. Rows marked `replaced` (below) don't count: a request is
   approved when every other row is approved. Other policies (any-one, quorum) are v2+.

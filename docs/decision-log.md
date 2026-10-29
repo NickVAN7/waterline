@@ -2905,3 +2905,36 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §6.2; build plan (S2-C11)
 - **Source:** owner, Oct 29, 2026 (DC-2026-10-29, docs-consistency decision 2, option (a))
+
+### DL-231: A request offers Cancel only while it's pending
+- **Date:** 2026-10-29
+- **Decision:** An approval request's read carries `approval_request.cancel` in its
+  `allowed_actions` only while the request is pending and the caller may cancel it, as a trash
+  row carries Restore only when the restore would pass (DL-222).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 spec-test-writer question)
+
+### DL-232: `allowed_actions` leaves out what the entity's state rules out for good
+- **Date:** 2026-10-29
+- **Decision:** Besides `authorize()`, an entity's `allowed_actions` leaves out an action its
+  state rules out for good (a decided or cancelled request's Cancel, DL-231; a restore that would
+  fail, DL-222), so the UI hides it. A rule with choices or a reason to show keeps its own field
+  (`allowed_transitions`, `can_delete_children`), and the UI disables that control with the
+  reason (UI-TOK-10).
+- **Supersedes:** build plan "API conventions" ("Rules that depend on data get their own field",
+  in part)
+- **Superseded by:** none
+- **Applies to:** build plan "API conventions"; ui-design-guide UI-TOK-10; `frontend/CLAUDE.md`
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29b, docs-consistency decision 1, option (a))
+
+### DL-233: A request offers Decide only to an approver whose row is still pending
+- **Date:** 2026-10-29
+- **Decision:** A request's read carries `approval.decide` only while the request is pending and
+  the caller's own `approval` row is still pending (not decided, not `replaced`), by DL-232.
+  Built in S2-C11.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C11)
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29b, docs-consistency decision 2, option (a))

@@ -362,7 +362,8 @@ html {
   checkbox's checked state exposing it. For a navigation item, `aria-current="page"` plus the
   same bar. A selected row does not also get the hover tint.
 - **UI-TOK-10** **Disabled and pending.** *Hide* an action the user may never take (a permission
-  denial; `allowed_actions`). *Disable with a visible reason* an action that is blocked by
+  denial, or a state that rules it out for good, such as a decided request's Cancel;
+  `allowed_actions`, DL-232). *Disable with a visible reason* an action that is blocked by
   state (archived project, last owner, no rows selected): `aria-disabled="true"` (the control
   stays focusable), `--color-disabled-bg`, `--color-disabled-text`, `--color-disabled-border`,
   and the reason as text tied by `aria-describedby`. No `opacity` for disabled. A native

@@ -89,8 +89,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - Forms: visible labels; the server validates; a 422 shows inline errors, moves focus to the
   first invalid field, and has no summary box; a required field has the red asterisk; the submit
   button is `aria-disabled` while pending, never `disabled` (UI-FRM-2, UI-FRM-4 to 8).
-- Actions: hide what a user may never do (`allowed_actions`); disable with a visible reason what
-  state blocks; never use opacity for disabled (UI-TOK-10).
+- Actions: hide what a user may never do (`allowed_actions`, which also leaves out what the
+  entity's state rules out for good, DL-232); disable with a visible reason what state blocks; never use opacity for disabled (UI-TOK-10).
 - An error is never only in a toast. A toast never takes focus or covers the focused element
   (UI-FBK-1, UI-FBK-9, UI-FBK-10). An alert that reports an event has a dismiss button; a
   persistent banner does not (UI-FBK-13).
