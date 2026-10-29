@@ -7,6 +7,7 @@ from typing import cast
 
 from sqlalchemy import Select, exists, false, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.base_model import INCLUDE_DELETED
 from app.enums import RestrictionLevel
@@ -164,6 +165,24 @@ class RequirementRepository:
                 Requirement.reporter_id == reporter_id, Requirement.approved_revision_id.is_(None)
             )
         return statement.execution_options(**{INCLUDE_DELETED: True})
+
+    def revisions(self, requirement_id: uuid.UUID) -> Select[RequirementRevision]:
+        """The requirement's revisions, with their authors (the feed orders them)."""
+        return (
+            select(RequirementRevision)
+            .where(RequirementRevision.requirement_id == requirement_id)
+            .options(joinedload(RequirementRevision.creator))
+        )
+
+    async def revision(
+        self, requirement_id: uuid.UUID, revision_number: int
+    ) -> RequirementRevision | None:
+        """The requirement's revision `revision_number`, with its author."""
+        return await self.session.scalar(
+            self.revisions(requirement_id).where(
+                RequirementRevision.revision_number == revision_number
+            )
+        )
 
     async def revision_number(self, revision_id: uuid.UUID) -> int:
         """The number of a revision that exists (the current one)."""

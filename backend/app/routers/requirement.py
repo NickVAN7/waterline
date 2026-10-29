@@ -1,4 +1,4 @@
-"""Requirements (design-doc §6, §6.1; build plan, S2-C5)."""
+"""Requirements (design-doc §6, §6.1; build plan, S2-C5, S2-C9)."""
 
 from typing import Annotated
 
@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.authz.actions import Action
 from app.core.db import SessionDep
-from app.core.lists import Page
+from app.core.lists import Feed, Page
 from app.enums import DeletedChildren
 from app.routers.deps import (
     ERRORS,
@@ -23,10 +23,12 @@ from app.schemas.requirement import (
     RequirementRestrictionUpdate,
     RequirementTree,
     RequirementUpdate,
+    RevisionItem,
+    RevisionRead,
     TrashItem,
 )
 from app.services.project import ProjectEntity
-from app.services.requirement import TRASH, RequirementEntity, RequirementService
+from app.services.requirement import REVISIONS, TRASH, RequirementEntity, RequirementService
 
 router = APIRouter(tags=["requirement"])
 
@@ -47,6 +49,7 @@ Restored = Annotated[
     RequirementEntity, Depends(authorized(load_deleted_requirement, Action.REQUIREMENT_RESTORE))
 ]
 TrashQuery = Annotated[TRASH.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+RevisionsQuery = Annotated[REVISIONS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
 @router.post("/projects/{key}/requirements", status_code=status.HTTP_201_CREATED, responses=ERRORS)
@@ -143,3 +146,21 @@ async def project_trash(
 ) -> Page[TrashItem]:
     """The project's deleted items the caller may restore, newest first."""
     return await RequirementService(session).trash(ctx, project, query)
+
+
+@router.get("/projects/{key}/requirements/{number}/revisions", responses=ERRORS)
+async def requirement_revisions(
+    requirement: Viewed, query: RevisionsQuery, session: SessionDep
+) -> Feed[RevisionItem]:
+    """The requirement's revisions, newest first (`?before=` the previous page's
+    `next_cursor`)."""
+    return await RequirementService(session).revisions(requirement, query)
+
+
+@router.get("/projects/{key}/requirements/{number}/revisions/{revision_number}", responses=ERRORS)
+async def get_requirement_revision(
+    requirement: Viewed, revision_number: int, session: SessionDep
+) -> RevisionRead:
+    """One revision's title, description, change note, and author; 404 for a number the
+    requirement doesn't have."""
+    return await RequirementService(session).revision(requirement, revision_number)

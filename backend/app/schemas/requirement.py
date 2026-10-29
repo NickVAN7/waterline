@@ -116,6 +116,27 @@ class RequirementTree(BaseModel):
     truncated: bool
 
 
+class RevisionItem(BaseModel):
+    """A row of the requirement's revision list, newest first (design-doc §6.1); the author's
+    name is resolved at read time, and `created_by_is_active` false shows the "Deactivated"
+    badge."""
+
+    id: uuid.UUID
+    revision_number: int
+    title: str
+    change_note: str | None
+    created_by_id: uuid.UUID
+    created_by_name: str
+    created_by_is_active: bool
+    created_at: datetime
+
+
+class RevisionRead(RevisionItem):
+    """One revision's snapshot, for the compare (DL-145: computed in the browser)."""
+
+    description_md: str
+
+
 class TrashItem(BaseModel):
     """A row of the project's trash: the item, who deleted it, and when (design-doc §9)."""
 

@@ -17,7 +17,7 @@ from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
 from app.core.base_model import check_version
 from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
-from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
+from app.core.lists import Feed, Filter, FilterType, ListSpec, Page, fetch_feed, fetch_page
 from app.enums import (
     CONTENT_ITEM_CATEGORIES,
     ActivityAction,
@@ -49,6 +49,8 @@ from app.schemas.requirement import (
     RequirementRestrictionUpdate,
     RequirementTree,
     RequirementUpdate,
+    RevisionItem,
+    RevisionRead,
     TrashItem,
 )
 from app.services.approval import ApprovalService
@@ -74,6 +76,12 @@ TRASH = ListSpec(
             "type", literal(TrashItemType.REQUIREMENT.value), FilterType.ENUM, enum=TrashItemType
         ),
     ),
+)
+
+REVISIONS = ListSpec(
+    name="RevisionItem",
+    id_column=RequirementRevision.id,  # pyright: ignore[reportArgumentType]
+    paging="cursor",
 )
 
 
@@ -701,6 +709,24 @@ class RequirementService:
             for item in await self.repository.live_descendants(requirement.id)
         )
 
+    async def revisions(self, requirement: Requirement, query: BaseModel) -> Feed[RevisionItem]:
+        """The requirement's revisions, newest first, cursor-paged (append-only, design-doc
+        §6.1)."""
+        page = await fetch_feed(
+            self.session, self.repository.revisions(requirement.id), REVISIONS, query
+        )
+        return Feed[RevisionItem](
+            items=[_revision(row) for row in page.items],
+            next_cursor=page.next_cursor,
+        )
+
+    async def revision(self, requirement: Requirement, revision_number: int) -> RevisionRead:
+        """One revision with its snapshot; a number the requirement doesn't have is a 404."""
+        row = await self.repository.revision(requirement.id, revision_number)
+        if row is None:
+            raise NotFoundError
+        return RevisionRead(**_revision(row).model_dump(), description_md=row.description_md)
+
     async def read(self, ctx: AuthzContext, requirement: Requirement) -> RequirementRead:
         """The requirement, with the actions the caller may take on it."""
         project = await self._project(requirement)
@@ -727,6 +753,19 @@ class RequirementService:
             updated_at=requirement.updated_at,
             allowed_actions=allowed_actions(ctx, project_target(project, requirement)),
         )
+
+
+def _revision(row: RequirementRevision) -> RevisionItem:
+    return RevisionItem(
+        id=row.id,
+        revision_number=row.revision_number,
+        title=row.title,
+        change_note=row.change_note,
+        created_by_id=row.created_by,
+        created_by_name=row.creator.name,
+        created_by_is_active=row.creator.is_active,
+        created_at=row.created_at,
+    )
 
 
 async def _lift_requirements(session: AsyncSession, project: Project, actor_id: uuid.UUID) -> None:

@@ -5716,6 +5716,210 @@
           }
         }
       }
+    },
+    "/api/projects/{key}/requirements/{number}/revisions": {
+      "get": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Requirement Revisions",
+        "description": "The requirement's revisions, newest first (`?before=` the previous page's\n`next_cursor`).",
+        "operationId": "requirement_revisions_api_projects__key__requirements__number__revisions_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `next_cursor` of the previous page",
+              "title": "Before"
+            },
+            "description": "The `next_cursor` of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed_RevisionItem_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/requirements/{number}/revisions/{revision_number}": {
+      "get": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Get Requirement Revision",
+        "description": "One revision's title, description, change note, and author; 404 for a number the\nrequirement doesn't have.",
+        "operationId": "get_requirement_revision_api_projects__key__requirements__number__revisions__revision_number__get",
+        "parameters": [
+          {
+            "name": "revision_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision Number"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6152,6 +6356,35 @@
           "next_cursor"
         ],
         "title": "Feed[ActivityEntry]"
+      },
+      "Feed_RevisionItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Feed[RevisionItem]"
       },
       "HTTPValidationError": {
         "properties": {
@@ -8391,6 +8624,129 @@
         ],
         "title": "RestrictionUpdate",
         "description": "`PUT /api/projects/{key}/restriction` (DL-81): `level` (null: None) and\n`categories` replace the current ones. Adding `export_controlled` also needs\n`export_control_confirmed` and `confirmed_member_ids`, the project's current explicit\nmembers."
+      },
+      "RevisionItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "revision_number": {
+            "type": "integer",
+            "title": "Revision Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "created_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By Id"
+          },
+          "created_by_name": {
+            "type": "string",
+            "title": "Created By Name"
+          },
+          "created_by_is_active": {
+            "type": "boolean",
+            "title": "Created By Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "revision_number",
+          "title",
+          "change_note",
+          "created_by_id",
+          "created_by_name",
+          "created_by_is_active",
+          "created_at"
+        ],
+        "title": "RevisionItem",
+        "description": "A row of the requirement's revision list, newest first (design-doc §6.1); the author's\nname is resolved at read time, and `created_by_is_active` false shows the \"Deactivated\"\nbadge."
+      },
+      "RevisionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "revision_number": {
+            "type": "integer",
+            "title": "Revision Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "created_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By Id"
+          },
+          "created_by_name": {
+            "type": "string",
+            "title": "Created By Name"
+          },
+          "created_by_is_active": {
+            "type": "boolean",
+            "title": "Created By Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "description_md": {
+            "type": "string",
+            "title": "Description Md"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "revision_number",
+          "title",
+          "change_note",
+          "created_by_id",
+          "created_by_name",
+          "created_by_is_active",
+          "created_at",
+          "description_md"
+        ],
+        "title": "RevisionRead",
+        "description": "One revision's snapshot, for the compare (DL-145: computed in the browser)."
       },
       "SignInRequest": {
         "properties": {

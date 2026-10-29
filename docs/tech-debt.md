@@ -946,3 +946,26 @@ Entry format:
   and test cases' trash (Slices 3 and 5) may still want it.
 - **Fix by:** S2-C22 (the tech-debt review): removed, with its tests, if nothing uses it
 - **Status:** open
+
+### TD-76: The revision feed has no `(requirement_id, id)` index
+- **Added:** S2-C9
+- **What:** the build plan's feeds have `(scope, id)` indexes ("API conventions"); the revision
+  list (`GET …/requirements/{number}/revisions`) is served by `requirement_revision`'s
+  `UNIQUE(requirement_id, revision_number)` index and sorts the requirement's revisions by `id`.
+- **Why:** a requirement has tens of revisions, not thousands, so the sort is cheap; an index is
+  a migration for no measured gain.
+- **Fix by:** S2-C22 (the tech-debt review): add the index if a requirement's revisions number in
+  the thousands
+- **Status:** open
+
+### TD-77: The reporter and the trash's deleter carry no "deactivated" flag
+- **Added:** S2-C9 (checkpoint-reviewer finding 1)
+- **What:** `RequirementRead.reporter_name` and `TrashItem.deleted_by_name` name the user without
+  an `*_is_active` flag, so the screens can't show the "Deactivated" badge that follows a
+  deactivated user's name everywhere (ui-design-guide; design-doc §4), as `ActivityEntry` and
+  the revision rows (`created_by_is_active`, S2-C9) do.
+- **Why:** both are from earlier checkpoints (S2-C5, S2-C8), fixed only when needed (DL-106);
+  their screens come in S2-C18 and S2-C21.
+- **Fix by:** S2-C18 (`reporter_is_active`) and S2-C21 (`deleted_by_is_active`), each with its
+  screen
+- **Status:** open

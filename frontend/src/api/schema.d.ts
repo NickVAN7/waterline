@@ -1090,6 +1090,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/requirements/{number}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Revisions
+         * @description The requirement's revisions, newest first (`?before=` the previous page's
+         *     `next_cursor`).
+         */
+        get: operations["requirement_revisions_api_projects__key__requirements__number__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/revisions/{revision_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Requirement Revision
+         * @description One revision's title, description, change note, and author; 404 for a number the
+         *     requirement doesn't have.
+         */
+        get: operations["get_requirement_revision_api_projects__key__requirements__number__revisions__revision_number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1236,6 +1278,13 @@ export interface components {
         Feed_ActivityEntry_: {
             /** Items */
             items: components["schemas"]["ActivityEntry"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Feed[RevisionItem] */
+        Feed_RevisionItem_: {
+            /** Items */
+            items: components["schemas"]["RevisionItem"][];
             /** Next Cursor */
             next_cursor: string | null;
         };
@@ -2111,6 +2160,72 @@ export interface components {
             export_control_confirmed: boolean;
             /** Confirmed Member Ids */
             confirmed_member_ids?: string[] | null;
+        };
+        /**
+         * RevisionItem
+         * @description A row of the requirement's revision list, newest first (design-doc §6.1); the author's
+         *     name is resolved at read time, and `created_by_is_active` false shows the "Deactivated"
+         *     badge.
+         */
+        RevisionItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Title */
+            title: string;
+            /** Change Note */
+            change_note: string | null;
+            /**
+             * Created By Id
+             * Format: uuid
+             */
+            created_by_id: string;
+            /** Created By Name */
+            created_by_name: string;
+            /** Created By Is Active */
+            created_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * RevisionRead
+         * @description One revision's snapshot, for the compare (DL-145: computed in the browser).
+         */
+        RevisionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Title */
+            title: string;
+            /** Change Note */
+            change_note: string | null;
+            /**
+             * Created By Id
+             * Format: uuid
+             */
+            created_by_id: string;
+            /** Created By Name */
+            created_by_name: string;
+            /** Created By Is Active */
+            created_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description Md */
+            description_md: string;
         };
         /** SignInRequest */
         SignInRequest: {
@@ -5954,6 +6069,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_TrashItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_revisions_api_projects__key__requirements__number__revisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_RevisionItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_requirement_revision_api_projects__key__requirements__number__revisions__revision_number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_number: number;
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionRead"];
                 };
             };
             /** @description Unauthorized */
