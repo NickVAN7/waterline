@@ -775,9 +775,9 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
 
   | Item | Who can delete |
   |---|---|
-  | Task | reporter, or project admin |
-  | Requirement | reporter while it has never been approved (`approved_revision_id IS NULL`); once approved, project admin only |
-  | Test case | reporter, or project admin |
+  | Task | reporter, as a project member (member role or above; DL-219, DL-223), or project admin |
+  | Requirement | reporter, as a project member (member role or above; DL-219), while it has never been approved (`approved_revision_id IS NULL`); once approved, project admin only |
+  | Test case | reporter, as a project member (member role or above; DL-219, DL-223), or project admin |
   | Subtask (hard delete) | any project member (member role or above) |
   | Phase, milestone (hard delete) | any project member (member role or above), only while nothing references them |
 
@@ -1283,18 +1283,29 @@ accurate PR status.
 - **Linked tasks and test cases:** *detach* them (they remain, now without a requirement, and
   are flagged in the UI) **or** soft-delete them too.
 - **Child requirements:** *promote* them to the deleted requirement's parent (or top level)
-  **or** soft-delete them too.
+  **or** soft-delete them too: the whole subtree, grandchildren included, with the one
+  `deleted_at` that restoring brings back together (DL-221).
 
 Every unlink is recorded in `activity_log` (`action = unlinked`). Restoring a requirement does
 not re-link anything automatically; the log shows what was attached, and re-linking is manual.
 
 **Permissions in the delete dialog:** "soft-delete them too" applies only to items the user
-could delete directly (§5). For linked items or children they can't delete, only *detach* or
-*promote* is offered, with a note explaining why. The dialog never lets someone delete
-indirectly what they couldn't delete directly.
+could delete directly (§5). For linked items they can't delete, or children whose subtree holds a
+requirement they can't delete, only *detach* or *promote* is offered, with a note explaining why;
+the server says which (the requirement read's `can_delete_children`, DL-222), so the dialog never
+works the rule out itself. The dialog never lets someone delete
+indirectly what they couldn't delete directly: a delete of the subtree with any descendant the
+user couldn't delete directly is a 403, and nothing is deleted (DL-221). Every requirement in a
+deleted subtree is treated as deleted: each one's pending approval request is cancelled and
+logged, and the linked-items choice covers the whole subtree's links (DL-224).
 
-**Restore** follows delete: whoever may delete an item may restore it. The trash view shows each
-user what they can restore; project admins see everything in the project.
+**Restore** follows delete: whoever may delete an item may restore it. A restore that would
+bring back a descendant deleted with it that the user couldn't restore directly is a 403, and
+nothing is restored (DL-221). The trash view shows each user what they can restore, each item by
+its own rule (so an item whose restore would be refused for a descendant is still listed), with
+Restore in its `allowed_actions` only when the whole restore would pass (DL-222); project admins
+see everything in the project. An archived project's trash lists the same items, with no Restore
+(DL-220).
 
 **Trash** (DL-146): a project Trash page, the last item of the project's navigation (DL-202),
 lists deleted items by type (requirements from Slice 2; tasks and test
@@ -1312,7 +1323,8 @@ siblings, in their own order; a requirement restored at the top level goes to th
 top level (DL-217); when their ranks don't fit (a tie, or past the length cap), the new
 parent's children are rewritten in order, as for a drop (§6, DL-218).
 
-**Pending approvals:** deleting a requirement cancels any pending approval request on it,
+**Pending approvals:** deleting a requirement cancels any pending approval request on it (and on
+each requirement deleted with it, DL-224),
 logged on the request (§10). Restoring the item does not reopen the request. A gate
 with any approval request (pending or past) can't be deleted: its sign-off history must keep
 pointing at a real milestone. Cancel the gate instead (status `cancelled`).

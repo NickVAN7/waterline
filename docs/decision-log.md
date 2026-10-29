@@ -2780,3 +2780,66 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering", §9 "Trash"; build plan
   (S2-C8)
 - **Source:** owner, Oct 28, 2026 (DC-2026-10-28f, docs-consistency decision 1, option (a))
+
+### DL-219: A reporter deletes and restores as a project member
+- **Date:** 2026-10-28
+- **Decision:** The reporter rule for deleting and restoring a never-approved requirement needs
+  the project member role or above: a reporter who is now a viewer may not, and one who can no
+  longer see the project gets the usual 404.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Other targeted rules" (Deletion); build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (chat, S2-C8 spec-test-writer question 1 and 2)
+
+### DL-220: The trash lists each item by its own rule
+- **Date:** 2026-10-28
+- **Decision:** The trash lists a deleted item when the user could restore that item alone, even
+  if restoring it would be refused for a descendant deleted with it. An archived project's trash
+  lists the same items, with no Restore in `allowed_actions`.
+- **Supersedes:** none
+- **Superseded by:** DL-222 (in part: Restore in a row's `allowed_actions`)
+- **Applies to:** design-doc §9 "Restore"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (chat, S2-C8 spec-test-writer questions 3 and 4)
+
+### DL-221: Deleting children deletes the subtree; a delete or restore never reaches past the user's rights
+- **Date:** 2026-10-28
+- **Decision:** Deleting a requirement with its children deletes the whole subtree,
+  grandchildren included, with one `deleted_at`. A delete of the subtree, or a restore, that
+  would reach a descendant the user couldn't delete or restore directly is a 403, and nothing
+  changes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Deleting a requirement", "Permissions in the delete dialog",
+  "Restore"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (chat, S2-C8 spec-test-writer question 5)
+
+### DL-222: The server says when a delete or restore would reach past the user's rights
+- **Date:** 2026-10-28
+- **Decision:** The requirement read carries `can_delete_children`: whether the caller may delete
+  the requirement's whole subtree (DL-221), so the delete dialog offers "delete them too" only
+  then. A trash row's `allowed_actions` carry Restore only when the whole restore would pass; the
+  row is still listed by its own rule (DL-220). Built in S2-C8.
+- **Supersedes:** DL-220, in part (a row listed by its own rule carried Restore by that rule)
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Permissions in the delete dialog", "Restore"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28g, docs-consistency decision 1, option (a))
+
+### DL-223: Every reporter rule needs the member role
+- **Date:** 2026-10-28
+- **Decision:** DL-219's rule applies to tasks and test cases too: their reporter deletes and
+  restores them as a project member (member role or above).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Other targeted rules" (Deletion)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28g, docs-consistency decision 2, option (a))
+
+### DL-224: Every requirement in a deleted subtree is treated as deleted
+- **Date:** 2026-10-28
+- **Decision:** When a requirement is deleted with its subtree, each requirement in it has its
+  pending approval request cancelled and logged, and the delete dialog's linked-items choice
+  (Slices 3 and 5) covers the whole subtree's links. Built in S2-C8 (approval requests).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Permissions in the delete dialog", "Pending approvals"; build
+  plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28g, docs-consistency decision 3, option (a))
