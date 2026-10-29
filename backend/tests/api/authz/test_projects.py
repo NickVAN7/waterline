@@ -338,6 +338,8 @@ async def test_the_org_list_holds_only_the_projects_the_caller_can_open(
 # --- GET /api/projects/{key} (project.view) -----------------------------------------------------
 
 INHERITED_ON_A_LIVE_PROJECT = [
+    "approval_request.cancel",
+    "approval_request.create",
     "project.archive",
     "project.lower_restriction",
     "project.raise_restriction",
@@ -369,6 +371,8 @@ INHERITED_ON_A_LIVE_PROJECT = [
         (
             "project_admin",
             [
+                "approval_request.cancel",
+                "approval_request.create",
                 "project.lower_restriction",
                 "project.raise_restriction",
                 "project.update",

@@ -231,6 +231,8 @@ def test_a_project_action_is_404_to_who_cannot_see_the_project(persona: str, act
 # --- allowed_actions on a project (the project read, DL-76) -------------------------------------
 
 INHERITED_ON_A_LIVE_PROJECT = [
+    "approval_request.cancel",
+    "approval_request.create",
     "project.archive",
     "project.lower_restriction",
     "project.raise_restriction",
@@ -262,6 +264,8 @@ INHERITED_ON_A_LIVE_PROJECT = [
         (
             "project_admin",
             [
+                "approval_request.cancel",
+                "approval_request.create",
                 "project.lower_restriction",
                 "project.raise_restriction",
                 "project.update",

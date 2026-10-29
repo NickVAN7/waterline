@@ -60,6 +60,7 @@ from app.schemas.project import (
 )
 from app.schemas.user import AccessReason
 from app.schemas.workspace import SlugAvailability
+from app.services.approval import ApprovalService
 from app.services.my_work import PROJECTS, page_of
 from app.services.org import OrgService
 from app.services.roster import MemberRemoval, Roster, RosterSpec, register_on_member_removed
@@ -539,8 +540,9 @@ class ProjectService:
             )
 
     async def archive(self, ctx: AuthzContext, project: Project) -> None:
-        """Read-only until unarchived (`project_archived`). An archived project can't be archived
-        again: `authorize()` denies it as a mutation on an archived project (403)."""
+        """Read-only until unarchived (`project_archived`); its pending approval requests are
+        cancelled, each logged (DL-194). An archived project can't be archived again:
+        `authorize()` denies it as a mutation on an archived project (403)."""
         # Locked and read again: an archive that committed meanwhile leaves nothing to record.
         await self.repository.lock(project)
         if project.archived_at is not None:
@@ -548,6 +550,7 @@ class ProjectService:
         project.archived_at = datetime.now(UTC)
         await self.session.flush()
         self._log(AuditAction.PROJECT_ARCHIVED, ctx.user_id, project)
+        await ApprovalService(self.session).cancel_pending_in_project(project.id, ctx.user_id)
 
     async def unarchive(self, ctx: AuthzContext, project: Project) -> None:
         """`project_unarchived`; already unarchived changes and records nothing."""

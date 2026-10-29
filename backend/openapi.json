@@ -5920,6 +5920,368 @@
           }
         }
       }
+    },
+    "/api/projects/{key}/requirements/{number}/approval-requests": {
+      "post": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Request Approval",
+        "description": "Request approval of the requirement's current revision from the named approvers. 404 for\nan approver without access to the project; 422 on `approver_ids` (`duplicate`,\n`account_inactive`) and on the body (`pending_exists`: one pending request at a time).",
+        "operationId": "request_approval_api_projects__key__requirements__number__approval_requests_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Requirement Approval Requests",
+        "description": "The requirement's approval requests, newest first, with their approvers.",
+        "operationId": "requirement_approval_requests_api_projects__key__requirements__number__approval_requests_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: created_at. Default: -created_at",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: created_at. Default: -created_at"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ApprovalRequestItem_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/approval-requests/{request_id}": {
+      "get": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Get Approval Request",
+        "description": "The approval request, with the actions the caller may take on it; 404 for a deleted\nrequirement's.",
+        "operationId": "get_approval_request_api_approval_requests__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/approval-requests/{request_id}/cancel": {
+      "post": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Cancel Approval Request",
+        "description": "Cancel the pending request; 422 on `id` (`not_pending`) for one already decided or\ncancelled.",
+        "operationId": "cancel_approval_request_api_approval_requests__request_id__cancel_post",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6062,7 +6424,9 @@
           "requirement.lower_restriction",
           "requirement.approve_manually",
           "requirement.delete",
-          "requirement.restore"
+          "requirement.restore",
+          "approval_request.create",
+          "approval_request.cancel"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
@@ -6255,6 +6619,296 @@
           "actual_result"
         ],
         "title": "ActivityField"
+      },
+      "ApprovalDecision": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "replaced"
+        ],
+        "title": "ApprovalDecision"
+      },
+      "ApprovalRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "approver_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approver Id"
+          },
+          "approver_name": {
+            "type": "string",
+            "title": "Approver Name"
+          },
+          "approver_is_active": {
+            "type": "boolean",
+            "title": "Approver Is Active"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/ApprovalDecision"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "approver_id",
+          "approver_name",
+          "approver_is_active",
+          "decision",
+          "comment",
+          "decided_at"
+        ],
+        "title": "ApprovalRead",
+        "description": "One approver's row; `approver_is_active` false shows the \"Deactivated\" badge."
+      },
+      "ApprovalRequestCreate": {
+        "properties": {
+          "approver_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Approver Ids"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approver_ids"
+        ],
+        "title": "ApprovalRequestCreate",
+        "description": "A request bound to the requirement's current revision. `approver_ids`: 1 to 50 distinct\nusers with access to the project (a repeat is a 422 `duplicate`, someone without access a\n404, a deactivated one a 422 `account_inactive`; DL-226)."
+      },
+      "ApprovalRequestItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ApprovalRequestStatus"
+          },
+          "requirement_revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requirement Revision Id"
+          },
+          "revision_number": {
+            "type": "integer",
+            "title": "Revision Number"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "requested_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requested By Id"
+          },
+          "requested_by_name": {
+            "type": "string",
+            "title": "Requested By Name"
+          },
+          "requested_by_is_active": {
+            "type": "boolean",
+            "title": "Requested By Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalRead"
+            },
+            "type": "array",
+            "title": "Approvals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "requirement_revision_id",
+          "revision_number",
+          "note",
+          "requested_by_id",
+          "requested_by_name",
+          "requested_by_is_active",
+          "created_at",
+          "completed_at",
+          "approvals"
+        ],
+        "title": "ApprovalRequestItem",
+        "description": "A request on the requirement's list, newest first (DL-227), with its approvers."
+      },
+      "ApprovalRequestRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ApprovalRequestStatus"
+          },
+          "requirement_revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requirement Revision Id"
+          },
+          "revision_number": {
+            "type": "integer",
+            "title": "Revision Number"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "requested_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requested By Id"
+          },
+          "requested_by_name": {
+            "type": "string",
+            "title": "Requested By Name"
+          },
+          "requested_by_is_active": {
+            "type": "boolean",
+            "title": "Requested By Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalRead"
+            },
+            "type": "array",
+            "title": "Approvals"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "requirement_revision_id",
+          "revision_number",
+          "note",
+          "requested_by_id",
+          "requested_by_name",
+          "requested_by_is_active",
+          "created_at",
+          "completed_at",
+          "approvals",
+          "allowed_actions"
+        ],
+        "title": "ApprovalRequestRead",
+        "description": "One request, with the actions the caller may take on it."
+      },
+      "ApprovalRequestStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "cancelled"
+        ],
+        "title": "ApprovalRequestStatus"
       },
       "ChangePasswordRequest": {
         "properties": {
@@ -7024,6 +7678,37 @@
         "type": "object",
         "title": "OwnProfileUpdate",
         "description": "The signed-in user's change to their own profile: their email isn't theirs to change in v1\n(design-doc §4)."
+      },
+      "Page_ApprovalRequestItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalRequestItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[ApprovalRequestItem]"
       },
       "Page_MemberCandidate_": {
         "properties": {

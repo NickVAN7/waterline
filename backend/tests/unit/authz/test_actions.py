@@ -13,6 +13,8 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c13_actions() -> None:
     ones (DL-45), S1-C8 three more (DL-56), S1-C9 three more (DL-68), S1-C10 two (DL-73; no
     separate `user.reset_password`), S1-C11 six (DL-77), S1-C12 two (DL-79), S1-C13 two (DL-82)."""
     assert sorted(REGISTRY) == [
+        "approval_request.cancel",
+        "approval_request.create",
         "org.create",
         "org.update",
         "org.view",
@@ -79,6 +81,8 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c13_actions() -> None:
         ("requirement.approve_manually", Level.PROJECT),
         ("requirement.delete", Level.PROJECT),
         ("requirement.restore", Level.PROJECT),
+        ("approval_request.create", Level.PROJECT),
+        ("approval_request.cancel", Level.PROJECT),
     ],
 )
 def test_each_real_action_is_registered_at_its_level(action: str, level: Level) -> None:

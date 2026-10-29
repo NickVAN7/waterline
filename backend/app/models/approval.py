@@ -29,7 +29,7 @@ class ApprovalRequest(BaseModel):
             "entity_id",
             unique=True,
             postgresql_where="status = 'pending'",
-            # The request endpoints (S2-C10) check first; a clash here is a bug until then.
+            # The create checks first (DL-225); a clash here is a bug.
             info=internal_only(),
         ),
         Index(None, "entity_type", "entity_id", "created_at"),
@@ -56,6 +56,10 @@ class ApprovalRequest(BaseModel):
 
     project: Mapped[Project] = relationship(lazy="raise")
     requester: Mapped[User] = relationship(lazy="raise")
+    requirement_revision: Mapped[RequirementRevision | None] = relationship(lazy="raise")
+    approvals: Mapped[list[Approval]] = relationship(
+        lazy="raise", back_populates="approval_request", order_by="Approval.id"
+    )
 
 
 class Approval(BaseModel):
@@ -76,5 +80,7 @@ class Approval(BaseModel):
     comment: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime | None]
 
-    approval_request: Mapped[ApprovalRequest] = relationship(lazy="raise")
+    approval_request: Mapped[ApprovalRequest] = relationship(
+        lazy="raise", back_populates="approvals"
+    )
     approver: Mapped[User] = relationship(lazy="raise")

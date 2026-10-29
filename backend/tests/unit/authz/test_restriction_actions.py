@@ -327,7 +327,8 @@ def test_every_action_so_far_is_marked_management_but_the_requirement_actions() 
     """DL-82: "The registry marks every action content or management; every action so far is
     management"; S2-C3 adds the first content action, `requirement.view`, S2-C5
     `requirement.create`, S2-C6 the update, reporter, restriction, and approve-by-hand
-    actions (S2-plan, "Actions per row"; DL-212), and S2-C8 delete and restore."""
+    actions (S2-plan, "Actions per row"; DL-212), S2-C8 delete and restore, and S2-C10 the
+    approval request actions."""
     assert {
         action: REGISTRY[action].access
         for action in Action
@@ -342,4 +343,6 @@ def test_every_action_so_far_is_marked_management_but_the_requirement_actions() 
         Action.REQUIREMENT_APPROVE_MANUALLY: AccessKind.CONTENT,
         Action.REQUIREMENT_DELETE: AccessKind.CONTENT,
         Action.REQUIREMENT_RESTORE: AccessKind.CONTENT,
+        Action.APPROVAL_REQUEST_CREATE: AccessKind.CONTENT,
+        Action.APPROVAL_REQUEST_CANCEL: AccessKind.CONTENT,
     }

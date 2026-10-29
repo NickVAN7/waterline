@@ -98,6 +98,8 @@ class Action(StrEnum):
     REQUIREMENT_APPROVE_MANUALLY = "requirement.approve_manually"
     REQUIREMENT_DELETE = "requirement.delete"
     REQUIREMENT_RESTORE = "requirement.restore"
+    APPROVAL_REQUEST_CREATE = "approval_request.create"
+    APPROVAL_REQUEST_CANCEL = "approval_request.cancel"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -349,5 +351,19 @@ REGISTRY: dict[str, ActionSpec] = {
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.ADMIN,
         rule=_reporter_while_never_approved,
+    ),
+    # Project admins, inherited included (§6.2, "Who does what"); content, so the export-control
+    # gate leaves only explicit admins (§3.1).
+    Action.APPROVAL_REQUEST_CREATE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    Action.APPROVAL_REQUEST_CANCEL: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
     ),
 }

@@ -157,6 +157,8 @@ INHERITED_ON_AN_EC_PROJECT = [
         (
             "project_admin",
             [
+                "approval_request.cancel",
+                "approval_request.create",
                 "project.lower_restriction",
                 "project.raise_restriction",
                 "project.update",
@@ -214,6 +216,8 @@ async def test_an_inherited_admin_with_a_viewer_membership_gets_content_actions_
 
     assert response.status_code == 200
     assert response.json()["allowed_actions"] == [
+        "approval_request.cancel",
+        "approval_request.create",
         *INHERITED_ON_AN_EC_PROJECT,
         "requirement.approve_manually",
         "requirement.create",

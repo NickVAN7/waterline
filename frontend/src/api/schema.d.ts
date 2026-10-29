@@ -1132,6 +1132,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/requirements/{number}/approval-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Approval Requests
+         * @description The requirement's approval requests, newest first, with their approvers.
+         */
+        get: operations["requirement_approval_requests_api_projects__key__requirements__number__approval_requests_get"];
+        put?: never;
+        /**
+         * Request Approval
+         * @description Request approval of the requirement's current revision from the named approvers. 404 for
+         *     an approver without access to the project; 422 on `approver_ids` (`duplicate`,
+         *     `account_inactive`) and on the body (`pending_exists`: one pending request at a time).
+         */
+        post: operations["request_approval_api_projects__key__requirements__number__approval_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approval-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Approval Request
+         * @description The approval request, with the actions the caller may take on it; 404 for a deleted
+         *     requirement's.
+         */
+        get: operations["get_approval_request_api_approval_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approval-requests/{request_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Approval Request
+         * @description Cancel the pending request; 422 on `id` (`not_pending`) for one already decided or
+         *     cancelled.
+         */
+        post: operations["cancel_approval_request_api_approval_requests__request_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1185,7 +1253,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel";
         /**
          * ActivityAction
          * @enum {string}
@@ -1236,6 +1304,133 @@ export interface components {
          * @enum {string}
          */
         ActivityField: "status" | "assignee_id" | "reporter_id" | "reviewer_id" | "sprint_id" | "milestone_id" | "phase_id" | "workstream_id" | "priority" | "severity" | "start_date" | "end_date" | "due_date" | "target_date" | "baseline_start" | "baseline_end" | "baseline_date" | "requirement_id" | "parent_requirement_id" | "time_estimate" | "approved_revision_id" | "approver_id" | "restriction_level" | "restriction_categories" | "lead_id" | "actual_result";
+        /**
+         * ApprovalDecision
+         * @enum {string}
+         */
+        ApprovalDecision: "pending" | "approved" | "rejected" | "replaced";
+        /**
+         * ApprovalRead
+         * @description One approver's row; `approver_is_active` false shows the "Deactivated" badge.
+         */
+        ApprovalRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Approver Id
+             * Format: uuid
+             */
+            approver_id: string;
+            /** Approver Name */
+            approver_name: string;
+            /** Approver Is Active */
+            approver_is_active: boolean;
+            decision: components["schemas"]["ApprovalDecision"];
+            /** Comment */
+            comment: string | null;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /**
+         * ApprovalRequestCreate
+         * @description A request bound to the requirement's current revision. `approver_ids`: 1 to 50 distinct
+         *     users with access to the project (a repeat is a 422 `duplicate`, someone without access a
+         *     404, a deactivated one a 422 `account_inactive`; DL-226).
+         */
+        ApprovalRequestCreate: {
+            /** Approver Ids */
+            approver_ids: string[];
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * ApprovalRequestItem
+         * @description A request on the requirement's list, newest first (DL-227), with its approvers.
+         */
+        ApprovalRequestItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["ApprovalRequestStatus"];
+            /**
+             * Requirement Revision Id
+             * Format: uuid
+             */
+            requirement_revision_id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Note */
+            note: string | null;
+            /**
+             * Requested By Id
+             * Format: uuid
+             */
+            requested_by_id: string;
+            /** Requested By Name */
+            requested_by_name: string;
+            /** Requested By Is Active */
+            requested_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Approvals */
+            approvals: components["schemas"]["ApprovalRead"][];
+        };
+        /**
+         * ApprovalRequestRead
+         * @description One request, with the actions the caller may take on it.
+         */
+        ApprovalRequestRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["ApprovalRequestStatus"];
+            /**
+             * Requirement Revision Id
+             * Format: uuid
+             */
+            requirement_revision_id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Note */
+            note: string | null;
+            /**
+             * Requested By Id
+             * Format: uuid
+             */
+            requested_by_id: string;
+            /** Requested By Name */
+            requested_by_name: string;
+            /** Requested By Is Active */
+            requested_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Approvals */
+            approvals: components["schemas"]["ApprovalRead"][];
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * ApprovalRequestStatus
+         * @enum {string}
+         */
+        ApprovalRequestStatus: "pending" | "approved" | "rejected" | "cancelled";
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -1573,6 +1768,17 @@ export interface components {
             name?: string | null;
             /** Username */
             username?: string | null;
+        };
+        /** Page[ApprovalRequestItem] */
+        Page_ApprovalRequestItem_: {
+            /** Items */
+            items: components["schemas"]["ApprovalRequestItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /** Page[MemberCandidate] */
         Page_MemberCandidate_: {
@@ -6192,6 +6398,249 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_approval_requests_api_projects__key__requirements__number__approval_requests_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: created_at. Default: -created_at */
+                sort?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ApprovalRequestItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    request_approval_api_projects__key__requirements__number__approval_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_approval_request_api_approval_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    cancel_approval_request_api_approval_requests__request_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
                 };
             };
             /** @description Unauthorized */

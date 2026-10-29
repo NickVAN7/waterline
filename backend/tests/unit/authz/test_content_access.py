@@ -361,6 +361,8 @@ def test_an_inherited_admins_allowed_actions_on_an_ec_project_are_management_onl
         (
             "project_admin",
             [
+                "approval_request.cancel",
+                "approval_request.create",
                 "project.lower_restriction",
                 "project.raise_restriction",
                 "project.update",
@@ -403,6 +405,8 @@ def test_an_inherited_admin_with_a_viewer_membership_keeps_content_in_allowed_ac
 ) -> None:
     """Content back with the membership; lowering still needs an explicit admin (DL-82)."""
     assert allowed_actions(_with_viewer_membership(persona), EC) == [
+        "approval_request.cancel",
+        "approval_request.create",
         "project.archive",
         "project.raise_restriction",
         "project.unarchive",

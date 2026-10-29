@@ -17,7 +17,11 @@ from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
 from app.services.org import OrgEntity, OrgService
 from app.services.project import ProjectEntity, ProjectService
-from app.services.requirement import RequirementEntity, RequirementService
+from app.services.requirement import (
+    ApprovalRequestEntity,
+    RequirementEntity,
+    RequirementService,
+)
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
 
@@ -148,6 +152,12 @@ async def load_requirement(
     key: str, number: int, session: SessionDep
 ) -> tuple[RequirementEntity, Target] | None:
     return await RequirementService(session).load(key, number)
+
+
+async def load_approval_request(
+    request_id: uuid.UUID, session: SessionDep
+) -> tuple[ApprovalRequestEntity, Target] | None:
+    return await RequirementService(session).load_approval_request(request_id)
 
 
 async def load_deleted_requirement(

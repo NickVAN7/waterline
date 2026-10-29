@@ -547,6 +547,8 @@ def test_allowed_actions_on_a_workspace_are_the_real_ones_allowed_sorted_by_name
         (
             PROJECT_TARGET,
             [
+                "approval_request.cancel",
+                "approval_request.create",
                 "project.archive",
                 "project.lower_restriction",
                 "project.raise_restriction",

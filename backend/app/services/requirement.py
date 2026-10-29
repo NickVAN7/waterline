@@ -24,6 +24,7 @@ from app.enums import (
     ActivityEntityType,
     ActivityField,
     ApprovalEntityType,
+    ApprovalRequestStatus,
     DeletedChildren,
     NumberPrefix,
     RequirementStatus,
@@ -31,16 +32,24 @@ from app.enums import (
     RestrictionLevel,
     TrashItemType,
 )
+from app.models.approval import ApprovalRequest
 from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
 from app.models.user import User
 from app.repositories.activity import ActivityRepository
-from app.repositories.base import direct_update
+from app.repositories.approval import ApprovalRepository
+from app.repositories.base import direct_update, get_by_id
 from app.repositories.project import ProjectRepository
 from app.repositories.requirement import RequirementRepository
 from app.repositories.user import UserRepository
 from app.rules.rank import rank_between
 from app.rules.restriction import Restriction, change, levels_below
+from app.schemas.approval import (
+    ApprovalRead,
+    ApprovalRequestCreate,
+    ApprovalRequestItem,
+    ApprovalRequestRead,
+)
 from app.schemas.requirement import (
     RequirementCreate,
     RequirementItem,
@@ -59,6 +68,7 @@ from app.services.project import register_on_restriction_changed
 from app.services.user import required_error
 
 type RequirementEntity = Requirement
+type ApprovalRequestEntity = ApprovalRequest
 
 # The ranked-view cap (DL-159; build plan, "API conventions").
 TREE_CAP = 2_000
@@ -82,6 +92,14 @@ REVISIONS = ListSpec(
     name="RevisionItem",
     id_column=RequirementRevision.id,  # pyright: ignore[reportArgumentType]
     paging="cursor",
+)
+
+# A requirement's approval requests: newest first, offset-paged (DL-227).
+APPROVAL_REQUESTS = ListSpec(
+    name="ApprovalRequestItem",
+    id_column=ApprovalRequest.id,  # pyright: ignore[reportArgumentType]
+    sorts={"created_at": ApprovalRequest.created_at},  # pyright: ignore[reportArgumentType]
+    default_sort=("-created_at",),
 )
 
 
@@ -753,6 +771,154 @@ class RequirementService:
             updated_at=requirement.updated_at,
             allowed_actions=allowed_actions(ctx, project_target(project, requirement)),
         )
+
+    # --- Approval requests (design-doc §6.2; S2-C10) -------------------------------------------
+
+    async def load_approval_request(
+        self, request_id: uuid.UUID
+    ) -> tuple[ApprovalRequest, Target] | None:
+        """The request, as a target on its live requirement inside its project; None for a
+        deleted requirement's (DL-228)."""
+        request = await ApprovalRepository(self.session).get(request_id)
+        if request is None or request.entity_type is not ApprovalEntityType.REQUIREMENT:
+            return None
+        requirement = await get_by_id(self.session, Requirement, request.entity_id)
+        if requirement is None:
+            return None
+        return request, project_target(await self._project(requirement), requirement)
+
+    async def request_approval(
+        self, ctx: AuthzContext, requirement: Requirement, body: ApprovalRequestCreate
+    ) -> ApprovalRequestRead:
+        """A request bound to the current revision, one pending at a time (DL-225, DL-229),
+        naming eligible approvers (DL-226); logged `created`."""
+        if len(set(body.approver_ids)) < len(body.approver_ids):
+            raise ValidationFailedError.on(
+                ("body", "approver_ids"), "Name each approver once.", "duplicate"
+            )
+        # The project held first (the order every requirement path takes), so an archive or an
+        # export-control change meanwhile waits, and the check runs again under it.
+        project = await self._project(requirement)
+        await ProjectRepository(self.session).hold(project)
+        # Then the requirement, so two creates (or a create and a delete) take turns (DL-229).
+        await self._lock_live(requirement)
+        target = project_target(project, requirement)
+        ensure(ctx, Action.APPROVAL_REQUEST_CREATE, target)
+        for approver_id in body.approver_ids:
+            await self._check_approver(target, approver_id)
+        request = await ApprovalService(self.session).create(
+            project_id=project.id,
+            entity_type=ApprovalEntityType.REQUIREMENT,
+            entity_id=requirement.id,
+            requirement_revision_id=requirement.current_revision_id,
+            approver_ids=body.approver_ids,
+            note=body.note,
+            actor_id=ctx.user_id,
+        )
+        return await self._read_approval_request(ctx, request.id, target)
+
+    async def _check_approver(self, target: Target, user_id: uuid.UUID) -> None:
+        """The approver has content access to the project (404 otherwise, as the member picker,
+        design-doc §6.2) and is active (422 `account_inactive`, DL-226)."""
+        users = UserRepository(self.session)
+        # Held, so a removal or deactivation committing meanwhile waits for this one (TD-72).
+        await users.hold_access(user_id)
+        user = await users.get(user_id)
+        if user is None or not authorize(
+            await users.authz_context(user), Action.REQUIREMENT_VIEW, target
+        ):
+            raise NotFoundError
+        if not user.is_active:
+            raise ValidationFailedError.on(
+                ("body", "approver_ids"), "This account is deactivated.", "account_inactive"
+            )
+
+    async def approval_requests(
+        self, requirement: Requirement, query: BaseModel
+    ) -> Page[ApprovalRequestItem]:
+        """The requirement's approval requests, newest first (DL-227)."""
+        page = await fetch_page(
+            self.session,
+            ApprovalRepository(self.session).for_entity(
+                ApprovalEntityType.REQUIREMENT, requirement.id
+            ),
+            APPROVAL_REQUESTS,
+            query,
+        )
+        return Page[ApprovalRequestItem](
+            items=[_approval_request(row) for row in page.items],
+            total=page.total,
+            limit=page.limit,
+            offset=page.offset,
+        )
+
+    async def read_approval_request(
+        self, ctx: AuthzContext, request: ApprovalRequest
+    ) -> ApprovalRequestRead:
+        """The request, with the actions the caller may take on it."""
+        requirement, project = await self._request_entities(request)
+        return await self._read_approval_request(
+            ctx, request.id, project_target(project, requirement)
+        )
+
+    async def cancel_approval_request(
+        self, ctx: AuthzContext, request: ApprovalRequest
+    ) -> ApprovalRequestRead:
+        """Cancel a pending request, logged (`status`); 422 `not_pending` otherwise (DL-228)."""
+        requirement, project = await self._request_entities(request)
+        # Held and checked again, as the create is: an export-control change meanwhile waits.
+        await ProjectRepository(self.session).hold(project)
+        target = project_target(project, requirement)
+        ensure(ctx, Action.APPROVAL_REQUEST_CANCEL, target)
+        await ApprovalService(self.session).cancel(request, ctx.user_id)
+        return await self._read_approval_request(ctx, request.id, target)
+
+    async def _request_entities(self, request: ApprovalRequest) -> tuple[Requirement, Project]:
+        # The loader's requirement and project, identity-map hits.
+        requirement = cast(Requirement, await self.session.get(Requirement, request.entity_id))
+        return requirement, await self._project(requirement)
+
+    async def _read_approval_request(
+        self, ctx: AuthzContext, request_id: uuid.UUID, target: Target
+    ) -> ApprovalRequestRead:
+        # A foreign key's row the caller just loaded or wrote, so never None.
+        request = cast(ApprovalRequest, await ApprovalRepository(self.session).get(request_id))
+        actions = allowed_actions(ctx, target)
+        if request.status is not ApprovalRequestStatus.PENDING:
+            # Ruled out for good by its state (DL-231, DL-232).
+            actions = [a for a in actions if a is not Action.APPROVAL_REQUEST_CANCEL]
+        return ApprovalRequestRead(
+            **_approval_request(request).model_dump(), allowed_actions=actions
+        )
+
+
+def _approval_request(request: ApprovalRequest) -> ApprovalRequestItem:
+    # A requirement's request is bound to a revision (the CHECK `requirement_revision`).
+    revision = cast(RequirementRevision, request.requirement_revision)
+    return ApprovalRequestItem(
+        id=request.id,
+        status=request.status,
+        requirement_revision_id=revision.id,
+        revision_number=revision.revision_number,
+        note=request.note,
+        requested_by_id=request.requested_by,
+        requested_by_name=request.requester.name,
+        requested_by_is_active=request.requester.is_active,
+        created_at=request.created_at,
+        completed_at=request.completed_at,
+        approvals=[
+            ApprovalRead(
+                id=row.id,
+                approver_id=row.approver_id,
+                approver_name=row.approver.name,
+                approver_is_active=row.approver.is_active,
+                decision=row.decision,
+                comment=row.comment,
+                decided_at=row.decided_at,
+            )
+            for row in request.approvals
+        ],
+    )
 
 
 def _revision(row: RequirementRevision) -> RevisionItem:

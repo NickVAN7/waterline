@@ -1,5 +1,7 @@
 from typing import ClassVar
 
+from polyfactory import Ignore
+
 from app.enums import ApprovalDecision, ApprovalEntityType, ApprovalRequestStatus
 from app.models.approval import Approval, ApprovalRequest
 from tests.factories import BaseFactory
@@ -14,6 +16,9 @@ class ApprovalRequestFactory(BaseFactory[ApprovalRequest]):
     __set_as_default_factory_for_type__: ClassVar[bool] = True
 
     entity_type = ApprovalEntityType.MILESTONE
+    # Read-side relationships: a built revision would satisfy the requirement CHECK by itself.
+    requirement_revision = Ignore()
+    approvals = Ignore()
     status = ApprovalRequestStatus.PENDING
     note = None
     completed_at = None

@@ -969,3 +969,44 @@ Entry format:
 - **Fix by:** S2-C18 (`reporter_is_active`) and S2-C21 (`deleted_by_is_active`), each with its
   screen
 - **Status:** open
+
+### TD-78: Each authorization spec test spells out every action a role holds
+- **Added:** S2-C10 (owner, chat)
+- **What:** seven spec-test files (`test_actions`, `test_authorize`, `test_project_actions`,
+  `test_content_access`, `test_restriction_actions`, and the API files `test_projects` and
+  `test_export_controlled_requirements`) each list, by hand, the actions a role or the registry
+  holds, so a new action means editing all seven, each with the owner's approval.
+- **Why:** the lists are expectations written independently of `REGISTRY`, so a wrongly granted
+  or wrongly marked action fails them; one hand-written table would keep that and cost one row.
+- **Fix by:** S2-C11, before its spec tests (it adds `approval.decide`): one expected table in
+  `tests/support/authz.py` (each action's level, content or management, and the lowest role
+  granting it, written by hand), the seven tests deriving their lists from it, and a test that
+  every registered action has a row; a test-only change, reviewed by `checkpoint-reviewer`, with
+  the owner's approval of the spec-test changes
+- **Status:** open
+
+### TD-79: Each approver costs about eight queries
+- **Added:** S2-C10 (checkpoint-reviewer finding 5)
+- **What:** creating an approval request checks each approver in turn: `hold_access` (four
+  queries), the user, and their authorization context (three), so 50 approvers are about 400
+  round trips, made while the requirement is locked.
+- **Why:** bounded by the 50-approver cap (DL-226), and a request names a handful in practice; a
+  batched version needs `hold_access` and `authz_context` for many users at once, which nothing
+  else needs yet.
+- **Fix by:** S2-C22 (the tech-debt review): batch the holds and the contexts (one query each
+  for every approver) if requests name many approvers
+- **Status:** open
+
+### TD-80: Deleting re-checks the rule against the project as first loaded
+- **Added:** S2-C10 (security-reviewer finding 1's sibling)
+- **What:** `RequirementService.delete` takes the tree lock (`lock_tree`, which selects only the
+  project's id) and then runs `ensure()` again, against the project row loaded at the start of
+  the request. An export-control change committing in between isn't seen, so an inherited admin
+  who just lost content access can still delete. The approval request create and cancel hold
+  the project with `ProjectRepository.hold`, which reads it again (S2-C10).
+- **Why:** from S2-C8, fixed only when needed (DL-106); the window is the request's own, and the
+  actor had access a moment before.
+- **Fix by:** S2-C22 (the tech-debt review): read the project again under the tree lock (or hold
+  it as the request create does) before the re-check, with a race test against marking the
+  project export-controlled
+- **Status:** open
