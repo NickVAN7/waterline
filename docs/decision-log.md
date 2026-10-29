@@ -2756,3 +2756,27 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering"; build plan ("Later
   slices")
 - **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C7.md`, open question 2)
+
+### DL-217: Where promoted children and a top-level restore are ranked
+- **Date:** 2026-10-28
+- **Decision:** When a requirement is deleted with its children promoted, the children take the
+  deleted requirement's place among its siblings, keeping their own order. A requirement
+  restored at the top level, because its parent is still in the trash, goes to the bottom of
+  the top level. Built in S2-C8.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Trash"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28e, docs-consistency decision 1: option (c) for
+  promote, (b) for a restore at the top level)
+
+### DL-218: Promote and a top-level restore rewrite ranks as a drop does
+- **Date:** 2026-10-28
+- **Decision:** When a delete's promoted children or a requirement restored at the top level
+  can't get ranks where DL-217 puts them (a tie, or ranks past the 255-character cap), the new
+  parent's children are rewritten in order in the same transaction, as for a drop (DL-204,
+  DL-213). Built in S2-C8.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering", §9 "Trash"; build plan
+  (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28f, docs-consistency decision 1, option (a))

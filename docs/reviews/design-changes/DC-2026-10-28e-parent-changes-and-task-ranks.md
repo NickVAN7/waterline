@@ -37,3 +37,8 @@
 | 1 | What rank does a promoted child get, and a requirement restored at the top level? DL-215 says they change parent as a move does, but a move takes its rank from neighbors the client sends | (a) keep the stored rank, change only the parent; (b) the bottom of the new siblings, keeping their order, with fresh ranks; (c) promoted children where the deleted parent was, keeping their order |
 
 Due before S2-C8.
+
+## Owner decisions after the change
+
+- Decision 1 (Oct 28, 2026): option (c) for promoted children, (b) for a restore at the top
+  level (DL-217). Recorded in DC-2026-10-28f.

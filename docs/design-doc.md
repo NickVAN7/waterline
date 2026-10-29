@@ -277,7 +277,8 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
 - **Manual ordering:** `rank` (sortable string, fractional indexing) on task, requirement, and
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
   that row, except a drop past the length cap or between tied neighbors, which rewrites that
-  gap's siblings (requirements, DL-204, DL-213; tasks decided in Slice 3, DL-216). See §6.
+  gap's siblings (requirements, DL-204, DL-213, and a delete's promote or a restore at the top
+  level the same way, DL-218; tasks decided in Slice 3, DL-216). See §6.
 - **Markdown** (DL-140): descriptions and comments are stored as markdown (`description_md`)
   and rendered in the browser, never on the server, with `markdown-it` (raw HTML off) and then
   DOMPurify on its output, so stored XSS can't run. Supported: CommonMark plus tables, task-list
@@ -1165,7 +1166,8 @@ requirement approval.
     display-order change isn't an edit (the subtask counter does move it).
   - **Ties:** every ordered query sorts by `(rank, id)`, so two items that receive the same rank
     still order deterministically. No periodic rebalancing in v1: the only rewrites are a drop
-    past the length cap and a drop between tied neighbors (above, DL-213). These rewrites and
+    past the length cap and a drop between tied neighbors (above, DL-213), and the same for a
+    delete's promoted children and a restore at the top level (§9, DL-218). These rewrites and
     the move lock below are the requirement tree's; which items a task rewrite covers, and
     whether task moves run one at a time, is decided in Slice 3 planning (DL-216).
   - **Requirement moves run one at a time per project** (DL-214; every requirement parent
@@ -1305,7 +1307,10 @@ logged (§10). A restored item whose stored restriction level is below its proje
 was raised while it was in the trash, which the raise skips) is raised to the project's level,
 logged (DL-209). Promoting children on delete and restoring at the top level change a parent as
 a move does (§6, DL-215): the project's tree lock first, no `version` bump, `updated_at` moved,
-the parent change logged.
+the parent change logged. Promoted children take the deleted requirement's place among its
+siblings, in their own order; a requirement restored at the top level goes to the bottom of the
+top level (DL-217); when their ranks don't fit (a tie, or past the length cap), the new
+parent's children are rewritten in order, as for a drop (§6, DL-218).
 
 **Pending approvals:** deleting a requirement cancels any pending approval request on it,
 logged on the request (§10). Restoring the item does not reopen the request. A gate
