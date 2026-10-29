@@ -894,7 +894,8 @@ Entry format:
   with no race test against it is unproven code.
 - **Fix by:** S2-C8 (the delete endpoint): hold the parent `FOR SHARE` on create, with a race
   test against a delete
-- **Status:** open
+- **Status:** resolved in S2-C8 (the parent held `FOR SHARE`; a delete locks a level of the
+  subtree before reading the next, so a child created under a locked row is seen or waits)
 
 ### TD-72: The reporter and the restriction floor are checked without a lock
 - **Added:** S2-C6
@@ -908,7 +909,10 @@ Entry format:
   stays correct meanwhile (the stricter level wins), so nothing is exposed.
 - **Fix by:** S2-C8: hold the reporter's membership and the project row `FOR SHARE`, with a
   race test each
-- **Status:** open
+- **Status:** resolved in S2-C8 (the new reporter's user row and memberships held `FOR SHARE`;
+  the project row held `FOR KEY SHARE`, not `FOR SHARE`, which would make every create wait on
+  a move's tree lock, against DL-214; a raise's `FOR UPDATE` still conflicts with it; the
+  export-control marking is TD-74)
 
 ### TD-73: The rank rewrite sends one UPDATE per sibling
 - **Added:** S2-C7 (checkpoint-reviewer finding 4)
@@ -920,4 +924,25 @@ Entry format:
   statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
   helper that does it now.
 - **Fix by:** S2-C22 (Slice 2's tech-debt review): one statement, if the timing matters
+- **Status:** open
+
+### TD-74: A new reporter's inherited admin isn't held against marking the project export-controlled
+- **Added:** S2-C8
+- **What:** a reporter change holds the new reporter's user row and memberships (TD-72), but not
+  the project row, so marking the project export-controlled while it commits can leave an
+  inherited admin with no explicit membership as the reporter, who may no longer create there.
+- **Why:** holding the project row in the edit would take it after the requirement's row, the
+  reverse of a raise's order (the project, then the rows it lifts), and could deadlock; the
+  reporter gets no content access from being the reporter, so nothing is exposed.
+- **Fix by:** S2-C22 (the tech-debt review)
+- **Status:** open
+
+### TD-75: `ListSpec.soft_deleted` and `?include_deleted` have no user
+- **Added:** S2-C8 (checkpoint-reviewer finding 4)
+- **What:** `app/core/lists.py` offers `soft_deleted` (a `?include_deleted` parameter, always
+  restricted) for the trash, but the trash lists only deleted rows through its own repository
+  query (`RequirementRepository.trash`), so no `ListSpec` sets it.
+- **Why:** the code is from an earlier checkpoint (S0/S1 lists), fixed only when needed; tasks'
+  and test cases' trash (Slices 3 and 5) may still want it.
+- **Fix by:** S2-C22 (the tech-debt review): removed, with its tests, if nothing uses it
 - **Status:** open

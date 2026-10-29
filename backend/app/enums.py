@@ -177,6 +177,19 @@ class ApprovalDecision(StrEnum):
     REPLACED = "replaced"
 
 
+class DeletedChildren(StrEnum):
+    """What a requirement's delete does with its children (design-doc §9)."""
+
+    PROMOTE = "promote"
+    DELETE = "delete"
+
+
+class TrashItemType(StrEnum):
+    """What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5)."""
+
+    REQUIREMENT = "requirement"
+
+
 # --- Change log (design-doc §10; schema-doc `activity_log`) -----------------------------------
 
 

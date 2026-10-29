@@ -6,7 +6,13 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
-from app.enums import Priority, RequirementStatus, RestrictionCategory, RestrictionLevel
+from app.enums import (
+    Priority,
+    RequirementStatus,
+    RestrictionCategory,
+    RestrictionLevel,
+    TrashItemType,
+)
 from app.schemas.limits import (
     CHANGE_NOTE_MAX,
     REQUIREMENT_DESCRIPTION_MAX,
@@ -78,6 +84,8 @@ class RequirementRead(BaseModel):
     restriction_categories: list[RestrictionCategory]
     current_revision_id: uuid.UUID | None
     approved_revision_id: uuid.UUID | None
+    # Whether the caller may delete the whole subtree with it (`?children=delete`, DL-222).
+    can_delete_children: bool
     approved_at: datetime | None
     version: int
     created_at: datetime
@@ -106,3 +114,16 @@ class RequirementTree(BaseModel):
 
     items: list[RequirementItem]
     truncated: bool
+
+
+class TrashItem(BaseModel):
+    """A row of the project's trash: the item, who deleted it, and when (design-doc §9)."""
+
+    type: TrashItemType
+    id: uuid.UUID
+    number: int
+    title: str
+    deleted_at: datetime
+    deleted_by_id: uuid.UUID | None
+    deleted_by_name: str | None
+    allowed_actions: list[Action]

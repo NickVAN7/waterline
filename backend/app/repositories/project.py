@@ -104,6 +104,12 @@ class ProjectRepository:
         """Re-read the project's row and hold it until the transaction ends."""
         await self.session.refresh(project, with_for_update=True)
 
+    async def hold(self, project: Project) -> None:
+        """Re-read the project's row and hold it `FOR KEY SHARE` until the transaction ends: a
+        project edit (its restriction raise included) waits, or is waited for, so a check
+        against its level stays true until commit (TD-72); moves' tree lock doesn't conflict."""
+        await self.session.refresh(project, with_for_update={"read": True, "key_share": True})
+
     # --- Members ------------------------------------------------------------------------------
 
     def members(self, project_id: uuid.UUID) -> Select[ProjectMembership]:

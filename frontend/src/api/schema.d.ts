@@ -984,7 +984,13 @@ export interface paths {
         get: operations["get_requirement_api_projects__key__requirements__number__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Requirement
+         * @description Move the requirement to the trash: its children promoted to its parent (`promote`, the
+         *     default) or deleted with it (`delete`, 403 if the caller may not delete each of them); a
+         *     pending approval request on it is cancelled.
+         */
+        delete: operations["delete_requirement_api_projects__key__requirements__number__delete"];
         options?: never;
         head?: never;
         /**
@@ -1036,6 +1042,48 @@ export interface paths {
          *     (`conflict`).
          */
         post: operations["move_requirement_api_projects__key__requirements__number__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Requirement
+         * @description Bring the requirement back from the trash with the descendants deleted with it (403 if
+         *     the caller may not restore each of them); at the bottom of the top level if its parent is
+         *     still in the trash. 404 for one not in the trash.
+         */
+        post: operations["restore_requirement_api_projects__key__requirements__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Trash
+         * @description The project's deleted items the caller may restore, newest first.
+         */
+        get: operations["project_trash_api_projects__key__trash_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1095,7 +1143,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore";
         /**
          * ActivityAction
          * @enum {string}
@@ -1153,6 +1201,12 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /**
+         * DeletedChildren
+         * @description What a requirement's delete does with its children (design-doc §9).
+         * @enum {string}
+         */
+        DeletedChildren: "promote" | "delete";
         /**
          * EmailCheck
          * @description Whether an account has this email; never whose (DL-66).
@@ -1530,6 +1584,17 @@ export interface components {
         Page_StaffRead_: {
             /** Items */
             items: components["schemas"]["StaffRead"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[TrashItem] */
+        Page_TrashItem_: {
+            /** Items */
+            items: components["schemas"]["TrashItem"][];
             /** Total */
             total: number;
             /** Limit */
@@ -1952,6 +2017,8 @@ export interface components {
             current_revision_id: string | null;
             /** Approved Revision Id */
             approved_revision_id: string | null;
+            /** Can Delete Children */
+            can_delete_children: boolean;
             /** Approved At */
             approved_at: string | null;
             /** Version */
@@ -2116,6 +2183,39 @@ export interface components {
             /** New Owner Id */
             new_owner_id?: string | null;
         };
+        /**
+         * TrashItem
+         * @description A row of the project's trash: the item, who deleted it, and when (design-doc §9).
+         */
+        TrashItem: {
+            type: components["schemas"]["TrashItemType"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /**
+             * Deleted At
+             * Format: date-time
+             */
+            deleted_at: string;
+            /** Deleted By Id */
+            deleted_by_id: string | null;
+            /** Deleted By Name */
+            deleted_by_name: string | null;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * TrashItemType
+         * @description What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5).
+         * @enum {string}
+         */
+        TrashItemType: "requirement";
         /** TypeRecommendation */
         TypeRecommendation: {
             type: components["schemas"]["ProjectType"];
@@ -5521,6 +5621,65 @@ export interface operations {
             };
         };
     };
+    delete_requirement_api_projects__key__requirements__number__delete: {
+        parameters: {
+            query?: {
+                children?: components["schemas"]["DeletedChildren"];
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     update_requirement_api_projects__key__requirements__number__patch: {
         parameters: {
             query?: never;
@@ -5670,6 +5829,131 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    restore_requirement_api_projects__key__requirements__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    project_trash_api_projects__key__trash_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: deleted_at. Default: -deleted_at */
+                sort?: string | null;
+                type?: components["schemas"]["TrashItemType"][] | null;
+                type__not?: components["schemas"]["TrashItemType"][] | null;
+                type__is_null?: boolean | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TrashItem_"];
                 };
             };
             /** @description Unauthorized */

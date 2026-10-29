@@ -5196,6 +5196,88 @@
             "description": "Unprocessable Content"
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Delete Requirement",
+        "description": "Move the requirement to the trash: its children promoted to its parent (`promote`, the\ndefault) or deleted with it (`delete`, 403 if the caller may not delete each of them); a\npending approval request on it is cancelled.",
+        "operationId": "delete_requirement_api_projects__key__requirements__number__delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          },
+          {
+            "name": "children",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DeletedChildren",
+              "default": "promote"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
       }
     },
     "/api/projects/{key}/requirements/{number}/restriction": {
@@ -5335,6 +5417,259 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/requirements/{number}/restore": {
+      "post": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Restore Requirement",
+        "description": "Bring the requirement back from the trash with the descendants deleted with it (403 if\nthe caller may not restore each of them); at the bottom of the top level if its parent is\nstill in the trash. 404 for one not in the trash.",
+        "operationId": "restore_requirement_api_projects__key__requirements__number__restore_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/trash": {
+      "get": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Project Trash",
+        "description": "The project's deleted items the caller may restore, newest first.",
+        "operationId": "project_trash_api_projects__key__trash_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: deleted_at. Default: -deleted_at",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: deleted_at. Default: -deleted_at"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrashItemType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "type__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrashItemType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type  Not"
+            }
+          },
+          {
+            "name": "type__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type  Is Null"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TrashItem_"
                 }
               }
             }
@@ -5521,7 +5856,9 @@
           "requirement.reassign_reporter",
           "requirement.raise_restriction",
           "requirement.lower_restriction",
-          "requirement.approve_manually"
+          "requirement.approve_manually",
+          "requirement.delete",
+          "requirement.restore"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
@@ -5733,6 +6070,15 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest"
+      },
+      "DeletedChildren": {
+        "type": "string",
+        "enum": [
+          "promote",
+          "delete"
+        ],
+        "title": "DeletedChildren",
+        "description": "What a requirement's delete does with its children (design-doc §9)."
       },
       "EmailCheck": {
         "properties": {
@@ -6631,6 +6977,37 @@
           "offset"
         ],
         "title": "Page[StaffRead]"
+      },
+      "Page_TrashItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrashItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[TrashItem]"
       },
       "Page_UserRow_": {
         "properties": {
@@ -7742,6 +8119,10 @@
             ],
             "title": "Approved Revision Id"
           },
+          "can_delete_children": {
+            "type": "boolean",
+            "title": "Can Delete Children"
+          },
           "approved_at": {
             "anyOf": [
               {
@@ -7791,6 +8172,7 @@
           "restriction_categories",
           "current_revision_id",
           "approved_revision_id",
+          "can_delete_children",
           "approved_at",
           "version",
           "created_at",
@@ -8177,6 +8559,82 @@
         ],
         "title": "StaffRoleUpdate",
         "description": "`new_owner_id`: when an owner steps down, current staff to make owner in the same change\n(the last owner needs one; DL-59)."
+      },
+      "TrashItem": {
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/TrashItemType"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deleted At"
+          },
+          "deleted_by_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By Id"
+          },
+          "deleted_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By Name"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "number",
+          "title",
+          "deleted_at",
+          "deleted_by_id",
+          "deleted_by_name",
+          "allowed_actions"
+        ],
+        "title": "TrashItem",
+        "description": "A row of the project's trash: the item, who deleted it, and when (design-doc §9)."
+      },
+      "TrashItemType": {
+        "type": "string",
+        "enum": [
+          "requirement"
+        ],
+        "title": "TrashItemType",
+        "description": "What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5)."
       },
       "TypeRecommendation": {
         "properties": {

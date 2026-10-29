@@ -13,6 +13,7 @@ from enum import StrEnum
 from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target
 from app.enums import AccessKind, OrgRole, ProjectRole, WorkspaceRole
+from app.models.requirement import Requirement
 from app.rules.account_rank import Account, can_manage_account
 
 
@@ -95,6 +96,8 @@ class Action(StrEnum):
     REQUIREMENT_RAISE_RESTRICTION = "requirement.raise_restriction"
     REQUIREMENT_LOWER_RESTRICTION = "requirement.lower_restriction"
     REQUIREMENT_APPROVE_MANUALLY = "requirement.approve_manually"
+    REQUIREMENT_DELETE = "requirement.delete"
+    REQUIREMENT_RESTORE = "requirement.restore"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -122,6 +125,19 @@ def _outranks(ctx: AuthzContext, target: Target) -> bool:
     """The rank rule (design-doc §4, "Account management"; DL-73) on a user target."""
     return isinstance(target.entity, Account) and can_manage_account(
         rank_account(ctx), target.entity
+    )
+
+
+def _reporter_while_never_approved(ctx: AuthzContext, target: Target) -> bool:
+    """A requirement's delete and restore rule (design-doc §5, "Deletion"; DL-219): its
+    reporter, as a project member or above, while it has never been approved."""
+    access = ctx.projects.get(target.project_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
+    return (
+        isinstance(target.entity, Requirement)
+        and target.entity.reporter_id == ctx.user_id
+        and target.entity.approved_revision_id is None
+        and access is not None
+        and access.role in (ProjectRole.MEMBER, ProjectRole.ADMIN)
     )
 
 
@@ -317,5 +333,21 @@ REGISTRY: dict[str, ActionSpec] = {
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.ADMIN,
+    ),
+    # Project admins, inherited included, and the reporter of one never approved (§5, "Deletion";
+    # whoever may delete it may restore it).
+    Action.REQUIREMENT_DELETE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        rule=_reporter_while_never_approved,
+    ),
+    Action.REQUIREMENT_RESTORE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        rule=_reporter_while_never_approved,
     ),
 }

@@ -71,6 +71,18 @@ class UserRepository:
     async def get_by_username(self, username: str) -> User | None:
         return await self.session.scalar(select(User).where(User.username == username))
 
+    async def hold_access(self, user_id: uuid.UUID) -> None:
+        """Hold the user's row and memberships `FOR SHARE` until the transaction ends, workspace,
+        org, then project (the order a removal "with their projects" locks them), so what they
+        may do, checked now, stays true until commit (TD-72)."""
+        for statement in (
+            select(User.id).where(User.id == user_id),
+            select(WorkspaceMembership.id).where(WorkspaceMembership.user_id == user_id),
+            select(Membership.id).where(Membership.user_id == user_id),
+            select(ProjectMembership.id).where(ProjectMembership.user_id == user_id),
+        ):
+            await self.session.execute(statement.with_for_update(read=True))
+
     async def lock_active_system_admins(self) -> list[uuid.UUID]:
         """The active system admins' IDs, their rows locked until the transaction ends: two
         revocations at once queue here, and the second sees the first's result, so together they

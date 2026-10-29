@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C7 (Tree operations) built; next is S2-C8 (history: `docs/reviews/`).
+> **Status:** S2-C8 (Delete, restore & trash) built; next is S2-C9 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -635,7 +635,7 @@ parameters are a 422, and every filter is in the OpenAPI schema) and passes the 
 the service; the **repository** builds a statement already scoped to what the user may see and
 calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)` (newest first,
 `next_cursor`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
-some users may filter by) and `include_deleted` (the trash: design-doc §9) apply only when the
+some users may filter by) and `include_deleted` apply only when the
 endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
 `not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`;
 `page.with_items(rows)` turns a `PageResult` into the response with the rows built from it.

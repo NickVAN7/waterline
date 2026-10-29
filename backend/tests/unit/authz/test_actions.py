@@ -30,9 +30,11 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c13_actions() -> None:
         "project_member.manage",
         "requirement.approve_manually",
         "requirement.create",
+        "requirement.delete",
         "requirement.lower_restriction",
         "requirement.raise_restriction",
         "requirement.reassign_reporter",
+        "requirement.restore",
         "requirement.update",
         "requirement.view",
         "user.check",
@@ -75,6 +77,8 @@ def test_the_registry_holds_exactly_the_s1_c7_to_s1_c13_actions() -> None:
         ("requirement.raise_restriction", Level.PROJECT),
         ("requirement.lower_restriction", Level.PROJECT),
         ("requirement.approve_manually", Level.PROJECT),
+        ("requirement.delete", Level.PROJECT),
+        ("requirement.restore", Level.PROJECT),
     ],
 )
 def test_each_real_action_is_registered_at_its_level(action: str, level: Level) -> None:

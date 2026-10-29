@@ -326,8 +326,8 @@ def test_a_project_target_carries_export_controlled_beside_its_other_facts() -> 
 def test_every_action_so_far_is_marked_management_but_the_requirement_actions() -> None:
     """DL-82: "The registry marks every action content or management; every action so far is
     management"; S2-C3 adds the first content action, `requirement.view`, S2-C5
-    `requirement.create`, and S2-C6 the update, reporter, restriction, and approve-by-hand
-    actions (S2-plan, "Actions per row"; DL-212)."""
+    `requirement.create`, S2-C6 the update, reporter, restriction, and approve-by-hand
+    actions (S2-plan, "Actions per row"; DL-212), and S2-C8 delete and restore."""
     assert {
         action: REGISTRY[action].access
         for action in Action
@@ -340,4 +340,6 @@ def test_every_action_so_far_is_marked_management_but_the_requirement_actions() 
         Action.REQUIREMENT_RAISE_RESTRICTION: AccessKind.CONTENT,
         Action.REQUIREMENT_LOWER_RESTRICTION: AccessKind.CONTENT,
         Action.REQUIREMENT_APPROVE_MANUALLY: AccessKind.CONTENT,
+        Action.REQUIREMENT_DELETE: AccessKind.CONTENT,
+        Action.REQUIREMENT_RESTORE: AccessKind.CONTENT,
     }

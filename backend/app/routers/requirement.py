@@ -2,11 +2,20 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.authz.actions import Action
 from app.core.db import SessionDep
-from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_project, load_requirement
+from app.core.lists import Page
+from app.enums import DeletedChildren
+from app.routers.deps import (
+    ERRORS,
+    AuthzContextDep,
+    authorized,
+    load_deleted_requirement,
+    load_project,
+    load_requirement,
+)
 from app.schemas.requirement import (
     RequirementCreate,
     RequirementMove,
@@ -14,9 +23,10 @@ from app.schemas.requirement import (
     RequirementRestrictionUpdate,
     RequirementTree,
     RequirementUpdate,
+    TrashItem,
 )
 from app.services.project import ProjectEntity
-from app.services.requirement import RequirementEntity, RequirementService
+from app.services.requirement import TRASH, RequirementEntity, RequirementService
 
 router = APIRouter(tags=["requirement"])
 
@@ -30,6 +40,13 @@ Viewed = Annotated[
 Updated = Annotated[
     RequirementEntity, Depends(authorized(load_requirement, Action.REQUIREMENT_UPDATE))
 ]
+Deleted = Annotated[
+    RequirementEntity, Depends(authorized(load_requirement, Action.REQUIREMENT_DELETE))
+]
+Restored = Annotated[
+    RequirementEntity, Depends(authorized(load_deleted_requirement, Action.REQUIREMENT_RESTORE))
+]
+TrashQuery = Annotated[TRASH.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
 @router.post("/projects/{key}/requirements", status_code=status.HTTP_201_CREATED, responses=ERRORS)
@@ -90,3 +107,39 @@ async def move_requirement(
     `parent_id` (`cycle`), `after_id` or `before_id` (`not_sibling`), and `before_id` with both
     (`conflict`)."""
     return await RequirementService(session).move(ctx, requirement, body)
+
+
+@router.delete(
+    "/projects/{key}/requirements/{number}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=ERRORS,
+)
+async def delete_requirement(
+    requirement: Deleted,
+    ctx: AuthzContextDep,
+    session: SessionDep,
+    children: DeletedChildren = DeletedChildren.PROMOTE,
+) -> None:
+    """Move the requirement to the trash: its children promoted to its parent (`promote`, the
+    default) or deleted with it (`delete`, 403 if the caller may not delete each of them); a
+    pending approval request on it is cancelled."""
+    await RequirementService(session).delete(ctx, requirement, children)
+
+
+@router.post("/projects/{key}/requirements/{number}/restore", responses=ERRORS)
+async def restore_requirement(
+    requirement: Restored, ctx: AuthzContextDep, session: SessionDep
+) -> RequirementRead:
+    """Bring the requirement back from the trash with the descendants deleted with it (403 if
+    the caller may not restore each of them); at the bottom of the top level if its parent is
+    still in the trash. 404 for one not in the trash."""
+    return await RequirementService(session).restore(ctx, requirement)
+
+
+@router.get("/projects/{key}/trash", responses=ERRORS)
+async def project_trash(
+    project: ProjectContentViewed, query: TrashQuery, ctx: AuthzContextDep, session: SessionDep
+) -> Page[TrashItem]:
+    """The project's deleted items the caller may restore, newest first."""
+    return await RequirementService(session).trash(ctx, project, query)

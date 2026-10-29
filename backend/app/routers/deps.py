@@ -148,3 +148,9 @@ async def load_requirement(
     key: str, number: int, session: SessionDep
 ) -> tuple[RequirementEntity, Target] | None:
     return await RequirementService(session).load(key, number)
+
+
+async def load_deleted_requirement(
+    key: str, number: int, session: SessionDep
+) -> tuple[RequirementEntity, Target] | None:
+    return await RequirementService(session).load_deleted(key, number)
