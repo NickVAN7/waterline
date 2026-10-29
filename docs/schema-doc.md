@@ -939,7 +939,7 @@ current status; `ix_test_result_assignee_id_status` on `(assignee_id, status)` f
 The `requirement_revision_id` foreign key is named `fk_approval_request_requirement_revision_id`:
 the convention's name is over Postgres's 63-character limit.
 Partial unique index: `UNIQUE(entity_type, entity_id) WHERE status = 'pending'` — one pending
-request per entity.
+request per entity (the service checks first: a 422 `pending_exists`, DL-225).
 Index `(entity_type, entity_id, created_at)`; index `(project_id, status)`: a project's pending
 requests (DL-192). Never deleted; cancelled instead (including when a
 project admin approves the requirement by hand, and when the project is archived, DL-194;
@@ -954,7 +954,7 @@ completes the request (design-doc §6.2).
 |---|---|---|
 | id | UUID (PK) | |
 | approval_request_id | UUID (FK → approval_request) | |
-| approver_id | UUID (FK → user) | any project role, including viewer; must have project access when the request is created (an explicit membership on an export-controlled project) |
+| approver_id | UUID (FK → user) | any project role, including viewer; must have project access when the request is created (an explicit membership on an export-controlled project) and be active; a request is created naming 1 to 50 distinct approvers (DL-226), and a replacement can add a row (design-doc §6.2) |
 | decision | enum: pending / approved / rejected / replaced | `replaced`: the approver lost the access needed to decide while the row was pending, and the requester still holds project admin; the row keeps its history, and a pending row for the requester is added unless they're already named. If the requester no longer holds project admin, the row stays `pending` and the request is flagged (design-doc §6.2); an archived project has no pending requests (archiving cancels them, DL-194). Decided rows are never replaced |
 | comment | text, nullable | at most 2,000 characters (DL-143) |
 | decided_at | timestamptz, nullable | |

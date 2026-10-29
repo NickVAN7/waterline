@@ -81,7 +81,8 @@ tested, what each kind of test is for, and the gates every change passes.
   - Hypothesis uses a fixed database of examples in CI (`derandomize` in CI profile) so runs are
     reproducible.
 - **Concurrency:** truly parallel transactions for number allocation, optimistic locking
-  (second save gets 409), the one-active-sprint rule, and approval completion.
+  (second save gets 409), the one-active-sprint rule, one pending approval request per
+  requirement (the second create gets 422 `pending_exists`, DL-229), and approval completion.
 - **Approvals** (Slice 2 for requirements, Slices 4–5 for gates and test runs):
   - completion moves a requirement to `approved`, a gate to `approved`, and a test run to
     `completed`; a rejection changes nothing on the entity, except a rejected re-open round,
@@ -98,7 +99,7 @@ tested, what each kind of test is for, and the gates every change passes.
     `approved_revision_id` are logged;
   - eligibility (design-doc §6.2): a viewer can be named; someone without project access is
     rejected with 404 (on an export-controlled project, an inherited admin without an explicit
-    membership too);
+    membership too); a deactivated one, a repeated one, none, or more than 50 with 422 (DL-226);
   - replacement of an approver who loses the access needed to decide, once for each path
     (project membership removed directly, with an org removal, and with a workspace removal;
     the org or workspace membership or role that gave inherited admin removed or changed;

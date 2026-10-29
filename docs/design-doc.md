@@ -950,7 +950,10 @@ requirement approval.
   without a migration.
 - An **approval request** names one or more approvers; each gets one `approval` row. A
   requirement request is bound to a specific revision. At most one request per entity is
-  pending at a time.
+  pending at a time: another is a 422 `pending_exists` (DL-225), checked with the requirement
+  locked, so two at once can't both pass (DL-229). Only a pending request can be cancelled or
+  decided (otherwise a 422 `not_pending`), and a deleted requirement's requests are a 404, as
+  its history is (DL-228, DL-230).
 - **Policy (v1): every named approver must approve.** Any rejection rejects the whole request;
   a further round is a new request. Rows marked `replaced` (below) don't count: a request is
   approved when every other row is approved. Other policies (any-one, quorum) are v2+.
@@ -962,7 +965,8 @@ requirement approval.
   access to the project when the request is created: a `project_membership` of any role, or
   inherited project admin (on an export-controlled project, only an explicit membership,
   §3.1). Naming anyone else is rejected the same way the project-member picker rejects a user
-  outside its scope (404, §4).
+  outside its scope (404, §4); a deactivated user is a 422 `account_inactive`. A request names
+  1 to 50 distinct approvers (a repeat is a 422 `duplicate`; DL-226).
 - **Replacing an approver who loses access.** When an approver loses the access needed to
   decide (content access to the project: any `project_membership` or inherited project admin;
   on an export-controlled project, an explicit membership, §3.1), each of their pending

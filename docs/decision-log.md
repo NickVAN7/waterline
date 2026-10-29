@@ -2843,3 +2843,65 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §9 "Permissions in the delete dialog", "Pending approvals"; build
   plan (S2-C8)
 - **Source:** owner, Oct 28, 2026 (DC-2026-10-28g, docs-consistency decision 3, option (a))
+
+### DL-225: A second request while one is pending is a 422
+- **Date:** 2026-10-29
+- **Decision:** Creating an approval request on an entity that already has a pending one is a
+  422 `validation_error` on `["body"]`, type `pending_exists`, checked by the service first; the
+  partial unique index on pending requests stays `internal_only()`, a clash there a bug.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; schema-doc (`approval_request`); build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-226: How a request's approvers are validated
+- **Date:** 2026-10-29
+- **Decision:** `approver_ids` holds 1 to 50 distinct user UUIDs (none, or more than 50, a 422;
+  a repeated one a 422 of type `duplicate`). Someone without the access §6.2 requires is a 404;
+  a deactivated user who has it is a 422 `account_inactive`, as for `reporter_id` (DL-211).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2 "Who can be an approver"; schema-doc (`approval`); build plan
+  (S2-C10); testing-strategy "Approvals"
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-227: A requirement's approval requests are offset-paged, newest first
+- **Date:** 2026-10-29
+- **Decision:** `GET /api/projects/{key}/requirements/{number}/approval-requests` uses the API
+  conventions' offset paging (`{items, total, limit, offset}`), newest first: requests change
+  status, so they aren't an append-only feed.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-228: Cancelling a decided request; a deleted requirement's requests
+- **Date:** 2026-10-29
+- **Decision:** Cancelling a request that isn't pending is a 422 `validation_error` on
+  `["path", "id"]`, type `not_pending`. A deleted requirement's approval requests are a 404 on
+  every request URL (its list, a request's read, and cancel), as its history is (DL-206).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-229: Creating a request locks its requirement first
+- **Date:** 2026-10-29
+- **Decision:** Creating an approval request locks the requirement row (`FOR UPDATE`) before the
+  pending check, so two creates at once give the second the 422 `pending_exists` (DL-225), and a
+  create racing a delete waits for it; the partial unique index stays an internal backstop.
+  S2-C10 adds a concurrency test.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C10); testing-strategy "Concurrency"
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29, docs-consistency decision 1, option (a))
+
+### DL-230: Deciding follows the request rules of DL-228
+- **Date:** 2026-10-29
+- **Decision:** `POST /api/approval-requests/{id}/decision` on a deleted requirement's request is
+  a 404, and on a request that isn't pending a 422 `validation_error` on `["path", "id"]`, type
+  `not_pending`, as for cancel (DL-228).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C11)
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29, docs-consistency decision 2, option (a))
