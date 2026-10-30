@@ -705,7 +705,9 @@ Workspace (the firm: tenant boundary)
   roles never grant it, and nothing later in the order overrides it. The archived
   check and the export-control gate still come first, so a personal action inside an archived
   project is denied like any other mutation. Known personal actions:
-  - `approval.decide`: only the approval row's named approver (§6.2; Slice 2);
+  - `approval.decide`: only the approval row's named approver, while that row is still pending
+    (§6.2; Slice 2): one who has decided is refused (403, before any 422 `not_pending`; one whose
+    row was replaced has lost access, so a 404; DL-234);
   - editing one's own comment: only its author (§11; Slice 6). Deleting any comment stays a
     project-admin action.
 - **Reads are authorized too**, not just mutations:

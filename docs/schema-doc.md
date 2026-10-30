@@ -960,8 +960,8 @@ completes the request (design-doc §6.2).
 | decided_at | timestamptz, nullable | |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(approval_request_id, approver_id)`. Only the named approver can set `decision` to
-approved or rejected (a personal action: no admin or system-admin override, design-doc §5);
+`UNIQUE(approval_request_id, approver_id)`. Only the named approver, while their row is still pending, can set `decision` to
+approved or rejected (DL-234) (a personal action: no admin or system-admin override, design-doc §5);
 `replaced` is a system effect of losing access. Index `(approver_id, decision)` for "my pending approvals".
 
 ---

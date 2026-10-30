@@ -2938,3 +2938,19 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §6.2; build plan (S2-C11)
 - **Source:** owner, Oct 29, 2026 (DC-2026-10-29b, docs-consistency decision 2, option (a))
+
+### DL-234: Deciding again after one's own row is decided is a 403
+- **Date:** 2026-10-29
+- **Decision:** `approval.decide`'s relationship is "the named approver whose own `approval` row
+  is still pending", so a named approver who has already decided (or whose row was replaced)
+  is refused by `authorize()`: a 403, the same rule that leaves Decide out of the read's
+  `allowed_actions` (DL-233). `authorize()` runs first, as everywhere: the 422 `not_pending`
+  (DL-230) is for a named approver whose own row is still pending on a request that isn't. An
+  approver whose row was replaced has lost content access, so they get a 404, like anyone who
+  can't see the project (§5); a 403 only once they have access again.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Personal actions", §6.2; schema-doc (`approval`); build plan
+  (S2-C11, Slice 2 "Approvals"); testing-strategy "Security"
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C11 scoping; DC-2026-10-29c, docs-consistency
+  decisions 1 and 2, option (a) each)

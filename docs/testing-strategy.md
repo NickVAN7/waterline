@@ -170,7 +170,9 @@ tested, what each kind of test is for, and the gates every change passes.
     description, status, and lead is a project-admin action.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
     included) and every project role denied, the relationship rule allowing it only for a user
-    with content access to the project, and the relationship without that access denied.
+    with content access to the project, and the relationship without that access denied; for
+    `approval.decide`, a named approver whose own row is decided or `replaced` denied too
+    (DL-234).
   - Restriction (design-doc §3.1, Slice 1; "classification" until S2-C0d, DL-134):
     removing `export_controlled`, and on an
     export-controlled project lowering the level or removing any category, is refused for an
