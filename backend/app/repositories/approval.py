@@ -79,11 +79,14 @@ class ApprovalRepository:
         return await self._lock_pending(ApprovalRequest.project_id == project_id)
 
     async def _lock_pending(self, *where: ColumnElement[bool]) -> list[ApprovalRequest]:
+        """Locked, each with its rows read again under the lock (a replacement reads them)."""
         return list(
             await self.session.scalars(
                 select(ApprovalRequest)
                 .where(*where, ApprovalRequest.status == ApprovalRequestStatus.PENDING)
                 .order_by(ApprovalRequest.id)
                 .with_for_update()
+                .options(selectinload(ApprovalRequest.approvals))
+                .execution_options(populate_existing=True)
             )
         )

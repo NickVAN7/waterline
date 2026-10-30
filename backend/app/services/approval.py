@@ -8,6 +8,10 @@ from typing import cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.change_log import log_change
+from app.authz.actions import Action
+from app.authz.authorize import authorize
+from app.authz.context import AuthzContext
+from app.authz.target import project_target
 from app.core.errors import ValidationFailedError
 from app.enums import (
     ActivityAction,
@@ -18,8 +22,15 @@ from app.enums import (
     ApprovalRequestStatus,
 )
 from app.models.approval import Approval, ApprovalRequest
+from app.models.project import Project
 from app.repositories.approval import ApprovalRepository
-from app.rules.approval_policy import request_outcome
+from app.repositories.user import UserRepository
+from app.rules.approval_policy import (
+    ApproverRow,
+    completing_approver,
+    replacement,
+    request_outcome,
+)
 
 # What an approvable area does when a request on its entity completes or is rejected (build plan,
 # "Callbacks instead of upward calls"): `(session, request, actor_id)`, the actor the user whose
@@ -110,11 +121,109 @@ class ApprovalService:
         row.decision, row.comment, row.decided_at = decision, comment, now
         outcome = request_outcome([r.decision for r in request.approvals])
         if outcome is not ApprovalRequestStatus.PENDING:
-            request.status, request.completed_at = outcome, now
-            self._log_status(request, actor_id, outcome)
-            handlers = _ON_APPROVED if outcome is ApprovalRequestStatus.APPROVED else _ON_REJECTED
-            await handlers[request.entity_type](self.session, request, actor_id)
+            await self._finish(request, outcome, actor_id, actor_id, now)
         await self.session.flush()
+
+    async def replace_lost_access(self, project: Project, actor_id: uuid.UUID | None) -> None:
+        """Replace the pending rows, on the project's pending requests, of approvers who can no
+        longer decide them (design-doc §6.2), whatever took the access away. Runs in the
+        transaction of the change that took the access away, which holds the project's lock, so
+        no decision is in flight; `actor_id` is None only for an app CLI command. A replacement
+        that leaves every counted row approved completes the request."""
+        users = UserRepository(self.session)
+        contexts: dict[uuid.UUID, AuthzContext | None] = {}
+
+        async def context(id_: uuid.UUID) -> AuthzContext | None:
+            # None for a deactivated account: it has lost access, whatever it holds.
+            if id_ not in contexts:
+                user = await users.get(id_)
+                contexts[id_] = (
+                    await users.authz_context(user) if user is not None and user.is_active else None
+                )
+            return contexts[id_]
+
+        for request in await self.repository.lock_pending_in_project(project.id):
+            target = project_target(project, request)
+            lost: set[uuid.UUID] = set()
+            for row in request.approvals:
+                if row.decision is ApprovalDecision.PENDING:
+                    approver = await context(row.approver_id)
+                    if approver is None or not authorize(approver, Action.APPROVAL_DECIDE, target):
+                        lost.add(row.approver_id)
+            if lost:
+                requester = await context(request.requested_by)
+                await self._replace(
+                    request,
+                    lost,
+                    holds_admin=requester is not None
+                    and authorize(
+                        requester, Action.APPROVAL_REQUEST_CREATE, project_target(project)
+                    ),
+                    actor_id=actor_id,
+                )
+        await self.session.flush()
+
+    async def _replace(
+        self,
+        request: ApprovalRequest,
+        lost: set[uuid.UUID],
+        *,
+        holds_admin: bool,
+        actor_id: uuid.UUID | None,
+    ) -> None:
+        """Mark the lost approvers' rows `replaced`, each logged as an `approver_id` change to
+        the requester, add the requester's row, and complete the request if that leaves it
+        approved (design-doc §6.2)."""
+        rows = [ApproverRow(r.approver_id, r.decision, r.decided_at) for r in request.approvals]
+        result = replacement(rows, lost, request.requested_by, requester_holds_admin=holds_admin)
+        for row in request.approvals:
+            if row.approver_id in result.replaced:
+                row.decision = ApprovalDecision.REPLACED
+                log_change(
+                    self.session,
+                    project_id=request.project_id,
+                    entity_type=ActivityEntityType.APPROVAL_REQUEST,
+                    entity_id=request.id,
+                    action=ActivityAction.UPDATED,
+                    changed_by=actor_id,
+                    field=ActivityField.APPROVER_ID,
+                    old=row.approver_id,
+                    new=request.requested_by,
+                )
+        if result.add_requester:
+            request.approvals.append(
+                Approval(
+                    approval_request_id=request.id,
+                    approver_id=request.requested_by,
+                    decision=ApprovalDecision.PENDING,
+                )
+            )
+        await self.session.flush()
+        if (
+            request_outcome([r.decision for r in request.approvals])
+            is ApprovalRequestStatus.APPROVED
+        ):
+            approved_by = completing_approver(
+                [ApproverRow(r.approver_id, r.decision, r.decided_at) for r in request.approvals]
+            )
+            await self._finish(
+                request, ApprovalRequestStatus.APPROVED, actor_id, approved_by, datetime.now(UTC)
+            )
+
+    async def _finish(
+        self,
+        request: ApprovalRequest,
+        outcome: ApprovalRequestStatus,
+        actor_id: uuid.UUID | None,
+        handler_actor_id: uuid.UUID,
+        now: datetime,
+    ) -> None:
+        """Complete or reject the request, its status logged as `actor_id`, and run the entity's
+        handler as `handler_actor_id` (the approver whose decision completed it)."""
+        request.status, request.completed_at = outcome, now
+        self._log_status(request, actor_id, outcome)
+        handlers = _ON_APPROVED if outcome is ApprovalRequestStatus.APPROVED else _ON_REJECTED
+        await handlers[request.entity_type](self.session, request, handler_actor_id)
 
     async def lock(self, request: ApprovalRequest) -> ApprovalRequest:
         """The request, locked and read again with its rows (two decisions take turns)."""
@@ -157,7 +266,7 @@ class ApprovalService:
         self._log_status(request, actor_id, ApprovalRequestStatus.CANCELLED)
 
     def _log_status(
-        self, request: ApprovalRequest, actor_id: uuid.UUID, new: ApprovalRequestStatus
+        self, request: ApprovalRequest, actor_id: uuid.UUID | None, new: ApprovalRequestStatus
     ) -> None:
         log_change(
             self.session,

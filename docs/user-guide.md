@@ -100,7 +100,9 @@ admins) can also:
   authorized for export-controlled data.
 - A row offers **Change role** and **Remove from project**. A project has no last-admin rule:
   its admins may change or remove any role, their own included. Removing the lead leaves the
-  project with no lead.
+  project with no lead. Removing someone who can then no longer see the project's content hands
+  their undecided approvals to whoever requested each one, if that person is still a project
+  admin.
 - **Access review**, at the top beside the add buttons, opens the project's access review
   (`/<organization>/projects/<KEY>/access`): everyone who can open the project, with their
   project role, if any, why they reach it (the

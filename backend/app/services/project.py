@@ -516,6 +516,9 @@ class ProjectService:
             # Each lifts only what's now below the floor, so a lower lifts nothing (DL-208).
             for handler in _ON_RESTRICTION_CHANGED:
                 await handler(self.session, project, ctx.user_id)
+            if adds_export_control:
+                # Inherited admins without a membership can no longer decide (design-doc §6.2).
+                await ApprovalService(self.session).replace_lost_access(project, ctx.user_id)
             self._log(
                 AuditAction.PROJECT_RESTRICTION_CHANGED,
                 ctx.user_id,
@@ -711,12 +714,14 @@ class ProjectService:
         return self._members(project).row(ctx, membership)
 
     async def remove_member(self, ctx: AuthzContext, project: Project, user_id: uuid.UUID) -> None:
-        """Remove a member (`project_member_removed`); removing the lead clears `lead_id`."""
+        """Remove a member (`project_member_removed`); removing the lead clears `lead_id`, and
+        their pending approvals are replaced if that took their access (design-doc §6.2)."""
         await self._lock_live(project)
         membership = await self.repository.membership(project.id, user_id, lock=True)
         if membership is None:
             raise NotFoundError
         await self._remove(membership, project, ctx.user_id)
+        await ApprovalService(self.session).replace_lost_access(project, ctx.user_id)
 
     async def _remove(
         self,

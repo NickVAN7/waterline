@@ -264,6 +264,11 @@ class RequirementService:
         requirements here (422 `not_member` or `account_inactive`, DL-211). Logs `status`,
         `priority`, and `reporter_id`."""
         project = await self._project(requirement)
+        # Held, then read: the target sees what a restriction change committed meanwhile
+        # (TD-74). Project, then requirement, as every requirement path takes them, so a member
+        # removal holding the project (and completing a request on this requirement) finishes
+        # first.
+        await ProjectRepository(self.session).hold(project)
         target = project_target(project, requirement)
         if values.status is RequirementStatus.APPROVED:
             ensure(ctx, Action.REQUIREMENT_APPROVE_MANUALLY, target)
@@ -853,7 +858,8 @@ class RequirementService:
     async def complete_approval(self, request: ApprovalRequest, approver_id: uuid.UUID) -> None:
         """A completed request (design-doc §6.2): its revision approved by the approver whose
         decision completed it, when it completed; only a `draft` requirement moves to `approved`
-        (DL-148). The decision holds the requirement's lock."""
+        (DL-148). The decision holds the requirement's lock; a replacement holds the project's,
+        which every requirement write takes first."""
         requirement = cast(Requirement, await self.session.get(Requirement, request.entity_id))
         status = (
             RequirementStatus.APPROVED

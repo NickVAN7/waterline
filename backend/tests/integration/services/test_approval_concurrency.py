@@ -19,6 +19,7 @@ from app.enums import (
     ApprovalRequestStatus,
     DeletedChildren,
     ProjectRole,
+    RequirementStatus,
     RestrictionCategory,
 )
 from app.models.approval import Approval, ApprovalRequest
@@ -29,6 +30,7 @@ from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.approval import ApprovalDecisionCreate, ApprovalRequestCreate
 from app.schemas.project import RestrictionUpdate
+from app.schemas.requirement import RequirementUpdate
 from app.services.auth import AuthService
 from app.services.project import ProjectService
 from app.services.requirement import RequirementService
@@ -299,3 +301,82 @@ async def test_one_approvers_two_decisions_at_once_keep_the_first(
         )
     assert sorted(outcomes) == ["ForbiddenError", "ok"]
     assert stored is decisions[outcomes.index("ok")]
+
+
+@pytest.mark.concurrency(*APPROVAL_TABLES)
+async def test_a_removal_waiting_on_its_approvers_decision_leaves_the_decision_standing(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """§6.2: decided rows are never replaced. The removal waits on the project's lock and on the
+    request's, both of which the decision holds, and reads Vera's row again once her approval
+    has committed. Without either lock it reads the row still pending and replaces it after her
+    approval commits (sabotage-checked with both removed: either alone is enough)."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    other = await an_approver(concurrency, requirement)
+    async with concurrency() as session:
+        loaded = await session.get_one(Requirement, requirement.id)
+        body = ApprovalRequestCreate(approver_ids=[vera.id, other.id])
+        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        await session.commit()
+        vera_ctx = await UserRepository(session).authz_context(await session.get_one(User, vera.id))
+
+    async def decide(session: AsyncSession) -> object:
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        return await RequirementService(session).decide(vera_ctx, loaded, body)
+
+    async def remove(session: AsyncSession) -> object:
+        project = await session.get_one(Project, requirement.project_id)
+        return await ProjectService(session).remove_member(ctx, project, vera.id)
+
+    refused = await race(concurrency, concurrency_engine, first=decide, second=remove)
+
+    async with concurrency() as check:
+        stored = await check.scalar(
+            select(Approval.decision).where(Approval.approver_id == vera.id)
+        )
+    assert (refused, stored) == ([], ApprovalDecision.APPROVED)
+
+
+@pytest.mark.concurrency(*APPROVAL_TABLES)
+async def test_a_completing_removal_waiting_on_an_edit_still_completes_the_request(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """§6.2 "It can complete the request". The edit holds the project, so a removal whose
+    replacement completes the request (the requester already named and approved) waits, and
+    reads the requirement as the edit left it. A title edit writes no `activity_log` row, whose
+    foreign key would hold the project anyway; without the hold the removal reads the old
+    version, and its write is refused as stale once the edit commits."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    async with concurrency() as session:
+        loaded = await session.get_one(Requirement, requirement.id)
+        body = ApprovalRequestCreate(approver_ids=[vera.id, ctx.user_id])
+        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        await session.commit()
+    async with concurrency() as session:
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        decision = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        await RequirementService(session).decide(ctx, loaded, decision)
+        await session.commit()
+
+    async def edit(session: AsyncSession) -> object:
+        loaded = await session.get_one(Requirement, requirement.id)
+        values = RequirementUpdate(version=loaded.version, title="Three-way match, revised")
+        return await RequirementService(session).update(ctx, loaded, values)
+
+    async def remove(session: AsyncSession) -> object:
+        project = await session.get_one(Project, requirement.project_id)
+        return await ProjectService(session).remove_member(ctx, project, vera.id)
+
+    refused = await race(concurrency, concurrency_engine, first=edit, second=remove)
+
+    async with concurrency() as check:
+        stored = await check.scalar(select(Requirement.status))
+        request_status = await check.scalar(select(ApprovalRequest.status))
+    assert (refused, stored, request_status) == (
+        [],
+        RequirementStatus.APPROVED,
+        ApprovalRequestStatus.APPROVED,
+    )

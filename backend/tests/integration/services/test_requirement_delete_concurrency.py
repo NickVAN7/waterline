@@ -10,10 +10,20 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.authz.context import AuthzContext, ProjectAccess
 from app.core.db import SessionMaker
-from app.enums import ActivityAction, DeletedChildren, ProjectRole, RestrictionLevel
+from app.enums import (
+    ActivityAction,
+    DeletedChildren,
+    OrgRole,
+    ProjectRole,
+    RestrictionCategory,
+    RestrictionLevel,
+)
 from app.models.audit import ActivityLog
+from app.models.org import Organization
 from app.models.project import Project
 from app.models.requirement import Requirement
+from app.models.user import User
+from app.repositories.user import UserRepository
 from app.schemas.project import RestrictionUpdate
 from app.schemas.requirement import (
     RequirementCreate,
@@ -22,7 +32,7 @@ from app.schemas.requirement import (
 )
 from app.services.project import ProjectService
 from app.services.requirement import RequirementService
-from tests.factories.org import OrganizationFactory
+from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.integration.services.test_requirement_concurrency import outcome
@@ -158,6 +168,50 @@ async def test_a_reporter_change_waiting_on_their_removal_sees_them_gone(
         return await RequirementService(session).update(ctx, loaded, body)
 
     refused = await race(concurrency, concurrency_engine, first=remove, second=reassign)
+
+    assert refused == ["not_member"]
+
+
+@pytest.mark.concurrency("membership", *TABLES)
+async def test_a_reporter_change_waiting_on_marking_export_controlled_refuses_an_inherited_admin(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """TD-74: the change holds the project before it reads its restriction, so an org admin with
+    no membership, who may create requirements until the project is marked export-controlled
+    (§3.1), is refused once it is. Without the hold first, the change checks the project as it
+    was, and the reporter is someone who may no longer create there."""
+    ctx, project, requirement = await a_project(concurrency)
+    async with committing_factories(concurrency) as session:
+        ivy = await UserFactory.create_async(is_system_admin=False, is_active=True)
+        await MembershipFactory.create_async(
+            organization=await session.get_one(Organization, project.organization_id),
+            user=ivy,
+            role=OrgRole.ADMIN,
+        )
+        # The editor keeps content access once it's export-controlled: an explicit admin.
+        ada = await UserFactory.create_async(is_system_admin=False, is_active=True)
+        await ProjectMembershipFactory.create_async(
+            project=await session.get_one(Project, project.id), user=ada, role=ProjectRole.ADMIN
+        )
+    async with concurrency() as session:
+        ada_ctx = await UserRepository(session).authz_context(await session.get_one(User, ada.id))
+    mark_ec = RestrictionUpdate(
+        level=None,
+        categories=[RestrictionCategory.EXPORT_CONTROLLED],
+        export_control_confirmed=True,
+        confirmed_member_ids=[ada.id],
+    )
+
+    async def mark(session: AsyncSession) -> object:
+        loaded = await session.get_one(Project, project.id)
+        return await ProjectService(session).set_restriction(ctx, loaded, mark_ec)
+
+    async def reassign(session: AsyncSession) -> object:
+        loaded = await session.get_one(Requirement, requirement.id)
+        body = RequirementUpdate(version=1, reporter_id=ivy.id)
+        return await RequirementService(session).update(ada_ctx, loaded, body)
+
+    refused = await race(concurrency, concurrency_engine, first=mark, second=reassign)
 
     assert refused == ["not_member"]
 

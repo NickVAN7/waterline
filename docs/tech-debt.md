@@ -855,6 +855,9 @@ Entry format:
   fault (exit 139, inside mutmut's trampoline reading `os.environ`, with `setproctitle` loaded)
   every time `rank_between` unpacked `_split(after)` into two names; calling `_split(after)`
   twice, as the module does now, passes. The crash is in the tool, not the code under test.
+  From S2-C12 it is intermittent, the same code crashing on some runs (in mutmut's stats run)
+  and passing on others: about half of six runs crashed, whatever the shape of
+  `rules/approval_policy.py`'s new functions.
 - **Why:** not worth chasing inside a checkpoint; the gate passes on the committed code.
 - **Fix by:** S2-C22 (the tech-debt review): retry on the then-current mutmut, and report it
   upstream if it still crashes
@@ -935,7 +938,9 @@ Entry format:
   reverse of a raise's order (the project, then the rows it lifts), and could deadlock; the
   reporter gets no content access from being the reporter, so nothing is exposed.
 - **Fix by:** S2-C22 (the tech-debt review)
-- **Status:** open
+- **Status:** resolved in S2-C12 (checkpoint-reviewer pass 2): the edit holds the project, then
+  builds its target, so the reporter check sees the restriction a change committed meanwhile;
+  race test `test_a_reporter_change_waiting_on_marking_export_controlled_refuses_an_inherited_admin`
 
 ### TD-75: `ListSpec.soft_deleted` and `?include_deleted` have no user
 - **Added:** S2-C8 (checkpoint-reviewer finding 4)
@@ -1011,4 +1016,34 @@ Entry format:
 - **Fix by:** S2-C22 (the tech-debt review): read the project again under the tree lock (or hold
   it as the request create does) before the re-check, with a race test against marking the
   project export-controlled
+- **Status:** open
+
+### TD-81: The replacement reads the requester's and approvers' access without holding it
+- **Added:** S2-C12
+- **What:** `ApprovalService.replace_lost_access` reads each approver's and the requester's
+  access (`UserRepository.authz_context`) under the project's lock only, without
+  `UserRepository.hold_access`. A path that changes their access without that lock (the org and
+  workspace removals and role changes, `revoke-system-admin`, deactivation) can commit between
+  the read and the replacement's commit. A requester who loses admin in that window can still get
+  a pending row, which leaves the request flagged for a project admin to cancel, as §6.2 does for
+  a requester who has no admin.
+- **Why:** holding them here would deadlock against an org removal "with their projects", which
+  locks the org membership and then needs the project row that the replacement already holds.
+  Those paths, and the lock order between them, are S2-C13's scope.
+- **Fix by:** S2-C13: set the lock order between the other paths and the replacement, with a race
+  test of a requester's org removal against an approver's project removal
+- **Status:** open
+
+### TD-82: A decision is checked against the approver's access as the request found it
+- **Added:** S2-C12 (security-reviewer finding 2)
+- **What:** `RequirementService.decide` waits on the project's and the request's locks, then
+  checks `approval.decide` against the caller's authorization context, which was loaded before
+  the wait. If a removal of that approver commits during the wait and leaves their row pending
+  (the requester no longer holds project admin, design-doc §6.2), the decision still passes on
+  the membership the removal deleted, and can complete the request.
+- **Why:** from S2-C11, fixed only when needed (DL-106). The window is the request's own, and
+  the approver had access a moment before, as for TD-80.
+- **Fix by:** S2-C22 (the tech-debt review): re-read the caller's project membership under the
+  locks before the check (as `ProjectService._with_current_role` does), with a race test of a
+  removal first and the decision second
 - **Status:** open
