@@ -73,8 +73,9 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Projects are locked first** (DL-235): a transaction that locks a project row takes it before
   any user or membership row, projects in ID order. A path that takes away someone's access
   locks their projects (pending approvals and requests) before changing anything, then looks
-  again and locks any project a request created meanwhile (the one place a project is locked
-  after a person's rows).
+  again and locks any project a request created meanwhile; a removal "with their projects" also
+  locks the project of a membership added while it waited. Those are the only places a project
+  is locked after a person's rows (TD-83).
 - **No recursion that deepens with input length** (a string a user can lengthen, a tree a
   user can deepen): Python stops at about 1,000 levels, so a long enough input is a 500. Use a
   loop (S2-C2 security review: the rank midpoint).
@@ -189,7 +190,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   use the `concurrency` fixture and `@pytest.mark.concurrency("<table>", ...)`. In a race test, a task
   running inside the task group records its outcome and the test asserts after the group closes:
   a failure inside the group stops the other transaction's commit and leaves rows that break later
-  tests (S1-C11 review; TD-30). Tests only
+  tests (S1-C11 review; TD-30). A test of lock *order* takes the first transaction's steps by
+  hand and pauses between them: `race()` runs the first to its end, so a lock taken late passes
+  as one taken early (S2-C13 review). Tests only
   ever use the test database (`waterline_test`, a pytest-xdist worker's copy of it, DL-100, or a
   `scratch_database` created from it for one test); never point a test at the dev database.
   Tests run in parallel, in any order: no test may depend on another's state.

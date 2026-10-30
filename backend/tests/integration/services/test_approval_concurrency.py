@@ -4,10 +4,12 @@ that another row exists holds it until commit). Each sabotage-checked against th
 its lock or hold."""
 
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Literal
 
+import anyio
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.authz.context import AuthzContext
@@ -18,28 +20,38 @@ from app.enums import (
     ApprovalDecision,
     ApprovalRequestStatus,
     DeletedChildren,
+    OrgRole,
     ProjectRole,
     RequirementStatus,
     RestrictionCategory,
 )
 from app.models.approval import Approval, ApprovalRequest
 from app.models.audit import ActivityLog
+from app.models.org import Membership, Organization
 from app.models.project import Project
 from app.models.requirement import Requirement
 from app.models.user import User
+from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
 from app.schemas.approval import ApprovalDecisionCreate, ApprovalRequestCreate
-from app.schemas.project import RestrictionUpdate
+from app.schemas.org import MemberRoleUpdate
+from app.schemas.project import ProjectMemberAdd, RestrictionUpdate
 from app.schemas.requirement import RequirementUpdate
 from app.services.auth import AuthService
+from app.services.org import OrgService
 from app.services.project import ProjectService
 from app.services.requirement import RequirementService
+from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.integration.services.test_account_concurrency import subject_of
 from tests.integration.services.test_requirement_concurrency import TABLES, a_requirement, outcome
 from tests.integration.services.test_restriction_concurrency import Change, race
-from tests.support.concurrency import committing_factories, run_in_parallel
+from tests.support.concurrency import (
+    committing_factories,
+    run_in_parallel,
+    wait_until_blocked_on_a_lock,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -380,3 +392,235 @@ async def test_a_completing_removal_waiting_on_an_edit_still_completes_the_reque
         RequirementStatus.APPROVED,
         ApprovalRequestStatus.APPROVED,
     )
+
+
+async def an_org_member(
+    concurrency: SessionMaker, requirement: Requirement, role: OrgRole, *, viewer: bool
+) -> tuple[User, AuthzContext]:
+    """Someone in the requirement's org with `role`; with `viewer`, a viewer of its project too."""
+    async with committing_factories(concurrency) as session:
+        project = await session.get_one(Project, requirement.project_id)
+        user = await UserFactory.create_async(is_system_admin=False, is_active=True)
+        org = await session.get_one(Organization, project.organization_id)
+        await MembershipFactory.create_async(organization=org, user=user, role=role)
+        if viewer:
+            await ProjectMembershipFactory.create_async(
+                project=project, user=user, role=ProjectRole.VIEWER
+            )
+    async with concurrency() as session:
+        return user, await UserRepository(session).authz_context(
+            await session.get_one(User, user.id)
+        )
+
+
+def remove_from_org(ctx: AuthzContext, requirement: Requirement, user: User, *, projects: bool):
+    async def change(session: AsyncSession) -> object:
+        project = await session.get_one(Project, requirement.project_id)
+        org = await session.get_one(Organization, project.organization_id)
+        return await OrgService(session).remove_member(ctx, org, user.id, with_projects=projects)
+
+    return change
+
+
+@pytest.mark.concurrency("membership", *APPROVAL_TABLES)
+async def test_an_approvers_removal_waiting_on_the_requesters_org_removal_reads_them_gone(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """TD-81, DL-235: Rita requests as an org admin. Her org removal holds the project of her
+    pending request, so Vera's removal there waits, and then finds Rita without project admin:
+    Vera's row stays pending, with no row for Rita (§6.2, "If the requester no longer holds
+    project admin either"). Without the requester's projects in `projects_with_pending`, the
+    removal never locks the project, Vera's removal doesn't wait (the race times out), and it
+    reads Rita as an admin. That the lock comes first is
+    `test_a_request_naming_someone_and_their_deactivation_never_deadlock`."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    rita, rita_ctx = await an_org_member(concurrency, requirement, OrgRole.ADMIN, viewer=False)
+    await a_pending_request(concurrency, rita_ctx, requirement, vera)
+
+    async def remove_vera(session: AsyncSession) -> object:
+        project = await session.get_one(Project, requirement.project_id)
+        return await ProjectService(session).remove_member(ctx, project, vera.id)
+
+    refused = await race(
+        concurrency,
+        concurrency_engine,
+        first=remove_from_org(ctx, requirement, rita, projects=False),
+        second=remove_vera,
+    )
+
+    async with concurrency() as check:
+        result = await check.execute(select(Approval.approver_id, Approval.decision))
+        rows = {(approver, ApprovalDecision(decision)) for approver, decision in result.all()}
+    assert (refused, rows) == ([], {(vera.id, ApprovalDecision.PENDING)})
+
+
+@pytest.mark.concurrency("membership", *APPROVAL_TABLES)
+async def test_a_request_naming_someone_and_their_org_removal_never_deadlock(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """DL-235: a request holds the project (`FOR KEY SHARE`), then the people it names
+    (`hold_access`, their org row included). Vera's org removal "with their projects" now locks
+    the project before her org row, so it waits there and the request's second step goes
+    through. Under the old order (the org row, then the project) each waits on the other, and
+    Postgres aborts one: a 500. The request's two steps are taken by hand, since the real one
+    can't be paused between them."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera, _ = await an_org_member(concurrency, requirement, OrgRole.MEMBER, viewer=True)
+    removal_pid: list[int] = []
+    removal_connected = anyio.Event()
+    outcomes: list[str] = []
+
+    async def remove_vera() -> None:
+        async with concurrency() as session:
+            removal_pid.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
+            removal_connected.set()
+            outcomes.append(
+                await outcome(remove_from_org(ctx, requirement, vera, projects=True)(session))
+            )
+            await session.commit()
+
+    async with concurrency() as request:
+        await ProjectRepository(request).hold(
+            await request.get_one(Project, requirement.project_id)
+        )
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as group:
+                group.start_soon(remove_vera)
+                await removal_connected.wait()
+                await wait_until_blocked_on_a_lock(concurrency_engine, removal_pid[0])
+                outcomes.append(await outcome(UserRepository(request).hold_access(vera.id)))
+                await request.commit()
+
+    async with concurrency() as check:
+        memberships = await check.scalar(
+            select(func.count()).select_from(Membership).where(Membership.user_id == vera.id)
+        )
+    assert (outcomes, memberships) == (["ok", "ok"], 0)
+
+
+@pytest.mark.concurrency("membership", *APPROVAL_TABLES)
+async def test_a_member_add_waits_on_the_project_before_the_persons_org_row(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """DL-235: an add takes the project before the person's org and staff rows, as the removal
+    "with their projects" does, so the two can't each hold one and wait on the other. While
+    Vera's removal holds both, an add of her waits in its project lock (under the old order it
+    waits on her org row instead), then finds her gone: a 404."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera, _ = await an_org_member(concurrency, requirement, OrgRole.MEMBER, viewer=True)
+    add_pid: list[int] = []
+    add_connected = anyio.Event()
+    outcomes: list[str] = []
+    waiting_in: list[str] = []
+
+    async def add_vera() -> None:
+        async with concurrency() as session:
+            add_pid.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
+            add_connected.set()
+            project = await session.get_one(Project, requirement.project_id)
+            body = ProjectMemberAdd(user_id=vera.id, role=ProjectRole.MEMBER)
+            outcomes.append(await outcome(ProjectService(session).add_member(ctx, project, body)))
+            await session.commit()
+
+    async with concurrency() as removal:
+        await remove_from_org(ctx, requirement, vera, projects=True)(removal)
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as group:
+                group.start_soon(add_vera)
+                await add_connected.wait()
+                await wait_until_blocked_on_a_lock(concurrency_engine, add_pid[0])
+                async with concurrency_engine.connect() as connection:
+                    waiting_in.append(
+                        await connection.scalar(
+                            text("SELECT query FROM pg_stat_activity WHERE pid = :pid"),
+                            {"pid": add_pid[0]},
+                        )
+                    )
+                await removal.commit()
+
+    # pg_stat_activity cuts long statements short, so the start names the table it locks.
+    assert (waiting_in[0].startswith("SELECT project."), outcomes) == (True, ["NotFoundError"])
+
+
+@pytest.mark.concurrency("session", *APPROVAL_TABLES)
+async def test_a_request_naming_someone_and_their_deactivation_never_deadlock(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine, settings: Settings
+) -> None:
+    """DL-235: Vera has a pending row in the project, so her deactivation locks the project
+    before her user row (`ApprovalService.lock_projects`), and waits there while a request
+    naming her holds it (`FOR KEY SHARE`); the request then takes her rows (`hold_access`) and
+    commits. Without the early lock, or with it after the user row, the deactivation holds her
+    row and waits on the project in `replace_for` while the request waits on her row: Postgres
+    aborts one, a 500. The request's two steps are taken by hand, as above."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    await a_pending_request(concurrency, ctx, requirement, vera)
+    deactivation_pid: list[int] = []
+    deactivation_connected = anyio.Event()
+    outcomes: list[str] = []
+
+    async def deactivate_vera() -> None:
+        async with concurrency() as session:
+            deactivation_pid.append(
+                (await session.execute(select(func.pg_backend_pid()))).scalar_one()
+            )
+            deactivation_connected.set()
+            service = AuthService(session, settings)
+            outcomes.append(
+                await outcome(service.deactivate(ctx, await subject_of(session, vera.id)))
+            )
+            await session.commit()
+
+    async with concurrency() as request:
+        await ProjectRepository(request).hold(
+            await request.get_one(Project, requirement.project_id)
+        )
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as group:
+                group.start_soon(deactivate_vera)
+                await deactivation_connected.wait()
+                await wait_until_blocked_on_a_lock(concurrency_engine, deactivation_pid[0])
+                outcomes.append(await outcome(UserRepository(request).hold_access(vera.id)))
+                await request.commit()
+
+    async with concurrency() as check:
+        active = await check.scalar(select(User.is_active).where(User.id == vera.id))
+        decision = await check.scalar(
+            select(Approval.decision).where(Approval.approver_id == vera.id)
+        )
+    assert (outcomes, active, decision) == (["ok", "ok"], False, ApprovalDecision.REPLACED)
+
+
+async def remove_her(orgs: OrgService, ctx: AuthzContext, org: Organization, user: User) -> object:
+    return await orgs.remove_member(ctx, org, user.id, with_projects=True)
+
+
+async def demote_her(orgs: OrgService, ctx: AuthzContext, org: Organization, user: User) -> object:
+    return await orgs.change_member_role(ctx, org, user.id, MemberRoleUpdate(role=OrgRole.MEMBER))
+
+
+@pytest.mark.concurrency("membership", *APPROVAL_TABLES)
+@pytest.mark.parametrize("change", [remove_her, demote_her], ids=["remove", "change_role"])
+async def test_naming_someone_outside_the_org_is_a_404_before_any_project_lock(
+    concurrency: SessionMaker, change: Callable[..., Awaitable[object]]
+) -> None:
+    """Security review (S2-C13): an org role change or removal checks the person is on the
+    roster, unlocked, before locking their projects (DL-235), so another org's admin naming
+    them can't hold up their projects elsewhere. Vera has a pending row in PMT, held here; Bolt's
+    admin naming her is a 404 at once. Without the check, the change waits on PMT before its
+    404 (the time limit runs out)."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    await a_pending_request(concurrency, ctx, requirement, vera)
+    async with committing_factories(concurrency):
+        bolt = await OrganizationFactory.create_async(name="Bolt Foods", slug="bolt-foods")
+
+    async with concurrency() as holder, concurrency() as session:
+        await ProjectRepository(holder).hold(await holder.get_one(Project, requirement.project_id))
+        org = await session.get_one(Organization, bolt.id)
+        work = change(OrgService(session), ctx, org, vera)
+        with anyio.fail_after(5):
+            refused = await outcome(work)
+
+    assert refused == "NotFoundError"

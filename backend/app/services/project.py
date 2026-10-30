@@ -583,9 +583,9 @@ class ProjectService:
 
     async def _lock_live(self, project: Project) -> None:
         """Lock the project, then re-read it: an archive that committed meanwhile still denies a
-        member change (design-doc §5). Lock order: the person's org and staff rows (an add's
-        `org_member_or_staff`), then the project, then its memberships, as a removal "with their
-        projects" takes them."""
+        member change (design-doc §5). Lock order: the project, then the person's org and staff
+        rows (an add's `org_member_or_staff`), then its memberships, as a removal "with their
+        projects" takes them (DL-235)."""
         await self.repository.lock(project)
         if project.archived_at is not None:
             raise ForbiddenError
@@ -642,6 +642,9 @@ class ProjectService:
         # The project's org exists: a foreign key.
         org = cast(Organization, await OrgService(self.session).get(project.organization_id))
         roster = self._members(project)
+        # The project before the person's org and staff rows (DL-235); the checks keep DL-78's
+        # order, the export-control confirmation last.
+        await self._lock_live(project)
         if payload.email is not None:
 
             async def admit(user: User) -> dict[str, JsonValue]:
@@ -653,16 +656,16 @@ class ProjectService:
                             "outside_org",
                         )
                     await OrgService(self.session).add_member(ctx, org, user.email, OrgRole.MEMBER)
-                # A second add of the same person, waiting here, then hits the unique constraint:
-                # `already_member` on `email` (DL-80).
-                return await self._lock_for_add(project, payload)
+                # A second add of the same person, waiting on the project, then hits the unique
+                # constraint: `already_member` on `email` (DL-80).
+                return _confirmation(payload, needed=project_target(project).export_controlled)
 
             return await roster.add(ctx, payload.email, payload.role, admit=admit)
         # Exactly one of the two was sent (checked above), so here it's `user_id`.
         user_id = cast(uuid.UUID, payload.user_id)
         if not await self.repository.org_member_or_staff(org, user_id):
             raise NotFoundError
-        confirmation = await self._lock_for_add(project, payload)
+        confirmation = _confirmation(payload, needed=project_target(project).export_controlled)
         if await self.repository.membership(project.id, user_id):
             raise ValidationFailedError.on(
                 ("body", "user_id"), _MEMBER_ROSTER.already_member, "already_member"

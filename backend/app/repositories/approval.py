@@ -3,11 +3,11 @@
 import uuid
 from collections.abc import Collection
 
-from sqlalchemy import ColumnElement, Select, exists, select
+from sqlalchemy import ColumnElement, Select, exists, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.enums import ApprovalEntityType, ApprovalRequestStatus
+from app.enums import ApprovalDecision, ApprovalEntityType, ApprovalRequestStatus
 from app.models.approval import Approval, ApprovalRequest
 
 # What a request's read shows: the revision, the requester, and each approval with its approver.
@@ -72,6 +72,23 @@ class ApprovalRepository:
         return await self._lock_pending(
             ApprovalRequest.entity_type == entity_type, ApprovalRequest.entity_id.in_(entity_ids)
         )
+
+    async def projects_with_pending(self, user_id: uuid.UUID) -> list[uuid.UUID]:
+        """The projects with a pending request the user requested or has a pending row on."""
+        approver = (
+            select(ApprovalRequest.project_id)
+            .join(Approval, Approval.approval_request_id == ApprovalRequest.id)
+            .where(
+                Approval.approver_id == user_id,
+                Approval.decision == ApprovalDecision.PENDING,
+                ApprovalRequest.status == ApprovalRequestStatus.PENDING,
+            )
+        )
+        requester = select(ApprovalRequest.project_id).where(
+            ApprovalRequest.requested_by == user_id,
+            ApprovalRequest.status == ApprovalRequestStatus.PENDING,
+        )
+        return list(await self.session.scalars(union(approver, requester)))
 
     async def lock_pending_in_project(self, project_id: uuid.UUID) -> list[ApprovalRequest]:
         """The project's pending requests, locked, in id order (the `(project_id, status)`

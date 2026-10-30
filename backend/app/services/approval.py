@@ -24,6 +24,7 @@ from app.enums import (
 from app.models.approval import Approval, ApprovalRequest
 from app.models.project import Project
 from app.repositories.approval import ApprovalRepository
+from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
 from app.rules.approval_policy import (
     ApproverRow,
@@ -123,6 +124,22 @@ class ApprovalService:
         if outcome is not ApprovalRequestStatus.PENDING:
             await self._finish(request, outcome, actor_id, actor_id, now)
         await self.session.flush()
+
+    async def lock_projects(self, user_id: uuid.UUID, *, also: Collection[uuid.UUID] = ()) -> None:
+        """Before a change that may take the user's access away, other than a project's own: lock
+        the projects where they have a pending row or requested a pending request, and `also`,
+        in one pass in ID order, before any other row (DL-235). A replacement there then waits
+        for the change, so it never reads the user's access while it changes (TD-81)."""
+        ids = {*await self.repository.projects_with_pending(user_id), *also}
+        await ProjectRepository(self.session).lock_all(ids)
+
+    async def replace_for(self, user_id: uuid.UUID, actor_id: uuid.UUID | None) -> None:
+        """After that change: look again, locking the project of any request created since
+        `lock_projects` (one of the two places a project is locked after a person's rows,
+        DL-235, TD-83), and run the replacement in each of the user's projects."""
+        ids = await self.repository.projects_with_pending(user_id)
+        for project in await ProjectRepository(self.session).lock_all(ids):
+            await self.replace_lost_access(project, actor_id)
 
     async def replace_lost_access(self, project: Project, actor_id: uuid.UUID | None) -> None:
         """Replace the pending rows, on the project's pending requests, of approvers who can no

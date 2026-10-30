@@ -1,9 +1,10 @@
 """`project` and `project_membership` (design-doc §1.1, §3)."""
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 
-from sqlalchemy import Select, exists, or_, select
+from sqlalchemy import ColumnElement, Select, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -71,8 +72,8 @@ class ProjectRepository:
         admin or a project member may be chosen from (design-doc §4, §5, "Org roles"). Both rows,
         if any, are held `FOR SHARE` until the transaction ends: a removal "with their projects"
         waits for the add, or the add for the removal (and finds the person gone), so no one keeps
-        a project role through a membership being removed (S1-C12 review). Callers take this lock
-        before the project's, as the removal does."""
+        a project role through a membership being removed (S1-C12 review). Callers take the
+        project's lock first, as the removal does (DL-235)."""
         org_member = await self.session.scalar(
             select(Membership.id)
             .where(Membership.organization_id == org.id, Membership.user_id == user_id)
@@ -109,6 +110,20 @@ class ProjectRepository:
         project edit (its restriction raise included) waits, or is waited for, so a check
         against its level stays true until commit (TD-72); moves' tree lock doesn't conflict."""
         await self.session.refresh(project, with_for_update={"read": True, "key_share": True})
+
+    async def lock_all(self, project_ids: Collection[uuid.UUID]) -> list[Project]:
+        """The projects, locked in ID order and read again (DL-235: projects first)."""
+        if not project_ids:
+            return []
+        return list(
+            await self.session.scalars(
+                select(Project)
+                .where(Project.id.in_(project_ids))
+                .order_by(Project.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        )
 
     # --- Members ------------------------------------------------------------------------------
 
@@ -169,24 +184,35 @@ class ProjectRepository:
     ) -> list[ProjectMembership]:
         """The user's memberships on the org's projects, or the workspace's, archived included,
         each with its project loaded, locked, and read again: projects in ID order, the lock every
-        member and lead change takes first. An add waits earlier, on the person's org or staff row
-        the removal holds (`org_member_or_staff`). So no change slips in between (S1-C12 review)."""
-        where = (
-            Project.organization_id == organization_id
-            if organization_id is not None
-            else Project.workspace_id == workspace_id
-        )
+        member and lead change takes first. The removal has locked the projects already, before
+        the org or staff row (`member_project_ids`, DL-235), so an add waits on the project and
+        then finds the person gone (`org_member_or_staff`; S1-C12 review). An add that committed
+        first, while the removal waited on the org row, is locked only here: after the person's
+        rows (TD-83)."""
         return list(
             await self.session.scalars(
                 select(ProjectMembership)
                 .join(Project, ProjectMembership.project_id == Project.id)
                 .options(contains_eager(ProjectMembership.project))
-                .where(ProjectMembership.user_id == user_id, where)
+                .where(ProjectMembership.user_id == user_id, _in(organization_id, workspace_id))
                 .order_by(Project.id)
                 # Each project, then its membership (the direct removal's order); a membership
                 # removed or changed meanwhile is skipped or read again, never acted on twice.
                 .with_for_update(of=(Project, ProjectMembership))
                 .execution_options(populate_existing=True)
+            )
+        )
+
+    async def member_project_ids(
+        self, user_id: uuid.UUID, *, organization_id: uuid.UUID | None, workspace_id: uuid.UUID
+    ) -> list[uuid.UUID]:
+        """The projects of the user's memberships in the org, or the workspace, archived included
+        (a removal "with their projects" locks them first, DL-235)."""
+        return list(
+            await self.session.scalars(
+                select(Project.id)
+                .join(ProjectMembership, ProjectMembership.project_id == Project.id)
+                .where(ProjectMembership.user_id == user_id, _in(organization_id, workspace_id))
             )
         )
 
@@ -219,3 +245,10 @@ class ProjectRepository:
             workspace_admins=[(user, role) for user, role in workspace_admins],
             org_admins=[(user, role) for user, role in org_admins],
         )
+
+
+def _in(organization_id: uuid.UUID | None, workspace_id: uuid.UUID | None) -> ColumnElement[bool]:
+    """The org's projects, or the workspace's when there's no org (a staff removal)."""
+    if organization_id is not None:
+        return Project.organization_id == organization_id
+    return Project.workspace_id == workspace_id

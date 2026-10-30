@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C12 (Approver replacement: project paths) built; next is S2-C13 (history: `docs/reviews/`).
+> **Status:** S2-C13 (Approver replacement: other paths) built; next is S2-C14 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -136,7 +136,7 @@ container from the api service's image: `docker compose run --rm api ...`, after
 | `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
 | `wl seed --demo` | Build the demo dataset instead, workspace and system admin included ("Demo data" in section 5): refused once a workspace exists, and unless `DEMO_SEED_ENABLED=true` (the `.env.example` default; off otherwise, and never on in production, since every demo account has the same public password). Takes no other values |
 | `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
-| `wl admin revoke-system-admin <email>` | Take it away; refused for the last active system admin |
+| `wl admin revoke-system-admin <email>` | Take it away, handing over their undecided approvals where the flag was their only access (logged with no actor); refused for the last active system admin |
 
 The CLI is a **thin orchestrator**: the real tool configuration is in each project's
 `pyproject.toml`, so `uv run pytest` in `backend/` gives the same result as `wl backend test`,
@@ -308,9 +308,12 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   the event (design-doc §10.1, "Scope"); the roster does this for org members.
 - **Staff and org members share one set of rules** (`app/services/roster.py`, DL-70): the
   email-first add, the create, the owner-only rule for owner and admin roles, stepping down, the
-  last-owner guard and handover, and the lock order (owners' rows first; adding an owner takes
-  that lock too, TD-25). The workspace and org services each describe their roster in a
-  `RosterSpec` and call a `Roster`. Project members are a third roster with no owner role
+  last-owner guard and handover, and the lock order (the person's projects first, DL-235, then
+  the owners' rows; adding an owner takes that lock too, TD-25). A role change or removal also
+  hands the person's pending approvals over where it took their access (design-doc §6.2):
+  `ApprovalService.lock_projects` before anything else, `replace_for` after the change, as
+  deactivation and `revoke-system-admin` do. The workspace and org services each describe their
+  roster in a `RosterSpec` and call a `Roster`. Project members are a third roster with no owner role
   (`owner=None`, `manage_admins=None`; DL-71): it uses the list, the email-first add (whose
   `admit` hook adds the project's `outside_org` and `join_org` step, DL-78, and returns any details
 for the added event, such as the export-control confirmation, DL-81), and `add_user`; the

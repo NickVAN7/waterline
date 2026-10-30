@@ -41,6 +41,7 @@ from app.schemas.auth import (
     PasswordPolicyRead,
     PasswordRequirement,
 )
+from app.services.approval import ApprovalService
 from app.services.user import (
     AccountSubject,
     UserService,
@@ -206,11 +207,14 @@ class AuthService:
         return True
 
     async def revoke_system_admin(self, email: str) -> bool:
-        """Take the flag away (app CLI only, no actor); False if the account doesn't have it.
+        """Take the flag away (app CLI only, no actor), handing over the pending approvals it
+        gave access to (design-doc §6.2, `changed_by` null); False if the account doesn't have it.
         403 `last_system_admin` when it's the last active system admin (lockout safeguard,
         design-doc §4); 404 for an unknown email."""
         user = await self._user_by_email(email)
         users = UserRepository(self.session)
+        approvals = ApprovalService(self.session)
+        await approvals.lock_projects(user.id)
         # Every active admin's row first, in ID order (so two revocations can't deadlock), then
         # the target re-read: a revocation that committed meanwhile shows as the flag gone.
         active = await users.lock_active_system_admins()
@@ -220,6 +224,7 @@ class AuthService:
         if active == [user.id]:
             raise ForbiddenError("This is the last active system admin.", code="last_system_admin")
         await UserService(self.session).set_system_admin(user, False)
+        await approvals.replace_for(user.id, None)
         log_admin_event(
             self.session,
             action=AuditAction.SYSTEM_ADMIN_REVOKED,
@@ -278,12 +283,15 @@ class AuthService:
         )
 
     async def deactivate(self, ctx: AuthzContext, subject: AccountSubject) -> None:
-        """Deactivate the account and end its sessions (`user_deactivated`); already inactive
-        changes nothing. 422 on the path's `user_id`: `last_owner` for the last active owner of
-        the workspace or an org, `last_system_admin` for the last active system admin."""
+        """Deactivate the account, hand over its pending approvals (design-doc §6.2), and end its
+        sessions (`user_deactivated`); already inactive changes nothing. 422 on the path's
+        `user_id`: `last_owner` for the last active owner of the workspace or an org,
+        `last_system_admin` for the last active system admin."""
         user = subject.user
         if not user.is_active:
             return
+        approvals = ApprovalService(self.session)
+        await approvals.lock_projects(user.id)
         await self._guard_last_owners(subject)
         if user.is_system_admin:
             # Locked like a revocation, so two deactivations can't remove the last one.
@@ -300,6 +308,7 @@ class AuthService:
         if not user.is_active:
             return
         await UserService(self.session).set_active(user, False)
+        await approvals.replace_for(user.id, ctx.user_id)
         await self.repository.delete_all(user.id)
         UserService(self.session).log_account_event(ctx, AuditAction.USER_DEACTIVATED, subject)
 

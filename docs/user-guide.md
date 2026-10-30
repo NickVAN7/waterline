@@ -187,7 +187,9 @@ its **Actions for …** menu, which lists only what you may do to that person.
   they first sign in. From a row you can **Change role** (stepping down yourself included) and
   **Remove from staff**, which by default also removes them from the workspace's projects; clear
   the box to let them keep those projects. The last owner can't step down or leave until you
-  choose who becomes owner: Waterline asks for that person when it happens.
+  choose who becomes owner: Waterline asks for that person when it happens. A role change or
+  removal that leaves someone unable to see a project's content hands their undecided approvals
+  there to whoever requested each one, if that person is still a project admin.
 - **Organizations** lists the workspace's organizations. **Create organization** asks for its
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
   existing person, or a new account with a temporary password, shown once.
@@ -202,7 +204,8 @@ its **Actions for …** menu, which lists only what you may do to that person.
 level or below, everywhere they belong), their row offers **Edit details** (email, name, and
 username; changing the email signs them out everywhere), **Reset password** (a new temporary
 password, shown once), **Sign out everywhere**, and **Deactivate** (they're signed out and can't
-sign in until reactivated; their work stays). A deactivated person shows a **Deactivated** badge
+sign in until reactivated; their work stays, and their undecided approvals go to whoever
+requested each one, if that person is still a project admin). A deactivated person shows a **Deactivated** badge
 and is offered **Reactivate** instead. The last active owner, or the last system admin, can't be
 deactivated.
 
@@ -229,8 +232,10 @@ is told to ask the organization's owners or admins.
   as **Staff** does under workspace administration: **Add person** asks for the email first, then
   either confirms an existing account or creates one with a temporary password, shown once; a
   row offers **Change role** and **Remove from organization**, which by default also removes the
-  person from the organization's projects; and the last owner can't step down or leave until you
-  choose who becomes owner. Only owners (and workspace owners and admins, and system admins)
+  person from the organization's projects (a role change or removal that leaves someone unable
+  to see a project's content hands their undecided approvals there to whoever requested each
+  one, as for staff); and the last owner can't step down or leave until you choose who becomes
+  owner. Only owners (and workspace owners and admins, and system admins)
   grant, change, or remove the owner and admin roles. Rows also offer the account actions and the
   access review your role covers (see "Account actions" and "Access review" above).
 - **Settings** renames the organization and changes its slug, which is in its web addresses

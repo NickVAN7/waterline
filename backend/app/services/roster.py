@@ -28,9 +28,11 @@ from app.core.errors import NotFoundError, ValidationFailedError, violated_const
 from app.core.lists import ListSpec, Page, fetch_page
 from app.enums import AuditAction, AuditEntityType
 from app.models.user import User
+from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
 from app.rules.account_rank import Account
 from app.schemas.workspace import NewUser
+from app.services.approval import ApprovalService
 from app.services.user import UserService
 
 
@@ -278,6 +280,12 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         )
         return await self.add_user(ctx, user, role)
 
+    async def _ensure_on_roster(self, user_id: uuid.UUID) -> None:
+        """404 before any lock for someone not on this roster: the projects locked first
+        (DL-235) may be another org's, which a stranger's ID must not hold up."""
+        if await self.repository.membership(self.scope_id, user_id) is None:
+            raise NotFoundError
+
     async def _member(self, user_id: uuid.UUID) -> M:
         """The membership a role change or removal acts on, locked. The owners' rows are locked
         first, always in the same order, so concurrent changes queue instead of deadlocking, and
@@ -345,7 +353,11 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         self, ctx: AuthzContext, user_id: uuid.UUID, role: R, *, new_owner_id: uuid.UUID | None
     ) -> Row:
         """Change a member's role. A last owner stepping down needs `new_owner_id`, who becomes
-        owner first (DL-59); otherwise 422 `last_owner` on `role`."""
+        owner first (DL-59); otherwise 422 `last_owner` on `role`. A role that gave inherited
+        admin hands the member's pending approvals over (design-doc §6.2)."""
+        approvals = ApprovalService(self.session)
+        await self._ensure_on_roster(user_id)
+        await approvals.lock_projects(user_id)
         membership = await self._member(user_id)
         self._ensure_change(ctx, membership, role)
         if membership.role == role:
@@ -355,6 +367,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         if membership.role == self.spec.owner:
             await self._guard_last_owner(membership, ("body", "role"))
         await self._set_role(ctx, membership, role)
+        await approvals.replace_for(user_id, ctx.user_id)
         return await self._row(ctx, membership)
 
     async def remove(
@@ -368,7 +381,20 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         """Remove a member; with their projects, the project area's registered handler removes
         their project memberships in the workspace or org too. A last owner leaving needs
         `new_owner_id`, who becomes owner first (DL-59); otherwise 422 `last_owner`. Sessions are
-        left alone (design-doc §4): access ends on the next request."""
+        left alone (design-doc §4): access ends on the next request. Their pending approvals
+        are handed over where the removal took their access (design-doc §6.2)."""
+        approvals = ApprovalService(self.session)
+        await self._ensure_on_roster(user_id)
+        also = (
+            await ProjectRepository(self.session).member_project_ids(
+                user_id,
+                organization_id=self.target.organization_id,
+                workspace_id=self.target.workspace_id,
+            )
+            if with_projects
+            else []
+        )
+        await approvals.lock_projects(user_id, also=also)
         membership = await self._member(user_id)
         self._ensure_change(ctx, membership, None)
         if new_owner_id is not None:
@@ -390,6 +416,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             )
             for handler in _ON_MEMBER_REMOVED:
                 await handler(self.session, removal)
+        await approvals.replace_for(user_id, ctx.user_id)
 
 
 def _already_member(exc: IntegrityError) -> bool:

@@ -858,9 +858,26 @@ Entry format:
   From S2-C12 it is intermittent, the same code crashing on some runs (in mutmut's stats run)
   and passing on others: about half of six runs crashed, whatever the shape of
   `rules/approval_policy.py`'s new functions.
-- **Why:** not worth chasing inside a checkpoint; the gate passes on the committed code.
-- **Fix by:** S2-C22 (the tech-debt review): retry on the then-current mutmut, and report it
-  upstream if it still crashes
+  After S2-C12 (on a new machine): the first `wl check` crashed in `mutmut run` (a fatal Python
+  error, with `setproctitle`, `greenlet`, and SQLAlchemy's compiled extensions loaded), and the
+  next, on the same tree, passed. Then, in a scratch copy, the gate's mutation sequence (clean,
+  `mutmut run`, `export-cicd-stats`, `mutation_gate check`) passed 30 times out of 30: 10 as
+  configured, 10 with `use_setproctitle = false`, and 10 with `process_isolation =
+  "forkserver"`. Since the setup as configured didn't crash there either, the runs don't show
+  whether either setting helps. What the copy lacked: mutmut running inside a full `wl check`,
+  after about 8,000 tests with the Docker stack up, and the repository's long-used `.venv`.
+  Ruled out: capping pytest-xdist (mutmut's pytest already runs with `-n 0`) and running the
+  gate's steps one at a time (they already do). Capping `--max-children` (default: one per
+  CPU) is unlikely to help, since the recorded crashes were in the single-process stats run,
+  before any child is forked.
+- **Why:** not worth chasing inside a checkpoint; the gate passes on the committed code. The
+  owner chose to leave mutmut as configured until it crashes again (after S2-C12).
+- **Fix by:** S2-C22 (the tech-debt review), or sooner at the next crash: reproduce it under
+  the gate's real conditions (`wl backend mutate` and `wl check` about 10 times each in the
+  repository), then compare `use_setproctitle = false` (the most direct candidate: on Linux,
+  `setproctitle` overwrites the environment's memory, and the crash is reading `os.environ`)
+  and `process_isolation = "forkserver"` there, about 10 runs each; also retry on the
+  then-current mutmut, and report it upstream if it still crashes
 - **Status:** open
 
 ### TD-69: Ranks have no maximum length
@@ -1032,7 +1049,11 @@ Entry format:
   Those paths, and the lock order between them, are S2-C13's scope.
 - **Fix by:** S2-C13: projects locked first (DL-235), with a race test of a requester's org
   removal against an approver's project removal
-- **Status:** open
+- **Status:** resolved in S2-C13: every path that takes access away locks the projects of the
+  person's pending rows and requests first (`ApprovalService.lock_projects`), so a replacement
+  there waits for the change: `test_a_request_naming_someone_and_their_deactivation_never_deadlock`
+  (the lock first) and `test_an_approvers_removal_waiting_on_the_requesters_org_removal_reads_them_gone`
+  (the requester's projects in it)
 
 ### TD-82: A decision is checked against the approver's access as the request found it
 - **Added:** S2-C12 (security-reviewer finding 2)
@@ -1046,4 +1067,32 @@ Entry format:
 - **Fix by:** S2-C22 (the tech-debt review): re-read the caller's project membership under the
   locks before the check (as `ProjectService._with_current_role` does), with a race test of a
   removal first and the decision second
+- **Status:** open
+
+### TD-83: A request created while someone loses access can deadlock with the change
+- **Added:** S2-C13 (owner decision, DL-235)
+- **What:** a path that takes someone's access away locks the projects of their pending rows and
+  requests first, makes the change, then looks again (`ApprovalService.replace_for`) and locks
+  the project of any request created in between. A removal "with their projects" also locks,
+  in `ProjectRepository.memberships_in`, the project of a membership added after it read their
+  projects (the add committed while the removal waited on their org or staff row). Those are
+  the two places a project is locked after a person's rows. A request naming them in such a
+  project, holding it and waiting on their rows, can deadlock with the change. Postgres aborts
+  one of the two: a 500, and nothing it did is kept.
+- **Why:** the window is a request created in the same moments as the person's removal,
+  deactivation, or role change; the owner accepted it rather than a retry (DL-235).
+- **Fix by:** S2-C22 (the tech-debt review): retry the transaction once on a deadlock, or
+  confirm the window is still rare enough to keep
+- **Status:** open
+
+### TD-84: Finding a requester's pending requests has no index
+- **Added:** S2-C13 (checkpoint-reviewer finding 4)
+- **What:** `ApprovalRepository.projects_with_pending` filters `approval_request` on
+  `requested_by` and `status`, and no index starts with `requested_by`, so each removal, role
+  change, deactivation, or revocation scans the table twice (the lock and the look again). The
+  table only grows: requests are cancelled, never deleted.
+- **Why:** negligible at the expected volumes (one firm's requests); an index is a schema change,
+  which goes through a design change (schema-doc).
+- **Fix by:** S2-C22 (the tech-debt review): an index on `(requested_by, status)`, or a partial
+  one on pending requests
 - **Status:** open
