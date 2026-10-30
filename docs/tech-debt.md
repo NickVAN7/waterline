@@ -1030,8 +1030,8 @@ Entry format:
 - **Why:** holding them here would deadlock against an org removal "with their projects", which
   locks the org membership and then needs the project row that the replacement already holds.
   Those paths, and the lock order between them, are S2-C13's scope.
-- **Fix by:** S2-C13: set the lock order between the other paths and the replacement, with a race
-  test of a requester's org removal against an approver's project removal
+- **Fix by:** S2-C13: projects locked first (DL-235), with a race test of a requester's org
+  removal against an approver's project removal
 - **Status:** open
 
 ### TD-82: A decision is checked against the approver's access as the request found it

@@ -2954,3 +2954,25 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   (S2-C11, Slice 2 "Approvals"); testing-strategy "Security"
 - **Source:** owner, Oct 29, 2026 (chat session, S2-C11 scoping; DC-2026-10-29c, docs-consistency
   decisions 1 and 2, option (a) each)
+
+### DL-235: Projects are locked first
+- **Date:** 2026-10-30
+- **Decision:** A transaction that locks a project row takes it before any user, workspace
+  membership, org membership, or project membership row, projects in ID order. Every path that
+  takes away access to decide (§6.2's causes other than a project's own) first locks, `FOR
+  UPDATE`, the live projects where the person has a pending `approval` row or requested a
+  pending request, then makes the change, then looks again and locks any project a request
+  created meanwhile, before the replacement runs. Adding a project member takes the project
+  before the person's org and staff rows (`FOR SHARE`), and an org or workspace removal "with
+  their projects" locks the projects before deleting the org or staff row. This closes TD-81
+  and the deadlock between a request naming someone and their org removal "with their
+  projects"; only the "looks again" step can still deadlock, for a request created in that
+  window.
+- **Supersedes:** S1-C12's lock order for a project member add and a removal "with their
+  projects" (the person's org and staff rows before the project; `backend/CLAUDE.md`, "a check
+  that another row exists")
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C13, Slice 2 notes "Approver replacement touches Slice 1
+  flows"); `backend/CLAUDE.md` ("Rules that are easy to break silently"); tech debt (TD-81);
+  developer guide (the roster's lock order, updated by S2-C13 with the code)
+- **Source:** owner, Oct 30, 2026 (chat session, S2-C13 start)

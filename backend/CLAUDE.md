@@ -68,8 +68,13 @@ Calls flow **routers → services → repositories → models**. Services also u
   twice (S1-C10 review: two deactivations, two events).
 - **A check that *another* row exists before a write that depends on it** (only an org member
   or staff may join a project) holds that row `FOR SHARE` until commit, taken before the
-  target's lock, with a race test against the change that removes it (S1-C12 review: three
-  passes found an add slipping past a removal "with their projects").
+  target's lock unless the target is a project, with a race test against the change that removes
+  it (S1-C12 review: three passes found an add slipping past a removal "with their projects").
+- **Projects are locked first** (DL-235): a transaction that locks a project row takes it before
+  any user or membership row, projects in ID order. A path that takes away someone's access
+  locks their projects (pending approvals and requests) before changing anything, then looks
+  again and locks any project a request created meanwhile (the one place a project is locked
+  after a person's rows).
 - **No recursion that deepens with input length** (a string a user can lengthen, a tree a
   user can deepen): Python stops at about 1,000 levels, so a long enough input is a 500. Use a
   loop (S2-C2 security review: the rank midpoint).
