@@ -2976,3 +2976,31 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   flows"); `backend/CLAUDE.md` ("Rules that are easy to break silently"); tech debt (TD-81);
   developer guide (the roster's lock order, updated by S2-C13 with the code)
 - **Source:** owner, Oct 30, 2026 (chat session, S2-C13 start)
+
+### DL-236: My work's approvals item
+- **Date:** 2026-10-30
+- **Decision:** An item in My work's approvals section (`GET /api/me/work`,
+  `GET /api/me/work/approvals`) is one pending `approval` row of the caller's: `request_id`,
+  `requested_at`, `requested_by_id`, `requested_by_name`, `note`, `entity_type`
+  (`requirement`), `entity_number`, `title` (the title of the revision under approval, not the
+  requirement's current one), `revision_number`, `project_key`, `project_name`, and
+  `organization_slug`; sorted by `requested_at`, oldest first (the longest wait on top). Left
+  out: rows not pending, requests not pending, deleted requirements, archived projects, and
+  every project whose content the caller can't see, as for every list (§5, "Reads are
+  authorized too"): one they can't open at all (a row left pending after they lost access,
+  §6.2, flagged for an admin), and an export-controlled one without an explicit membership
+  (§3.1).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("API conventions" My work row; S2-C14)
+- **Source:** owner, Oct 30, 2026 (chat session, S2-C14 start; DC-2026-10-30b,
+  docs-consistency decision 1, option (a))
+
+### DL-237: S2-C14's page part is TD-40's error state
+- **Date:** 2026-10-30
+- **Decision:** On the My work page, S2-C14 gives each section its own error state (TD-40), so
+  an unavailable section no longer fails the page; the approvals section's UI stays in S2-C20.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C14)
+- **Source:** owner, Oct 30, 2026 (chat session, S2-C14 start)
