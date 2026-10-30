@@ -6282,6 +6282,182 @@
           }
         }
       }
+    },
+    "/api/approval-requests/{request_id}/decision": {
+      "post": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Decide Approval Request",
+        "description": "Approve or reject on your own row, finally (403 once it's decided); 422 on `id`\n(`not_pending`) for a request already completed or cancelled. The last approval completes\nthe request; any rejection rejects it.",
+        "operationId": "decide_approval_request_api_approval_requests__request_id__decision_post",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDecisionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/requirements/{number}/approve": {
+      "post": {
+        "tags": [
+          "requirement"
+        ],
+        "summary": "Approve Requirement",
+        "description": "Approve the requirement's current revision by hand; a pending approval request on it is\ncancelled. 409 on a stale `version`.",
+        "operationId": "approve_requirement_api_projects__key__requirements__number__approve_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementApprove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6426,7 +6602,8 @@
           "requirement.delete",
           "requirement.restore",
           "approval_request.create",
-          "approval_request.cancel"
+          "approval_request.cancel",
+          "approval.decide"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
@@ -6630,6 +6807,36 @@
         ],
         "title": "ApprovalDecision"
       },
+      "ApprovalDecisionCreate": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "ApprovalDecisionCreate",
+        "description": "The caller's decision on their own row (design-doc §6.2): final (DL-195). A comment is\noptional, rejecting included (DL-196: the UI asks to confirm without one)."
+      },
       "ApprovalRead": {
         "properties": {
           "id": {
@@ -6782,6 +6989,10 @@
             ],
             "title": "Completed At"
           },
+          "newer_revision_exists": {
+            "type": "boolean",
+            "title": "Newer Revision Exists"
+          },
           "approvals": {
             "items": {
               "$ref": "#/components/schemas/ApprovalRead"
@@ -6802,6 +7013,7 @@
           "requested_by_is_active",
           "created_at",
           "completed_at",
+          "newer_revision_exists",
           "approvals"
         ],
         "title": "ApprovalRequestItem",
@@ -6867,6 +7079,10 @@
             ],
             "title": "Completed At"
           },
+          "newer_revision_exists": {
+            "type": "boolean",
+            "title": "Newer Revision Exists"
+          },
           "approvals": {
             "items": {
               "$ref": "#/components/schemas/ApprovalRead"
@@ -6894,6 +7110,7 @@
           "requested_by_is_active",
           "created_at",
           "completed_at",
+          "newer_revision_exists",
           "approvals",
           "allowed_actions"
         ],
@@ -8757,6 +8974,20 @@
         "type": "object",
         "title": "ProjectUpdate",
         "description": "Only the fields sent change; `lead_id: null` clears the lead. The key never changes."
+      },
+      "RequirementApprove": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "title": "RequirementApprove",
+        "description": "Approve by hand the revision the admin saw: `version` the one they read (a stale one is a\n409, DL-169)."
       },
       "RequirementCreate": {
         "properties": {

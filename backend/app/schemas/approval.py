@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +18,14 @@ class ApprovalRequestCreate(BaseModel):
 
     approver_ids: list[uuid.UUID] = Field(min_length=1, max_length=APPROVERS_MAX)
     note: str | None = Field(default=None, max_length=APPROVAL_NOTE_MAX)
+
+
+class ApprovalDecisionCreate(BaseModel):
+    """The caller's decision on their own row (design-doc §6.2): final (DL-195). A comment is
+    optional, rejecting included (DL-196: the UI asks to confirm without one)."""
+
+    decision: Literal[ApprovalDecision.APPROVED, ApprovalDecision.REJECTED]
+    comment: str | None = Field(default=None, max_length=APPROVAL_NOTE_MAX)
 
 
 class ApprovalRead(BaseModel):
@@ -44,6 +53,9 @@ class ApprovalRequestItem(BaseModel):
     requested_by_is_active: bool
     created_at: datetime
     completed_at: datetime | None
+    # The UI warns approvers when the requirement has a newer revision (design-doc §6.2, "Stale
+    # requests").
+    newer_revision_exists: bool
     approvals: list[ApprovalRead]
 
 

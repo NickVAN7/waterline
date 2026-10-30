@@ -1200,6 +1200,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/approval-requests/{request_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Approval Request
+         * @description Approve or reject on your own row, finally (403 once it's decided); 422 on `id`
+         *     (`not_pending`) for a request already completed or cancelled. The last approval completes
+         *     the request; any rejection rejects it.
+         */
+        post: operations["decide_approval_request_api_approval_requests__request_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Requirement
+         * @description Approve the requirement's current revision by hand; a pending approval request on it is
+         *     cancelled. 409 on a stale `version`.
+         */
+        post: operations["approve_requirement_api_projects__key__requirements__number__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1253,7 +1296,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide";
         /**
          * ActivityAction
          * @enum {string}
@@ -1309,6 +1352,20 @@ export interface components {
          * @enum {string}
          */
         ApprovalDecision: "pending" | "approved" | "rejected" | "replaced";
+        /**
+         * ApprovalDecisionCreate
+         * @description The caller's decision on their own row (design-doc §6.2): final (DL-195). A comment is
+         *     optional, rejecting included (DL-196: the UI asks to confirm without one).
+         */
+        ApprovalDecisionCreate: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Comment */
+            comment?: string | null;
+        };
         /**
          * ApprovalRead
          * @description One approver's row; `approver_is_active` false shows the "Deactivated" badge.
@@ -1382,6 +1439,8 @@ export interface components {
             created_at: string;
             /** Completed At */
             completed_at: string | null;
+            /** Newer Revision Exists */
+            newer_revision_exists: boolean;
             /** Approvals */
             approvals: components["schemas"]["ApprovalRead"][];
         };
@@ -1421,6 +1480,8 @@ export interface components {
             created_at: string;
             /** Completed At */
             completed_at: string | null;
+            /** Newer Revision Exists */
+            newer_revision_exists: boolean;
             /** Approvals */
             approvals: components["schemas"]["ApprovalRead"][];
             /** Allowed Actions */
@@ -2170,6 +2231,15 @@ export interface components {
             lead_id?: string | null;
             /** Enabled Modules */
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
+        };
+        /**
+         * RequirementApprove
+         * @description Approve by hand the revision the admin saw: `version` the one they read (a stale one is a
+         *     409, DL-169).
+         */
+        RequirementApprove: {
+            /** Version */
+            version: number;
         };
         /**
          * RequirementCreate
@@ -6641,6 +6711,131 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    decide_approval_request_api_approval_requests__request_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecisionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve_requirement_api_projects__key__requirements__number__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementApprove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
                 };
             };
             /** @description Unauthorized */

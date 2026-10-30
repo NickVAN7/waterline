@@ -28,7 +28,7 @@ from app.models.audit import ActivityLog
 from app.models.requirement import Requirement
 from app.models.user import User
 from tests.factories import BaseFactory
-from tests.factories.approval import ApprovalRequestFactory
+from tests.factories.approval import ApprovalFactory, ApprovalRequestFactory
 from tests.factories.org import MembershipFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.requirement import RequirementFactory, RequirementRevisionFactory
@@ -496,3 +496,96 @@ async def test_archiving_cancels_the_projects_pending_requests_and_unarchiving_k
         ApprovalRequestStatus.CANCELLED,
         1,
     )
+
+
+# --- The stale-revision warning (design-doc §6.2, "Stale requests") ----------------------------
+
+
+async def stale_flags(client: AsyncClient, request: ApprovalRequest) -> tuple[bool, bool]:
+    """`newer_revision_exists` on the request's read and on the list's row."""
+    one = (await client.get(f"/api/approval-requests/{request.id}")).json()
+    listed = (await client.get(REQUESTS)).json()["items"]
+    return one["newer_revision_exists"], listed[0]["newer_revision_exists"]
+
+
+async def test_a_request_on_the_current_revision_has_no_newer_one(
+    client: AsyncClient, t: Tenancy, admin: User
+) -> None:
+    """Bug: the flag is always true, or compares the wrong revisions."""
+    request = await request_on(t, await requirement(t), admin)
+
+    assert await stale_flags(client, request) == (False, False)
+
+
+async def test_a_request_says_when_a_newer_revision_was_saved_since(
+    client: AsyncClient, t: Tenancy, admin: User
+) -> None:
+    """Bound to revision 1, the requirement now at revision 2. Bug: the flag is always false."""
+    item = await requirement(t)
+    request = await request_on(t, item, admin)
+    newer = await RequirementRevisionFactory.create_async(requirement=item, revision_number=2)
+    item.current_revision_id = newer.id
+    await flush()
+
+    assert await stale_flags(client, request) == (True, True)
+
+
+# --- A decision's times (design-doc §6.2; schema-doc `approval`, `requirement`) ----------------
+
+
+async def test_the_completing_decision_records_when_it_was_made_and_when_it_was_approved(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, admin: User
+) -> None:
+    """`decided_at` on the row (the replacement's `approved_by` reads it, §6.2) and `approved_at`
+    on the requirement, the instant the request completed. Bug: either left unset or old."""
+    vera = await member(t, "Vera Viewer")
+    item = await requirement(t)
+    item.approved_at = datetime(2026, 9, 1, tzinfo=UTC)
+    await flush()
+    request = await request_on(t, item, admin)
+    await ApprovalFactory.create_async(approval_request=request, approver=vera)
+    await sign_in_as(client, vera)
+
+    response = await client.post(
+        f"/api/approval-requests/{request.id}/decision", json={"decision": "approved"}
+    )
+
+    assert response.status_code == 200
+    row = cast(
+        Approval,
+        await session.scalar(select(Approval).where(Approval.approval_request_id == request.id)),
+    )
+    stored_request = await stored(session, request.id)
+    await session.refresh(item)
+    assert row.decided_at is not None
+    assert stored_request.completed_at is not None
+    assert item.approved_at == stored_request.completed_at
+
+
+# --- The decision's body (DL-143; design-doc §6.2) ----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("body", "loc"),
+    [
+        ({"decision": "approved", "comment": "x" * 2001}, ["body", "comment"]),
+        ({"decision": "pending"}, ["body", "decision"]),
+        ({"decision": "replaced"}, ["body", "decision"]),
+    ],
+)
+async def test_a_decision_is_approved_or_rejected_with_a_comment_of_at_most_2000(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, body: dict[str, object], loc: list[str]
+) -> None:
+    """Bug: an approver sets their own row to `pending` again or to `replaced` (a system effect),
+    or an unbounded comment."""
+    vera = await member(t, "Vera Viewer")
+    await sign_in_as(client, vera)
+    item = await requirement(t)
+    request = await request_on(t, item, vera)
+    await ApprovalFactory.create_async(approval_request=request, approver=vera)
+
+    response = await client.post(f"/api/approval-requests/{request.id}/decision", json=body)
+
+    assert (response.status_code, response.json()["details"]["fields"][0]["loc"]) == (422, loc)
+    row = await session.scalar(select(Approval).where(Approval.approval_request_id == request.id))
+    assert cast(Approval, row).decision is ApprovalDecision.PENDING

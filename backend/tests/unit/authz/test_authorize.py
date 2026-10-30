@@ -46,6 +46,7 @@ from tests.support.authz import (
     WS2,
     WS_MEMBER_LEVEL,
     Comment,
+    actions_at,
     register_test_actions,
     rows,
 )
@@ -532,49 +533,12 @@ def test_allowed_actions_on_a_workspace_are_the_real_ones_allowed_sorted_by_name
 
 @pytest.mark.parametrize(
     ("target", "expected"),
-    [
-        (
-            ORG_TARGET,
-            [
-                "org.update",
-                "org.view",
-                "org_member.manage",
-                "org_member.manage_admins",
-                "project.assign_first_admin",
-                "project.create",
-            ],
-        ),
-        (
-            PROJECT_TARGET,
-            [
-                "approval_request.cancel",
-                "approval_request.create",
-                "project.archive",
-                "project.lower_restriction",
-                "project.raise_restriction",
-                "project.unarchive",
-                "project.update",
-                "project.view",
-                "project.view_access",
-                "project_member.manage",
-                "requirement.approve_manually",
-                "requirement.create",
-                "requirement.delete",
-                "requirement.lower_restriction",
-                "requirement.raise_restriction",
-                "requirement.reassign_reporter",
-                "requirement.restore",
-                "requirement.update",
-                "requirement.view",
-            ],
-        ),
-    ],
+    [(ORG_TARGET, actions_at(Level.ORGANIZATION)), (PROJECT_TARGET, actions_at(Level.PROJECT))],
 )
 def test_allowed_actions_lists_only_actions_at_the_targets_level(
     target: Target, expected: list[str]
 ) -> None:
-    """The real org-level actions are DL-56's two, DL-68's two, and DL-77's two; the real
-    project-level ones DL-77's four, DL-79's two, DL-82's two, and S2-C8's two; test-only ones
+    """Every real action at the target's level (the expected registry, TD-78); test-only ones
     are never listed."""
     assert allowed_actions(PERSONAS["system_admin"], target) == expected
 

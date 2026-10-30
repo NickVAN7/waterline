@@ -983,7 +983,9 @@ Entry format:
   granting it, written by hand), the seven tests deriving their lists from it, and a test that
   every registered action has a row; a test-only change, reviewed by `checkpoint-reviewer`, with
   the owner's approval of the spec-test changes
-- **Status:** open
+- **Status:** resolved in S2-C11 (`EXPECTED` and `project_actions` in `tests/support/authz.py`;
+  the seven tests derive their lists from it, and `test_actions.py` checks each registered action
+  against its row; owner-approved)
 
 ### TD-79: Each approver costs about eight queries
 - **Added:** S2-C10 (checkpoint-reviewer finding 5)

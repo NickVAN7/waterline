@@ -602,10 +602,10 @@ ERP modules (Slices 8+) get their own entries when they're designed.
   so each task's own delete permission is checked (design-doc §9: no indirect deletes).
 - **Callbacks instead of upward calls:** the approval service (in the lowest service layer) never imports the areas it approves.
   Each approvable area (requirement now; milestone gates and test runs later) registers a
-  handler (`on_approved`) with it, and the approval service calls the handler for the request's
-  entity type. There is no `on_rejected`: a rejection changes nothing on the entity
-  (design-doc §6.2). The requirement area calls the approval service directly (e.g.
-  to cancel pending requests on delete).
+  handler (`on_approved`) with it, and one for a rejection (`on_rejected`), for a rejected
+  re-open round (DL-195; any other rejection changes nothing, design-doc §6.2); the approval
+  service calls the handler for the request's entity type. The requirement area calls the
+  approval service directly (e.g. to cancel pending requests on delete).
 - **Email change handler:** the user service never imports `auth`. When an admin changes a
   user's email, the user service calls the `on_email_changed` handler `auth` registered, which
   deletes the user's sessions (design-doc §4).

@@ -4,6 +4,7 @@ that another row exists holds it until commit). Each sabotage-checked against th
 its lock or hold."""
 
 import uuid
+from typing import Literal
 
 import pytest
 from sqlalchemy import func, select
@@ -12,13 +13,21 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from app.authz.context import AuthzContext
 from app.core.db import SessionMaker
 from app.core.settings import Settings
-from app.enums import ActivityField, ApprovalRequestStatus, ProjectRole, RestrictionCategory
-from app.models.approval import ApprovalRequest
+from app.enums import (
+    ActivityField,
+    ApprovalDecision,
+    ApprovalRequestStatus,
+    DeletedChildren,
+    ProjectRole,
+    RestrictionCategory,
+)
+from app.models.approval import Approval, ApprovalRequest
 from app.models.audit import ActivityLog
 from app.models.project import Project
 from app.models.requirement import Requirement
 from app.models.user import User
-from app.schemas.approval import ApprovalRequestCreate
+from app.repositories.user import UserRepository
+from app.schemas.approval import ApprovalDecisionCreate, ApprovalRequestCreate
 from app.schemas.project import RestrictionUpdate
 from app.services.auth import AuthService
 from app.services.project import ProjectService
@@ -188,3 +197,105 @@ async def test_a_cancel_waiting_on_marking_export_controlled_is_a_404_to_an_inhe
     refused = await race(concurrency, concurrency_engine, first=mark, second=cancel)
 
     assert refused == ["NotFoundError"]
+
+
+@pytest.mark.concurrency(*APPROVAL_TABLES)
+async def test_the_last_two_approvals_at_once_complete_the_request_once(
+    concurrency: SessionMaker,
+) -> None:
+    """Testing strategy, "Concurrency": approval completion. The decision locks the requirement
+    and the request and reads the rows again, so the second sees the first's approval and
+    completes the request. Without the lock each sees the other's row still pending, and the
+    request never completes."""
+    ctx, requirement = await a_requirement(concurrency)
+    async with committing_factories(concurrency):
+        approvers = [await UserFactory.create_async(is_system_admin=True) for _ in range(2)]
+    async with concurrency() as session:
+        loaded = await session.get_one(Requirement, requirement.id)
+        body = ApprovalRequestCreate(approver_ids=[a.id for a in approvers])
+        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        await session.commit()
+
+    async def approve(session: AsyncSession, index: int) -> str:
+        approver = AuthzContext(user_id=approvers[index].id, is_system_admin=True)
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        decision = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        return await outcome(RequirementService(session).decide(approver, loaded, decision))
+
+    outcomes = await run_in_parallel(concurrency, 2, approve)
+
+    async with concurrency() as check:
+        status = await check.scalar(select(ApprovalRequest.status))
+        completions = await check.scalar(
+            select(func.count())
+            .select_from(ActivityLog)
+            .where(
+                ActivityLog.field_changed == ActivityField.STATUS,
+                ActivityLog.new_value == "approved",
+            )
+        )
+    # One `approved` on the request and one on the requirement (draft → approved).
+    assert (outcomes, status, completions) == (["ok", "ok"], ApprovalRequestStatus.APPROVED, 2)
+
+
+@pytest.mark.concurrency(*APPROVAL_TABLES)
+async def test_a_decision_waiting_on_its_requirements_delete_is_a_404(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """DL-228: a deleted requirement's request is a 404. The decision locks the requirement
+    before the request, as the delete does; without that lock it waits on the request the delete
+    cancelled and answers `not_pending` instead (and the two can lock in opposite orders)."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    request_id = await a_pending_request(concurrency, ctx, requirement, vera)
+    async with concurrency() as session:
+        vera_ctx = await UserRepository(session).authz_context(await session.get_one(User, vera.id))
+
+    async def delete(session: AsyncSession) -> object:
+        loaded = await session.get_one(Requirement, requirement.id)
+        return await RequirementService(session).delete(ctx, loaded, DeletedChildren.PROMOTE)
+
+    async def decide(session: AsyncSession) -> object:
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        return await RequirementService(session).decide(vera_ctx, loaded, body)
+
+    refused = await race(concurrency, concurrency_engine, first=delete, second=decide)
+
+    assert refused == ["NotFoundError"]
+
+
+@pytest.mark.concurrency(*APPROVAL_TABLES)
+async def test_one_approvers_two_decisions_at_once_keep_the_first(
+    concurrency: SessionMaker,
+) -> None:
+    """Decisions are final (DL-195): an approver's double submit, approve and reject at once.
+    The second waits on the locks and is refused under them (403, DL-234), so the first stands.
+    Without the check under the locks the second overwrites the first."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    other = await an_approver(concurrency, requirement)
+    async with concurrency() as session:
+        loaded = await session.get_one(Requirement, requirement.id)
+        body = ApprovalRequestCreate(approver_ids=[vera.id, other.id])
+        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        await session.commit()
+        vera_ctx = await UserRepository(session).authz_context(await session.get_one(User, vera.id))
+    decisions: list[Literal[ApprovalDecision.APPROVED, ApprovalDecision.REJECTED]] = [
+        ApprovalDecision.APPROVED,
+        ApprovalDecision.REJECTED,
+    ]
+
+    async def decide(session: AsyncSession, index: int) -> str:
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        body = ApprovalDecisionCreate(decision=decisions[index])
+        return await outcome(RequirementService(session).decide(vera_ctx, loaded, body))
+
+    outcomes = await run_in_parallel(concurrency, 2, decide)
+
+    async with concurrency() as check:
+        stored = await check.scalar(
+            select(Approval.decision).where(Approval.approver_id == vera.id)
+        )
+    assert sorted(outcomes) == ["ForbiddenError", "ok"]
+    assert stored is decisions[outcomes.index("ok")]

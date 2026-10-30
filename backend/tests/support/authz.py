@@ -1,6 +1,8 @@
 """Test-only helpers for the authorization core (S1-C7; DL-16, DL-44).
 
 - A fixed tenancy layout and one `AuthzContext` per persona, for the pure unit tests.
+- The expected registry (`EXPECTED`, TD-78): every real action, written by hand, and the
+  project-level actions each holder gets (`project_actions`), so a new action is one row.
 - Test-only actions at org and project level (DL-44: each area registers its own real
   actions), registered in `REGISTRY` by each test that needs them.
 - A test-only router over real projects, orgs, and workspaces, using the load-and-authorize
@@ -22,7 +24,7 @@ from app.authz.context import AuthzContext, ProjectAccess
 from app.authz.target import Target, org_target, project_target, workspace_target
 from app.core.db import SessionDep
 from app.core.security import generate_token, hash_token
-from app.enums import OrgRole, ProjectModule, ProjectRole, WorkspaceRole
+from app.enums import AccessKind, OrgRole, ProjectModule, ProjectRole, WorkspaceRole
 from app.models.org import Organization
 from app.models.project import Project
 from app.models.user import User
@@ -99,6 +101,122 @@ PERSONAS: dict[str, AuthzContext] = {
     ),
     "nobody": AuthzContext(user_id=_user(14)),
 }
+
+
+# --- The expected registry (TD-78) ---------------------------------------------------------------
+# Written by hand from design-doc §3.1 and §5, the S2-plan's "Actions per row", and the decision
+# log, never from `REGISTRY`: the spec tests compare the registry and `allowed_actions` with it,
+# so a wrongly granted or wrongly marked action fails them. A new action is one row here.
+
+C, M = AccessKind.CONTENT, AccessKind.MANAGEMENT
+
+
+@dataclass(frozen=True)
+class Expected:
+    """How a real action is granted, as far as the spec tests check it.
+
+    `project_role`: the lowest explicit project role granting a project-level action (inherited
+    project admins, i.e. system, workspace, and org admins, are granted every project-level
+    action); None for one only inherited admins get, or for a personal action.
+    `explicit_when_export_controlled`: on an export-controlled project only the project role
+    grants it (DL-82). `personal`: a personal action (design-doc §5): no role or admin level
+    grants it, only its relationship to the entity, so it's never granted on a bare target."""
+
+    level: Level
+    access: AccessKind = M
+    project_role: ProjectRole | None = None
+    mutation: bool = True
+    archive_exempt: bool = False
+    explicit_when_export_controlled: bool = False
+    personal: bool = False
+
+
+_W, _O, _P, _U = Level.WORKSPACE, Level.ORGANIZATION, Level.PROJECT, Level.USER
+_ADMIN, _MEMBER, _VIEWER = ProjectRole.ADMIN, ProjectRole.MEMBER, ProjectRole.VIEWER
+
+EXPECTED: dict[str, Expected] = {
+    # Workspace (DL-45, DL-56, DL-68).
+    "workspace.view": Expected(_W, mutation=False),
+    "workspace.update": Expected(_W),
+    "workspace_staff.manage": Expected(_W),
+    "workspace_staff.manage_admins": Expected(_W),
+    "org.create": Expected(_W),
+    "user.check": Expected(_W, mutation=False),
+    # Organization (DL-56, DL-77).
+    "org.view": Expected(_O, mutation=False),
+    "org.update": Expected(_O),
+    "org_member.manage": Expected(_O),
+    "org_member.manage_admins": Expected(_O),
+    "project.create": Expected(_O),
+    "project.assign_first_admin": Expected(_O),
+    # A user, at its own level (DL-73).
+    "user.manage": Expected(_U),
+    "user.view_access": Expected(_U, mutation=False),
+    # A project: management (DL-77, DL-79, DL-82).
+    "project.view": Expected(_P, project_role=_VIEWER, mutation=False),
+    "project.update": Expected(_P, project_role=_ADMIN),
+    "project.archive": Expected(_P),
+    "project.unarchive": Expected(_P, archive_exempt=True),
+    "project_member.manage": Expected(_P, project_role=_ADMIN),
+    "project.view_access": Expected(_P, project_role=_ADMIN, mutation=False),
+    "project.raise_restriction": Expected(_P, project_role=_ADMIN),
+    "project.lower_restriction": Expected(
+        _P, project_role=_ADMIN, explicit_when_export_controlled=True
+    ),
+    # A project: content (S2-plan, "Actions per row"; DL-212, DL-219).
+    "requirement.view": Expected(_P, C, _VIEWER, mutation=False),
+    "requirement.create": Expected(_P, C, _MEMBER),
+    "requirement.update": Expected(_P, C, _MEMBER),
+    "requirement.reassign_reporter": Expected(_P, C, _ADMIN),
+    "requirement.raise_restriction": Expected(_P, C, _MEMBER),
+    "requirement.lower_restriction": Expected(_P, C, _ADMIN, explicit_when_export_controlled=True),
+    "requirement.approve_manually": Expected(_P, C, _ADMIN),
+    "requirement.delete": Expected(_P, C, _ADMIN),
+    "requirement.restore": Expected(_P, C, _ADMIN),
+    # Approval requests (§6.2, "Who does what").
+    "approval_request.create": Expected(_P, C, _ADMIN),
+    "approval_request.cancel": Expected(_P, C, _ADMIN),
+    # Deciding one's own row: personal, no role grants it (§5, "Personal actions"; DL-234).
+    "approval.decide": Expected(_P, C, personal=True),
+}
+
+_RANK = {_VIEWER: 1, _MEMBER: 2, _ADMIN: 3}
+
+
+def project_actions(
+    role: ProjectRole | None = None,
+    *,
+    inherited: bool = False,
+    export_controlled: bool = False,
+    archived: bool = False,
+) -> list[str]:
+    """The project-level actions on a bare project target, in `allowed_actions`' name order, for
+    someone holding the explicit project `role`, inherited project admin, or both. Behind the
+    export-control gate inherited admin grants content only with a membership, and never an
+    action only the project role grants there (§3.1, DL-82); an archived project keeps reads and
+    the exempt (§5 step 1). Targeted rules (a reporter's) and personal actions need an entity,
+    so none apply."""
+
+    def granted(e: Expected) -> bool:
+        by_role = (
+            role is not None and e.project_role is not None and _RANK[role] >= _RANK[e.project_role]
+        )
+        gated = export_controlled and (
+            e.explicit_when_export_controlled or (role is None and e.access is C)
+        )
+        return not e.personal and (by_role or (inherited and not gated))
+
+    return sorted(
+        action
+        for action, e in EXPECTED.items()
+        if e.level is _P and granted(e) and not (archived and e.mutation and not e.archive_exempt)
+    )
+
+
+def actions_at(level: Level) -> list[str]:
+    """Every real action at `level` but the personal ones, in name order: what a system admin gets
+    on a target there (§5: system admins get anything except personal actions)."""
+    return sorted(action for action, e in EXPECTED.items() if e.level is level and not e.personal)
 
 
 def rows(allowed: set[str]) -> list[tuple[str, bool]]:

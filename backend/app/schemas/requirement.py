@@ -57,6 +57,13 @@ class RequirementRestrictionUpdate(BaseModel):
     categories: list[RestrictionCategory]
 
 
+class RequirementApprove(BaseModel):
+    """Approve by hand the revision the admin saw: `version` the one they read (a stale one is a
+    409, DL-169)."""
+
+    version: int
+
+
 class RequirementMove(BaseModel):
     """`POST …/requirements/{number}/move`: under `parent_id` (null: the top level), just after
     the sibling `after_id` or just before `before_id`, or with neither at the bottom of the

@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C10 (Approval requests) built; next is S2-C11 (history: `docs/reviews/`).
+> **Status:** S2-C11 (Decisions & completion) built; next is S2-C12 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -328,6 +328,12 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
   new level already set) and the actor. Each item area registers one that lifts its live rows
   stored below the project's level (`RequirementService.lift_to_project`, DL-208 to DL-210), so a
   lower lifts nothing.
+- **An approval request completing or rejected** calls the handlers registered for its entity
+  type with `register_on_approved()` and `register_on_rejected()` (`app/services/approval.py`),
+  each given the request and the deciding user. An approvable area registers both (the
+  requirement area: `RequirementService.complete_approval`, which records the approval, and
+  `reject_approval`, which moves a rejected re-open round back to `draft`, DL-195); the decision
+  holds the entity's lock.
 - **The user check** (`GET /api/workspaces/{id}/user-check`, DL-66) answers one of `email`,
   `username`, or `name`; `suggest_username()` (`app/rules/identifiers.py`) builds the name's
   username, and `UserService.check` adds `-2`, `-3`, … while it's taken.

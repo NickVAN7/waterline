@@ -26,7 +26,7 @@ from tests.factories.org import OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.requirement import RequirementFactory
 from tests.factories.workspace import WorkspaceFactory
-from tests.support.authz import Tenancy, persona_user, sign_in_as
+from tests.support.authz import Tenancy, persona_user, project_actions, sign_in_as
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
 
@@ -135,15 +135,7 @@ async def test_an_inherited_admin_with_an_explicit_membership_reads_the_history(
 
 # --- The project read (project.view, management) -----------------------------------------------
 
-INHERITED_ON_AN_EC_PROJECT = [
-    "project.archive",
-    "project.raise_restriction",
-    "project.unarchive",
-    "project.update",
-    "project.view",
-    "project.view_access",
-    "project_member.manage",
-]
+INHERITED_ON_AN_EC_PROJECT = project_actions(inherited=True, export_controlled=True)
 
 
 @pytest.mark.parametrize(
@@ -154,39 +146,9 @@ INHERITED_ON_AN_EC_PROJECT = [
         ("workspace_admin", INHERITED_ON_AN_EC_PROJECT),
         ("org_owner", INHERITED_ON_AN_EC_PROJECT),
         ("org_admin", INHERITED_ON_AN_EC_PROJECT),
-        (
-            "project_admin",
-            [
-                "approval_request.cancel",
-                "approval_request.create",
-                "project.lower_restriction",
-                "project.raise_restriction",
-                "project.update",
-                "project.view",
-                "project.view_access",
-                "project_member.manage",
-                "requirement.approve_manually",
-                "requirement.create",
-                "requirement.delete",
-                "requirement.lower_restriction",
-                "requirement.raise_restriction",
-                "requirement.reassign_reporter",
-                "requirement.restore",
-                "requirement.update",
-                "requirement.view",
-            ],
-        ),
-        (
-            "project_member",
-            [
-                "project.view",
-                "requirement.create",
-                "requirement.raise_restriction",
-                "requirement.update",
-                "requirement.view",
-            ],
-        ),
-        ("project_viewer", ["project.view", "requirement.view"]),
+        ("project_admin", project_actions(ProjectRole.ADMIN, export_controlled=True)),
+        ("project_member", project_actions(ProjectRole.MEMBER, export_controlled=True)),
+        ("project_viewer", project_actions(ProjectRole.VIEWER, export_controlled=True)),
     ],
 )
 async def test_an_ec_projects_actions_carry_content_only_for_explicit_members(
@@ -215,19 +177,9 @@ async def test_an_inherited_admin_with_a_viewer_membership_gets_content_actions_
     response = await client.get("/api/projects/PMT")
 
     assert response.status_code == 200
-    assert response.json()["allowed_actions"] == [
-        "approval_request.cancel",
-        "approval_request.create",
-        *INHERITED_ON_AN_EC_PROJECT,
-        "requirement.approve_manually",
-        "requirement.create",
-        "requirement.delete",
-        "requirement.raise_restriction",
-        "requirement.reassign_reporter",
-        "requirement.restore",
-        "requirement.update",
-        "requirement.view",
-    ]
+    assert response.json()["allowed_actions"] == project_actions(
+        ProjectRole.VIEWER, inherited=True, export_controlled=True
+    )
 
 
 @pytest.mark.parametrize("who", ["system_admin", "workspace_admin", "org_admin"])
@@ -240,8 +192,6 @@ async def test_an_archived_ec_projects_actions_for_an_inherited_admin_carry_no_c
     response = await client.get("/api/projects/PMT")
 
     assert response.status_code == 200
-    assert response.json()["allowed_actions"] == [
-        "project.unarchive",
-        "project.view",
-        "project.view_access",
-    ]
+    assert response.json()["allowed_actions"] == project_actions(
+        inherited=True, export_controlled=True, archived=True
+    )

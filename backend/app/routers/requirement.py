@@ -14,12 +14,19 @@ from app.routers.deps import (
     AuthzContextDep,
     authorized,
     load_approval_request,
+    load_approval_request_to_decide,
     load_deleted_requirement,
     load_project,
     load_requirement,
 )
-from app.schemas.approval import ApprovalRequestCreate, ApprovalRequestItem, ApprovalRequestRead
+from app.schemas.approval import (
+    ApprovalDecisionCreate,
+    ApprovalRequestCreate,
+    ApprovalRequestItem,
+    ApprovalRequestRead,
+)
 from app.schemas.requirement import (
+    RequirementApprove,
     RequirementCreate,
     RequirementMove,
     RequirementRead,
@@ -66,6 +73,13 @@ Requesting = Annotated[
 ]
 RequestViewed = Annotated[
     ApprovalRequestEntity, Depends(authorized(load_approval_request, Action.REQUIREMENT_VIEW))
+]
+Deciding = Annotated[
+    ApprovalRequestEntity,
+    Depends(authorized(load_approval_request_to_decide, Action.APPROVAL_DECIDE)),
+]
+ApprovedByHand = Annotated[
+    RequirementEntity, Depends(authorized(load_requirement, Action.REQUIREMENT_APPROVE_MANUALLY))
 ]
 RequestCancelled = Annotated[
     ApprovalRequestEntity,
@@ -225,3 +239,22 @@ async def cancel_approval_request(
     """Cancel the pending request; 422 on `id` (`not_pending`) for one already decided or
     cancelled."""
     return await RequirementService(session).cancel_approval_request(ctx, request)
+
+
+@router.post("/approval-requests/{request_id}/decision", responses=ERRORS)
+async def decide_approval_request(
+    request: Deciding, body: ApprovalDecisionCreate, ctx: AuthzContextDep, session: SessionDep
+) -> ApprovalRequestRead:
+    """Approve or reject on your own row, finally (403 once it's decided); 422 on `id`
+    (`not_pending`) for a request already completed or cancelled. The last approval completes
+    the request; any rejection rejects it."""
+    return await RequirementService(session).decide(ctx, request, body)
+
+
+@router.post("/projects/{key}/requirements/{number}/approve", responses=ERRORS)
+async def approve_requirement(
+    requirement: ApprovedByHand, body: RequirementApprove, ctx: AuthzContextDep, session: SessionDep
+) -> RequirementRead:
+    """Approve the requirement's current revision by hand; a pending approval request on it is
+    cancelled. 409 on a stale `version`."""
+    return await RequirementService(session).approve(ctx, requirement, body)

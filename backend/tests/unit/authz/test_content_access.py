@@ -34,7 +34,18 @@ from app.authz.context import AuthzContext, ProjectAccess
 from app.authz.target import Target
 from app.core.errors import ForbiddenError, NotFoundError
 from app.enums import AccessKind, OrgRole, ProjectRole, WorkspaceRole
-from tests.support.authz import ORG, ORG2, PERSONAS, PROJ, PROJ2, WS, WS2, Comment, is_author
+from tests.support.authz import (
+    ORG,
+    ORG2,
+    PERSONAS,
+    PROJ,
+    PROJ2,
+    WS,
+    WS2,
+    Comment,
+    is_author,
+    project_actions,
+)
 
 pytestmark = pytest.mark.security
 
@@ -335,15 +346,7 @@ def test_ensure_lets_an_inherited_admin_with_an_explicit_membership_read_content
 
 # --- allowed_actions on an export-controlled project (the project read) ------------------------
 
-INHERITED_ON_AN_EC_PROJECT = [
-    "project.archive",
-    "project.raise_restriction",
-    "project.unarchive",
-    "project.update",
-    "project.view",
-    "project.view_access",
-    "project_member.manage",
-]
+INHERITED_ON_AN_EC_PROJECT = project_actions(inherited=True, export_controlled=True)
 
 
 @pytest.mark.parametrize("persona", sorted(INHERITED_ADMINS))
@@ -358,39 +361,9 @@ def test_an_inherited_admins_allowed_actions_on_an_ec_project_are_management_onl
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        (
-            "project_admin",
-            [
-                "approval_request.cancel",
-                "approval_request.create",
-                "project.lower_restriction",
-                "project.raise_restriction",
-                "project.update",
-                "project.view",
-                "project.view_access",
-                "project_member.manage",
-                "requirement.approve_manually",
-                "requirement.create",
-                "requirement.delete",
-                "requirement.lower_restriction",
-                "requirement.raise_restriction",
-                "requirement.reassign_reporter",
-                "requirement.restore",
-                "requirement.update",
-                "requirement.view",
-            ],
-        ),
-        (
-            "project_member",
-            [
-                "project.view",
-                "requirement.create",
-                "requirement.raise_restriction",
-                "requirement.update",
-                "requirement.view",
-            ],
-        ),
-        ("project_viewer", ["project.view", "requirement.view"]),
+        ("project_admin", project_actions(ProjectRole.ADMIN, export_controlled=True)),
+        ("project_member", project_actions(ProjectRole.MEMBER, export_controlled=True)),
+        ("project_viewer", project_actions(ProjectRole.VIEWER, export_controlled=True)),
     ],
 )
 def test_an_explicit_members_allowed_actions_on_an_ec_project_keep_content(
@@ -404,36 +377,18 @@ def test_an_inherited_admin_with_a_viewer_membership_keeps_content_in_allowed_ac
     persona: str,
 ) -> None:
     """Content back with the membership; lowering still needs an explicit admin (DL-82)."""
-    assert allowed_actions(_with_viewer_membership(persona), EC) == [
-        "approval_request.cancel",
-        "approval_request.create",
-        "project.archive",
-        "project.raise_restriction",
-        "project.unarchive",
-        "project.update",
-        "project.view",
-        "project.view_access",
-        "project_member.manage",
-        "requirement.approve_manually",
-        "requirement.create",
-        "requirement.delete",
-        "requirement.raise_restriction",
-        "requirement.reassign_reporter",
-        "requirement.restore",
-        "requirement.update",
-        "requirement.view",
-    ]
+    assert allowed_actions(_with_viewer_membership(persona), EC) == project_actions(
+        ProjectRole.VIEWER, inherited=True, export_controlled=True
+    )
 
 
 @pytest.mark.parametrize("persona", ["system_admin", "workspace_admin", "org_admin"])
 def test_an_archived_ec_projects_allowed_actions_for_an_inherited_admin_carry_no_content(
     persona: str,
 ) -> None:
-    assert allowed_actions(PERSONAS[persona], ARCHIVED_EC) == [
-        "project.unarchive",
-        "project.view",
-        "project.view_access",
-    ]
+    assert allowed_actions(PERSONAS[persona], ARCHIVED_EC) == project_actions(
+        inherited=True, export_controlled=True, archived=True
+    )
 
 
 # --- An independent oracle over many contexts and specs (Hypothesis) ---------------------------

@@ -160,6 +160,12 @@ async def load_approval_request(
     return await RequirementService(session).load_approval_request(request_id)
 
 
+async def load_approval_request_to_decide(
+    request_id: uuid.UUID, session: SessionDep
+) -> tuple[ApprovalRequestEntity, Target] | None:
+    return await RequirementService(session).load_approval_request_to_decide(request_id)
+
+
 async def load_deleted_requirement(
     key: str, number: int, session: SessionDep
 ) -> tuple[RequirementEntity, Target] | None:

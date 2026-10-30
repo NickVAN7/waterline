@@ -12,7 +12,8 @@ from enum import StrEnum
 
 from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target
-from app.enums import AccessKind, OrgRole, ProjectRole, WorkspaceRole
+from app.enums import AccessKind, ApprovalDecision, OrgRole, ProjectRole, WorkspaceRole
+from app.models.approval import ApprovalRequest
 from app.models.requirement import Requirement
 from app.rules.account_rank import Account, can_manage_account
 
@@ -100,6 +101,7 @@ class Action(StrEnum):
     REQUIREMENT_RESTORE = "requirement.restore"
     APPROVAL_REQUEST_CREATE = "approval_request.create"
     APPROVAL_REQUEST_CANCEL = "approval_request.cancel"
+    APPROVAL_DECIDE = "approval.decide"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -140,6 +142,15 @@ def _reporter_while_never_approved(ctx: AuthzContext, target: Target) -> bool:
         and target.entity.approved_revision_id is None
         and access is not None
         and access.role in (ProjectRole.MEMBER, ProjectRole.ADMIN)
+    )
+
+
+def _named_approver_still_pending(user_id: uuid.UUID, entity: object) -> bool:
+    """`approval.decide`'s relationship (design-doc §5, "Personal actions"; DL-234): the user's
+    own row on the request is still pending, whatever the request's status."""
+    return isinstance(entity, ApprovalRequest) and any(
+        row.approver_id == user_id and row.decision is ApprovalDecision.PENDING
+        for row in entity.approvals
     )
 
 
@@ -366,4 +377,6 @@ REGISTRY: dict[str, ActionSpec] = {
         org_role=OrgRole.ADMIN,
         project_role=ProjectRole.ADMIN,
     ),
+    # Personal: only the named approver's own pending row grants it, no role (§5).
+    Action.APPROVAL_DECIDE: ActionSpec(Level.PROJECT, relationship=_named_approver_still_pending),
 }

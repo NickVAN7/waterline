@@ -31,6 +31,7 @@ from app.enums import AccessKind, OrgRole, ProjectRole, ProjectType, WorkspaceRo
 from app.models.project import Project
 from tests.support.authz import (
     ARCHIVED_PROJECT_TARGET,
+    EXPECTED,
     ORG,
     PERSONAS,
     PROJ,
@@ -323,26 +324,11 @@ def test_a_project_target_carries_export_controlled_beside_its_other_facts() -> 
 # --- The registry's content/management marking (DL-82; §5) --------------------------------------
 
 
-def test_every_action_so_far_is_marked_management_but_the_requirement_actions() -> None:
-    """DL-82: "The registry marks every action content or management; every action so far is
-    management"; S2-C3 adds the first content action, `requirement.view`, S2-C5
-    `requirement.create`, S2-C6 the update, reporter, restriction, and approve-by-hand
-    actions (S2-plan, "Actions per row"; DL-212), S2-C8 delete and restore, and S2-C10 the
-    approval request actions."""
+def test_the_content_actions_are_exactly_the_expected_ones() -> None:
+    """DL-82: "The registry marks every action content or management"; the content ones are the
+    expected registry's (tests/support/authz.py, TD-78; S2-plan, "Actions per row")."""
     assert {
         action: REGISTRY[action].access
         for action in Action
         if REGISTRY[action].access is not AccessKind.MANAGEMENT
-    } == {
-        Action.REQUIREMENT_VIEW: AccessKind.CONTENT,
-        Action.REQUIREMENT_CREATE: AccessKind.CONTENT,
-        Action.REQUIREMENT_UPDATE: AccessKind.CONTENT,
-        Action.REQUIREMENT_REASSIGN_REPORTER: AccessKind.CONTENT,
-        Action.REQUIREMENT_RAISE_RESTRICTION: AccessKind.CONTENT,
-        Action.REQUIREMENT_LOWER_RESTRICTION: AccessKind.CONTENT,
-        Action.REQUIREMENT_APPROVE_MANUALLY: AccessKind.CONTENT,
-        Action.REQUIREMENT_DELETE: AccessKind.CONTENT,
-        Action.REQUIREMENT_RESTORE: AccessKind.CONTENT,
-        Action.APPROVAL_REQUEST_CREATE: AccessKind.CONTENT,
-        Action.APPROVAL_REQUEST_CANCEL: AccessKind.CONTENT,
-    }
+    } == {action: e.access for action, e in EXPECTED.items() if e.access is AccessKind.CONTENT}

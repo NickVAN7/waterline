@@ -1,8 +1,9 @@
 """Approval requests (design-doc §6.2; build plan, S2-C10 and S2-C11, which add the rest)."""
 
 import uuid
-from collections.abc import Collection
+from collections.abc import Awaitable, Callable, Collection
 from datetime import UTC, datetime
+from typing import cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +19,22 @@ from app.enums import (
 )
 from app.models.approval import Approval, ApprovalRequest
 from app.repositories.approval import ApprovalRepository
+from app.rules.approval_policy import request_outcome
+
+# What an approvable area does when a request on its entity completes or is rejected (build plan,
+# "Callbacks instead of upward calls"): `(session, request, actor_id)`, the actor the user whose
+# decision did it.
+type RequestHandler = Callable[[AsyncSession, ApprovalRequest, uuid.UUID], Awaitable[None]]
+_ON_APPROVED: dict[ApprovalEntityType, RequestHandler] = {}
+_ON_REJECTED: dict[ApprovalEntityType, RequestHandler] = {}
+
+
+def register_on_approved(entity_type: ApprovalEntityType, handler: RequestHandler) -> None:
+    _ON_APPROVED[entity_type] = handler
+
+
+def register_on_rejected(entity_type: ApprovalEntityType, handler: RequestHandler) -> None:
+    _ON_REJECTED[entity_type] = handler
 
 
 class ApprovalService:
@@ -73,6 +90,38 @@ class ApprovalService:
         )
         return request
 
+    async def decide(
+        self,
+        request: ApprovalRequest,
+        actor_id: uuid.UUID,
+        decision: ApprovalDecision,
+        comment: str | None,
+    ) -> None:
+        """Record the actor's decision on their own row; the policy then completes or rejects the
+        request (design-doc §6.2), logged, and the entity's handler runs. The caller holds the
+        entity's lock, has locked the request (`lock`), and has authorized the actor's pending
+        row (DL-234); 422 `not_pending` for a request that isn't pending (DL-230)."""
+        if request.status is not ApprovalRequestStatus.PENDING:
+            raise ValidationFailedError.on(
+                ("path", "id"), "This approval request isn't pending.", "not_pending"
+            )
+        now = datetime.now(UTC)
+        row = next(r for r in request.approvals if r.approver_id == actor_id)
+        row.decision, row.comment, row.decided_at = decision, comment, now
+        outcome = request_outcome([r.decision for r in request.approvals])
+        if outcome is not ApprovalRequestStatus.PENDING:
+            request.status, request.completed_at = outcome, now
+            self._log_status(request, actor_id, outcome)
+            handlers = _ON_APPROVED if outcome is ApprovalRequestStatus.APPROVED else _ON_REJECTED
+            await handlers[request.entity_type](self.session, request, actor_id)
+        await self.session.flush()
+
+    async def lock(self, request: ApprovalRequest) -> ApprovalRequest:
+        """The request, locked and read again with its rows (two decisions take turns)."""
+        await self.repository.lock(request)
+        # The row is already in the session, so this only reloads it: never None.
+        return cast(ApprovalRequest, await self.repository.get(request.id))
+
     async def cancel(self, request: ApprovalRequest, actor_id: uuid.UUID) -> None:
         """Cancel a pending request, logged; 422 `not_pending` for one decided or cancelled,
         read under its lock (DL-228)."""
@@ -105,6 +154,11 @@ class ApprovalService:
     def _cancel(self, request: ApprovalRequest, actor_id: uuid.UUID) -> None:
         request.status = ApprovalRequestStatus.CANCELLED
         request.completed_at = datetime.now(UTC)
+        self._log_status(request, actor_id, ApprovalRequestStatus.CANCELLED)
+
+    def _log_status(
+        self, request: ApprovalRequest, actor_id: uuid.UUID, new: ApprovalRequestStatus
+    ) -> None:
         log_change(
             self.session,
             project_id=request.project_id,
@@ -114,5 +168,5 @@ class ApprovalService:
             changed_by=actor_id,
             field=ActivityField.STATUS,
             old=ApprovalRequestStatus.PENDING,
-            new=ApprovalRequestStatus.CANCELLED,
+            new=new,
         )

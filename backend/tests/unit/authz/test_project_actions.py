@@ -32,6 +32,7 @@ from tests.support.authz import (
     PROJ2,
     PROJECT_TARGET,
     WS,
+    project_actions,
     rows,
 )
 
@@ -230,70 +231,18 @@ def test_a_project_action_is_404_to_who_cannot_see_the_project(persona: str, act
 
 # --- allowed_actions on a project (the project read, DL-76) -------------------------------------
 
-INHERITED_ON_A_LIVE_PROJECT = [
-    "approval_request.cancel",
-    "approval_request.create",
-    "project.archive",
-    "project.lower_restriction",
-    "project.raise_restriction",
-    "project.unarchive",
-    "project.update",
-    "project.view",
-    "project.view_access",
-    "project_member.manage",
-    "requirement.approve_manually",
-    "requirement.create",
-    "requirement.delete",
-    "requirement.lower_restriction",
-    "requirement.raise_restriction",
-    "requirement.reassign_reporter",
-    "requirement.restore",
-    "requirement.update",
-    "requirement.view",
-]
-
 
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_admin", INHERITED_ON_A_LIVE_PROJECT),
-        (
-            "project_admin",
-            [
-                "approval_request.cancel",
-                "approval_request.create",
-                "project.lower_restriction",
-                "project.raise_restriction",
-                "project.update",
-                "project.view",
-                "project.view_access",
-                "project_member.manage",
-                "requirement.approve_manually",
-                "requirement.create",
-                "requirement.delete",
-                "requirement.lower_restriction",
-                "requirement.raise_restriction",
-                "requirement.reassign_reporter",
-                "requirement.restore",
-                "requirement.update",
-                "requirement.view",
-            ],
-        ),
-        (
-            "project_member",
-            [
-                "project.view",
-                "requirement.create",
-                "requirement.raise_restriction",
-                "requirement.update",
-                "requirement.view",
-            ],
-        ),
-        ("project_viewer", ["project.view", "requirement.view"]),
+        ("system_admin", project_actions(inherited=True)),
+        ("workspace_owner", project_actions(inherited=True)),
+        ("workspace_admin", project_actions(inherited=True)),
+        ("org_owner", project_actions(inherited=True)),
+        ("org_admin", project_actions(inherited=True)),
+        ("project_admin", project_actions(ProjectRole.ADMIN)),
+        ("project_member", project_actions(ProjectRole.MEMBER)),
+        ("project_viewer", project_actions(ProjectRole.VIEWER)),
         ("org_member", []),
         ("other_project_admin", []),
         ("nobody", []),
