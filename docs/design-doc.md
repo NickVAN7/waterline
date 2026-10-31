@@ -1188,7 +1188,8 @@ requirement approval.
   - **Cross-column drop** on a board changes status and rank in one request. The status change
     goes through the transition rules in `authorize()` (§5); if denied, the card snaps back with
     a short message and nothing is saved.
-- **Requirement tree:** drag reorders among siblings only. Changing a requirement's parent uses a
+- **Requirement tree:** no drag (PrimeVue TreeTable, DL-174): its menu (`MoveToMenu`) reorders
+  among siblings with the non-drag set below (DL-243). Changing a requirement's parent uses a
   "Move to…" action, which runs the same-project and cycle checks and shows the result clearly.
   Parent changes are logged (§10).
 - **Sprint planning** (`sprints` module): the backlog shows sprint sections; dragging a task into

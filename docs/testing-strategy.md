@@ -146,7 +146,9 @@ tested, what each kind of test is for, and the gates every change passes.
   - for each SVAR widget wrapper (from the first checkpoint that ships a board or an editable
     grid; DL-64) and for `RequirementsTree`, the TreeTable wrapper (DL-174): a theme audit in both themes and in the interactive states that fails on any
     color that is not one of our tokens, and keyboard and move/cancel specs that drive the
-    non-drag alternative with the server mocked to allow and to deny (ui-design-guide §7.1, §9);
+    non-drag alternative with the server mocked to allow and to deny (ui-design-guide §7.1, §9;
+    `RequirementsTree`'s keyboard and move specs are component specs, and its theme audit runs
+    end to end with the requirements page from S2-C17, DL-243);
   - a manual keyboard and screen-reader pass on each slice's new screens at slice
     verification, since automated checks find only part of the problems.
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):

@@ -3072,3 +3072,19 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   (S2-C21b)
 - **Source:** owner, Oct 31, 2026 (DC-2026-10-31, docs-consistency decision 3: the device only,
   "keep it simple for now")
+
+### DL-243: The tree's move menu, and where its specs run
+- **Date:** 2026-10-31
+- **Decision:** S2-C15 builds `MoveToMenu`, outside the widget, with Move up and Move down on
+  the selected row, the server deciding each; S2-C17 adds Move to top, Move to bottom, Move
+  after…, and "Move to…", and the board reuses it in Slice 3. The requirement tree has no drag
+  (TreeTable, DL-174), so the menu is its only way to reorder, with the full set every drag's
+  alternative offers. `RequirementsTree`'s keyboard, axe, and move/cancel specs are component
+  specs, with no end-to-end copy; its theme audit, which needs a browser, is an end-to-end spec
+  in both themes in S2-C17, the first page that renders the tree.
+- **Supersedes:** design-doc §6 in part (the requirement tree reordered by drag)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C15, S2-C17); design-doc §6 ("Manual ordering"); ui-design-guide
+  §9 (the keyboard and move/cancel row); testing strategy (the wrapper specs)
+- **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start; DC-2026-10-31c, docs-consistency
+  decisions 1 to 3)
