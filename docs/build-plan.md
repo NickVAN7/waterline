@@ -1600,7 +1600,7 @@ before the features.
 | 20 | Approvals UI *(provisional)* | The request dialog (approver picker), re-open on an approved requirement (DL-195), the decide panel (rejecting prompts for a comment and asks to confirm without one, DL-196), cancel, approve by hand, the flagged-request state, My work's approvals section |
 | 21 | Delete dialog & trash *(provisional)* | The delete dialog (children promote or delete, the pending-request note), the Trash page, the last item of the project navigation (DL-202), and restore (DL-146) |
 | 21a | Show deactivated *(provisional)* | DL-200, DL-238: the built Slice 1 lists (org members, project members, workspace staff, workspace users) list active people only, with a "Show deactivated" filter for that scope's admins (backend, with API tests and `wl gen-client`), and the built pickers (add member, lead, first admin) leave deactivated people out; the badge and Status column in the filtered view; the user guide's lists; supersedes DL-102 and DL-113 in part, as DL-200 records |
-| 21b | Session list *(provisional)* | DL-197, DL-238: Account settings lists the user's active sessions (this one marked) and signs out the others; `user_agent` and `ip_address` on `session` (design-doc §4; the migration, the endpoints, and their actions specified at the re-cut, DL-139) |
+| 21b | Session list *(provisional)* | DL-197, DL-238: Account settings lists the user's active sessions (this one marked) and signs out the others, each shown by its device and browser, sign-in time, and last activity; `user_agent` on `session`, no IP address or location (design-doc §4, DL-242; the migration, the endpoints, and their actions specified at the re-cut, DL-139) |
 | 21c | Favorite projects *(provisional)* | DL-197, DL-238: a star on a project row of My work keeps it at the top, per user (design-doc §11); the favorite table, its endpoints, and its actions specified at the re-cut (DL-139) |
 | 21d | Documentation page *(provisional)* | DL-197, DL-238: the user menu's Documentation item opens `/docs`, the user guide rendered through `MarkdownView` (S2-C16); `docs` joins the reserved slugs (design-doc §3, `rules/identifiers.py`, test-first), with what an existing org already using that slug gets decided at the re-cut (DL-139) |
 | 22 | Slice verification | As S1-C17, plus `simplicity-auditor` after `repo-auditor` (DL-138); "Done when" walked through; a manual keyboard and screen-reader pass; the tech-debt review (TD-19, TD-31, TD-42, TD-61, TD-63, TD-64, TD-66); the retro, including whether `repo-auditor` keeps its lean category (DL-166), and S2-C0a's findings 1 (the git guard against Claude Code permission rules, after a trial in a scratch session) and 3 (one list of agents, skills, and hooks) (DL-171) |
@@ -1617,12 +1617,12 @@ before the features.
 
 Checkpoints 0d, 2, 4, 5, 6, 8, 10, 11, 12, 13, and 21d add or change `app/rules/` or `app/authz/`
 code, so each starts with `spec-test-writer` (DL-15); each row confirms it against its content
-when it starts. The `security-reviewer` runs on every checkpoint from 0c to 14, and on 16, 21a, and 21b. The
+when it starts. The `security-reviewer` runs on every checkpoint from 0c to 14, and on 16 and 21a to 21d (DL-241). The
 `ui-reviewer` runs whenever a diff touches `frontend/src/` or `frontend/e2e/` (DL-62).
 
 The sections below describe the content; the table above is the order of work. The plan's
 fixes, decisions, conventions, each row's actions, threat-model pass, and open questions are in
-`docs/reviews/s2/S2-plan.md`.
+`docs/reviews/s2/S2-plan.md` (S2-C21a to S2-C21d's added at their re-cuts, DL-240).
 
 ### Requirements (§6, §6.1, §7, §9)
 - **Rank** (DL-4): requirements are ordered by `rank` among siblings, so the rank helper

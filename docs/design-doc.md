@@ -634,8 +634,9 @@ Workspace (the firm: tenant boundary)
   - The same cookie settings in every environment, dev and test included (build plan,
     implementation decision 9).
 - **Active sessions in Account settings** (v1, DL-197; S2-C21b, DL-238): the
-  user sees their active sessions and signs out of the others (adds `user_agent` and
-  `ip_address` to `session`). (Admin "sign out everywhere" is built in Slice 1, under the rank
+  user sees their active sessions, each with its device and browser (from its user agent),
+  when it signed in, and when it was last active, and signs out of the others (adds
+  `user_agent` to `session`; no IP address or location is kept, DL-242). (Admin "sign out everywhere" is built in Slice 1, under the rank
   rule in "Account management".)
 - **Before the first non-local deployment** (features, not design questions):
   - Sign-in throttling per account and per IP, with progressive delays and no permanent

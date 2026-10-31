@@ -44,4 +44,9 @@
 
 ## Owner decisions
 
-None yet: the three decisions above are open.
+Answered after the commit (Oct 31, 2026), recorded in DC-2026-10-31b:
+1. Decision 1: option (a), DL-240.
+2. Decision 2: the recommendation, (c) for `security-reviewer` and (a) for `spec-test-writer`,
+   DL-241.
+3. Decision 3: the device and browser only, no IP address or location (a location lookup needs
+   a new data dependency), DL-242.

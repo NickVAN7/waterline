@@ -2501,7 +2501,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   place; the saved-filter and favorite tables are designed with them.
 - **Supersedes:** design-doc §4 "Active-sessions page" before the first non-local deployment
   (now v1); design-doc §14 "Saved filters / views are later"
-- **Superseded by:** none
+- **Superseded by:** DL-242 (in part: no `ip_address` on `session`)
 - **Applies to:** design-doc §4, §11, §14, §16; schema-doc (`comment`); build plan ("Later
   slices": Slice 6); screen-inventory Pieces 7 and 8, step 6
 - **Source:** owner, Oct 26, 2026 (screen inventory Pieces 7 and 8; handoff decisions 7, 9 to 16)
@@ -3035,3 +3035,40 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan ("Later slices — placements decided so far"); design-doc §1.1,
   §11; screen-inventory step 6; tech debt (TD-62)
 - **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start: TD-62's check)
+
+### DL-240: The inventory rows' actions and threats go in the Slice 2 plan record
+- **Date:** 2026-10-31
+- **Decision:** Each re-cut of S2-C21a to S2-C21d adds the row's endpoints and actions to
+  `docs/reviews/s2/S2-plan.md`'s "Actions per row" table and its threats to "Threat-model pass",
+  in the re-cut's `docs:` commit, so the plan record stays the one place for Slice 2's actions
+  (DL-139).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 2, the plan record sentence); `docs/reviews/s2/S2-plan.md`
+- **Source:** owner, Oct 31, 2026 (DC-2026-10-31, docs-consistency decision 1, option (a))
+
+### DL-241: Reviewers for the inventory rows
+- **Date:** 2026-10-31
+- **Decision:** `security-reviewer` runs on S2-C21a to S2-C21d (21c: a favorite must not reveal
+  a project the user can't open; 21d: the reserved-slug rule). The `spec-test-writer` list stays
+  as it is (21d), each of 21a to 21c confirming at its start whether it adds or changes
+  `app/rules/` or `app/authz/` code.
+- **Supersedes:** none (widens DL-238's reviewer list)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 2, the reviewer lists)
+- **Source:** owner, Oct 31, 2026 (DC-2026-10-31, docs-consistency decision 2, the
+  recommendation: option (c) for `security-reviewer`, option (a) for `spec-test-writer`)
+
+### DL-242: The session list shows the device, not an address or a place
+- **Date:** 2026-10-31
+- **Decision:** S2-C21b's session list shows each session's device and browser (a short label
+  from its user agent, "Firefox on Windows", with no parsing library), when it signed in, and
+  when it was last active. `session` gains `user_agent` only: no IP address is stored and no
+  location is looked up (that would need a geolocation data source, a new dependency, DL-129),
+  so no forwarded-header rule is needed for it.
+- **Supersedes:** DL-197 in part (design-doc §4: `ip_address` added to `session`)
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sessions"); schema-doc (deferred tables); build plan
+  (S2-C21b)
+- **Source:** owner, Oct 31, 2026 (DC-2026-10-31, docs-consistency decision 3: the device only,
+  "keep it simple for now")

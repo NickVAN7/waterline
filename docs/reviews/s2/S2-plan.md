@@ -64,6 +64,7 @@ conventions, threat-model pass, and open questions behind it (DL-139).
 Proposed names, each registered in `authz/actions.py` (DL-151) and confirmed by its row's spec
 tests. Content actions are denied by the export-control gate to anyone without an explicit
 membership (design-doc §3.1); the org overview's action is `org_member.manage` (Q5, DL-163).
+S2-C21a to S2-C21d's rows, here and in "Threat-model pass", are added at their re-cuts (DL-240).
 
 | Row | Endpoints | Action | Allowed to | Kind |
 |---|---|---|---|---|
