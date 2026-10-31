@@ -14,10 +14,11 @@ be checked for completeness.
 | 6. Consolidate | One inventory; page vs. panel vs. dialog vs. inline; mapped to build slices | **Done** (Oct 27, 2026) |
 | 7. Design guide | Tokens, enum → visual mapping, components, patterns | **Done** (Oct 10, 2026): `docs/ui-design-guide.md`, the authoritative UI guide (DL-61) |
 
-**The inventory is complete** (Oct 27, 2026; DL-157, DL-203). Step 6's consolidated table is the
-list S2-C15's check runs against (TD-62): every screen there against the docs and the built
-screens. Routes for screens not yet built are proposals that each slice's planning confirms, and
-Slice 2's web rows (S2-C15 to S2-C21) are re-cut before they start (DL-139).
+**The inventory is complete** (Oct 27, 2026; DL-157, DL-203). Step 6's consolidated table was
+checked against the docs and the built screens before S2-C15 (TD-62, DC-2026-10-31), and the
+screens it left without a slice were placed (DL-238, DL-239). Routes for screens not yet built
+are proposals that each slice's planning confirms, and Slice 2's web rows (S2-C15 to S2-C21d)
+are re-cut before they start (DL-139).
 
 Early mockups (sprint board, requirement detail, delete-requirement dialog, test case) exist on
 the "Waterline key screens" design canvas. They predate this inventory; where they differ,
@@ -629,28 +630,28 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | Change temporary password | page (auth layout) | `/account/change-password` | 1 | Built |
 | Account settings (profile, appearance) | page | `/account` | 1 | Built |
 | Change password | page | `/account/password` | 1 | Built |
-| Active sessions, sign out others | section of Account settings | `/account` | 2+ (new) | — |
+| Active sessions, sign out others | section of Account settings | `/account` | 2 (S2-C21b, DL-238) | — |
 | GitHub account link / unlink | section of Account settings | `/account` | 7 | — |
-| Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 2+ (new) | — |
+| Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (DL-239) | — |
 | No access | page | `/account/no-access` | 1 | Built |
 | My work | page | `/` | 1, sections in 2, 3, 5 | Projects built |
-| Favorite projects | section of My work; star on project rows | `/` | 2+ (new) | — |
-| Documentation (user guide) | page, from the user menu | `/docs` | 2+ (new) | — |
+| Favorite projects | section of My work; star on project rows | `/` | 2 (S2-C21c, DL-238) | — |
+| Documentation (user guide) | page, from the user menu | `/docs` | 2 (S2-C21d, DL-238) | — |
 | Search results | page, from the header search bar | `/search` | 6 | — |
 | System status | page, no sign-in | `/status` | 0 | Built |
 | Page not found (404) / Forbidden (403) | page in the shell | any | 1 | Built |
-| Turned-off module | page in the project | the module's route | with each module | — |
+| Turned-off module | page in the project | the module's route | 4, with Sprints (DL-239) | — |
 
 ### Workspace administration
 
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
-| Staff (add, role, account actions, remove; "Show deactivated" for admins) | page + dialogs | `/workspace/staff` | 1 | Built (deactivated filter new) |
+| Staff (add, role, account actions, remove; "Show deactivated" for admins) | page + dialogs | `/workspace/staff` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
 | Organizations (list, create) | page + dialog | `/workspace/orgs` | 1 | Built |
-| Users (account actions, edit details, email; "Show deactivated" for admins) | page + dialogs | `/workspace/users` | 1 | Built (deactivated filter new) |
+| Users (account actions, edit details, email; "Show deactivated" for admins) | page + dialogs | `/workspace/users` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
 | Per-person access review | page | `/workspace/users/:userId/access` | 1 | Built |
 | Workspace settings | page | `/workspace/settings` | 1 | Built |
-| Audit log | page | `/workspace/audit` | before the first non-local deployment | — |
+| Audit log | page | `/workspace/audit` | 7, before the first non-local deployment (DL-239) | — |
 | Operations (failed jobs, webhook deliveries) + indicator | page; indicator in the header | `/workspace/operations` | 7 | — |
 
 ### Organization
@@ -658,7 +659,7 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
 | Org overview (projects, archived below) | page | `/:orgSlug/overview` | 1 | Built |
-| Org members ("Show deactivated" for admins) | page + dialogs | `/:orgSlug/members` | 1 | Built (deactivated filter new) |
+| Org members ("Show deactivated" for admins) | page + dialogs | `/:orgSlug/members` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
 | Org settings (details, tag vocabulary, GitHub installations) | page | `/:orgSlug/settings` | 1; tags 6; GitHub 7 | Details built |
 | Org projects list; create project | page + dialog | `/:orgSlug/projects` | 1 | Built |
 
@@ -666,8 +667,8 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
-| Project home (headline numbers, Get started checklist) | page | `…/:key` | 1; numbers with their slices | Shell built |
-| Members (add, role, remove; "Show deactivated" for admins) | page + dialogs | `…/:key/members` | 1 | Built (deactivated filter new) |
+| Project home (headline numbers, Get started checklist) | page | `…/:key` | 1; numbers with their slices; checklist 3 (DL-239) | Shell built |
+| Members (add, role, remove; "Show deactivated" for admins) | page + dialogs | `…/:key/members` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
 | Project access review | page | `…/:key/access` | 1 | Built |
 | Project settings (details, modules, restriction, archive) | page | `…/:key/settings` | 1 | Built |
 | Workstreams | section of Settings (or its own tab) | `…/:key/settings` | 3 | — |

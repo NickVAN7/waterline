@@ -144,7 +144,7 @@ whether existing software projects get the module turned on.
   A disabled module's endpoints return 404 for that project. In the UI, a turned-off module's
   page (from a bookmark, say) is an explanatory page inside the project instead of a 404: "The
   Sprints module is turned off for this project. Contact your administrator for questions.",
-  with the module's name. An unshipped module has no page at all (DL-200).
+  with the module's name (Slice 4, DL-239). An unshipped module has no page at all (DL-200).
 - **UI guidance on module choice.** Module selection (at project creation and in project
   settings) shows, for the project's type, which modules are recommended and a short
   best-practice note for each. Examples:
@@ -251,7 +251,8 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   of top-level routes (`workspace`, `account`, `sign-in`, …). Workspace slugs follow the same list
   only to keep root-level workspace URLs possible later; in v1 workspace pages are `/workspace/…`.
   The system-status page (the API and database health check) is at `/status`, which is on the list;
-  My work is the root route (`/`, §11). The list lives in `rules/identifiers.py` and is exported
+  My work is the root route (`/`, §11), and the Documentation page's `docs` joins the list in
+  S2-C21d (DL-238). The list lives in `rules/identifiers.py` and is exported
   through the OpenAPI schema (an enum), so a frontend test checks every top-level route in the
   router against the generated list.
 - **Timestamps:** `timestamptz` everywhere. Every table has `created_at`/`updated_at`, with
@@ -632,7 +633,7 @@ Workspace (the firm: tenant boundary)
     `last_seen_at` written at most every 5 minutes.
   - The same cookie settings in every environment, dev and test included (build plan,
     implementation decision 9).
-- **Active sessions in Account settings** (v1, DL-197; its slice is the owner's to place): the
+- **Active sessions in Account settings** (v1, DL-197; S2-C21b, DL-238): the
   user sees their active sessions and signs out of the others (adds `user_agent` and
   `ip_address` to `session`). (Admin "sign out everywhere" is built in Slice 1, under the rank
   rule in "Account management".)
@@ -1468,9 +1469,11 @@ table, `audit_event` (schema-doc, "Audit").
 ### Lists: saved filters and CSV export
 - **Saved filters** (DL-197): a user saves a filter-bar setup by name, per list, and reapplies,
   renames, or deletes it. Personal only in v1 (sharing is v2, §16). The filters also live in the
-  URL, so a filtered list can be bookmarked or shared. Its table is designed with its slice.
+  URL, so a filtered list can be bookmarked or shared. Slice 3 (DL-239); its table is designed
+  there.
 - **CSV export** (DL-197) of the current list, with its filters and columns as shown, for tasks,
-  requirements, test cases, and test results. Exporting a whole project stays v2 (§16).
+  requirements, test cases, and test results: requirements and tasks in Slice 3, test cases and
+  test results in Slice 5 (DL-239). Exporting a whole project stays v2 (§16).
 
 ### Polymorphic tables
 `comment`, `entity_tag`, `link_attachment`, and `approval_request` reference their parent by
@@ -1494,8 +1497,8 @@ content of export-controlled projects where the user has no explicit membership 
 leaves out archived projects and every item in them (tasks, reviews, test cases; archiving
 cancels their approval requests, §6.2; DL-200), which stay visible inside the project. Until
 notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
-projects** (DL-197): a star on a project row keeps it at the top, per user (its table is
-designed with its slice); favoriting items is v1.5 or later, and there's no "recently viewed".
+projects** (DL-197): a star on a project row keeps it at the top, per user (S2-C21c, DL-238;
+its table is designed there); favoriting items is v1.5 or later, and there's no "recently viewed".
 My work is the cross-project view in v1; a portfolio view comes when it outgrows the page
 (§16). It lives at the root route (`/`), so it adds nothing to the reserved-slug
 list (§3); a top-level route of its own would have to join it. Each section arrives with its
@@ -1520,11 +1523,13 @@ member besides its creator), **Compile your plan** (once it has a phase or miles
 date; the item is hidden until phases and milestones ship), and **Start your project** (a
 requirement, a test case, and a task, each part shown once its feature ships). The ticks are
 loose: a step started counts. It's shown only to the project's admins, disappears when all three
-are ticked, and a project admin can hide it sooner (a per-project flag, designed with its slice).
+are ticked, and a project admin can hide it sooner (a per-project flag, designed with it). It
+ships in Slice 3 (DL-239).
 GitHub is not part of it.
 
 ### Documentation
-The user menu's **Documentation** item renders the user guide inside the app (DL-197).
+The user menu's **Documentation** item renders the user guide inside the app (DL-197), at
+`/docs` (S2-C21d, DL-238; `docs` joins the reserved slugs there, §3).
 
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).

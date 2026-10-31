@@ -1179,7 +1179,7 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 | `notification` (user_id, type, entity_type, entity_id, actor_id, created_at, read_at) | v1.5 |
 | `api_token` (user_id, name, token_hash, prefix, last_used_at, expires_at, revoked_at) | first need |
 | `login_attempt` (sign-in throttling per account and per IP, design-doc §4) | before the first non-local deployment |
-| `session.user_agent`, `session.ip_address` columns (the active-sessions list, design-doc §4) | v1, its slice to be placed (DL-197) |
+| `session.user_agent`, `session.ip_address` columns (the active-sessions list, design-doc §4) | S2-C21b (DL-238; specified at its re-cut, DL-139) |
 | ERP modules, design pending: `raid_item`, `entity_link`, `status_report`, `budget_line`, `cost_entry`, `data_object`, `load_cycle`, `data_load`, runbook step / rehearsal tables | v2 (design-doc §16) |
 | ERP portfolio and team tables, design pending: project portfolio fields and templates (PMO dashboard), workspace teams (resourcing), workstream members | v2 (design-doc §16) |
 | `invitation`, `time_entry`, `sprint_project`, `sprint_snapshot`, file attachments | v2+ (`time_entry` may move up with the budget module) |

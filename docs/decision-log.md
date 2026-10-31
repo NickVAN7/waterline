@@ -3004,3 +3004,34 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C14)
 - **Source:** owner, Oct 30, 2026 (chat session, S2-C14 start)
+
+### DL-238: Four inventory items join Slice 2, after the requirement screens
+- **Date:** 2026-10-31
+- **Decision:** Slice 2 gains four rows, after S2-C21 and before slice verification (S2-C22),
+  in the `s2-web` group: S2-C21a, the built Slice 1 lists' "Show deactivated" change and
+  deactivated people left out of the built pickers (DL-200); S2-C21b, the session list in
+  Account settings (DL-197); S2-C21c, favorite projects on My work (DL-197); and S2-C21d, the
+  Documentation page, last (DL-197), on S2-C16's `MarkdownView`, with `docs` joining the
+  reserved slugs. Each is provisional like the other web rows, its endpoints and (for S2-C21b
+  and S2-C21c) its schema specified when it is re-cut, before it starts (DL-139).
+- **Supersedes:** none (places DL-197's session list, favorites, and Documentation, and DL-200's
+  change to the built lists, which those entries left to the owner)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 2 checkpoints, groups, reviewers, "Done when"); design-doc
+  §3, §4, §11; schema-doc (deferred tables: `session`); ui-design-guide §4 (UI-SHL-4, UI-SHL-8),
+  §6 (deactivated users); screen-inventory (its introduction, step 6); tech debt (TD-62)
+- **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start: TD-62's check)
+
+### DL-239: Where the other unplaced inventory items go
+- **Date:** 2026-10-31
+- **Decision:** Saved filters (DL-197) and the Get started checklist with its per-project hide
+  flag (DL-201) go in Slice 3; CSV export of the current list (DL-197) in Slice 3 for
+  requirements and tasks and in Slice 5 for test cases and test results; the turned-off module
+  page (DL-200) in Slice 4, with Sprints, the first module that can be turned off; the
+  workspace audit log page (`/workspace/audit`) in Slice 7, the last v1 slice, so before the
+  first non-local deployment.
+- **Supersedes:** none (places the items DL-197, DL-200, and DL-201 left to the owner)
+- **Superseded by:** none
+- **Applies to:** build plan ("Later slices — placements decided so far"); design-doc §1.1,
+  §11; screen-inventory step 6; tech debt (TD-62)
+- **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start: TD-62's check)

@@ -444,8 +444,8 @@ render inside the full shell when signed in.
   **Members**, and **Settings** (UI-SHL-10). Past about eight orgs (workspace admins see all of
   them) the popover gains a filter field. With one org and no org admin rights it is plain text,
   not a control. The current org's name is always visible. There is no separate org switcher;
-  the user menu keeps workspace "Administration" only (the theme choice moved to account
-  settings in S2-C0g, DL-164), and its **Sign out** has an icon and the danger tone.
+  the user menu keeps workspace "Administration" only, and from S2-C21d **Documentation**
+  (DL-238; the theme choice moved to account settings in S2-C0g, DL-164), and its **Sign out** has an icon and the danger tone.
 - **UI-SHL-5** **Sidebar** (`--sidebar-width`), top to bottom: **My work** (an icon, bolder
   text, and a divider below it, so it reads as separate from project navigation); the **project
   selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). **On an admin page**
@@ -481,8 +481,8 @@ render inside the full shell when signed in.
   `ProjectHeader` holds them the same way (from S2-C0g, TD-49). The one exception is
   the auth card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
   size below the app's name, the card's largest text (`text-xl`; DL-176). Sections use `h2`
-  and nest in order. If a help or contact link is ever added (3.2.6), it goes in the user menu,
-  in the same place on every page.
+  and nest in order. The help link (3.2.6) is the user menu's **Documentation** item (S2-C21d,
+  DL-238), in the same place on every page.
 - **UI-SHL-9** **Route changes:** on navigation, set `document.title` to
   `<h1 text> · Waterline` and move focus to the new `h1` (`tabindex="-1"`) once the view has
   rendered. A change that only alters list state through `useListQuery` (sort, filter, page)
@@ -739,7 +739,7 @@ render inside the full shell when signed in.
   users are left out** of every picker and of the member and user lists (org members, project
   members, workspace staff and users); that scope's admins get a "Show deactivated" filter on
   those lists, and the badge and Status column apply there (DL-200; the built Slice 1 lists
-  change in a checkpoint the owner places). Items still assigned to them are highlighted.
+  change in S2-C21a, DL-238). Items still assigned to them are highlighted.
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
 - **UI-FBK-8** **Empty states** distinguish two cases. *Nothing exists yet:* a heading ("No members

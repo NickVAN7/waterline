@@ -26,7 +26,7 @@ marked for the slice is in the model (the `checkpoint` skill, step 2).
 |---|---|
 | **0** | Skeleton: stack, shared conventions, CI, app shell. No features. |
 | **1** | Auth, tenancy (workspace, organizations, workspace/org/project memberships), projects (types, modules, keys, status, lead), number allocation, `authorize()`, admin audit events, the API conventions (lists, errors, allowed actions, identifiers), access review, and My work as the home page (its projects section). |
-| **2** | Requirements & approvals: Slice 1's leftovers and the owner's UI feedback first (S2-C0a to S2-C0j); requirements (tree, `RQ` numbering, rank, revisions compared, item history, delete and trash), approvals with named approvers and their replacement (My work's approvals section), `log_change()` and the activity log, the export-control gate, rendered markdown and the CSP. |
+| **2** | Requirements & approvals: Slice 1's leftovers and the owner's UI feedback first (S2-C0a to S2-C0j); requirements (tree, `RQ` numbering, rank, revisions compared, item history, delete and trash), approvals with named approvers and their replacement (My work's approvals section), `log_change()` and the activity log, the export-control gate, rendered markdown and the CSP; then "Show deactivated" on the built lists, the session list, favorite projects, and the Documentation page (DL-238). |
 | 3 | Tasks and subtasks, phases, workstreams, transition rules, rank for tasks; backlog and board (the board is SVAR Kanban through a wrapper, ui-design-guide §7.1; DL-64); copy branch name; My work's task sections (assigned, awaiting review). |
 | 4 | Sprints (module), including completing a sprint with unfinished tasks; milestones/gates. |
 | 5 | Test cases, runs, results (with assignees), ad-hoc runs, re-running failed cases; My work's test-case section. |
@@ -1550,7 +1550,7 @@ export-controlled content is hidden from anyone without an explicit membership; 
 Slice 1 feedback is in.
 
 **Before starting:** the plan record's open questions (`docs/reviews/s2/S2-plan.md`) answered by
-the owner before S2-C0a (done, DL-159 to DL-163); `uv run wl audit` green; the web rows (S2-C15 to S2-C21) stay
+the owner before S2-C0a (done, DL-159 to DL-163); `uv run wl audit` green; the web rows (S2-C15 to S2-C21d) stay
 provisional until the owner's screen inventory covers their screens (DL-157; complete, DL-203),
 and are re-cut before they start (DL-139).
 
@@ -1599,6 +1599,10 @@ before the features.
 | 19 | History & revisions *(provisional)* | The History and Revisions tabs (DL-145, DL-147) |
 | 20 | Approvals UI *(provisional)* | The request dialog (approver picker), re-open on an approved requirement (DL-195), the decide panel (rejecting prompts for a comment and asks to confirm without one, DL-196), cancel, approve by hand, the flagged-request state, My work's approvals section |
 | 21 | Delete dialog & trash *(provisional)* | The delete dialog (children promote or delete, the pending-request note), the Trash page, the last item of the project navigation (DL-202), and restore (DL-146) |
+| 21a | Show deactivated *(provisional)* | DL-200, DL-238: the built Slice 1 lists (org members, project members, workspace staff, workspace users) list active people only, with a "Show deactivated" filter for that scope's admins (backend, with API tests and `wl gen-client`), and the built pickers (add member, lead, first admin) leave deactivated people out; the badge and Status column in the filtered view; the user guide's lists; supersedes DL-102 and DL-113 in part, as DL-200 records |
+| 21b | Session list *(provisional)* | DL-197, DL-238: Account settings lists the user's active sessions (this one marked) and signs out the others; `user_agent` and `ip_address` on `session` (design-doc §4; the migration, the endpoints, and their actions specified at the re-cut, DL-139) |
+| 21c | Favorite projects *(provisional)* | DL-197, DL-238: a star on a project row of My work keeps it at the top, per user (design-doc §11); the favorite table, its endpoints, and its actions specified at the re-cut (DL-139) |
+| 21d | Documentation page *(provisional)* | DL-197, DL-238: the user menu's Documentation item opens `/docs`, the user guide rendered through `MarkdownView` (S2-C16); `docs` joins the reserved slugs (design-doc §3, `rules/identifiers.py`, test-first), with what an existing org already using that slug gets decided at the re-cut (DL-139) |
 | 22 | Slice verification | As S1-C17, plus `simplicity-auditor` after `repo-auditor` (DL-138); "Done when" walked through; a manual keyboard and screen-reader pass; the tech-debt review (TD-19, TD-31, TD-42, TD-61, TD-63, TD-64, TD-66); the retro, including whether `repo-auditor` keeps its lean category (DL-166), and S2-C0a's findings 1 (the git guard against Claude Code permission rules, after a trial in a scratch session) and 3 (one list of agents, skills, and hooks) (DL-171) |
 
 **Groups** ("Pull requests"): five review points, on the `s2` branch with one PR.
@@ -1609,11 +1613,11 @@ before the features.
 | 2 | `s2-foundations` | 1–4 (models, rank, change log, content access) |
 | 3 | `s2-requirements` | 5–9 (requirements, tree, delete and trash, revisions) |
 | 4 | `s2-approvals` | 10–14 (requests, decisions, replacement, My work) |
-| 5 | `s2-web` | 15–22 (the web screens and slice verification) |
+| 5 | `s2-web` | 15–21d, 22 (the web screens, the four inventory rows, DL-238, and slice verification) |
 
-Checkpoints 0d, 2, 4, 5, 6, 8, 10, 11, 12, and 13 add or change `app/rules/` or `app/authz/`
+Checkpoints 0d, 2, 4, 5, 6, 8, 10, 11, 12, 13, and 21d add or change `app/rules/` or `app/authz/`
 code, so each starts with `spec-test-writer` (DL-15); each row confirms it against its content
-when it starts. The `security-reviewer` runs on every checkpoint from 0c to 14, and on 16. The
+when it starts. The `security-reviewer` runs on every checkpoint from 0c to 14, and on 16, 21a, and 21b. The
 `ui-reviewer` runs whenever a diff touches `frontend/src/` or `frontend/e2e/` (DL-62).
 
 The sections below describe the content; the table above is the order of work. The plan's
@@ -1721,6 +1725,9 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
 - The requirements page, requirement detail (with History and Revisions), the approvals UI, the
   delete dialog, and the Trash page (S2-C17 to S2-C21), re-cut against the completed screen
   inventory before they start (DL-139, DL-203).
+- **The four inventory rows** (DL-238): "Show deactivated" on the built Slice 1 lists and the
+  built pickers (DL-200), the session list in Account settings, favorite projects on My work
+  (DL-197), and last the Documentation page (S2-C21a to S2-C21d), each re-cut before it starts.
 - End-to-end tests (Playwright, Chromium): creating and editing a requirement; requesting and
   deciding an approval; a stored XSS payload that doesn't run; deleting and restoring a tree.
 
@@ -1748,6 +1755,10 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
       page.
 - [ ] A stored XSS payload in a description doesn't execute (component and end-to-end tests), and
       the CSP header is present.
+- [ ] The member and user lists and the pickers leave deactivated people out, and the scope's
+      admins find them with "Show deactivated"; a user sees their sessions and signs out the
+      others; a starred project stays at the top of My work; the user menu's Documentation opens
+      the user guide (DL-238).
 - [ ] No `classification` remains in the API or UI; Restricted is gone; an unshipped module can't
       be enabled.
 - [ ] S2-C0a's audit record exists with every finding decided, and every item in
@@ -1771,6 +1782,9 @@ notes for each slice's planning, not plans.
   and whether task moves run one at a time (DL-214's lock).
 - **Slice 3** (DL-155): the project activity feed's API and page, with the filter bar (DL-147);
   item IDs (`WTL-RQ-12`) auto-linked in rendered markdown, once there are tasks to link (DL-144).
+- **Slice 3** (DL-239): saved filters (design-doc §11, "Lists"; their table designed with them);
+  CSV export of the requirement and task lists; the project home's Get started checklist, with
+  its per-project hide flag (design-doc §11, DL-201).
 - **Slice 3** (DL-199): a basic Timeline page holding phases; the requirement tree's task
   coverage columns (task count and progress); the approver's review panel gains the item's tasks
   and subtasks (DL-196). **Slice 5:** its test coverage columns (test-case
@@ -1780,6 +1794,8 @@ notes for each slice's planning, not plans.
   slippage; releases as a milestone filter on lists and the board, with a progress bar on each
   milestone; re-opening a gate (DL-195: a rejected round moves the milestone back to
   `in_progress`; a `released` milestone can't be re-opened).
+- **Slice 4** (DL-239): the turned-off module page (design-doc §1.1, UI-SHL-13), with Sprints,
+  the first module that can be turned off.
 - **Slices 4 and 7** (DL-155): when `sprints` (Slice 4) or `github` (Slice 7) ships, whether
   existing software projects get it turned on (DL-136).
 - **Slice 4:** completing a sprint with unfinished tasks moves them to the next planned sprint
@@ -1791,11 +1807,14 @@ notes for each slice's planning, not plans.
   `status` and `actual_result` changes logged (`entity_type = test_result`; design-doc §10);
   My work's test-case section, with `ix_test_result_assignee_id_status` (schema-doc,
   `test_result`).
+- **Slice 5** (DL-239): CSV export of the test-case and test-result lists.
 - **Slice 6:** sending a task back from review prompts for an optional comment (design-doc §5,
   "Targeted rules — Task status transitions").
 - **Slice 6** (DL-197): comment edit and delete by their authors, with the "edited" marker
   (`comment.edited_at`), and project admins deleting any; the header search bar and its results
   page; the approver's review panel gains the item's comments (DL-196).
+- **Slice 7** (DL-239): the workspace audit log page (`/workspace/audit`), before the first
+  non-local deployment.
 - **Slice 7:** the system-admin operations screen: a failure indicator and a read-only list of
   failed jobs and webhook deliveries, failed jobs read through a wrapped helper in
   `app/jobs/`, and a `wl admin` command to retry a failed job (design-doc §13, "Operations

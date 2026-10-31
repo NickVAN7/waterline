@@ -798,7 +798,9 @@ Entry format:
 - **Fix by:** S2-C15, the start of the `s2-web` group: the completed inventory (committed at the
   `s2-foundations` boundary, DL-203), its step 6 table checked against the docs and the built
   screens (it wasn't committed when S2-C0i started, DL-157)
-- **Status:** open
+- **Status:** resolved in DC-2026-10-31: step 6's Built rows match the router; the items with no
+  slice (DL-197, DL-200, DL-201) placed by the owner (DL-238, DL-239); the web rows' own re-cuts
+  stay at each row's start (DL-139)
 
 ### TD-63: Settings saves are last-save-wins, with no optimistic lock
 - **Added:** S1-C17 (repo-auditor's question)
