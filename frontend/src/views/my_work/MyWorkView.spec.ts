@@ -11,7 +11,10 @@ import { testRouter } from '@/test/router'
 import MyWorkView from './MyWorkView.vue'
 
 type Section = { available: boolean; items: ReturnType<typeof projectItem>[]; total: number }
-const work = (projects: Section) => ok({ sections: { projects } })
+type Approvals = { available: boolean; items: never[]; total: number }
+const NO_APPROVALS: Approvals = { available: true, items: [], total: 0 }
+const work = (projects: Section, approvals: Approvals = NO_APPROVALS) =>
+  ok({ sections: { projects, approvals } })
 const NETWORK = failed(503, { code: 'network_error', message: '', details: {} })
 
 async function mountView() {
@@ -83,6 +86,21 @@ describe('MyWorkView', () => {
     expect(rows[0]!.text()).not.toContain('Software')
   })
 
+  it('still lists the projects when another section is unavailable (TD-40)', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      work(
+        { available: true, items: [projectItem('ERP')], total: 1 },
+        { available: false, items: [], total: 0 },
+      ),
+    )
+
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('section li a').map((a) => a.text())).toEqual(['ERP project'])
+    expect(wrapper.find('[role=alert]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain("Couldn't load")
+  })
+
   it('is busy, saying so, while the projects load', async () => {
     vi.spyOn(client, 'GET').mockReturnValue(new Promise(() => {}) as never)
 
@@ -131,6 +149,24 @@ describe('MyWorkView', () => {
       expect(document.activeElement?.textContent?.trim()).toBe('Try again')
     },
   )
+
+  const UNAVAILABLE = work({ available: false, items: [], total: 0 })
+  it.each([
+    ['the request fails, then the section is unavailable', NETWORK, UNAVAILABLE],
+    ['the section is unavailable, then the request fails', UNAVAILABLE, NETWORK],
+  ])('announces a failed Try again as a new alert when %s', async (_, first, second) => {
+    vi.spyOn(client, 'GET').mockResolvedValueOnce(first).mockResolvedValueOnce(second)
+    const wrapper = await mountView()
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Try again')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role=alert]').text()).toContain("Couldn't load your projects")
+    expect(document.activeElement?.textContent?.trim()).toBe('Try again')
+  })
 
   it.each([
     ['the request fails', NETWORK],

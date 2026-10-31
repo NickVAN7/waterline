@@ -562,7 +562,10 @@ Entry format:
   per-section error state would have nothing beside it.
 - **Fix by:** S2-C14 (My work's approvals section, its second; each section gets its own error
   state)
-- **Status:** open
+- **Status:** resolved in S2-C14: each section's query runs in its own savepoint
+  (`MyWorkService._section`), and the page gives the projects section its own error state, keyed
+  on its failed loads in a row of either kind (the request or the section), so another section's
+  failure leaves it showing
 
 ### TD-41: Pickers of people load the first 200
 - **Added:** S1-C15

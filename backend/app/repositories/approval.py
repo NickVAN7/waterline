@@ -5,10 +5,17 @@ from collections.abc import Collection
 
 from sqlalchemy import ColumnElement, Select, exists, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import contains_eager, joinedload, selectinload
 
+from app.authz.scoping import Scope
 from app.enums import ApprovalDecision, ApprovalEntityType, ApprovalRequestStatus
 from app.models.approval import Approval, ApprovalRequest
+from app.models.org import Organization
+from app.models.project import Project
+from app.models.requirement import Requirement, RequirementRevision
+from app.models.user import User
+from app.repositories.base import scope_clause
+from app.repositories.project import export_controlled
 
 # What a request's read shows: the revision, the requester, and each approval with its approver.
 _FOR_READ = (
@@ -71,6 +78,46 @@ class ApprovalRepository:
         """The entities' pending requests, locked, in id order."""
         return await self._lock_pending(
             ApprovalRequest.entity_type == entity_type, ApprovalRequest.entity_id.in_(entity_ids)
+        )
+
+    def pending_for(self, approver_id: uuid.UUID, scope: Scope) -> Select[Approval]:
+        """The approver's pending rows on pending requests in the live projects of `scope` (their
+        `content_scope`), each with its request, revision and requirement, requester, and project
+        and org loaded (My work, DL-236; the `(approver_id, decision)` index). A deleted
+        requirement's rows are hidden by the soft-delete filter."""
+        return (
+            select(Approval)
+            .join(ApprovalRequest, Approval.approval_request_id == ApprovalRequest.id)
+            .join(
+                RequirementRevision,
+                ApprovalRequest.requirement_revision_id == RequirementRevision.id,
+            )
+            .join(Requirement, RequirementRevision.requirement_id == Requirement.id)
+            .join(User, ApprovalRequest.requested_by == User.id)
+            .join(Project, ApprovalRequest.project_id == Project.id)
+            .join(Organization, Project.organization_id == Organization.id)
+            .options(
+                contains_eager(Approval.approval_request).options(
+                    contains_eager(ApprovalRequest.requirement_revision).contains_eager(
+                        RequirementRevision.requirement
+                    ),
+                    contains_eager(ApprovalRequest.requester),
+                    contains_eager(ApprovalRequest.project).contains_eager(Project.organization),
+                )
+            )
+            .where(
+                Approval.approver_id == approver_id,
+                Approval.decision == ApprovalDecision.PENDING,
+                ApprovalRequest.status == ApprovalRequestStatus.PENDING,
+                Project.archived_at.is_(None),
+                scope_clause(
+                    scope,
+                    Project.id,
+                    Project.workspace_id,
+                    Project.organization_id,
+                    export_controlled=export_controlled(),
+                ),
+            )
         )
 
     async def projects_with_pending(self, user_id: uuid.UUID) -> list[uuid.UUID]:

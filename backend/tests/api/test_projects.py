@@ -619,7 +619,10 @@ async def test_module_guidance_lists_every_module_and_each_types_recommendations
 
 
 @pytest.mark.security
-@pytest.mark.parametrize("path", ["/api/module-guidance", "/api/me/work", "/api/me/work/projects"])
+@pytest.mark.parametrize(
+    "path",
+    ["/api/module-guidance", "/api/me/work", "/api/me/work/projects", "/api/me/work/approvals"],
+)
 async def test_signed_in_endpoints_need_a_session(client: AsyncClient, path: str) -> None:
     response = await client.get(path)
 
@@ -671,9 +674,13 @@ async def test_a_section_whose_query_fails_is_unavailable(
 
     response = await client.get("/api/me/work")
 
-    assert (response.status_code, response.json()) == (
+    assert (response.status_code, response.json()["sections"]) == (
         200,
-        {"sections": {"projects": {"available": False, "items": [], "total": 0}}},
+        {
+            "projects": {"available": False, "items": [], "total": 0},
+            # TD-40: the other sections still show.
+            "approvals": {"available": True, "items": [], "total": 0},
+        },
     )
 
 

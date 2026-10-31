@@ -4759,6 +4759,92 @@
         }
       }
     },
+    "/api/me/work/approvals": {
+      "get": {
+        "tags": [
+          "my_work"
+        ],
+        "summary": "My Approvals",
+        "description": "The caller's pending approvals, oldest request first (DL-236).",
+        "operationId": "my_approvals_api_me_work_approvals_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: requested_at. Default: requested_at",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: requested_at. Default: requested_at"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ApprovalWorkItem_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/{key}/requirements/{number}/activity": {
       "get": {
         "tags": [
@@ -6837,6 +6923,15 @@
         "title": "ApprovalDecisionCreate",
         "description": "The caller's decision on their own row (design-doc §6.2): final (DL-195). A comment is\noptional, rejecting included (DL-196: the UI asks to confirm without one)."
       },
+      "ApprovalEntityType": {
+        "type": "string",
+        "enum": [
+          "requirement",
+          "milestone",
+          "test_run"
+        ],
+        "title": "ApprovalEntityType"
+      },
       "ApprovalRead": {
         "properties": {
           "id": {
@@ -7126,6 +7221,84 @@
           "cancelled"
         ],
         "title": "ApprovalRequestStatus"
+      },
+      "ApprovalWorkItem": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "requested_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requested By Id"
+          },
+          "requested_by_name": {
+            "type": "string",
+            "title": "Requested By Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/ApprovalEntityType"
+          },
+          "entity_number": {
+            "type": "integer",
+            "title": "Entity Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "revision_number": {
+            "type": "integer",
+            "title": "Revision Number"
+          },
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "organization_slug": {
+            "type": "string",
+            "title": "Organization Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "requested_at",
+          "requested_by_id",
+          "requested_by_name",
+          "note",
+          "entity_type",
+          "entity_number",
+          "title",
+          "revision_number",
+          "project_key",
+          "project_name",
+          "organization_slug"
+        ],
+        "title": "ApprovalWorkItem",
+        "description": "One of the caller's pending approvals, in My work (design-doc §11; DL-236): `title` and\n`revision_number` are the revision under approval's, whatever the requirement is now."
       },
       "ChangePasswordRequest": {
         "properties": {
@@ -7926,6 +8099,37 @@
           "offset"
         ],
         "title": "Page[ApprovalRequestItem]"
+      },
+      "Page_ApprovalWorkItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalWorkItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[ApprovalWorkItem]"
       },
       "Page_MemberCandidate_": {
         "properties": {
@@ -10089,6 +10293,32 @@
         ],
         "title": "ValidationError"
       },
+      "WorkSection_ApprovalWorkItem_": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalWorkItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "WorkSection[ApprovalWorkItem]"
+      },
       "WorkSection_ProjectItem_": {
         "properties": {
           "available": {
@@ -10119,11 +10349,15 @@
         "properties": {
           "projects": {
             "$ref": "#/components/schemas/WorkSection_ProjectItem_"
+          },
+          "approvals": {
+            "$ref": "#/components/schemas/WorkSection_ApprovalWorkItem_"
           }
         },
         "type": "object",
         "required": [
-          "projects"
+          "projects",
+          "approvals"
         ],
         "title": "WorkSections"
       },

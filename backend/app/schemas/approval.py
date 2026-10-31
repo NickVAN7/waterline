@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
-from app.enums import ApprovalDecision, ApprovalRequestStatus
+from app.enums import ApprovalDecision, ApprovalEntityType, ApprovalRequestStatus
 from app.schemas.limits import APPROVAL_NOTE_MAX, APPROVERS_MAX
 
 
@@ -63,3 +63,21 @@ class ApprovalRequestRead(ApprovalRequestItem):
     """One request, with the actions the caller may take on it."""
 
     allowed_actions: list[Action]
+
+
+class ApprovalWorkItem(BaseModel):
+    """One of the caller's pending approvals, in My work (design-doc §11; DL-236): `title` and
+    `revision_number` are the revision under approval's, whatever the requirement is now."""
+
+    request_id: uuid.UUID
+    requested_at: datetime
+    requested_by_id: uuid.UUID
+    requested_by_name: str
+    note: str | None
+    entity_type: ApprovalEntityType
+    entity_number: int
+    title: str
+    revision_number: int
+    project_key: str
+    project_name: str
+    organization_slug: str

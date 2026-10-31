@@ -60,9 +60,7 @@ class ProjectRepository:
                     Project.id,
                     Project.workspace_id,
                     Project.organization_id,
-                    export_controlled=Project.restriction_categories.contains(
-                        [RestrictionCategory.EXPORT_CONTROLLED]
-                    ),
+                    export_controlled=export_controlled(),
                 )
             )
         )
@@ -252,3 +250,8 @@ def _in(organization_id: uuid.UUID | None, workspace_id: uuid.UUID | None) -> Co
     if organization_id is not None:
         return Project.organization_id == organization_id
     return Project.workspace_id == workspace_id
+
+
+def export_controlled() -> ColumnElement[bool]:
+    """Whether a project is export-controlled, for a content scope's `scope_clause`."""
+    return Project.restriction_categories.contains([RestrictionCategory.EXPORT_CONTROLLED])

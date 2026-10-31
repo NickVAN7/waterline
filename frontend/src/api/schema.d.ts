@@ -923,6 +923,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/work/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Approvals
+         * @description The caller's pending approvals, oldest request first (DL-236).
+         */
+        get: operations["my_approvals_api_me_work_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/requirements/{number}/activity": {
         parameters: {
             query?: never;
@@ -1367,6 +1387,11 @@ export interface components {
             comment?: string | null;
         };
         /**
+         * ApprovalEntityType
+         * @enum {string}
+         */
+        ApprovalEntityType: "requirement" | "milestone" | "test_run";
+        /**
          * ApprovalRead
          * @description One approver's row; `approver_is_active` false shows the "Deactivated" badge.
          */
@@ -1492,6 +1517,45 @@ export interface components {
          * @enum {string}
          */
         ApprovalRequestStatus: "pending" | "approved" | "rejected" | "cancelled";
+        /**
+         * ApprovalWorkItem
+         * @description One of the caller's pending approvals, in My work (design-doc §11; DL-236): `title` and
+         *     `revision_number` are the revision under approval's, whatever the requirement is now.
+         */
+        ApprovalWorkItem: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Requested By Id
+             * Format: uuid
+             */
+            requested_by_id: string;
+            /** Requested By Name */
+            requested_by_name: string;
+            /** Note */
+            note: string | null;
+            entity_type: components["schemas"]["ApprovalEntityType"];
+            /** Entity Number */
+            entity_number: number;
+            /** Title */
+            title: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Project Key */
+            project_key: string;
+            /** Project Name */
+            project_name: string;
+            /** Organization Slug */
+            organization_slug: string;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -1834,6 +1898,17 @@ export interface components {
         Page_ApprovalRequestItem_: {
             /** Items */
             items: components["schemas"]["ApprovalRequestItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ApprovalWorkItem] */
+        Page_ApprovalWorkItem_: {
+            /** Items */
+            items: components["schemas"]["ApprovalWorkItem"][];
             /** Total */
             total: number;
             /** Limit */
@@ -2671,6 +2746,21 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** WorkSection[ApprovalWorkItem] */
+        WorkSection_ApprovalWorkItem_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ApprovalWorkItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** WorkSection[ProjectItem] */
         WorkSection_ProjectItem_: {
             /** Available */
@@ -2689,6 +2779,7 @@ export interface components {
         /** WorkSections */
         WorkSections: {
             projects: components["schemas"]["WorkSection_ProjectItem_"];
+            approvals: components["schemas"]["WorkSection_ApprovalWorkItem_"];
         };
         /** WorkspaceRead */
         WorkspaceRead: {
@@ -5748,6 +5839,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ProjectItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_approvals_api_me_work_approvals_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: requested_at. Default: requested_at */
+                sort?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ApprovalWorkItem_"];
                 };
             };
             /** @description Unauthorized */
