@@ -1101,3 +1101,14 @@ Entry format:
 - **Fix by:** S2-C22 (the tech-debt review): an index on `(requested_by, status)`, or a partial
   one on pending requests
 - **Status:** open
+
+### TD-85: A refused move can't tell the page to reload
+- **Added:** S2-C15 (ui-reviewer finding 4)
+- **What:** `RequirementsTree` shows a refused move's message but tells its page nothing, so
+  after a 403 the Move button stays (the page doesn't reload `allowed_actions`), and after a
+  stale 404 or 422 "Reload the page" is the only way to get the current tree.
+- **Why:** no page renders the tree until S2-C17, so there's nothing to tell; an event with no
+  listener would be speculative.
+- **Fix by:** S2-C17 (the requirements page): the tree tells the page, which reloads the list,
+  or the project's actions after a 403
+- **Status:** open

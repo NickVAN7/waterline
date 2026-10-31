@@ -172,6 +172,14 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.
+- A PrimeVue table's selected-row bar goes on the row's first cell, and only on the selected
+  row: its tables use `border-collapse: separate`, where a `tr`'s border isn't drawn, and forced
+  colors draw a transparent border. A class check in jsdom can't show the bar is drawn
+  (UI-TOK-9; S2-C15 review).
+- A blocked PrimeVue menu item is `aria-disabled` through `pt.item`, in the disabled tokens on
+  `pt.itemContent` (which sets its own color over the item's), and
+  stays focusable, its command doing nothing: a `disabled` item is skipped by the arrow keys and
+  faded with opacity, so the keyboard never reaches its reason (UI-TOK-10; S2-C15 review).
 
 ## Tests
 
@@ -201,6 +209,8 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
 - An e2e step after a dialog closes waits for the dialog to be hidden and focus to be back on
   its opener before it moves focus: the close event returns focus a task later, and would take
   it back (S1-C16b).
+- A mocked 422 has the server's real shape: the top-level `message` is "The request is invalid.",
+  and the reason is in `details.fields` (S2-C15 review).
 - Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
   `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
   not `getByLabel`: the label's text includes the required asterisk, the accessible name
