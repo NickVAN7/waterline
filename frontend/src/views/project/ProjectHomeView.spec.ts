@@ -55,8 +55,9 @@ describe('ProjectHomeView', () => {
     expect(wrapper.get('header').text()).toContain('Lead: Liam Lead')
     expect(wrapper.text()).not.toContain('No lead')
     expect(wrapper.get('header').text()).not.toContain('Deactivated')
-    // Unclassified: no banner (design-doc §3.1).
-    expect(wrapper.text()).not.toContain('Classification:')
+    // No level and no categories: no restriction badge (UI-FBK-6).
+    expect(wrapper.get('header').text()).not.toContain('Internal')
+    expect(wrapper.get('header').text()).not.toContain('No restriction level')
     expect(document.title).toBe('ERP rollout · Waterline')
     expect(useCurrentOrgStore().project?.key).toBe('ERP')
     await expectNoA11yViolations(wrapper)
@@ -82,21 +83,19 @@ describe('ProjectHomeView', () => {
     expect(wrapper.get('header').text()).toContain('Deactivated')
   })
 
-  it('shows the classification banner, level and categories as text (UI-FBK-6)', async () => {
+  it('shows the restriction badge in the header, level and categories as text (UI-FBK-6, DL-137)', async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(
       ok(
         project({
-          classification_level: 'confidential',
-          classification_categories: ['financial', 'pii'],
+          restriction_level: 'confidential',
+          restriction_categories: ['financial', 'pii'],
         }),
       ),
     )
 
     const { wrapper } = await mountAt('/acme/projects/ERP')
 
-    expect(wrapper.text()).toContain(
-      'Classification: Confidential. Categories: Financial, Personal data (PII).',
-    )
+    expect(wrapper.get('header').text()).toContain('Confidential · Financial, Personal data (PII)')
     await expectNoA11yViolations(wrapper)
   })
 

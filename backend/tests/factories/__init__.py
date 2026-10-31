@@ -36,6 +36,14 @@ class BaseFactory[T](SQLAlchemyFactory[T]):
         return super().should_column_be_set(column)
 
 
+def reset_factories() -> None:
+    """The fixed seed again, and Faker's `unique` memory cleared: without that, each reset
+    replays the same values, which `unique` skips, so values depend on the tests run before
+    and `unique` runs out after about a thousand resets."""
+    BaseFactory.seed_random(SEED)
+    BaseFactory.__faker__.unique.clear()
+
+
 def fake_slug(*words: str, max_length: int = 40) -> str:
     """A slug in the identifier format (lowercase letters, digits, and hyphens, starting with a
     letter; design-doc §3) built from `words`, with a short number so slugs rarely collide."""
@@ -48,11 +56,14 @@ def fake_slug(*words: str, max_length: int = 40) -> str:
 # Register every model factory (each sets itself as the default for its model), so nested
 # parents are built with realistic values too. Imported last: they import BaseFactory above.
 from tests.factories import (  # noqa: E402
+    approval,
+    audit,
     audit_event,
     auth,
     numbering,
     org,
     project,
+    requirement,
     user,
     workspace,
 )
@@ -60,12 +71,16 @@ from tests.factories import (  # noqa: E402
 __all__ = [
     "SEED",
     "BaseFactory",
+    "approval",
+    "audit",
     "audit_event",
     "auth",
     "fake_slug",
     "numbering",
     "org",
     "project",
+    "requirement",
+    "reset_factories",
     "user",
     "workspace",
 ]

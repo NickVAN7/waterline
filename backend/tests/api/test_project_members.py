@@ -5,6 +5,7 @@ projects" across the org, workspace, and project areas, the picker's search, and
 access review's content. Who gets 2xx/403/404 is in tests/api/authz/test_project_members.py (spec
 tests)."""
 
+import uuid
 from datetime import UTC, datetime
 
 import pytest
@@ -12,7 +13,15 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import AuditAction, OrgRole, ProjectRole, WorkspaceRole
+from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    ActivityField,
+    AuditAction,
+    OrgRole,
+    ProjectRole,
+    WorkspaceRole,
+)
 from app.models.audit_event import AuditEvent
 from app.models.org import Membership
 from app.models.project import Project, ProjectMembership
@@ -21,11 +30,18 @@ from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
+from tests.support.activity import activity
 from tests.support.authz import Tenancy, persona_user, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.usefixtures("session")]
 
 MEMBERS = "/api/projects/PMT/members"
+
+
+def lead_cleared(project_id: uuid.UUID, lead_id: uuid.UUID, by: uuid.UUID) -> tuple[object, ...]:
+    """A removal clearing the project's lead, as `activity` reads it back (design-doc §10)."""
+    entity = (ActivityEntityType.PROJECT, project_id, ActivityAction.UPDATED)
+    return (*entity, ActivityField.LEAD_ID, str(lead_id), None, by)
 
 
 @pytest.fixture
@@ -403,6 +419,7 @@ async def test_removing_the_lead_clears_the_lead_and_records_it(
             {"role": "member", "lead_cleared": True},
         )
     ]
+    assert await activity(session) == [lead_cleared(t.project.id, bob.id, admin.id)]
 
 
 async def test_removing_someone_else_leaves_the_lead(
@@ -420,6 +437,7 @@ async def test_removing_someone_else_leaves_the_lead(
     assert response.status_code == 204
     assert await lead_of(session, t.project) == admin.id
     assert [e[4] for e in await events(session)] == [{"role": "viewer"}]
+    assert await activity(session) == []
 
 
 async def test_removing_someone_not_on_the_project_is_a_404(
@@ -490,6 +508,8 @@ async def test_removing_an_org_member_with_projects_removes_them_from_the_orgs_p
         ],
         key=str,
     )
+    # The archived project's lead change is logged too (build plan, "Projects").
+    assert await activity(session) == [lead_cleared(ledger.id, bob.id, owner.id)]
 
 
 async def test_removing_an_org_member_without_projects_leaves_them(
@@ -517,6 +537,8 @@ async def test_removing_staff_with_projects_removes_them_from_every_workspace_pr
     abroad = await ProjectFactory.create_async(organization=other_org, key="ABR")
     for project in (t.project, elsewhere, abroad):
         await ProjectMembershipFactory.create_async(project=project, user=sam)
+    elsewhere.lead_id = sam.id
+    await session.flush()
     await sign_in_as(client, owner)
 
     response = await client.delete(
@@ -531,7 +553,11 @@ async def test_removing_staff_with_projects_removes_them_from_every_workspace_pr
         (e[2], e[4]) for e in await events(session) if e[0] == AuditAction.PROJECT_MEMBER_REMOVED
     ]
     via = {"role": "member", "via": "workspace_member_removed"}
-    assert sorted(removed, key=str) == sorted([(t.project.id, via), (elsewhere.id, via)], key=str)
+    cleared = {"role": "member", "lead_cleared": True, "via": "workspace_member_removed"}
+    assert sorted(removed, key=str) == sorted(
+        [(t.project.id, via), (elsewhere.id, cleared)], key=str
+    )
+    assert await activity(session) == [lead_cleared(elsewhere.id, sam.id, owner.id)]
 
 
 # --- The picker and the member list ---------------------------------------------------------------

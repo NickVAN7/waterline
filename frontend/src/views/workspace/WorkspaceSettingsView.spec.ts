@@ -63,7 +63,8 @@ describe('WorkspaceSettingsView', () => {
 
     expect(patch).toHaveBeenCalledWith('/api/workspaces/{workspace_id}', {
       params: { path: { workspace_id: WORKSPACE_ID } },
-      body: { name: 'Harbor Co', slug: 'harbor' },
+      // Only what changed, so another admin's slug change stands (TD-56).
+      body: { name: 'Harbor Co' },
     })
     expect(wrapper.text()).toContain('Settings saved.')
   })

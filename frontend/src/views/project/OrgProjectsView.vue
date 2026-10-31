@@ -64,16 +64,11 @@ const page = useLoad(() =>
 watch(
   [org, list.params],
   () => {
-    if (!org.value) return
-    void page.run().then((loaded) => {
-      // A page past the end (an old link, since the list shrank) goes back to the first.
-      if (loaded && !page.data.value?.items.length && list.offset.value > 0) {
-        void router.replace(list.linkTo(0))
-      }
-    })
+    if (org.value) void page.run()
   },
   { immediate: true },
 )
+list.returnWhenEmpty(page.data)
 
 const projects = computed(() => page.data.value)
 
@@ -177,7 +172,7 @@ const announcement = computed(() => {
         }}
       </EmptyState>
       <template v-else>
-        <ProjectList :projects="projects.items" />
+        <ProjectList :projects="projects.items" with-type />
         <Pagination
           v-if="projects.total > list.limit"
           :offset="list.offset.value"

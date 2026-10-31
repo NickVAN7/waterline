@@ -10,22 +10,14 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { projectItem } from '@/test/projects'
 import { testRouter } from '@/test/router'
 
 import ProjectSelector from './ProjectSelector.vue'
 
 type Item = components['schemas']['ProjectItem']
 
-const item = (key: string, name: string): Item => ({
-  id: `project-${key}`,
-  key,
-  name,
-  type: 'software',
-  status: 'active',
-  lead_id: null,
-  organization_id: ACME.id,
-  organization_slug: 'acme',
-})
+const item = (key: string, name: string): Item => projectItem(key, { id: `project-${key}`, name })
 
 const page = (items: Item[]) => ok({ items, total: items.length, limit: 200, offset: 0 })
 
@@ -79,6 +71,17 @@ describe('ProjectSelector', () => {
     expect(dialog().textContent).not.toContain('New project')
     expect(document.activeElement?.closest('[role=dialog]')).toBe(dialog())
     await expectNoA11yViolations(document.body)
+  })
+
+  it("heads the list with the org's name, so it's clear whose projects they are (DL-137)", async () => {
+    await openSelector()
+
+    const heading = dialog().querySelector('p')!
+    expect(heading.textContent).toBe(ACME.name)
+    expect(
+      heading.compareDocumentPosition(dialog().querySelector('ul')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('shows the selected project on the button and marks it in the list', async () => {

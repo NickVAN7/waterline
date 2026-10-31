@@ -11,7 +11,6 @@ from app.authz.context import AuthzContext
 from app.authz.scoping import org_scope
 from app.authz.target import org_target, workspace_target
 from app.core.errors import (
-    FieldError,
     ForbiddenError,
     NotFoundError,
     UnauthorizedError,
@@ -42,6 +41,7 @@ from app.schemas.auth import (
     PasswordPolicyRead,
     PasswordRequirement,
 )
+from app.services.approval import ApprovalService
 from app.services.user import (
     AccountSubject,
     UserService,
@@ -157,8 +157,8 @@ class AuthService:
         session's new token (the other sessions are deleted). 422 on `current_password`
         (`incorrect`) or on `new_password` (the password policy's problems)."""
         if not await verify_password(user.hashed_password, current_password):
-            raise ValidationFailedError(
-                [FieldError(("body", "current_password"), "This isn't your password.", "incorrect")]
+            raise ValidationFailedError.on(
+                ("body", "current_password"), "This isn't your password.", "incorrect"
             )
         problems = password_errors(
             new_password,
@@ -207,11 +207,14 @@ class AuthService:
         return True
 
     async def revoke_system_admin(self, email: str) -> bool:
-        """Take the flag away (app CLI only, no actor); False if the account doesn't have it.
+        """Take the flag away (app CLI only, no actor), handing over the pending approvals it
+        gave access to (design-doc §6.2, `changed_by` null); False if the account doesn't have it.
         403 `last_system_admin` when it's the last active system admin (lockout safeguard,
         design-doc §4); 404 for an unknown email."""
         user = await self._user_by_email(email)
         users = UserRepository(self.session)
+        approvals = ApprovalService(self.session)
+        await approvals.lock_projects(user.id)
         # Every active admin's row first, in ID order (so two revocations can't deadlock), then
         # the target re-read: a revocation that committed meanwhile shows as the flag gone.
         active = await users.lock_active_system_admins()
@@ -221,6 +224,7 @@ class AuthService:
         if active == [user.id]:
             raise ForbiddenError("This is the last active system admin.", code="last_system_admin")
         await UserService(self.session).set_system_admin(user, False)
+        await approvals.replace_for(user.id, None)
         log_admin_event(
             self.session,
             action=AuditAction.SYSTEM_ADMIN_REVOKED,
@@ -279,24 +283,32 @@ class AuthService:
         )
 
     async def deactivate(self, ctx: AuthzContext, subject: AccountSubject) -> None:
-        """Deactivate the account and end its sessions (`user_deactivated`); already inactive
-        changes nothing. 422 on the path's `user_id`: `last_owner` for the last active owner of
-        the workspace or an org, `last_system_admin` for the last active system admin."""
+        """Deactivate the account, hand over its pending approvals (design-doc §6.2), and end its
+        sessions (`user_deactivated`); already inactive changes nothing. 422 on the path's
+        `user_id`: `last_owner` for the last active owner of the workspace or an org,
+        `last_system_admin` for the last active system admin."""
         user = subject.user
         if not user.is_active:
             return
+        approvals = ApprovalService(self.session)
+        await approvals.lock_projects(user.id)
         await self._guard_last_owners(subject)
         if user.is_system_admin:
             # Locked like a revocation, so two deactivations can't remove the last one.
             active = await UserRepository(self.session).lock_active_system_admins()
             if active == [user.id]:
-                raise _on_user_id("This is the last active system admin.", "last_system_admin")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"),
+                    "This is the last active system admin.",
+                    "last_system_admin",
+                )
         # The row last (owners, system admins, then the user, as a revocation takes them), and
         # read again: a deactivation that committed meanwhile leaves nothing to do or record.
         await UserRepository(self.session).lock(user)
         if not user.is_active:
             return
         await UserService(self.session).set_active(user, False)
+        await approvals.replace_for(user.id, ctx.user_id)
         await self.repository.delete_all(user.id)
         UserService(self.session).log_account_event(ctx, AuditAction.USER_DEACTIVATED, subject)
 
@@ -316,10 +328,14 @@ class AuthService:
         user_id = subject.user.id
         for workspace_id in workspace_ids:
             if await workspaces.active_owners(workspace_id) == [user_id]:
-                raise _on_user_id("The workspace needs another owner first.", "last_owner")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"), "The workspace needs another owner first.", "last_owner"
+                )
         for org_id in org_ids:
             if await orgs.active_owners(org_id) == [user_id]:
-                raise _on_user_id("The organization needs another owner first.", "last_owner")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"), "The organization needs another owner first.", "last_owner"
+                )
 
     async def reset_password(
         self, ctx: AuthzContext, subject: AccountSubject, password: str
@@ -350,10 +366,6 @@ class AuthService:
         await UserRepository(self.session).lock(subject.user)
         await self.repository.delete_all(subject.user.id)
         UserService(self.session).log_account_event(ctx, AuditAction.SIGNED_OUT_EVERYWHERE, subject)
-
-
-def _on_user_id(message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(("path", "user_id"), message, type_)])
 
 
 async def _end_sessions(session: AsyncSession, user: User) -> None:

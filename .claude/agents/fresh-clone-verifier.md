@@ -47,7 +47,8 @@ The absolute path of the repository and the checkpoint ID.
    - If the guide assumes something it never tells you to do (a tool, an environment variable,
      a file to create), that's a finding.
 5. **Verify the result** using the guide's own instructions for checking the setup (for
-   example `uv run wl doctor`, `uv run wl up`, the health page, `uv run wl check --full`). If the guide
+   example `uv run wl doctor`, `uv run wl up`, the health check, plain `uv run wl check`; not
+   `wl check --full`, which CI runs, DL-170). If the guide
    gives no way to check that setup worked, that's a finding.
 6. **Clean up:** first confirm with `docker compose ls` that the project being removed is
    `waterline-verify`, then run `COMPOSE_PROJECT_NAME=waterline-verify docker compose down -v`

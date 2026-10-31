@@ -197,8 +197,7 @@ Entry format:
 ### TD-14: The pre-deployment items in design-doc §4 have no slice
 - **Added:** S1 planning (Sept 30, 2026)
 - **What:** Design-doc §4, "Before the first non-local deployment", lists work with no slice
-  of its own: sign-in throttling (`login_attempt`), the active-sessions page, password
-  re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
+  of its own: sign-in throttling (`login_attempt`), password re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
   lengths, the reverse proxy forwarding `Host`, re-evaluating the `Origin` check against an
   allowed-origins setting, the admin audit-event screen, general API rate limiting (per IP at
   the reverse proxy, per user in the app for expensive endpoints; 429 `rate_limited` with
@@ -244,7 +243,7 @@ Entry format:
 - **Added:** S1-C1 (security review of the append-only follow-up)
 - **What:** The app and Alembic use the same database URL, so the running app is the owner of
   every table (in Compose, `POSTGRES_USER`, a superuser). The `audit_event` append-only trigger
-  stops ordinary `UPDATE` and `DELETE`, but SQL on the app's own connection could disable or
+  (and, from S2-C3, `activity_log`'s, DL-193) stops ordinary `UPDATE` and `DELETE`, but SQL on the app's own connection could disable or
   drop the trigger first (or `TRUNCATE` the table), so the guard doesn't hold against, say, an
   injection.
 - **Why:** v1 runs locally for a few users; splitting roles needs deployment-time setup
@@ -252,7 +251,7 @@ Entry format:
 - **Fix by:** Slice 7 (before the first non-local deployment, with TD-14; re-target if
   deployment moves later): migrations run as the owner, the app as a role with only data rights
   on the app's tables (no `ALTER`, `DROP`, or `TRUNCATE`), with a test that the app's role can't
-  disable the trigger.
+  disable the triggers.
 - **Status:** open
 
 ### TD-18: No property-based test for number allocation yet
@@ -277,7 +276,7 @@ Entry format:
   latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
   The vulnerable code only expands glob patterns from the repository's own ESLint
   configuration, never untrusted input, and never ships in the app.
-- **Fix by:** Slice 2's tech-debt review (owner, S1-C17; still no fixed `braces` on Oct 21, 2026, and no
+- **Fix by:** S2-C22 (Slice 2's tech-debt review; owner, S1-C17; still no fixed `braces` on Oct 21, 2026, and no
   Slice 2 feature needs it: it only expands the linter's own globs)
 - **Status:** open
 
@@ -451,16 +450,16 @@ Entry format:
 
 ### TD-31: Other locked mutations check rights against the role loaded before the lock
 - **Added:** S1-C13
-- **What:** the `AuthzContext` is loaded at the start of a request. The classification change
+- **What:** the `AuthzContext` is loaded at the start of a request. The restriction change
   re-reads the caller's own project role after taking the project's lock (`_with_current_role`,
   owner decision in the S1-C13 security review), so a role removed while it waits is seen. The
   other mutations that wait on a lock (project update, archive, member adds, role changes and
   removals, and the workspace and org rosters) still check rights against the context as loaded:
   a caller whose role is removed while their request waits can still finish it. The window is
   milliseconds and needs a request already in flight.
-- **Why:** the owner decided the classification change in S1-C13 and chose to revisit the rest
+- **Why:** the owner decided the restriction change in S1-C13 and chose to revisit the rest
   later.
-- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
+- **Fix by:** S2-C22 (Slice 2's tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
   the window is milliseconds and needs a request already in flight; fix it when a checkpoint
   adds a locked mutation where the race would matter
 - **Status:** open
@@ -561,15 +560,18 @@ Entry format:
   failure (UI-FBK-15). With more than one section, that would hide the sections that did load.
 - **Why:** ui-reviewer finding (S1-C14a review, pass 2). Slice 1 has one section, so a
   per-section error state would have nothing beside it.
-- **Fix by:** Slice 2 (My work's approvals section, its second; each section gets its own error
+- **Fix by:** S2-C14 (My work's approvals section, its second; each section gets its own error
   state)
-- **Status:** open
+- **Status:** resolved in S2-C14: each section's query runs in its own savepoint
+  (`MyWorkService._section`), and the page gives the projects section its own error state, keyed
+  on its failed loads in a row of either kind (the request or the section), so another section's
+  failure leaves it showing
 
 ### TD-41: Pickers of people load the first 200
 - **Added:** S1-C15
 - **What:** the replacement-owner picker (the roster's people), the create-org dialog's owner
   picker (the workspace's active users), and the create-project dialog's first-admin picker (the
-  org's active members, from S1-C16, DL-112) each load one page at the API's limit (200) and
+  org's active members and the workspace's active staff, DL-152) each load one page at the API's limit (200) and
   offer those; a roster, workspace, or org with more people shows only the first 200 by name.
 - **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
   would be new API (the lists have no text filter yet).
@@ -585,7 +587,7 @@ Entry format:
 - **Why:** removing it needs a separate authorization action for the reset, which `allowed_actions`
   leaves out on one's own row: a design change in `app/authz/` with spec tests, outside S1-C15
   (owner decision, S1-C15 review).
-- **Fix by:** Slice 2 (its tech-debt review re-checks it): the owner re-targeted it at S1-C17 until an
+- **Fix by:** S2-C22 (Slice 2's tech-debt review re-checks it): the owner re-targeted it at S1-C17 until an
   account action needs its own authorization action; the split was dropped once already
   (DL-73), so it comes back only as a design change
 - **Status:** open
@@ -609,9 +611,9 @@ Entry format:
   `workspace.view`, and `member-candidates` needs an existing project.
 - **Why:** a candidates endpoint for project creation is new API and authorization surface;
   the owner chose the org's members for now (DL-112).
-- **Fix by:** Slice 2 (a `first-admin-candidates` endpoint under `project.assign_first_admin`, or
-  the owner's other choice)
-- **Status:** open
+- **Fix by:** S2-C0c (`GET /api/orgs/{org_id}/first-admin-candidates` under
+  `project.assign_first_admin`, and the create dialog's picker on it; DL-152)
+- **Status:** resolved in S2-C0c
 
 ### TD-45: The project header doesn't mark a deactivated lead
 - **Added:** S1-C16
@@ -653,7 +655,8 @@ Entry format:
   another admin adds or removes `export_controlled` while it's open, an add answers 422
   `confirmation_required` or `confirmation_not_needed` on `export_control_confirmed`, a field the
   dialogs don't show: the server's message is the form's alert, and the checkbox appears or goes
-  only after a reload. Project settings' classification form has the same gap.
+  only after a reload. Project settings' restriction form has the same gap, for a project made export-controlled
+  through the API (DL-133).
 - **Why:** rare (two admins changing one project at once), and the server refuses the add, so
   nothing is recorded wrongly; the owner chose to reload the project on that 422, as a 403 does
   (DL-116).
@@ -665,8 +668,8 @@ Entry format:
 - **What:** the members page's actions (Add member, Add by email, Access review) sit in a row
   under `ProjectHeader`, not in a right-hand actions slot as `PageHeader`'s are.
 - **Why:** the owner left the layout as is for now; it may come with their changes in Slice 2.
-- **Fix by:** Slice 2 (the owner's layout changes, or a decision to keep it)
-- **Status:** open
+- **Fix by:** S2-C0g (the actions in the project header, DL-137)
+- **Status:** resolved in S2-C0g (`ProjectHeader`'s actions slot, beside the `h1`)
 
 ### TD-50: Two other dialogs' last step isn't read with Done
 - **Added:** S1-C16c (DL-118)
@@ -686,8 +689,8 @@ Entry format:
   screen reader hears only once the dialog closes.
 - **Why:** the owner chose to log the S1-C16d review's findings rather than fix them; DL-122 asked
   for the step's existing text, which it has.
-- **Fix by:** Slice 2 (the owner's UI feedback at its start)
-- **Status:** open
+- **Fix by:** S2-C0h (the owner's UI feedback, DL-137)
+- **Status:** resolved in S2-C0h ("Password reset for <name>." read with Done)
 
 ### TD-52: No length limit on names and descriptions
 - **Added:** S1-C17 (repo-auditor)
@@ -695,32 +698,34 @@ Entry format:
   user schemas have no `max_length`, and nothing caps the request body. Each edit's old and new
   values go into `audit_event`, which can't be deleted, so a very large value grows it for good.
 - **Why:** the limits aren't in the schema doc; the owner picks them.
-- **Fix by:** Slice 2 (the limits decided, then `Field(max_length=…)` and `wl gen-client`)
-- **Status:** open
+- **Fix by:** S2-C0c for the existing fields (DL-143: names 100 characters, project description
+  2,000; `Field(max_length=…)` and `wl gen-client`); each Slice 2 field with its row
+- **Status:** resolved in S2-C0c
 
 ### TD-53: The routers' error-response map is written out four times
 - **Added:** S1-C17 (repo-auditor)
 - **What:** `routers/org.py`, `user.py`, `workspace.py`, and `project.py` each define the same
   `ERRORS` map; one in `routers/deps.py` would do.
 - **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
-- **Fix by:** Slice 2 (the first checkpoint that adds a router)
-- **Status:** open
+- **Fix by:** S2-C0c (one `ERRORS` map in `routers/deps.py`)
+- **Status:** resolved in S2-C0c
 
 ### TD-54: Re-wrapping a page of rows is repeated five times
 - **Added:** S1-C17 (repo-auditor)
 - **What:** the workspace, roster, project, user, and my-work services each rebuild a `Page`
   from a `PageResult`; a `PageResult.map(fn)` in `core/lists.py` would do.
 - **Why:** found at the slice-end audit; a refactor outside S1-C17's scope.
-- **Fix by:** Slice 2 (the first checkpoint that adds a list)
-- **Status:** open
+- **Fix by:** S2-C0c (`PageResult.map`)
+- **Status:** resolved in S2-C0c, as `PageResult.with_items(rows)`: the roster builds its rows
+  with one `await` over the page, which a per-item function can't
 
 ### TD-55: `anyio` is used by the app but declared only for development
 - **Added:** S1-C17 (repo-auditor)
 - **What:** `core/security.py` hashes passwords through `anyio.to_thread`, but `anyio` is in the
   dev dependencies; production has it only because Starlette depends on it.
 - **Why:** found at the slice-end audit; harmless while Starlette brings it.
-- **Fix by:** Slice 2 (move it to `[project] dependencies`)
-- **Status:** open
+- **Fix by:** S2-C0c (move it to `[project] dependencies`)
+- **Status:** resolved in S2-C0c
 
 
 ### TD-56: A settings save sends every field, undoing another admin's change
@@ -731,8 +736,8 @@ Entry format:
   `AccountDetailsDialog` already sends only the changed fields.
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
-- **Fix by:** S2-C0 (send only the changed fields, as `AccountDetailsDialog` does)
-- **Status:** open
+- **Fix by:** S2-C0h (send only the changed fields, as `AccountDetailsDialog` does)
+- **Status:** resolved in S2-C0h (`NameSlugSettings`, `ProfileForm`, and project settings' details send only what changed)
 
 ### TD-57: An update's change check reads an unlocked row
 - **Added:** S1-C17 (repo-auditor A2)
@@ -741,8 +746,8 @@ Entry format:
   append-only `audit_event`.
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
-- **Fix by:** S2-C0 (lock and re-read the row before comparing, with a concurrency test for each)
-- **Status:** open
+- **Fix by:** S2-C0c (lock and re-read the row before comparing, with a concurrency test for each)
+- **Status:** resolved in S2-C0c
 
 ### TD-58: Removing the last row of the last page leaves an empty page
 - **Added:** S1-C17 (repo-auditor A3)
@@ -750,8 +755,8 @@ Entry format:
   the last page shows an empty page with no Previous; the project list goes back to page 1.
 - **Why:** found at the slice-end audit, in code from earlier checkpoints; the owner deferred it
   to a pre-checkpoint at the start of Slice 2.
-- **Fix by:** S2-C0 (the project list's return to page 1, moved into `useListQuery`)
-- **Status:** open
+- **Fix by:** S2-C0g (the project list's return to page 1, moved into `useListQuery`)
+- **Status:** resolved in S2-C0g (`useListQuery`'s `returnWhenEmpty`, on every paged list)
 
 ### TD-59: The username suggestion is copied in two dialogs
 - **Added:** S1-C17 (repo-auditor A4)
@@ -759,18 +764,20 @@ Entry format:
   suggestion (S1-C16d's timer fix had to go into both).
 - **Why:** found at the slice-end audit; the owner deferred it to a pre-checkpoint at the start
   of Slice 2.
-- **Fix by:** S2-C0 (one `useUsernameSuggestion` composable)
-- **Status:** open
+- **Fix by:** S2-C0h (one `useUsernameSuggestion` composable)
+- **Status:** resolved in S2-C0h (`useUsernameSuggestion`, in `NewAccountFields`)
 
 ### TD-60: The docs name per-area policy files; Slice 1 built one registry
 - **Added:** S1-C17 (docs-consistency)
 - **What:** the build plan (the area layout, the feature map), `backend/CLAUDE.md`, and the
   `new-area` skill put each area's authorization in `authz/policies/<area>.py`; Slice 1 built one
-  registry, `authz/actions.py`.
+  registry, `authz/actions.py`. DL-151 kept the one registry and corrected those docs; what's left
+  is S2-C0c's check that the `new-area` skill matches the built `project` area (DL-132).
 - **Why:** the owner decided the fix belongs at the start of Slice 2, before its first new area
   follows the docs.
-- **Fix by:** S2-C0 (the docs and the registry made to agree, before the first Slice 2 area)
-- **Status:** open
+- **Fix by:** S2-C0c (DL-151: the docs now describe the one registry, `authz/actions.py`; S2-C0c's
+  `new-area` check confirms the skill matches)
+- **Status:** resolved in S2-C0c
 
 ### TD-61: The token contrast check runs only by hand
 - **Added:** S1-C17 (docs-consistency)
@@ -778,18 +785,22 @@ Entry format:
   token change that fails the contrast minimums.
 - **Why:** no token has changed since it was written; the owner's brand values are still to
   come. The owner revisits whether to port it at Slice 2's end.
-- **Fix by:** Slice 2 (its slice-end tech-debt review decides: port it into `wl check`, or
+- **Fix by:** S2-C22 (Slice 2's slice-end tech-debt review decides: port it into `wl check`, or
   re-target)
 - **Status:** open
 
-### TD-62: Screen inventory steps 2 to 6 aren't done
+### TD-62: The completed screen inventory isn't checked against the docs and built screens
 - **Added:** S1-C17 (docs-consistency)
-- **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) were never done;
-  Slice 1's screens were designed checkpoint by checkpoint.
+- **What:** `docs/screen-inventory.md`'s steps 2 (journeys) to 6 (consolidate) are done (DL-203),
+  but Slice 1's screens were designed checkpoint by checkpoint, and step 6's table hasn't been
+  checked against the docs and the built screens.
 - **Why:** the owner completes the inventory separately, outside the checkpoints.
-- **Fix by:** S2-C0 (the owner's completed inventory checked against the docs and the built
-  screens)
-- **Status:** open
+- **Fix by:** S2-C15, the start of the `s2-web` group: the completed inventory (committed at the
+  `s2-foundations` boundary, DL-203), its step 6 table checked against the docs and the built
+  screens (it wasn't committed when S2-C0i started, DL-157)
+- **Status:** resolved in DC-2026-10-31: step 6's Built rows match the router; the items with no
+  slice (DL-197, DL-200, DL-201) placed by the owner (DL-238, DL-239); the web rows' own re-cuts
+  stay at each row's start (DL-139)
 
 ### TD-63: Settings saves are last-save-wins, with no optimistic lock
 - **Added:** S1-C17 (repo-auditor's question)
@@ -797,6 +808,307 @@ Entry format:
   the same field, the later save wins without either seeing the conflict. (TD-56 covers fields
   the saver didn't change.)
 - **Why:** the owner judged it not an issue at Slice 1's scale.
-- **Fix by:** Slice 2 (its slice-end tech-debt review revisits it: an optimistic lock, or
+- **Fix by:** S2-C22 (Slice 2's slice-end tech-debt review revisits it: an optimistic lock, or
   re-target)
+- **Status:** open
+
+### TD-64: One action registry for every area
+- **Added:** DC-2026-10-22 (DL-151)
+- **What:** every area's actions are registered in one file, `authz/actions.py` (263 lines with
+  Slice 1's actions), rather than per-area policy files; it grows with every area.
+- **Why:** the owner kept the one registry Slice 1 built (DL-151), and expects it will likely
+  need splitting as the app grows.
+- **Fix by:** Slice 2 (its slice-end tech-debt review, and each one after: split it into per-area
+  files once it passes about 600 lines or a slice-end audit recommends it)
+- **Status:** open
+
+### TD-65: A project update locks its row twice
+- **Added:** S2-C0c (checkpoint-reviewer)
+- **What:** `ProjectService.update` takes the project's `FOR UPDATE` lock first (its archived and
+  lead checks need it), then `apply_changes` re-reads the row under its own lock: one extra query
+  per project edit, with nothing gained.
+- **Why:** splitting `apply_changes` into a locking and a non-locking half is more code than one
+  query costs at v1's load.
+- **Fix by:** Slice 2 retro (keep, or split `apply_changes` if another caller needs the
+  non-locking half)
+- **Status:** open
+
+### TD-66: "None" for a missing role is written in two views
+- **Added:** S2-C0g (ui-reviewer finding 3's siblings)
+- **What:** the per-person access review's workspace role and the per-project access review's
+  project role show "None" for a missing role as a literal in the template, not from
+  `src/app/labels.ts` (frontend `CLAUDE.md`, "Display labels").
+- **Why:** both are S1-C15 and S1-C12 code that S2-C0g didn't need to change (DL-106); S2-C0g's
+  own Role and Status values are in `labels.ts`.
+- **Fix by:** S2-C22 (the tech-debt review)
+- **Status:** open
+
+### TD-67: A drop between two tied ranks has no rank to take
+- **Added:** S2-C2 (spec-test-writer question)
+- **What:** two items can share a rank after simultaneous drops (design-doc §6, "Ties"), and
+  `rules/rank.py` raises `ValueError` for equal neighbors, since no rank sorts between them. A
+  move between two tied items would be a 500 until the endpoint handles it.
+- **Why:** the rule can't decide it alone; the move endpoint loads the neighbors and is built in
+  S2-C7.
+- **Fix by:** S2-C7 (the move endpoint decides what a drop between tied neighbors does): it
+  rewrites the gap's siblings, as the length cap does (DL-213)
+- **Status:** resolved in S2-C7
+
+### TD-68: mutmut segfaults on one shape of `rules/rank.py`
+- **Added:** S2-C2
+- **What:** with mutmut 3.8.0 on Python 3.14.4, `wl backend mutate` crashed with a segmentation
+  fault (exit 139, inside mutmut's trampoline reading `os.environ`, with `setproctitle` loaded)
+  every time `rank_between` unpacked `_split(after)` into two names; calling `_split(after)`
+  twice, as the module does now, passes. The crash is in the tool, not the code under test.
+  From S2-C12 it is intermittent, the same code crashing on some runs (in mutmut's stats run)
+  and passing on others: about half of six runs crashed, whatever the shape of
+  `rules/approval_policy.py`'s new functions.
+  After S2-C12 (on a new machine): the first `wl check` crashed in `mutmut run` (a fatal Python
+  error, with `setproctitle`, `greenlet`, and SQLAlchemy's compiled extensions loaded), and the
+  next, on the same tree, passed. Then, in a scratch copy, the gate's mutation sequence (clean,
+  `mutmut run`, `export-cicd-stats`, `mutation_gate check`) passed 30 times out of 30: 10 as
+  configured, 10 with `use_setproctitle = false`, and 10 with `process_isolation =
+  "forkserver"`. Since the setup as configured didn't crash there either, the runs don't show
+  whether either setting helps. What the copy lacked: mutmut running inside a full `wl check`,
+  after about 8,000 tests with the Docker stack up, and the repository's long-used `.venv`.
+  Ruled out: capping pytest-xdist (mutmut's pytest already runs with `-n 0`) and running the
+  gate's steps one at a time (they already do). Capping `--max-children` (default: one per
+  CPU) is unlikely to help, since the recorded crashes were in the single-process stats run,
+  before any child is forked.
+- **Why:** not worth chasing inside a checkpoint; the gate passes on the committed code. The
+  owner chose to leave mutmut as configured until it crashes again (after S2-C12).
+- **Fix by:** S2-C22 (the tech-debt review), or sooner at the next crash: reproduce it under
+  the gate's real conditions (`wl backend mutate` and `wl check` about 10 times each in the
+  repository), then compare `use_setproctitle = false` (the most direct candidate: on Linux,
+  `setproctitle` overwrites the environment's memory, and the crash is reading `os.environ`)
+  and `process_isolation = "forkserver"` there, about 10 runs each; also retry on the
+  then-current mutmut, and report it upstream if it still crashes
+- **Status:** open
+
+### TD-69: Ranks have no maximum length
+- **Added:** S2-C2 (security-reviewer finding 1)
+- **What:** drops into one gap lengthen a rank about one character every six moves (10,000
+  drops just after one rank: about 1,700 characters), and nothing rebalances in v1 (design-doc
+  §6). Past about 2,700 bytes Postgres refuses the btree entry for `task`'s
+  `(project_id, status, rank)` index, so a scripted run of drops would make further drops into
+  that gap fail. `rules/rank.py` no longer crashes on long ranks (a loop, not recursion).
+- **Why:** a limit, and what a drop does when it's reached, was the owner's decision, and only
+  the move endpoint can act on it. Decided (DL-204): a 255-character cap, and a drop that would
+  pass it rewrites the ranks of that gap's siblings in one transaction.
+- **Fix by:** S2-C7 (the move endpoint)
+- **Status:** resolved in S2-C7
+
+### TD-70: The requirement tree stops at 2,000 rows
+- **Added:** S2-C5
+- **What:** `GET /api/projects/{key}/requirements` returns at most 2,000 requirements in
+  `(rank, id)` order, with `truncated: true` above it (DL-159). The cut is by rank across every
+  level, so a truncated tree can hold a child whose parent was left out.
+- **Why:** the tree is a ranked view, returned whole for drag-and-drop (build plan, "API
+  conventions"); the owner judged 2,000 more than enough for v1 (DL-159).
+- **Fix by:** S2-C22 (the tech-debt review): reviewed there, then paged when a project nears
+  2,000 requirements (DL-159)
+- **Status:** open
+
+### TD-71: Creating a child doesn't hold its parent
+- **Added:** S2-C5
+- **What:** `POST /api/projects/{key}/requirements` checks that `parent_id` is a live
+  requirement in the project, then inserts the child, without holding the parent `FOR SHARE`
+  (backend `CLAUDE.md`, "A check that *another* row exists…"). A delete of the parent committing
+  in between would leave a live child under a deleted parent.
+- **Why:** nothing deletes a requirement until S2-C8, so there's no race to test yet, and a lock
+  with no race test against it is unproven code.
+- **Fix by:** S2-C8 (the delete endpoint): hold the parent `FOR SHARE` on create, with a race
+  test against a delete
+- **Status:** resolved in S2-C8 (the parent held `FOR SHARE`; a delete locks a level of the
+  subtree before reading the next, so a child created under a locked row is seen or waits)
+
+### TD-72: The reporter and the restriction floor are checked without a lock
+- **Added:** S2-C6
+- **What:** `PATCH …/requirements/{number}` checks that a new reporter may create requirements in
+  the project (DL-211) without holding their membership `FOR SHARE`, so a removal committing in
+  between leaves a reporter who no longer qualifies. Creating a requirement and its restriction
+  `PUT` check the level against the project's (DL-208) without holding the project row `FOR
+  SHARE`, so a project raise committing in between can leave the item below the new floor (the
+  raise lifts only the rows it sees).
+- **Why:** the same lock-and-race-test work as TD-71, done once in S2-C8; the effective level
+  stays correct meanwhile (the stricter level wins), so nothing is exposed.
+- **Fix by:** S2-C8: hold the reporter's membership and the project row `FOR SHARE`, with a
+  race test each
+- **Status:** resolved in S2-C8 (the new reporter's user row and memberships held `FOR SHARE`;
+  the project row held `FOR KEY SHARE`, not `FOR SHARE`, which would make every create wait on
+  a move's tree lock, against DL-214; a raise's `FOR UPDATE` still conflicts with it; the
+  export-control marking is TD-74)
+
+### TD-73: The rank rewrite sends one UPDATE per sibling
+- **Added:** S2-C7 (checkpoint-reviewer finding 4)
+- **What:** a move with no rank between its neighbors (a tie or the 255-character cap, DL-204,
+  DL-213) rewrites the parent's children with one `direct_update` each, so a rewrite among the
+  tree's cap of 2,000 top-level requirements is about 2,000 round trips under the project's
+  tree lock (DL-214), holding up other moves in that project for a second or two.
+- **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
+  statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
+  helper that does it now.
+- **Fix by:** S2-C22 (Slice 2's tech-debt review): one statement, if the timing matters
+- **Status:** open
+
+### TD-74: A new reporter's inherited admin isn't held against marking the project export-controlled
+- **Added:** S2-C8
+- **What:** a reporter change holds the new reporter's user row and memberships (TD-72), but not
+  the project row, so marking the project export-controlled while it commits can leave an
+  inherited admin with no explicit membership as the reporter, who may no longer create there.
+- **Why:** holding the project row in the edit would take it after the requirement's row, the
+  reverse of a raise's order (the project, then the rows it lifts), and could deadlock; the
+  reporter gets no content access from being the reporter, so nothing is exposed.
+- **Fix by:** S2-C22 (the tech-debt review)
+- **Status:** resolved in S2-C12 (checkpoint-reviewer pass 2): the edit holds the project, then
+  builds its target, so the reporter check sees the restriction a change committed meanwhile;
+  race test `test_a_reporter_change_waiting_on_marking_export_controlled_refuses_an_inherited_admin`
+
+### TD-75: `ListSpec.soft_deleted` and `?include_deleted` have no user
+- **Added:** S2-C8 (checkpoint-reviewer finding 4)
+- **What:** `app/core/lists.py` offers `soft_deleted` (a `?include_deleted` parameter, always
+  restricted) for the trash, but the trash lists only deleted rows through its own repository
+  query (`RequirementRepository.trash`), so no `ListSpec` sets it.
+- **Why:** the code is from an earlier checkpoint (S0/S1 lists), fixed only when needed; tasks'
+  and test cases' trash (Slices 3 and 5) may still want it.
+- **Fix by:** S2-C22 (the tech-debt review): removed, with its tests, if nothing uses it
+- **Status:** open
+
+### TD-76: The revision feed has no `(requirement_id, id)` index
+- **Added:** S2-C9
+- **What:** the build plan's feeds have `(scope, id)` indexes ("API conventions"); the revision
+  list (`GET …/requirements/{number}/revisions`) is served by `requirement_revision`'s
+  `UNIQUE(requirement_id, revision_number)` index and sorts the requirement's revisions by `id`.
+- **Why:** a requirement has tens of revisions, not thousands, so the sort is cheap; an index is
+  a migration for no measured gain.
+- **Fix by:** S2-C22 (the tech-debt review): add the index if a requirement's revisions number in
+  the thousands
+- **Status:** open
+
+### TD-77: The reporter and the trash's deleter carry no "deactivated" flag
+- **Added:** S2-C9 (checkpoint-reviewer finding 1)
+- **What:** `RequirementRead.reporter_name` and `TrashItem.deleted_by_name` name the user without
+  an `*_is_active` flag, so the screens can't show the "Deactivated" badge that follows a
+  deactivated user's name everywhere (ui-design-guide; design-doc §4), as `ActivityEntry` and
+  the revision rows (`created_by_is_active`, S2-C9) do.
+- **Why:** both are from earlier checkpoints (S2-C5, S2-C8), fixed only when needed (DL-106);
+  their screens come in S2-C18 and S2-C21.
+- **Fix by:** S2-C18 (`reporter_is_active`) and S2-C21 (`deleted_by_is_active`), each with its
+  screen
+- **Status:** open
+
+### TD-78: Each authorization spec test spells out every action a role holds
+- **Added:** S2-C10 (owner, chat)
+- **What:** seven spec-test files (`test_actions`, `test_authorize`, `test_project_actions`,
+  `test_content_access`, `test_restriction_actions`, and the API files `test_projects` and
+  `test_export_controlled_requirements`) each list, by hand, the actions a role or the registry
+  holds, so a new action means editing all seven, each with the owner's approval.
+- **Why:** the lists are expectations written independently of `REGISTRY`, so a wrongly granted
+  or wrongly marked action fails them; one hand-written table would keep that and cost one row.
+- **Fix by:** S2-C11, before its spec tests (it adds `approval.decide`): one expected table in
+  `tests/support/authz.py` (each action's level, content or management, and the lowest role
+  granting it, written by hand), the seven tests deriving their lists from it, and a test that
+  every registered action has a row; a test-only change, reviewed by `checkpoint-reviewer`, with
+  the owner's approval of the spec-test changes
+- **Status:** resolved in S2-C11 (`EXPECTED` and `project_actions` in `tests/support/authz.py`;
+  the seven tests derive their lists from it, and `test_actions.py` checks each registered action
+  against its row; owner-approved)
+
+### TD-79: Each approver costs about eight queries
+- **Added:** S2-C10 (checkpoint-reviewer finding 5)
+- **What:** creating an approval request checks each approver in turn: `hold_access` (four
+  queries), the user, and their authorization context (three), so 50 approvers are about 400
+  round trips, made while the requirement is locked.
+- **Why:** bounded by the 50-approver cap (DL-226), and a request names a handful in practice; a
+  batched version needs `hold_access` and `authz_context` for many users at once, which nothing
+  else needs yet.
+- **Fix by:** S2-C22 (the tech-debt review): batch the holds and the contexts (one query each
+  for every approver) if requests name many approvers
+- **Status:** open
+
+### TD-80: Deleting re-checks the rule against the project as first loaded
+- **Added:** S2-C10 (security-reviewer finding 1's sibling)
+- **What:** `RequirementService.delete` takes the tree lock (`lock_tree`, which selects only the
+  project's id) and then runs `ensure()` again, against the project row loaded at the start of
+  the request. An export-control change committing in between isn't seen, so an inherited admin
+  who just lost content access can still delete. The approval request create and cancel hold
+  the project with `ProjectRepository.hold`, which reads it again (S2-C10).
+- **Why:** from S2-C8, fixed only when needed (DL-106); the window is the request's own, and the
+  actor had access a moment before.
+- **Fix by:** S2-C22 (the tech-debt review): read the project again under the tree lock (or hold
+  it as the request create does) before the re-check, with a race test against marking the
+  project export-controlled
+- **Status:** open
+
+### TD-81: The replacement reads the requester's and approvers' access without holding it
+- **Added:** S2-C12
+- **What:** `ApprovalService.replace_lost_access` reads each approver's and the requester's
+  access (`UserRepository.authz_context`) under the project's lock only, without
+  `UserRepository.hold_access`. A path that changes their access without that lock (the org and
+  workspace removals and role changes, `revoke-system-admin`, deactivation) can commit between
+  the read and the replacement's commit. A requester who loses admin in that window can still get
+  a pending row, which leaves the request flagged for a project admin to cancel, as §6.2 does for
+  a requester who has no admin.
+- **Why:** holding them here would deadlock against an org removal "with their projects", which
+  locks the org membership and then needs the project row that the replacement already holds.
+  Those paths, and the lock order between them, are S2-C13's scope.
+- **Fix by:** S2-C13: projects locked first (DL-235), with a race test of a requester's org
+  removal against an approver's project removal
+- **Status:** resolved in S2-C13: every path that takes access away locks the projects of the
+  person's pending rows and requests first (`ApprovalService.lock_projects`), so a replacement
+  there waits for the change: `test_a_request_naming_someone_and_their_deactivation_never_deadlock`
+  (the lock first) and `test_an_approvers_removal_waiting_on_the_requesters_org_removal_reads_them_gone`
+  (the requester's projects in it)
+
+### TD-82: A decision is checked against the approver's access as the request found it
+- **Added:** S2-C12 (security-reviewer finding 2)
+- **What:** `RequirementService.decide` waits on the project's and the request's locks, then
+  checks `approval.decide` against the caller's authorization context, which was loaded before
+  the wait. If a removal of that approver commits during the wait and leaves their row pending
+  (the requester no longer holds project admin, design-doc §6.2), the decision still passes on
+  the membership the removal deleted, and can complete the request.
+- **Why:** from S2-C11, fixed only when needed (DL-106). The window is the request's own, and
+  the approver had access a moment before, as for TD-80.
+- **Fix by:** S2-C22 (the tech-debt review): re-read the caller's project membership under the
+  locks before the check (as `ProjectService._with_current_role` does), with a race test of a
+  removal first and the decision second
+- **Status:** open
+
+### TD-83: A request created while someone loses access can deadlock with the change
+- **Added:** S2-C13 (owner decision, DL-235)
+- **What:** a path that takes someone's access away locks the projects of their pending rows and
+  requests first, makes the change, then looks again (`ApprovalService.replace_for`) and locks
+  the project of any request created in between. A removal "with their projects" also locks,
+  in `ProjectRepository.memberships_in`, the project of a membership added after it read their
+  projects (the add committed while the removal waited on their org or staff row). Those are
+  the two places a project is locked after a person's rows. A request naming them in such a
+  project, holding it and waiting on their rows, can deadlock with the change. Postgres aborts
+  one of the two: a 500, and nothing it did is kept.
+- **Why:** the window is a request created in the same moments as the person's removal,
+  deactivation, or role change; the owner accepted it rather than a retry (DL-235).
+- **Fix by:** S2-C22 (the tech-debt review): retry the transaction once on a deadlock, or
+  confirm the window is still rare enough to keep
+- **Status:** open
+
+### TD-84: Finding a requester's pending requests has no index
+- **Added:** S2-C13 (checkpoint-reviewer finding 4)
+- **What:** `ApprovalRepository.projects_with_pending` filters `approval_request` on
+  `requested_by` and `status`, and no index starts with `requested_by`, so each removal, role
+  change, deactivation, or revocation scans the table twice (the lock and the look again). The
+  table only grows: requests are cancelled, never deleted.
+- **Why:** negligible at the expected volumes (one firm's requests); an index is a schema change,
+  which goes through a design change (schema-doc).
+- **Fix by:** S2-C22 (the tech-debt review): an index on `(requested_by, status)`, or a partial
+  one on pending requests
+- **Status:** open
+
+### TD-85: A refused move can't tell the page to reload
+- **Added:** S2-C15 (ui-reviewer finding 4)
+- **What:** `RequirementsTree` shows a refused move's message but tells its page nothing, so
+  after a 403 the Move button stays (the page doesn't reload `allowed_actions`), and after a
+  stale 404 or 422 "Reload the page" is the only way to get the current tree.
+- **Why:** no page renders the tree until S2-C17, so there's nothing to tell; an event with no
+  listener would be speculative.
+- **Fix by:** S2-C17 (the requirements page): the tree tells the page, which reloads the list,
+  or the project's actions after a 403
 - **Status:** open

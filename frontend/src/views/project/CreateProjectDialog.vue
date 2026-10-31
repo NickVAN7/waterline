@@ -2,9 +2,9 @@
 // Creating a project in an org (build plan, "The projects API"; design-doc §1.1, §3.1, §5): a
 // name, a key checked live (UI-FRM-9), the type, a description, the modules (the type's
 // recommendations and each module's note, from module guidance), a first admin when the org's
-// entry in `/me` allows naming one (the org's active members, DL-112), and the classification.
-// Marking it export-controlled first asks, in its own dialog, for the confirmation that its first
-// admin is authorized (DL-114). Created, the dialog opens the project.
+// entry in `/me` allows naming one (the org's active members and the workspace's active staff,
+// DL-152), and the restriction, without export control (DL-133). Created, the dialog opens the
+// project.
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -22,16 +22,15 @@ import { useAvailability } from '@/composables/useAvailability'
 import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 import { useCurrentUserStore } from '@/stores/currentUser'
 
-import ClassificationFields from './ClassificationFields.vue'
-import ExportControlDialog from './ExportControlDialog.vue'
+import RestrictionFields from './RestrictionFields.vue'
 import ModuleFields from './ModuleFields.vue'
 import { recommendedFor } from './modules'
 
 type Org = components['schemas']['MeOrg']
 type ProjectType = components['schemas']['ProjectType']
 type ProjectModule = components['schemas']['ProjectModule']
-type Level = components['schemas']['ClassificationLevel']
-type Category = components['schemas']['ClassificationCategory']
+type Level = components['schemas']['RestrictionLevel']
+type Category = components['schemas']['RestrictionCategory']
 type Guidance = components['schemas']['ModuleGuidance']
 
 const props = defineProps<{ org: Org }>()
@@ -51,7 +50,7 @@ const modules = ref<ProjectModule[]>([])
 const modulesEdited = ref(false)
 const categories = ref<Category[]>([])
 const guidance = ref<Guidance | null>(null)
-const people = ref<{ value: string; label: string; name: string; email: string }[]>([])
+const people = ref<{ value: string; label: string }[]>([])
 const pending = ref(false)
 const status = ref('')
 const errors = useFormErrors({
@@ -61,12 +60,11 @@ const errors = useFormErrors({
   description: 'Description',
   enabled_modules: 'Modules',
   first_admin_id: 'First admin',
-  classification_level: 'Classification',
-  classification_categories: 'Categories',
+  restriction_level: 'Restriction',
+  restriction_categories: 'Categories',
 })
 
 const dialog = ref<InstanceType<typeof ModalDialog>>()
-const exportControl = ref<InstanceType<typeof ExportControlDialog>>()
 const alertBox = ref<InstanceType<typeof FormAlert>>()
 const nameField = ref<InstanceType<typeof TextField>>()
 const keyField = ref<InstanceType<typeof TextField>>()
@@ -101,22 +99,6 @@ function toggleModule() {
   errors.clearField('enabled_modules')
 }
 
-const exportControlled = computed(() => categories.value.includes('export_controlled'))
-// The confirmation covers the first admin, the only explicit member a new project has (§3.1).
-const firstAdminId = computed(() => values.value.first_admin_id || store.me?.user.id || '')
-const firstAdmin = computed(() => {
-  const named = people.value.find((p) => p.value === values.value.first_admin_id)
-  return named
-    ? { id: named.value, name: named.name, email: named.email, active: true, you: false }
-    : {
-        id: firstAdminId.value,
-        name: store.me?.user.name ?? '',
-        email: store.me?.user.email ?? '',
-        active: true,
-        you: true,
-      }
-})
-
 async function open(): Promise<void> {
   values.value = {
     name: '',
@@ -147,21 +129,16 @@ async function loadGuidance() {
 
 async function loadPeople() {
   try {
-    // shortcut: the org's first 200 members, as the other pickers (TD-41); its staff aren't
-    // listed (TD-44, DL-112).
-    const members = await api(
-      client.GET('/api/orgs/{org_id}/members', {
+    // shortcut: the first 200 candidates, as the other pickers (TD-41). The org's active
+    // members and the workspace's active staff (DL-152).
+    const candidates = await api(
+      client.GET('/api/orgs/{org_id}/first-admin-candidates', {
         params: { path: { org_id: props.org.id }, query: { limit: 200 } },
       }),
     )
-    people.value = members.items
-      .filter((m) => m.is_active && m.user_id !== store.me?.user.id)
-      .map((m) => ({
-        value: m.user_id,
-        label: `${m.name} (${m.email})`,
-        name: m.name,
-        email: m.email,
-      }))
+    people.value = candidates.items
+      .filter((m) => m.user_id !== store.me?.user.id)
+      .map((m) => ({ value: m.user_id, label: `${m.name} (${m.email})` }))
   } catch (error) {
     if (!(error instanceof ApiError)) throw error
     // The picker offers only "Me"; the creator becomes the first admin.
@@ -180,7 +157,6 @@ async function submit(): Promise<void> {
   if (pending.value) return
   const empty = errors.requireFilled({ name: values.value.name, key: values.value.key })
   if (empty) return focus(empty)
-  if (exportControlled.value && !(await exportControl.value?.open([firstAdmin.value]))) return
   pending.value = true
   status.value = 'Creating the project…'
   try {
@@ -188,7 +164,8 @@ async function submit(): Promise<void> {
       client.POST('/api/orgs/{org_id}/projects', {
         params: { path: { org_id: props.org.id } },
         // Cast: the schema types `export_control_confirmed` as always sent (it has a default), but
-        // the server refuses it where no confirmation is needed (`confirmation_not_needed`).
+        // the server refuses it where no confirmation is needed (`confirmation_not_needed`), and
+        // the UI never makes a project export-controlled (DL-133).
         body: {
           name: values.value.name,
           key: values.value.key,
@@ -196,11 +173,8 @@ async function submit(): Promise<void> {
           ...(values.value.description ? { description: values.value.description } : {}),
           ...(guidance.value ? { enabled_modules: modules.value } : {}),
           ...(values.value.first_admin_id ? { first_admin_id: values.value.first_admin_id } : {}),
-          classification_level: values.value.level || null,
-          classification_categories: categories.value,
-          ...(exportControlled.value
-            ? { export_control_confirmed: true, confirmed_member_ids: [firstAdminId.value] }
-            : {}),
+          restriction_level: values.value.level || null,
+          restriction_categories: categories.value,
         } as components['schemas']['ProjectCreate'],
       }),
     )
@@ -312,18 +286,18 @@ defineExpose({ open })
         v-model="values.first_admin_id"
         label="First admin"
         :options="[{ value: '', label: `Me (${store.me?.user.name ?? ''})` }, ...people]"
-        help="The project's first admin and lead. You can name another of the organization's members."
+        help="The project's first admin and lead. You can name another of the organization's members or the workspace's staff."
         :error="errors.fieldErrors.value.first_admin_id"
         @update:model-value="errors.clearField('first_admin_id')"
       />
-      <ClassificationFields
+      <RestrictionFields
         v-model:level="values.level"
         v-model:categories="categories"
         prefix="create-project"
-        :level-error="errors.fieldErrors.value.classification_level"
-        :categories-error="errors.fieldErrors.value.classification_categories"
-        @edit-level="errors.clearField('classification_level')"
-        @edit-categories="errors.clearField('classification_categories')"
+        :level-error="errors.fieldErrors.value.restriction_level"
+        :categories-error="errors.fieldErrors.value.restriction_categories"
+        @edit-level="errors.clearField('restriction_level')"
+        @edit-categories="errors.clearField('restriction_categories')"
       />
       <div class="flex flex-wrap items-center gap-3">
         <Button type="submit" :pending="pending" pending-label="Creating…">Create project</Button>
@@ -331,6 +305,5 @@ defineExpose({ open })
       </div>
       <p class="sr-only" aria-live="polite">{{ errors.announcement.value || status }}</p>
     </form>
-    <ExportControlDialog ref="exportControl" />
   </ModalDialog>
 </template>

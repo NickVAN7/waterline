@@ -1,9 +1,10 @@
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import WorkspaceRole
+from app.schemas.limits import NAME_MAX
 
 
 class WorkspaceRead(BaseModel):
@@ -16,7 +17,7 @@ class WorkspaceRead(BaseModel):
 class WorkspaceUpdate(BaseModel):
     """Only the fields sent change."""
 
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=NAME_MAX)
     slug: str | None = None
 
 
@@ -60,7 +61,7 @@ class NewUser(BaseModel):
 
     email: str
     username: str
-    name: str
+    name: str = Field(max_length=NAME_MAX)
     password: str
 
 

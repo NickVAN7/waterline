@@ -109,9 +109,114 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
     await continueWith(wrapper, 'new@acme.example')
 
     expect(wrapper.text()).toContain('No account has this email yet.')
-    expect(wrapper.get('dd').text()).toBe('new@acme.example')
+    // Editable here, so a mistyped email is fixed on this step (UI-FRM-13, DL-137).
+    expect(wrapper.get<HTMLInputElement>('#add-email').element.value).toBe('new@acme.example')
     expect(document.activeElement?.id).toBe('add-name')
     await expectNoA11yViolations(wrapper)
+  })
+
+  it.each(['ann', 'ann@acme', 'ann @acme.example', '@acme.example'])(
+    'refuses %s on step 1 before asking the server (UI-FRM-13)',
+    async (email) => {
+      const get = userCheck(false)
+      const { wrapper } = await openDialog()
+
+      await continueWith(wrapper, email)
+
+      expect(wrapper.get('#add-email-error').text()).toBe(
+        'Enter an email address like name@example.com.',
+      )
+      expect(document.activeElement?.id).toBe('add-email')
+      expect(get).not.toHaveBeenCalledWith(
+        '/api/workspaces/{workspace_id}/user-check',
+        expect.objectContaining({ params: expect.objectContaining({ query: { email } }) }),
+      )
+    },
+  )
+
+  it('checks an email changed on step 2 again, creating with the new one', async () => {
+    const get = userCheck(false)
+    const { wrapper, roster } = await openDialog()
+    await continueWith(wrapper, 'nwe@acme.example')
+    await wrapper.get('#add-email').setValue('new@acme.example')
+    await wrapper.get('#add-name').setValue('Jane Doe')
+    await wrapper.get('#add-username').setValue('jane-doe')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const checked = get.mock.calls
+      .map((call) => (call[1] as { params?: { query?: Record<string, string> } })?.params?.query)
+      .filter((query) => query && 'email' in query)
+    expect(checked).toEqual([{ email: 'nwe@acme.example' }, { email: 'new@acme.example' }])
+    expect(roster.create).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@acme.example' }),
+      expect.anything(),
+    )
+  })
+
+  it("goes to the confirm step when step 2's new email is someone's account", async () => {
+    const get = userCheck(false)
+    const { wrapper, roster } = await openDialog()
+    await continueWith(wrapper, 'nwe@acme.example')
+    get.mockImplementation(((path: string, init: { params: { query?: Record<string, string> } }) =>
+      Promise.resolve(
+        ok(
+          'email' in (init?.params?.query ?? {})
+            ? { email: 'ann@acme.example', exists: true }
+            : { available: true, problem: null, suggestion: null },
+        ),
+      )) as never)
+    await wrapper.get('#add-email').setValue('ann@acme.example')
+    await wrapper.get('#add-name').setValue('Ann Lee')
+    await wrapper.get('#add-username').setValue('ann')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(roster.create).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('An account already exists for ann@acme.example. Add them?')
+    expect(document.activeElement?.textContent?.trim()).toBe('Back')
+  })
+
+  it("refuses step 2's email in a bad shape, there, before asking the server", async () => {
+    userCheck(false)
+    const { wrapper, roster } = await openDialog()
+    await continueWith(wrapper, 'new@acme.example')
+    await wrapper.get('#add-email').setValue('new@acme')
+    await wrapper.get('#add-name').setValue('Jane Doe')
+    await wrapper.get('#add-username').setValue('jane-doe')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(roster.create).not.toHaveBeenCalled()
+    expect(wrapper.get('#add-email-error').text()).toBe(
+      'Enter an email address like name@example.com.',
+    )
+    expect(document.activeElement?.id).toBe('add-email')
+  })
+
+  it("keeps a create's 422 on the email on step 2, under the field (UI-FRM-13)", async () => {
+    userCheck(false)
+    const { wrapper, roster } = await openDialog()
+    roster.create.mockRejectedValue(
+      invalid({ loc: ['body', 'email'], message: 'That email is taken.', type: 'taken' }),
+    )
+    await continueWith(wrapper, 'new@acme.example')
+    await wrapper.get('#add-name').setValue('Jane Doe')
+    await wrapper.get('#add-username').setValue('jane-doe')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No account has this email yet.')
+    expect(wrapper.get('#add-email-error').text()).toBe('That email is taken.')
+    expect(document.activeElement?.id).toBe('add-email')
   })
 
   it('suggests a username from the name until the admin edits it', async () => {
@@ -157,6 +262,40 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
     await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
 
     expect(wrapper.get<HTMLInputElement>('#add-username').element.value).toBe('jd')
+  })
+
+  it("keeps the admin's own username after Back and Continue, whatever the name becomes", async () => {
+    userCheck(false, 'jane-q-doe')
+    const { wrapper } = await openDialog()
+    await continueWith(wrapper, 'new@acme.example')
+    await wrapper.get('#add-name').setValue('Jane Doe')
+    await wrapper.get('#add-username').setValue('jdoe')
+    await button(wrapper, 'Back').trigger('click')
+    await flushPromises()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    vi.useFakeTimers()
+
+    await wrapper.get('#add-name').setValue('Jane Q Doe')
+    await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
+
+    expect(wrapper.get<HTMLInputElement>('#add-username').element.value).toBe('jdoe')
+  })
+
+  it('follows the name again once reopened, after a username was typed the time before', async () => {
+    userCheck(false, 'jane-doe')
+    const { wrapper } = await openDialog()
+    await continueWith(wrapper, 'new@acme.example')
+    await wrapper.get('#add-username').setValue('jdoe')
+
+    await wrapper.vm.open()
+    await flushPromises()
+    await continueWith(wrapper, 'new@acme.example')
+    vi.useFakeTimers()
+    await wrapper.get('#add-name').setValue('Jane Doe')
+    await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
+
+    expect(wrapper.get<HTMLInputElement>('#add-username').element.value).toBe('jane-doe')
   })
 
   it('creates the account with the role, then shows the temporary password once', async () => {
@@ -349,6 +488,43 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
         exportControlConfirmed: true,
       },
     )
+  })
+
+  it("unticks the confirmation when step 2's email changes: another email is another person (§3.1)", async () => {
+    userCheck(false)
+    const { wrapper } = await openDialog({ exportControlled: true })
+    await continueWith(wrapper, 'nwe@acme.example')
+    await wrapper.get('input[type=checkbox]').setValue(true)
+
+    await wrapper.get('#add-email').setValue('new@acme.example')
+
+    expect(wrapper.get<HTMLInputElement>('input[type=checkbox]').element.checked).toBe(false)
+  })
+
+  it("starts the confirm step reached from step 2 unticked, as step 1's does (§3.1)", async () => {
+    const get = userCheck(false)
+    const { wrapper, roster } = await openDialog({ exportControlled: true })
+    await continueWith(wrapper, 'nwe@acme.example')
+    get.mockImplementation(((path: string, init: { params: { query?: Record<string, string> } }) =>
+      Promise.resolve(
+        ok(
+          'email' in (init?.params?.query ?? {})
+            ? { email: 'ann@acme.example', exists: true }
+            : { available: true, problem: null, suggestion: null },
+        ),
+      )) as never)
+    await wrapper.get('#add-email').setValue('ann@acme.example')
+    await wrapper.get('#add-name').setValue('Ann Lee')
+    await wrapper.get('#add-username').setValue('ann')
+    await wrapper.get('#add-password').setValue('fake-fake-fake-01')
+    await wrapper.get('input[type=checkbox]').setValue(true)
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('An account already exists for ann@acme.example. Add them?')
+    expect(wrapper.get<HTMLInputElement>('input[type=checkbox]').element.checked).toBe(false)
+    expect(roster.add).not.toHaveBeenCalled()
   })
 
   it('asks again for the next person after Back: the confirmation was for the first (§3.1)', async () => {

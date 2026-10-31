@@ -2,10 +2,10 @@
 
 from sqlalchemy.orm import registry
 
-from app.core.base_model import ClassificationMixin
+from app.core.base_model import RestrictionMixin
 
-# The classifiable tables (schema-doc, conventions: "Classification"), each from its own slice.
-CLASSIFIABLE_TABLES = frozenset({"project", "requirement", "task", "testcase"})
+# The restrictable tables (schema-doc, conventions: "Restriction"), each from its own slice.
+RESTRICTABLE_TABLES = frozenset({"project", "requirement", "task", "testcase"})
 
 
 def relationships_that_can_lazy_load(models: registry) -> list[str]:
@@ -38,15 +38,15 @@ def versioned_tables_without_version_checks(models: registry) -> list[str]:
     )
 
 
-def classifiable_models_without_the_mixin(models: registry) -> list[str]:
-    """Models of a classifiable table, or with a `classification_*` column, that don't use
-    `ClassificationMixin` (design-doc §3.1): their columns would drift from the shared ones."""
+def restrictable_models_without_the_mixin(models: registry) -> list[str]:
+    """Models of a restrictable table, or with a `restriction_*` column, that don't use
+    `RestrictionMixin` (design-doc §3.1): their columns would drift from the shared ones."""
     return sorted(
         mapper.class_.__name__
         for mapper in models.mappers
         if (
-            mapper.persist_selectable.name in CLASSIFIABLE_TABLES  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
-            or any(key.startswith("classification_") for key in mapper.columns.keys())  # noqa: SIM118
+            mapper.persist_selectable.name in RESTRICTABLE_TABLES  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+            or any(key.startswith("restriction_") for key in mapper.columns.keys())  # noqa: SIM118
         )
-        and not issubclass(mapper.class_, ClassificationMixin)
+        and not issubclass(mapper.class_, RestrictionMixin)
     )

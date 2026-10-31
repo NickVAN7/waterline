@@ -1,23 +1,26 @@
 <script setup lang="ts">
 // Creating an org with its first owner (build plan, "The workspace and org API"; design-doc §4): a
 // name, a slug checked live (UI-FRM-9), and the owner: an existing active person, or a new account
-// (email, name, username suggested from the name, and a temporary password shown once,
-// UI-FRM-11). A taken email or username reports on its field, wherever the server puts it
+// (`NewAccountFields`: email, name, username suggested from the name, and a temporary password
+// shown once, UI-FRM-11). A taken email or username reports on its field, wherever the server puts it
 // (`new_owner.email` or `email` on a race, TD-25): `useFormErrors` reads the field from the end of
 // `loc`.
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import SelectField from '@/components/SelectField.vue'
-import TemporaryPasswordField from '@/components/TemporaryPasswordField.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
 import TextField from '@/components/TextField.vue'
-import { AVAILABILITY_DELAY_MS, useAvailability } from '@/composables/useAvailability'
+import { useAvailability } from '@/composables/useAvailability'
 import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 import { useCurrentUserStore } from '@/stores/currentUser'
+import NewAccountFields, {
+  type NewAccount,
+  type NewAccountField,
+} from '@/views/roster/NewAccountFields.vue'
 
 const props = defineProps<{ workspaceId: string }>()
 const emit = defineEmits<{ done: [message: string] }>()
@@ -25,17 +28,11 @@ const store = useCurrentUserStore()
 
 type Owner = 'existing' | 'new'
 const owner = ref<Owner>('existing')
-const values = ref({
-  name: '',
-  slug: '',
-  owner_id: '',
-  email: '',
-  owner_name: '',
-  username: '',
-  password: '',
-})
+const values = ref({ name: '', slug: '', owner_id: '' })
+const newOwner = ref<NewAccount>({ email: '', name: '', username: '', password: '' })
 const people = ref<{ value: string; label: string }[]>([])
 const created = ref(false)
+// Kept here: the new owner's fields go when "An existing person" is chosen (TD-59).
 const usernameEdited = ref(false)
 const pending = ref(false)
 const status = ref('')
@@ -57,11 +54,9 @@ const fields = {
   name: ref<InstanceType<typeof TextField>>(),
   slug: ref<InstanceType<typeof TextField>>(),
   owner_id: ref<InstanceType<typeof SelectField>>(),
-  email: ref<InstanceType<typeof TextField>>(),
-  owner_name: ref<InstanceType<typeof TextField>>(),
-  username: ref<InstanceType<typeof TextField>>(),
-  password: ref<InstanceType<typeof TemporaryPasswordField>>(),
 }
+const ownerFields = ref<InstanceType<typeof NewAccountFields>>()
+const OWNER_LABELS = { email: "Owner's email", name: "Owner's name", username: "Owner's username" }
 const path = () => ({ workspace_id: props.workspaceId })
 
 const slug = computed(() => values.value.slug)
@@ -73,56 +68,10 @@ const { message: slugAvailability } = useAvailability(slug, 'Slug', (value) =>
   ),
 )
 
-function userCheck(query: { username: string } | { name: string }) {
-  return api(
-    client.GET('/api/workspaces/{workspace_id}/user-check', { params: { path: path(), query } }),
-  )
-}
-const username = computed(() => values.value.username)
-const { message: usernameAvailability } = useAvailability(
-  username,
-  'Username',
-  (value) =>
-    userCheck({ username: value }) as Promise<{ available: boolean; problem: string | null }>,
-)
-// The username follows the server's suggestion for the owner's name until it's edited (DL-66).
-let suggesting: ReturnType<typeof setTimeout> | undefined
-// A suggestion still pending when the dialog goes would ask the API for nothing.
-onBeforeUnmount(() => clearTimeout(suggesting))
-watch(
-  () => values.value.owner_name,
-  (name) => {
-    clearTimeout(suggesting)
-    if (usernameEdited.value || name.trim() === '') return
-    suggesting = setTimeout(async () => {
-      try {
-        const { suggestion } = (await userCheck({ name })) as { suggestion: string | null }
-        if (!usernameEdited.value && values.value.owner_name === name && suggestion) {
-          values.value.username = suggestion
-        }
-      } catch (error) {
-        if (!(error instanceof ApiError)) throw error
-      }
-    }, AVAILABILITY_DELAY_MS)
-  },
-)
-
-function editUsername() {
-  usernameEdited.value = true
-  ownerErrors.clearField('username')
-}
-
 async function open(): Promise<void> {
   owner.value = 'existing'
-  values.value = {
-    name: '',
-    slug: '',
-    owner_id: '',
-    email: '',
-    owner_name: '',
-    username: '',
-    password: '',
-  }
+  values.value = { name: '', slug: '', owner_id: '' }
+  newOwner.value = { email: '', name: '', username: '', password: '' }
   created.value = false
   usernameEdited.value = false
   orgErrors.reset()
@@ -142,12 +91,15 @@ async function open(): Promise<void> {
   }
 }
 
-type Target = keyof typeof fields | 'alert'
+// The org's fields, or the new owner's (`owner.<field>`: both have a `name`).
+type Target = keyof typeof fields | `owner.${NewAccountField}` | 'alert'
 
 async function focus(target: Target) {
   await nextTick()
   if (target === 'alert') alertBox.value?.focus()
-  else fields[target].value?.focus()
+  else if (target.startsWith('owner.'))
+    ownerFields.value?.focus(target.slice('owner.'.length) as NewAccountField)
+  else fields[target as keyof typeof fields].value?.focus()
 }
 
 /** The first empty required field, in the order the form shows them, or null. */
@@ -160,13 +112,8 @@ function firstEmpty(): Target | null {
     owner_id: owner.value === 'existing' ? values.value.owner_id : 'new',
   })
   if (owner.value === 'existing') return org
-  const person = ownerErrors.requireFilled({
-    email: values.value.email,
-    name: values.value.owner_name,
-    username: values.value.username,
-    password: values.value.password,
-  })
-  return org ?? (person === 'name' ? 'owner_name' : person)
+  const person = ownerErrors.requireFilled(newOwner.value)
+  return org ?? (person && `owner.${person}`)
 }
 
 /** The server's 422, split between the org's fields and the new owner's. */
@@ -193,12 +140,7 @@ async function submit(): Promise<void> {
       : {
           name: values.value.name,
           slug: values.value.slug,
-          new_owner: {
-            email: values.value.email,
-            name: values.value.owner_name,
-            username: values.value.username,
-            password: values.value.password,
-          },
+          new_owner: newOwner.value,
         }
   pending.value = true
   status.value = 'Creating the organization…'
@@ -231,8 +173,8 @@ async function submit(): Promise<void> {
       : null
     if (!orgTarget) orgErrors.reset()
     if (!ownerTarget) ownerErrors.reset()
-    const target = orgTarget ?? ownerTarget ?? 'alert'
-    await focus(target === 'name' && !orgTarget ? 'owner_name' : target)
+    if (orgTarget) await focus(orgTarget)
+    else await focus(ownerTarget && ownerTarget !== 'alert' ? `owner.${ownerTarget}` : 'alert')
   } finally {
     pending.value = false
   }
@@ -259,9 +201,9 @@ defineExpose({ open })
     <template v-if="created">
       <!-- Read with Done, which gets focus (DL-118). -->
       <p id="org-created-what" class="m-0">
-        {{ values.name }} is created, with {{ values.owner_name }} as its owner.
+        {{ values.name }} is created, with {{ newOwner.name }} as its owner.
       </p>
-      <TemporaryPasswordNotice :password="values.password" warning-id="org-created-warning" />
+      <TemporaryPasswordNotice :password="newOwner.password" warning-id="org-created-warning" />
       <div>
         <Button
           ref="doneButton"
@@ -339,48 +281,17 @@ defineExpose({ open })
         :error="orgErrors.fieldErrors.value.owner_id"
         @update:model-value="orgErrors.clearField('owner_id')"
       />
-      <template v-else>
-        <TextField
-          id="org-owner-email"
-          :ref="(el) => (fields.email.value = el as never)"
-          v-model="values.email"
-          label="Owner's email"
-          type="email"
-          autocomplete="off"
-          required
-          :error="ownerErrors.fieldErrors.value.email"
-          @update:model-value="ownerErrors.clearField('email')"
-        />
-        <TextField
-          id="org-owner-name"
-          :ref="(el) => (fields.owner_name.value = el as never)"
-          v-model="values.owner_name"
-          label="Owner's name"
-          autocomplete="off"
-          required
-          :error="ownerErrors.fieldErrors.value.name"
-          @update:model-value="ownerErrors.clearField('name')"
-        />
-        <TextField
-          id="org-owner-username"
-          :ref="(el) => (fields.username.value = el as never)"
-          v-model="values.username"
-          label="Owner's username"
-          autocomplete="off"
-          required
-          help="Suggested from the name. Lowercase letters, digits, and hyphens, starting with a letter."
-          :error="ownerErrors.fieldErrors.value.username"
-          @update:model-value="editUsername"
-        />
-        <p class="m-0 text-sm" aria-live="polite">{{ usernameAvailability }}</p>
-        <TemporaryPasswordField
-          id="org-owner-password"
-          :ref="(el) => (fields.password.value = el as never)"
-          v-model="values.password"
-          :error="ownerErrors.fieldErrors.value.password"
-          @update:model-value="ownerErrors.clearField('password')"
-        />
-      </template>
+      <NewAccountFields
+        v-else
+        ref="ownerFields"
+        v-model="newOwner"
+        v-model:username-edited="usernameEdited"
+        :workspace-id="workspaceId"
+        prefix="org-owner"
+        :labels="OWNER_LABELS"
+        :errors="ownerErrors.fieldErrors.value"
+        @edit="ownerErrors.clearField"
+      />
       <div class="flex flex-wrap gap-3">
         <Button type="submit" :pending="pending" pending-label="Creating…"
           >Create organization</Button

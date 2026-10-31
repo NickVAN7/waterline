@@ -1,32 +1,15 @@
 <script setup lang="ts">
-// The selected project's pages in the sidebar (UI-SHL-6): Home, then each enabled module whose
-// slice hasn't shipped (`available` false in module guidance) as plain muted text with "Not
-// available yet", never a link to a broken screen (design-doc §1.1), then Members (`project.view`:
-// anyone who sees the project reads its members), then Settings for those it offers anything (`hasSettings`). A
-// module's link arrives with its slice.
-import { computed, onMounted } from 'vue'
-
-import { api, client } from '@/api/client'
-import { MODULE, NOT_AVAILABLE_YET } from '@/app/labels'
+// The selected project's pages in the sidebar (UI-SHL-6): Home, then Members (`project.view`:
+// anyone who sees the project reads its members), then Settings for those it offers anything
+// (`hasSettings`). A module's link arrives with its slice: no module can be enabled before it
+// ships (DL-136).
 import { allows } from '@/composables/allowedActions'
-import { useLoad } from '@/composables/useLoad'
 import type { Project } from '@/stores/currentOrg'
 import { hasSettings } from '@/views/project/settings'
 
 import SidebarLink from './SidebarLink.vue'
 
-const props = defineProps<{ project: Project; orgSlug: string | undefined }>()
-
-const guidance = useLoad(() => api(client.GET('/api/module-guidance')))
-onMounted(() => void guidance.run())
-
-// Until guidance answers (or if it fails), no module is shown: nothing is claimed either way.
-const unavailable = computed(() => {
-  const notes = guidance.data.value?.modules ?? []
-  return props.project.enabled_modules.filter(
-    (module) => notes.find((n) => n.module === module)?.available === false,
-  )
-})
+defineProps<{ project: Project; orgSlug: string | undefined }>()
 </script>
 
 <template>
@@ -34,14 +17,6 @@ const unavailable = computed(() => {
     <SidebarLink :to="{ name: 'project-home', params: { orgSlug, key: project.key } }">
       Home
     </SidebarLink>
-    <p
-      v-for="module in unavailable"
-      :key="module"
-      class="m-0 flex flex-col px-3 py-1 text-text-muted"
-    >
-      {{ MODULE[module] ?? module }}
-      <span class="text-sm">{{ NOT_AVAILABLE_YET }}</span>
-    </p>
     <SidebarLink
       v-if="allows(project, 'project.view')"
       :to="{ name: 'project-members', params: { orgSlug, key: project.key } }"

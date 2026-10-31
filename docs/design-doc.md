@@ -20,7 +20,7 @@
 >    `authorize()` (§5). API conventions are in `build-plan.md`.
 > 6. Oct 5, 2026 review: personal actions in `authorize()` (§5), approver eligibility and
 >    replacement (§6.2), manual requirement approval by project admins (§5, §6.2), revision 1 at
->    creation (§6.1), data classification and export control (§3.1), accessibility (WCAG 2.2
+>    creation (§6.1), data restriction and export control (§3.1), accessibility (WCAG 2.2
 >    AA, §1) and loading states (`screen-inventory.md`, step 5), API rate limiting (§4), and
 >    malware scanning for future file uploads (§16).
 > 7. Journey decisions (Oct 6–7, 2026), from the screen-inventory journey work: any org member
@@ -111,10 +111,12 @@ per kind of project.
     their projects") clears `lead_id` in the same transaction (a project admin may also clear it,
     DL-76), recorded in the
     `project_member_removed` event's details and, from Slice 2, as a `lead_id` change in the
-    project activity feed (§10); the UI flags a project with no lead. A
+    activity log (§10; shown in the project activity feed from Slice 3, DL-147); the UI flags a
+    project with no lead. A
     deactivated lead stays the lead and is shown with the "deactivated" badge (§4), for a
     project admin to replace.
-  - Status and lead changes also appear in the project activity feed (§10), from Slice 2.
+  - Status and lead changes are also logged to the activity log from Slice 2, and appear in the
+    project activity feed from Slice 3 (§10, DL-147).
   - **`project.description`** — plain text, optional (as on phases and workstreams).
 
 | Module | Adds | Default on for | Status |
@@ -127,17 +129,22 @@ per kind of project.
 | `data_migration` | Data objects, load cycles, reconciliation | erp | v2 |
 | `cutover` | Cutover runbook and rehearsals | erp | v2 |
 
-The v1 modules (`sprints`, `github`) can be enabled from the start (Slice 1), so software
-projects are seeded with their defaults before those modules' screens exist; until a module's
-slice ships, the UI shows its features and links greyed out or disabled. The API's module
-guidance tells the UI which modules are **available** (shipped), from one place in the backend
-that is updated when a module's slice ships. The v2 (ERP) modules can be enabled only once they
-have shipped. Until then, seeding skips them (an `erp` or `general` project created in v1 starts
-with no modules), while module guidance still lists them as recommended, with `available`
-false.
+**A module can be enabled only once it has shipped** (DL-136), v1 and v2 modules alike: a known
+module that hasn't shipped is a 422 `module_unavailable`, and a v2 module, which the API doesn't
+know until its slice adds it, a 422 `enum` (DL-178). The
+API's module guidance tells the UI which modules are **available** (shipped), from one place in
+the backend that is updated when a module's slice ships. Until then, seeding skips the module
+(every project created before Slice 4 starts with no modules), the API refuses enabling it (422
+`validation_error` on `enabled_modules`, as above), and the UI shows it as a
+disabled checkbox with "Not available yet", while module guidance still lists it as recommended,
+with `available` false. When `sprints` (Slice 4) and `github` (Slice 7) ship, that slice decides
+whether existing software projects get the module turned on.
 
 - **Disabling a module hides it; it never deletes data.** Re-enabling brings everything back.
-  A disabled module's endpoints return 404 for that project.
+  A disabled module's endpoints return 404 for that project. In the UI, a turned-off module's
+  page (from a bookmark, say) is an explanatory page inside the project instead of a 404: "The
+  Sprints module is turned off for this project. Contact your administrator for questions.",
+  with the module's name (Slice 4, DL-239). An unshipped module has no page at all (DL-200).
 - **UI guidance on module choice.** Module selection (at project creation and in project
   settings) shows, for the project's type, which modules are recommended and a short
   best-practice note for each. Examples:
@@ -160,7 +167,7 @@ false.
 | ORM / Migrations | SQLAlchemy 2.x (plain, not SQLModel) + Alembic | Mature; fits the relational, traceability-heavy model. SQLModel was rejected (build-plan, implementation decision 1) |
 | Database | PostgreSQL | Also hosts the job queue and full-text search — no extra services in v1 |
 | Background jobs | procrastinate (Postgres-backed queue) | No new infrastructure; jobs enqueue in the same transaction as the data they act on |
-| Frontend | Vue 3 + TypeScript; PrimeVue + Tailwind v4 on one token set; SVAR Vue Kanban and DataGrid for the board and editable grids, SVAR Gantt planned for v2 | Existing familiarity; accessible widgets we don't hand-build, one palette (`docs/ui-design-guide.md`) |
+| Frontend | Vue 3 + TypeScript; PrimeVue 5 (PrimeUI License, the owner's Community License key, DL-135) + Tailwind v4 on one token set; SVAR Vue Kanban and DataGrid for the board and editable grids, SVAR Gantt planned for v2 | Existing familiarity; accessible widgets we don't hand-build, one palette (`docs/ui-design-guide.md`) |
 | Local dev | Docker Compose: `api`, `worker`, `web`, `postgres`, plus a one-shot `migrate` | Worker and migrate run the same image as `api` with a different command; `migrate` applies migrations before `api` and `worker` start; `web` is the Vite dev server |
 | Deployment | Self-hosted/local initially | Stateless API + externalized DB keeps it cloud-portable |
 
@@ -244,7 +251,8 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   of top-level routes (`workspace`, `account`, `sign-in`, …). Workspace slugs follow the same list
   only to keep root-level workspace URLs possible later; in v1 workspace pages are `/workspace/…`.
   The system-status page (the API and database health check) is at `/status`, which is on the list;
-  My work is the root route (`/`, §11). The list lives in `rules/identifiers.py` and is exported
+  My work is the root route (`/`, §11), and the Documentation page's `docs` joins the list in
+  S2-C21d (DL-238). The list lives in `rules/identifiers.py` and is exported
   through the OpenAPI schema (an enum), so a frontend test checks every top-level route in the
   router against the generated list.
 - **Timestamps:** `timestamptz` everywhere. Every table has `created_at`/`updated_at`, with
@@ -262,41 +270,62 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   reload instead of silently overwriting someone else's edit. If the item is **gone** instead
   (deleted, or soft-deleted since the user loaded it), the save returns **404**: there is
   nothing to reload. An item that was already soft-deleted when loaded (e.g. one being
-  restored) isn't "gone", so a conflict there is still 409.
+  restored) isn't "gone", so a conflict there is still 409. Rank (§6), the subtask counter
+  (§3), an item's restriction (DL-168), and a requirement's parent change (a move, a delete's
+  promote, a restore at the top level; DL-214, DL-215) don't bump `version`, so none of them
+  causes a 409 for someone editing the item's content. A new item starts at `version` 1: setting its first
+  revision pointer in the creating transaction doesn't bump it either (DL-207).
 - **Manual ordering:** `rank` (sortable string, fractional indexing) on task, requirement, and
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
-  that row. See §6.
-- **Markdown:** rendered markdown (descriptions, comments) is sanitized on render to prevent
-  stored XSS.
+  that row, except a drop past the length cap or between tied neighbors, which rewrites that
+  gap's siblings (requirements, DL-204, DL-213, and a delete's promote or a restore at the top
+  level the same way, DL-218; tasks decided in Slice 3, DL-216). See §6.
+- **Markdown** (DL-140): descriptions and comments are stored as markdown (`description_md`)
+  and rendered in the browser, never on the server, with `markdown-it` (raw HTML off) and then
+  DOMPurify on its output, so stored XSS can't run. Supported: CommonMark plus tables, task-list
+  syntax, strikethrough, and autolinks. **No remote images**: image syntax renders as a link,
+  since a remote image tracks who opens the page and leaks that a Confidential item was opened
+  (uploads are v2). Links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`.
+  Headings shift down one level, so a description never adds a second `h1`. Code blocks are
+  monospace, with no syntax highlighting. A server-side renderer (`markdown-it-py` and `nh3`)
+  is added only when something server-side shows content (v1.5 notifications, exports). A
+  Content-Security-Policy is the second layer (§4).
 
-### 3.1 Data classification
+### 3.1 Data restriction
 
-Owner decisions, Oct 5, 2026. Classification labels say how sensitive a project's content is and
-why. In v1 they drive a banner and badges, logging, and the export-control access rules below.
-Columns: `ClassificationMixin` (schema-doc, conventions).
+Owner decisions, Oct 5, 2026; renamed from "classification", with the Restricted level removed,
+Oct 21, 2026 (DL-134). Restriction labels say how sensitive a project's content is and why. In
+v1 they drive badges, logging, and the export-control access rules below. Columns:
+`RestrictionMixin` (schema-doc, conventions).
 
 - **Two parts:**
-  - a **level**, one per entity: empty (unclassified, the default) → **Internal** →
-    **Confidential** → **Restricted**;
+  - a **level**, one per entity: **None** (the default, stored as null) → **Internal** →
+    **Confidential**;
   - **categories**, any number: `financial`, `proprietary`, `pii`, `export_controlled`.
 
   Categories say *why* something is sensitive; the level says *how* sensitive. They're
-  independent (PII can be Confidential or Restricted).
+  independent (PII can be Internal or Confidential).
 - **Levels.** The "Means" text is the UI's description beside each choice:
 
   | Level | Means | Examples |
   |---|---|---|
-  | *(none)* | Not yet classified; treated like Internal for every rule; no banner | — |
+  | None | Not yet restricted; treated like Internal for every rule; no badge | — |
   | Internal | For the firm and the client's project team; not for the public. Disclosure is embarrassing, not damaging | plans, schedules, ordinary tasks |
-  | Confidential | Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement | client financials, pricing, contract terms, proprietary process designs, business-contact PII |
-  | Restricted | Disclosure would cause serious harm or breach a legal or regulatory duty; need-to-know | sensitive PII (government IDs, bank details, payroll, health), unpatched security vulnerabilities, M&A |
+  | Confidential | Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement | client financials, pricing, contract terms, proprietary process designs, PII |
 
-- **What's classified:**
+- **What's restricted:**
   - The **project** sets the floor.
   - **Content items** (requirements, tasks, test cases; later RAID items, status reports, budget
-    lines, attachments) can raise the level and add categories, never go below the project's.
-  - **Effective classification** = the stricter of the item's and the project's levels, plus
-    the union of their categories. Unclassified with Internal is Internal (owner decision,
+    lines, attachments) can raise the level and add categories, never go below the project's
+    (DL-208): an item's stored level is none (it inherits the project's) or at least the
+    project's. A level below it, at creation or in a restriction change, is a 422
+    `validation_error` of type `below_project` on the level field. Raising a project's level
+    raises every live item stored below the new level to it, logged on each item
+    (`restriction_level`, by the admin who raised the project), without moving the item's
+    `updated_at` (nobody edited it); items in the trash are raised when restored instead
+    (DL-209). A restriction change made on the item itself moves `updated_at` (DL-210).
+  - **Effective restriction** = the stricter of the item's and the project's levels, plus
+    the union of their categories. None with Internal is Internal (owner decision,
     Oct 12, 2026).
   - **Everything else inherits:** phases, milestones, workstreams, sprints, and test runs from
     the project; subtasks, comments, and links from their parent; approval requests from what
@@ -304,10 +333,14 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
 - **`export_controlled` is project-only in v1.** Its protection comes from access control,
   which is project-level in v1. Item-level `export_controlled` arrives with v2 per-person
   visibility (§16).
+- **The UI hides export control** (DL-133): the create-project dialog and project settings
+  don't offer `export_controlled`. The API still accepts it, and every rule below holds for a
+  project made export-controlled through the API, including the member-add confirmations and,
+  from Slice 2, the export-control gate.
 - **Who sets it:**
   - A project's level and categories start empty (no seeding by project type). The creator
     (any org member who may create projects, §5) can set them when creating the project,
-    `export_controlled` included, or project admins later.
+    `export_controlled` included (through the API, DL-133), or project admins later.
   - Project admins (including inherited) set and raise them.
   - Members can raise an item's level and add categories.
   - Lowering a level or removing a category is project-admin only.
@@ -319,13 +352,13 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
 - **Export-controlled projects (who sees content).** When a project has `export_controlled`:
   - **Content needs explicit membership.** Inherited admins (system admins, workspace
     owners/admins, org owners/admins) keep **management** access: the project in lists, its
-    settings, members, archive and unarchive, and raising its classification. They lose
+    settings, members, archive and unarchive, and raising its restriction. They lose
     **content** access unless they hold an explicit `project_membership`. Content means
     requirements, tasks, test cases, subtasks, comments, links, approvals, test runs, the
     activity feed, and anything else inside the project. Every content action denied to them,
     read or mutation, is a 404, as elsewhere. `authorize()` applies this as the export-control
     gate (§5), built in Slice 2 with the first content (requirements); the project's own record
-    (`project.view`: name, key, settings, members, classification) is management.
+    (`project.view`: name, key, settings, members, restriction) is management.
   - **Adding a member needs a confirmation.** Adding anyone to the project (picker, email-first
     add, or creating a user for it) requires the admin to confirm the person is authorized for
     export-controlled data (a required field in the request; 422 without it). The confirmation
@@ -338,20 +371,20 @@ Columns: `ClassificationMixin` (schema-doc, conventions).
     the only explicit member is then its first admin (§5, "Org roles"), and the confirmation is
     recorded in `project_created`.
   - **Approvers on an export-controlled project** must be explicit members; an approver who
-    loses that (including when the project is marked export-controlled) is replaced, except in
-    an archived project (§6.2).
+    loses that (including when the project is marked export-controlled) is replaced (§6.2; an
+    archived project has no pending requests, DL-194).
     Approver replacement goes to the requester only if they're an explicit project admin;
     otherwise the request is flagged.
 - **What the labels control:**
 
   | Rule | Arrives |
   |---|---|
-  | Banner on project pages and a badge on items: level and categories, as text, never color alone | v1 |
+  | A badge in the project header and on items: level and categories, as text, never color alone (DL-137) | v1 |
   | Changes logged: `audit_event` for projects (§10.1), `activity_log` for items (§10) | v1 |
   | The export-controlled rules above | v1 |
   | Notifications show no content for Confidential and above, only a link | v1.5 |
-  | Exports carry a classification header; Restricted exports for project admins only | when exports exist |
-  | AI features: never Restricted or `export_controlled`; Confidential only through a workspace-approved provider | v2 |
+  | Exports carry a restriction header | when exports exist |
+  | AI features: never `export_controlled`; Confidential only through a workspace-approved provider | v2 |
   | Retention rules per level or category | v2+ |
 
 - **Not in v1** (§16): per-person visibility of items (v2, a separate access table); item-level
@@ -406,7 +439,7 @@ Workspace (the firm: tenant boundary)
     projects. An org membership alone (role member) shows the org, not its projects;
   - only workspace owners/admins (and system admins) see the **workspace pages** (staff, org
     list, users). Workspace members and client users see only their orgs and projects, through
-    the org switcher.
+    the org menu (DL-137).
 - **Client users normally belong to one org.** This is typical, not enforced.
 - **One workspace for the foreseeable future.** It exists mainly to roll up dashboards and
   statistics across clients. Rules that only matter with several workspaces (e.g. users in more
@@ -429,8 +462,12 @@ Workspace (the firm: tenant boundary)
 - `is_active` — an inactive user **cannot sign in at all**; deactivation deletes their sessions
   immediately. Their past work (tasks, comments, log entries) still references them and is shown
   with a "deactivated" badge. Their open tasks stay assigned; the UI highlights them for manual
-  reassignment. Their pending approvals are replaced (§6.2; in an archived project the rows stay
-  pending and the requests are flagged).
+  reassignment. Their pending approvals are replaced (§6.2; an archived project has none,
+  DL-194). They're left out of every picker (assignee, reviewer, approver, lead, member) and of
+  the member and user lists (org members, project members, workspace staff and users), which
+  show active people only; that scope's admins get a "Show deactivated" filter on those lists,
+  which is how they find someone to reactivate, and no one else sees deactivated people listed
+  (DL-200).
 - `is_system_admin` — may perform any action in any workspace, org, or project, except
   personal actions such as deciding another person's approval (§5) and the content of an
   export-controlled project they aren't an explicit member of (§3.1). Workspaces and orgs
@@ -543,6 +580,10 @@ Workspace (the firm: tenant boundary)
   sessions:** every request re-checks memberships, so the lost access ends at once; a user with no
   memberships left can still sign in and sees a "no access" page. Deactivation is how someone is cut
   off.
+- **Content-Security-Policy** (Slice 2, DL-142): every page is served with a CSP that allows
+  scripts only from our own origin, a second layer behind the markdown sanitizer (§3). PrimeVue's
+  injected styles need a nonce or `style-src 'unsafe-inline'`; S2-C16 decides which and records
+  it here.
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
@@ -592,12 +633,14 @@ Workspace (the firm: tenant boundary)
     `last_seen_at` written at most every 5 minutes.
   - The same cookie settings in every environment, dev and test included (build plan,
     implementation decision 9).
+- **Active sessions in Account settings** (v1, DL-197; S2-C21b, DL-238): the
+  user sees their active sessions, each with its device and browser (from its user agent),
+  when it signed in, and when it was last active, and signs out of the others (adds
+  `user_agent` to `session`; no IP address or location is kept, DL-242). (Admin "sign out everywhere" is built in Slice 1, under the rank
+  rule in "Account management".)
 - **Before the first non-local deployment** (features, not design questions):
   - Sign-in throttling per account and per IP, with progressive delays and no permanent
     lockout (`login_attempt` table).
-  - Active-sessions page (adds `user_agent` and `ip_address` to `session`) with per-session
-    revoke. (Admin "sign out everywhere" is built in Slice 1, under the rank rule in "Account
-    management".)
   - Password re-entry for sensitive actions (an admin changing a user's email;
     linking/unlinking GitHub; admin password resets).
   - Nightly worker job deleting expired sessions.
@@ -613,8 +656,8 @@ Workspace (the firm: tenant boundary)
   - Local HTTPS for the dev server, and end-to-end tests beyond Chromium.
   - A screen for the admin audit events (§10.1).
   - Separate database roles: migrations run as the owner; the app runs as a role with only data
-    rights (no `ALTER`, `DROP`, or `TRUNCATE`), so the `audit_event` append-only trigger can't
-    be disabled from the app's own connection (§10.1).
+    rights (no `ALTER`, `DROP`, or `TRUNCATE`), so the `audit_event` and `activity_log`
+    append-only triggers can't be disabled from the app's own connection (§10, §10.1).
   - General API rate limiting, beyond sign-in throttling: per IP at the reverse proxy, and per
     user in the app for expensive endpoints (search, exports, later AI features). A limited
     request gets 429 with a `Retry-After` header and the standard error body (code
@@ -664,7 +707,9 @@ Workspace (the firm: tenant boundary)
   roles never grant it, and nothing later in the order overrides it. The archived
   check and the export-control gate still come first, so a personal action inside an archived
   project is denied like any other mutation. Known personal actions:
-  - `approval.decide`: only the approval row's named approver (§6.2; Slice 2);
+  - `approval.decide`: only the approval row's named approver, while that row is still pending
+    (§6.2; Slice 2): one who has decided is refused (403, before any 422 `not_pending`; one whose
+    row was replaced has lost access, so a 404; DL-234);
   - editing one's own comment: only its author (§11; Slice 6). Deleting any comment stays a
     project-admin action.
 - **Reads are authorized too**, not just mutations:
@@ -734,9 +779,9 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
 
   | Item | Who can delete |
   |---|---|
-  | Task | reporter, or project admin |
-  | Requirement | reporter while it has never been approved (`approved_revision_id IS NULL`); once approved, project admin only |
-  | Test case | reporter, or project admin |
+  | Task | reporter, as a project member (member role or above; DL-219, DL-223), or project admin |
+  | Requirement | reporter, as a project member (member role or above; DL-219), while it has never been approved (`approved_revision_id IS NULL`); once approved, project admin only |
+  | Test case | reporter, as a project member (member role or above; DL-219, DL-223), or project admin |
   | Subtask (hard delete) | any project member (member role or above) |
   | Phase, milestone (hard delete) | any project member (member role or above), only while nothing references them |
 
@@ -745,10 +790,18 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   it out of `approved` to any other status; completing the gate's approval request sets it as
   a system effect. Members change other milestone statuses as usual. `approved` is refused on
   non-gate milestones.
+- **Requirement status** (DL-148): there is no transition table. Members move a requirement
+  from any status to any other, `rejected` and `deferred` included, **except into `approved`**.
+  New requirements always start as `draft`. There are no parent/child status rules.
 - **Requirement approval by hand:** only a project admin (including inherited) moves a
-  requirement into `approved` by hand; members get 403 for that transition. Doing so sets
+  requirement into `approved` by hand, through its own action, `requirement.approve_manually`,
+  which `allowed_actions` carries so the status menu offers Approved only to those who may use it
+  (DL-148); members get 403 for that transition. Doing so sets
   `approved_revision_id` to the current revision, `approved_by` to that admin, and
   `approved_at` to now, and cancels any pending approval request on the requirement (§6.2).
+  That action is the only path: a `PATCH` setting `status` to `approved` answers admins 422
+  `validation_error`, type `use_approve` (DL-161). It takes the `version` the admin saw, and a
+  stale one is a 409, so the revision approved is the one on screen (DL-169).
   Moving a requirement *out* of `approved` (e.g. to `in_progress`) follows the normal edit
   rules; `approved_revision_id` stays set, so "Approved · modified" (§6.1) and the delete rule
   above still work. Logged like any change (`status` and `approved_revision_id`, §10).
@@ -776,7 +829,9 @@ no schema change.
   **content** access (§3.1), so inherited admins without an explicit membership show as
   management only.
 - **Per person:** every org and project the person can reach, and through what (the same
-  reasons).
+  reasons). Each project says whether it's export-controlled, and only those rows show content
+  or management access (DL-177, as the per-project view does, DL-133); the others' blank cell
+  says "Not export-controlled" to a screen reader (DL-184).
 - Both views are **management** actions (like the members list, §3.1), so inherited admins
   open them on an export-controlled project too.
 - **Who opens them** (owner decision, Oct 7, 2026): the per-project view, project admins
@@ -830,14 +885,33 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   approach as task dependencies).
 - `priority` (critical/high/medium/low), markdown `description_md`, `rank` among siblings.
 - `reporter_id` (NOT NULL, set to the creator; project admins can reassign it). Drives delete
-  permission (§5). Distinct from any ERP "business owner" role, which is covered by approvals
+  permission (§5). A reassigned reporter is an active user who may create requirements in the
+  project: a project member or admin, or an inherited project admin with content access (on an
+  export-controlled project, an explicit membership). On `reporter_id`, a deactivated user is a
+  422 `validation_error` of type `account_inactive`, anyone else outside that set `not_member`,
+  and an unchanged `reporter_id` is no change, so a deactivated reporter never blocks a save,
+  as for a project's lead (DL-211). Distinct from any ERP "business owner" role, which is covered by approvals
   (§6.2).
 - `workstream_id` (nullable). A new child requirement defaults to its parent's workstream in the
   UI.
 - **Acceptance criteria live in the description** (no separate field). New requirements are
   pre-filled from a template with a `## Acceptance Criteria` heading, so criteria are
-  consistently placed and machine-findable for v2 AI features.
+  consistently placed and machine-findable for v2 AI features. One template per project type
+  (DL-149), a frontend constant chosen by the project's type when the create form opens (the
+  server injects nothing, and changing a project's type later changes no requirement):
+  - Software and General: `## Context`, `## Acceptance Criteria`, `1.`
+  - ERP: `## Business Process`, `## Current State`, `## Future State`, `## Acceptance Criteria`,
+    `1.` (revisited when ERP is designed, v2).
+
+  Criteria are a numbered list (Given/When/Then optional, never enforced), never checkboxes:
+  ticking one would edit the description, create a revision, and flag "Approved · modified".
+  Templates hold no placeholder comments (raw HTML is off, so they'd show); hints sit beside the
+  editor. A requirement with no "Acceptance Criteria" heading (any level, ignoring case) shows a
+  "No acceptance criteria" note on its detail page; nothing blocks it.
 - Revision history and approval tracking — see §6.1 and §6.2.
+- **Traceability in v1** is coverage columns on the requirement tree: task count and progress,
+  test-case count, latest result, and approval state, filled in as Slices 3 and 5 ship. There is
+  no separate requirement × test case matrix page (DL-199).
 
 ### 6.1 Requirement revisions
 - **Creating a requirement creates revision 1**, in the same transaction, and sets
@@ -855,7 +929,19 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   The status stays `approved`; the UI shows "Approved · modified" with a diff between the two
   revisions. Re-approval is a new approval request for the current revision.
 - **Any two revisions can be compared**, not only the approved one against the current one:
-  the history lets the user pick both sides of the diff.
+  the history lets the user pick both sides of the diff (DL-145). The diff is computed in the
+  browser with `jsdiff` on the **raw markdown**, never rendered HTML: line by line, then word by
+  word within changed lines; inline, not side by side (side by side can't reflow to 320 px);
+  unchanged runs over three lines collapse ("Show 12 unchanged lines"); a title change is shown
+  as its own field; each side's change note and author are shown. The From and To pickers
+  default to approved vs. current when the requirement is "Approved · modified", otherwise to
+  the selected revision vs. the one before it; the older one is always From. The API serves the
+  revision list (cursor-paged: revisions are append-only) and one revision's read; there is no
+  compare endpoint.
+- **History** (DL-147): the requirement's detail page has a History tab (its activity entries,
+  §10, in plain language, the server resolving the names of the actor and of user fields, former
+  members' included, with the "Deactivated" badge where it applies, DL-160) beside a Revisions
+  tab (the list and the compare above).
 - Status and priority changes are *not* revisions — they go to `activity_log`.
 
 ### 6.2 Approvals
@@ -868,7 +954,11 @@ requirement approval.
   without a migration.
 - An **approval request** names one or more approvers; each gets one `approval` row. A
   requirement request is bound to a specific revision. At most one request per entity is
-  pending at a time.
+  pending at a time: another is a 422 `pending_exists` (DL-225), checked with the requirement
+  locked, so two at once can't both pass (DL-229). Only a pending request can be cancelled or
+  decided (otherwise a 422 `not_pending`; a request's read offers Cancel only while it's
+  pending, and Decide only while the caller's own row is, DL-231, DL-233), and a deleted requirement's requests are a 404, as its history is (DL-228,
+  DL-230).
 - **Policy (v1): every named approver must approve.** Any rejection rejects the whole request;
   a further round is a new request. Rows marked `replaced` (below) don't count: a request is
   approved when every other row is approved. Other policies (any-one, quorum) are v2+.
@@ -880,7 +970,8 @@ requirement approval.
   access to the project when the request is created: a `project_membership` of any role, or
   inherited project admin (on an export-controlled project, only an explicit membership,
   §3.1). Naming anyone else is rejected the same way the project-member picker rejects a user
-  outside its scope (404, §4).
+  outside its scope (404, §4); a deactivated user is a 422 `account_inactive`. A request names
+  1 to 50 distinct approvers (a repeat is a 422 `duplicate`; DL-226).
 - **Replacing an approver who loses access.** When an approver loses the access needed to
   decide (content access to the project: any `project_membership` or inherited project admin;
   on an export-controlled project, an explicit membership, §3.1), each of their pending
@@ -909,14 +1000,9 @@ requirement approval.
     in the same transaction: `approved_by` is the counted approver with the latest
     `decided_at`, the completion time is now, the request's `status` change is logged with the
     replacement's `changed_by`, and the entity's `on_approved` handler runs.
-  - **Not in an archived project** (owner decision, Oct 6, 2026). The paths that can still
-    take access away there (removal from the org or workspace "with their projects", which the
-    archived check exempts, §5; and changes that aren't project mutations: an org or workspace
-    role change or removal, `revoke-system-admin`, deactivation) don't replace the approver:
-    their row stays pending and the request is flagged, for a project admin to cancel or
-    re-request once the project is unarchived. So no request completes in an archived project
-    either. (Removing a project member directly, or marking the project export-controlled, is a
-    project mutation and is denied there anyway.)
+  - **Never in an archived project:** archiving cancels its pending requests (below), so the
+    paths that can still take access away there (removal "with their projects", role changes,
+    `revoke-system-admin`, deactivation) find no pending row to replace (DL-194).
   - It's a system effect, not an action anyone takes on the approver's behalf, so it doesn't
     conflict with `approval.decide` being a personal action.
   - **Approvals only.** Tasks keep their rule: a deactivated user's tasks stay assigned and are
@@ -925,6 +1011,9 @@ requirement approval.
   without a request (§5, "Requirement approval by hand"), e.g. to record a sign-off made
   outside the app. A pending approval request on the requirement is then moot, so it is
   cancelled, logged on the request (`status`, §10).
+- **Archiving a project cancels all its pending approval requests** (DL-194), each logged on the
+  request (`status`, §10), in the archive's transaction. Unarchiving doesn't reopen them; a
+  project admin re-requests.
 - **v2:** the RAID module adds change requests and decisions as approvable entities, so the
   steering committee (project viewers named as approvers) can sign them off.
 - **Completing a requirement request** sets `approved_revision_id` to the request's revision,
@@ -936,8 +1025,25 @@ requirement approval.
   a project admin can also set it or move it out of `approved` by hand (§5; logged like any
   status change), so a gate signed off outside the app can still be recorded. **Completing a test-run
   request** moves the run to `completed` (if it isn't already).
-- **A rejected request changes nothing** on the entity, for every entity type; the request's
-  status and the `approval` rows record the rejection, and a new round is a new request.
+- **A rejected request changes nothing** on the entity, for every entity type, except a
+  re-open round (below); the request's status and the `approval` rows record the rejection, and
+  a new round is a new request.
+- **Decisions are final** (no "unapprove", DL-195). A project admin **re-opens** an approved
+  item by starting a new request on it: a requirement whose status is `approved` and that isn't
+  "Approved · modified" (the request is bound to its approved revision), or a gate whose
+  milestone is `approved`. The item's status doesn't change while the request is pending. If
+  it's approved, the approval is updated as usual; if it's rejected, the item moves off
+  approved, logged like any status change (§10): a requirement back to `draft`, a gate's
+  milestone back to `in_progress`. Re-approving an "Approved · modified" requirement isn't a
+  re-open: its rejection changes nothing. A `released` milestone can't be re-opened. What a
+  rejected re-open round does to a completed test run's exit sign-off is decided before Slice 5.
+- **Deciding, in the UI** (DL-196): the approver's review shows, besides the bound revision (or
+  the gate's milestone, or the run's results) and the other approvers' decisions and comments,
+  the item's associated tasks and subtasks with their statuses (from Slice 3) and its comments
+  (from Slice 6). Rejecting prompts for a comment; it isn't required, but submitting without one
+  asks the approver to confirm. There's no project-level approvals page in v1: the project
+  home's pending-approvals number and each list's filter bar cover it. Delegating one's
+  approvals is v2 (§16).
 - **Cancelling a test run** (status `cancelled`) cancels any pending exit sign-off request on
   it, logged on the request (§10). Cancelled runs are left out of metrics and default lists.
 - **Stale requests:** because a request is bound to its revision, approving it after a newer
@@ -1017,6 +1123,10 @@ requirement approval.
   where they go: the next planned sprint (the `planned` sprint with the earliest
   `start_date`, then the lowest `id`), or the backlog (`sprint_id` cleared). It is one
   request; each task's `sprint_id` change is logged as usual (§10).
+- **The Sprints page** (Slice 4, DL-199) lists planned, active, and completed sprints; a
+  completed sprint's summary (what finished, what rolled over) is reconstructed from
+  `activity_log` until sprint snapshots exist. A `planned` sprint can be hard deleted, its
+  tasks returning to the backlog; active and completed sprints can't be deleted (§9).
 
 ### Milestone
 - Flat, separate from the requirement tree; a point in time for cross-cutting groupings.
@@ -1026,6 +1136,11 @@ requirement approval.
 - Optional `phase_id` (see Phase above).
 - Task links to a milestone independently of its requirement. Test runs can reference a
   milestone (§8); test cases do not.
+- **Releases** have no page of their own in v1: lists and the board filter by milestone, and
+  each milestone shows a progress bar (DL-199).
+- **The Timeline page** is a dated table of phases and milestones, baseline vs. current dates
+  and slippage: a basic version holding phases in Slice 3, milestones and slippage in Slice 4.
+  The Gantt chart is v2 (DL-199).
 
 ### Manual ordering (rank)
 - One rank per task (not per view). The backlog shows tasks in rank order; a board column shows
@@ -1038,17 +1153,43 @@ requirement approval.
 - **Mechanics:**
   - **The server computes rank.** The client sends the neighbors ("after X, before Y" as IDs);
     the server derives the new fractional-index value. Clients never write rank strings.
+  - **Rank strings** (`rules/rank.py`) use only digits and lowercase letters, the characters
+    the database's `en_US.utf8` collation sorts in the same order as Python's string
+    comparison (it doesn't for mixed case: `'aB' < 'ab'` is false in the database). A rank sorts
+    strictly between its neighbors; with no neighbor on one side it sorts before or after the
+    other, and with neither it's the first rank. Ranks stay short however many items are added
+    at the top or bottom: 10,000 in a row stay under 10 characters. Neighbors that aren't in
+    strictly increasing order, equal ones included, raise `ValueError`: no rank sorts between
+    two equal ones. A drop between two equal neighbors (a tie, below) rewrites that gap's
+    siblings as the length cap does (DL-213); any other out-of-order pair is a programming
+    error. An
+    integration test pins the collation: generated ranks sorted by the database's `ORDER BY`
+    come back in Python's order (DL-205; S2-C7).
+  - **Rank length is capped at 255 characters** (DL-204). Drops into one gap lengthen a rank
+    (about one character every six drops), so a drop whose new rank would exceed the cap
+    rewrites the ranks of that gap's siblings in one transaction, the drop's, instead of
+    failing; the order is unchanged.
   - **Rank writes bypass optimistic locking.** Rank is updated with a direct `UPDATE` that does
     not bump `version`, so reordering never causes a 409 for someone editing the item's content
     (same approach as the subtask counter, §3). A rank write also leaves `updated_at` alone: a
     display-order change isn't an edit (the subtask counter does move it).
   - **Ties:** every ordered query sorts by `(rank, id)`, so two items that receive the same rank
-    in a simultaneous drop still order deterministically. No locking or periodic rebalancing in
-    v1.
+    still order deterministically. No periodic rebalancing in v1: the only rewrites are a drop
+    past the length cap and a drop between tied neighbors (above, DL-213), and the same for a
+    delete's promoted children and a restore at the top level (§9, DL-218). These rewrites and
+    the move lock below are the requirement tree's; which items a task rewrite covers, and
+    whether task moves run one at a time, is decided in Slice 3 planning (DL-216).
+  - **Requirement moves run one at a time per project** (DL-214; every requirement parent
+    change, a delete's promote and a restore at the top level included, DL-215): a move takes
+    the project's tree lock
+    first (`FOR NO KEY UPDATE` on the project row, which doesn't block creates), so two moves
+    at once can't make a parent cycle that neither saw. A reorder leaves `updated_at` alone; a
+    parent change is logged and moves it. Neither bumps `version`.
   - **Cross-column drop** on a board changes status and rank in one request. The status change
     goes through the transition rules in `authorize()` (§5); if denied, the card snaps back with
     a short message and nothing is saved.
-- **Requirement tree:** drag reorders among siblings only. Changing a requirement's parent uses a
+- **Requirement tree:** no drag (PrimeVue TreeTable, DL-174): its menu (`MoveToMenu`) reorders
+  among siblings with the non-drag set below (DL-243). Changing a requirement's parent uses a
   "Move to…" action, which runs the same-project and cycle checks and shows the result clearly.
   Parent changes are logged (§10).
 - **Sprint planning** (`sprints` module): the backlog shows sprint sections; dragging a task into
@@ -1066,7 +1207,7 @@ v1 uses **fixed status values per entity** (stored as varchar + CHECK).
 | Entity | Values |
 |---|---|
 | Project | `planning` / `active` / `on_hold` / `completed` / `cancelled` (informational: gates nothing; separate from archiving, §1.1) |
-| Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` (`approved`: set by completing an approval request, or by hand by a project admin only, §5, §6.2) |
+| Requirement | `draft` / `approved` / `in_progress` / `done` / `rejected` / `deferred` (any to any, except `approved`: set by completing an approval request, or by hand by a project admin only, §5, §6.2; DL-148) |
 | Task | `todo` / `in_progress` / `blocked` / `in_review` / `done` / `cancelled` |
 | Test run | `planned` / `in_progress` / `completed` / `cancelled` |
 | Test result | `not_run` / `passed` / `failed` / `blocked` / `skipped` |
@@ -1138,6 +1279,7 @@ written after a bug); it is flagged in the UI, not blocked.
 | Approval request | never deleted; cancelled instead |
 | Test run, recorded test result | not deleted in v1: a run is completed or cancelled, never removed; a result with an outcome is permanent. A result still `not_run` (a case only planned into a run) can be removed from the run |
 | Subtask | hard delete |
+| Sprint | hard delete while `planned`, its tasks returning to the backlog; active and completed sprints can't be deleted (DL-199) |
 
 **Deleting a task:** its subtasks, comments, tags, attachments, and GitHub links are left in
 place and hidden with it — restoring the task restores everything. Dependencies involving it are
@@ -1151,25 +1293,58 @@ accurate PR status.
 - **Linked tasks and test cases:** *detach* them (they remain, now without a requirement, and
   are flagged in the UI) **or** soft-delete them too.
 - **Child requirements:** *promote* them to the deleted requirement's parent (or top level)
-  **or** soft-delete them too.
+  **or** soft-delete them too: the whole subtree, grandchildren included, with the one
+  `deleted_at` that restoring brings back together (DL-221).
 
 Every unlink is recorded in `activity_log` (`action = unlinked`). Restoring a requirement does
 not re-link anything automatically; the log shows what was attached, and re-linking is manual.
 
 **Permissions in the delete dialog:** "soft-delete them too" applies only to items the user
-could delete directly (§5). For linked items or children they can't delete, only *detach* or
-*promote* is offered, with a note explaining why. The dialog never lets someone delete
-indirectly what they couldn't delete directly.
+could delete directly (§5). For linked items they can't delete, or children whose subtree holds a
+requirement they can't delete, only *detach* or *promote* is offered, with a note explaining why;
+the server says which (the requirement read's `can_delete_children`, DL-222), so the dialog never
+works the rule out itself. The dialog never lets someone delete
+indirectly what they couldn't delete directly: a delete of the subtree with any descendant the
+user couldn't delete directly is a 403, and nothing is deleted (DL-221). Every requirement in a
+deleted subtree is treated as deleted: each one's pending approval request is cancelled and
+logged, and the linked-items choice covers the whole subtree's links (DL-224).
 
-**Restore** follows delete: whoever may delete an item may restore it. The trash view shows each
-user what they can restore; project admins see everything in the project.
+**Restore** follows delete: whoever may delete an item may restore it. A restore that would
+bring back a descendant deleted with it that the user couldn't restore directly is a 403, and
+nothing is restored (DL-221). The trash view shows each user what they can restore, each item by
+its own rule (so an item whose restore would be refused for a descendant is still listed), with
+Restore in its `allowed_actions` only when the whole restore would pass (DL-222); project admins
+see everything in the project. An archived project's trash lists the same items, with no Restore
+(DL-220).
 
-**Pending approvals:** deleting a requirement cancels any pending approval request on it,
+**Trash** (DL-146): a project Trash page, the last item of the project's navigation (DL-202),
+lists deleted items by type (requirements from Slice 2; tasks and test
+cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
+`allowed_actions` allows it. Nothing is purged automatically in v1. **Restoring a tree:**
+restoring a requirement also restores the descendants deleted in the same action, identified by
+the same `deleted_at` (one transaction's `now()`); children deleted separately stay in the trash.
+A requirement whose parent is still deleted is restored at the top level, with the parent change
+logged (§10). A restored item whose stored restriction level is below its project's (the project
+was raised while it was in the trash, which the raise skips) is raised to the project's level,
+logged (DL-209). Promoting children on delete and restoring at the top level change a parent as
+a move does (§6, DL-215): the project's tree lock first, no `version` bump, `updated_at` moved,
+the parent change logged. Promoted children take the deleted requirement's place among its
+siblings, in their own order; a requirement restored at the top level goes to the bottom of the
+top level (DL-217); when their ranks don't fit (a tie, or past the length cap), the new
+parent's children are rewritten in order, as for a drop (§6, DL-218).
+
+**Pending approvals:** deleting a requirement cancels any pending approval request on it (and on
+each requirement deleted with it, DL-224),
 logged on the request (§10). Restoring the item does not reopen the request. A gate
 with any approval request (pending or past) can't be deleted: its sign-off history must keep
 pointing at a real milestone. Cancel the gate instead (status `cancelled`).
 
 **Comments** are soft-deleted and shown as "comment deleted" so threads stay readable.
+
+**A link to a deleted item** (from a comment, history, or a bookmark) is the standard 404 for
+everyone, as for an item that doesn't exist (§5); Trash is the way back (DL-200). **A deleted
+requirement's history** (§6.1) is a 404 too: there is no history from Trash in v1, which shows
+what was deleted, by whom, and when, and restoring the item brings its history back (DL-206).
 
 ## 10. Audit — ActivityLog
 
@@ -1182,7 +1357,7 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
   - **Requirement / task / test case:** `status`, `assignee_id`, `reporter_id`, `reviewer_id`,
     `sprint_id`, `milestone_id`, `phase_id`, `workstream_id`, `priority`, `severity`,
     `start_date`, `due_date`, `requirement_id`, `parent_requirement_id`, `time_estimate`,
-    `approved_revision_id`, `classification_level`, `classification_categories` (§3.1).
+    `approved_revision_id`, `restriction_level`, `restriction_categories` (§3.1).
   - **Approval request:** `created` when it is made, `status` for every change (`pending`
     → `approved` / `rejected` / `cancelled`, whether cancelled by a project admin, by deleting a
     requirement, by a project admin approving the requirement by hand, or by cancelling a test
@@ -1200,12 +1375,16 @@ pointing at a real milestone. Cancel the gate instead (status `cancelled`).
   - `rank` is deliberately excluded — drag-and-drop would flood the log.
 - `old_value` / `new_value` are text (the table is generic across types). For link events they
   hold the other entity's ID.
-- `project_id` on every row makes the project activity feed a single indexed query.
+- `project_id` on every row makes the project activity feed a single indexed query. The feed's
+  API and page arrive in Slice 3, with the filter bar; Slice 2 logs to the table and shows each
+  requirement's own entries on its History tab (§6.1; DL-147).
 - **Implementation rules:**
   - Only the shared helper `log_change(...)` writes to `activity_log` — never an endpoint
     directly. Endpoints pass enum members; the helper serializes them.
   - `log_change()` does **not** commit; it adds the row to the request's session, so the change
     and its log entry commit (or roll back) together.
+  - Append-only, in the database (DL-193): a trigger rejects every `UPDATE` and `DELETE` on
+    `activity_log`, as on `audit_event` (§10.1), since the log is the record behind sign-offs.
 - Content history for requirements lives in `requirement_revision`, not the log (§6.1).
   Approval decisions live in the `approval` rows (§6.2); their effect on a requirement is logged
   through `approved_revision_id`.
@@ -1222,7 +1401,7 @@ table, `audit_event` (schema-doc, "Audit").
   changed, signed out everywhere, profile edits), system-admin grants and revocations, workspace
   creation (by the seed command) and changes (name, slug), workspace/org/project membership changes
   (added, role changed, removed), org creation and changes, and project creation, changes (name,
-  description, type, status, lead, modules), archiving, unarchiving, and classification changes
+  description, type, status, lead, modules), archiving, unarchiving, and restriction changes
   (§3.1). A project member added to an export-controlled project, a project marked
   export-controlled, and a project created export-controlled (in `project_created`, with its initial
   level and categories) record the admin's export-control confirmation in the event's details.
@@ -1255,7 +1434,8 @@ table, `audit_event` (schema-doc, "Audit").
 ### Comments
 - Flat list (threading is v2), on **tasks and requirements**. Markdown body.
 - Viewers can comment. Authors edit their own comments (a personal action, §5) and delete
-  them; project admins can delete any.
+  them; project admins can delete any. An edited comment shows an "edited" marker
+  (`comment.edited_at`, DL-197).
 - Soft-deleted.
 
 ### Tags
@@ -1286,6 +1466,16 @@ table, `audit_event` (schema-doc, "Audit").
 ### Link attachments
 - URL + label on tasks, requirements, and test cases. Real file uploads are v2+ (§16; needs a storage
   backend decision, e.g. MinIO → S3/R2).
+- Not edited: a wrong link is removed and added again (DL-200).
+
+### Lists: saved filters and CSV export
+- **Saved filters** (DL-197): a user saves a filter-bar setup by name, per list, and reapplies,
+  renames, or deletes it. Personal only in v1 (sharing is v2, §16). The filters also live in the
+  URL, so a filtered list can be bookmarked or shared. Slice 3 (DL-239); its table is designed
+  there.
+- **CSV export** (DL-197) of the current list, with its filters and columns as shown, for tasks,
+  requirements, test cases, and test results: requirements and tasks in Slice 3, test cases and
+  test results in Slice 5 (DL-239). Exporting a whole project stays v2 (§16).
 
 ### Polymorphic tables
 `comment`, `entity_tag`, `link_attachment`, and `approval_request` reference their parent by
@@ -1302,10 +1492,17 @@ Journey decisions, Oct 6–7, 2026. **My work is the home page after sign-in for
   pending their decision, and test cases assigned to them in open runs (`not_run` results in
   runs that are `planned` or `in_progress`, §8).
 
-It is scoped like every list endpoint (§5, "Reads are authorized too"), leaves out the
+Each project shows its org, status, lead, and the user's access (their explicit project role,
+or inherited admin; DL-153). It is scoped like every list endpoint (§5, "Reads are authorized
+too"), leaves out the
 content of export-controlled projects where the user has no explicit membership (§3.1), and
-leaves out archived projects. Until notifications (v1.5), it's how people learn that something
-is waiting for them. It lives at the root route (`/`), so it adds nothing to the reserved-slug
+leaves out archived projects and every item in them (tasks, reviews, test cases; archiving
+cancels their approval requests, §6.2; DL-200), which stay visible inside the project. Until
+notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
+projects** (DL-197): a star on a project row keeps it at the top, per user (S2-C21c, DL-238;
+its table is designed there); favoriting items is v1.5 or later, and there's no "recently viewed".
+My work is the cross-project view in v1; a portfolio view comes when it outgrows the page
+(§16). It lives at the root route (`/`), so it adds nothing to the reserved-slug
 list (§3); a top-level route of its own would have to join it. Each section arrives with its
 feature: projects in Slice 1, approvals in Slice 2, tasks in Slice 3, test cases in Slice 5.
 Schema: the assignee and reviewer indexes on `task` and `test_result` (schema-doc).
@@ -1320,6 +1517,21 @@ through the other areas' repositories and calls no service (build plan, "Feature
   rest still show.
 - `GET /api/me/work/{section}`: one section as an ordinary offset-paged list (build plan,
   "API conventions"), for "see all".
+
+### Project home: Get started checklist
+DL-201. A new project's home page shows three items, each linking to where it's done and ticked
+automatically from the project's data: **Invite your team** (ticked once the project has a
+member besides its creator), **Compile your plan** (once it has a phase or milestone with a
+date; the item is hidden until phases and milestones ship), and **Start your project** (a
+requirement, a test case, and a task, each part shown once its feature ships). The ticks are
+loose: a step started counts. It's shown only to the project's admins, disappears when all three
+are ticked, and a project admin can hide it sooner (a per-project flag, designed with it). It
+ships in Slice 3 (DL-239).
+GitHub is not part of it.
+
+### Documentation
+The user menu's **Documentation** item renders the user guide inside the app (DL-197), at
+`/docs` (S2-C21d, DL-238; `docs` joins the reserved slugs there, §3).
 
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).
@@ -1466,7 +1678,9 @@ dependency; procrastinate 3.10.0, SQLAlchemy 2.1.1, psycopg 3.3.6, Postgres 18.6
 - Postgres full-text search over title + description of requirements, tasks, and test cases:
   a generated `search_vector` (`tsvector`) column with a GIN index on each table.
 - Typing an exact ID (`PMT-TA-45`, or `PMT-TA-45.2` for a subtask) jumps directly to that item.
-- Saved filters / views are later.
+- A **search bar in the header**, with a results page, limited to what the user can see (§5;
+  DL-197).
+- Saved filters are a list feature (§11).
 
 ## 15. Open Implementation Decisions
 
@@ -1497,6 +1711,13 @@ corrected. *Decided Oct 6–7, 2026:* a planned case can
 - **In-app notifications** (`notification` table, bell icon, polling): assigned to you, review
   requested, approval requested, status changes on tasks you're involved in, @mentions (via
   `username`). Generated by a worker job queued from `log_change()`.
+- **Status reports, simplified** (DL-198): a published status report summarizes a finished
+  period (a sprint, phase, or iteration). The full version comes by v2, with the PMO dashboard
+  and ERP (below).
+- **Export to a slide deck or document** (a candidate, DL-198; v1 if it's cheap): a
+  stakeholder-ready summary of a view or period.
+- **Favoriting items** (requirements, tasks, test cases), beside v1's favorite projects
+  (DL-197).
 
 ### v2 — ERP implementations
 v1 is built for software projects (§1); v2 adds what ERP implementations need. Each item needs
@@ -1508,7 +1729,7 @@ its own design pass.
    cost and schedule impact for change requests; a generic `entity_link` to connect items to
    requirements, tasks, and defects.
 2. **Status reports** (`status_reports`) — per-period overall and per-workstream RAG, narrative,
-   frozen key metrics; immutable once published.
+   frozen key metrics; immutable once published (the full version of v1.5's, DL-198).
 3. **Budget & actuals** (`budget`) — budget lines (category, workstream, planned, forecast),
    cost entries (vendor, invoice/PO reference), money as `numeric(14,2)` with a project
    currency; approved change requests draw down contingency; possible import of actuals from
@@ -1539,6 +1760,9 @@ its own design pass.
 
 **Planning and setup** (journey decisions, Oct 6–7, 2026):
 - **Project templates** and **bulk import/export** (requirements, tasks, test cases).
+- **Approval delegation** (DL-196): an approver hands their pending approvals to someone else
+  while away.
+- **Shared saved filters** (DL-197).
 - A **needs-attention view**; in v1 the filter bar covers it.
 - **Sprint load views**.
 
@@ -1574,7 +1798,7 @@ its own design pass.
   - size limits and content-type checks (by content, not just extension);
   - files are served as downloads (`Content-Disposition: attachment`), never rendered inline
     from the app's origin.
-- Configurable classification levels and categories per workspace (reference tables on top of
+- Configurable restriction levels and categories per workspace (reference tables on top of
   the columns, §3.1)
 - Automatic `Task.status` changes from GitHub events
 - Approval policies beyond all-must-approve (any-one, quorum); per-org settings for enforced
@@ -1583,6 +1807,5 @@ its own design pass.
 - Commit-message ID detection; requirement (`RQ`) linking from PRs
 - Project key rename with old key kept as an alias; moving items between projects (or subtasks
   between tasks) with old IDs kept as aliases
-- Saved filters/views
 - Redis, if caching / rate limiting / real-time needs appear
 - AI-assisted features (requirements drafting, task breakdown, test-case generation)

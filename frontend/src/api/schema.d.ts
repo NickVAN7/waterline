@@ -607,7 +607,8 @@ export interface paths {
         };
         /**
          * List Projects
-         * @description The org's projects the caller can open; archived ones only with `include_archived`.
+         * @description The org's projects the caller can open; archived ones with `include_archived`, or alone
+         *     with `archived_only`.
          */
         get: operations["list_projects_api_orgs__org_id__projects_get"];
         put?: never;
@@ -618,6 +619,27 @@ export interface paths {
          *     `taken`; on `first_admin_id`: `account_inactive`.
          */
         post: operations["create_project_api_orgs__org_id__projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/first-admin-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * First Admin Candidates
+         * @description The create dialog's picker: the org's active members and the workspace's active staff,
+         *     offset-paged with `?q=` (DL-152). Needs `project.assign_first_admin`.
+         */
+        get: operations["first_admin_candidates_api_orgs__org_id__first_admin_candidates_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -668,7 +690,7 @@ export interface paths {
         patch: operations["update_project_api_projects__key__patch"];
         trace?: never;
     };
-    "/api/projects/{key}/classification": {
+    "/api/projects/{key}/restriction": {
         parameters: {
             query?: never;
             header?: never;
@@ -677,13 +699,13 @@ export interface paths {
         };
         get?: never;
         /**
-         * Set Project Classification
-         * @description Set the project's classification level and categories (DL-81): raising needs
-         *     `project.raise_classification`, lowering `project.lower_classification`. 422 on
+         * Set Project Restriction
+         * @description Set the project's restriction level and categories (DL-81): raising needs
+         *     `project.raise_restriction`, lowering `project.lower_restriction`. 422 on
          *     `export_control_confirmed` and `confirmed_member_ids`: `confirmation_required`,
          *     `members_changed`, or `confirmation_not_needed`.
          */
-        put: operations["set_project_classification_api_projects__key__classification_put"];
+        put: operations["set_project_restriction_api_projects__key__restriction_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -901,6 +923,346 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/work/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Approvals
+         * @description The caller's pending approvals, oldest request first (DL-236).
+         */
+        get: operations["my_approvals_api_me_work_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Activity
+         * @description The requirement's history, newest first (`?before=` the previous page's `next_cursor`).
+         */
+        get: operations["requirement_activity_api_projects__key__requirements__number__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Tree
+         * @description The project's requirements for the tree, siblings in rank order: complete up to 2,000,
+         *     with `truncated` above it (DL-159).
+         */
+        get: operations["requirement_tree_api_projects__key__requirements_get"];
+        put?: never;
+        /**
+         * Create Requirement
+         * @description Create a requirement: the next `RQ` number, `draft`, revision 1, at the bottom of its
+         *     siblings. 404 for a `parent_id` outside the project; 422 on `title` (`missing`) and on
+         *     `restriction_categories` (`project_only`: `export_controlled` is set on the project).
+         */
+        post: operations["create_requirement_api_projects__key__requirements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Requirement
+         * @description The requirement, with the actions the caller may take on it.
+         */
+        get: operations["get_requirement_api_projects__key__requirements__number__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Requirement
+         * @description Move the requirement to the trash: its children promoted to its parent (`promote`, the
+         *     default) or deleted with it (`delete`, 403 if the caller may not delete each of them); a
+         *     pending approval request on it is cancelled.
+         */
+        delete: operations["delete_requirement_api_projects__key__requirements__number__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Requirement
+         * @description Change the fields sent. 409 on a stale `version`; a new revision only when the title or
+         *     description changes. `status` `approved`: 403 without `requirement.approve_manually`, else
+         *     422 `use_approve`; `reporter_id` needs `requirement.reassign_reporter`, 422
+         *     `account_inactive` or `not_member`.
+         */
+        patch: operations["update_requirement_api_projects__key__requirements__number__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/restriction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Requirement Restriction
+         * @description Set the requirement's restriction level and categories (no `version`, DL-162): raising
+         *     needs `requirement.raise_restriction`, lowering `requirement.lower_restriction`. 422 on
+         *     `level` (`below_project`) and on `categories` (`project_only`).
+         */
+        put: operations["set_requirement_restriction_api_projects__key__requirements__number__restriction_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Requirement
+         * @description Move the requirement under `parent_id` (null: the top level), just after `after_id` or
+         *     just before `before_id`, or to the bottom. 404 for a parent outside the project; 422 on
+         *     `parent_id` (`cycle`), `after_id` or `before_id` (`not_sibling`), and `before_id` with both
+         *     (`conflict`).
+         */
+        post: operations["move_requirement_api_projects__key__requirements__number__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Requirement
+         * @description Bring the requirement back from the trash with the descendants deleted with it (403 if
+         *     the caller may not restore each of them); at the bottom of the top level if its parent is
+         *     still in the trash. 404 for one not in the trash.
+         */
+        post: operations["restore_requirement_api_projects__key__requirements__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Trash
+         * @description The project's deleted items the caller may restore, newest first.
+         */
+        get: operations["project_trash_api_projects__key__trash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Revisions
+         * @description The requirement's revisions, newest first (`?before=` the previous page's
+         *     `next_cursor`).
+         */
+        get: operations["requirement_revisions_api_projects__key__requirements__number__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/revisions/{revision_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Requirement Revision
+         * @description One revision's title, description, change note, and author; 404 for a number the
+         *     requirement doesn't have.
+         */
+        get: operations["get_requirement_revision_api_projects__key__requirements__number__revisions__revision_number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/approval-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Approval Requests
+         * @description The requirement's approval requests, newest first, with their approvers.
+         */
+        get: operations["requirement_approval_requests_api_projects__key__requirements__number__approval_requests_get"];
+        put?: never;
+        /**
+         * Request Approval
+         * @description Request approval of the requirement's current revision from the named approvers. 404 for
+         *     an approver without access to the project; 422 on `approver_ids` (`duplicate`,
+         *     `account_inactive`) and on the body (`pending_exists`: one pending request at a time).
+         */
+        post: operations["request_approval_api_projects__key__requirements__number__approval_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approval-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Approval Request
+         * @description The approval request, with the actions the caller may take on it; 404 for a deleted
+         *     requirement's.
+         */
+        get: operations["get_approval_request_api_approval_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approval-requests/{request_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Approval Request
+         * @description Cancel the pending request; 422 on `id` (`not_pending`) for one already decided or
+         *     cancelled.
+         */
+        post: operations["cancel_approval_request_api_approval_requests__request_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approval-requests/{request_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Approval Request
+         * @description Approve or reject on your own row, finally (403 once it's decided); 422 on `id`
+         *     (`not_pending`) for a request already completed or cancelled. The last approval completes
+         *     the request; any rejection rejects it.
+         */
+        post: operations["decide_approval_request_api_approval_requests__request_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Requirement
+         * @description Approve the requirement's current revision by hand; a pending approval request on it is
+         *     cancelled. 409 on a stale `version`.
+         */
+        post: operations["approve_requirement_api_projects__key__requirements__number__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -954,7 +1316,246 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_classification" | "project.lower_classification";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide";
+        /**
+         * ActivityAction
+         * @enum {string}
+         */
+        ActivityAction: "created" | "updated" | "deleted" | "restored" | "linked" | "unlinked";
+        /**
+         * ActivityEntry
+         * @description One change, newest first in its feed. Names are resolved by the server at read time, so a
+         *     former member's name stays; `*_is_active` false shows the "Deactivated" badge. `changed_by_*`
+         *     is null when an app CLI command made the change. `old_value_*` and `new_value_*` name the
+         *     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`),
+         *     and are null for any other field.
+         */
+        ActivityEntry: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            action: components["schemas"]["ActivityAction"];
+            field_changed: components["schemas"]["ActivityField"] | null;
+            /** Old Value */
+            old_value: string | null;
+            /** New Value */
+            new_value: string | null;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Changed By Id */
+            changed_by_id: string | null;
+            /** Changed By Name */
+            changed_by_name: string | null;
+            /** Changed By Is Active */
+            changed_by_is_active: boolean | null;
+            /** Old Value Name */
+            old_value_name: string | null;
+            /** Old Value Is Active */
+            old_value_is_active: boolean | null;
+            /** New Value Name */
+            new_value_name: string | null;
+            /** New Value Is Active */
+            new_value_is_active: boolean | null;
+        };
+        /**
+         * ActivityField
+         * @enum {string}
+         */
+        ActivityField: "status" | "assignee_id" | "reporter_id" | "reviewer_id" | "sprint_id" | "milestone_id" | "phase_id" | "workstream_id" | "priority" | "severity" | "start_date" | "end_date" | "due_date" | "target_date" | "baseline_start" | "baseline_end" | "baseline_date" | "requirement_id" | "parent_requirement_id" | "time_estimate" | "approved_revision_id" | "approver_id" | "restriction_level" | "restriction_categories" | "lead_id" | "actual_result";
+        /**
+         * ApprovalDecision
+         * @enum {string}
+         */
+        ApprovalDecision: "pending" | "approved" | "rejected" | "replaced";
+        /**
+         * ApprovalDecisionCreate
+         * @description The caller's decision on their own row (design-doc §6.2): final (DL-195). A comment is
+         *     optional, rejecting included (DL-196: the UI asks to confirm without one).
+         */
+        ApprovalDecisionCreate: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Comment */
+            comment?: string | null;
+        };
+        /**
+         * ApprovalEntityType
+         * @enum {string}
+         */
+        ApprovalEntityType: "requirement" | "milestone" | "test_run";
+        /**
+         * ApprovalRead
+         * @description One approver's row; `approver_is_active` false shows the "Deactivated" badge.
+         */
+        ApprovalRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Approver Id
+             * Format: uuid
+             */
+            approver_id: string;
+            /** Approver Name */
+            approver_name: string;
+            /** Approver Is Active */
+            approver_is_active: boolean;
+            decision: components["schemas"]["ApprovalDecision"];
+            /** Comment */
+            comment: string | null;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /**
+         * ApprovalRequestCreate
+         * @description A request bound to the requirement's current revision. `approver_ids`: 1 to 50 distinct
+         *     users with access to the project (a repeat is a 422 `duplicate`, someone without access a
+         *     404, a deactivated one a 422 `account_inactive`; DL-226).
+         */
+        ApprovalRequestCreate: {
+            /** Approver Ids */
+            approver_ids: string[];
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * ApprovalRequestItem
+         * @description A request on the requirement's list, newest first (DL-227), with its approvers.
+         */
+        ApprovalRequestItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["ApprovalRequestStatus"];
+            /**
+             * Requirement Revision Id
+             * Format: uuid
+             */
+            requirement_revision_id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Note */
+            note: string | null;
+            /**
+             * Requested By Id
+             * Format: uuid
+             */
+            requested_by_id: string;
+            /** Requested By Name */
+            requested_by_name: string;
+            /** Requested By Is Active */
+            requested_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Newer Revision Exists */
+            newer_revision_exists: boolean;
+            /** Approvals */
+            approvals: components["schemas"]["ApprovalRead"][];
+        };
+        /**
+         * ApprovalRequestRead
+         * @description One request, with the actions the caller may take on it.
+         */
+        ApprovalRequestRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["ApprovalRequestStatus"];
+            /**
+             * Requirement Revision Id
+             * Format: uuid
+             */
+            requirement_revision_id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Note */
+            note: string | null;
+            /**
+             * Requested By Id
+             * Format: uuid
+             */
+            requested_by_id: string;
+            /** Requested By Name */
+            requested_by_name: string;
+            /** Requested By Is Active */
+            requested_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Newer Revision Exists */
+            newer_revision_exists: boolean;
+            /** Approvals */
+            approvals: components["schemas"]["ApprovalRead"][];
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * ApprovalRequestStatus
+         * @enum {string}
+         */
+        ApprovalRequestStatus: "pending" | "approved" | "rejected" | "cancelled";
+        /**
+         * ApprovalWorkItem
+         * @description One of the caller's pending approvals, in My work (design-doc §11; DL-236): `title` and
+         *     `revision_number` are the revision under approval's, whatever the requirement is now.
+         */
+        ApprovalWorkItem: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Requested By Id
+             * Format: uuid
+             */
+            requested_by_id: string;
+            /** Requested By Name */
+            requested_by_name: string;
+            /** Note */
+            note: string | null;
+            entity_type: components["schemas"]["ApprovalEntityType"];
+            /** Entity Number */
+            entity_number: number;
+            /** Title */
+            title: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Project Key */
+            project_key: string;
+            /** Project Name */
+            project_name: string;
+            /** Organization Slug */
+            organization_slug: string;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
@@ -963,34 +1564,11 @@ export interface components {
             new_password: string;
         };
         /**
-         * ClassificationCategory
+         * DeletedChildren
+         * @description What a requirement's delete does with its children (design-doc §9).
          * @enum {string}
          */
-        ClassificationCategory: "financial" | "proprietary" | "pii" | "export_controlled";
-        /**
-         * ClassificationLevel
-         * @enum {string}
-         */
-        ClassificationLevel: "internal" | "confidential" | "restricted";
-        /**
-         * ClassificationUpdate
-         * @description `PUT /api/projects/{key}/classification` (DL-81): `level` (null: unclassified) and
-         *     `categories` replace the current ones. Adding `export_controlled` also needs
-         *     `export_control_confirmed` and `confirmed_member_ids`, the project's current explicit
-         *     members.
-         */
-        ClassificationUpdate: {
-            level: components["schemas"]["ClassificationLevel"] | null;
-            /** Categories */
-            categories: components["schemas"]["ClassificationCategory"][];
-            /**
-             * Export Control Confirmed
-             * @default false
-             */
-            export_control_confirmed: boolean;
-            /** Confirmed Member Ids */
-            confirmed_member_ids?: string[] | null;
-        };
+        DeletedChildren: "promote" | "delete";
         /**
          * EmailCheck
          * @description Whether an account has this email; never whose (DL-66).
@@ -1016,6 +1594,20 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** Feed[ActivityEntry] */
+        Feed_ActivityEntry_: {
+            /** Items */
+            items: components["schemas"]["ActivityEntry"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /** Feed[RevisionItem] */
+        Feed_RevisionItem_: {
+            /** Items */
+            items: components["schemas"]["RevisionItem"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1040,7 +1632,7 @@ export interface components {
         };
         /**
          * MeOrg
-         * @description An org the user sees (design-doc §4, "Visibility"), for the org switcher. `role` is null
+         * @description An org the user sees (design-doc §4, "Visibility"), for the org menu. `role` is null
          *     when the user sees it without an org membership (through a project, or as an admin above
          *     it).
          */
@@ -1302,6 +1894,28 @@ export interface components {
             /** Username */
             username?: string | null;
         };
+        /** Page[ApprovalRequestItem] */
+        Page_ApprovalRequestItem_: {
+            /** Items */
+            items: components["schemas"]["ApprovalRequestItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ApprovalWorkItem] */
+        Page_ApprovalWorkItem_: {
+            /** Items */
+            items: components["schemas"]["ApprovalWorkItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[MemberCandidate] */
         Page_MemberCandidate_: {
             /** Items */
@@ -1368,6 +1982,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[TrashItem] */
+        Page_TrashItem_: {
+            /** Items */
+            items: components["schemas"]["TrashItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[UserRow] */
         Page_UserRow_: {
             /** Items */
@@ -1413,6 +2038,11 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * Priority
+         * @enum {string}
+         */
+        Priority: "critical" | "high" | "medium" | "low";
         /**
          * ProjectAccessEntry
          * @description One person who reaches the project: their explicit role, if any, and why they reach it.
@@ -1465,12 +2095,12 @@ export interface components {
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
             /** First Admin Id */
             first_admin_id?: string | null;
-            classification_level?: components["schemas"]["ClassificationLevel"] | null;
+            restriction_level?: components["schemas"]["RestrictionLevel"] | null;
             /**
-             * Classification Categories
+             * Restriction Categories
              * @default []
              */
-            classification_categories: components["schemas"]["ClassificationCategory"][];
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
             /**
              * Export Control Confirmed
              * @default false
@@ -1497,6 +2127,8 @@ export interface components {
             status: components["schemas"]["ProjectStatus"];
             /** Lead Id */
             lead_id: string | null;
+            /** Lead Name */
+            lead_name: string | null;
             /**
              * Organization Id
              * Format: uuid
@@ -1504,6 +2136,10 @@ export interface components {
             organization_id: string;
             /** Organization Slug */
             organization_slug: string;
+            /** Organization Name */
+            organization_name: string;
+            /** My Access */
+            my_access: components["schemas"]["ProjectRole"] | "inherited_admin";
         };
         /**
          * ProjectMemberAdd
@@ -1596,6 +2232,8 @@ export interface components {
             organization_id: string;
             /** Archived */
             archived: boolean;
+            /** Export Controlled */
+            export_controlled: boolean;
             /** Reasons */
             reasons: components["schemas"]["AccessReason"][];
             access: components["schemas"]["AccessKind"];
@@ -1630,9 +2268,9 @@ export interface components {
             enabled_modules: components["schemas"]["ProjectModule"][];
             /** Archived */
             archived: boolean;
-            classification_level: components["schemas"]["ClassificationLevel"] | null;
-            /** Classification Categories */
-            classification_categories: components["schemas"]["ClassificationCategory"][];
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
             /** Modules Holding Data */
             modules_holding_data: components["schemas"]["ProjectModule"][];
             /** Allowed Actions */
@@ -1668,6 +2306,277 @@ export interface components {
             lead_id?: string | null;
             /** Enabled Modules */
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
+        };
+        /**
+         * RequirementApprove
+         * @description Approve by hand the revision the admin saw: `version` the one they read (a stale one is a
+         *     409, DL-169).
+         */
+        RequirementApprove: {
+            /** Version */
+            version: number;
+        };
+        /**
+         * RequirementCreate
+         * @description A new requirement: `draft`, reported by the caller, at the bottom of its siblings.
+         *     `parent_id` is a requirement in the same project (anything else is a 404); the restriction
+         *     may raise the item's level and add categories (design-doc §3.1; `export_controlled` is
+         *     project-only).
+         */
+        RequirementCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Description Md
+             * @default
+             */
+            description_md: string;
+            /** @default medium */
+            priority: components["schemas"]["Priority"];
+            /** Parent Id */
+            parent_id?: string | null;
+            restriction_level?: components["schemas"]["RestrictionLevel"] | null;
+            /**
+             * Restriction Categories
+             * @default []
+             */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * RequirementItem
+         * @description A row of the requirement tree.
+         */
+        RequirementItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Title */
+            title: string;
+            status: components["schemas"]["RequirementStatus"];
+            priority: components["schemas"]["Priority"];
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Current Revision Id */
+            current_revision_id: string | null;
+            /** Approved Revision Id */
+            approved_revision_id: string | null;
+        };
+        /**
+         * RequirementMove
+         * @description `POST …/requirements/{number}/move`: under `parent_id` (null: the top level), just after
+         *     the sibling `after_id` or just before `before_id`, or with neither at the bottom of the
+         *     parent's children (design-doc §6, "Manual ordering").
+         */
+        RequirementMove: {
+            /** Parent Id */
+            parent_id: string | null;
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+        };
+        /**
+         * RequirementRead
+         * @description One requirement, with the actions the caller may take on it. "Approved · modified" is
+         *     derived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1).
+         */
+        RequirementRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Title */
+            title: string;
+            /** Description Md */
+            description_md: string;
+            status: components["schemas"]["RequirementStatus"];
+            priority: components["schemas"]["Priority"];
+            /**
+             * Reporter Id
+             * Format: uuid
+             */
+            reporter_id: string;
+            /** Reporter Name */
+            reporter_name: string;
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Current Revision Id */
+            current_revision_id: string | null;
+            /** Approved Revision Id */
+            approved_revision_id: string | null;
+            /** Can Delete Children */
+            can_delete_children: boolean;
+            /** Approved At */
+            approved_at: string | null;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * RequirementRestrictionUpdate
+         * @description `PUT …/requirements/{number}/restriction` (DL-162): `level` (null: inherit the project's)
+         *     and `categories` replace the current ones. No `version` (DL-168).
+         */
+        RequirementRestrictionUpdate: {
+            level: components["schemas"]["RestrictionLevel"] | null;
+            /** Categories */
+            categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * RequirementStatus
+         * @enum {string}
+         */
+        RequirementStatus: "draft" | "approved" | "in_progress" | "done" | "rejected" | "deferred";
+        /**
+         * RequirementTree
+         * @description The project's requirements in `(rank, id)` order, siblings in rank order (the client
+         *     nests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159).
+         */
+        RequirementTree: {
+            /** Items */
+            items: components["schemas"]["RequirementItem"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * RequirementUpdate
+         * @description Only the fields sent change. `version` is the one the caller read (a stale one is a
+         *     409). A new revision, with `change_note`, only when `title` or `description_md` changes
+         *     (design-doc §6.1). `status` may not be `approved` (DL-161); `reporter_id` needs
+         *     `requirement.reassign_reporter` (DL-211).
+         */
+        RequirementUpdate: {
+            /** Version */
+            version: number;
+            /** Title */
+            title?: string | null;
+            /** Description Md */
+            description_md?: string | null;
+            /** Change Note */
+            change_note?: string | null;
+            status?: components["schemas"]["RequirementStatus"] | null;
+            priority?: components["schemas"]["Priority"] | null;
+            /** Reporter Id */
+            reporter_id?: string | null;
+        };
+        /**
+         * RestrictionCategory
+         * @enum {string}
+         */
+        RestrictionCategory: "financial" | "proprietary" | "pii" | "export_controlled";
+        /**
+         * RestrictionLevel
+         * @enum {string}
+         */
+        RestrictionLevel: "internal" | "confidential";
+        /**
+         * RestrictionUpdate
+         * @description `PUT /api/projects/{key}/restriction` (DL-81): `level` (null: None) and
+         *     `categories` replace the current ones. Adding `export_controlled` also needs
+         *     `export_control_confirmed` and `confirmed_member_ids`, the project's current explicit
+         *     members.
+         */
+        RestrictionUpdate: {
+            level: components["schemas"]["RestrictionLevel"] | null;
+            /** Categories */
+            categories: components["schemas"]["RestrictionCategory"][];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
+            /** Confirmed Member Ids */
+            confirmed_member_ids?: string[] | null;
+        };
+        /**
+         * RevisionItem
+         * @description A row of the requirement's revision list, newest first (design-doc §6.1); the author's
+         *     name is resolved at read time, and `created_by_is_active` false shows the "Deactivated"
+         *     badge.
+         */
+        RevisionItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Title */
+            title: string;
+            /** Change Note */
+            change_note: string | null;
+            /**
+             * Created By Id
+             * Format: uuid
+             */
+            created_by_id: string;
+            /** Created By Name */
+            created_by_name: string;
+            /** Created By Is Active */
+            created_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * RevisionRead
+         * @description One revision's snapshot, for the compare (DL-145: computed in the browser).
+         */
+        RevisionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Title */
+            title: string;
+            /** Change Note */
+            change_note: string | null;
+            /**
+             * Created By Id
+             * Format: uuid
+             */
+            created_by_id: string;
+            /** Created By Name */
+            created_by_name: string;
+            /** Created By Is Active */
+            created_by_is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description Md */
+            description_md: string;
         };
         /** SignInRequest */
         SignInRequest: {
@@ -1740,6 +2649,39 @@ export interface components {
             /** New Owner Id */
             new_owner_id?: string | null;
         };
+        /**
+         * TrashItem
+         * @description A row of the project's trash: the item, who deleted it, and when (design-doc §9).
+         */
+        TrashItem: {
+            type: components["schemas"]["TrashItemType"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /**
+             * Deleted At
+             * Format: date-time
+             */
+            deleted_at: string;
+            /** Deleted By Id */
+            deleted_by_id: string | null;
+            /** Deleted By Name */
+            deleted_by_name: string | null;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * TrashItemType
+         * @description What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5).
+         * @enum {string}
+         */
+        TrashItemType: "requirement";
         /** TypeRecommendation */
         TypeRecommendation: {
             type: components["schemas"]["ProjectType"];
@@ -1767,6 +2709,7 @@ export interface components {
             is_active: boolean;
             /** Is System Admin */
             is_system_admin: boolean;
+            workspace_role: components["schemas"]["WorkspaceRole"] | null;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -1803,6 +2746,21 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** WorkSection[ApprovalWorkItem] */
+        WorkSection_ApprovalWorkItem_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ApprovalWorkItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** WorkSection[ProjectItem] */
         WorkSection_ProjectItem_: {
             /** Available */
@@ -1821,6 +2779,7 @@ export interface components {
         /** WorkSections */
         WorkSections: {
             projects: components["schemas"]["WorkSection_ProjectItem_"];
+            approvals: components["schemas"]["WorkSection_ApprovalWorkItem_"];
         };
         /** WorkspaceRead */
         WorkspaceRead: {
@@ -3783,13 +4742,14 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: key, name. Default: name */
                 sort?: string | null;
+                include_archived?: boolean;
+                archived_only?: boolean;
                 status?: components["schemas"]["ProjectStatus"][] | null;
                 status__not?: components["schemas"]["ProjectStatus"][] | null;
                 status__is_null?: boolean | null;
                 type?: components["schemas"]["ProjectType"][] | null;
                 type__not?: components["schemas"]["ProjectType"][] | null;
                 type__is_null?: boolean | null;
-                include_archived?: boolean;
             };
             header?: never;
             path: {
@@ -3868,6 +4828,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    first_admin_candidates_api_orgs__org_id__first_admin_candidates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberCandidate_"];
                 };
             };
             /** @description Unauthorized */
@@ -4088,7 +5112,7 @@ export interface operations {
             };
         };
     };
-    set_project_classification_api_projects__key__classification_put: {
+    set_project_restriction_api_projects__key__restriction_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -4099,7 +5123,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ClassificationUpdate"];
+                "application/json": components["schemas"]["RestrictionUpdate"];
             };
         };
         responses: {
@@ -4819,6 +5843,1155 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_approvals_api_me_work_approvals_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: requested_at. Default: requested_at */
+                sort?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ApprovalWorkItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_activity_api_projects__key__requirements__number__activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_ActivityEntry_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_tree_api_projects__key__requirements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementTree"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_requirement_api_projects__key__requirements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_requirement_api_projects__key__requirements__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_requirement_api_projects__key__requirements__number__delete: {
+        parameters: {
+            query?: {
+                children?: components["schemas"]["DeletedChildren"];
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_requirement_api_projects__key__requirements__number__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    set_requirement_restriction_api_projects__key__requirements__number__restriction_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementRestrictionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_requirement_api_projects__key__requirements__number__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    restore_requirement_api_projects__key__requirements__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    project_trash_api_projects__key__trash_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: deleted_at. Default: -deleted_at */
+                sort?: string | null;
+                type?: components["schemas"]["TrashItemType"][] | null;
+                type__not?: components["schemas"]["TrashItemType"][] | null;
+                type__is_null?: boolean | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TrashItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_revisions_api_projects__key__requirements__number__revisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_RevisionItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_requirement_revision_api_projects__key__requirements__number__revisions__revision_number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_number: number;
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_approval_requests_api_projects__key__requirements__number__approval_requests_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: created_at. Default: -created_at */
+                sort?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ApprovalRequestItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    request_approval_api_projects__key__requirements__number__approval_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_approval_request_api_approval_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    cancel_approval_request_api_approval_requests__request_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    decide_approval_request_api_approval_requests__request_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecisionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRequestRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve_requirement_api_projects__key__requirements__number__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementApprove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

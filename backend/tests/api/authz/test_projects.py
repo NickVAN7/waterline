@@ -37,7 +37,7 @@ from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
-from tests.support.authz import Tenancy, persona_user, sign_in_as, tenancy
+from tests.support.authz import Tenancy, persona_user, project_actions, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
 
@@ -337,39 +337,18 @@ async def test_the_org_list_holds_only_the_projects_the_caller_can_open(
 
 # --- GET /api/projects/{key} (project.view) -----------------------------------------------------
 
-INHERITED_ON_A_LIVE_PROJECT = [
-    "project.archive",
-    "project.lower_classification",
-    "project.raise_classification",
-    "project.unarchive",
-    "project.update",
-    "project.view",
-    "project.view_access",
-    "project_member.manage",
-]
-
 
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
-        ("system_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_admin", INHERITED_ON_A_LIVE_PROJECT),
-        (
-            "project_admin",
-            [
-                "project.lower_classification",
-                "project.raise_classification",
-                "project.update",
-                "project.view",
-                "project.view_access",
-                "project_member.manage",
-            ],
-        ),
-        ("project_member", ["project.view"]),
-        ("project_viewer", ["project.view"]),
+        ("system_admin", project_actions(inherited=True)),
+        ("workspace_owner", project_actions(inherited=True)),
+        ("workspace_admin", project_actions(inherited=True)),
+        ("org_owner", project_actions(inherited=True)),
+        ("org_admin", project_actions(inherited=True)),
+        ("project_admin", project_actions(ProjectRole.ADMIN)),
+        ("project_member", project_actions(ProjectRole.MEMBER)),
+        ("project_viewer", project_actions(ProjectRole.VIEWER)),
     ],
 )
 async def test_the_project_is_returned_with_the_callers_actions(
@@ -402,11 +381,20 @@ async def test_the_project_is_404_to_whoever_cannot_see_it(client: AsyncClient, 
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
-        ("system_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("workspace_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("org_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("project_admin", ["project.view", "project.view_access"]),
-        ("project_viewer", ["project.view"]),
+        (
+            "system_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "workspace_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "org_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        ("project_admin", ["project.view", "project.view_access", "requirement.view"]),
+        ("project_viewer", ["project.view", "requirement.view"]),
     ],
 )
 async def test_an_archived_project_is_still_readable_with_only_unarchive_left(

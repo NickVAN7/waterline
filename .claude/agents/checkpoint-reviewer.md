@@ -16,8 +16,8 @@ scope against the decision-log entries and the docs that code implements.
 
 A **re-review** (DL-105) also gets a fix diff (a file: `diff -ruN -x .git` of the reviewed copy
 against the fixed one) and your previous pass's findings with their resolutions; at a slice's
-last checkpoint, also `repo-auditor`'s or `fresh-clone-verifier`'s major findings that the fix
-diff resolves, with their resolutions (DL-110). Review the fix
+last checkpoint, also `repo-auditor`'s, `fresh-clone-verifier`'s, or `user-guide-verifier`'s
+major or blocker findings that the fix diff resolves, with their resolutions (DL-110, DL-190). Review the fix
 diff, reading whatever code it touches in full, and check each resolution: is the finding really
 fixed, and did the fix break anything near it? Don't re-review the rest of the checkpoint, and
 don't reopen a resolution the owner decided. Sabotage-check **one** behavior the fix changed

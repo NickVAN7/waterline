@@ -60,7 +60,7 @@ async def test_project_workspace_must_be_its_orgs_workspace(session: AsyncSessio
         )
 
 
-# --- Modules and classification ------------------------------------------------------------------
+# --- Modules and restriction ------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("modules", [[], ["sprints"], ["sprints", "github"]])
@@ -79,22 +79,22 @@ async def test_modules_outside_the_allowed_list_are_rejected(
         await ProjectFactory.create_async(enabled_modules=["sprints", module])
 
 
-async def test_project_allows_every_classification_category(session: AsyncSession) -> None:
+async def test_project_allows_every_restriction_category(session: AsyncSession) -> None:
     categories = ["financial", "proprietary", "pii", "export_controlled"]
-    project = await ProjectFactory.create_async(classification_categories=categories)
+    project = await ProjectFactory.create_async(restriction_categories=categories)
 
     stored = await session.scalar(
-        select(Project.classification_categories).where(Project.id == project.id)
+        select(Project.restriction_categories).where(Project.id == project.id)
     )
     assert stored == categories
 
 
-async def test_unknown_classification_category_is_rejected(session: AsyncSession) -> None:
-    with pytest.raises(IntegrityError, match="ck_project_classification_categories"):
-        await ProjectFactory.create_async(classification_categories=["pii", "secret"])
+async def test_unknown_restriction_category_is_rejected(session: AsyncSession) -> None:
+    with pytest.raises(IntegrityError, match="ck_project_restriction_categories"):
+        await ProjectFactory.create_async(restriction_categories=["pii", "secret"])
 
 
-async def test_new_project_is_planning_and_unclassified_by_default(session: AsyncSession) -> None:
+async def test_new_project_is_planning_and_unrestricted_by_default(session: AsyncSession) -> None:
     org = await OrganizationFactory.create_async()
     await session.execute(
         text(
@@ -109,8 +109,8 @@ async def test_new_project_is_planning_and_unclassified_by_default(session: Asyn
         await session.execute(
             select(
                 Project.status,
-                Project.classification_level,
-                Project.classification_categories,
+                Project.restriction_level,
+                Project.restriction_categories,
                 Project.lead_id,
                 Project.archived_at,
             )
@@ -125,8 +125,8 @@ async def test_new_project_is_planning_and_unclassified_by_default(session: Asyn
         ("UPDATE project SET type = 'hardware' WHERE id = :id", "ck_project_type"),
         ("UPDATE project SET status = 'archived' WHERE id = :id", "ck_project_status"),
         (
-            "UPDATE project SET classification_level = 'secret' WHERE id = :id",
-            "ck_project_classification_level",
+            "UPDATE project SET restriction_level = 'secret' WHERE id = :id",
+            "ck_project_restriction_level",
         ),
     ],
 )

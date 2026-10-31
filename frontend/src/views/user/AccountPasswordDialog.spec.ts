@@ -48,10 +48,12 @@ describe('AccountPasswordDialog', () => {
     expect(wrapper.get('output').text()).toBe('fake-fake-fake-01')
     const done = document.activeElement as HTMLElement
     expect(done.textContent?.trim()).toBe('Done')
-    // The warning is read with Done (DL-118).
-    expect(wrapper.get(`#${done.getAttribute('aria-describedby')}`).text()).toBe(
+    // What was done, then the warning, are read with Done (DL-118, TD-51).
+    const ids = done.getAttribute('aria-describedby')!.split(' ')
+    expect(ids.map((id) => wrapper.get(`#${id}`).text())).toEqual([
+      'Password reset for Jane Doe.',
       'This password is shown once. Give it to the user; they must change it at first sign-in.',
-    )
+    ])
     expect(wrapper.emitted('done')).toEqual([['Password reset for Jane Doe.']])
   })
 

@@ -9,7 +9,7 @@ import { ANNOUNCE_DELAY_MS, FORM_MESSAGES } from '@/composables/useFormErrors'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok, validationFailed } from '@/test/api'
 import { acme, mountOrgPages, mountOrgView } from '@/test/org'
-import { cleanUpAfterEach } from '@/test/workspace'
+import { cleanUpAfterEach, listPage } from '@/test/workspace'
 
 import OrgSettingsView from './OrgSettingsView.vue'
 
@@ -29,6 +29,7 @@ function answers(allowed: Action[] = OWNER, saved: { name?: string; slug?: strin
       return Promise.resolve(ok({ available: false, problem: 'taken' }))
     if (path === '/api/auth/me')
       return Promise.resolve(ok(me({ orgs: [{ ...acme(OWNER), ...saved }] })))
+    if (path === '/api/orgs/{org_id}/members') return Promise.resolve(ok(listPage([])))
     return Promise.resolve(ok(org(allowed)))
   }) as never)
 }
@@ -37,13 +38,14 @@ beforeEach(() => setActivePinia(createPinia()))
 cleanUpAfterEach()
 
 describe('OrgSettingsView', () => {
-  it("shows the org's name and slug to change, under the org's section nav", async () => {
+  it("shows the org's name and slug to change", async () => {
     answers()
 
     const { wrapper } = await mountOrgView(OrgSettingsView, '/acme/settings', OWNER)
 
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing settings')
-    expect(wrapper.get('nav').attributes('aria-label')).toBe('Organization administration')
+    // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
+    expect(wrapper.find('nav').exists()).toBe(false)
     expect(wrapper.get<HTMLInputElement>('#org-name').element.value).toBe('Acme Manufacturing')
     expect(wrapper.get<HTMLInputElement>('#org-slug').element.value).toBe('acme')
     await expectNoA11yViolations(wrapper)
@@ -62,7 +64,8 @@ describe('OrgSettingsView', () => {
 
     expect(patch).toHaveBeenCalledWith('/api/orgs/{org_id}', {
       params: { path: { org_id: ACME.id } },
-      body: { name: 'Acme Industries', slug: 'acme' },
+      // Only what changed, so another admin's slug change stands (TD-56).
+      body: { name: 'Acme Industries' },
     })
     expect(wrapper.text()).toContain('Settings saved.')
     expect(wrapper.get('h1').text()).toBe('Acme Industries settings')

@@ -24,13 +24,15 @@ from app.authz.context import AuthzContext
 from app.authz.target import Target, user_target
 from app.core.base_model import Base
 from app.core.constraint_errors import constraint_registry
-from app.core.errors import FieldError, NotFoundError, ValidationFailedError, violated_constraint
+from app.core.errors import NotFoundError, ValidationFailedError, violated_constraint
 from app.core.lists import ListSpec, Page, fetch_page
 from app.enums import AuditAction, AuditEntityType
 from app.models.user import User
+from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
 from app.rules.account_rank import Account
 from app.schemas.workspace import NewUser
+from app.services.approval import ApprovalService
 from app.services.user import UserService
 
 
@@ -183,12 +185,8 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             list_spec,
             query,  # pyright: ignore[reportArgumentType] -- list_spec.query_model
         )
-        return Page[Row](
-            items=await self.rows(ctx, page.items),  # pyright: ignore[reportArgumentType] -- rows of M
-            total=page.total,
-            limit=page.limit,
-            offset=page.offset,
-        )
+        rows: list[Row] = await self.rows(ctx, page.items)  # pyright: ignore[reportArgumentType] -- rows of M
+        return page.with_items(rows)
 
     def _ensure_role_change(self, ctx: AuthzContext, *roles: object) -> None:
         """Granting, changing, or removing an owner or admin role also needs `manage_admins`
@@ -235,7 +233,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         except IntegrityError as exc:
             if not _already_member(exc):
                 raise
-            raise _field_error(loc, self.spec.already_member, "already_member") from exc
+            raise ValidationFailedError.on(loc, self.spec.already_member, "already_member") from exc
         self._log(self.spec.added, ctx, user.id, role=role.value, **(details or {}))
         membership.user = user
         return await self._row(ctx, membership)
@@ -256,11 +254,17 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         self._ensure_role_change(ctx, role)
         user = await UserRepository(self.session).get_by_email(email.strip().lower())
         if user is not None and await self.repository.membership(self.scope_id, user.id):
-            raise _email_error(self.spec.already_member, "already_member")
+            raise ValidationFailedError.on(
+                ("body", "email"), self.spec.already_member, "already_member"
+            )
         if user is None:
-            raise _email_error("No account has this email.", "no_account")
+            raise ValidationFailedError.on(
+                ("body", "email"), "No account has this email.", "no_account"
+            )
         if not user.is_active:
-            raise _email_error("This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "email"), "This account is deactivated.", "account_inactive"
+            )
         details = await admit(user) if admit is not None else None
         return await self.add_user(ctx, user, role, details=details)
 
@@ -275,6 +279,12 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             organization_id=self.target.organization_id,
         )
         return await self.add_user(ctx, user, role)
+
+    async def _ensure_on_roster(self, user_id: uuid.UUID) -> None:
+        """404 before any lock for someone not on this roster: the projects locked first
+        (DL-235) may be another org's, which a stranger's ID must not hold up."""
+        if await self.repository.membership(self.scope_id, user_id) is None:
+            raise NotFoundError
 
     async def _member(self, user_id: uuid.UUID) -> M:
         """The membership a role change or removal acts on, locked. The owners' rows are locked
@@ -294,7 +304,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         # request waited may have made someone an owner that the first list couldn't include.
         await self._owners.lock_owners(self.scope_id)
         if await self._owners.active_owners(self.scope_id) == [membership.user_id]:
-            raise ValidationFailedError([FieldError(loc, self.spec.needs_owner, "last_owner")])
+            raise ValidationFailedError.on(loc, self.spec.needs_owner, "last_owner")
 
     def _ensure_change(self, ctx: AuthzContext, membership: M, new_role: R | None) -> None:
         """The owner-only rule for owner and admin roles, except on one's own row for member,
@@ -318,14 +328,14 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         (`not_owner`), the replacement is the target (`same_user`), isn't on the roster
         (`not_member`), or is deactivated (`account_inactive`)."""
         if membership.role != self.spec.owner:
-            raise _field_error(loc, "Only an owner hands over ownership.", "not_owner")
+            raise ValidationFailedError.on(loc, "Only an owner hands over ownership.", "not_owner")
         if new_owner_id == membership.user_id:
-            raise _field_error(loc, "Name someone else as the new owner.", "same_user")
+            raise ValidationFailedError.on(loc, "Name someone else as the new owner.", "same_user")
         successor = await self.repository.membership(self.scope_id, new_owner_id, lock=True)
         if successor is None:
-            raise _field_error(loc, self.spec.successor_not_member, "not_member")
+            raise ValidationFailedError.on(loc, self.spec.successor_not_member, "not_member")
         if not successor.user.is_active:
-            raise _field_error(loc, "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(loc, "This account is deactivated.", "account_inactive")
         # Only a roster with an owner role hands over (the caller acts on an owner's row).
         await self._set_role(ctx, successor, cast(R, self.spec.owner))
 
@@ -343,7 +353,11 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         self, ctx: AuthzContext, user_id: uuid.UUID, role: R, *, new_owner_id: uuid.UUID | None
     ) -> Row:
         """Change a member's role. A last owner stepping down needs `new_owner_id`, who becomes
-        owner first (DL-59); otherwise 422 `last_owner` on `role`."""
+        owner first (DL-59); otherwise 422 `last_owner` on `role`. A role that gave inherited
+        admin hands the member's pending approvals over (design-doc §6.2)."""
+        approvals = ApprovalService(self.session)
+        await self._ensure_on_roster(user_id)
+        await approvals.lock_projects(user_id)
         membership = await self._member(user_id)
         self._ensure_change(ctx, membership, role)
         if membership.role == role:
@@ -353,6 +367,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         if membership.role == self.spec.owner:
             await self._guard_last_owner(membership, ("body", "role"))
         await self._set_role(ctx, membership, role)
+        await approvals.replace_for(user_id, ctx.user_id)
         return await self._row(ctx, membership)
 
     async def remove(
@@ -366,7 +381,20 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         """Remove a member; with their projects, the project area's registered handler removes
         their project memberships in the workspace or org too. A last owner leaving needs
         `new_owner_id`, who becomes owner first (DL-59); otherwise 422 `last_owner`. Sessions are
-        left alone (design-doc §4): access ends on the next request."""
+        left alone (design-doc §4): access ends on the next request. Their pending approvals
+        are handed over where the removal took their access (design-doc §6.2)."""
+        approvals = ApprovalService(self.session)
+        await self._ensure_on_roster(user_id)
+        also = (
+            await ProjectRepository(self.session).member_project_ids(
+                user_id,
+                organization_id=self.target.organization_id,
+                workspace_id=self.target.workspace_id,
+            )
+            if with_projects
+            else []
+        )
+        await approvals.lock_projects(user_id, also=also)
         membership = await self._member(user_id)
         self._ensure_change(ctx, membership, None)
         if new_owner_id is not None:
@@ -388,6 +416,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
             )
             for handler in _ON_MEMBER_REMOVED:
                 await handler(self.session, removal)
+        await approvals.replace_for(user_id, ctx.user_id)
 
 
 def _already_member(exc: IntegrityError) -> bool:
@@ -395,11 +424,3 @@ def _already_member(exc: IntegrityError) -> bool:
     one-membership-per-person constraint)."""
     error = constraint_registry(Base.metadata).get(violated_constraint(exc) or "")
     return error is not None and error.type == "already_member"
-
-
-def _email_error(message: str, type_: str) -> ValidationFailedError:
-    return _field_error(("body", "email"), message, type_)
-
-
-def _field_error(loc: tuple[str, ...], message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(loc, message, type_)])

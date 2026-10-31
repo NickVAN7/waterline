@@ -3,14 +3,16 @@ API"; DL-76, DL-78)."""
 
 import dataclasses
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import cast
 
 from pydantic import BaseModel
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.admin_event import JsonValue, change_details, log_admin_event
+from app.audit.admin_event import JsonValue, apply_changes, change_details, log_admin_event
+from app.audit.change_log import log_change
 from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, ensure
 from app.authz.context import AuthzContext, ProjectAccess
@@ -19,25 +21,27 @@ from app.authz.target import Target, org_target, project_target
 from app.core.errors import FieldError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
 from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    ActivityField,
     AuditAction,
     AuditEntityType,
-    ClassificationCategory,
     OrgRole,
     ProjectModule,
     ProjectRole,
     ProjectType,
+    RestrictionCategory,
 )
 from app.models.org import Organization
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
 from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
-from app.rules.classification import Classification, change
 from app.rules.identifiers import normalize_project_key, project_key_problem
 from app.rules.modules import ALL_MODULES, is_available, recommended_modules, seed_modules
+from app.rules.restriction import Restriction, change
 from app.schemas.org import MemberCreate
 from app.schemas.project import (
-    ClassificationUpdate,
     MemberCandidate,
     ModuleGuidance,
     ModuleNote,
@@ -51,10 +55,12 @@ from app.schemas.project import (
     ProjectMemberRead,
     ProjectRead,
     ProjectUpdate,
+    RestrictionUpdate,
     TypeRecommendation,
 )
 from app.schemas.user import AccessReason
 from app.schemas.workspace import SlugAvailability
+from app.services.approval import ApprovalService
 from app.services.my_work import PROJECTS, page_of
 from app.services.org import OrgService
 from app.services.roster import MemberRemoval, Roster, RosterSpec, register_on_member_removed
@@ -71,11 +77,12 @@ from app.services.user import (
 type ProjectEntity = Project
 
 
-class OrgProjectQuery(PROJECTS.query_model):  # pyright: ignore[reportGeneralTypeIssues, reportUntypedBaseClass] -- built by ListSpec
-    """The org's project list also takes `include_archived` (FastAPI reads a query model only as
-    an endpoint's sole query parameter)."""
-
-    include_archived: bool = False
+# My work's list, with archived projects on request (DL-181).
+ORG_PROJECTS = dataclasses.replace(
+    PROJECTS,
+    name="OrgProject",
+    archived_column=Project.archived_at,  # pyright: ignore[reportArgumentType]
+)
 
 
 PROJECT_MEMBERS = ListSpec(
@@ -130,12 +137,14 @@ def module_guidance() -> ModuleGuidance:
     )
 
 
-def _distinct(modules: list[ProjectModule]) -> list[str]:
+def _enabled(modules: list[ProjectModule]) -> list[str]:
+    """The modules as stored, without duplicates; one that hasn't shipped is a 422
+    `module_unavailable` (design-doc §1.1, DL-136)."""
+    if not all(is_available(m) for m in modules):
+        raise ValidationFailedError.on(
+            ("body", "enabled_modules"), "This module isn't available yet.", "module_unavailable"
+        )
     return list(dict.fromkeys(m.value for m in modules))
-
-
-def _field(field: str, message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(("body", field), message, type_)])
 
 
 _CONFIRMED = "export_control_confirmed"
@@ -197,24 +206,35 @@ def _confirmation(
     return details
 
 
-def _classification(project: Project) -> Classification:
-    return Classification(
-        project.classification_level,
-        frozenset(ClassificationCategory(c) for c in project.classification_categories),
+def _restriction(project: Project) -> Restriction:
+    return Restriction(
+        project.restriction_level,
+        frozenset(RestrictionCategory(c) for c in project.restriction_categories),
     )
 
 
-def _stored(categories: frozenset[ClassificationCategory]) -> list[str]:
-    """Categories as stored: in `ClassificationCategory` order, no duplicates."""
-    return [c.value for c in ClassificationCategory if c in categories]
+def _stored(categories: frozenset[RestrictionCategory]) -> list[str]:
+    """Categories as stored: in `RestrictionCategory` order, no duplicates."""
+    return [c.value for c in RestrictionCategory if c in categories]
 
 
-def _classification_json(classification: Classification) -> dict[str, JsonValue]:
-    level = classification.level
+def _restriction_json(restriction: Restriction) -> dict[str, JsonValue]:
+    level = restriction.level
     return {
-        "classification_level": level.value if level else None,
-        "classification_categories": list[JsonValue](_stored(classification.categories)),
+        "restriction_level": level.value if level else None,
+        "restriction_categories": list[JsonValue](_stored(restriction.categories)),
     }
+
+
+type RestrictionChangedHandler = Callable[[AsyncSession, Project, uuid.UUID], Awaitable[None]]
+
+# Registered by the item areas (requirements, S2-C6), which this module never imports: each lifts
+# its live items stored below the project's new level (DL-208, DL-209).
+_ON_RESTRICTION_CHANGED: list[RestrictionChangedHandler] = []
+
+
+def register_on_restriction_changed(handler: RestrictionChangedHandler) -> None:
+    _ON_RESTRICTION_CHANGED.append(handler)
 
 
 class ProjectService:
@@ -267,7 +287,9 @@ class ProjectService:
             raise NotFoundError
         user = await UserRepository(self.session).get(first_admin_id)
         if user is None or not user.is_active:
-            raise _field("first_admin_id", "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "first_admin_id"), "This account is deactivated.", "account_inactive"
+            )
         return first_admin_id
 
     async def create(
@@ -284,11 +306,11 @@ class ProjectService:
         if problems:
             raise ValidationFailedError(problems)
         first_admin_id = await self._first_admin(ctx, org, values.first_admin_id)
-        classification = Classification(
-            values.classification_level, frozenset(values.classification_categories)
+        restriction = Restriction(
+            values.restriction_level, frozenset(values.restriction_categories)
         )
         # Created export-controlled: the first admin is its only explicit member (§3.1).
-        export_controlled = ClassificationCategory.EXPORT_CONTROLLED in classification.categories
+        export_controlled = RestrictionCategory.EXPORT_CONTROLLED in restriction.categories
         confirmation = _confirmation(
             values,
             needed=export_controlled,
@@ -306,10 +328,10 @@ class ProjectService:
             name=values.name.strip(),
             description=values.description,
             type=values.type,
-            enabled_modules=_distinct(modules),
+            enabled_modules=_enabled(modules),
             lead_id=first_admin_id,
-            classification_level=classification.level,
-            classification_categories=_stored(classification.categories),
+            restriction_level=restriction.level,
+            restriction_categories=_stored(restriction.categories),
         )
         self.session.add(project)
         await self.session.flush()
@@ -321,7 +343,7 @@ class ProjectService:
             AuditAction.PROJECT_CREATED,
             ctx.user_id,
             project,
-            details={**_classification_json(classification), **confirmation},
+            details={**_restriction_json(restriction), **confirmation},
         )
         self._log(
             AuditAction.PROJECT_MEMBER_ADDED,
@@ -341,13 +363,14 @@ class ProjectService:
         return await self.read(ctx, project)
 
     async def list_in_org(
-        self, ctx: AuthzContext, org: Organization, query: OrgProjectQuery
+        self, ctx: AuthzContext, org: Organization, query: object
     ) -> Page[ProjectItem]:
-        """The org's projects the caller can open; archived ones only with `include_archived`."""
-        statement = self.repository.visible(
-            project_scope(ctx), include_archived=query.include_archived
-        ).where(Project.organization_id == org.id)
-        return page_of(await fetch_page(self.session, statement, PROJECTS, query))  # pyright: ignore[reportArgumentType] -- the query model
+        """The org's projects the caller can open; archived ones with `include_archived`, or
+        alone with `archived_only`."""
+        statement = self.repository.visible(project_scope(ctx)).where(
+            Project.organization_id == org.id
+        )
+        return page_of(ctx, await fetch_page(self.session, statement, ORG_PROJECTS, query))  # pyright: ignore[reportArgumentType] -- the query model
 
     async def key_availability(self, org: Organization, key: str) -> SlugAvailability:
         """Whether `key`, uppercased as create does, could be a new project's key."""
@@ -372,10 +395,8 @@ class ProjectService:
             lead_is_active=lead.is_active if lead else None,
             enabled_modules=[ProjectModule(m) for m in project.enabled_modules],
             archived=project.archived_at is not None,
-            classification_level=project.classification_level,
-            classification_categories=[
-                ClassificationCategory(c) for c in project.classification_categories
-            ],
+            restriction_level=project.restriction_level,
+            restriction_categories=[RestrictionCategory(c) for c in project.restriction_categories],
             # Each module's has-data hook arrives with its slice; none holds data yet.
             modules_holding_data=[],
             allowed_actions=allowed_actions(ctx, project_target(project)),
@@ -402,27 +423,45 @@ class ProjectService:
             if field in sent and (field == "description" or getattr(values, field) is not None):
                 changes[field] = getattr(values, field)
         if values.enabled_modules is not None:
-            changes["enabled_modules"] = _distinct(values.enabled_modules)
+            changes["enabled_modules"] = _enabled(values.enabled_modules)
         if "lead_id" in sent and values.lead_id != project.lead_id:
             if values.lead_id is not None:
                 await self._check_lead(project, values.lead_id)
             changes["lead_id"] = values.lead_id
-        changed = {
-            key: (getattr(project, key), new)
-            for key, new in changes.items()
-            if getattr(project, key) != new
-        }
-        if changed:
-            for key, (_, new) in changed.items():
-                setattr(project, key, new)
-            await self.session.flush()
+        # apply_changes re-reads under its own lock; the one above covers the checks before it.
+        if changed := await apply_changes(self.session, project, changes):
             self._log(
                 AuditAction.PROJECT_UPDATED,
                 ctx.user_id,
                 project,
                 details=change_details(_json(changed)),
             )
+            # The activity feed shows these two (design-doc §10); the rest are audit events only.
+            for field in (ActivityField.STATUS, ActivityField.LEAD_ID):
+                if field.value in changed:
+                    old, new = changed[field.value]
+                    self._log_change(project, field, ctx.user_id, old, new)
         return await self.read(ctx, project)
+
+    def _log_change(
+        self,
+        project: Project,
+        field: ActivityField,
+        actor_id: uuid.UUID,
+        old: object,
+        new: object,
+    ) -> None:
+        log_change(
+            self.session,
+            project_id=project.id,
+            entity_type=ActivityEntityType.PROJECT,
+            entity_id=project.id,
+            action=ActivityAction.UPDATED,
+            changed_by=actor_id,
+            field=field,
+            old=old,
+            new=new,
+        )
 
     async def _with_current_role(self, ctx: AuthzContext, project: Project) -> AuthzContext:
         """`ctx` with the caller's role on `project` read again, for a check made under the
@@ -438,12 +477,12 @@ class ProjectService:
             )
         return dataclasses.replace(ctx, projects=projects)
 
-    async def set_classification(
-        self, ctx: AuthzContext, project: Project, values: ClassificationUpdate
+    async def set_restriction(
+        self, ctx: AuthzContext, project: Project, values: RestrictionUpdate
     ) -> ProjectRead:
-        """Replace the level and categories (`project_classification_changed`; DL-81): a raise
-        needs `project.raise_classification`, a lower `project.lower_classification`, a change
-        that does neither (the classification already held included, which records nothing)
+        """Replace the level and categories (`project_restriction_changed`; DL-81): a raise
+        needs `project.raise_restriction`, a lower `project.lower_restriction`, a change
+        that does neither (the restriction already held included, which records nothing)
         either one. Adding `export_controlled` needs the confirmation, against the explicit
         members as they commit."""
         # Locked and read again: the rights, the "nothing to change" check, and the confirmed
@@ -454,15 +493,15 @@ class ProjectService:
         # decision, S1-C13 security review).
         ctx = await self._with_current_role(ctx, project)
         target = project_target(project)
-        old = _classification(project)
-        new = Classification(values.level, frozenset(values.categories))
+        old = _restriction(project)
+        new = Restriction(values.level, frozenset(values.categories))
         kind = change(old, new)
-        raise_, lower = Action.PROJECT_RAISE_CLASSIFICATION, Action.PROJECT_LOWER_CLASSIFICATION
+        raise_, lower = Action.PROJECT_RAISE_RESTRICTION, Action.PROJECT_LOWER_RESTRICTION
         needed = [a for a, does in ((raise_, kind.raises), (lower, kind.lowers)) if does]
         # Neither: either action will do, and lower is never granted without raise (DL-82).
         for action in needed or [raise_]:
             ensure(ctx, action, target)
-        adds_export_control = ClassificationCategory.EXPORT_CONTROLLED in (
+        adds_export_control = RestrictionCategory.EXPORT_CONTROLLED in (
             new.categories - old.categories
         )
         confirmation = _confirmation(
@@ -471,16 +510,22 @@ class ProjectService:
             members=await self.repository.member_ids(project.id) if adds_export_control else None,
         )
         if new != old:
-            project.classification_level = new.level
-            project.classification_categories = _stored(new.categories)
+            project.restriction_level = new.level
+            project.restriction_categories = _stored(new.categories)
             await self.session.flush()
+            # Each lifts only what's now below the floor, so a lower lifts nothing (DL-208).
+            for handler in _ON_RESTRICTION_CHANGED:
+                await handler(self.session, project, ctx.user_id)
+            if adds_export_control:
+                # Inherited admins without a membership can no longer decide (design-doc §6.2).
+                await ApprovalService(self.session).replace_lost_access(project, ctx.user_id)
             self._log(
-                AuditAction.PROJECT_CLASSIFICATION_CHANGED,
+                AuditAction.PROJECT_RESTRICTION_CHANGED,
                 ctx.user_id,
                 project,
                 details={
-                    "old": _classification_json(old),
-                    "new": _classification_json(new),
+                    "old": _restriction_json(old),
+                    "new": _restriction_json(new),
                     **confirmation,
                 },
             )
@@ -488,14 +533,19 @@ class ProjectService:
 
     async def _check_lead(self, project: Project, lead_id: uuid.UUID) -> None:
         if not await self.repository.is_member(project.id, lead_id):
-            raise _field("lead_id", "The lead must be a member of the project.", "not_member")
+            raise ValidationFailedError.on(
+                ("body", "lead_id"), "The lead must be a member of the project.", "not_member"
+            )
         user = await UserRepository(self.session).get(lead_id)
         if user is None or not user.is_active:
-            raise _field("lead_id", "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "lead_id"), "This account is deactivated.", "account_inactive"
+            )
 
     async def archive(self, ctx: AuthzContext, project: Project) -> None:
-        """Read-only until unarchived (`project_archived`). An archived project can't be archived
-        again: `authorize()` denies it as a mutation on an archived project (403)."""
+        """Read-only until unarchived (`project_archived`); its pending approval requests are
+        cancelled, each logged (DL-194). An archived project can't be archived again:
+        `authorize()` denies it as a mutation on an archived project (403)."""
         # Locked and read again: an archive that committed meanwhile leaves nothing to record.
         await self.repository.lock(project)
         if project.archived_at is not None:
@@ -503,6 +553,7 @@ class ProjectService:
         project.archived_at = datetime.now(UTC)
         await self.session.flush()
         self._log(AuditAction.PROJECT_ARCHIVED, ctx.user_id, project)
+        await ApprovalService(self.session).cancel_pending_in_project(project.id, ctx.user_id)
 
     async def unarchive(self, ctx: AuthzContext, project: Project) -> None:
         """`project_unarchived`; already unarchived changes and records nothing."""
@@ -532,9 +583,9 @@ class ProjectService:
 
     async def _lock_live(self, project: Project) -> None:
         """Lock the project, then re-read it: an archive that committed meanwhile still denies a
-        member change (design-doc §5). Lock order: the person's org and staff rows (an add's
-        `org_member_or_staff`), then the project, then its memberships, as a removal "with their
-        projects" takes them."""
+        member change (design-doc §5). Lock order: the project, then the person's org and staff
+        rows (an add's `org_member_or_staff`), then its memberships, as a removal "with their
+        projects" takes them (DL-235)."""
         await self.repository.lock(project)
         if project.archived_at is not None:
             raise ForbiddenError
@@ -543,7 +594,7 @@ class ProjectService:
         self, project: Project, payload: ProjectMemberAdd | ProjectMemberCreate
     ) -> dict[str, JsonValue]:
         """Lock the live project for a member add, then check the export-control confirmation
-        against what it is now (a classification change holds the same lock; DL-81)."""
+        against what it is now (a restriction change holds the same lock; DL-81)."""
         await self._lock_live(project)
         return _confirmation(payload, needed=project_target(project).export_controlled)
 
@@ -552,22 +603,31 @@ class ProjectService:
     ) -> Page[ProjectMemberRead]:
         return await self._members(project).list(ctx, PROJECT_MEMBERS, query)
 
+    async def first_admin_candidates(
+        self, org: Organization, query: object
+    ) -> Page[MemberCandidate]:
+        """The create dialog's picker: the org's active members and the workspace's active staff
+        (DL-152). The caller holds `project.assign_first_admin`."""
+        return await self._candidates(
+            self.repository.first_admin_candidates(org.id, org.workspace_id), query
+        )
+
     async def member_candidates(self, project: Project, query: object) -> Page[MemberCandidate]:
         """The picker: the org's active members and the workspace's staff not yet on it."""
+        return await self._candidates(self.repository.candidates(project), query)
+
+    async def _candidates(self, people: Select[User], query: object) -> Page[MemberCandidate]:
         page = await fetch_page(
             self.session,
-            self.repository.candidates(project),
+            people,
             MEMBER_CANDIDATES,
             query,  # pyright: ignore[reportArgumentType] -- MEMBER_CANDIDATES.query_model
         )
-        return Page[MemberCandidate](
-            items=[
+        return page.with_items(
+            [
                 MemberCandidate(user_id=u.id, email=u.email, username=u.username, name=u.name)
                 for u in page.items
-            ],
-            total=page.total,
-            limit=page.limit,
-            offset=page.offset,
+            ]
         )
 
     async def add_member(
@@ -576,39 +636,46 @@ class ProjectService:
         """Add someone by `user_id` (the picker) or `email` (email first), in DL-78's order of
         checks; `join_org` adds an account from outside the org and the staff to the org too."""
         if (payload.user_id is None) == (payload.email is None):
-            raise ValidationFailedError(
-                [FieldError(("body",), "Send exactly one of user_id or email.", "one_parameter")]
+            raise ValidationFailedError.on(
+                ("body",), "Send exactly one of user_id or email.", "one_parameter"
             )
         # The project's org exists: a foreign key.
         org = cast(Organization, await OrgService(self.session).get(project.organization_id))
         roster = self._members(project)
+        # The project before the person's org and staff rows (DL-235); the checks keep DL-78's
+        # order, the export-control confirmation last.
+        await self._lock_live(project)
         if payload.email is not None:
 
             async def admit(user: User) -> dict[str, JsonValue]:
                 if not await self.repository.org_member_or_staff(org, user.id):
                     if not payload.join_org:
-                        raise _field(
-                            "email",
+                        raise ValidationFailedError.on(
+                            ("body", "email"),
                             "This person isn't in the organization. Confirm to add them to it too.",
                             "outside_org",
                         )
                     await OrgService(self.session).add_member(ctx, org, user.email, OrgRole.MEMBER)
-                # A second add of the same person, waiting here, then hits the unique constraint:
-                # `already_member` on `email` (DL-80).
-                return await self._lock_for_add(project, payload)
+                # A second add of the same person, waiting on the project, then hits the unique
+                # constraint: `already_member` on `email` (DL-80).
+                return _confirmation(payload, needed=project_target(project).export_controlled)
 
             return await roster.add(ctx, payload.email, payload.role, admit=admit)
         # Exactly one of the two was sent (checked above), so here it's `user_id`.
         user_id = cast(uuid.UUID, payload.user_id)
         if not await self.repository.org_member_or_staff(org, user_id):
             raise NotFoundError
-        confirmation = await self._lock_for_add(project, payload)
+        confirmation = _confirmation(payload, needed=project_target(project).export_controlled)
         if await self.repository.membership(project.id, user_id):
-            raise _field("user_id", _MEMBER_ROSTER.already_member, "already_member")
+            raise ValidationFailedError.on(
+                ("body", "user_id"), _MEMBER_ROSTER.already_member, "already_member"
+            )
         # An org member or staff member has an account.
         user = cast(User, await UserRepository(self.session).get(user_id))
         if not user.is_active:
-            raise _field("user_id", "This account is deactivated.", "account_inactive")
+            raise ValidationFailedError.on(
+                ("body", "user_id"), "This account is deactivated.", "account_inactive"
+            )
         return await roster.add_user(
             ctx, user, payload.role, loc=("body", "user_id"), details=confirmation
         )
@@ -650,12 +717,14 @@ class ProjectService:
         return self._members(project).row(ctx, membership)
 
     async def remove_member(self, ctx: AuthzContext, project: Project, user_id: uuid.UUID) -> None:
-        """Remove a member (`project_member_removed`); removing the lead clears `lead_id`."""
+        """Remove a member (`project_member_removed`); removing the lead clears `lead_id`, and
+        their pending approvals are replaced if that took their access (design-doc §6.2)."""
         await self._lock_live(project)
         membership = await self.repository.membership(project.id, user_id, lock=True)
         if membership is None:
             raise NotFoundError
         await self._remove(membership, project, ctx.user_id)
+        await ApprovalService(self.session).replace_lost_access(project, ctx.user_id)
 
     async def _remove(
         self,
@@ -672,6 +741,7 @@ class ProjectService:
         if project.lead_id == membership.user_id:
             project.lead_id = None
             details["lead_cleared"] = True
+            self._log_change(project, ActivityField.LEAD_ID, actor_id, membership.user_id, None)
         if via is not None:
             details["via"] = via.value
         await self.session.flush()

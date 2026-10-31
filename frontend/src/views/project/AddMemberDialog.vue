@@ -6,7 +6,10 @@
 // (UI-FRM-15), and choosing someone else clears the confirmation. A failed search says so under the
 // picker, where typing again retries it; it isn't the form's alert, whose Retry is the add. A 403,
 // or a refusal for the project's changed export control, tells the page (`refused`), so it reloads
-// what the user may do (UI-FRM-7, DL-116).
+// what the user may do (UI-FRM-7, DL-116). The picker's list opens on focus while no one is chosen
+// (DL-137; once someone is, focus back after a refusal shows the error, not the list) and scrolls
+// itself, the listbox the combobox controls, not its unnamed container: the keyboard reaches it
+// through the combobox, which axe recognises only on the listbox (`scrollable-region-focusable`).
 import AutoComplete from 'primevue/autocomplete'
 import { nextTick, ref } from 'vue'
 
@@ -76,7 +79,8 @@ async function search(q: string): Promise<void> {
   try {
     const page = await api(
       client.GET('/api/projects/{key}/member-candidates', {
-        params: { path: { key: props.projectKey }, query: { q, limit: 20 } },
+        // On focus the query is empty: the first candidates, unfiltered (`q` can't be empty).
+        params: { path: { key: props.projectKey }, query: { limit: 20, ...(q ? { q } : {}) } },
       }),
     )
     suggestions.value = page.items
@@ -175,7 +179,10 @@ defineExpose({ open })
             :suggestions="suggestions"
             :option-label="label"
             force-selection
+            :complete-on-focus="!chosen()"
             append-to="self"
+            scroll-height="none"
+            :pt="{ list: { class: 'max-h-56 overflow-y-auto' } }"
             empty-search-message="No one found."
             :input-props="{
               'aria-required': 'true',

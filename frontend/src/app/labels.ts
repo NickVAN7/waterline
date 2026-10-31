@@ -4,8 +4,8 @@ import type { IconName } from '@/components/Icon.vue'
 
 type ProjectStatus = components['schemas']['ProjectStatus']
 type ProjectType = components['schemas']['ProjectType']
-type ClassificationLevel = components['schemas']['ClassificationLevel']
-type ClassificationCategory = components['schemas']['ClassificationCategory']
+type RestrictionLevel = components['schemas']['RestrictionLevel']
+type RestrictionCategory = components['schemas']['RestrictionCategory']
 export type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
 
 export type BadgeLabel = { label: string; tone: Tone; icon: IconName }
@@ -38,43 +38,46 @@ export const MODULE: Record<string, string> = {
   cutover: 'Cutover',
 }
 
-/** An enabled module whose slice hasn't shipped (design-doc §1.1, UI-SHL-6). */
+/** A module whose slice hasn't shipped, which can't be enabled (design-doc §1.1, DL-136). */
 export const NOT_AVAILABLE_YET = 'Not available yet'
 
-/** Classification levels with the description shown beside each choice (design-doc §3.1, its
- * "Means" column), and the banner's tone (UI-FBK-6; the alert's icon follows the tone). */
-export const CLASSIFICATION_LEVEL: Record<
-  ClassificationLevel,
-  { label: string; description: string; tone: 'info' | 'warning' | 'danger' }
+/** Restriction levels with the description shown beside each choice (design-doc §3.1, its
+ * "Means" column), and the header badge's tone and icon (UI-FBK-6). */
+export const RESTRICTION_LEVEL: Record<
+  RestrictionLevel,
+  BadgeLabel & { tone: 'info' | 'warning'; description: string }
 > = {
   internal: {
     label: 'Internal',
     description:
       "For the firm and the client's project team; not for the public. Disclosure is embarrassing, not damaging.",
     tone: 'info',
+    icon: 'info',
   },
   confidential: {
     label: 'Confidential',
     description:
       'Disclosure outside the project team would harm the client or the firm, or break a confidentiality agreement.',
     tone: 'warning',
-  },
-  restricted: {
-    label: 'Restricted',
-    description:
-      'Disclosure would cause serious harm or breach a legal or regulatory duty; need-to-know.',
-    tone: 'danger',
+    icon: 'warning',
   },
 }
 
-/** The unclassified choice (design-doc §3.1): no banner. */
-export const UNCLASSIFIED = {
-  label: 'Not classified',
-  description: 'Not yet classified; treated like Internal for every rule.',
+/** The null level's choice (design-doc §3.1): no badge. */
+export const NO_RESTRICTION = {
+  label: 'None',
+  description: 'Not yet restricted; treated like Internal for every rule.',
+}
+
+/** The badge for categories with no level, in Internal's tone (UI-FBK-6). */
+export const NO_RESTRICTION_LEVEL: BadgeLabel = {
+  label: 'No restriction level',
+  tone: RESTRICTION_LEVEL.internal.tone,
+  icon: RESTRICTION_LEVEL.internal.icon,
 }
 
 /** Why content is sensitive (design-doc §3.1). */
-export const CLASSIFICATION_CATEGORY: Record<ClassificationCategory, string> = {
+export const RESTRICTION_CATEGORY: Record<RestrictionCategory, string> = {
   financial: 'Financial',
   proprietary: 'Proprietary',
   pii: 'Personal data (PII)',
@@ -114,6 +117,12 @@ export const PROJECT_ROLE: Record<ProjectRole, string> = {
   viewer: 'Viewer',
 }
 
+/** The user's own access to a project in a list (DL-153): their role, or admin by inheritance. */
+export const MY_ACCESS: Record<components['schemas']['ProjectItem']['my_access'], string> = {
+  ...PROJECT_ROLE,
+  inherited_admin: 'Admin (inherited)',
+}
+
 /** Why someone reaches an org or project, in an access review (design-doc §5, "Access review"). */
 export const ACCESS_REASON: Record<AccessReason, string> = {
   system_admin: 'System admin',
@@ -134,11 +143,29 @@ export const ACCESS_KIND: Record<AccessKind, string> = {
   management: 'Management only',
 }
 
+/** An active account's status, and someone with no workspace role, in the users list's Status
+ * and Role columns (DL-137, DL-183); the access review's no-role text. */
+export const ACTIVE = 'Active'
+export const USER = 'User'
+export const NO_ROLE = 'None'
+
+/** A per-person access review's Access cell on a project that isn't export-controlled, read by
+ * screen readers only (DL-184). */
+export const NOT_EXPORT_CONTROLLED = 'Not export-controlled'
+
 /** The badge after a deactivated user's name, everywhere it appears (UI-FBK-6). */
 export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', icon: 'x' }
 
-/** The badge on a system admin, read-only on the users page (design-doc §4). */
-export const SYSTEM_ADMIN: BadgeLabel = { label: 'System admin', tone: 'info', icon: 'check' }
+/** A person's workspace role and system admin as text ("Owner, System admin"), or `none` with
+ * neither: the users list's Role ("User") and the access review's ("None") (DL-188, DL-189). */
+export function workspaceRoleText(
+  role: WorkspaceRole | null | undefined,
+  isSystemAdmin: boolean,
+  none: string,
+): string {
+  const parts = [role && WORKSPACE_ROLE[role], isSystemAdmin && ACCESS_REASON.system_admin]
+  return parts.filter(Boolean).join(', ') || none
+}
 
 /** What a live availability check says about a slug or username (UI-FRM-9), after the field's
  * name: the identifier rule's problems (design-doc §3, §4) and `taken`. */

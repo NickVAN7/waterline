@@ -6,14 +6,19 @@ import type { RouteLocationRaw } from 'vue-router'
 
 import { useId } from 'vue'
 
-const props = defineProps<{
-  offset: number
-  limit: number
-  total: number
-  /** How many rows this page shows. */
-  count: number
-  linkTo: (offset: number) => RouteLocationRaw
-}>()
+const props = withDefaults(
+  defineProps<{
+    offset: number
+    limit: number
+    total: number
+    /** How many rows this page shows. */
+    count: number
+    linkTo: (offset: number) => RouteLocationRaw
+    /** The nav's name: a page with two paged lists names each after its list. */
+    label?: string
+  }>(),
+  { label: 'Pagination' },
+)
 
 const showingId = useId()
 
@@ -28,7 +33,7 @@ const pages = () => [
 </script>
 
 <template>
-  <nav aria-label="Pagination" class="flex flex-wrap items-center gap-4 text-sm">
+  <nav :aria-label="label" class="flex flex-wrap items-center gap-4 text-sm">
     <span :id="showingId" class="text-text-muted">
       Showing {{ offset + 1 }}–{{ offset + count }} of {{ total }}
     </span>

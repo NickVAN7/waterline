@@ -32,6 +32,7 @@ from tests.support.authz import (
     PROJ2,
     PROJECT_TARGET,
     WS,
+    project_actions,
     rows,
 )
 
@@ -230,39 +231,18 @@ def test_a_project_action_is_404_to_who_cannot_see_the_project(persona: str, act
 
 # --- allowed_actions on a project (the project read, DL-76) -------------------------------------
 
-INHERITED_ON_A_LIVE_PROJECT = [
-    "project.archive",
-    "project.lower_classification",
-    "project.raise_classification",
-    "project.unarchive",
-    "project.update",
-    "project.view",
-    "project.view_access",
-    "project_member.manage",
-]
-
 
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_admin", INHERITED_ON_A_LIVE_PROJECT),
-        (
-            "project_admin",
-            [
-                "project.lower_classification",
-                "project.raise_classification",
-                "project.update",
-                "project.view",
-                "project.view_access",
-                "project_member.manage",
-            ],
-        ),
-        ("project_member", ["project.view"]),
-        ("project_viewer", ["project.view"]),
+        ("system_admin", project_actions(inherited=True)),
+        ("workspace_owner", project_actions(inherited=True)),
+        ("workspace_admin", project_actions(inherited=True)),
+        ("org_owner", project_actions(inherited=True)),
+        ("org_admin", project_actions(inherited=True)),
+        ("project_admin", project_actions(ProjectRole.ADMIN)),
+        ("project_member", project_actions(ProjectRole.MEMBER)),
+        ("project_viewer", project_actions(ProjectRole.VIEWER)),
         ("org_member", []),
         ("other_project_admin", []),
         ("nobody", []),
@@ -275,11 +255,20 @@ def test_allowed_actions_on_a_project(persona: str, expected: list[str]) -> None
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("workspace_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("org_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("project_admin", ["project.view", "project.view_access"]),
-        ("project_viewer", ["project.view"]),
+        (
+            "system_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "workspace_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "org_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        ("project_admin", ["project.view", "project.view_access", "requirement.view"]),
+        ("project_viewer", ["project.view", "requirement.view"]),
         ("org_member", []),
     ],
 )

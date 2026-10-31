@@ -30,7 +30,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 ## 3. Update the docs
 
 - `docs/developer-guide.md`: anything a developer now needs (setup steps, commands, conventions,
-  how-tos, troubleshooting).
+  how-tos, troubleshooting). Its Status stays one line, the checkpoint and the next one; what was
+  built goes in the commit and the review record, not there (DL-170).
 - `docs/user-guide.md`: any user-visible behavior.
 - `docs/design-doc.md`, `docs/schema-doc.md`, `docs/build-plan.md`: any drift between the docs
   and what was built (approved changes only; unapproved divergence goes back to the owner).
@@ -62,7 +63,7 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   - the build plan's section for the slice says the checkpoint gets the security reviewer
     (e.g. Slice 1: "every checkpoint from 1 to 16b"); or
   - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
-    `password_policy.py`, `identifiers.py`, or `classification.py`; session, token, password,
+    `password_policy.py`, `identifiers.py`, or `restriction.py`; session, token, password,
     or cookie code in `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project`
     areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
     `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
@@ -89,13 +90,22 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 - **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
   (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
   absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
-  any other finding. Run `uv run wl up` again afterwards.
+  any other finding.
+- **Last checkpoint of a slice:** with the dev stack still down, invoke the `user-guide-verifier`
+  agent with the repository's absolute path, the checkpoint ID, and the slice whose "Done when"
+  list to walk (DL-124). Its findings are fixed in `docs/user-guide.md`, or in the app when the
+  app is what's wrong, like any other finding. Run `uv run wl up` again afterwards.
 - **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
   agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
   (the root commit for Slice 0). It reports **Fixes** and **Decisions**.
 - **Last checkpoint of a slice:** after `docs-consistency`, invoke the `repo-auditor` agent with
   the slice ID and the checkpoint ID (DL-41). It audits the whole repository, not this diff, and
   runs no tests.
+- **Last checkpoint of a slice** (from S2-C0a, which builds it, DL-138): after `repo-auditor`,
+  invoke the `simplicity-auditor` agent. It audits the whole repository for overengineering,
+  reports only, and its findings feed the retro; the next slice's C0 applies those the owner
+  accepts. The review record gets its own `## simplicity-auditor` section (a docs consistency
+  test requires that heading in the slice's last record, DL-165).
 
 ## 5. Resolve every finding
 
@@ -115,6 +125,9 @@ scope: fix one only when the fix is within it. Otherwise log it (minor), or put 
 for the owner as a proposed design change (major or blocker). Its questions go to the owner,
 and its findings feed the slice retro.
 
+`simplicity-auditor` findings (from S2-C0a, DL-138) are never fixed in the checkpoint: each goes
+to the owner, who decides it, and feeds the retro; the next slice's C0 applies the accepted ones.
+
 **Fix in one batch** (DL-105, DL-106), once every reviewer has reported:
 - Fix every finding together. Before each fix, grep for the same pattern elsewhere in the diff
   and the code it touches, and fix every instance at once.
@@ -128,8 +141,8 @@ and its findings feed the slice retro.
 findings, tests, or docs alone don't trigger one. Only `checkpoint-reviewer`,
 `security-reviewer`, and `ui-reviewer` are re-reviewed; the other agents' findings are fixed
 without another pass (DL-108), except that a code fix for a major or blocker finding from
-`repo-auditor` or `fresh-clone-verifier` is covered by `checkpoint-reviewer`'s re-review, or by
-one pass of it if it had none, given those findings and their resolutions too (DL-110). The re-review gets, besides the usual inputs:
+`repo-auditor`, `fresh-clone-verifier`, or `user-guide-verifier` is covered by `checkpoint-reviewer`'s re-review, or by
+one pass of it if it had none, given those findings and their resolutions too (DL-110, DL-190). The re-review gets, besides the usual inputs:
 - the fix diff: take `uv run wl review-copy <dir>/reviewed-2` and pass the reviewer
   `diff -ruN -x .git <dir>/reviewed-1 <dir>/reviewed-2`, saved to a file, as what to review
   (each copy is a clone, with its own `.git`; the rest of the diff was reviewed in pass 1);
@@ -147,7 +160,7 @@ If a finding shows a rule that would have prevented the mistake, add it to the r
 `CLAUDE.md`.
 
 **Record every pass** of every reviewer that ran (checkpoint, security, UI, fresh-clone,
-docs-consistency, repo-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
+docs-consistency, repo-auditor, simplicity-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
 Include the base commit, the totals, the "Spec tests" section (when the checkpoint has one), and
 for each pass its verdict, its findings table in the `S0-C1.md` columns, one row per finding with
 its resolution (fixed / logged with TD number / rejected with evidence / proposed to the owner;
@@ -221,7 +234,7 @@ reviewers, not verification.
 Send the owner:
 - the review note (the commit message body);
 - each reviewer's findings table (checkpoint, security, UI, fresh-clone, docs-consistency,
-  repo-auditor) with
+  repo-auditor, simplicity-auditor) with
   the resolution of each finding (as recorded in `docs/reviews/s<n>/<ID>.md`);
 - the `docs-consistency` Decisions, unresolved, with their options;
 - any open questions from the review. Each decision or question says what it is, why it
@@ -239,7 +252,8 @@ Send the owner:
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
   the owner, which skills and agents never triggered, the verdict of any process trial, and the
-  `repo-auditor` findings left for the owner (with the design changes they propose).
+  `repo-auditor` findings left for the owner (with the design changes they propose), and every
+  `simplicity-auditor` finding for the owner to decide.
   The owner decides what changes; each change gets a decision-log entry and is applied on the
   slice branch before the merge (DL-19);
 - what the next checkpoint will cover.

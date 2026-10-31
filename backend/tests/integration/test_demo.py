@@ -143,7 +143,7 @@ async def test_the_demo_orgs_have_their_owner_and_members(
     }
 
 
-async def test_the_demo_projects_have_their_org_type_lead_state_and_classification(
+async def test_the_demo_projects_have_their_org_type_lead_state_and_restriction(
     built: int, session: AsyncSession
 ) -> None:
     lead = aliased(User)
@@ -155,8 +155,8 @@ async def test_the_demo_projects_have_their_org_type_lead_state_and_classificati
             Project.type,
             lead.username,
             Project.archived_at.is_not(None),
-            Project.classification_level,
-            Project.classification_categories,
+            Project.restriction_level,
+            Project.restriction_categories,
         )
         .join(Organization, Project.organization_id == Organization.id)
         .join(lead, Project.lead_id == lead.id)

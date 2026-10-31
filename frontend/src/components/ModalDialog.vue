@@ -4,7 +4,8 @@
 // field of a form, or a confirmation's Cancel), else the dialog's first focusable element. On
 // close, focus returns to the control that opened it, or, when that's gone (a removed row), to
 // `fallbackFocus()`; an action that navigates away closes with `close({ returnFocus: false })`,
-// so the new page's `h1` keeps focus (the close event comes later, in its own task).
+// so the new page's `h1` keeps focus (the close event comes later, in its own task). `m-auto`
+// centers it in the viewport: the base styles' reset drops the browser's own (DL-137).
 import { nextTick, ref, useId } from 'vue'
 
 const props = defineProps<{ title: string; fallbackFocus?: () => void }>()
@@ -54,7 +55,7 @@ defineExpose({ open, close })
   <dialog
     ref="dialog"
     :aria-labelledby="titleId"
-    class="w-full max-w-(--content-narrow) rounded-lg border border-border bg-surface p-0 text-text shadow-dialog"
+    class="m-auto w-full max-w-(--content-narrow) rounded-lg border border-border bg-surface p-0 text-text shadow-dialog"
     @close="closed"
   >
     <div class="flex flex-col gap-4 p-6">

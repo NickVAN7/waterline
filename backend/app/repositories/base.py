@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import ColumnElement, Result, or_, select, true, update
+from sqlalchemy import ColumnElement, Result, and_, not_, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, class_mapper
 from sqlalchemy.orm.attributes import set_committed_value
@@ -96,12 +96,23 @@ def scope_clause(
     id_column: InstrumentedAttribute[uuid.UUID],
     workspace_column: InstrumentedAttribute[uuid.UUID],
     organization_column: InstrumentedAttribute[uuid.UUID] | None = None,
+    *,
+    export_controlled: ColumnElement[bool] | None = None,
 ) -> ColumnElement[bool]:
     """The `WHERE` limiting a list to the rows `scope` covers (app/authz/scoping.py): every row,
-    or those whose own ID, org (when the table has one), or workspace it lists."""
+    or those whose own ID, org (when the table has one), or workspace it lists. For a content
+    scope, `export_controlled` says whether the row's project is export-controlled: only the IDs
+    reach those rows."""
+    inherited: ColumnElement[bool]
     if scope.everything:
-        return true()
-    clauses = [id_column.in_(scope.ids), workspace_column.in_(scope.workspace_ids)]
-    if organization_column is not None:
-        clauses.append(organization_column.in_(scope.organization_ids))
-    return or_(*clauses)
+        inherited = true()
+    else:
+        clauses = [workspace_column.in_(scope.workspace_ids)]
+        if organization_column is not None:
+            clauses.append(organization_column.in_(scope.organization_ids))
+        inherited = or_(*clauses)
+    if scope.content:
+        if export_controlled is None:
+            raise ValueError("a content scope needs the export_controlled expression")
+        inherited = and_(inherited, not_(export_controlled))
+    return or_(id_column.in_(scope.ids), inherited)

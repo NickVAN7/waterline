@@ -12,7 +12,9 @@ from enum import StrEnum
 
 from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target
-from app.enums import AccessKind, OrgRole, ProjectRole, WorkspaceRole
+from app.enums import AccessKind, ApprovalDecision, OrgRole, ProjectRole, WorkspaceRole
+from app.models.approval import ApprovalRequest
+from app.models.requirement import Requirement
 from app.rules.account_rank import Account, can_manage_account
 
 
@@ -43,9 +45,9 @@ class ActionSpec:
       of the roles above: e.g. `org.view`, for a project member who has no org role.
     - `rule`: a targeted rule granting it on top of the roles above, from the whole context
       (e.g. `user.check`: an admin role anywhere in the target's workspace, DL-68).
-    - `access`: content or management (design-doc §3.1, §5); the export-control gate that uses
-      it comes in Slice 2. The default is content, the closed side: an action someone forgets to
-      mark is never let past the gate (S1-C13 security review).
+    - `access`: content or management (design-doc §3.1, §5), read by the export-control gate.
+      The default is content, the closed side: an action someone forgets to mark is never let
+      past the gate (S1-C13 security review).
     - `explicit_when_export_controlled`: on an export-controlled project, only the project role
       grants it, so an inherited admin without an explicit membership is denied (DL-82).
     """
@@ -86,8 +88,20 @@ class Action(StrEnum):
     PROJECT_UNARCHIVE = "project.unarchive"
     PROJECT_MEMBER_MANAGE = "project_member.manage"
     PROJECT_VIEW_ACCESS = "project.view_access"
-    PROJECT_RAISE_CLASSIFICATION = "project.raise_classification"
-    PROJECT_LOWER_CLASSIFICATION = "project.lower_classification"
+    PROJECT_RAISE_RESTRICTION = "project.raise_restriction"
+    PROJECT_LOWER_RESTRICTION = "project.lower_restriction"
+    REQUIREMENT_VIEW = "requirement.view"
+    REQUIREMENT_CREATE = "requirement.create"
+    REQUIREMENT_UPDATE = "requirement.update"
+    REQUIREMENT_REASSIGN_REPORTER = "requirement.reassign_reporter"
+    REQUIREMENT_RAISE_RESTRICTION = "requirement.raise_restriction"
+    REQUIREMENT_LOWER_RESTRICTION = "requirement.lower_restriction"
+    REQUIREMENT_APPROVE_MANUALLY = "requirement.approve_manually"
+    REQUIREMENT_DELETE = "requirement.delete"
+    REQUIREMENT_RESTORE = "requirement.restore"
+    APPROVAL_REQUEST_CREATE = "approval_request.create"
+    APPROVAL_REQUEST_CANCEL = "approval_request.cancel"
+    APPROVAL_DECIDE = "approval.decide"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -115,6 +129,28 @@ def _outranks(ctx: AuthzContext, target: Target) -> bool:
     """The rank rule (design-doc §4, "Account management"; DL-73) on a user target."""
     return isinstance(target.entity, Account) and can_manage_account(
         rank_account(ctx), target.entity
+    )
+
+
+def _reporter_while_never_approved(ctx: AuthzContext, target: Target) -> bool:
+    """A requirement's delete and restore rule (design-doc §5, "Deletion"; DL-219): its
+    reporter, as a project member or above, while it has never been approved."""
+    access = ctx.projects.get(target.project_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
+    return (
+        isinstance(target.entity, Requirement)
+        and target.entity.reporter_id == ctx.user_id
+        and target.entity.approved_revision_id is None
+        and access is not None
+        and access.role in (ProjectRole.MEMBER, ProjectRole.ADMIN)
+    )
+
+
+def _named_approver_still_pending(user_id: uuid.UUID, entity: object) -> bool:
+    """`approval.decide`'s relationship (design-doc §5, "Personal actions"; DL-234): the user's
+    own row on the request is still pending, whatever the request's status."""
+    return isinstance(entity, ApprovalRequest) and any(
+        row.approver_id == user_id and row.decision is ApprovalDecision.PENDING
+        for row in entity.approvals
     )
 
 
@@ -244,7 +280,7 @@ REGISTRY: dict[str, ActionSpec] = {
         mutation=False,
     ),
     # Project admins, inherited included (§3.1; DL-82).
-    Action.PROJECT_RAISE_CLASSIFICATION: ActionSpec(
+    Action.PROJECT_RAISE_RESTRICTION: ActionSpec(
         Level.PROJECT,
         access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
@@ -252,7 +288,7 @@ REGISTRY: dict[str, ActionSpec] = {
         project_role=ProjectRole.ADMIN,
     ),
     # The same, but an explicit project admin only on an export-controlled project (DL-82).
-    Action.PROJECT_LOWER_CLASSIFICATION: ActionSpec(
+    Action.PROJECT_LOWER_RESTRICTION: ActionSpec(
         Level.PROJECT,
         access=AccessKind.MANAGEMENT,
         workspace_role=WorkspaceRole.ADMIN,
@@ -260,4 +296,87 @@ REGISTRY: dict[str, ActionSpec] = {
         project_role=ProjectRole.ADMIN,
         explicit_when_export_controlled=True,
     ),
+    # Requirements (Slice 2): project viewers and up, inherited admins included (S2-plan, actions).
+    Action.REQUIREMENT_VIEW: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.VIEWER,
+        mutation=False,
+    ),
+    # Project members and up, inherited admins included (S2-plan, actions; §5 Role capabilities).
+    Action.REQUIREMENT_CREATE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.MEMBER,
+    ),
+    Action.REQUIREMENT_UPDATE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.MEMBER,
+    ),
+    # Members raise an item's restriction (§3.1, "Who sets it").
+    Action.REQUIREMENT_RAISE_RESTRICTION: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.MEMBER,
+    ),
+    # Project admins, inherited included (S2-plan, actions; DL-211).
+    Action.REQUIREMENT_REASSIGN_REPORTER: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    # Lowering is project-admin only, and on an export-controlled project an explicit project
+    # admin's (§3.1, as for the project's own, DL-82).
+    Action.REQUIREMENT_LOWER_RESTRICTION: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        explicit_when_export_controlled=True,
+    ),
+    # Approving by hand (§5; registered here for the PATCH's 403/422 split, DL-212).
+    Action.REQUIREMENT_APPROVE_MANUALLY: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    # Project admins, inherited included, and the reporter of one never approved (§5, "Deletion";
+    # whoever may delete it may restore it).
+    Action.REQUIREMENT_DELETE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        rule=_reporter_while_never_approved,
+    ),
+    Action.REQUIREMENT_RESTORE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        rule=_reporter_while_never_approved,
+    ),
+    # Project admins, inherited included (§6.2, "Who does what"); content, so the export-control
+    # gate leaves only explicit admins (§3.1).
+    Action.APPROVAL_REQUEST_CREATE: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    Action.APPROVAL_REQUEST_CANCEL: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+    ),
+    # Personal: only the named approver's own pending row grants it, no role (§5).
+    Action.APPROVAL_DECIDE: ActionSpec(Level.PROJECT, relationship=_named_approver_still_pending),
 }

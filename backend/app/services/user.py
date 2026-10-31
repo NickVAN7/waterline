@@ -4,11 +4,17 @@ import uuid
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.admin_event import JsonValue, change_details, changed_fields, log_admin_event
+from app.audit.admin_event import (
+    JsonValue,
+    apply_changes,
+    change_details,
+    changed_fields,
+    log_admin_event,
+)
 from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target, user_target
@@ -18,20 +24,22 @@ from app.core.security import hash_password
 from app.enums import (
     AccessKind,
     AuditAction,
-    ClassificationCategory,
     OrgRole,
     ProjectRole,
+    RestrictionCategory,
     WorkspaceRole,
 )
+from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.repositories.user import UserRepository
+from app.repositories.user import NO_ROLE_SYSTEM_ADMIN, UserRepository
 from app.repositories.workspace import WorkspaceRepository
-from app.rules.account_rank import Account, covering_orgs
+from app.rules.account_rank import Account, WorkspaceRoleHeld, covering_orgs
 from app.rules.identifiers import (
     SLUG_MAX,
     SLUG_MIN,
     IdentifierProblem,
+    slug_problem,
     suggest_username,
     username_problem,
 )
@@ -106,6 +114,23 @@ def required_error(value: str, *, field: str, under: Under = BODY) -> list[Field
     return [FieldError((*under, field), "This is required.", "missing")]
 
 
+def name_and_slug_errors(name: str | None, slug: str | None) -> list[FieldError]:
+    """A rename's problems: a blank name, or a slug the identifier rule refuses (each when sent)."""
+    return [
+        *(required_error(name, field="name") if name is not None else []),
+        *(identifier_error(slug_problem(slug), field="slug") if slug is not None else []),
+    ]
+
+
+def rename_values(name: str | None, slug: str | None) -> dict[str, str]:
+    """The name (trimmed) and slug a rename sent, for `apply_changes`."""
+    return {
+        key: value
+        for key, value in (("name", name.strip() if name is not None else None), ("slug", slug))
+        if value is not None
+    }
+
+
 def email_error(email: str, *, under: Under = BODY) -> list[FieldError]:
     """Only the shape a typo breaks: a real check needs a verification email (design-doc §4)."""
     local, at, domain = email.partition("@")
@@ -176,6 +201,10 @@ def access_kind(export_controlled: bool, *, explicit: bool) -> AccessKind:
     return AccessKind.MANAGEMENT if export_controlled and not explicit else AccessKind.CONTENT
 
 
+def _export_controlled(project: Project) -> bool:
+    return RestrictionCategory.EXPORT_CONTROLLED in project.restriction_categories
+
+
 # The entity a user endpoint loads, for routers (which never import models).
 type UserEntity = AccountSubject
 
@@ -184,6 +213,7 @@ USERS = ListSpec(
     id_column=User.id,  # pyright: ignore[reportArgumentType]
     sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
     default_sort=("name",),
+    sort_first=(NO_ROLE_SYSTEM_ADMIN,),
     filters=(Filter("is_active", User.is_active, FilterType.BOOLEAN),),  # pyright: ignore[reportArgumentType]
 )
 
@@ -307,14 +337,8 @@ class UserService:
         whose), `username` (whether it's free and well-formed), or `name` (an available username
         suggested from it, with `-2`, `-3`, ... added while taken); none or several is a 422."""
         if [email, username, name].count(None) != 2:
-            raise ValidationFailedError(
-                [
-                    FieldError(
-                        ("query",),
-                        "Send exactly one of email, username, or name.",
-                        "one_parameter",
-                    )
-                ]
+            raise ValidationFailedError.on(
+                ("query",), "Send exactly one of email, username, or name.", "one_parameter"
             )
         users = UserRepository(self.session)
         if email is not None:
@@ -360,6 +384,12 @@ class UserService:
     def row(self, ctx: AuthzContext, subject: AccountSubject) -> UserRow:
         """A users-list row, with the account actions the caller may take on the user."""
         user = subject.user
+        # The staff role, from the memberships the rank rule already loaded (DL-183).
+        staff = (
+            held.role
+            for held in subject.account.memberships
+            if isinstance(held, WorkspaceRoleHeld) and held.workspace_id == subject.workspace_id
+        )
         return UserRow(
             id=user.id,
             email=user.email,
@@ -367,6 +397,7 @@ class UserService:
             name=user.name,
             is_active=user.is_active,
             is_system_admin=user.is_system_admin,
+            workspace_role=next(staff, None),
             allowed_actions=allowed_actions(
                 ctx, user_target(subject.workspace_id, user.id, subject.account)
             ),
@@ -384,13 +415,8 @@ class UserService:
             query,  # pyright: ignore[reportArgumentType] -- USERS.query_model
         )
         accounts = await users.accounts(page.items)
-        return Page[UserRow](
-            items=[
-                self.row(ctx, AccountSubject(u, accounts[u.id], workspace.id)) for u in page.items
-            ],
-            total=page.total,
-            limit=page.limit,
-            offset=page.offset,
+        return page.with_items(
+            [self.row(ctx, AccountSubject(u, accounts[u.id], workspace.id)) for u in page.items]
         )
 
     def log_account_event(
@@ -461,10 +487,12 @@ class UserService:
             raise ValidationFailedError(problems)
         return changed
 
-    async def _apply(self, user: User, changed: dict[str, tuple[str, str]]) -> None:
-        for key, (_, new) in changed.items():
-            setattr(user, key, new)
-        await self.session.flush()
+    async def _apply(self, user: User, changed: dict[str, tuple[str, str]]) -> dict[str, Any]:
+        """Set the validated changes under the row's lock; the result is what the locked row
+        actually changed, for the event."""
+        return await apply_changes(
+            self.session, user, {key: new for key, (_, new) in changed.items()}
+        )
 
     async def update(
         self, ctx: AuthzContext, subject: AccountSubject, values: UserUpdate
@@ -479,14 +507,13 @@ class UserService:
             and user.id == ctx.user_id
             and values.email.strip().lower() != user.email
         ):
-            raise ValidationFailedError(
-                [FieldError(("body", "email"), "You can't change your own email.", "own_email")]
+            raise ValidationFailedError.on(
+                ("body", "email"), "You can't change your own email.", "own_email"
             )
         changed = await self._profile_changes(
             user, email=values.email, name=values.name, username=values.username
         )
-        if changed:
-            await self._apply(user, changed)
+        if changed := await self._apply(user, changed):
             self.log_account_event(ctx, AuditAction.USER_UPDATED, subject, change_details(changed))
             if "email" in changed:
                 for handler in _ON_EMAIL_CHANGED:
@@ -498,8 +525,7 @@ class UserService:
         changed = await self._profile_changes(
             user, email=None, name=values.name, username=values.username
         )
-        if changed:
-            await self._apply(user, changed)
+        if changed := await self._apply(user, changed):
             log_admin_event(
                 self.session,
                 action=AuditAction.USER_UPDATED,
@@ -563,11 +589,9 @@ class UserService:
                     name=p.name,
                     organization_id=p.organization_id,
                     archived=p.archived_at is not None,
+                    export_controlled=_export_controlled(p),
                     reasons=sorted(projects[p.id], key=order.index),
-                    access=access_kind(
-                        ClassificationCategory.EXPORT_CONTROLLED in p.classification_categories,
-                        explicit=p.id in explicit,
-                    ),
+                    access=access_kind(_export_controlled(p), explicit=p.id in explicit),
                 )
                 for p in sorted(seen.projects, key=lambda p: p.key)
                 if p.id in projects

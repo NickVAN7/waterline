@@ -1075,7 +1075,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `confirmation_not_needed`. Each row of the per-project review, and each project of the per-person
   review, gains `access` (`content` or `management`).
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-134, in part (the names, and the `restricted` level)
 - **Applies to:** build plan ("Classification & export control": the classification API and access
   reviews; "The account API"; "The project members API"; the S1-C13 row)
 - **Source:** chat session (owner, Oct 12, 2026: the proposal at the start of S1-C13; the owner
@@ -1092,7 +1092,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   and lower rules (design-doc §3.1). The registry marks every action content or management; every action so far is
   management.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-134, in part (the actions' names)
 - **Applies to:** build plan ("Classification & export control": the classification actions; the
   S1-C13 row); `app/authz/`
 - **Source:** chat session (owner, Oct 12, 2026, with DL-81; the no-op and unclassified rules:
@@ -1136,7 +1136,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Decision:** The System / Light / Dark choice in the account menu (ui-design-guide UI-TOK-2)
   is built in S1-C14a with the user menu, not deferred.
 - **Supersedes:** ui-design-guide §10 open item 7 ("recommended to ship with S1-C14")
-- **Superseded by:** none
+- **Superseded by:** DL-137, in part (the choice moved to account settings)
 - **Applies to:** build plan (S1-C14a row; "Web screens"); ui-design-guide (§10, item 7)
 - **Source:** chat session (owner, Oct 13, 2026)
 
@@ -1353,7 +1353,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   account actions from the row alone (no per-user read), show a deactivated person as such, and
   can explain the last-active-owner guard (DL-74) before the server's 422.
 - **Supersedes:** none (settles the two questions DL-75 left for S1-C15)
-- **Superseded by:** none
+- **Superseded by:** DL-200 (in part: deactivated people are left out of the lists)
 - **Applies to:** build plan ("The workspace and org API", "The org members API", the S1-C15 row)
 - **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
 
@@ -1380,7 +1380,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `/{org_slug}/settings`. Every page is linkable and keeps its list state in the URL.
 - **Supersedes:** none (settles UI-SHL-10's "proposed default" entry point and its "internal
   layout is decided when they are built"; closes the guide's open item 6 for the entry point)
-- **Superseded by:** none
+- **Superseded by:** DL-137, in part (the entry point and the section nav)
 - **Applies to:** ui-design-guide (UI-SHL-10); build plan (the S1-C15 row)
 - **Source:** chat session (owner, Oct 14, 2026, at the start of S1-C15)
 
@@ -1495,7 +1495,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   list them to an org admin (TD-44).
 - **Supersedes:** the build plan's "Web screens" picker of "the org's members and the
   workspace's staff", in part
-- **Superseded by:** none
+- **Superseded by:** DL-152
 - **Applies to:** build plan (the S1-C16 row; "Web screens"); tech debt (TD-44, TD-41)
 - **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16: option b, over a new
   candidates endpoint)
@@ -1510,7 +1510,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the server refuses as lead (`account_inactive`).
 - **Supersedes:** DL-111, in part (the project read's fields); the build plan's project member
   row fields ("The project members API")
-- **Superseded by:** none
+- **Superseded by:** DL-200 (in part: deactivated members are left out of the lead picker)
 - **Applies to:** build plan ("The projects API", "The project members API", the S1-C16a row)
 - **Source:** chat session (owner, Oct 20, 2026, at the start of S1-C16a: option a, over the flag
   on the read only, or neither)
@@ -1643,7 +1643,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   S1-C9 exception is removed from `CLAUDE.md` and the `checkpoint` skill; the build plan keeps
   the trial's description, with its verdict. Every checkpoint stops for approval.
 - **Supersedes:** none (DL-10's trial ends with this verdict)
-- **Superseded by:** none
+- **Superseded by:** DL-172, in part (the build plan's description)
 - **Applies to:** `CLAUDE.md` ("How work is done: checkpoints"); `checkpoint` skill ("Report
   and stop"); build plan ("Verification")
 - **Source:** Slice 1 retro (`docs/reviews/s1/S1-retro.md`; owner, Oct 21, 2026)
@@ -1716,6 +1716,1375 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   start of Slice 2", is part of S2-C0 (DL-124). The owner's UI feedback is at
   `docs/ui-feedback.md`.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-158, in part (the feedback file's path)
 - **Applies to:** build plan ("Claude configuration", "Slice 2 — notes for planning")
 - **Source:** DC-2026-10-21d docs-consistency decision 3 (owner, Oct 21, 2026)
+
+### DL-133: Export control is hidden in the UI; the API and Slice 2's gate stay
+- **Date:** 2026-10-21
+- **Decision:** The UI no longer offers `export_controlled`, on the create-project dialog or in
+  project settings; the API keeps accepting it and everything S1-C13 built stays, the member-add
+  confirmations included (reached only on a project made export-controlled through the API). The
+  access review's Access column shows only on an export-controlled project. Slice 2 still builds
+  the export-control gate, content scoping, explicit-only approvers, and the replacement path.
+- **Supersedes:** design-doc §3.1's UI for export control, in part (S1-C16, S1-C16a)
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1; ui-design-guide (UI-FRM-15, the restriction rules); user
+  guide; screen inventory; build plan (S2-C0d)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-134: "Classification" becomes "Restriction", and the Restricted level is removed
+- **Date:** 2026-10-21
+- **Decision:** A full rename in code and docs: `classification_level` and
+  `classification_categories` → `restriction_level` and `restriction_categories`,
+  `ClassificationMixin` → `RestrictionMixin`, `ClassificationLevel`/`ClassificationCategory` →
+  `RestrictionLevel`/`RestrictionCategory`, `rules/classification.py` → `rules/restriction.py`,
+  `PUT /api/projects/{key}/classification` → `PUT /api/projects/{key}/restriction`,
+  `ClassificationUpdate` → `RestrictionUpdate`, the actions `project.raise_classification` and
+  `project.lower_classification` → `project.raise_restriction` and `project.lower_restriction`,
+  the audit event `project_classification_changed` → `project_restriction_changed`, and the
+  activity log's `field_changed` values. The UI label is "Restriction", with the levels None,
+  Internal, and Confidential (None is the null level, treated like Internal for every rule).
+  Restricted is removed, with its two rules (Restricted exports for project admins only; AI never
+  on Restricted). The migration maps `restricted` to `confidential`, renames the columns and
+  CHECK constraints, and rewrites the existing `audit_event` rows' action (dev data only), with a
+  downgrade. This entry is the owner's approval of the spec-test changes the rename needs.
+- **Supersedes:** design-doc §3.1's Restricted level and its rules; DL-81 and DL-82, in part (the
+  names)
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1, §5, §10, §10.1; schema doc; build plan; ui-design-guide;
+  developer guide; user guide; testing strategy; screen inventory; tech debt; the
+  `security-reviewer` and `ui-reviewer` agents; the `checkpoint`, `migration`, and `new-area`
+  skills; built in S2-C0d
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-135: PrimeVue 5 stays, with the owner's license key
+- **Date:** 2026-10-21
+- **Decision:** PrimeVue 5 (`primevue`, `@primevue/*`, `@primeuix/*`) is under the PrimeUI
+  License and needs a key; the owner holds a Community License. The key is a build-time setting
+  in `.env` and a CI secret, never committed, with a placeholder in `.env.example`; it ships in
+  the browser bundle, which is expected. An end-to-end check fails if a license notice renders.
+  `tailwindcss-primeui` stays MIT. Downgrading to 4.5.5 (the last MIT release) was rejected.
+- **Supersedes:** none (records the license DL-129 asks for, for a dependency added before it)
+- **Superseded by:** none
+- **Applies to:** design-doc §2; build plan ("Tooling", S2-C0e); developer guide (setup)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-136: An unshipped module can't be enabled
+- **Date:** 2026-10-21
+- **Decision:** The v1 modules (`sprints`, `github`) follow the v2 modules' rule: seeding skips
+  unshipped modules, the API refuses enabling one (422 `validation_error` on `enabled_modules`,
+  type `module_unavailable`), and the UI shows them as disabled checkboxes with "Not available
+  yet". A migration removes `sprints` and `github` from every project. Slices 4 and 7 each decide
+  whether existing software projects get their module turned on when it ships.
+- **Supersedes:** design-doc §1.1, "The v1 modules can be enabled from the start (Slice 1)"
+- **Superseded by:** DL-178, in part (a v2 module is a 422 `enum`)
+- **Applies to:** design-doc §1.1; build plan (the projects API, S2-C0d, "Later slices");
+  ui-design-guide UI-SHL-6; user guide
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-137: The owner's Slice 1 UI feedback, mapped to S2-C0's rows
+- **Date:** 2026-10-21
+- **Decision:** Each item in the owner's UI feedback is assigned an S2-C0 row, with these rule
+  changes: the header reads "Waterline" and the current org's name, which is the org menu
+  (switching orgs and, when allowed, the org's Overview, Members, and Settings), replacing the
+  org switcher; admin pages' sidebars show the admin area's section nav in place of the project
+  selector, and the in-page section nav goes; an org overview page at `/{org_slug}/overview`;
+  the theme choice moves to an "Appearance" section of account settings, and sign-out gets an
+  icon and the danger tone; change password is its own page, `/account/password`; the
+  add-person flow's step 2 can edit the email, and step 1 checks its format; a restriction badge
+  in the project header replaces the banner; project settings' Archive sits in a "Danger zone";
+  the project selector, list, and picker changes; dialogs centered, with an end-to-end check;
+  sign-in and project-settings spacing.
+- **Supersedes:** ui-design-guide UI-SHL-4; DL-104, in part (the entry point and section nav);
+  DL-85, in part (the theme choice's place)
+- **Superseded by:** DL-164, in part (the row that moves the theme choice)
+- **Applies to:** ui-design-guide (UI-SHL-4, UI-SHL-5, UI-SHL-6, UI-SHL-10, UI-TOK-2,
+  UI-FRM-13, UI-FRM-14, UI-FBK-6); design-doc §11; user guide; the feedback file; build plan
+  (S2-C0d to S2-C0i)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-138: The simplicity audit (`simplicity-auditor`)
+- **Date:** 2026-10-21
+- **Decision:** A read-only agent audits the whole repository for overengineering, from
+  MIT-licensed prompts vendored into `.claude/audit/` and pinned to a commit (Ponytail's
+  whole-repo audit and core skill; `addyosmani/agent-skills`' `code-simplification`, the
+  Architecture and Readability & Simplicity axes of `code-review-and-quality`, and the red flags
+  and checklist of `api-and-interface-design`), read as plain files. Each finding has evidence,
+  lines saved, and a category (delete, simplify, merge duplicates, process, or "conflicts with
+  DL-n"); bugs, security, and scale stay with `repo-auditor`. It runs at every slice's
+  verification checkpoint after `repo-auditor`, before the retro; the next slice's C0 applies the
+  accepted findings. A docs consistency test fails when a slice from Slice 2 on has a C1 record
+  but no C0a record, or a slice-end record lacks its section. Updating the vendored prompts is a
+  design change. Built in S2-C0a, which also runs it first on `main` at `e999564`.
+- **Supersedes:** none
+- **Superseded by:** DL-165, in part (a C0 record also satisfies the test)
+- **Applies to:** build plan ("Workflow items scheduled", S2-C0a, S2-C22); `CLAUDE.md`
+  ("Skills, agents, and hooks"); `checkpoint` skill (the slice-end list)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-139: Planning a slice, and sizing its checkpoints
+- **Date:** 2026-10-21
+- **Decision:** Each slice's plan is recorded in `docs/reviews/s<n>/S<n>-plan.md` (fixes,
+  decisions, conventions, a short threat-model pass, and the owner's open questions, answered
+  before C0a). Its C0 rows come first: the accepted audit findings, the retro's code changes, and
+  owner feedback. Sizing: one unit per checkpoint (about 2,000 lines added, tests included);
+  every row lists its endpoints and actions in the plan; web rows stay provisional until the
+  screen inventory covers their screens, and are re-cut before they start (not a split); a shared
+  piece used for the first time gets its own row. The plan's readiness review checks every row.
+- **Supersedes:** none (resolves the "Start of Slice 2 planning" workflow item)
+- **Superseded by:** none
+- **Applies to:** build plan ("Planning a slice", "Workflow items scheduled")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-140: Markdown is rendered in the browser
+- **Date:** 2026-10-21
+- **Decision:** `markdown-it` (MIT) with raw HTML off, then DOMPurify (Apache-2.0 option); the API
+  carries only the markdown. CommonMark plus tables, task-list syntax, strikethrough, and
+  autolinks; no remote images (image syntax renders as a link); links only `http`, `https`, and
+  `mailto`, with `rel="noopener noreferrer"`; headings shifted one level; code blocks in
+  monospace without highlighting. A server-side renderer (`markdown-it-py` and `nh3`) comes only
+  when something server-side shows content. Tests: a component test over a corpus of known XSS
+  payloads, and an end-to-end test that a stored payload doesn't run.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 ("Markdown"); `frontend/CLAUDE.md`; ui-design-guide (UI-MD-1);
+  build plan (S2-C16)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-141: The markdown editor is a textarea with Write and Preview tabs
+- **Date:** 2026-10-21
+- **Decision:** A textarea with Write and Preview tabs, previewing with the saved view's
+  renderer; no WYSIWYG editor. A toolbar can come later if usability calls for it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-MD-2); build plan (S2-C16)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-142: A Content-Security-Policy from Slice 2
+- **Date:** 2026-10-21
+- **Decision:** A CSP behind the sanitizer, scripts only from our own origin. PrimeVue's injected
+  styles need a nonce or `style-src 'unsafe-inline'`; S2-C16 decides which and records it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4; developer guide; build plan (S2-C16)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-143: Length limits
+- **Date:** 2026-10-21
+- **Decision:** Requirement title 200 characters, requirement description 20,000; project, org,
+  workspace, and user names 100; project description 2,000; revision change notes 500;
+  approval-request notes and approver comments 2,000. Enforced with `Field(max_length=…)` and
+  recorded in the schema doc. TD-52's existing fields are built in S2-C0c, the Slice 2 fields
+  with their checkpoints.
+- **Supersedes:** none (TD-52's open decision)
+- **Superseded by:** none
+- **Applies to:** schema doc; build plan (S2-C0c, the Slice 2 rows); tech debt (TD-52)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-144: Item-ID auto-links wait for Slice 3; @mentions for v1.5
+- **Date:** 2026-10-21
+- **Decision:** Auto-linking item IDs (`WTL-RQ-12`) in rendered markdown comes in Slice 3, once
+  there are tasks to link; @mentions come with notifications in v1.5 (design-doc §16 already
+  lists them there).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Later slices — placements decided so far")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-145: Revision compare
+- **Date:** 2026-10-21
+- **Decision:** Computed in the browser with `jsdiff` (`diff`, BSD-3-Clause) on the raw markdown,
+  line by line and then word by word within changed lines, inline; unchanged runs over three
+  lines collapse; a title change is its own field; each side's change note and author shown.
+  Additions `<ins>`, removals `<del>`, each with visually hidden "Added:"/"Removed:" and tone
+  tokens. From/To pickers default to approved vs current when "Approved · modified", otherwise
+  the selected revision vs the one before; the older one is always From. API: the revision list
+  (cursor-paged) and one revision's read; no compare endpoint.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; ui-design-guide (UI-MD-3); build plan (S2-C9, S2-C19)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-146: Trash in Slice 2
+- **Date:** 2026-10-21
+- **Decision:** A project Trash page, linked from the requirements page's header, listing by
+  type (item, deleted by, when, and Restore where allowed); no automatic purge in v1. Restoring a
+  requirement also restores the descendants deleted in the same action (the same `deleted_at`);
+  children deleted separately stay in the trash. A requirement whose parent is still deleted is
+  restored at the top level, with the parent change logged.
+- **Supersedes:** none
+- **Superseded by:** DL-202 (in part: where Trash is linked)
+- **Applies to:** design-doc §9; build plan (S2-C8, S2-C21)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-147: Item history in Slice 2; the project activity feed in Slice 3
+- **Date:** 2026-10-21
+- **Decision:** The requirement detail page has a History tab (activity entries in plain
+  language, names resolved by the server) and a Revisions tab (DL-145). The project activity
+  feed's API and page move to Slice 3, with the filter bar; Slice 2 still logs project status and
+  lead changes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §1.1, §10, §11; build plan (S2-C3, S2-C19, "Later slices")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-148: Requirement status has no transition table
+- **Date:** 2026-10-21
+- **Decision:** Members move a requirement from any status to any other except into `approved`,
+  which stays project-admin only by hand (`requirement.approve_manually`, its own action in
+  `allowed_actions`) or by a completed approval request. New requirements start as `draft`; a
+  completed request moves only a `draft` requirement to `approved`. No parent/child status rules.
+  Badge tones: Draft neutral; Approved success; Approved · modified warning; In progress info;
+  Done success with a check icon; Rejected danger; Deferred neutral with a pause icon.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5, §7; ui-design-guide UI-FBK-5 and §10 item 8; build plan (S2-C6,
+  S2-C11)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-149: Acceptance-criteria templates, one per project type
+- **Date:** 2026-10-21
+- **Decision:** The create form pre-fills the description from a frontend constant chosen by the
+  project's type; the server injects nothing. Software and General: `## Context`,
+  `## Acceptance Criteria`, `1.`; ERP: `## Business Process`, `## Current State`,
+  `## Future State`, `## Acceptance Criteria`, `1.` (revisited in v2). A numbered list, never
+  checkboxes; no placeholder comments (hints go beside the editor). A requirement without an
+  "Acceptance Criteria" heading (any level, case-insensitive) shows a "No acceptance criteria"
+  note, never a block.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 ("Requirement"); build plan (S2-C17, S2-C18)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-150: A spike decides the tree widget
+- **Date:** 2026-10-21
+- **Decision:** S2-C0b compares SVAR DataGrid's tree mode with PrimeVue TreeTable on one
+  checklist (tree mode in SVAR's free package; keyboard; `treegrid` semantics; a move through our
+  menu with the server mocked to allow and deny; pointer drag; the token theme audit; about 500
+  rows). v1's tree needs columns, expand and collapse, and sibling reorder, but no inline editing,
+  and drag is optional. Evidence in `docs/spikes/`; the result is a decision-log entry that
+  decides S2-C15 and closes ui-design-guide §10 item 5(g).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §7.1, §10 item 5(g); build plan (S2-C0b, S2-C15)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-151: One action registry, as built
+- **Date:** 2026-10-21
+- **Decision:** `authz/actions.py` stays the single action registry; the build plan,
+  `backend/CLAUDE.md`, and the `new-area` skill drop `authz/policies/<area>.py`. A tech-debt entry
+  tracks splitting it per area once it passes about 600 lines or a slice-end audit recommends it.
+- **Supersedes:** the per-area `authz/policies/` files in the build plan's area layout
+- **Superseded by:** none
+- **Applies to:** build plan (repository layout, feature map); `backend/CLAUDE.md`; `new-area`
+  skill; tech debt (TD-60, TD-64); built in S2-C0c
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-152: A first-admin candidates endpoint
+- **Date:** 2026-10-21
+- **Decision:** `GET /api/orgs/{org_id}/first-admin-candidates` lists the org's members and the
+  workspace's staff (offset-paged, `?q=`) under `project.assign_first_admin`; the create dialog's
+  picker uses it.
+- **Supersedes:** DL-112
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0c); tech debt (TD-44)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-153: My work's project fields
+- **Date:** 2026-10-21
+- **Decision:** A project item gains `organization_name`, `lead_name`, and `my_access` (the
+  user's explicit project role, or `inherited_admin`), for My work, the project list, and the org
+  overview.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §11; build plan (S2-C0f, S2-C0g)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-154: The ranked-view cap is proposed at 2,000
+- **Date:** 2026-10-21
+- **Decision:** Proposed, for the owner to confirm before S2-C5: 2,000 requirements per project
+  tree; above it the response carries `truncated: true` and the page says so, with a tech-debt
+  entry to page the tree if a project nears it. The API conventions mark it "proposed".
+- **Supersedes:** none
+- **Superseded by:** DL-159
+- **Applies to:** build plan ("API conventions", S2-C5); `docs/reviews/s2/S2-plan.md` (open
+  questions)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-155: Later-slice placements from the Slice 2 plan
+- **Date:** 2026-10-21
+- **Decision:** Slice 3: the project activity feed (DL-147) and item-ID auto-links (DL-144).
+  Slices 4 and 7: whether existing projects get the module turned on when it ships (DL-136).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Later slices — placements decided so far")
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-156: S2-C0 becomes rows S2-C0a to S2-C0i
+- **Date:** 2026-10-21
+- **Decision:** DL-124's single pre-checkpoint is planned as nine rows, S2-C0a to S2-C0i (the
+  simplicity audit, the tree spike, backend leftovers, restriction and modules, the shell, org
+  admin, account and lists, forms, tooling and inventory). A slice's checkpoint table may start
+  at 0 or 0a, and the docs consistency tests accept it.
+- **Supersedes:** none (implements DL-124, which left the rows to the plan)
+- **Superseded by:** DL-188, in part (a tenth row, S2-C0j)
+- **Applies to:** build plan (the Slice 2 section); `backend/tests/support/docs.py`
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning; the table's start at 0
+  confirmed in this design change)
+
+### DL-157: Two screen-inventory dependencies
+- **Date:** 2026-10-21
+- **Decision:** TD-62's check is row S2-C0i. If the owner's completed screen inventory isn't
+  committed when S2-C0i starts, TD-62 moves to the start of `s2-web`, and the web rows stay
+  provisional until it is.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0i, the web rows); screen inventory; tech debt (TD-62)
+- **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
+
+### DL-158: The owner's UI feedback lives with Slice 1's review records
+- **Date:** 2026-10-22
+- **Decision:** The owner's Slice 1 UI feedback moves from `docs/ui-feedback.md` to
+  `docs/reviews/s1/S1-ui-feedback.md`.
+- **Supersedes:** DL-132, in part (the file's path)
+- **Superseded by:** none
+- **Applies to:** build plan; the S2 plan record
+- **Source:** owner, Oct 22, 2026 (starting Slice 2)
+
+### DL-159: The ranked-view cap is 2,000
+- **Date:** 2026-10-22
+- **Decision:** Confirmed: 2,000 requirements per project tree; above it the response carries
+  `truncated: true` and the page says so, with a tech-debt entry to page the tree if a project
+  nears it. The owner judged it more than enough and cheap to lower.
+- **Supersedes:** DL-154
+- **Superseded by:** none
+- **Applies to:** build plan ("API conventions", S2-C5); `docs/reviews/s2/S2-plan.md` (Q1)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-160: Former members keep their names in history
+- **Date:** 2026-10-22
+- **Decision:** The History tab shows the actor's name on every entry, including people who have since
+  left the project, with the "Deactivated" badge for a deactivated account.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; build plan (S2-C3); `docs/reviews/s2/S2-plan.md` (Q2)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-161: Approving by hand has one path
+- **Date:** 2026-10-22
+- **Decision:** A requirement is approved by hand only through
+  `POST …/requirements/{number}/approve` (`requirement.approve_manually`). A `PATCH` setting
+  `status` to `approved` answers 403 to members and 422 `validation_error` on `status`, type
+  `use_approve`, to admins.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5; build plan (S2-C6, S2-C11); `docs/reviews/s2/S2-plan.md` (Q3)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-162: A requirement's restriction change takes no `version`
+- **Date:** 2026-10-22
+- **Decision:** `PUT …/requirements/{number}/restriction` takes no `version`, as a project's doesn't:
+  last write wins, and each change is logged.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C6); `docs/reviews/s2/S2-plan.md` (Q4)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-163: The org overview's gate is `org_member.manage`
+- **Date:** 2026-10-22
+- **Decision:** The org overview page is gated by the existing `org_member.manage` action (the
+  holders who already see Members); no new action.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0f); `docs/reviews/s2/S2-plan.md` (Q5)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-164: The theme choice moves in one row
+- **Date:** 2026-10-22
+- **Decision:** S2-C0g removes the theme choice from the user menu as it adds account settings'
+  Appearance section, so there is no checkpoint without a theme override; S2-C0e no longer
+  touches it.
+- **Supersedes:** DL-137, in part (the row that moves the theme choice)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0e, S2-C0g); ui-design-guide UI-SHL-4;
+  `.claude/agents/ui-reviewer.md`; `docs/reviews/s1/S1-ui-feedback.md`
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-165: A slice may open at C0 or C0a
+- **Date:** 2026-10-22
+- **Decision:** DL-138's docs consistency test (built in S2-C0a) accepts either a C0 or a C0a record
+  before a slice's C1 record, matching DL-156's table rule.
+- **Supersedes:** DL-138, in part (the C0a record)
+- **Superseded by:** none
+- **Applies to:** build plan ("Workflow items scheduled", S2-C0a)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-166: `repo-auditor` keeps its lean category, re-evaluated at Slice 2's retro
+- **Date:** 2026-10-22
+- **Decision:** `repo-auditor` keeps "lean" (DL-41) beside `simplicity-auditor`, with the overlap rule
+  (a finding both would report is reported once, by `repo-auditor`). Slice 2's retro reviews
+  whether either reported lean findings and how useful they were, and the owner decides whether
+  to keep, drop, or narrow it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C22)
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-167: The tree spike's result amends the SVAR rule
+- **Date:** 2026-10-22
+- **Decision:** If the S2-C0b spike picks SVAR DataGrid for the tree, the spike's decision-log entry
+  also widens UI-STY-7 and DL-64 ("the editable grid") to cover the requirement tree; the rule
+  isn't widened before then.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0b); when SVAR wins, every statement of SVAR's scope:
+  ui-design-guide UI-STY-7, design-doc §2, the build plan's tooling line, screen inventory,
+  testing strategy, `frontend/CLAUDE.md`, and `.claude/agents/ui-reviewer.md`
+- **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
+  design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
+
+### DL-168: A restriction change doesn't bump `version`
+- **Date:** 2026-10-22
+- **Decision:** `PUT …/requirements/{number}/restriction` (and later items' equivalents) is a
+  direct update that doesn't bump the item's `version`, as rank writes don't, so a restriction
+  change never causes a 409 for someone editing the item's content.
+- **Supersedes:** none (completes DL-162)
+- **Superseded by:** none
+- **Applies to:** design-doc §2 ("Optimistic locking"); build plan ("Backend architecture",
+  S2-C6); `backend/CLAUDE.md`; `new-area` skill; developer guide (with S2-C6)
+- **Source:** owner, Oct 22, 2026 (`DC-2026-10-22b-slice-2-plan-answers.md`, decision 1)
+
+### DL-169: Approving by hand checks the `version`
+- **Date:** 2026-10-22
+- **Decision:** `POST …/requirements/{number}/approve` takes the `version` the admin saw; a stale
+  one is a 409, so the revision approved is the one on screen.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5; build plan (S2-C11)
+- **Source:** owner, Oct 22, 2026 (`DC-2026-10-22b-slice-2-plan-answers.md`, decision 2)
+
+### DL-170: S2-C0a's accepted simplicity findings, mapped to rows
+- **Date:** 2026-10-22
+- **Decision:** Eight of the S2-C0a audit's findings are accepted and assigned to the row that
+  touches their code: 8 (one `apply_changes`, carrying TD-57's lock) and 9
+  (`ValidationFailedError.on`) to S2-C0c; 10 (an `ORG_PROJECTS` spec) to S2-C0g; 4
+  (`NameSlugSettings.vue`) and 5 (`NewAccountFields.vue`) to S2-C0h; 2 (the developer guide's
+  Status section in one line) and 6 (`fresh-clone-verifier` runs the guide's quick checks, not
+  `wl check --full`) to S2-C0i; and 7 (the stale-row 404 or 409 decided once, in `get_session`)
+  to S2-C1, the first row where a versioned model's test can exercise it.
+- **Supersedes:** none (an exception to DL-138's "the next slice's C0 applies the ones the
+  owner accepts", and the S2-C0a row, for finding 7 only)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0c, S2-C0g, S2-C0h, S2-C0i, S2-C1);
+  `docs/reviews/s2/S2-C0a.md`
+- **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
+
+### DL-171: S2-C0a's findings 1 and 3 are decided at Slice 2's retro
+- **Date:** 2026-10-22
+- **Decision:** Finding 1 (replace the git guard with Claude Code permission rules and a hook
+  refusing commits on `main`) is decided at the retro, after a trial of the rules in a scratch
+  session; finding 3 (one list of agents, skills, and hooks, in developer guide section 11) is
+  decided there too. Until then the guard and the three lists stay as they are.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C22); `docs/reviews/s2/S2-C0a.md`
+- **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
+
+### DL-172: The build plan names the review-tier trial in one line
+- **Date:** 2026-10-22
+- **Decision:** The build plan's description of the review-tier trial becomes one line naming
+  it and its verdict (DL-10, DL-125); the rules it describes no longer apply (S2-C0a finding 11).
+- **Supersedes:** DL-125, in part (the build plan keeping the trial's full description)
+- **Superseded by:** none
+- **Applies to:** build plan ("Verification")
+- **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
+
+### DL-173: The developer guide's setup ends with plain `wl check`
+- **Date:** 2026-10-22
+- **Decision:** The first-time setup in the developer guide ends with plain `uv run wl check`,
+  naming `wl check --full` as what CI runs, so `fresh-clone-verifier`, following the guide,
+  runs the quick checks DL-170 gives it. Built in S2-C0i.
+- **Supersedes:** none (completes DL-170, finding 6)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C0i); developer guide (section 1, with S2-C0i)
+- **Source:** owner, Oct 22, 2026 (`DC-2026-10-22d-simplicity-decisions.md`, decision 1)
+
+### DL-174: The requirement tree is PrimeVue TreeTable
+- **Date:** 2026-10-22
+- **Decision:** S2-C15 builds the requirement tree on PrimeVue TreeTable, in a
+  `RequirementsTree` wrapper with the move menu, not on SVAR DataGrid's tree mode. SVAR's MIT
+  tree mode turns off row drag and its own move (the store sets `reorder` false when `tree` is
+  set, and `move-item` skips the move), its arrow keys move between columns rather than opening
+  and closing rows, and it has a critical axe defect; TreeTable follows the WAI treegrid
+  keyboard pattern and passes axe with the wrapper fixes the spike found. TreeTable's first
+  render with every branch open is 2.1 s at the 2,000-row cap (0.2 s with branches closed).
+- **Supersedes:** ui-design-guide UI-SVR-2, in part (manual row order means the SVAR DataGrid,
+  except for the requirement tree)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-SVR-2, UI-SVR-4, the component list, §10 item 5(g));
+  build plan (S2-C15, "Web screens"); testing strategy (the wrapper specs);
+  `.claude/agents/ui-reviewer.md`; `docs/spikes/S2-C0b-tree/`
+- **Source:** the S2-C0b spike (`docs/spikes/S2-C0b-tree/results.md`; DL-150), for the
+  owner's approval at the checkpoint report
+
+### DL-175: TreeTable approved; the tree opens at the top level
+- **Date:** 2026-10-22
+- **Decision:** The owner approves DL-174. The requirement tree opens with only the top-level
+  rows showing (every branch closed); "Expand all" opens the second level at once and the deeper rows a batch per frame, so
+  the page never freezes (the data is already loaded, DL-159; the cost is drawing rows), and
+  S2-C17 measures it at the 2,000-row cap.
+- **Supersedes:** none (confirms DL-174)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17); `docs/reviews/s2/S2-C0b.md`
+- **Source:** owner, Oct 22, 2026 (answers to S2-C0b's open questions)
+
+### DL-176: The auth card's pages use a plain, smaller `h1`
+- **Date:** 2026-10-23
+- **Decision:** Sign-in and the forced password change are UI-SHL-8's one exception to "one `h1`,
+  in a `PageHeader`": no actions, and a plain `h1` one size below the app's name, the card's
+  largest text (`text-xl`), as S2-C0e built it.
+- **Supersedes:** ui-design-guide UI-SHL-8, in part (every page's `h1` in a `PageHeader`)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-8; developer guide ("Adding a screen")
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0e.md`, checkpoint-reviewer finding 2)
+
+### DL-177: A person's access review shows Access on export-controlled projects only
+- **Date:** 2026-10-23
+- **Decision:** As DL-133 does for the per-project review's Access column, the per-person review
+  shows a project's Access (content or management) only on an export-controlled project's row; its
+  project rows carry `export_controlled`, and the column shows only when one of them is.
+- **Supersedes:** none (extends DL-133 to the per-person view)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("Access review"); build plan (the per-person access API, S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0d.md`, open question 1)
+
+### DL-178: A v2 module is refused as an unknown value until it ships
+- **Date:** 2026-10-23
+- **Decision:** `enabled_modules` takes only the modules the API knows (the v1 modules until a v2
+  module's slice adds it), so a v2 module is a 422 of type `enum`; `module_unavailable` is for a
+  known module that hasn't shipped. No change to the code built in S2-C0d.
+- **Supersedes:** design-doc §1.1's "the API refuses enabling it (422 `module_unavailable`)" for v2
+  modules, in part (DL-136's wording)
+- **Superseded by:** none
+- **Applies to:** design-doc §1.1
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0d.md`, open question 2)
+
+### DL-179: The restriction badge names itself for screen readers
+- **Date:** 2026-10-23
+- **Decision:** The project header's restriction badge starts with a visually hidden
+  "Restriction: ", so a badge read alone ("Internal") says what it is.
+- **Supersedes:** none (adds to UI-FBK-6, DL-137)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0d.md`, open question 3)
+
+### DL-180: The org overview lists archived projects in their own section
+- **Date:** 2026-10-23
+- **Decision:** The org overview includes the org's archived projects, in a section below its
+  projects headed "Archived", each linking to its settings, where it's unarchived.
+- **Supersedes:** none (adds to UI-SHL-10, DL-137)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-10; build plan (S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/s2/S2-C0f.md`, open question 1)
+
+### DL-181: An archived-only list filter, `?archived_only=true`
+- **Date:** 2026-10-23
+- **Decision:** A list whose `ListSpec` has an `archived_column` also takes `?archived_only=true`,
+  which returns only its archived rows, so a page can show them in their own paged section; the
+  org overview's "Archived" section (DL-180) uses it. Built in S2-C0g, in `ListSpec`'s archived
+  handling, with API tests and `wl gen-client`.
+- **Supersedes:** none (adds to the build plan's "Hidden rows")
+- **Superseded by:** none
+- **Applies to:** build plan ("Hidden rows", the org projects API, S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/design-changes/DC-2026-10-23-owner-review-answers.md`,
+  decision 1, option (a))
+
+### DL-182: `archived_only` with `include_archived` is a 422
+- **Date:** 2026-10-23
+- **Decision:** A list request with both `?archived_only=true` and `?include_archived=true` is a 422
+  `validation_error` of type `conflict` on `archived_only`: asking for both is a mistake, said so
+  rather than one silently winning. Built in S2-C0g with DL-181, with its test.
+- **Supersedes:** none (adds to DL-181)
+- **Superseded by:** none
+- **Applies to:** build plan ("Hidden rows", the org projects API, S2-C0g)
+- **Source:** owner, Oct 23, 2026 (`docs/reviews/design-changes/DC-2026-10-23b-archived-only-filter.md`,
+  decision 1, option (a))
+
+### DL-183: The workspace users list's Role shows the workspace role
+- **Date:** 2026-10-25
+- **Decision:** The workspace users list's Role column shows each person's workspace (staff) role,
+  Owner, Admin, or Member, or "User" with none, plus the "System admin" badge for a system admin;
+  each user row carries `workspace_role`. Built in S2-C0h, with API tests and `wl gen-client`.
+- **Supersedes:** none (S2-C0g built Role as "System admin" or "User", DL-137)
+- **Superseded by:** DL-187 and DL-188, in part
+- **Applies to:** build plan (the account API's users list, S2-C0h); ui-design-guide UI-FBK-6
+- **Source:** owner, Oct 25, 2026 (`docs/reviews/s2/S2-C0g.md`, open question 1)
+
+### DL-184: A blank Access cell says why to a screen reader
+- **Date:** 2026-10-25
+- **Decision:** In the per-person access review, a project row that isn't export-controlled,
+  whose Access cell is blank (DL-177), holds a visually hidden "Not export-controlled". Built in
+  S2-C0h.
+- **Supersedes:** none (adds to DL-177)
+- **Superseded by:** none
+- **Applies to:** design-doc §5 ("Access review"); build plan (S2-C0h)
+- **Source:** owner, Oct 25, 2026 (`docs/reviews/s2/S2-C0g.md`, open question 2)
+
+### DL-185: Add-person's step 2 checks a changed email on Create account
+- **Date:** 2026-10-26
+- **Decision:** In the email-first add-person flow, step 2's edited email goes through the user
+  check when the admin submits Create account, and only if it changed since the last check; an
+  existing account opens the same confirm step as step 1. It isn't checked as it's typed. As
+  built in S2-C0h.
+- **Supersedes:** UI-FRM-13's "re-checked through the user check when it changes" (DL-137)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-13
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0h.md`, open question 1)
+
+### DL-186: An archived project's Unarchive stays in the Danger zone
+- **Date:** 2026-10-26
+- **Decision:** Project settings keep one "Danger zone" section for Archive and Unarchive: the one
+  button changes in place, so focus stays on it. As built in S2-C0h.
+- **Supersedes:** none (adds to UI-FRM-14)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-14
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0h.md`, open question 3)
+
+### DL-187: A system admin with no workspace role shows the badge alone
+- **Date:** 2026-10-26
+- **Decision:** In the workspace users list's Role column, a system admin with no workspace role
+  shows only the "System admin" badge, not "User" beside it; "User" stays for an account with
+  neither. "No workspace role" stays "User" in the users list and "None" in the per-person
+  access review. Built in S2-C0i.
+- **Supersedes:** DL-183, in part ("User" beside the badge)
+- **Superseded by:** DL-188
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (the account bullet, S2-C0i)
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0h.md`, open question 4;
+  `docs/reviews/design-changes/DC-2026-10-25-c0g-review-answers.md`, Decisions 1 and 2)
+
+### DL-188: System admin is text in the users list's Role, and system admins with no role sort last
+- **Date:** 2026-10-26
+- **Decision:** The workspace users list's Role column shows system admin as text, not a badge:
+  "Owner, System admin" for a system admin with a workspace role, "System admin" for one with
+  none, the workspace role alone otherwise, and "User" for neither. The list (`GET
+  /api/workspaces/{workspace_id}/users`) puts system admins with no workspace role after
+  everyone else, in the chosen sort's order, across pages. Built in S2-C0j.
+- **Supersedes:** DL-187; DL-183, in part (the badge); DL-156, in part (the row count)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (the account bullet, the users list's
+  endpoint row, S2-C0j, the `s2-prep` group)
+- **Source:** owner, Oct 26, 2026 (chat session, at the S2-C0i report)
+
+### DL-189: The per-person access review shows system admin as text too
+- **Date:** 2026-10-26
+- **Decision:** The per-person access review shows system admin as text, as the users list does
+  (DL-188), not a badge: beside the workspace role ("Owner, System admin"), or alone for a system
+  admin with no workspace role; "None" stays for a person with neither. Built in S2-C0j.
+- **Supersedes:** none (extends DL-188)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (S2-C0j)
+- **Source:** owner, Oct 26, 2026
+  (`docs/reviews/design-changes/DC-2026-10-26b-users-role-text.md`, Decision 1)
+
+### DL-190: `user-guide-verifier`'s app fixes are re-reviewed
+- **Date:** 2026-10-26
+- **Decision:** A code fix for a major or blocker finding from `user-guide-verifier` is covered by
+  `checkpoint-reviewer`'s re-review, as `repo-auditor`'s and `fresh-clone-verifier`'s are
+  (DL-110).
+- **Supersedes:** none (extends DL-110)
+- **Superseded by:** none
+- **Applies to:** `.claude/skills/checkpoint/SKILL.md` (step 5); `.claude/agents/checkpoint-reviewer.md`
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0i.md`, open question 1)
+
+### DL-191: The access review's role term is "Role"
+- **Date:** 2026-10-26
+- **Decision:** The per-person access review's "Workspace role" term is renamed "Role", the users
+  list's column name, since it can now hold "System admin" (DL-189), which isn't a workspace role.
+  Bundled into S2-C1 (DL-131).
+- **Supersedes:** none (extends DL-189)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C1)
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C0j.md`, open question 1)
+
+### DL-192: Indexes on `requirement.parent_requirement_id` and `approval_request (project_id, status)`
+- **Date:** 2026-10-26
+- **Decision:** `requirement.parent_requirement_id` gets an index: a move, a delete (promote or
+  delete the children), and a restore look rows up by it, so they don't rely on the project
+  filter and the 2,000 cap to stay cheap. `approval_request` gets an index on
+  `(project_id, status)`: approver replacement when a project is marked export-controlled
+  (S2-C12) finds the project's pending requests, and requests are never deleted (DL-37).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** schema-doc (`requirement`, `approval_request`); build plan (S2-C1)
+- **Source:** owner, Oct 26, 2026 (asked at the start of S2-C1, DL-37;
+  `docs/reviews/design-changes/DC-2026-10-26e-requirement-approval-indexes.md`)
+
+### DL-193: `activity_log` is append-only in the database
+- **Date:** 2026-10-26
+- **Decision:** A trigger rejects every `UPDATE` and `DELETE` on `activity_log`, a copy of
+  `audit_event`'s (`tr_activity_log_append_only`, function `activity_log_append_only()`), since
+  the change log is the record behind sign-offs. Built in S2-C3 with `log_change()`: a migration
+  and a test. TD-17's runtime role covers both triggers.
+- **Supersedes:** none (`activity_log` was append-only by convention only)
+- **Superseded by:** none
+- **Applies to:** design-doc §4, §10; schema-doc (`activity_log`); build plan (S2-C3, "Change
+  log"); TD-17
+- **Source:** owner, Oct 26, 2026 (`docs/reviews/s2/S2-C1.md`, open question 1)
+
+### DL-194: Archiving a project cancels its pending approval requests
+- **Date:** 2026-10-27
+- **Decision:** Archiving a project cancels every pending approval request in it, each logged on
+  the request (`status`), in the archive's transaction; unarchiving doesn't reopen them, and a
+  project admin re-requests. An archived project therefore has no pending rows for approver
+  replacement to act on, and nothing is flagged there. Built in S2-C10, with approval requests:
+  the project service's archive calls the approval service (layer 1).
+- **Supersedes:** design-doc §6.2 "Not in an archived project" (owner decision, Oct 6, 2026:
+  rows stay pending and the request is flagged)
+- **Superseded by:** none
+- **Applies to:** design-doc §4, §6.2, §11; schema-doc (`approval_request`, `approval`); build
+  plan (S2-C10, S2-C12, Slice 2 "Approvals", "Done when"); testing-strategy "Approvals"
+- **Source:** owner, Oct 26–27, 2026 (screen inventory Piece 6, chat session; handoff decision 1)
+
+### DL-195: Approval decisions are final; re-opening an approved item
+- **Date:** 2026-10-27
+- **Decision:** There is no "unapprove". A project admin re-opens an approved item by starting a
+  new request on it: a requirement whose status is `approved` and that isn't "Approved ·
+  modified", or a gate whose milestone is `approved`. The status doesn't change while it's
+  pending; approved, the approval is updated as usual; rejected, the item moves off approved (a
+  requirement back to `draft`, a gate's milestone back to `in_progress`), logged. Re-approving
+  an "Approved · modified" requirement isn't a re-open: its rejection changes nothing. A
+  `released` milestone can't be re-opened. What a rejected re-open round does to a completed
+  test run's exit sign-off is still open (decided before Slice 5).
+- **Supersedes:** design-doc §6.2 "A rejected request changes nothing on the entity" (in part:
+  it still holds for every round but a re-open)
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; schema-doc (`approval_request`); build plan (S2-C10, S2-C11,
+  S2-C20, Slice 2 "Approvals", "Later slices": Slice 4); testing-strategy "Approvals";
+  screen-inventory Piece 6
+- **Source:** owner, Oct 26–27, 2026 (handoff decision 2; open question A and the meaning of
+  "release milestone" answered in chat, Oct 27, 2026)
+
+### DL-196: The approver's review, the reject prompt, and what's left out
+- **Date:** 2026-10-27
+- **Decision:** The approver's review shows the item's associated tasks and subtasks with their
+  statuses (from Slice 3) and its comments (from Slice 6), beside the other approvers' decisions
+  and comments. Rejecting prompts for a comment; it isn't required, but submitting without one
+  asks the approver to confirm. No project-level approvals page in v1 (the project home's
+  pending-approvals number and each list's filter bar cover it). Approval delegation is v2.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2, §16; build plan (S2-C20, "Later slices": Slices 3 and 6);
+  screen-inventory Pieces 6 and step 3
+- **Source:** owner, Oct 26, 2026 (screen inventory Piece 6; handoff decisions 3 to 6)
+
+### DL-197: Everyone's v1 features from the inventory's Pieces 7 and 8
+- **Date:** 2026-10-27
+- **Decision:** In v1: CSV export of the current list (its filters and columns) for tasks,
+  requirements, test cases, and test results, a whole-project export staying v2; My work as the
+  cross-project view (a portfolio view when it outgrows it); a self-service session list in
+  Account settings (sign out of the others); saved filters, a named filter-bar setup per user per
+  list, personal only (sharing v2), renamable and deletable, with the filters in the URL;
+  comments edited and soft-deleted by their authors with an "edited" marker
+  (`comment.edited_at`), project admins deleting any; favorite projects on My work (items
+  v1.5+, no "recently viewed"); a Documentation item in the user menu rendering the user guide;
+  a header search bar with a results page (Slice 6). GitHub stays in Slice 7. The slices for the
+  session list, saved filters, CSV export, favorites, and Documentation are the owner's to
+  place; the saved-filter and favorite tables are designed with them.
+- **Supersedes:** design-doc §4 "Active-sessions page" before the first non-local deployment
+  (now v1); design-doc §14 "Saved filters / views are later"
+- **Superseded by:** DL-242 (in part: no `ip_address` on `session`)
+- **Applies to:** design-doc §4, §11, §14, §16; schema-doc (`comment`); build plan ("Later
+  slices": Slice 6); screen-inventory Pieces 7 and 8, step 6
+- **Source:** owner, Oct 26, 2026 (screen inventory Pieces 7 and 8; handoff decisions 7, 9 to 16)
+
+### DL-198: Status reports in v1.5, and export to a deck or document
+- **Date:** 2026-10-27
+- **Decision:** A published status report summarizes a finished period (a sprint, phase, or
+  iteration). A simplified version is targeted for v1.5, the full version by v2 with the PMO
+  dashboard and ERP. Export of a view or period to a slide deck or document is a v1.5 candidate
+  (v1 if it's cheap).
+- **Supersedes:** none (status reports were a v2 ERP module only)
+- **Superseded by:** none
+- **Applies to:** design-doc §16; screen-inventory Piece 7, "Noted for later steps"
+- **Source:** owner, Oct 26, 2026 (screen inventory Piece 7; handoff decision 8)
+
+### DL-199: Sprints page, Timeline, releases, and traceability
+- **Date:** 2026-10-27
+- **Decision:** A Sprints page (Slice 4) lists planned, active, and completed sprints, and a
+  completed sprint's summary is reconstructed from `activity_log` until sprint snapshots exist.
+  A planned sprint can be hard deleted (its tasks return to the backlog); active and completed
+  ones can't. The Timeline is a dated table of phases and milestones with baseline vs. current
+  dates and slippage: a basic page holding phases in Slice 3, milestones and slippage in Slice 4;
+  the Gantt chart stays v2. Releases get no page in v1: a milestone filter on lists and the
+  board, and a progress bar on each milestone. Traceability is coverage columns on the
+  requirement tree (task count and progress, test-case count, latest result, approval state),
+  filled in as Slices 3 and 5 ship, with no separate matrix page.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 (Requirement, Sprint, Milestone), §9; build plan ("Later
+  slices": Slices 3, 4, 5); screen-inventory steps 3, 4, 6
+- **Source:** owner, Oct 26–27, 2026 (handoff decisions 17, 18, 20 to 22; the basic Timeline in
+  Slice 3 answered in chat, Oct 27, 2026)
+
+### DL-200: States: turned-off modules, deleted links, archived projects, deactivated users
+- **Date:** 2026-10-27
+- **Decision:** A turned-off module's page is an explanatory page inside the project ("The
+  Sprints module is turned off for this project. Contact your administrator for questions.");
+  an unshipped module has no page, and the API stays a 404. A link to a deleted item is the
+  standard 404 for everyone; Trash is the way back. My work leaves out every item of an archived
+  project. Deactivated users are left out of every picker and of the member and user lists,
+  whose admins get a "Show deactivated" filter; their existing work keeps their name with the
+  badge, and items still assigned to them are highlighted. Link attachments aren't edited
+  (remove and re-add). The change to the built Slice 1 lists, and the turned-off module page, go
+  in checkpoints the owner places.
+- **Supersedes:** ui-design-guide UI-FBK-6 (in part: deactivated people listed with a badge in
+  every list); DL-102 (in part: the staff and org member lists showing deactivated people);
+  DL-113 (in part: the lead picker marking deactivated members)
+- **Superseded by:** none
+- **Applies to:** design-doc §1.1, §4, §9, §11; ui-design-guide UI-FBK-6, UI-SHL-13;
+  screen-inventory step 5
+- **Source:** owner, Oct 27, 2026 (screen inventory step 5; handoff decisions 19, 23 to 26)
+
+### DL-201: The Get started checklist
+- **Date:** 2026-10-27
+- **Decision:** A new project's home page shows three items, each linking to where it's done and
+  ticked automatically from the project's data: Invite your team (a member besides the creator),
+  Compile your plan (a phase or milestone with a date; hidden until phases and milestones ship),
+  and Start your project (a requirement, a test case, and a task, each part shown once its
+  feature ships). The ticks are loose. It's shown only to the project's admins, disappears when
+  all three are ticked, and a project admin can hide it sooner, through a per-project flag
+  designed with its slice (the owner's to place). GitHub isn't part of it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §11; screen-inventory step 5, step 6
+- **Source:** owner, Oct 27, 2026 (handoff decision 27; who sees it and the loose ticks answered
+  in chat, Oct 27, 2026)
+
+### DL-202: Item side panels, expandable create dialogs, and flat project navigation
+- **Date:** 2026-10-27
+- **Decision:** Opening a requirement, task, test case, or test run from a list or the board
+  opens a side panel with its own URL (Back closes it) and Open full page; direct links and Copy
+  link use the full page. Create dialogs can expand into a full page, keeping typed values, and
+  land on the new item. Project navigation stays flat: Home, Requirements, Tasks (Board and
+  Backlog tabs), Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash
+  last, leaving out turned-off and unshipped modules.
+- **Supersedes:** DL-146 (in part: Trash linked from the requirements page's header)
+- **Superseded by:** none
+- **Applies to:** design-doc §9; ui-design-guide UI-SHL-6, UI-SHL-11, UI-SHL-12; build plan
+  (S2-C17, S2-C21); screen-inventory step 6
+- **Source:** owner, Oct 27, 2026 (handoff decisions 28 to 30; test runs opening like the other
+  items answered in chat, Oct 27, 2026)
+
+### DL-203: The screen inventory is complete
+- **Date:** 2026-10-27
+- **Decision:** `docs/screen-inventory.md` steps 2 to 6 are done. Step 6's consolidated table
+  (screen, type, proposed route, slice, built or not) is the list S2-C15's TD-62 check runs
+  against; routes for unbuilt screens are proposals each slice's planning confirms.
+- **Supersedes:** none (completes DL-157's condition)
+- **Superseded by:** none
+- **Applies to:** screen-inventory; build plan (Slice 2 "Before starting", "Web screens");
+  TD-62
+- **Source:** owner, Oct 26–27, 2026 (handoff decision 31)
+
+### DL-204: Rank length cap, with a rewrite of the gap's siblings
+- **Date:** 2026-10-27
+- **Decision:** A rank is capped at 255 characters. A drop whose new rank would exceed the cap
+  rewrites the ranks of that gap's siblings in one transaction, the drop's, instead of failing;
+  the order is unchanged. Built in S2-C7 (the move endpoint), resolving TD-69.
+- **Supersedes:** design-doc §6 "No locking or periodic rebalancing in v1" (in part: the cap's
+  rewrite is the one exception)
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7); TD-69
+- **Source:** owner, Oct 27, 2026 (`docs/reviews/s2/S2-C2.md`, option A for the length limit)
+
+### DL-205: An integration test pins the rank collation
+- **Date:** 2026-10-27
+- **Decision:** S2-C7 adds an integration test that sorts generated ranks with the database's
+  `ORDER BY` and compares the order with Python's, so a change of collation, or of the rank
+  alphabet, fails a test instead of silently misordering items.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7)
+- **Source:** owner, Oct 27, 2026 (`docs/reviews/s2/S2-C2.md`, option A for the collation)
+
+### DL-206: No history from Trash in v1
+- **Date:** 2026-10-27
+- **Decision:** A deleted requirement's history is a 404, like everything else about a deleted
+  item: Trash shows what was deleted, by whom, and when, and restoring brings the history back.
+  S2-C8 adds a test pinning the 404.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C8, "Done when")
+- **Source:** owner, Oct 27, 2026 (`docs/reviews/s2/S2-C3.md`, open question 1)
+
+### DL-207: A new item starts at version 1
+- **Date:** 2026-10-28
+- **Decision:** Creating a requirement (and later a task or test case) sets its first revision
+  pointer, `current_revision_id`, with `direct_update` in the creating transaction, so the
+  write doesn't bump `version` and a new item starts at 1. Nobody else can have read the row's
+  version before its transaction commits, so skipping the bump hides no concurrent edit. Built
+  in S2-C6 (S2-C5 starts it at 2).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Optimistic locking"; schema-doc `requirement`
+  (`current_revision_id`); build plan (the direct-update helper, S2-C6); `backend/CLAUDE.md`;
+  `new-area` skill
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C5.md`, open question 1, option b)
+
+### DL-208: An item's stored level is never below the project's
+- **Date:** 2026-10-28
+- **Decision:** An item's stored restriction level is null (it inherits the project's) or at
+  least the project's. A lower level, at creation or in a restriction change, is a 422
+  `below_project`. Raising a project's level raises every item stored below the new level to
+  it, logged on each item as a `restriction_level` change by the admin who raised the
+  project. Built in S2-C6.
+- **Supersedes:** schema-doc `requirement.restriction_level` "never below the project's in
+  effect" (the stored level could be lower)
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1 "What's restricted"; schema-doc `requirement`
+  (`restriction_level`); build plan (S2-C6); `new-area` skill
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C5.md`, open question 2)
+
+### DL-209: A project raise skips the trash; restore raises the item
+- **Date:** 2026-10-28
+- **Decision:** Raising a project's level lifts only its live items stored below it (no
+  `include_deleted` query). Restoring an item stored below its project's level raises it to the
+  project's level, logged as a `restriction_level` change by the user restoring it. Built in
+  S2-C6 (the raise) and S2-C8 (the restore).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1 "What's restricted", §9 "Restore"; build plan (S2-C6, S2-C8);
+  `new-area` skill
+- **Source:** owner, Oct 28, 2026
+  (`docs/reviews/design-changes/DC-2026-10-28-version-one-and-restriction-floor.md`, decision 1,
+  option b)
+
+### DL-210: `updated_at` on restriction writes
+- **Date:** 2026-10-28
+- **Decision:** An item's own restriction change (the restriction PUT, a restore's raise)
+  moves its `updated_at`; items lifted by a project raise don't (`touch_updated_at=False`),
+  since nobody edited them. Neither bumps `version` (DL-168). The first revision pointer set at
+  creation (DL-207) doesn't either: the row was just inserted.
+- **Supersedes:** build plan and `backend/CLAUDE.md` "restriction writes: decided before S2-C6"
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1; build plan (the direct-update helper, S2-C6);
+  `backend/CLAUDE.md`; `new-area` skill
+- **Source:** owner, Oct 28, 2026
+  (`docs/reviews/design-changes/DC-2026-10-28-version-one-and-restriction-floor.md`, decision 2,
+  option b; the item's own change moving `updated_at` was the recommendation given with it)
+
+### DL-211: Who may be a requirement's reporter
+- **Date:** 2026-10-28
+- **Decision:** A project admin may reassign a requirement's reporter only to an active user
+  who may create requirements in the project: a project member or admin, or an inherited
+  project admin with content access (on an export-controlled project, an explicit membership).
+  On `reporter_id`, a deactivated user is a 422 `validation_error` of type `account_inactive`,
+  anyone else outside that set `not_member`, and an unchanged `reporter_id` is no change, so a
+  deactivated reporter never blocks a save (the project lead's convention). Viewers are left
+  out: they can't create requirements, and the reporter may delete one.
+- **Supersedes:** none (the docs named no rule)
+- **Superseded by:** none
+- **Applies to:** design-doc §6 (`reporter_id`); build plan (S2-C6)
+- **Source:** owner, Oct 28, 2026 (chat, before S2-C6)
+
+### DL-212: `requirement.approve_manually` is registered in S2-C6
+- **Date:** 2026-10-28
+- **Decision:** S2-C6 registers `requirement.approve_manually` (project admins, inherited
+  included; content), so its `PATCH` can answer a status of `approved` with 403 to those who
+  may not approve by hand and 422 `use_approve` to those who may (DL-161). S2-C11 adds the
+  endpoint. Until then `allowed_actions` lists the action with no endpoint behind it; no
+  screen reads it before S2-C18.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C6, S2-C11); `docs/reviews/s2/S2-plan.md` (actions table)
+- **Source:** owner, Oct 28, 2026 (chat, before S2-C6)
+
+### DL-213: A drop between tied ranks rewrites the gap's siblings
+- **Date:** 2026-10-28
+- **Decision:** A move whose neighbors share a rank (no rank sorts between them) rewrites the
+  ranks of that parent's children in their order, with the moved item placed, in the move's
+  transaction: the same rewrite as a drop past the length cap (DL-204). Built in S2-C7,
+  resolving TD-67.
+- **Supersedes:** design-doc §6 "Ties": "the only rewrite is the length cap's"
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7); TD-67
+- **Source:** owner, Oct 28, 2026 (chat, during S2-C7)
+
+### DL-214: Moves run one at a time per project
+- **Date:** 2026-10-28
+- **Decision:** A requirement move takes the project's tree lock first (`FOR NO KEY UPDATE`
+  on the project row, so creates' foreign-key checks still pass), then the item's row, so two
+  moves at once can't build a parent cycle that each passed alone. A reorder leaves
+  `updated_at` alone; a parent change is logged and moves it; neither bumps `version`. Built in
+  S2-C7.
+- **Supersedes:** design-doc §6 "Ties": "No locking"
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; build plan (S2-C7); developer guide
+  ("Direct updates"); `backend/CLAUDE.md`; `new-area` skill
+- **Source:** owner, Oct 28, 2026 (chat, during S2-C7)
+
+### DL-215: Every requirement parent change follows the move's rules
+- **Date:** 2026-10-28
+- **Decision:** Promoting children when a requirement is deleted, and restoring a requirement at
+  the top level because its parent is still in the trash, change a parent as a move does
+  (DL-214): the project's tree lock first, then the rows; no `version` bump; `updated_at`
+  moved; the parent change logged. Built in S2-C8.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Optimistic locking", §6 "Manual ordering", §9; build plan
+  (the direct-update helper, S2-C8); developer guide ("Direct updates"); `backend/CLAUDE.md`;
+  `new-area` skill
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C7.md`, open question 1, option a)
+
+### DL-216: Tasks' rank rewrites and move lock are decided in Slice 3 planning
+- **Date:** 2026-10-28
+- **Decision:** The tie and cap rewrites (DL-204, DL-213) and the move lock (DL-214) are the
+  requirement tree's. Which items a task rewrite covers (a board column, a sprint section, or the
+  project's whole task order) and whether task moves run one at a time are decided in Slice 3
+  planning.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering"; build plan ("Later
+  slices")
+- **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C7.md`, open question 2)
+
+### DL-217: Where promoted children and a top-level restore are ranked
+- **Date:** 2026-10-28
+- **Decision:** When a requirement is deleted with its children promoted, the children take the
+  deleted requirement's place among its siblings, keeping their own order. A requirement
+  restored at the top level, because its parent is still in the trash, goes to the bottom of
+  the top level. Built in S2-C8.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Trash"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28e, docs-consistency decision 1: option (c) for
+  promote, (b) for a restore at the top level)
+
+### DL-218: Promote and a top-level restore rewrite ranks as a drop does
+- **Date:** 2026-10-28
+- **Decision:** When a delete's promoted children or a requirement restored at the top level
+  can't get ranks where DL-217 puts them (a tie, or ranks past the 255-character cap), the new
+  parent's children are rewritten in order in the same transaction, as for a drop (DL-204,
+  DL-213). Built in S2-C8.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering", §9 "Trash"; build plan
+  (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28f, docs-consistency decision 1, option (a))
+
+### DL-219: A reporter deletes and restores as a project member
+- **Date:** 2026-10-28
+- **Decision:** The reporter rule for deleting and restoring a never-approved requirement needs
+  the project member role or above: a reporter who is now a viewer may not, and one who can no
+  longer see the project gets the usual 404.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Other targeted rules" (Deletion); build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (chat, S2-C8 spec-test-writer question 1 and 2)
+
+### DL-220: The trash lists each item by its own rule
+- **Date:** 2026-10-28
+- **Decision:** The trash lists a deleted item when the user could restore that item alone, even
+  if restoring it would be refused for a descendant deleted with it. An archived project's trash
+  lists the same items, with no Restore in `allowed_actions`.
+- **Supersedes:** none
+- **Superseded by:** DL-222 (in part: Restore in a row's `allowed_actions`)
+- **Applies to:** design-doc §9 "Restore"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (chat, S2-C8 spec-test-writer questions 3 and 4)
+
+### DL-221: Deleting children deletes the subtree; a delete or restore never reaches past the user's rights
+- **Date:** 2026-10-28
+- **Decision:** Deleting a requirement with its children deletes the whole subtree,
+  grandchildren included, with one `deleted_at`. A delete of the subtree, or a restore, that
+  would reach a descendant the user couldn't delete or restore directly is a 403, and nothing
+  changes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Deleting a requirement", "Permissions in the delete dialog",
+  "Restore"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (chat, S2-C8 spec-test-writer question 5)
+
+### DL-222: The server says when a delete or restore would reach past the user's rights
+- **Date:** 2026-10-28
+- **Decision:** The requirement read carries `can_delete_children`: whether the caller may delete
+  the requirement's whole subtree (DL-221), so the delete dialog offers "delete them too" only
+  then. A trash row's `allowed_actions` carry Restore only when the whole restore would pass; the
+  row is still listed by its own rule (DL-220). Built in S2-C8.
+- **Supersedes:** DL-220, in part (a row listed by its own rule carried Restore by that rule)
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Permissions in the delete dialog", "Restore"; build plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28g, docs-consistency decision 1, option (a))
+
+### DL-223: Every reporter rule needs the member role
+- **Date:** 2026-10-28
+- **Decision:** DL-219's rule applies to tasks and test cases too: their reporter deletes and
+  restores them as a project member (member role or above).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Other targeted rules" (Deletion)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28g, docs-consistency decision 2, option (a))
+
+### DL-224: Every requirement in a deleted subtree is treated as deleted
+- **Date:** 2026-10-28
+- **Decision:** When a requirement is deleted with its subtree, each requirement in it has its
+  pending approval request cancelled and logged, and the delete dialog's linked-items choice
+  (Slices 3 and 5) covers the whole subtree's links. Built in S2-C8 (approval requests).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Permissions in the delete dialog", "Pending approvals"; build
+  plan (S2-C8)
+- **Source:** owner, Oct 28, 2026 (DC-2026-10-28g, docs-consistency decision 3, option (a))
+
+### DL-225: A second request while one is pending is a 422
+- **Date:** 2026-10-29
+- **Decision:** Creating an approval request on an entity that already has a pending one is a
+  422 `validation_error` on `["body"]`, type `pending_exists`, checked by the service first; the
+  partial unique index on pending requests stays `internal_only()`, a clash there a bug.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; schema-doc (`approval_request`); build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-226: How a request's approvers are validated
+- **Date:** 2026-10-29
+- **Decision:** `approver_ids` holds 1 to 50 distinct user UUIDs (none, or more than 50, a 422;
+  a repeated one a 422 of type `duplicate`). Someone without the access §6.2 requires is a 404;
+  a deactivated user who has it is a 422 `account_inactive`, as for `reporter_id` (DL-211).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2 "Who can be an approver"; schema-doc (`approval`); build plan
+  (S2-C10); testing-strategy "Approvals"
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-227: A requirement's approval requests are offset-paged, newest first
+- **Date:** 2026-10-29
+- **Decision:** `GET /api/projects/{key}/requirements/{number}/approval-requests` uses the API
+  conventions' offset paging (`{items, total, limit, offset}`), newest first: requests change
+  status, so they aren't an append-only feed.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-228: Cancelling a decided request; a deleted requirement's requests
+- **Date:** 2026-10-29
+- **Decision:** Cancelling a request that isn't pending is a 422 `validation_error` on
+  `["path", "id"]`, type `not_pending`. A deleted requirement's approval requests are a 404 on
+  every request URL (its list, a request's read, and cancel), as its history is (DL-206).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 scoping)
+
+### DL-229: Creating a request locks its requirement first
+- **Date:** 2026-10-29
+- **Decision:** Creating an approval request locks the requirement row (`FOR UPDATE`) before the
+  pending check, so two creates at once give the second the 422 `pending_exists` (DL-225), and a
+  create racing a delete waits for it; the partial unique index stays an internal backstop.
+  S2-C10 adds a concurrency test.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C10); testing-strategy "Concurrency"
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29, docs-consistency decision 1, option (a))
+
+### DL-230: Deciding follows the request rules of DL-228
+- **Date:** 2026-10-29
+- **Decision:** `POST /api/approval-requests/{id}/decision` on a deleted requirement's request is
+  a 404, and on a request that isn't pending a 422 `validation_error` on `["path", "id"]`, type
+  `not_pending`, as for cancel (DL-228).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C11)
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29, docs-consistency decision 2, option (a))
+
+### DL-231: A request offers Cancel only while it's pending
+- **Date:** 2026-10-29
+- **Decision:** An approval request's read carries `approval_request.cancel` in its
+  `allowed_actions` only while the request is pending and the caller may cancel it, as a trash
+  row carries Restore only when the restore would pass (DL-222).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C10)
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C10 spec-test-writer question)
+
+### DL-232: `allowed_actions` leaves out what the entity's state rules out for good
+- **Date:** 2026-10-29
+- **Decision:** Besides `authorize()`, an entity's `allowed_actions` leaves out an action its
+  state rules out for good (a decided or cancelled request's Cancel, DL-231; a restore that would
+  fail, DL-222), so the UI hides it. A rule with choices or a reason to show keeps its own field
+  (`allowed_transitions`, `can_delete_children`), and the UI disables that control with the
+  reason (UI-TOK-10).
+- **Supersedes:** build plan "API conventions" ("Rules that depend on data get their own field",
+  in part)
+- **Superseded by:** none
+- **Applies to:** build plan "API conventions"; ui-design-guide UI-TOK-10; `frontend/CLAUDE.md`
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29b, docs-consistency decision 1, option (a))
+
+### DL-233: A request offers Decide only to an approver whose row is still pending
+- **Date:** 2026-10-29
+- **Decision:** A request's read carries `approval.decide` only while the request is pending and
+  the caller's own `approval` row is still pending (not decided, not `replaced`), by DL-232.
+  Built in S2-C11.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C11)
+- **Source:** owner, Oct 29, 2026 (DC-2026-10-29b, docs-consistency decision 2, option (a))
+
+### DL-234: Deciding again after one's own row is decided is a 403
+- **Date:** 2026-10-29
+- **Decision:** `approval.decide`'s relationship is "the named approver whose own `approval` row
+  is still pending", so a named approver who has already decided (or whose row was replaced)
+  is refused by `authorize()`: a 403, the same rule that leaves Decide out of the read's
+  `allowed_actions` (DL-233). `authorize()` runs first, as everywhere: the 422 `not_pending`
+  (DL-230) is for a named approver whose own row is still pending on a request that isn't. An
+  approver whose row was replaced has lost content access, so they get a 404, like anyone who
+  can't see the project (§5); a 403 only once they have access again.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Personal actions", §6.2; schema-doc (`approval`); build plan
+  (S2-C11, Slice 2 "Approvals"); testing-strategy "Security"
+- **Source:** owner, Oct 29, 2026 (chat session, S2-C11 scoping; DC-2026-10-29c, docs-consistency
+  decisions 1 and 2, option (a) each)
+
+### DL-235: Projects are locked first
+- **Date:** 2026-10-30
+- **Decision:** A transaction that locks a project row takes it before any user, workspace
+  membership, org membership, or project membership row, projects in ID order. Every path that
+  takes away access to decide (§6.2's causes other than a project's own) first locks, `FOR
+  UPDATE`, the live projects where the person has a pending `approval` row or requested a
+  pending request, then makes the change, then looks again and locks any project a request
+  created meanwhile, before the replacement runs. Adding a project member takes the project
+  before the person's org and staff rows (`FOR SHARE`), and an org or workspace removal "with
+  their projects" locks the projects before deleting the org or staff row. This closes TD-81
+  and the deadlock between a request naming someone and their org removal "with their
+  projects"; only the "looks again" step can still deadlock, for a request created in that
+  window.
+- **Supersedes:** S1-C12's lock order for a project member add and a removal "with their
+  projects" (the person's org and staff rows before the project; `backend/CLAUDE.md`, "a check
+  that another row exists")
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C13, Slice 2 notes "Approver replacement touches Slice 1
+  flows"); `backend/CLAUDE.md` ("Rules that are easy to break silently"); tech debt (TD-81);
+  developer guide (the roster's lock order, updated by S2-C13 with the code)
+- **Source:** owner, Oct 30, 2026 (chat session, S2-C13 start)
+
+### DL-236: My work's approvals item
+- **Date:** 2026-10-30
+- **Decision:** An item in My work's approvals section (`GET /api/me/work`,
+  `GET /api/me/work/approvals`) is one pending `approval` row of the caller's: `request_id`,
+  `requested_at`, `requested_by_id`, `requested_by_name`, `note`, `entity_type`
+  (`requirement`), `entity_number`, `title` (the title of the revision under approval, not the
+  requirement's current one), `revision_number`, `project_key`, `project_name`, and
+  `organization_slug`; sorted by `requested_at`, oldest first (the longest wait on top). Left
+  out: rows not pending, requests not pending, deleted requirements, archived projects, and
+  every project whose content the caller can't see, as for every list (§5, "Reads are
+  authorized too"): one they can't open at all (a row left pending after they lost access,
+  §6.2, flagged for an admin), and an export-controlled one without an explicit membership
+  (§3.1).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("API conventions" My work row; S2-C14)
+- **Source:** owner, Oct 30, 2026 (chat session, S2-C14 start; DC-2026-10-30b,
+  docs-consistency decision 1, option (a))
+
+### DL-237: S2-C14's page part is TD-40's error state
+- **Date:** 2026-10-30
+- **Decision:** On the My work page, S2-C14 gives each section its own error state (TD-40), so
+  an unavailable section no longer fails the page; the approvals section's UI stays in S2-C20.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C14)
+- **Source:** owner, Oct 30, 2026 (chat session, S2-C14 start)
+
+### DL-238: Four inventory items join Slice 2, after the requirement screens
+- **Date:** 2026-10-31
+- **Decision:** Slice 2 gains four rows, after S2-C21 and before slice verification (S2-C22),
+  in the `s2-web` group: S2-C21a, the built Slice 1 lists' "Show deactivated" change and
+  deactivated people left out of the built pickers (DL-200); S2-C21b, the session list in
+  Account settings (DL-197); S2-C21c, favorite projects on My work (DL-197); and S2-C21d, the
+  Documentation page, last (DL-197), on S2-C16's `MarkdownView`, with `docs` joining the
+  reserved slugs. Each is provisional like the other web rows, its endpoints and (for S2-C21b
+  and S2-C21c) its schema specified when it is re-cut, before it starts (DL-139).
+- **Supersedes:** none (places DL-197's session list, favorites, and Documentation, and DL-200's
+  change to the built lists, which those entries left to the owner)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 2 checkpoints, groups, reviewers, "Done when"); design-doc
+  §3, §4, §11; schema-doc (deferred tables: `session`); ui-design-guide §4 (UI-SHL-4, UI-SHL-8),
+  §6 (deactivated users); screen-inventory (its introduction, step 6); tech debt (TD-62)
+- **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start: TD-62's check)
+
+### DL-239: Where the other unplaced inventory items go
+- **Date:** 2026-10-31
+- **Decision:** Saved filters (DL-197) and the Get started checklist with its per-project hide
+  flag (DL-201) go in Slice 3; CSV export of the current list (DL-197) in Slice 3 for
+  requirements and tasks and in Slice 5 for test cases and test results; the turned-off module
+  page (DL-200) in Slice 4, with Sprints, the first module that can be turned off; the
+  workspace audit log page (`/workspace/audit`) in Slice 7, the last v1 slice, so before the
+  first non-local deployment.
+- **Supersedes:** none (places the items DL-197, DL-200, and DL-201 left to the owner)
+- **Superseded by:** none
+- **Applies to:** build plan ("Later slices — placements decided so far"); design-doc §1.1,
+  §11; screen-inventory step 6; tech debt (TD-62)
+- **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start: TD-62's check)
+
+### DL-240: The inventory rows' actions and threats go in the Slice 2 plan record
+- **Date:** 2026-10-31
+- **Decision:** Each re-cut of S2-C21a to S2-C21d adds the row's endpoints and actions to
+  `docs/reviews/s2/S2-plan.md`'s "Actions per row" table and its threats to "Threat-model pass",
+  in the re-cut's `docs:` commit, so the plan record stays the one place for Slice 2's actions
+  (DL-139).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 2, the plan record sentence); `docs/reviews/s2/S2-plan.md`
+- **Source:** owner, Oct 31, 2026 (DC-2026-10-31, docs-consistency decision 1, option (a))
+
+### DL-241: Reviewers for the inventory rows
+- **Date:** 2026-10-31
+- **Decision:** `security-reviewer` runs on S2-C21a to S2-C21d (21c: a favorite must not reveal
+  a project the user can't open; 21d: the reserved-slug rule). The `spec-test-writer` list stays
+  as it is (21d), each of 21a to 21c confirming at its start whether it adds or changes
+  `app/rules/` or `app/authz/` code.
+- **Supersedes:** none (widens DL-238's reviewer list)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 2, the reviewer lists)
+- **Source:** owner, Oct 31, 2026 (DC-2026-10-31, docs-consistency decision 2, the
+  recommendation: option (c) for `security-reviewer`, option (a) for `spec-test-writer`)
+
+### DL-242: The session list shows the device, not an address or a place
+- **Date:** 2026-10-31
+- **Decision:** S2-C21b's session list shows each session's device and browser (a short label
+  from its user agent, "Firefox on Windows", with no parsing library), when it signed in, and
+  when it was last active. `session` gains `user_agent` only: no IP address is stored and no
+  location is looked up (that would need a geolocation data source, a new dependency, DL-129),
+  so no forwarded-header rule is needed for it.
+- **Supersedes:** DL-197 in part (design-doc §4: `ip_address` added to `session`)
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sessions"); schema-doc (deferred tables); build plan
+  (S2-C21b)
+- **Source:** owner, Oct 31, 2026 (DC-2026-10-31, docs-consistency decision 3: the device only,
+  "keep it simple for now")
+
+### DL-243: The tree's move menu, and where its specs run
+- **Date:** 2026-10-31
+- **Decision:** S2-C15 builds `MoveToMenu`, outside the widget, with Move up and Move down on
+  the selected row, the server deciding each; S2-C17 adds Move to top, Move to bottom, Move
+  after…, and "Move to…", and the board reuses it in Slice 3. The requirement tree has no drag
+  (TreeTable, DL-174), so the menu is its only way to reorder, with the full set every drag's
+  alternative offers. `RequirementsTree`'s keyboard, axe, and move/cancel specs are component
+  specs, with no end-to-end copy; its theme audit, which needs a browser, is an end-to-end spec
+  in both themes in S2-C17, the first page that renders the tree.
+- **Supersedes:** design-doc §6 in part (the requirement tree reordered by drag)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C15, S2-C17); design-doc §6 ("Manual ordering"); ui-design-guide
+  §9 (the keyboard and move/cancel row); testing strategy (the wrapper specs)
+- **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start; DC-2026-10-31c, docs-consistency
+  decisions 1 to 3)

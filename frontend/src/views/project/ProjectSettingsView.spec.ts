@@ -25,13 +25,15 @@ const LEAD = '0190f0a0-0000-7000-8000-0000000000d1'
 const ADMIN: Action[] = [
   'project.view',
   'project.update',
-  'project.raise_classification',
-  'project.lower_classification',
+  'project.raise_restriction',
+  'project.lower_restriction',
 ]
 const GUIDANCE: components['schemas']['ModuleGuidance'] = {
   modules: [
-    { module: 'sprints', note: 'Plan work in sprints.', available: false },
-    { module: 'github', note: 'Link pull requests.', available: false },
+    // As though both had shipped, so they can be turned off (DL-136); `raid` hasn't.
+    { module: 'sprints', note: 'Plan work in sprints.', available: true },
+    { module: 'github', note: 'Link pull requests.', available: true },
+    { module: 'raid', note: 'Track risks and issues.', available: false },
   ],
   types: [
     { type: 'software', recommended: ['sprints', 'github'] },
@@ -158,14 +160,8 @@ describe('ProjectSettingsView', () => {
     await wrapper.get('#project-settings-status').setValue('on_hold')
     await submitForm(wrapper, 0)
 
-    expect(body(patch)).toEqual({
-      name: 'Billing',
-      description: null,
-      type: 'software',
-      status: 'on_hold',
-      lead_id: LEAD,
-      enabled_modules: ['sprints'],
-    })
+    // Only what changed, so another admin's change to the rest stands (TD-56).
+    expect(body(patch)).toEqual({ name: 'Billing', status: 'on_hold' })
     expect(wrapper.text()).toContain('Settings saved.')
     expect(wrapper.get('h1').text()).toBe('Billing settings')
     expect(useCurrentOrgStore().project?.name).toBe('Billing')
@@ -263,6 +259,45 @@ describe('ProjectSettingsView', () => {
     )
   })
 
+  it("shows a module that hasn't shipped as a disabled checkbox, not available yet (DL-136)", async () => {
+    const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
+
+    const raid = wrapper.get<HTMLInputElement>('input[type=checkbox][value=raid]')
+    expect(raid.element.disabled).toBe(true)
+    expect(raid.element.labels![0]!.textContent).toContain('Not available yet')
+    expect(
+      wrapper.get<HTMLInputElement>('input[type=checkbox][value=github]').element.disabled,
+    ).toBe(false)
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('sends the modules only when they changed, and then alone (TD-56)', async () => {
+    const { wrapper } = await mountAt(
+      project({ enabled_modules: ['sprints'], allowed_actions: ADMIN }),
+    )
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok(project()))
+
+    await wrapper.get('input[type=checkbox][value=sprints]').setValue(false)
+    await submitForm(wrapper, 0)
+
+    expect(body(patch)).toEqual({ enabled_modules: [] })
+  })
+
+  it("sends no field another section's save brought in, only what was typed (TD-56)", async () => {
+    const shown = project({ status: 'active', allowed_actions: ADMIN })
+    const { wrapper } = await mountAt(shown)
+    // Another admin put it on hold meanwhile; the restriction save's answer carries that.
+    vi.spyOn(client, 'PUT').mockResolvedValue(ok({ ...shown, status: 'on_hold' }))
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok(shown))
+    await wrapper.get('input[type=radio][value=confidential]').setValue(true)
+    await submitForm(wrapper, 1)
+
+    await wrapper.get('#project-settings-name').setValue('Billing')
+    await submitForm(wrapper, 0)
+
+    expect(body(patch)).toEqual({ name: 'Billing' })
+  })
+
   it('warns about no module that was off, or an unrecommended one without data', async () => {
     const { wrapper } = await mountAt(
       project({ type: 'erp', enabled_modules: ['sprints'], allowed_actions: ADMIN }),
@@ -280,17 +315,17 @@ describe('ProjectSettingsView', () => {
     const { wrapper } = await mountAt(shown)
     vi.spyOn(client, 'PATCH').mockResolvedValue(ok(shown))
 
-    await wrapper.get('input[type=radio][value=restricted]').setValue(true)
+    await wrapper.get('input[type=radio][value=confidential]').setValue(true)
     await submitForm(wrapper, 0)
 
     expect(
-      wrapper.get<HTMLInputElement>('input[type=radio][value=restricted]').element.checked,
+      wrapper.get<HTMLInputElement>('input[type=radio][value=confidential]').element.checked,
     ).toBe(true)
   })
 
   it('on a 403 that took the edit away, keeps the alert, focused, and shows no form (UI-FRM-7)', async () => {
     const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }), [
-      project({ allowed_actions: ['project.view', 'project.raise_classification'] }),
+      project({ allowed_actions: ['project.view', 'project.raise_restriction'] }),
     ])
     vi.spyOn(client, 'PATCH').mockResolvedValue(
       failed(403, { code: 'forbidden', message: 'Forbidden.', details: {} }),
@@ -303,138 +338,76 @@ describe('ProjectSettingsView', () => {
     expect(document.activeElement?.closest('[role=alert]')).not.toBeNull()
   })
 
-  it('reads the project again, keeping what was typed, when its export control changed elsewhere (DL-116)', async () => {
-    const shown = project({ allowed_actions: ADMIN })
-    const { wrapper, get } = await mountAt(shown, [
-      project({ ...shown, classification_categories: ['export_controlled'] }),
-    ])
-    vi.spyOn(client, 'PUT').mockResolvedValue(
-      validationFailed([
-        {
-          loc: ['body', 'export_control_confirmed'],
-          message: 'This project is already export-controlled.',
-          type: 'confirmation_not_needed',
-        },
-      ]),
-    )
+  it('reads the project again, keeping what was typed, when its export control changed elsewhere, and saves on the next try (DL-116)', async () => {
+    // Export-controlled through the API (DL-133) when loaded, and removed elsewhere since: the
+    // first save still sends it, as last read.
+    const shown = project({ restriction_categories: ['export_controlled'], allowed_actions: ADMIN })
+    const reloaded = project({ allowed_actions: ADMIN })
+    const { wrapper, get } = await mountAt(shown, [reloaded])
+    const put = vi
+      .spyOn(client, 'PUT')
+      .mockResolvedValueOnce(
+        validationFailed([
+          {
+            loc: ['body', 'export_control_confirmed'],
+            message: 'Confirm that the people involved are authorized for export-controlled data.',
+            type: 'confirmation_required',
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(ok(project({ ...reloaded, restriction_level: 'confidential' })))
     const reads = () => get.mock.calls.filter((c) => c[0] === '/api/projects/{key}').length
     const before = reads()
     // A level the reloaded project doesn't have: a reload that refilled the form would lose it.
-    await wrapper.get('input[type=radio][value=restricted]').setValue(true)
-    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
+    await wrapper.get('input[type=radio][value=confidential]').setValue(true)
     await submitForm(wrapper, 1)
-    const confirm = openDialog(wrapper)!
-    await confirm.get('input[type=checkbox]').setValue(true)
-    await confirm.get('form').trigger('submit')
-    await flushPromises()
 
     expect(reads()).toBe(before + 1)
     expect(
-      wrapper.get<HTMLInputElement>('input[type=radio][value=restricted]').element.checked,
+      wrapper.get<HTMLInputElement>('input[type=radio][value=confidential]').element.checked,
     ).toBe(true)
-    expect(wrapper.text()).toContain('This project is already export-controlled.')
-    expect(
-      wrapper.get<HTMLInputElement>('input[type=checkbox][value=export_controlled]').element
-        .checked,
-    ).toBe(true)
-  })
-
-  it('reads the project again when its explicit members changed since they were confirmed (DL-120)', async () => {
-    const shown = project({ allowed_actions: ADMIN })
-    const { wrapper, get } = await mountAt(shown)
-    vi.spyOn(client, 'PUT').mockResolvedValue(
-      validationFailed([
-        {
-          loc: ['body', 'confirmed_member_ids'],
-          message: "The project's members changed. Confirm them again.",
-          type: 'members_changed',
-        },
-      ]),
-    )
-    const reads = () => get.mock.calls.filter((c) => c[0] === '/api/projects/{key}').length
-    const before = reads()
-    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
-    await submitForm(wrapper, 1)
-    const confirm = openDialog(wrapper)!
-    await confirm.get('input[type=checkbox]').setValue(true)
-    await confirm.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(reads()).toBe(before + 1)
-    expect(wrapper.text()).toContain("The project's members changed. Confirm them again.")
-  })
-
-  it('marks the project export-controlled only once its explicit members are confirmed (DL-114)', async () => {
-    const shown = project({ allowed_actions: ADMIN })
-    const { wrapper } = await mountAt(shown)
-    const put = vi
-      .spyOn(client, 'PUT')
-      .mockResolvedValue(
-        ok(project({ ...shown, classification_categories: ['export_controlled'] })),
-      )
-
-    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
-    await submitForm(wrapper, 1)
-    const confirm = openDialog(wrapper)!
-    expect(put).not.toHaveBeenCalled()
-    expect(confirm.findAll('li').map((li) => li.text().replace(/\s+/g, ' '))).toEqual([
-      'Liam Lead (liam@acme.example)',
-      'Ann Lee (ann@acme.example)',
-      'Dee Gone (dee@acme.example) Deactivated',
-      'Casey Cole (casey@acme.example) (you)',
-    ])
-
-    await confirm.get('input[type=checkbox]').setValue(true)
-    await confirm.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(body(put)).toEqual({
-      level: null,
-      categories: ['export_controlled'],
-      export_control_confirmed: true,
-      confirmed_member_ids: [LEAD, 'u-ann', 'u-dee', ME.id],
-    })
-    expect(wrapper.text()).toContain('Classification saved.')
+    // Not the server's words: this form offers no confirmation (DL-133).
     expect(wrapper.text()).toContain(
-      'Classification: Not classified. Categories: Export-controlled.',
+      "This project's export control changed since you opened it. It has been read again: save again.",
     )
-  })
+    expect(wrapper.text()).not.toContain('Confirm that the people involved')
 
-  it('saves nothing when the export-control confirmation is cancelled', async () => {
-    const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
-    const put = vi.spyOn(client, 'PUT')
-
-    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
     await submitForm(wrapper, 1)
-    await button(openDialog(wrapper) as never, 'Cancel').trigger('click')
-    await flushPromises()
 
-    expect(put).not.toHaveBeenCalled()
+    expect(body(put, 1)).toEqual({ level: 'confidential', categories: [] })
+    expect(wrapper.text()).toContain('Restriction saved.')
   })
 
-  it('confirms removing export control, and sends no confirmation fields', async () => {
-    const shown = project({
-      classification_categories: ['export_controlled'],
-      allowed_actions: ADMIN,
-    })
+  it("offers no export control, and keeps the one it doesn't show (DL-133)", async () => {
+    const shown = project({ restriction_categories: ['export_controlled'], allowed_actions: ADMIN })
     const { wrapper } = await mountAt(shown)
-    const put = vi.spyOn(client, 'PUT').mockResolvedValue(ok(project({ allowed_actions: ADMIN })))
+    const put = vi.spyOn(client, 'PUT').mockResolvedValue(
+      ok(
+        project({
+          ...shown,
+          restriction_level: 'confidential',
+          restriction_categories: ['pii', 'export_controlled'],
+        }),
+      ),
+    )
 
-    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(false)
+    expect(wrapper.find('input[type=checkbox][value=export_controlled]').exists()).toBe(false)
+    await wrapper.get('input[type=radio][value=confidential]').setValue(true)
+    await wrapper.get('input[type=checkbox][value=pii]').setValue(true)
     await submitForm(wrapper, 1)
-    const confirm = openDialog(wrapper)!
-    expect(confirm.get('h2').text()).toBe('Remove export control?')
-    expect(put).not.toHaveBeenCalled()
-    await confirm.get('form').trigger('submit')
-    await flushPromises()
 
-    expect(body(put)).toEqual({ level: null, categories: [] })
+    expect(openDialog(wrapper)).toBeUndefined()
+    expect(body(put)).toEqual({ level: 'confidential', categories: ['pii', 'export_controlled'] })
+    expect(wrapper.text()).toContain('Restriction saved.')
+    expect(wrapper.get('header').text()).toContain(
+      'Confidential · Personal data (PII), Export-controlled',
+    )
   })
 
   it('sends a level change without asking, and says when lowering needs an explicit admin', async () => {
     const shown = project({
-      classification_categories: ['export_controlled'],
-      allowed_actions: ['project.view', 'project.raise_classification'],
+      restriction_categories: ['export_controlled'],
+      allowed_actions: ['project.view', 'project.raise_restriction'],
     })
     const { wrapper } = await mountAt(shown)
     const put = vi.spyOn(client, 'PUT').mockResolvedValue(ok(shown))
@@ -443,11 +416,11 @@ describe('ProjectSettingsView', () => {
       'Lowering its level or removing a category needs one of its explicit project admins.',
     )
     expect(wrapper.find('#project-settings-name').exists()).toBe(false)
-    await wrapper.get('input[type=radio][value=restricted]').setValue(true)
+    await wrapper.get('input[type=radio][value=confidential]').setValue(true)
     await submitForm(wrapper, 0)
 
     expect(openDialog(wrapper)).toBeUndefined()
-    expect(body(put)).toEqual({ level: 'restricted', categories: ['export_controlled'] })
+    expect(body(put)).toEqual({ level: 'confidential', categories: ['export_controlled'] })
   })
 
   it('archives only once confirmed, then offers Unarchive on the same, focused button', async () => {
@@ -472,6 +445,24 @@ describe('ProjectSettingsView', () => {
     expect(wrapper.text()).toContain('This project is archived. It is read-only.')
     expect(archive.text()).toBe('Unarchive project')
     expect(document.activeElement).toBe(archive.element)
+  })
+
+  it('puts archiving in a Danger zone, its confirm on the danger button (UI-FRM-14, DL-137)', async () => {
+    const { wrapper } = await mountAt(
+      project({ allowed_actions: ['project.view', 'project.archive'] }),
+    )
+
+    const zone = wrapper.get('section[aria-labelledby=project-danger-heading]')
+    expect(zone.get('h2').text()).toBe('Danger zone')
+    expect(zone.get('h3').text()).toBe('Archive')
+    expect(zone.classes()).toContain('border-tone-danger-edge')
+    const archive = button(wrapper, 'Archive project')
+    await archive.element.closest('form')!.dispatchEvent(new Event('submit'))
+    await flushPromises()
+    const confirm = openDialog(wrapper)!
+    const confirmButton = confirm.findAll('button').find((b) => b.text() === 'Archive project')!
+    expect(confirmButton.classes()).toContain('bg-danger')
+    await expectNoA11yViolations(wrapper)
   })
 
   it('unarchives without asking', async () => {
@@ -523,38 +514,6 @@ describe('ProjectSettingsView', () => {
     expect(hidden.get('h1').text()).toBe('Page not found')
   })
 
-  it('confirms every explicit member, across pages of the member list', async () => {
-    const shown = project({ allowed_actions: ADMIN })
-    const { wrapper, get } = await mountAt(shown, [], 3)
-    const put = vi.spyOn(client, 'PUT').mockResolvedValue(ok(shown))
-    get.mockClear()
-
-    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
-    await submitForm(wrapper, 1)
-    const confirm = openDialog(wrapper)!
-    await confirm.get('input[type=checkbox]').setValue(true)
-    await confirm.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(confirm.findAll('li')).toHaveLength(4)
-    expect(body(put)).toMatchObject({ confirmed_member_ids: [LEAD, 'u-ann', 'u-dee', ME.id] })
-  })
-
-  it("says so when the members can't be loaded, and asks nothing", async () => {
-    const { wrapper, get } = await mountAt(project({ allowed_actions: ADMIN }))
-    get.mockResolvedValue(failed(503, { code: 'network_error', message: '', details: {} }))
-    const put = vi.spyOn(client, 'PUT')
-
-    await wrapper.get('input[type=checkbox][value=export_controlled]').setValue(true)
-    await submitForm(wrapper, 1)
-
-    expect(openDialog(wrapper)).toBeUndefined()
-    expect(put).not.toHaveBeenCalled()
-    expect(document.activeElement?.closest('[role=alert]')?.textContent).toContain(
-      "We couldn't reach the server.",
-    )
-  })
-
   it('on a 403 that took the edit away, keeps what was typed in the other form', async () => {
     const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }), [
       project({ allowed_actions: ['project.view', 'project.update'] }),
@@ -564,7 +523,7 @@ describe('ProjectSettingsView', () => {
     )
 
     await wrapper.get('#project-settings-name').setValue('Typed name')
-    await wrapper.get('input[type=radio][value=restricted]').setValue(true)
+    await wrapper.get('input[type=radio][value=confidential]').setValue(true)
     await submitForm(wrapper, 1)
 
     expect(wrapper.get<HTMLInputElement>('#project-settings-name').element.value).toBe('Typed name')
@@ -630,7 +589,7 @@ describe('ProjectSettingsView', () => {
     )
 
     expect(wrapper.find('#project-details-heading').exists()).toBe(true)
-    expect(wrapper.find('#project-classification-heading').exists()).toBe(false)
+    expect(wrapper.find('#project-restriction-heading').exists()).toBe(false)
     expect(wrapper.find('#project-archive-heading').exists()).toBe(false)
   })
 })

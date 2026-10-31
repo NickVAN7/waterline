@@ -81,13 +81,17 @@ tested, what each kind of test is for, and the gates every change passes.
   - Hypothesis uses a fixed database of examples in CI (`derandomize` in CI profile) so runs are
     reproducible.
 - **Concurrency:** truly parallel transactions for number allocation, optimistic locking
-  (second save gets 409), the one-active-sprint rule, and approval completion.
+  (second save gets 409), the one-active-sprint rule, one pending approval request per
+  requirement (the second create gets 422 `pending_exists`, DL-229), and approval completion.
 - **Approvals** (Slice 2 for requirements, Slices 4–5 for gates and test runs):
   - completion moves a requirement to `approved`, a gate to `approved`, and a test run to
-    `completed`; a rejection changes nothing on the entity;
+    `completed`; a rejection changes nothing on the entity, except a rejected re-open round,
+    which moves an approved requirement back to `draft` (a gate's milestone back to
+    `in_progress`), while a rejected re-approval of an "Approved · modified" requirement
+    changes nothing (DL-195);
   - requests log `created` and every status change, including a cancellation caused by
-    deleting a requirement, by a project admin approving the requirement by hand, or by
-    cancelling a test run;
+    deleting a requirement, by a project admin approving the requirement by hand, by archiving
+    the project (every pending request, DL-194), or by cancelling a test run;
   - manual requirement approval (design-doc §5): a project admin (including inherited) moving
     a requirement into `approved` sets `approved_revision_id` to the current revision,
     `approved_by` to that admin, and `approved_at`, and cancels a pending request; members get
@@ -95,7 +99,7 @@ tested, what each kind of test is for, and the gates every change passes.
     `approved_revision_id` are logged;
   - eligibility (design-doc §6.2): a viewer can be named; someone without project access is
     rejected with 404 (on an export-controlled project, an inherited admin without an explicit
-    membership too);
+    membership too); a deactivated one, a repeated one, none, or more than 50 with 422 (DL-226);
   - replacement of an approver who loses the access needed to decide, once for each path
     (project membership removed directly, with an org removal, and with a workspace removal;
     the org or workspace membership or role that gave inherited admin removed or changed;
@@ -106,11 +110,8 @@ tested, what each kind of test is for, and the gates every change passes.
     when the requester no longer holds project admin; decided rows are never replaced;
     `replaced` rows don't count toward the policy; the change is logged (`approver_id`, old and
     new user IDs, `changed_by` the actor, null from the CLI);
-  - no replacement in an archived project, on each path that still takes access away there
-    (removal from the org or workspace with their projects; an org or workspace role change or
-    removal; `revoke-system-admin`; deactivation): the access is removed, the approver's row
-    stays pending, and the request is flagged; removing a project member directly is still
-    denied there;
+  - archiving a project cancels its pending requests (DL-194), and unarchiving doesn't
+    reopen them; removing a project member directly is still denied in an archived project;
   - a replacement that leaves every counted row approved completes the request (`approved_by`
     the counted approver with the latest `decided_at`; the `status` change logged; the
     entity's `on_approved` effect applied);
@@ -121,7 +122,9 @@ tested, what each kind of test is for, and the gates every change passes.
   per table; the tech-debt log's format, references, and deadlines; the decision log's format and
   references; every `audit-allowlist.toml` entry names an open tech-debt entry; the developer
   guide's status line vs. `git log`; design-doc § references; the agents and skills listed vs. those
-  in `.claude/`. Parsers are strict: a doc that loses the structure they expect fails the test
+  in `.claude/`; from Slice 2 on, the review records (the latest checkpoint's record exists, a C0
+  or C0a record before C1, and a `## simplicity-auditor` heading in the slice's last record;
+  DL-138, DL-165). Parsers are strict: a doc that loses the structure they expect fails the test
   instead of passing by finding nothing. The column check runs per column: a documented column whose
   Notes cell starts with `Added in Slice <n>.` (schema-doc conventions) is reported as **skipped**
   (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished (its last checkpoint, or any
@@ -141,9 +144,11 @@ tested, what each kind of test is for, and the gates every change passes.
   - end-to-end tests run inside `wl check --full` (`wl e2e`, on an isolated seeded stack; DL-65,
     DL-99), which CI runs;
   - for each SVAR widget wrapper (from the first checkpoint that ships a board or an editable
-    grid; DL-64): a theme audit in both themes and in the interactive states that fails on any
+    grid; DL-64) and for `RequirementsTree`, the TreeTable wrapper (DL-174): a theme audit in both themes and in the interactive states that fails on any
     color that is not one of our tokens, and keyboard and move/cancel specs that drive the
-    non-drag alternative with the server mocked to allow and to deny (ui-design-guide §7.1, §9);
+    non-drag alternative with the server mocked to allow and to deny (ui-design-guide §7.1, §9;
+    `RequirementsTree`'s keyboard and move specs are component specs, and its theme audit runs
+    end to end with the requirements page from S2-C17, DL-243);
   - a manual keyboard and screen-reader pass on each slice's new screens at slice
     verification, since automated checks find only part of the problems.
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):
@@ -167,17 +172,20 @@ tested, what each kind of test is for, and the gates every change passes.
     description, status, and lead is a project-admin action.
   - Personal actions (design-doc §5): rows for each, with every admin level (system admin
     included) and every project role denied, the relationship rule allowing it only for a user
-    with content access to the project, and the relationship without that access denied.
-  - Classification (design-doc §3.1, Slice 1): removing `export_controlled`, and on an
+    with content access to the project, and the relationship without that access denied; for
+    `approval.decide`, a named approver whose own row is decided or `replaced` denied too
+    (DL-234).
+  - Restriction (design-doc §3.1, Slice 1; "classification" until S2-C0d, DL-134):
+    removing `export_controlled`, and on an
     export-controlled project lowering the level or removing any category, is refused for an
     inherited admin and allowed for an explicit project admin; every member-add path (picker,
     email-first add, creating a user for the project), marking a project export-controlled,
     and creating one export-controlled require the confirmation (422 without it);
-    classification changes record their audit event.
+    restriction changes record their audit event.
   - The export-control gate (design-doc §5, Slice 2 onward): on an export-controlled project,
     inherited admins without an explicit membership get 404 for every content action, read or
     mutation, and are allowed management actions; explicit members are allowed.
-  - Effective classification (Hypothesis property): never lower than the project's level, and
+  - Effective restriction (Hypothesis property): never lower than the project's level, and
     its categories are always a superset of the project's.
   - Access to a project, org, or workspace the user can't see returns 404, never 403 or data;
     list endpoints return only the user's accessible projects and orgs.

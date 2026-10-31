@@ -139,6 +139,8 @@ export const overrides = {
   // semantic `formField`, `overlay.select`, and `list.option` above. Its `dropdown` and `chip`
   // tokens are still Aura's: map them here before using `dropdown` or `multiple` (UI-STY-6).
   components: {
+    // The requirement tree (S2-C15): Aura's border is `{surface.800}` in dark, off our tokens.
+    treetable: { root: { borderColor: token('border-subtle') } },
     button: {
       root: {
         primary: buttonSeverity('accent', 'accent-hover', 'on-accent'),

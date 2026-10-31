@@ -18,8 +18,8 @@ Calls flow **routers → services → repositories → models**. Services also u
 - **Models:** tables only; they are the domain entities.
 - **`rules/`:** pure logic with no database access (transition tables, approval policy).
 - Files are named by aggregate and the name repeats in every layer (`models/task.py`,
-  `schemas/task.py`, `repositories/task.py`, `services/task.py`, `routers/task.py`,
-  `authz/policies/task.py`).
+  `schemas/task.py`, `repositories/task.py`, `services/task.py`, `routers/task.py`); every
+  area's actions are registered in the one registry, `authz/actions.py` (DL-151).
 
 ## Cross-area rules
 
@@ -68,8 +68,17 @@ Calls flow **routers → services → repositories → models**. Services also u
   twice (S1-C10 review: two deactivations, two events).
 - **A check that *another* row exists before a write that depends on it** (only an org member
   or staff may join a project) holds that row `FOR SHARE` until commit, taken before the
-  target's lock, with a race test against the change that removes it (S1-C12 review: three
-  passes found an add slipping past a removal "with their projects").
+  target's lock unless the target is a project, with a race test against the change that removes
+  it (S1-C12 review: three passes found an add slipping past a removal "with their projects").
+- **Projects are locked first** (DL-235): a transaction that locks a project row takes it before
+  any user or membership row, projects in ID order. A path that takes away someone's access
+  locks their projects (pending approvals and requests) before changing anything, then looks
+  again and locks any project a request created meanwhile; a removal "with their projects" also
+  locks the project of a membership added while it waited. Those are the only places a project
+  is locked after a person's rows (TD-83).
+- **No recursion that deepens with input length** (a string a user can lengthen, a tree a
+  user can deepen): Python stops at about 1,000 levels, so a long enough input is a 500. Use a
+  loop (S2-C2 security review: the rank midpoint).
 - **`authorize()` fails closed.** New actions are registered explicitly; unknown actions are
   denied. Entities a user can't see return **404**, not 403.
 - **`app/authz/` never queries.** It decides from the `AuthzContext` and the `Target`; loading
@@ -81,7 +90,8 @@ Calls flow **routers → services → repositories → models**. Services also u
   → visible actions (anyone who sees the target; never a project content action, DL-58) → system
   admin → workspace owner/admin → org role (owner/admin; member only for `project.create`) → project
   role → targeted rules. From S1-C13, every registered action is marked content or management; the
-  export-control gate that uses the marking is built in Slice 2 (design-doc §3.1). **Personal
+  export-control gate in `authorize()` uses the marking (design-doc §3.1; S2-C4), and a list of
+  content across projects takes `content_scope(ctx)`. **Personal
   actions** (e.g. `approval.decide`) are checked before the admin levels and never granted by them:
   only the relationship rule (e.g. the named approver) allows one, and only for a user with content
   access to the project.
@@ -97,12 +107,16 @@ Calls flow **routers → services → repositories → models**. Services also u
   literals.
 - **Numbers** come only from the numbering service (`project_counter`,
   `task.next_subtask_number`). Never compute `MAX(number)+1`.
-- **Rank and counter writes bypass optimistic locking** via the direct-update helper; content
-  edits go through the ORM so `version` is checked (stale → 409, or 404 if the row is gone).
+- **Rank, counter, and restriction writes, a requirement's parent change (a move, a delete's
+  promote, a restore at the top level), and a new item's first revision pointer, bypass
+  optimistic locking** via the direct-update helper (DL-168, DL-207, DL-214, DL-215); content edits go through the ORM so `version` is checked (stale → 409, or 404 if the
+  row is gone).
 - **Soft delete** is filtered globally; opt in explicitly for trash/restore queries.
 - **Immutable:** project `key`, `project_id` on requirements/tasks/test cases, `task_id` on
   subtasks.
-- **Markdown** is sanitized on render, never trusted.
+- **Markdown** is stored and returned as-is and never rendered by the backend: the browser
+  renders and sanitizes it (`MarkdownView`, design-doc §3, DL-140). A server-side renderer
+  (`markdown-it-py` and `nh3`) arrives only when something server-side shows content.
 
 ## Models
 
@@ -111,14 +125,19 @@ Calls flow **routers → services → repositories → models**. Services also u
 - A model that defines `__mapper_args__` must merge `TimestampMixin.__mapper_args__`
   (`{**TimestampMixin.__mapper_args__, ...}`); replacing it drops `eager_defaults`.
 - Leave constraint `name=` off (the naming convention names them), except a short name for
-  CHECK constraints. Import every model module in `app/models/__init__.py`.
+  CHECK constraints, and a name the convention would make longer than Postgres's 63
+  characters (a test fails on one). Import every model module in `app/models/__init__.py`.
 - A new parent and child added without a `relationship()` between them: flush the parent first.
 - Mixins: `SoftDeleteMixin` for `deleted_at`, `VersionMixin` for `version` — listed **before**
   `BaseModel` (`class Task(VersionMixin, SoftDeleteMixin, BaseModel)`). Enum columns use
   `enum_type(MyEnum, "<column>")`, with the `StrEnum` defined outside SQLAlchemy code.
 - Every update to a versioned entity calls `check_version(entity, payload.version)` before
-  changing it. Rank and counter writes use `direct_update` (no version bump), passing
-  `touch_updated_at=False` for rank writes and `True` for counters.
+  changing it, except a restriction change (DL-168). Rank, counter, and restriction writes, and
+  the first revision pointer set at creation (DL-207), and a requirement's parent change (DL-214,
+  DL-215), use
+  `direct_update` (no version bump), passing `touch_updated_at=False` for rank writes and `True`
+  for counters, an item's own restriction change, and a parent change, `False`
+  for items lifted by a project raise and for the first revision pointer (DL-210, DL-214).
 - Trash/restore queries opt in with `.execution_options(include_deleted=True)`; nothing else
   does.
 
@@ -171,7 +190,9 @@ Calls flow **routers → services → repositories → models**. Services also u
   use the `concurrency` fixture and `@pytest.mark.concurrency("<table>", ...)`. In a race test, a task
   running inside the task group records its outcome and the test asserts after the group closes:
   a failure inside the group stops the other transaction's commit and leaves rows that break later
-  tests (S1-C11 review; TD-30). Tests only
+  tests (S1-C11 review; TD-30). A test of lock *order* takes the first transaction's steps by
+  hand and pauses between them: `race()` runs the first to its end, so a lock taken late passes
+  as one taken early (S2-C13 review). Tests only
   ever use the test database (`waterline_test`, a pytest-xdist worker's copy of it, DL-100, or a
   `scratch_database` created from it for one test); never point a test at the dev database.
   Tests run in parallel, in any order: no test may depend on another's state.

@@ -80,6 +80,7 @@ watch(
   },
   { immediate: true },
 )
+query.returnWhenEmpty(page.data)
 const status = computed(() => page.error.value?.status)
 const notFound = computed(() => props.hidden && status.value === 404)
 const refused = computed(() => !props.allowed || status.value === 404 || status.value === 403)
@@ -152,7 +153,6 @@ const announcement = computed(() => {
   <NotFoundView v-if="notFound" />
   <ForbiddenView v-else-if="refused" :who-to-ask="whoToAsk" />
   <div v-else class="flex flex-col gap-6">
-    <slot name="nav" />
     <slot name="header" :add="() => adder?.open()">
       <PageHeader :title="title">
         <Button v-if="canAdd" @click="adder?.open()">Add person</Button>

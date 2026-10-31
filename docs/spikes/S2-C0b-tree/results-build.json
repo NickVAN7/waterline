@@ -1,0 +1,610 @@
+{
+  "svar": {
+    "renderMs": 180,
+    "semantics": {
+      "gridRole": "treegrid",
+      "gridName": null,
+      "rowsInDom": 500,
+      "levels": [
+        "1",
+        "2",
+        "3"
+      ],
+      "leafExpanded": null,
+      "rowindexMin": 0,
+      "headerRowindex": null,
+      "setsizePosinset": false,
+      "cellRole": "gridcell",
+      "tabStops": 1
+    },
+    "axe": [
+      "aria-valid-attr-value (critical, 1 nodes)"
+    ],
+    "keyboard": {
+      "tabIntoWidget": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Area 1RQ-1in_review",
+        "inWidget": true
+      },
+      "arrowDown": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Area 1.1 requirementRQ-2approv",
+        "inWidget": true
+      },
+      "arrowUp": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Area 1RQ-1in_review",
+        "inWidget": true
+      },
+      "arrowLeftOnOpenParent": {
+        "focus": {
+          "tag": "div",
+          "role": "gridcell",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "true"
+        },
+        "rows": 500
+      },
+      "arrowRightOnClosedParent": {
+        "focus": {
+          "tag": "div",
+          "role": "gridcell",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "true"
+        },
+        "rows": 500
+      },
+      "enter": {
+        "focus": {
+          "tag": "div",
+          "role": "gridcell",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "false",
+          "selected": "true"
+        },
+        "rows": 476
+      },
+      "space": {
+        "focus": {
+          "tag": "div",
+          "role": "gridcell",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "true"
+        }
+      },
+      "tabOut": {
+        "tag": "body",
+        "role": null,
+        "text": "Requirements (svar)Move upMove",
+        "inWidget": false
+      }
+    },
+    "licenseNotice": 0,
+    "errors": [],
+    "theme_light": {
+      "tokensResolved": 36,
+      "unmapped": {}
+    },
+    "axe_light_selected": [
+      "aria-valid-attr-value (critical, 1 nodes)"
+    ],
+    "theme_dark": {
+      "tokensResolved": 38,
+      "unmapped": {}
+    },
+    "axe_dark_selected": [
+      "aria-valid-attr-value (critical, 1 nodes)"
+    ],
+    "menuMoveAllowed": {
+      "before": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "dataAfter": [
+        1,
+        2,
+        4,
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        4,
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "focusAfter": "Detail 1.1.1RQ-3rejected"
+    },
+    "menuMoveDenied": {
+      "before": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "dataAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "message": "You can’t move this requirement.",
+      "focusAfter": "Move down"
+    },
+    "dragAllowed": {
+      "dataAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "events": []
+    },
+    "dragDenied": {
+      "dataAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "events": []
+    },
+    "rowsAtCap": 2000,
+    "renderMsAtCap": 290,
+    "renderMsAtCapClosed": 104,
+    "moveMsAtCap": 120
+  },
+  "prime": {
+    "renderMs": 625,
+    "semantics": {
+      "gridRole": "treegrid",
+      "gridName": null,
+      "rowsInDom": 500,
+      "levels": [
+        "1",
+        "2",
+        "3"
+      ],
+      "leafExpanded": null,
+      "rowindexMin": null,
+      "headerRowindex": null,
+      "setsizePosinset": true,
+      "cellRole": "cell",
+      "tabStops": 1
+    },
+    "axe": [
+      "button-name (critical, 100 nodes)"
+    ],
+    "keyboard": {
+      "tabIntoWidget": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Area 1RQ-1in_review",
+        "inWidget": true
+      },
+      "arrowDown": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Area 1.1 requirementRQ-2approv",
+        "inWidget": true
+      },
+      "arrowUp": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Area 1RQ-1in_review",
+        "inWidget": true
+      },
+      "arrowLeftOnOpenParent": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "false",
+          "selected": "false"
+        },
+        "rows": 476
+      },
+      "arrowRightOnClosedParent": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1.1 requirementRQ-2approv",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "false"
+        },
+        "rows": 500
+      },
+      "enter": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1.1 requirementRQ-2approv",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "false"
+        },
+        "rows": 500
+      },
+      "space": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1.1 requirementRQ-2approv",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "false"
+        }
+      },
+      "tabOut": {
+        "tag": "body",
+        "role": null,
+        "text": "Requirements (prime)Move upMov",
+        "inWidget": false
+      }
+    },
+    "licenseNotice": 0,
+    "errors": [],
+    "theme_light": {
+      "tokensResolved": 36,
+      "unmapped": {}
+    },
+    "axe_light_selected": [
+      "button-name (critical, 100 nodes)"
+    ],
+    "theme_dark": {
+      "tokensResolved": 38,
+      "unmapped": {
+        "border-bottom-color: rgb(39, 39, 42)": "th.p-treetable-header-cell"
+      }
+    },
+    "axe_dark_selected": [
+      "button-name (critical, 100 nodes)"
+    ],
+    "menuMoveAllowed": {
+      "before": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "dataAfter": [
+        1,
+        2,
+        4,
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        4,
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "focusAfter": "Detail 1.1.1RQ-3rejected"
+    },
+    "menuMoveDenied": {
+      "before": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "dataAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "message": "You can’t move this requirement.",
+      "focusAfter": "Move down"
+    },
+    "rowsAtCap": 2000,
+    "renderMsAtCap": 2138,
+    "renderMsAtCapClosed": 217,
+    "moveMsAtCap": 55,
+    "moveMsAtCapRebuilt": 918
+  },
+  "prime_fixed": {
+    "renderMs": 657,
+    "semantics": {
+      "gridRole": "treegrid",
+      "gridName": "Requirements",
+      "rowsInDom": 500,
+      "levels": [
+        "1",
+        "2",
+        "3"
+      ],
+      "leafExpanded": null,
+      "rowindexMin": null,
+      "headerRowindex": null,
+      "setsizePosinset": true,
+      "cellRole": "cell",
+      "tabStops": 1
+    },
+    "axe": [],
+    "keyboard": {
+      "tabIntoWidget": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Area 1RQ-1in_review",
+        "inWidget": true
+      },
+      "arrowDown": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Area 1.1 requirementRQ-2approv",
+        "inWidget": true
+      },
+      "arrowUp": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Area 1RQ-1in_review",
+        "inWidget": true
+      },
+      "arrowLeftOnOpenParent": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "false",
+          "selected": "false"
+        },
+        "rows": 476
+      },
+      "arrowRightOnClosedParent": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "false"
+        },
+        "rows": 500
+      },
+      "enter": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "true"
+        },
+        "rows": 500
+      },
+      "space": {
+        "focus": {
+          "tag": "tr",
+          "role": "row",
+          "text": "Area 1RQ-1in_review",
+          "inWidget": true
+        },
+        "row": {
+          "expanded": "true",
+          "selected": "true"
+        }
+      },
+      "tabOut": {
+        "tag": "body",
+        "role": null,
+        "text": "Requirements (prime)Move upMov",
+        "inWidget": false
+      }
+    },
+    "licenseNotice": 0,
+    "errors": [],
+    "theme_light": {
+      "tokensResolved": 36,
+      "unmapped": {}
+    },
+    "axe_light_selected": [],
+    "theme_dark": {
+      "tokensResolved": 38,
+      "unmapped": {}
+    },
+    "axe_dark_selected": [],
+    "menuMoveAllowed": {
+      "before": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "dataAfter": [
+        1,
+        2,
+        4,
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        4,
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "focusAfter": "Detail 1.1.1RQ-3rejected"
+    },
+    "menuMoveDenied": {
+      "before": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "dataAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenAfter": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "screenEqualsData": true,
+      "message": "You can’t move this requirement.",
+      "focusAfter": "Move down"
+    }
+  }
+}

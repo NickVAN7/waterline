@@ -33,9 +33,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   `schema.d.ts` by hand.
 - **The server is authoritative.** The UI may hide actions a user can't take, but never assumes
   it's enforcing permissions. Don't duplicate business rules; e.g. rank is computed by the
-  server (send neighbor IDs, not rank values), and transitions are validated by the server. One
-  exception: the `PasswordRequirements` list checks the requirements the server publishes as the
-  user types (DL-91).
+  server (send neighbor IDs, not rank values), and transitions are validated by the server. Two
+  exceptions: the `PasswordRequirements` list checks the requirements the server publishes as the
+  user types (DL-91), and the add-person flow checks an email's shape before its user check
+  (`useFormErrors`' `invalidate`; UI-FRM-4, UI-FRM-13).
 - **Handle the error format** (`{code, message, details}`) consistently: 409 → prompt to
   reload; 404 → `NotFoundView` in place (see `ProjectHomeView`); 422 → field errors from `details.fields`
   (`loc`, `message`, `type` per field). Forms use `useFormErrors` for all of this. A 401 and a
@@ -43,7 +44,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   (`src/app/session.ts`); a view never handles them itself.
 - **Requests:** same origin through the Vite proxy (`/api`), `credentials: 'include'`, JSON
   bodies only.
-- **Rendered markdown** is sanitized before display.
+- **Rendered markdown** goes only through `MarkdownView` (from S2-C16): `markdown-it` with raw
+  HTML off, then DOMPurify; never `v-html` on anything else. No remote images, links only
+  `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
+  ui-design-guide UI-MD-1).
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
   slug change to the new URL; a null org is the not-found page.
@@ -60,10 +64,11 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   shown only after about 300 ms (fast loads don't flash), on a region with `aria-busy="true"`,
   with any shimmer off under `prefers-reduced-motion`. Actions such as saving a form show a
   pending state on the control itself, not a skeleton.
-- An enabled module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7)
-  shows its features and links greyed out or disabled (design-doc §1.1), never as broken
-  screens. Whether a module is available comes from the API's module guidance (`available`),
-  never a frontend list.
+- A module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7) can't be
+  enabled (from S2-C0d, DL-136; design-doc §1.1): the API refuses it (422 `module_unavailable`)
+  and the UI shows a disabled checkbox with "Not available yet", never a broken screen. Whether
+  a module is available comes from the API's module guidance (`available`), never a frontend
+  list.
 
 ## UI
 
@@ -84,8 +89,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - Forms: visible labels; the server validates; a 422 shows inline errors, moves focus to the
   first invalid field, and has no summary box; a required field has the red asterisk; the submit
   button is `aria-disabled` while pending, never `disabled` (UI-FRM-2, UI-FRM-4 to 8).
-- Actions: hide what a user may never do (`allowed_actions`); disable with a visible reason what
-  state blocks; never use opacity for disabled (UI-TOK-10).
+- Actions: hide what a user may never do (`allowed_actions`, which also leaves out what the
+  entity's state rules out for good, DL-232); disable with a visible reason what state blocks; never use opacity for disabled (UI-TOK-10).
 - An error is never only in a toast. A toast never takes focus or covers the focused element
   (UI-FBK-1, UI-FBK-9, UI-FBK-10). An alert that reports an event has a dismiss button; a
   persistent banner does not (UI-FBK-13).
@@ -132,6 +137,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   keyed by id: names aren't unique (UI-FBK-6; S1-C16a review).
 - A dialog component is mounted once per page: two copies share their fields' ids, so each label
   names both fields (S1-C16).
+- A page with more than one paged list names each `Pagination` after its list (`label`,
+  "Archived pagination"): two landmarks never share a name (UI-TBL-3; S2-C0g review).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).
@@ -142,14 +149,37 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A confirmation the client sends (`export_control_confirmed`) comes from the current server state
   as well as the box: a reload can take the box away while it's still ticked (DL-116; S1-C16c
   review).
+- A save that sends only the changed fields compares them with the values the form was filled
+  from, never with data loaded since (another section's save, a background reload, a `/me`
+  reload): a field the form still shows the old value of would undo the newer one (TD-56; S2-C0h
+  review).
+- State that outlives a step of a multi-step dialog (an edited username, a confirmation box) is
+  the dialog's, reset in `open()`, not a child's that a `v-if` unmounts; a confirmation is
+  cleared whenever the identity it confirms changes, the email included (UI-FRM-13, design-doc
+  §3.1; S2-C0h review).
+- A value a form keeps but doesn't render (project settings' `export_controlled`, DL-133) is sent
+  from the latest server data on every save, never from the form: a reload that keeps what was
+  typed would bring a stale one back, and no control could remove it (S2-C0d review).
 - A dialog's search or lookup that fails says so at its own field, not in the form's alert, whose
   Retry and dismiss belong to the submit (UI-FRM-7; S1-C16b review).
+- A PrimeVue list that can scroll (an `AutoComplete` opened on focus) scrolls its listbox, the
+  element the combobox controls (`scroll-height="none"`, and `pt.list`'s `max-h-56
+overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not PrimeVue's
+  unnamed container (S2-C0h e2e).
 - A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets
   `append-to="self"`: the page behind a `showModal()` dialog is inert, so an overlay appended to
   `<body>` can't be used (S1-C16b).
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.
+- A PrimeVue table's selected-row bar goes on the row's first cell, and only on the selected
+  row: its tables use `border-collapse: separate`, where a `tr`'s border isn't drawn, and forced
+  colors draw a transparent border. A class check in jsdom can't show the bar is drawn
+  (UI-TOK-9; S2-C15 review).
+- A blocked PrimeVue menu item is `aria-disabled` through `pt.item`, in the disabled tokens on
+  `pt.itemContent` (which sets its own color over the item's), and
+  stays focusable, its command doing nothing: a `disabled` item is skipped by the arrow keys and
+  faded with opacity, so the keyboard never reaches its reason (UI-TOK-10; S2-C15 review).
 
 ## Tests
 
@@ -179,6 +209,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - An e2e step after a dialog closes waits for the dialog to be hidden and focus to be back on
   its opener before it moves focus: the close event returns focus a task later, and would take
   it back (S1-C16b).
+- A mocked 422 has the server's real shape: the top-level `message` is "The request is invalid.",
+  and the reason is in `details.fields` (S2-C15 review).
 - Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
   `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
   not `getByLabel`: the label's text includes the required asterisk, the accessible name

@@ -113,11 +113,13 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   `backend/app/rules/` or `backend/app/authz/`, before the implementation.
 - `migration` — for every schema change.
 - `new-area` — for a new aggregate, or a new endpoint or action in an existing one.
+- `vue-screen` — for every new or reshaped screen or dialog in `frontend/src/views/`.
 - `checkpoint` — to close every checkpoint; it runs `security-reviewer` (when the build plan
   names the checkpoint for it, or the diff touches security-relevant code), then
   `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a temporary copy), then
   `ui-reviewer` (when the diff touches `frontend/src/` or `frontend/e2e/`), then
-  `fresh-clone-verifier`, `docs-consistency`, and `repo-auditor` (last checkpoint of a slice).
+  `fresh-clone-verifier`, `user-guide-verifier`, `docs-consistency`, and `repo-auditor` (last
+  checkpoint of a slice), then `simplicity-auditor` (DL-138).
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).

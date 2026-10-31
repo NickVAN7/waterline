@@ -7,7 +7,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { DEACTIVATED, SYSTEM_ADMIN } from '@/app/labels'
+import { ACTIVE, DEACTIVATED, USER, workspaceRoleText } from '@/app/labels'
 import { focusHeading, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -25,7 +25,6 @@ import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import AccountActions from '@/views/user/AccountActions.vue'
 
 import { WHO_TO_ASK } from './workspaceAdmin'
-import WorkspaceNav from './WorkspaceNav.vue'
 
 const workspace = useWorkspace()
 const store = useCurrentUserStore()
@@ -50,6 +49,7 @@ watch(
   },
   { immediate: true },
 )
+list.returnWhenEmpty(page.data)
 watch(
   () => page.error.value?.status === 404,
   (gone) => {
@@ -83,7 +83,6 @@ const announcement = computed(() => {
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <WorkspaceNav />
     <PageHeader title="Users" />
     <p class="m-0 text-text-muted">
       People join through Staff or an organization's members; their accounts are managed here.
@@ -112,7 +111,8 @@ const announcement = computed(() => {
                 <th scope="col" class="p-2">Name</th>
                 <th scope="col" class="p-2">Email</th>
                 <th scope="col" class="p-2">Username</th>
-                <th scope="col" class="p-2">System admin</th>
+                <th scope="col" class="p-2">Role</th>
+                <th scope="col" class="p-2">Status</th>
                 <th scope="col" class="p-2"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -122,27 +122,18 @@ const announcement = computed(() => {
                 :key="user.id"
                 class="border-b border-border-subtle"
               >
-                <td class="p-2">
-                  <span class="flex flex-wrap items-center gap-2">
-                    {{ user.name }}
-                    <Badge
-                      v-if="!user.is_active"
-                      :tone="DEACTIVATED.tone"
-                      :icon="DEACTIVATED.icon"
-                      >{{ DEACTIVATED.label }}</Badge
-                    >
-                  </span>
-                </td>
+                <td class="p-2">{{ user.name }}</td>
                 <td class="p-2">{{ user.email }}</td>
                 <td class="p-2 font-mono">{{ user.username }}</td>
                 <td class="p-2">
-                  <Badge
-                    v-if="user.is_system_admin"
-                    :tone="SYSTEM_ADMIN.tone"
-                    :icon="SYSTEM_ADMIN.icon"
-                    >{{ SYSTEM_ADMIN.label }}</Badge
-                  >
-                  <span v-else>No</span>
+                  <!-- The staff role and system admin as text, or "User" with neither (DL-188). -->
+                  {{ workspaceRoleText(user.workspace_role, user.is_system_admin, USER) }}
+                </td>
+                <td class="p-2">
+                  <Badge v-if="!user.is_active" :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{
+                    DEACTIVATED.label
+                  }}</Badge>
+                  <template v-else>{{ ACTIVE }}</template>
                 </td>
                 <td class="p-2 text-right">
                   <RowActions :name="user.name" :actions="account?.actionsFor(user) ?? []" />

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Your own name and username (`PATCH /api/me`; build plan, "The account API"). The email isn't
-// yours to change in v1 (design-doc §4), so it's shown, not edited.
+// yours to change in v1 (design-doc §4), so it's shown, not edited. Only the fields changed are
+// sent, so an admin's edit to the other since the page loaded stands (TD-56).
 import { nextTick, ref } from 'vue'
 
 import { api, client } from '@/api/client'
@@ -14,6 +15,9 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 const store = useCurrentUserStore()
 
 const values = ref({ name: store.me?.user.name ?? '', username: store.me?.user.username ?? '' })
+// What the form was filled from: a save sends what differs from it, not from a `/me` reloaded
+// since, whose newer values the form doesn't show (TD-56).
+let base = { ...values.value }
 const pending = ref(false)
 const status = ref('')
 const done = ref('')
@@ -39,7 +43,12 @@ async function submit() {
   pending.value = true
   status.value = 'Saving your profile…'
   try {
-    const user = await api(client.PATCH('/api/me', { body: values.value }))
+    const body: { name?: string; username?: string } = {}
+    for (const field of ['name', 'username'] as const) {
+      if (values.value[field] !== base[field]) body[field] = values.value[field]
+    }
+    const user = await api(client.PATCH('/api/me', { body }))
+    base = { name: user.name, username: user.username }
     if (store.me) store.me = { ...store.me, user }
     status.value = ''
     done.value = 'Profile saved.'

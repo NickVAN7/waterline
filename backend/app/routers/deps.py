@@ -3,26 +3,42 @@ authorization context, and load-and-authorize (`authorized`)."""
 
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Cookie, Depends, Request
+from fastapi import Cookie, Depends, Request, status
 
 from app.authz.authorize import authorize, ensure, module_enabled
 from app.authz.context import AuthzContext
 from app.authz.target import Target, org_target, workspace_target
 from app.core.db import SessionDep
-from app.core.errors import NotFoundError
+from app.core.errors import ErrorBody, NotFoundError
 from app.core.settings import Settings
 from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
 from app.services.org import OrgEntity, OrgService
 from app.services.project import ProjectEntity, ProjectService
+from app.services.requirement import (
+    ApprovalRequestEntity,
+    RequirementEntity,
+    RequirementService,
+)
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
 
 # `__Host-`: the browser only accepts it with `Secure`, `Path=/`, and no `Domain` (design-doc
 # §4, "Slice 1 security checklist").
 SESSION_COOKIE = "__Host-session"
+
+# The error responses the area routers document on each endpoint (the OpenAPI `responses`).
+ERRORS: dict[int | str, dict[str, Any]] = {
+    code: {"model": ErrorBody}
+    for code in (
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    )
+}
 
 
 def get_settings_from_app(request: Request) -> Settings:
@@ -130,3 +146,27 @@ async def load_user(user_id: uuid.UUID, session: SessionDep) -> tuple[UserEntity
 
 async def load_project(key: str, session: SessionDep) -> tuple[ProjectEntity, Target] | None:
     return await ProjectService(session).load(key)
+
+
+async def load_requirement(
+    key: str, number: int, session: SessionDep
+) -> tuple[RequirementEntity, Target] | None:
+    return await RequirementService(session).load(key, number)
+
+
+async def load_approval_request(
+    request_id: uuid.UUID, session: SessionDep
+) -> tuple[ApprovalRequestEntity, Target] | None:
+    return await RequirementService(session).load_approval_request(request_id)
+
+
+async def load_approval_request_to_decide(
+    request_id: uuid.UUID, session: SessionDep
+) -> tuple[ApprovalRequestEntity, Target] | None:
+    return await RequirementService(session).load_approval_request_to_decide(request_id)
+
+
+async def load_deleted_requirement(
+    key: str, number: int, session: SessionDep
+) -> tuple[RequirementEntity, Target] | None:
+    return await RequirementService(session).load_deleted(key, number)

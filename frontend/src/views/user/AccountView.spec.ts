@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
+import { applyStoredTheme, THEME_KEY } from '@/composables/useTheme'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
@@ -39,24 +40,84 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = ''
+  localStorage.clear()
+  applyStoredTheme()
 })
 
 describe('AccountView', () => {
-  it('shows the profile, filled in, and the password form with its requirements', async () => {
+  it('shows the profile, filled in, the theme choice, and a link to change the password', async () => {
     const wrapper = await mountView()
 
     expect(wrapper.get('h1').text()).toBe('Account settings')
-    expect(wrapper.findAll('h2').map((h) => h.text())).toEqual(['Profile', 'Password'])
+    expect(wrapper.findAll('h2').map((h) => h.text())).toEqual([
+      'Profile',
+      'Appearance',
+      'Password',
+    ])
     expect((wrapper.get('#name').element as HTMLInputElement).value).toBe('Casey Cole')
     expect((wrapper.get('#username').element as HTMLInputElement).value).toBe('casey')
     expect(wrapper.text()).toContain('casey@harbor.example')
     expect(wrapper.find('#email').exists()).toBe(false)
-    expect(wrapper.find('#new_password-requirements').exists()).toBe(true)
+    // Change password is its own page (DL-137), so Save profile is the one primary action.
+    expect(wrapper.find('#new_password').exists()).toBe(false)
+    expect(wrapper.get('a[href="/account/password"]').text()).toBe('Change password')
     expect(wrapper.findAll('button').map((b) => b.text())).not.toContain('Sign out')
-    // One primary action on the page (UI-FRM-15): the password form's button is secondary.
-    const change = wrapper.findAll('button').find((b) => b.text() === 'Change password')!
-    expect(change.classes()).toContain('border-border')
     await expectNoA11yViolations(wrapper)
+  })
+
+  it('offers System, Light, and Dark, with System chosen by default (UI-TOK-2)', async () => {
+    const wrapper = await mountView()
+
+    const radios = wrapper.findAll<HTMLInputElement>('input[name=theme]')
+    expect(wrapper.get('legend').text()).toBe('Theme')
+    // The note is read with the group, not left after it (UI-FRM-3).
+    expect(wrapper.get('fieldset').attributes('aria-describedby')).toBe('theme-note')
+    expect(wrapper.get('#theme-note').text()).toBe('Saved in this browser only.')
+    expect(
+      radios.map((r) => [r.element.labels?.[0]?.textContent?.trim(), r.element.checked]),
+    ).toEqual([
+      ['System (follows your device)', true],
+      ['Light', false],
+      ['Dark', false],
+    ])
+  })
+
+  it('applies and stores a chosen theme at once (DL-164)', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('input[value=dark]').setValue(true)
+
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem(THEME_KEY)).toBe('dark')
+  })
+
+  it('shows the stored theme as chosen', async () => {
+    localStorage.setItem(THEME_KEY, 'light')
+    applyStoredTheme()
+
+    const wrapper = await mountView()
+
+    expect(wrapper.get<HTMLInputElement>('input[value=light]').element.checked).toBe(true)
+  })
+
+  it("sends only the field changed, so an admin's change to the other stands (TD-56)", async () => {
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok({ ...me().user, name: 'Casey C' }))
+    const wrapper = await mountView()
+
+    await saveProfile(wrapper, 'Casey C', 'casey')
+
+    expect(patch).toHaveBeenCalledWith('/api/me', { body: { name: 'Casey C' } })
+  })
+
+  it('sends no name a /me reload brought in after the form was filled (TD-56)', async () => {
+    const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok({ ...me().user, username: 'cc' }))
+    const wrapper = await mountView()
+    // An admin renamed them meanwhile; a reload of `/me` carries it, the form still shows the old.
+    useCurrentUserStore().me = me({ user: { ...me().user, name: 'Casey Renamed' } })
+
+    await saveProfile(wrapper, 'Casey Cole', 'cc')
+
+    expect(patch).toHaveBeenCalledWith('/api/me', { body: { username: 'cc' } })
   })
 
   it('saves the profile and shows the new name to the rest of the app', async () => {

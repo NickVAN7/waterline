@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from polyfactory import Use
 
-from app.enums import ProjectModule, ProjectRole, ProjectType
+from app.enums import ProjectRole, ProjectType
 from app.models.project import Project, ProjectMembership
 from tests.factories import BaseFactory
 
@@ -14,8 +14,8 @@ def _key() -> str:
 
 
 class ProjectFactory(BaseFactory[Project]):
-    """A software project with its default modules, unclassified, unarchived, and no lead (the
-    lead must hold a project membership, so a test that needs one sets both)."""
+    """A software project with no modules (none has shipped, DL-136), no restriction, unarchived,
+    and no lead (the lead must hold a project membership, so a test that needs one sets both)."""
 
     __model__ = Project
     __set_as_default_factory_for_type__: ClassVar[bool] = True
@@ -24,10 +24,10 @@ class ProjectFactory(BaseFactory[Project]):
     name = Use(lambda: BaseFactory.__faker__.catch_phrase())
     description = None
     type = ProjectType.SOFTWARE
-    enabled_modules = Use(lambda: [ProjectModule.SPRINTS.value, ProjectModule.GITHUB.value])
+    enabled_modules = Use(list[str])
     lead = None
     archived_at = None
-    classification_level = None
+    restriction_level = None
 
 
 class ProjectMembershipFactory(BaseFactory[ProjectMembership]):

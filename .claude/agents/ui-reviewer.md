@@ -69,20 +69,26 @@ correct; you decide whether the code does it.
   `position: sticky` or `fixed`? Below 40 rem, does the header wrap and stop being sticky, with
   no horizontal scroll at 320 CSS px (DL-98)? (UI-SHL-3)
 - Is the skip link still the first focusable element and does it reach `main`? (UI-SHL-1)
-- **Org switcher:** in the header on the right, orgs only (no members or settings links), a menu
-  of links with `aria-current` for several orgs, plain text for one, never hidden at narrow
-  widths? (UI-SHL-4)
-- **Sidebar:** My work, then the project selector, then the selected project's pages; items
-  hidden through `allowed_actions`; text always visible; a keyboard-operable "Menu" disclosure
-  below 48 rem with nothing hover-only? Only the current page has `aria-current="page"`
-  ("All projects" is not current inside a project)? Org and workspace administration is not in
-  the sidebar? (UI-SHL-5, UI-SHL-6, UI-SHL-10)
-- **Project selector:** a disclosure popover of links, with a filter past about eight projects,
-  "All projects", and "New project" only when allowed. An enabled-but-unshipped module is plain
-  text with "Not available yet" and never a link to a broken screen? (Before S1-C16 the project
+- **Org menu** (from S2-C0e and S2-C0f, DL-137; before that, Slice 1's switcher on the right):
+  "Waterline" then the current org's name, which is the menu: links to switch orgs
+  (`aria-current` on the current one) and, only when `allowed_actions` allows, Overview,
+  Members, and Settings; plain text with one org and no admin rights; never hidden at narrow
+  widths? The user menu holds workspace "Administration" only (and, until S2-C0g, the theme
+  choice; DL-164), and Sign out has an icon and the danger tone? (UI-SHL-4)
+- **Sidebar:** My work, then the project selector, then the selected project's pages; on an
+  admin page (from S2-C0f), My work and then that admin area's section nav instead, with no
+  section nav inside the page; items hidden through `allowed_actions`; text always visible; a
+  keyboard-operable "Menu" disclosure below 48 rem with nothing hover-only? Only the current
+  page has `aria-current="page"` ("All projects" is not current inside a project)?
+  (UI-SHL-5, UI-SHL-6, UI-SHL-10)
+- **Project selector:** a disclosure popover of links headed by the org's name, with a filter
+  past about eight projects, "All projects" styled apart, and "New project" only when allowed and
+  not indented (from S2-C0e)? An unshipped module is never a link to a broken screen, and from
+  S2-C0d can't be enabled (a disabled checkbox with "Not available yet", DL-136)? (Before S1-C16 the project
   pages are Home only, with no "New project" and no lead name in the header, DL-97; Settings joins the pages at S1-C16a and Members at S1-C16b, each with its page, DL-109; the access review is its own page linked from Members, not a pages item, and Members has Add member (primary) and Add by email (secondary), DL-119.) (UI-SHL-6)
 - Does the page use `PageHeader` with its primary action, one `h1`, and, if a help link was
-  added, the user-menu placement? (UI-SHL-8)
+  added, the user-menu placement? (UI-SHL-8; the auth card's pages excepted: a plain `text-xl`
+  `h1`, no `PageHeader`, DL-176)
 - From Slice 2 on: does every drag have a menu alternative ("Move to top", "Move up",
   "Move after…")? (UI-TBL-5) For SVAR widgets the alternative must be ours and outside the
   widget (§2.5).
@@ -158,7 +164,7 @@ correct; you decide whether the code does it.
   role-name check or a disabled button? Is `opacity` used for disabled? (UI-FBK-4, UI-TOK-10,
   §2.7)
 - **Status never by color alone:** every badge has an icon, text, and a tone from the mapping
-  module; every status, RAG, classification, selection, and error is understandable in
+  module; every status, RAG, restriction, selection, and error is understandable in
   grayscale? (UI-FBK-5, UI-FBK-6, UI-TOK-9)
 - **Alerts:** an alert that reports an event has a top-right "Dismiss alert" button (32×32) that
   returns focus to the control that caused it (or the `h1`); a persistent banner or an
@@ -218,8 +224,8 @@ correct; you decide whether the code does it.
 
 ### 2.5 SVAR widgets: Kanban, DataGrid, Gantt (UI-SVR, UI-STY-7)
 Skip this section when nothing imports `@svar-ui/*`. Otherwise, in the diff:
-- **Where it is imported.** Does any file other than the wrappers (`TaskBoard`,
-  `RequirementsGrid`, `ScheduleChart`) import `@svar-ui/*`? Are the packages the MIT
+- **Where it is imported.** Does any file other than the wrappers (`TaskBoard`, a DataGrid
+  wrapper, `ScheduleChart`) import `@svar-ui/*`? Are the packages the MIT
   `@svar-ui/*` ones at the exact pinned versions, with the Gantt not on 2.8.0? (UI-SVR-1,
   UI-SVR-4)
 - **Which component.** Is the SVAR DataGrid used for a list that is only read, filtered, and
@@ -246,6 +252,17 @@ Skip this section when nothing imports `@svar-ui/*`. Otherwise, in the diff:
   removed. (UI-SVR-7)
 - **Dates and the Gantt.** Any `toISOString()` used to build a date for a widget or the API?
   Does every Gantt screen also offer the table? (UI-SVR-8, UI-SVR-9)
+
+### 2.5a Rendered markdown and revision compare (UI-MD, from S2-C16)
+
+- Is every piece of user markdown rendered through `MarkdownView` (raw HTML off, then
+  DOMPurify), with no other `v-html`? Remote images rendered as links, links limited to `http`,
+  `https`, and `mailto` with `rel="noopener noreferrer"`, headings shifted down a level?
+  (UI-MD-1)
+- Is the editor a labelled textarea with Write and Preview tabs that preview through
+  `MarkdownView`? (UI-MD-2)
+- Does the compare use `<ins>` and `<del>` with visually hidden "Added:"/"Removed:" and tone
+  tokens, inline at 320 px, with collapsed unchanged runs behind a button? (UI-MD-3)
 
 ### 2.6 Reduced motion, zoom, and forced colors (code risks only)
 You cannot run these; flag code that makes them likely to fail: animations not covered by the

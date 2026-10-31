@@ -76,6 +76,18 @@ def test_only_user_references_accept_me() -> None:
         spec.query_model.model_validate({"parent": ["me"]})
 
 
+def test_a_fixed_sort_comes_before_the_requested_one() -> None:
+    # The users list's system admins with no workspace role stay last, whatever the sort (DL-188).
+    spec = ListSpec(
+        name="Z",
+        id_column=column("id"),
+        sorts={"name": column("name")},
+        sort_first=(column("last"),),
+    )
+
+    assert sql(order_by(spec, "-name")) == ["last", "name DESC", "id ASC"]
+
+
 def test_the_sort_parameter_documents_the_default() -> None:
     description = SPEC.query_model.model_fields["sort"].description
 

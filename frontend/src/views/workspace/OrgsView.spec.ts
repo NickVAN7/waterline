@@ -6,7 +6,13 @@ import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, workspaceEntry } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
-import { cleanUpAfterEach, listPage, mountWorkspaceView, WORKSPACE_ID } from '@/test/workspace'
+import {
+  cleanUpAfterEach,
+  emptyPastTheFirst,
+  listPage,
+  mountWorkspaceView,
+  WORKSPACE_ID,
+} from '@/test/workspace'
 
 import OrgsView from './OrgsView.vue'
 
@@ -23,6 +29,14 @@ beforeEach(() => {
 cleanUpAfterEach()
 
 describe('OrgsView', () => {
+  it('goes back to the first page when a later one loads empty (TD-58)', async () => {
+    emptyPastTheFirst(listPage(ORGS))
+
+    const { router } = await mountWorkspaceView(OrgsView, '/workspace/orgs?offset=25')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/orgs')
+  })
   it("lists the workspace's organizations, each linking to its projects", async () => {
     const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(ORGS)))
 

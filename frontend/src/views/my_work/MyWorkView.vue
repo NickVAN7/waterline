@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // My work, the home page after sign-in (design-doc §11): one request for every section
-// (`GET /api/me/work`). Slice 1 has the projects section: its first items and a total.
-import { computed, onMounted } from 'vue'
+// (`GET /api/me/work`). The page shows the projects section, its first items and a total; the
+// approvals section's UI comes in S2-C20 (DL-237).
+import { computed, onMounted, ref } from 'vue'
 
-import { ApiError, api, client, UNEXPECTED_RESPONSE } from '@/api/client'
+import { api, client } from '@/api/client'
+import { focusHeading } from '@/app/routeFocus'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -11,21 +13,25 @@ import Skeleton from '@/components/Skeleton.vue'
 import { useLoad } from '@/composables/useLoad'
 import ProjectList from '@/views/project/ProjectList.vue'
 
-// A section the server couldn't read comes back unavailable: a failure like any other, so a
-// failed Try again is a new alert and keeps focus (UI-FBK-15).
-// shortcut: with one section, an unavailable one fails the page; once My work has more sections,
-// give each its own error state so the rest still show (TD-40).
-const work = useLoad(async () => {
-  const loaded = await api(client.GET('/api/me/work'))
-  if (!loaded.sections.projects.available) {
-    throw new ApiError(200, { code: UNEXPECTED_RESPONSE, message: '', details: {} })
-  }
-  return loaded
-})
-onMounted(work.run)
-
+// A section the server couldn't read comes back unavailable and gets its own error state, so the
+// other sections still show (TD-40). Failed loads in a row, of either kind (the request or the
+// section), key that state: a failed Try again is a new alert and keeps focus (UI-FBK-15).
+const work = useLoad(() => api(client.GET('/api/me/work')))
 const projects = computed(() => work.data.value?.sections.projects)
-const failed = computed(() => Boolean(work.error.value))
+const failed = computed(() => Boolean(work.error.value) || projects.value?.available === false)
+const failures = ref(0)
+
+async function load() {
+  await work.run()
+  failures.value = failed.value ? failures.value + 1 : 0
+}
+onMounted(load)
+
+// Focus moves to the `h1` only once the section has loaded: Try again is then gone.
+async function retry() {
+  await load()
+  if (!failed.value) await focusHeading()
+}
 
 const announcement = computed(() => {
   if (work.loading.value) return 'Loading your projects…'
@@ -47,17 +53,17 @@ const announcement = computed(() => {
       <Skeleton v-if="!projects && !failed" />
       <ErrorState
         v-else-if="failed"
-        :key="work.failures.value"
-        :live="work.failures.value > 1"
+        :key="failures"
+        :live="failures > 1"
         thing="your projects"
         :pending="work.loading.value"
-        @retry="work.retry"
+        @retry="retry"
       />
       <EmptyState v-else-if="projects && !projects.total" heading="No projects yet" :level="3">
         Projects you're added to will appear here.
       </EmptyState>
       <template v-else-if="projects">
-        <ProjectList :projects="projects.items" />
+        <ProjectList :projects="projects.items" with-access />
         <!-- shortcut: no "see all" list yet (TD-37); the org's project list shows the rest. -->
         <p v-if="projects.total > projects.items.length" class="m-0 text-sm text-text-muted">
           Showing {{ projects.items.length }} of {{ projects.total }} projects. Each organization's
