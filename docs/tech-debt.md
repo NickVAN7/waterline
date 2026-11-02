@@ -1131,6 +1131,20 @@ Entry format:
   `<style>` or `style` attribute isn't blocked; scripts stay `'self'` only.
 - **Why:** PrimeVue and the Vite dev server inject `<style>` tags, and a nonce needs a server
   that mints one per response; the Vite dev server is the only one today.
-- **Fix by:** Slice 7 (before the first non-local deployment): a per-response nonce (PrimeVue's
-  `csp.nonce`, Vite's `html.cspNonce`) in place of `'unsafe-inline'`, if its server can mint one
+- **Fix by:** Slice 7 (before the first non-local deployment): its server sends the policy
+  (`contentSecurityPolicy`, `frontend/vite.config.ts`, today sent only by the Vite dev server)
+  with a per-response nonce (PrimeVue's `csp.nonce`, Vite's `html.cspNonce`) in place of
+  `'unsafe-inline'`, if it can mint one
+- **Status:** open
+
+### TD-88: The markdown components haven't been checked in a browser
+- **Added:** S2-C16 (ui-reviewer findings 5 and the coverage gaps)
+- **What:** no page renders `MarkdownView` or `MarkdownEditor` yet, so axe's browser-only rules
+  (contrast, `link-in-text-block`, target size) haven't run on them, and nothing has checked the
+  disabled task-list checkboxes' contrast (WCAG 1.4.11), the selected tab in forced colors, or a
+  long URL and a wide table at 320 px.
+- **Why:** they're shared pieces built before their first page (DL-139); jsdom has no layout.
+- **Fix by:** S2-C17 (the create dialog, the first page with the editor and its Preview): its
+  end-to-end spec runs axe on both tabs in both themes; restyle the task-list checkbox
+  (`appearance: none`, `--color-border` box) if it's under 3:1
 - **Status:** open

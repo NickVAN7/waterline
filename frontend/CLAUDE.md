@@ -47,7 +47,7 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 - **Rendered markdown** goes only through `MarkdownView` (from S2-C16): `markdown-it` with raw
   HTML off, then DOMPurify; never `v-html` on anything else. No remote images, links only
   `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
-  ui-design-guide UI-MD-1).
+  ui-design-guide UI-MD-1). Markdown is edited only in `MarkdownEditor` (UI-MD-2).
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
   slug change to the new URL; a null org is the not-found page.
@@ -103,6 +103,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - Loading: a skeleton after about 300 ms with `aria-busy`; a pending action shows on its
   control (UI-FBK-11, UI-FRM-8).
 - On navigation set the page title and focus the `h1`; one `h1` per page (UI-SHL-9).
+- A link inside running text (a paragraph, a list item, rendered markdown) is underlined:
+  `--color-link` against `--color-text` is about 1.7:1, so color alone can't mark it (WCAG
+  1.4.1; S2-C16 review).
 - Targets at least 24×24 px; focus ring from `--color-focus`, never `outline: none` (UI-TOK-5,
   UI-TOK-6).
 - A new color pair is added to `check_contrast.py` in the same change (UI-TOK-3).

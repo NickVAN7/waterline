@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C15 (Tree widget) built; next is S2-C16 (history: `docs/reviews/`).
+> **Status:** S2-C16 (Markdown view & editor) built; next is S2-C17 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -866,6 +866,12 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   Vite's own CORS handling is off (`server.cors: false`), so cross-origin behaviour, including
   preflights, is decided by the API alone. Every route the router doesn't know shows the
   not-found page; Vite serves `index.html` for any non-file path, so deep links work.
+- **Content-Security-Policy** (design-doc §4, DL-142): Vite sends it on every response
+  (`contentSecurityPolicy`, `vite.config.ts`): scripts only from our own origin, no plugins, no
+  framing; inline styles allowed, since PrimeVue and Vite inject `<style>` tags (DL-246, TD-87).
+  Anything that needs another origin (a script, a font, a frame) changes the policy, which is a
+  design change. `e2e/csp.spec.ts` checks the header, that the app runs with no violation, and
+  that an injected inline script doesn't run. A production server must send the same header.
 - **Calling the API:** always through `@/api/client`, typed by the generated schema:
 
   ```ts
@@ -922,6 +928,12 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   form's buttons, which is visible and polite.
 - **Allowed actions:** `allows(entity, 'project.create')` (`@/composables/allowedActions`)
   hides an action the user may never take; the server still checks.
+- **Markdown** (UI-MD-1, UI-MD-2): show stored markdown only with `<MarkdownView :source>`,
+  the one place `v-html` is allowed (markdown-it with raw HTML off, then DOMPurify; links only
+  `http`, `https`, and `mailto`; images as links; headings one level down; `- [ ]` task lists as
+  read-only checkboxes). Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
+  and Preview tabs; `focus()` returns to Write). A new XSS vector goes in
+  `MarkdownView.xss-corpus.ts`, which its spec runs through the renderer.
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
   menu button with a popover of links that the org menu and project selector share; opening
   it moves focus inside (the popover sits at the end of `<body>`, out of the Tab order). A spec
