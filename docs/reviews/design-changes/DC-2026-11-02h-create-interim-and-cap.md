@@ -9,7 +9,7 @@
 - **Kind:** docs only (no tooling code, so no `checkpoint-reviewer`, DL-18).
 - **Base commit:** `82b62ce` (S2-C17's fix).
 - **Reviewers:** `docs-consistency` (trigger `design-change`), on one snapshot (DL-105).
-- **Totals:** 1 fix, fixed; 3 decisions for the owner, open.
+- **Totals:** 1 fix, fixed; 3 decisions for the owner, decided after the commit.
 - **Gates at close:** `uv run wl check` green; CI on the commit.
 
 ---
@@ -33,6 +33,6 @@
 
 | # | Question | Options | Status |
 |---|---|---|---|
-| 1 | The owner's exception to the log's rule (DL-254's Supersedes edited) is recorded only inline and here. | (a) leave it; (b) a DL or a header line letting the owner approve such a correction, cited each time | Open |
-| 2 | Should TD-70 (the tree stops at 2,000 rows) list DL-256's consequence, for S2-C22's review of it? | (a) add it to TD-70; (b) leave it | Open |
-| 3 | If the timing test flakes, may it be quarantined while the owner rules? | (a) quarantined with a TD entry; (b) never: CI red until the owner rules; (c) one retry, numbers recorded | Open |
+| 1 | The owner's exception to the log's rule (DL-254's Supersedes edited) is recorded only inline and here. | (a) leave it; (b) a DL or a header line letting the owner approve such a correction, cited each time | **Decided** (owner, Nov 2, 2026): (a), leave it |
+| 2 | Should TD-70 (the tree stops at 2,000 rows) list DL-256's consequence, for S2-C22's review of it? | (a) add it to TD-70; (b) leave it | **Decided** (owner): (a), in DC-2026-11-02i |
+| 3 | If the timing test flakes, may it be quarantined while the owner rules? | (a) quarantined with a TD entry; (b) never: CI red until the owner rules; (c) one retry, numbers recorded | **Decided** (owner): never quarantined; one rerun, both runs' numbers to the owner; the owner revisits the test if it keeps failing (DL-257, DC-2026-11-02i) |

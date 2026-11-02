@@ -902,9 +902,11 @@ Entry format:
 - **Added:** S2-C5
 - **What:** `GET /api/projects/{key}/requirements` returns at most 2,000 requirements in
   `(rank, id)` order, with `truncated: true` above it (DL-159). The cut is by rank across every
-  level, so a truncated tree can hold a child whose parent was left out.
+  level, so a truncated tree can hold a child whose parent was left out, and a requirement moved
+  to the bottom of its level can fall past the cut and leave the tree on the next load (DL-256).
 - **Why:** the tree is a ranked view, returned whole for drag-and-drop (build plan, "API
-  conventions"); the owner judged 2,000 more than enough for v1 (DL-159).
+  conventions"); the owner judged 2,000 more than enough for v1 (DL-159), and accepted the moved
+  row's case (DL-256).
 - **Fix by:** S2-C22 (the tech-debt review): reviewed there, then paged when a project nears
   2,000 requirements (DL-159)
 - **Status:** open

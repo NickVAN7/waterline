@@ -208,7 +208,10 @@ Then:
 - Push only the finished checkpoint commit, never work in progress. Wait for CI on it
   (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
-  report. Never report a checkpoint whose CI isn't green.
+  report. Never report a checkpoint whose CI isn't green. The one exception: CI red from the
+  Expand all timing test (`e2e/requirements.spec.ts`) gets no `fix(<ID>)` commit: rerun the
+  job once, then stop and send both runs' numbers to the owner, whatever the rerun shows
+  (DL-257).
 - Never merge. At the slice's last checkpoint, the owner's approval decides the merge. Any
   changes the owner decides in the slice retro are applied first, on the slice branch, with the
   `design-change` skill and green CI (DL-19). Before asking, check that every commit is linked

@@ -3236,3 +3236,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** user guide (Requirements)
 - **Source:** owner, Nov 2, 2026 (S2-C17 report, open question 1)
+
+### DL-257: The timing test is never quarantined
+- **Date:** 2026-11-02
+- **Decision:** The Expand all timing test (DL-253, DL-254) is an exception to "Flaky tests are
+  bugs": it is never quarantined, and the test and its limits stay as they are. When it turns CI
+  red, the job is rerun once, and both runs' numbers go to the owner whatever the rerun shows;
+  the checkpoint waits for the owner. If it keeps failing in CI, the owner revisits the test.
+  The owner accepts the risk.
+- **Supersedes:** none (an exception to the testing strategy's quarantine rule for this test)
+- **Superseded by:** none
+- **Applies to:** testing strategy ("Flaky tests are bugs"); checkpoint skill (step 6)
+- **Source:** owner, Nov 2, 2026 (DC-2026-11-02h, docs-consistency decision 3, a variant of (b))

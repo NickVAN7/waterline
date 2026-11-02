@@ -325,8 +325,9 @@ saying why.
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
   tech-debt entry the same day, never retried until green. The one deliberate timing test,
   Expand all at the 2,000-row cap (`e2e/requirements.spec.ts`), fails on a task over 1 s on the
-  workstation and over 3 s in CI (DL-253, DL-254); if it flakes, record the run's numbers and
-  take the limit to the owner rather than removing the timing.
+  workstation and over 3 s in CI (DL-253, DL-254). It is never quarantined or changed to get a
+  green run: when it fails in CI, the job is rerun once and both runs' numbers go to the owner,
+  who revisits the test if it keeps failing (DL-257).
 
 ## Test naming and structure
 
