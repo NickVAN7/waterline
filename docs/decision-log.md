@@ -3199,7 +3199,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   nearing the cap revisits it (TD-89).
 - **Supersedes:** DL-175 in part ("so the page never freezes"); answers DC-2026-10-22f's
   decision 1 (the pass mark)
-- **Superseded by:** none
+- **Superseded by:** DL-254 (in part: the guard's limit in CI)
 - **Applies to:** build plan (S2-C17); tech debt (TD-89)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17's measurement)
 
@@ -3209,7 +3209,30 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   on the workstation (`wl e2e`, `wl check --full`) and over 3 s in CI (`CI` set), whose runner
   measured about 2.5 times slower (S2-C17's CI: 12.7 s to the last row, longest task 2.1 s in
   light and 2.4 s in dark). DL-253's pass mark, 1 s, is the workstation's.
-- **Supersedes:** none (refines DL-253's guard; answers DC-2026-11-02f's decision 2)
+- **Supersedes:** DL-253 in part (the guard's limit in CI; owner, DC-2026-11-02h); answers
+  DC-2026-11-02f's decision 2
 - **Superseded by:** none
-- **Applies to:** `frontend/e2e/requirements.spec.ts`; build plan (S2-C17)
+- **Applies to:** `frontend/e2e/requirements.spec.ts`; build plan (S2-C17); testing strategy
+  ("Flaky tests are bugs", DC-2026-11-02h)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17's red CI)
+
+### DL-255: What creating a requirement does before S2-C18
+- **Date:** 2026-11-02
+- **Decision:** Until the requirement's own page exists, S2-C17a's create dialog closes on
+  success, reloads the tree, and reveals, selects, and focuses the new row. S2-C18 replaces this
+  with UI-SHL-12's behavior, unchanged: landing on the new item, and the dialog's expansion to a
+  full page (DL-250).
+- **Supersedes:** none (an interim, by DL-250's split)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17a, S2-C18); ui-design-guide (UI-SHL-12)
+- **Source:** owner, Nov 2, 2026 (DC-2026-11-02e, docs-consistency decision 1, option (a))
+
+### DL-256: A moved requirement may drop out of a truncated tree
+- **Date:** 2026-11-02
+- **Decision:** Past the 2,000-row cap (DL-159), the tree is the first 2,000 by rank; a
+  requirement moved to the bottom of its level (Move to bottom, Move to…) can fall past the cut
+  and leave the tree on the next load. Accepted, and said in the user guide's note on the cap.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** user guide (Requirements)
+- **Source:** owner, Nov 2, 2026 (S2-C17 report, open question 1)

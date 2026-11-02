@@ -89,7 +89,8 @@ shows its requirements as a tree, each with its ID (`ERP-RQ-7`). It opens with o
 requirements showing: open a branch with its arrow, or with the Right arrow key on its row
 (Left closes it). **Expand all** opens every branch; on a very large project it takes a few
 seconds, and the button says "Expanding…" until it's done. A project with more than 2,000
-requirements shows the first 2,000, with a note saying so. Anyone who can read the project's
+requirements shows the first 2,000, with a note saying so; there, a requirement you move to the
+bottom of its level can fall past the first 2,000 and leave the tree the next time it loads. Anyone who can read the project's
 content can open it; on an export-controlled project, that's only its members.
 
 If you may edit requirements (members and admins), select a row and use **Move** (named after

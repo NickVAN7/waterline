@@ -323,7 +323,10 @@ saying why.
   (a merge commit) only with green CI (build-plan, "Pull requests"). GitHub enforces it: the
   `wl check` status check is required on `main` (DL-27).
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
-  tech-debt entry the same day, never retried until green.
+  tech-debt entry the same day, never retried until green. The one deliberate timing test,
+  Expand all at the 2,000-row cap (`e2e/requirements.spec.ts`), fails on a task over 1 s on the
+  workstation and over 3 s in CI (DL-253, DL-254); if it flakes, record the run's numbers and
+  take the limit to the owner rather than removing the timing.
 
 ## Test naming and structure
 
