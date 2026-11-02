@@ -105,24 +105,21 @@ describe('MarkdownView', () => {
     expect(view.text()).toContain('go')
   })
 
-  it('renders a task list as read-only checkboxes named by their state', () => {
+  it('renders a task list as marks named by their state, not form controls (TD-88)', () => {
     const view = render('- [ ] Draft\n- [x] Review\n- [X] Sign off')
 
-    const boxes = view.findAll('input[type="checkbox"]')
+    const boxes = view.findAll('[role="img"]')
     expect(boxes.map((box) => box.attributes('aria-label'))).toEqual(['Not done', 'Done', 'Done'])
-    expect(boxes.map((box) => (box.element as HTMLInputElement).checked)).toEqual([
-      false,
-      true,
-      true,
-    ])
-    expect(boxes.every((box) => box.attributes('disabled') !== undefined)).toBe(true)
+    // The check is drawn only on a done item's box.
+    expect(boxes.map((box) => box.classes('task-done'))).toEqual([false, true, true])
+    expect(view.find('input').exists()).toBe(false)
     expect(view.findAll('li').map((li) => li.text())).toEqual(['Draft', 'Review', 'Sign off'])
   })
 
   it('leaves "[ ]" outside a list item as text', () => {
     const view = render('[ ] not a task')
 
-    expect(view.find('input').exists()).toBe(false)
+    expect(view.find('[role="img"]').exists()).toBe(false)
     expect(view.text()).toBe('[ ] not a task')
   })
 
@@ -139,7 +136,7 @@ describe('MarkdownView', () => {
       '# Title\n\nText with [a link](https://example.com).\n\n- [ ] Task\n- [x] Done\n\n| H |\n|---|\n| d |\n\n```\ncode\n```',
     )
 
-    expect(view.findAll('input[type="checkbox"]')).toHaveLength(2)
+    expect(view.findAll('[role="img"]')).toHaveLength(2)
     await expectNoA11yViolations(view)
   })
 

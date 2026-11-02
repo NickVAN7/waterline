@@ -11,7 +11,8 @@ import { useCurrentOrgStore } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok } from '@/test/api'
-import { stubResizeObserver } from '@/test/overlay'
+import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { requirementRead } from '@/test/requirements'
 import { project } from '@/test/projects'
 
 import RequirementsView from './RequirementsView.vue'
@@ -42,6 +43,9 @@ const READER = project({ allowed_actions: ['project.view', 'requirement.view'] }
 // Someone who sees the project but no longer its content (an export-control change).
 const READER_ONLY_PROJECT = () =>
   project({ allowed_actions: ['project.view'], restriction_categories: ['export_controlled'] })
+const CREATOR = project({
+  allowed_actions: ['project.view', 'requirement.view', 'requirement.create'],
+})
 const MOVER = project({
   allowed_actions: ['project.view', 'requirement.view', 'requirement.update'],
 })
@@ -111,6 +115,7 @@ async function moveUp(title: string) {
 beforeEach(() => {
   setActivePinia(createPinia())
   stubResizeObserver()
+  stubDialog()
 })
 afterEach(() => {
   document.body.innerHTML = ''
@@ -310,5 +315,115 @@ describe('RequirementsView', () => {
     expect(wrapper.get('h1').text()).toBe("You can't open this page")
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(document.title).toBe("You can't open this page · Waterline")
+  })
+
+  describe('New requirement', () => {
+    const newButton = () =>
+      [...document.querySelectorAll<HTMLButtonElement>('main button')].filter(
+        (b) => b.textContent!.trim() === 'New requirement',
+      )
+
+    it('is in the header for those who may create, and not for readers', async () => {
+      await mountAt([CREATOR])
+      expect(newButton()).toHaveLength(1)
+      document.body.innerHTML = ''
+
+      await mountAt([READER])
+      expect(newButton()).toHaveLength(0)
+    })
+
+    it.each([
+      ['may create', CREATOR, 'Create one with New requirement, above.'],
+      ['may only read', READER, "The project's members and admins can add them."],
+    ])(
+      'an empty project tells someone who %s how requirements are added, with one button at most',
+      async (_, shown, sentence) => {
+        const { wrapper } = await mountAt([shown], [ok({ items: [], truncated: false })])
+
+        expect(wrapper.get('section section').text()).toContain(sentence)
+        expect(wrapper.get('section section').find('button').exists()).toBe(false)
+      },
+    )
+
+    it('creates one and closes onto it: the tree reloads with the new row selected and focused (DL-255)', async () => {
+      const refunds = item(7, 'Refunds')
+      vi.spyOn(client, 'POST').mockResolvedValue(ok(requirementRead(7, 'Refunds')))
+      const { wrapper, get } = await mountAt(
+        [CREATOR],
+        [ok(TREE), ok({ items: [...TREE.items, refunds], truncated: false })],
+      )
+
+      newButton()[0]!.click()
+      await flushPromises()
+      const title = document.querySelector<HTMLInputElement>('#create-requirement-title')!
+      title.value = 'Refunds'
+      title.dispatchEvent(new Event('input'))
+      document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit()
+      await flushPromises()
+
+      expect(treeCalls(get)).toHaveLength(2)
+      const row = wrapper.findAll('tbody tr').find((r) => r.text().includes('Refunds'))!
+      expect(row.attributes('aria-selected')).toBe('true')
+      expect(document.activeElement).toBe(row.element)
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+
+    async function create(title = 'Refunds') {
+      newButton()[0]!.click()
+      await flushPromises()
+      const field = document.querySelector<HTMLInputElement>('#create-requirement-title')!
+      field.value = title
+      field.dispatchEvent(new Event('input'))
+      document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit()
+      await flushPromises()
+    }
+
+    it('a 403 reloads what the user may do, and New requirement goes (UI-FRM-7)', async () => {
+      vi.spyOn(client, 'POST').mockResolvedValue(
+        failed(403, { code: 'forbidden', message: '', details: {} }),
+      )
+      const { get } = await mountAt([CREATOR, READER])
+
+      await create()
+
+      expect(projectCalls(get)).toHaveLength(2)
+      expect(newButton()).toHaveLength(0)
+    })
+
+    it("a 404 reloads the tree, so a parent that's gone leaves the list", async () => {
+      vi.spyOn(client, 'POST').mockResolvedValue(
+        failed(404, { code: 'not_found', message: '', details: {} }),
+      )
+      const { get } = await mountAt([CREATOR])
+
+      await create()
+
+      expect(treeCalls(get)).toHaveLength(2)
+    })
+
+    it('says it was created when the tree past the cap does not show it, focus on the h1', async () => {
+      vi.spyOn(client, 'POST').mockResolvedValue(ok(requirementRead(7, 'Refunds')))
+      const { wrapper } = await mountAt([CREATOR], [ok(TREE), ok({ ...TREE, truncated: true })])
+
+      await create()
+
+      expect(wrapper.text()).toContain(
+        "ERP-RQ-7 Refunds was created. It's past the first 2,000 requirements, so the tree doesn't show it.",
+      )
+      expect(document.activeElement).toBe(wrapper.get('h1').element)
+    })
+
+    it("says it was created when the tree's reload fails, focus staying on Try again (UI-FBK-15)", async () => {
+      vi.spyOn(client, 'POST').mockResolvedValue(ok(requirementRead(7, 'Refunds')))
+      const { wrapper } = await mountAt(
+        [CREATOR],
+        [ok(TREE), failed(503, { code: 'network_error', message: '', details: {} })],
+      )
+
+      await create()
+
+      expect(wrapper.text()).toContain('ERP-RQ-7 Refunds was created.')
+      expect(document.activeElement!.textContent!.trim()).toBe('Try again')
+    })
   })
 })

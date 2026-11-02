@@ -26,7 +26,8 @@ md.core.ruler.push('waterline', (state) => {
     if (token.type === 'heading_open' || token.type === 'heading_close') {
       token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + 1)}`
     }
-    // Task lists: "[ ]" or "[x]" opening a list item becomes a read-only checkbox.
+    // Task lists: "[ ]" or "[x]" opening a list item becomes a box drawn in our tokens, named
+    // "Done" or "Not done": a disabled checkbox wears the browser's grey, under 3:1 (TD-88).
     const first = token.children?.[0]
     const task = first?.type === 'text' ? /^\[([ xX])\] /.exec(first.content) : null
     if (
@@ -37,7 +38,7 @@ md.core.ruler.push('waterline', (state) => {
       const done = task[1] !== ' '
       first!.content = first!.content.slice(task[0].length)
       const box = new state.Token('html_inline', '', 0)
-      box.content = `<input type="checkbox" disabled${done ? ' checked' : ''} aria-label="${done ? 'Done' : 'Not done'}"> `
+      box.content = `<span class="task-box${done ? ' task-done' : ''}" role="img" aria-label="${done ? 'Done' : 'Not done'}"></span> `
       token.children!.unshift(box)
     }
   })
@@ -46,7 +47,7 @@ md.core.ruler.push('waterline', (state) => {
 const sanitizeOptions = {
   ALLOWED_URI_REGEXP: SAFE_URL,
   // DOMPurify checks every other attribute's value against that regex too.
-  ADD_URI_SAFE_ATTR: ['type', 'start'],
+  ADD_URI_SAFE_ATTR: ['start'],
   FORBID_TAGS: ['img', 'style', 'form'],
   FORBID_ATTR: ['style'],
 }
@@ -125,6 +126,27 @@ const html = computed(() => renderMarkdown(props.source))
   padding: var(--spacing) calc(var(--spacing) * 2);
   border: 1px solid var(--color-border-subtle);
   text-align: start;
+}
+.markdown :deep(.task-box) {
+  position: relative;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+/* The check: two borders of a box turned 45 degrees, so forced colors draw it too. */
+.markdown :deep(.task-done)::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 30%;
+  inset-block-start: 5%;
+  width: 35%;
+  height: 65%;
+  border: solid var(--color-text);
+  border-width: 0 0.15em 0.15em 0;
+  transform: rotate(45deg);
 }
 .markdown :deep(:where(li > p:only-child, :last-child)) {
   margin-block-end: 0;

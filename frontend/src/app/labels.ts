@@ -4,6 +4,7 @@ import type { IconName } from '@/components/Icon.vue'
 
 type ProjectStatus = components['schemas']['ProjectStatus']
 type ProjectType = components['schemas']['ProjectType']
+type Priority = components['schemas']['Priority']
 type RestrictionLevel = components['schemas']['RestrictionLevel']
 type RestrictionCategory = components['schemas']['RestrictionCategory']
 export type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
@@ -25,6 +26,14 @@ export const PROJECT_TYPE: Record<ProjectType, string> = {
   software: 'Software',
   erp: 'ERP implementation',
   general: 'General',
+}
+
+/** Requirement and task priority (design-doc §7), most urgent first. */
+export const PRIORITY: Record<Priority, string> = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
 }
 
 /** Module names (design-doc §1.1), v2 ones included: module guidance lists them all. */

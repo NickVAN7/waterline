@@ -141,3 +141,83 @@ test('Expand all opens 2,000 rows without freezing the page', async ({ page }, t
   // 1 s on the workstation; CI's shared runner is about 2.5 times slower (DL-254).
   expect(longest).toBeLessThan(process.env.CI ? 3000 : 1000)
 })
+
+// S2-C17a and TD-88: the create dialog, the first page showing the markdown editor and its
+// Preview, checked in a browser in both themes.
+test('creating a requirement: the editor and its Preview, then the new row', async ({
+  page,
+}, testInfo) => {
+  const { user, key } = runFor(testInfo)
+  await signIn(page, user)
+  await page.goto(`/acme/projects/${key}/requirements`)
+
+  await page.getByRole('button', { name: 'New requirement' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Create a requirement' })
+  await expect(dialog.getByRole('textbox', { name: 'Title', exact: true })).toBeFocused()
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, 'dialog[open] .p-tabs')
+
+  await dialog.getByRole('textbox', { name: 'Title', exact: true }).fill('Refunds')
+  await dialog
+    .getByRole('textbox', { name: 'Description', exact: true })
+    .fill(
+      [
+        '## Context',
+        '',
+        'See [the refund policy](https://example.com/policy), and',
+        'https://example.com/a/very/long/address/that/keeps/going/without/a/single/break/anywhere',
+        '',
+        '## Acceptance Criteria',
+        '',
+        '1. A refund reverses the payment.',
+        '',
+        '- [ ] Drafted',
+        '- [x] Reviewed',
+        '',
+        '| Case | Amount | Result |',
+        '|---|---|---|',
+        '| Full | 100 | Refunded |',
+      ].join('\n'),
+    )
+  await dialog.getByRole('tab', { name: 'Preview' }).click()
+  const preview = dialog.getByRole('tabpanel')
+  await expect(preview.getByRole('link', { name: 'the refund policy' })).toBeVisible()
+  await expect(preview.getByRole('img', { name: 'Done', exact: true })).toBeVisible()
+  // Contrast, link-in-text-block, and the rest, on the rendered markdown.
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, 'dialog[open] .markdown')
+
+  // Forced colors: the selected tab keeps its bar, in the system's Highlight color (UI-TOK-9).
+  // Forced colors turn any other background into an opaque Canvas, so "not transparent" proves
+  // nothing: compare with Highlight itself.
+  await page.emulateMedia({ forcedColors: 'active' })
+  const bar = await dialog.locator('.p-tablist-active-bar').evaluate((el) => {
+    const probe = document.createElement('div')
+    probe.style.background = 'Highlight'
+    document.body.append(probe)
+    const highlight = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return {
+      background: getComputedStyle(el).backgroundColor,
+      highlight,
+      height: el.getBoundingClientRect().height,
+    }
+  })
+  expect(bar.background).toBe(bar.highlight)
+  expect(bar.height).toBeGreaterThanOrEqual(3)
+  await page.emulateMedia({ forcedColors: 'none' })
+
+  // At 320 px the long address and the table wrap: no sideways scroll (WCAG 1.4.10). A modal
+  // dialog scrolls itself, never the page, so the dialog and its panel are what's measured.
+  const size = page.viewportSize()!
+  await page.setViewportSize({ width: 320, height: size.height })
+  expect(await dialog.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
+  expect(await preview.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
+  await page.setViewportSize(size)
+
+  await dialog.getByRole('button', { name: 'Create requirement' }).click()
+  await expect(dialog).toBeHidden()
+  const row = page.getByRole('row', { name: /Refunds/ })
+  await expect(row).toBeFocused()
+  await expect(row).toHaveAttribute('aria-selected', 'true')
+})

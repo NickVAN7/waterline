@@ -162,6 +162,19 @@ async function reveal(node: Node) {
     ?.focus()
 }
 
+/** Selects a row, opens its branches, and focuses it (a requirement just created, DL-255);
+ * false when it isn't in the tree (past the 2,000-row cap). */
+async function show(id: string): Promise<boolean> {
+  const found = locate(nodes.value, id)
+  if (!found) return false
+  const node = found[0][found[1]]!
+  selectionKeys.value = { [node.key]: true }
+  await reveal(node)
+  return true
+}
+
+defineExpose({ show })
+
 function step(by: -1 | 1) {
   const [siblings, index] = selected.value!
   const node = siblings[index]!

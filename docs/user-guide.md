@@ -93,6 +93,17 @@ requirements shows the first 2,000, with a note saying so; there, a requirement 
 bottom of its level can fall past the first 2,000 and leave the tree the next time it loads. Anyone who can read the project's
 content can open it; on an export-controlled project, that's only its members.
 
+**New requirement** (members and admins), at the top of the page, opens a form: a **Title**
+(required), a **Description**, a **Priority** (Critical, High, Medium, or Low; Medium to start),
+and a **Parent** (the top level, or any requirement in the tree). The description starts from your
+project type's template: **Context** and **Acceptance Criteria** for software and general
+projects; **Business Process**, **Current State**, **Future State**, and **Acceptance Criteria**
+for ERP implementations. Write the criteria as a numbered list. The description is markdown:
+**Write** is the text, **Preview** shows how it will read (raw HTML shows as text, images as
+links, and `- [ ]` and `- [x]` as "not done" and "done" marks). **Create requirement** adds it,
+numbered `ERP-RQ-<n>`, and the form closes onto its row in the tree, selected. A new requirement
+is a draft, at the bottom of its level, with the project's restriction.
+
 If you may edit requirements (members and admins), select a row and use **Move** (named after
 the requirement, "Move ERP-RQ-7") to reorder it among the requirements at its level: **Move to
 top**, **Move up**, **Move down**, **Move to bottom**, or **Move after…**, which asks which one

@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C17 (Requirements page) built; next is S2-C17a (history: `docs/reviews/`).
+> **Status:** S2-C17a (Create requirement) built; next is S2-C18 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -931,7 +931,7 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
 - **Markdown** (UI-MD-1, UI-MD-2): show stored markdown only with `<MarkdownView :source>`,
   the one place `v-html` is allowed (markdown-it with raw HTML off, then DOMPurify; links only
   `http`, `https`, and `mailto`; images as links; headings one level down; `- [ ]` task lists as
-  read-only checkboxes). Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
+  marks drawn in tokens, named "Done" or "Not done"). Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
   and Preview tabs; `focus()` returns to Write). A new XSS vector goes in
   `MarkdownView.xss-corpus.ts`, which its spec runs through the renderer.
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the

@@ -1151,7 +1151,12 @@ Entry format:
 - **Fix by:** S2-C17a (the create dialog, the first page with the editor and its Preview; DL-249): its
   end-to-end spec runs axe on both tabs in both themes; restyle the task-list checkbox
   (`appearance: none`, `--color-border` box) if it's under 3:1
-- **Status:** open
+- **Status:** resolved in S2-C17a (the create dialog's end-to-end spec, both themes: axe on the
+  form and on the rendered Preview, link-in-text-block and contrast included; the theme audit on
+  the tabs and the rendered markdown; the selected tab's bar under forced colors; no sideways
+  scroll at 320 px with a long address and a table. The task-list checkbox was replaced by a mark
+  drawn in tokens, named "Done" or "Not done", rather than measured: the browser's disabled look
+  isn't reachable by our tokens)
 
 ### TD-89: Expand all pauses near the 2,000-row cap
 - **Added:** DC-2026-11-02f (DL-253)

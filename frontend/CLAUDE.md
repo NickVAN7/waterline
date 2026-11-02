@@ -180,6 +180,9 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   row: its tables use `border-collapse: separate`, where a `tr`'s border isn't drawn, and forced
   colors draw a transparent border. A class check in jsdom can't show the bar is drawn
   (UI-TOK-9; S2-C15 review).
+- A rule that overrides a PrimeVue style (a forced-colors fix) is unlayered, outside `@layer
+base`: PrimeVue's layer comes later and wins over `base`, and `!important` isn't allowed
+  (`base.css`'s active-bar rule; S2-C17a review).
 - A blocked PrimeVue menu item is `aria-disabled` through `pt.item`, in the disabled tokens on
   `pt.itemContent` (which sets its own color over the item's), and
   stays focusable, its command doing nothing: a `disabled` item is skipped by the arrow keys and
@@ -215,6 +218,11 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   it back (S1-C16b).
 - A mocked 422 has the server's real shape: the top-level `message` is "The request is invalid.",
   and the reason is in `details.fields` (S2-C15 review).
+- An e2e reflow check on content in a modal dialog measures the dialog and its panels
+  (`scrollWidth` against `clientWidth`), never the document: a top-layer dialog scrolls itself.
+  A forced-colors check compares with the system color the rule sets (a probe styled
+  `Highlight`), never only "not transparent": forced colors turn a background into an opaque
+  Canvas. Prove each can fail once (S2-C17a review).
 - Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
   `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
   not `getByLabel`: the label's text includes the required asterisk, the accessible name

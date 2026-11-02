@@ -14,15 +14,6 @@
     outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
-  /* Forced colors drop backgrounds, and the selected tab's bar is one: keep it, in a system
-     color that shows on the system background (UI-TOK-9). */
-  @media (forced-colors: active) {
-    .p-tablist-active-bar {
-      forced-color-adjust: none;
-      background: Highlight;
-    }
-  }
-
   html {
     /* Keeps keyboard focus clear of the sticky header, a sticky selection toolbar (when one is
        showing), and any visible toasts */
@@ -56,5 +47,16 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+/* Forced colors drop backgrounds, and the selected tab's bar is one: keep it, in a system color
+   that shows on the system background (UI-TOK-9). Outside the layers on purpose: PrimeVue's
+   layer, later than `base`, sets the bar's background, and an unlayered rule wins over every
+   layer without `!important` (S2-C17a review). */
+@media (forced-colors: active) {
+  .p-tablist-active-bar {
+    forced-color-adjust: none;
+    background: Highlight;
   }
 }

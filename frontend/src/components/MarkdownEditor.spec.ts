@@ -112,7 +112,7 @@ describe('MarkdownEditor', () => {
 
     await tab('Preview').trigger('click')
 
-    expect(panel('Preview').findAll('input[type="checkbox"]')).toHaveLength(1)
+    expect(panel('Preview').findAll('[role="img"]')).toHaveLength(1)
     await expectNoA11yViolations(editor)
   })
 })
