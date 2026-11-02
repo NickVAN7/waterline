@@ -1112,3 +1112,15 @@ Entry format:
 - **Fix by:** S2-C17 (the requirements page): the tree tells the page, which reloads the list,
   or the project's actions after a 403
 - **Status:** open
+
+### TD-86: npm overrides pin `minimatch` and `glob`
+- **Added:** `658e50b` (`chore(deps):`, Oct 31, 2026; logged after the fact)
+- **What:** `frontend/package.json` has `overrides` pinning `minimatch` 11.0.3 and `glob`
+  14.0.3, past the versions their parent packages ask for, to clear `wl audit`
+  (GHSA-g3hv-75wg-m249, GHSA-3g3m-2fjr-6pw4).
+- **Why:** the parents hadn't released versions that pull the fixed ones; an override silently
+  outlives its need, so it's logged here.
+- **Fix by:** S2-C22 (the tech-debt review), and at any dependency bump before it: remove the
+  `overrides`, reinstall, and rerun `uv run wl audit`; if green, drop them in a `chore(deps):`
+  commit, otherwise keep this open
+- **Status:** open
