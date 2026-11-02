@@ -2243,7 +2243,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the page never freezes (the data is already loaded, DL-159; the cost is drawing rows), and
   S2-C17 measures it at the 2,000-row cap.
 - **Supersedes:** none (confirms DL-174)
-- **Superseded by:** none
+- **Superseded by:** DL-253 (in part: the pass mark)
 - **Applies to:** build plan (S2-C17); `docs/reviews/s2/S2-C0b.md`
 - **Source:** owner, Oct 22, 2026 (answers to S2-C0b's open questions)
 
@@ -3187,3 +3187,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C18)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17 re-cut)
+
+### DL-253: Expand all's pass mark at the cap
+- **Date:** 2026-11-02
+- **Decision:** "Expand all" opens the second level at once and the deeper branches 25 a frame,
+  its button showing "Expanding…" until done. At the 2,000-row cap it may pause: PrimeVue
+  TreeTable re-renders every visible row each frame, so no batch size keeps a frame short near
+  the cap (S2-C17 measured 5.5 s to the last row with the longest task 0.84 s at 25 a frame;
+  0.79 s at 5, taking 15.7 s; 1.3 s at 100; the spike's all-at-once render, one 2.1 s task).
+  The pass mark is no single task over 1 s at the cap, guarded by an end-to-end spec; a project
+  nearing the cap revisits it (TD-89).
+- **Supersedes:** DL-175 in part ("so the page never freezes"); answers DC-2026-10-22f's
+  decision 1 (the pass mark)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17); tech debt (TD-89)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C17's measurement)

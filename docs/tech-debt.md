@@ -1148,3 +1148,14 @@ Entry format:
   end-to-end spec runs axe on both tabs in both themes; restyle the task-list checkbox
   (`appearance: none`, `--color-border` box) if it's under 3:1
 - **Status:** open
+
+### TD-89: Expand all pauses near the 2,000-row cap
+- **Added:** DC-2026-11-02f (DL-253)
+- **What:** at the cap, "Expand all" takes about 5.5 s to show every row, with single pauses of
+  up to about 0.8 s, since PrimeVue TreeTable re-renders every visible row each frame.
+- **Why:** v1 projects are far below the cap; a fix (virtual scrolling, or a widget that draws
+  only the rows in view) is a widget change.
+- **Fix by:** Slice 7 (the end of v1), or sooner if a project nears 1,000 requirements:
+  measure again with the largest real project, and change the tree's rendering only if one
+  nears the cap
+- **Status:** open
