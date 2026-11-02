@@ -29,4 +29,4 @@ None.
 | # | Question | Options | Status |
 |---|---|---|---|
 | 1 | TD-89's Fix by named "Slice 8 (v1 hardening)", which doesn't exist (v1 is Slices 0 to 7). | (a) Slice 7, the end of v1; (b) Slice 8+ (v2); (c) the trigger only | **Resolved** as the owner's answer put it (log it, revisit if a project nears the cap): Slice 7, the end of v1, as a measurement that changes the rendering only if a project nears the cap |
-| 2 | The 1 s guard runs in CI (`wl check --full`), on unknown hardware, against 0.84 s measured locally: a timing test could be flaky. | (a) keep 1 s everywhere; (b) run it locally only; (c) set the limit from CI's own measurement | Open: S2-C17's report gives CI's measurement |
+| 2 | The 1 s guard runs in CI (`wl check --full`), on unknown hardware, against 0.84 s measured locally: a timing test could be flaky. | (a) keep 1 s everywhere; (b) run it locally only; (c) set the limit from CI's own measurement | **Decided** (owner, Nov 2, 2026, after S2-C17's CI measured 2.1 to 2.4 s): a separate CI limit, 3 s (DL-254) |

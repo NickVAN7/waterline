@@ -3202,3 +3202,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C17); tech debt (TD-89)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17's measurement)
+
+### DL-254: Expand all's guard has a CI limit
+- **Date:** 2026-11-02
+- **Decision:** The end-to-end guard on Expand all at the 2,000-row cap fails on a task over 1 s
+  on the workstation (`wl e2e`, `wl check --full`) and over 3 s in CI (`CI` set), whose runner
+  measured about 2.5 times slower (S2-C17's CI: 12.7 s to the last row, longest task 2.1 s in
+  light and 2.4 s in dark). DL-253's pass mark, 1 s, is the workstation's.
+- **Supersedes:** none (refines DL-253's guard; answers DC-2026-11-02f's decision 2)
+- **Superseded by:** none
+- **Applies to:** `frontend/e2e/requirements.spec.ts`; build plan (S2-C17)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C17's red CI)
