@@ -114,7 +114,7 @@ screen-reader pass at slice verification, **R** the `ui-reviewer` agent.
 
 | WCAG | What it means in Waterline | Rules | Checked by |
 |---|---|---|---|
-| 1.4.1 Use of color | Status, RAG, badges, restriction, selection, and form errors always carry text, an icon, or a shape too | UI-FBK-5, UI-FRM-5, UI-TOK-9 | R, M |
+| 1.4.1 Use of color | Status, RAG, badges, restriction, selection, and form errors always carry text, an icon, or a shape too; a link in running text is underlined | UI-FBK-5, UI-FRM-5, UI-TOK-9, UI-TOK-13 | R, M |
 | 1.4.3 / 1.4.11 Contrast | Text 4.5:1; component boundaries, icons, and focus ring 3:1, in both themes | UI-TOK-3 | A (browser only), R |
 | 1.4.4 / 1.4.10 / 1.4.12 Resize, reflow, text spacing | rem font sizes; no horizontal page scroll down to 320 CSS px; no fixed heights on text | UI-TOK-4, UI-SHL-7 | M, R |
 | 1.4.13 Content on hover or focus | A hint appears on hover and on keyboard focus, stays while hovered, and Esc dismisses it | UI-FRM-17 | M, R |
@@ -376,6 +376,10 @@ html {
 - **UI-TOK-11** **Placeholders** use `--color-placeholder`, not muted text and not an opacity;
   a disabled field's placeholder uses `--color-disabled-text`. A placeholder is an example, never
   a label (UI-FRM-1). PrimeVue's own placeholder color is mapped to the token (§3.5).
+- **UI-TOK-13** A link inside running text (a paragraph, a list item, rendered markdown) is
+  underlined: `--color-link` against `--color-text` is about 1.7:1, so color alone can't mark it
+  (WCAG 1.4.1, DL-248). A standalone link (navigation, a lone "Go to My work") may omit the
+  underline.
 
 ### 3.5 PrimeVue preset
 

@@ -198,6 +198,8 @@ correct; you decide whether the code does it.
   or `!important` to hide a missing mapping? Is its state set (hover, focus, disabled, invalid,
   selected) checked in both themes? Is a PrimeIcons font or class pulled in? (UI-STY-4,
   UI-STY-6, UI-TOK-12)
+- Is every link inside running text (a paragraph, a list item, rendered markdown) underlined, not
+  marked by color alone? (UI-TOK-13)
 - Is the focus ring the `--color-focus` token (never the accent, a tone, or a hover color), and
   do PrimeVue Button severities use it too? (UI-TOK-5)
 - Do new interactive controls reach 24×24 px including padding, with icon-only buttons at

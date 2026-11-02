@@ -3135,3 +3135,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (Slice 2, the reviewer lists)
 - **Source:** owner, Nov 2, 2026 (DC-2026-11-02b, docs-consistency decision 1, option (a))
+
+### DL-248: A link in running text is underlined
+- **Date:** 2026-11-02
+- **Decision:** UI-TOK-13: a link inside running text (a paragraph, a list item, rendered
+  markdown) is underlined, since `--color-link` against `--color-text` is about 1.7:1 and color
+  alone can't mark it (WCAG 1.4.1); a standalone link may omit the underline. The rule
+  S2-C16's review added to `frontend/CLAUDE.md` now cites it.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-TOK-13, the WCAG 1.4.1 row); `frontend/CLAUDE.md` (UI);
+  `.claude/agents/ui-reviewer.md` (the token checklist)
+- **Source:** owner, Nov 2, 2026 (S2-C16 report, open question 1, option (a))

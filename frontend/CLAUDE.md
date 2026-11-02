@@ -104,8 +104,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   control (UI-FBK-11, UI-FRM-8).
 - On navigation set the page title and focus the `h1`; one `h1` per page (UI-SHL-9).
 - A link inside running text (a paragraph, a list item, rendered markdown) is underlined:
-  `--color-link` against `--color-text` is about 1.7:1, so color alone can't mark it (WCAG
-  1.4.1; S2-C16 review).
+  `--color-link` against `--color-text` is about 1.7:1, so color alone can't mark it
+  (UI-TOK-13).
 - Targets at least 24×24 px; focus ring from `--color-focus`, never `outline: none` (UI-TOK-5,
   UI-TOK-6).
 - A new color pair is added to `check_contrast.py` in the same change (UI-TOK-3).
