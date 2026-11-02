@@ -3147,3 +3147,43 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide (UI-TOK-13, the WCAG 1.4.1 row); `frontend/CLAUDE.md` (UI);
   `.claude/agents/ui-reviewer.md` (the token checklist)
 - **Source:** owner, Nov 2, 2026 (S2-C16 report, open question 1, option (a))
+
+### DL-249: S2-C17 splits: the requirements page, then create (S2-C17a)
+- **Date:** 2026-11-02
+- **Decision:** S2-C17 builds the requirements page (its route, the project navigation's
+  Requirements entry, the tree with Expand all, the full move menu with its pickers, the theme
+  audit); the create dialog moves to a new row, S2-C17a, with TD-88's browser checks of the
+  markdown components, since the dialog is the first page that shows them.
+- **Supersedes:** build plan S2-C17 in part (the create dialog)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17, S2-C17a); tech debt (TD-88)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C17 re-cut)
+
+### DL-250: Create is a dialog until S2-C18
+- **Date:** 2026-11-02
+- **Decision:** S2-C17a builds the create dialog only. Its expansion to a full page
+  (`…/:key/requirements/new`) and landing on the new item once created (screen inventory,
+  "Creating an item") come with the item's page in S2-C18.
+- **Supersedes:** none (places the screen inventory's create pattern)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17a, S2-C18)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C17 re-cut)
+
+### DL-251: The restriction control is on the requirement's detail
+- **Date:** 2026-11-02
+- **Decision:** S2-C18 builds the control that raises or lowers a requirement's restriction,
+  on its detail beside the badge, through `PUT …/restriction` (convention C3). The create
+  dialog has no restriction fields: a new requirement starts at the project's level.
+- **Supersedes:** none (fills a gap: no row built it)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17a, S2-C18)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C17 re-cut)
+
+### DL-252: The tree's Status column comes with the badges
+- **Date:** 2026-11-02
+- **Decision:** The requirement tree gains a Status column, with the status badge (DL-148), in
+  S2-C18, which builds the badges; S2-C17's tree keeps Title and ID.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C18)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C17 re-cut)

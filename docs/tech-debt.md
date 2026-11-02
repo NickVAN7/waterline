@@ -1144,7 +1144,7 @@ Entry format:
   disabled task-list checkboxes' contrast (WCAG 1.4.11), the selected tab in forced colors, or a
   long URL and a wide table at 320 px.
 - **Why:** they're shared pieces built before their first page (DL-139); jsdom has no layout.
-- **Fix by:** S2-C17 (the create dialog, the first page with the editor and its Preview): its
+- **Fix by:** S2-C17a (the create dialog, the first page with the editor and its Preview; DL-249): its
   end-to-end spec runs axe on both tabs in both themes; restyle the task-list checkbox
   (`appearance: none`, `--color-border` box) if it's under 3:1
 - **Status:** open
