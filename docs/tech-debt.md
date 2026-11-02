@@ -1111,7 +1111,9 @@ Entry format:
   listener would be speculative.
 - **Fix by:** S2-C17 (the requirements page): the tree tells the page, which reloads the list,
   or the project's actions after a 403
-- **Status:** open
+- **Status:** resolved in S2-C17 (the tree emits `stale` on a 404 or 422 and `refused` on a
+  403; the requirements page reloads the tree or the project, and the refusal stays, with focus
+  on it if the move menu went)
 
 ### TD-86: npm overrides pin `minimatch` and `glob`
 - **Added:** `658e50b` (`chore(deps):`, Oct 31, 2026; logged after the fact)
@@ -1158,4 +1160,16 @@ Entry format:
 - **Fix by:** Slice 7 (the end of v1), or sooner if a project nears 1,000 requirements:
   measure again with the largest real project, and change the tree's rendering only if one
   nears the cap
+- **Status:** open
+
+### TD-90: The members page's refused reload leaves focus on a first visit
+- **Added:** S2-C17 (ui-reviewer pass 2, finding A's sibling)
+- **What:** `ProjectMembersView.refused()` settles a page its reload replaced with
+  `settlePage()`, which doesn't move focus on a visit's first page: opened from a link, a refused
+  action that turns the page into the 404 or 403 page leaves focus on `<body>`. The requirements
+  page focuses the new `h1` directly (S2-C17).
+- **Why:** earlier-checkpoint code, fixed only when needed (DL-106); the case needs a direct visit
+  and a refusal that changes the page.
+- **Fix by:** S2-C22 (the tech-debt review): the same direct `syncTitle()` and `focusHeading()`,
+  with a first-visit spec
 - **Status:** open

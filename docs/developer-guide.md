@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C16 (Markdown view & editor) built; next is S2-C17 (history: `docs/reviews/`).
+> **Status:** S2-C17 (Requirements page) built; next is S2-C17a (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -1155,7 +1155,11 @@ afterwards (see `tests/integration/test_migrations.py`).
   so an overlay mid-fade isn't read as low contrast) and, on the shell's pages,
   `expectFocusNotObscured(page)` (`e2e/support/a11y.ts`). `signIn(page, username)`
   (`e2e/support/demo.ts`) signs in as a demo user. A flow that changes data uses its
-  own user or keys per run (`forcedChangeUser`: `fiona` in light, `felix` in dark).
+  own user or keys per run (`forcedChangeUser`: `fiona` in light, `felix` in dark; the
+  requirements spec works in `ERP` as `ben` in light and `PORTAL` as `finn` in dark). A wrapped
+  widget's spec also runs the theme audit, `expectOnlyTokenColors(page, selector)`
+  (`e2e/support/theme.ts`), which fails on any color under the selector that isn't a token, at
+  rest and in each interactive state (a selection, an open menu).
 - **CLI tests** live in `tools/cli/tests/`: every command's `--help` works, every command has
   `--dry-run`, dry-run output matches the expected commands, and the doctor checks are tested
   with fake probes. The CLI is held to **100% line + branch coverage** (in

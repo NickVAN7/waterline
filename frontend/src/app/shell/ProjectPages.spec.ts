@@ -52,6 +52,18 @@ describe('ProjectPages', () => {
     expect(wrapper.findAll('a').map((a) => a.text())).toEqual(['Home'])
   })
 
+  it('links Requirements, after Home, for whoever may read the content', async () => {
+    const wrapper = await mountWith(['project.view', 'requirement.view', 'project.update'])
+
+    expect(wrapper.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Home', '/acme/projects/ERP'],
+      ['Requirements', '/acme/projects/ERP/requirements'],
+      ['Members', '/acme/projects/ERP/members'],
+      ['Settings', '/acme/projects/ERP/settings'],
+    ])
+    await expectNoA11yViolations(wrapper)
+  })
+
   it('links no Settings with only project.view', async () => {
     const wrapper = await mountWith(['project.view'])
 

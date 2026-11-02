@@ -13,7 +13,12 @@ import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
 
 export function useProjectPage(
-  routeName: 'project-home' | 'project-members' | 'project-access' | 'project-settings',
+  routeName:
+    | 'project-home'
+    | 'project-requirements'
+    | 'project-members'
+    | 'project-access'
+    | 'project-settings',
 ) {
   const route = useRoute()
   const router = useRouter()

@@ -84,6 +84,22 @@ the top. An address with an organization's old slug (the part of the address tha
 or a lowercase key takes you to the project's own address. A project you can't see shows "Page
 not found", the same as one that doesn't exist.
 
+**Requirements**, in the sidebar under the project (`/<organization>/projects/<KEY>/requirements`),
+shows its requirements as a tree, each with its ID (`ERP-RQ-7`). It opens with only the top-level
+requirements showing: open a branch with its arrow, or with the Right arrow key on its row
+(Left closes it). **Expand all** opens every branch; on a very large project it takes a few
+seconds, and the button says "Expanding…" until it's done. A project with more than 2,000
+requirements shows the first 2,000, with a note saying so. Anyone who can read the project's
+content can open it; on an export-controlled project, that's only its members.
+
+If you may edit requirements (members and admins), select a row and use **Move** (named after
+the requirement, "Move ERP-RQ-7") to reorder it among the requirements at its level: **Move to
+top**, **Move up**, **Move down**, **Move to bottom**, or **Move after…**, which asks which one
+to place it after. **Move to…** gives it a new parent, or takes it to the top level; its own
+children move with it. A move that doesn't apply says why in the menu ("already first").
+If a requirement's place changed since you opened the page, the move is refused and the tree
+reloads to show where things are now.
+
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The
 project's admins (and organization owners and admins, workspace owners and admins, and system
