@@ -1617,7 +1617,7 @@ before the features.
 
 Checkpoints 0d, 2, 4, 5, 6, 8, 10, 11, 12, 13, and 21d add or change `app/rules/` or `app/authz/`
 code, so each starts with `spec-test-writer` (DL-15); each row confirms it against its content
-when it starts. The `security-reviewer` runs on every checkpoint from 0c to 14, and on 16 and 21a to 21d (DL-241). The
+when it starts. The `security-reviewer` runs on every checkpoint from 0c to 14, and on 16, 18, and 21a to 21d (DL-241, DL-247). The
 `ui-reviewer` runs whenever a diff touches `frontend/src/` or `frontend/e2e/` (DL-62).
 
 The sections below describe the content; the table above is the order of work. The plan's

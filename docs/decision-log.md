@@ -3125,3 +3125,13 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §4 (the CSP, "Before the first non-local deployment"); build plan
   (S2-C16); tech debt (TD-87, TD-14)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C16 re-cut)
+
+### DL-247: `security-reviewer` runs on S2-C18
+- **Date:** 2026-11-02
+- **Decision:** `security-reviewer` runs on S2-C18 (requirement detail), which holds the
+  end-to-end test that a stored XSS payload doesn't run (DL-245), so the stored-XSS controls
+  are security-reviewed where that test lands.
+- **Supersedes:** none (widens DL-241's reviewer list)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 2, the reviewer lists)
+- **Source:** owner, Nov 2, 2026 (DC-2026-11-02b, docs-consistency decision 1, option (a))
