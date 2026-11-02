@@ -3165,7 +3165,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   (`…/:key/requirements/new`) and landing on the new item once created (screen inventory,
   "Creating an item") come with the item's page in S2-C18.
 - **Supersedes:** none (places the screen inventory's create pattern)
-- **Superseded by:** none
+- **Superseded by:** DL-261 (in part: in S2-C18a, not S2-C18)
 - **Applies to:** build plan (S2-C17a, S2-C18)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17 re-cut)
 
@@ -3223,7 +3223,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   with UI-SHL-12's behavior, unchanged: landing on the new item, and the dialog's expansion to a
   full page (DL-250).
 - **Supersedes:** none (an interim, by DL-250's split)
-- **Superseded by:** none
+- **Superseded by:** DL-261 (in part: in S2-C18a, not S2-C18)
 - **Applies to:** build plan (S2-C17a, S2-C18); ui-design-guide (UI-SHL-12)
 - **Source:** owner, Nov 2, 2026 (DC-2026-11-02e, docs-consistency decision 1, option (a))
 
@@ -3280,3 +3280,46 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** checkpoint skill (step 7, the try-it script)
 - **Source:** owner, Nov 2, 2026 (chat session, after S2-C16's packages were missing from the
   dev stack)
+
+### DL-261: S2-C18 splits: the requirement's page, then editing (S2-C18a)
+- **Date:** 2026-11-02
+- **Decision:** S2-C18 builds the requirement's page (view, the status menu and badges with the
+  tree's Status column, the restriction badge and control, the "No acceptance criteria" note,
+  "Approved · modified", the stored-XSS end-to-end test); a new row, S2-C18a, builds editing
+  (with the change note and 409 handling) and the create dialog's full page and landing on the
+  new item, which move there from S2-C18 (DL-250, DL-255).
+- **Supersedes:** DL-250 and DL-255 in part (S2-C18 becomes S2-C18a); build plan S2-C18 in part
+  (editing, create's full page and landing)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17a, S2-C18, S2-C18a); ui-design-guide (UI-SHL-12)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C18 re-cut)
+
+### DL-262: The item side panel is its own row, S2-C18b
+- **Date:** 2026-11-02
+- **Decision:** UI-SHL-11's side panel is first built in S2-C18b, for requirements opened from
+  the tree (`?open=RQ-<n>`, Back closes it; Open full page; Copy link), as the shared panel tasks
+  reuse in Slice 3: a shared piece used for the first time gets its own row (DL-139). Until then
+  a requirement opens as its full page.
+- **Supersedes:** none (places UI-SHL-11 in Slice 2)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C18b; "Later slices", Slice 3); ui-design-guide (UI-SHL-11)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C18 re-cut)
+
+### DL-263: A requirement is edited in an edit mode on its page
+- **Date:** 2026-11-02
+- **Decision:** Edit turns the requirement's title, description (in `MarkdownEditor`), and
+  priority into a form in place, with the change note, Save, and Cancel; status and restriction
+  stay their own controls.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C18a)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C18 re-cut)
+
+### DL-264: The tree's ID opens the requirement
+- **Date:** 2026-11-02
+- **Decision:** In the requirement tree, the ID cell (`ERP-RQ-7`) is a link to the requirement;
+  clicking the row elsewhere still selects it for the move menu.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C18)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C18 re-cut)

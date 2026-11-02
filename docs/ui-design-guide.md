@@ -511,12 +511,12 @@ render inside the full shell when signed in.
   the board opens a **side panel** over the list, so the list keeps its place, with **Open full
   page** (DL-202). The panel has its own URL, the list's route with the item open (e.g.
   `?open=TA-45`), so Back closes it and the address can be shared. A direct link to an item, and
-  **Copy link**, use the full-page route.
+  **Copy link**, use the full-page route. For requirements, the panel comes in S2-C18b; until then
+  a requirement opens as its full page (DL-262).
 - **UI-SHL-12** **Creating an item** is a dialog with the essential fields that the user can
   **expand into a full page**, keeping what they typed; after creating, they land on the new
-  item to fill in the rest (DL-202). For requirements, the landing and the expansion come with the
-  item's page in S2-C18; until then the dialog closes onto the new row in the tree (DL-250,
-  DL-255).
+  item to fill in the rest (DL-202). For requirements, the landing and the expansion come with editing
+  in S2-C18a; until then the dialog closes onto the new row in the tree (DL-250, DL-255, DL-261).
 - **UI-SHL-13** **A turned-off module's page** (a bookmark to Sprints after the module was turned
   off) is an explanatory page inside the project, not a 404: "The Sprints module is turned off
   for this project. Contact your administrator for questions.", with the module's name. A module
