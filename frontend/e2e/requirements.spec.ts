@@ -138,5 +138,6 @@ test('Expand all opens 2,000 rows without freezing the page', async ({ page }, t
   console.log(
     `[${testInfo.project.name}] Expand all at 2,000: ${elapsed} ms, longest task ${Math.round(longest)} ms`,
   )
-  expect(longest).toBeLessThan(1000)
+  // 1 s on the workstation; CI's shared runner is about 2.5 times slower (DL-254).
+  expect(longest).toBeLessThan(process.env.CI ? 3000 : 1000)
 })
