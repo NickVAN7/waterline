@@ -3248,3 +3248,35 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** testing strategy ("Flaky tests are bugs"); checkpoint skill (step 6)
 - **Source:** owner, Nov 2, 2026 (DC-2026-11-02h, docs-consistency decision 3, a variant of (b))
+
+### DL-258: Task-list items render as marks, not checkboxes
+- **Date:** 2026-11-02
+- **Decision:** A task-list item's `[ ]` or `[x]` renders as a mark drawn in tokens, named "Not
+  done" or "Done" (`role="img"`), not as a disabled checkbox: the browser's disabled look can't be
+  reached by our tokens and falls under 3:1. This is how TD-88's checkbox item was resolved
+  (S2-C17a).
+- **Supersedes:** none (settles how TD-88's fix was made)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-MD-1); developer guide (conventions, Markdown); TD-88
+- **Source:** owner, Nov 2, 2026 (S2-C17a report, open question 1)
+
+### DL-259: A dialog's form may use a Select for fixed choices
+- **Date:** 2026-11-02
+- **Decision:** UI-FRM-12 keeps radios for three or four choices on a page, and allows a Select
+  for fixed choices in a dialog's form (type, role, priority), as the built dialogs do.
+- **Supersedes:** UI-FRM-12 in part ("radios for three or four choices", in a dialog's form)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-FRM-12)
+- **Source:** owner, Nov 2, 2026 (S2-C17a report, open question 2)
+
+### DL-260: Try-it steps after a dependency change
+- **Date:** 2026-11-02
+- **Decision:** When a checkpoint added or changed a dependency, its try-it steps come after a
+  `wl up` on the owner's dev stack, and the report tells the owner to hard-reload any open tab:
+  the web container keeps its image's `node_modules`, and a tab loaded before can keep a failed
+  module's styles.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** checkpoint skill (step 7, the try-it script)
+- **Source:** owner, Nov 2, 2026 (chat session, after S2-C16's packages were missing from the
+  dev stack)

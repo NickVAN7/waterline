@@ -250,8 +250,10 @@ Send the owner:
   `Origin` header before S1-C14, screens after), each with its expected result, including at
   least one step that should be denied. Its first step sets up or names the state it needs
   (e.g. `uv run wl seed --demo` on an empty database), and before handing it over, check the
-  owner's dev stack (its users, `.env`), not only the end-to-end stack (DL-127). Run it once
-  yourself to make sure the steps are right;
+  owner's dev stack (its users, `.env`), not only the end-to-end stack (DL-127). When the
+  checkpoint added or changed a dependency, restart the owner's stack with `wl up` first, and
+  tell them to hard-reload any open tab (DL-260). Run it once yourself to make sure the steps
+  are right;
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
 - **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
   the owner, which skills and agents never triggered, the verdict of any process trial, and the

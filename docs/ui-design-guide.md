@@ -618,7 +618,8 @@ render inside the full shell when signed in.
   than claiming success.
 - **UI-FRM-12** **Grouping and choice controls:** related radios or checkboxes sit in a
   `<fieldset>` with a `<legend>`; a single checkbox's label is to its right. Use radios for
-  three or four choices and a Select for more fixed choices (type, role). Use the combobox only
+  three or four choices on a page, and a Select for more fixed choices, or for fixed choices in a
+  dialog's form (type, role, priority; DL-259). Use the combobox only
   where the user must search people or orgs; a people picker opens its list on focus and filters
   as the user types (DL-137; from S2-C0h).
 - **UI-FRM-13** **No redundant entry (3.3.7):** a multi-step flow keeps what the user typed. The
@@ -999,7 +1000,9 @@ the revision compare in S2-C19.
   on its output; never `v-html` on anything else. No remote images (image syntax renders as a
   link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
   shifted down one level, so a description never adds a second `h1` (UI-SHL-8); code blocks in
-  the monospace font, with no syntax highlighting. A component test runs a corpus of known XSS
+  the monospace font, with no syntax highlighting. A task-list item's `[ ]` or `[x]` is a mark
+  drawn in tokens and named "Not done" or "Done" (`role="img"`), not a disabled checkbox, whose
+  look the tokens can't reach (DL-258). A component test runs a corpus of known XSS
   payloads (the OWASP cheat sheet's) through it, and an end-to-end test (S2-C18, DL-245) proves a
   stored payload doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
 - **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
