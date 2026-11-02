@@ -202,8 +202,8 @@ Entry format:
   allowed-origins setting, the admin audit-event screen, general API rate limiting (per IP at
   the reverse proxy, per user in the app for expensive endpoints; 429 `rate_limited` with
   `Retry-After`; added Oct 5, 2026), and a compliant deployment for export-controlled data
-  (design-doc §3.1; added Oct 5, 2026). (The password minimum and local HTTPS have their own
-  entries, TD-12 and TD-13.)
+  (design-doc §3.1; added Oct 5, 2026). (The password minimum, local HTTPS, and the CSP's inline
+  styles have their own entries, TD-12, TD-13, and TD-87.)
 - **Why:** v1 runs locally for a few users; none of these matter until the app is deployed.
 - **Fix by:** Slice 7 (before the first non-local deployment, and by the end of v1 at the
   latest; re-target if deployment moves later): build each item, or give it its own slice.
@@ -1123,4 +1123,14 @@ Entry format:
 - **Fix by:** S2-C22 (the tech-debt review), and at any dependency bump before it: remove the
   `overrides`, reinstall, and rerun `uv run wl audit`; if green, drop them in a `chore(deps):`
   commit, otherwise keep this open
+- **Status:** open
+
+### TD-87: The CSP allows inline styles
+- **Added:** DC-2026-11-02b (DL-246)
+- **What:** the Content-Security-Policy has `style-src 'self' 'unsafe-inline'`, so an injected
+  `<style>` or `style` attribute isn't blocked; scripts stay `'self'` only.
+- **Why:** PrimeVue and the Vite dev server inject `<style>` tags, and a nonce needs a server
+  that mints one per response; the Vite dev server is the only one today.
+- **Fix by:** Slice 7 (before the first non-local deployment): a per-response nonce (PrimeVue's
+  `csp.nonce`, Vite's `html.cspNonce`) in place of `'unsafe-inline'`, if its server can mint one
 - **Status:** open

@@ -91,7 +91,7 @@ S2-C21a to S2-C21d's rows, here and in "Threat-model pass", are added at their r
 
 | Threat | Control | Row |
 |---|---|---|
-| Stored XSS through markdown | Raw HTML off, DOMPurify, links limited by scheme, no remote images, the CSP; an XSS-corpus component test and an end-to-end payload test | S2-C16 |
+| Stored XSS through markdown | Raw HTML off, DOMPurify, links limited by scheme, no remote images, the CSP; an XSS-corpus component test (S2-C16) and an end-to-end payload test (S2-C18, DL-245) | S2-C16, S2-C18 |
 | A parent, a move target, or an approver from another project, or someone without access | Scoped lookups (a 404 for anything outside the project or the user's access); same-project and cycle checks | S2-C5, S2-C7, S2-C10 |
 | Deciding someone else's approval | `approval.decide` is a personal action no admin level grants | S2-C11 |
 | Export-controlled content leaking through a list, feed, revision, the trash, or My work | Content scoping in every list query, the gate on every content action, a test per list | S2-C4 onward |

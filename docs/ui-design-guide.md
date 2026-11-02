@@ -994,8 +994,8 @@ the revision compare in S2-C19.
   link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
   shifted down one level, so a description never adds a second `h1` (UI-SHL-8); code blocks in
   the monospace font, with no syntax highlighting. A component test runs a corpus of known XSS
-  payloads (the OWASP cheat sheet's) through it, and an end-to-end test proves a stored payload
-  doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
+  payloads (the OWASP cheat sheet's) through it, and an end-to-end test (S2-C18, DL-245) proves a
+  stored payload doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
 - **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
   **Preview** tabs (a tablist), previewing with `MarkdownView` (DL-141). No WYSIWYG editor; a
   toolbar may come later if usability calls for it. Hints (such as a template's) sit beside the

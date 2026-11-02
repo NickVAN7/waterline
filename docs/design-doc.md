@@ -581,9 +581,10 @@ Workspace (the firm: tenant boundary)
   memberships left can still sign in and sees a "no access" page. Deactivation is how someone is cut
   off.
 - **Content-Security-Policy** (Slice 2, DL-142): every page is served with a CSP that allows
-  scripts only from our own origin, a second layer behind the markdown sanitizer (§3). PrimeVue's
-  injected styles need a nonce or `style-src 'unsafe-inline'`; S2-C16 decides which and records
-  it here.
+  scripts only from our own origin, a second layer behind the markdown sanitizer (§3). Styles
+  are `style-src 'self' 'unsafe-inline'` (DL-246): PrimeVue and the Vite dev server inject
+  `<style>` tags, and a nonce needs a server that mints one per response, which comes with the
+  first deployment (TD-87).
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
@@ -654,6 +655,8 @@ Workspace (the firm: tenant boundary)
   - Raise the password minimum to 12 characters (existing shorter passwords are flagged for
     change at their next sign-in).
   - Local HTTPS for the dev server, and end-to-end tests beyond Chromium.
+  - Replace the CSP's `style-src 'unsafe-inline'` with a per-response nonce, if the
+    deployment's server can mint one (DL-246, TD-87).
   - A screen for the admin audit events (§10.1).
   - Separate database roles: migrations run as the owner; the app runs as a role with only data
     rights (no `ALTER`, `DROP`, or `TRUNCATE`), so the `audit_event` and `activity_log`

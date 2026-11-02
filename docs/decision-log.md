@@ -3101,3 +3101,27 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide (UI-TOK-9, UI-TBL-7); `frontend/CLAUDE.md` (UI);
   `.claude/agents/ui-reviewer.md` (the token checklist)
 - **Source:** owner, Nov 2, 2026 (S2-C15 review, open question 1: option (a))
+
+### DL-245: The end-to-end stored-XSS test runs in S2-C18
+- **Date:** 2026-11-02
+- **Decision:** S2-C16 builds `MarkdownView`, `MarkdownEditor`, the CSP, and the XSS-corpus
+  component test; the end-to-end test that a stored payload doesn't run moves to S2-C18
+  (requirement detail), the first screen that renders a stored description, so S2-C16 adds no
+  test-only route.
+- **Supersedes:** build plan S2-C16 in part (its end-to-end payload test)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C16, S2-C18); `docs/reviews/s2/S2-plan.md` ("Threat-model pass");
+  ui-design-guide (UI-MD-1)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C16 re-cut)
+
+### DL-246: The CSP allows inline styles
+- **Date:** 2026-11-02
+- **Decision:** The Content-Security-Policy's styles are `style-src 'self' 'unsafe-inline'`;
+  scripts stay `'self'` only. PrimeVue and the Vite dev server (the only server today) inject
+  `<style>` tags, and a nonce needs a per-response one the dev server can't mint; a nonce is
+  revisited with the first deployment's server (TD-87).
+- **Supersedes:** none (settles DL-142's open choice)
+- **Superseded by:** none
+- **Applies to:** design-doc §4 (the CSP, "Before the first non-local deployment"); build plan
+  (S2-C16); tech debt (TD-87, TD-14)
+- **Source:** owner, Nov 2, 2026 (chat session, S2-C16 re-cut)
