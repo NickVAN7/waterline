@@ -203,8 +203,9 @@ correct; you decide whether the code does it.
 - Do new interactive controls reach 24×24 px including padding, with icon-only buttons at
   least 32×32 (the password toggle may be 28×28)? (UI-TOK-6)
 - Buttons: secondary is an outline with no fill and hover `--color-hover`; one primary per view?
-  Selected rows use `--color-selected` plus a checked box and a 3 px leading bar; disabled uses
-  the three disabled tokens, not `opacity`; placeholders use `--color-placeholder`? (UI-TOK-8 to
+  Selected rows use `--color-selected` plus a 3 px leading bar, and a checked box in a
+  multi-select table (a single-select one, such as the requirement tree, has none, DL-244);
+  disabled uses the three disabled tokens, not `opacity`; placeholders use `--color-placeholder`? (UI-TOK-8 to
   11)
 - Does any animation or transition use literal durations or convey information alone? (The
   pending spinner's `animate-spin` is the one exception, DL-92.) (UI-TOK-7)

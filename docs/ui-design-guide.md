@@ -357,9 +357,11 @@ html {
   *Ghost:* no border or fill, for low-emphasis actions. A button never needs a caption below
   it; the reason text in UI-TOK-10 is only for a control that is disabled by state.
 - **UI-TOK-9** **Selected.** A selected row or item uses `--color-selected`, **plus a cue that is
-  not color**: for table rows, a checked checkbox and a 3 px leading bar in `--color-accent`
-  (drawn as a border, so it survives forced-colors mode), with `aria-selected` or the
-  checkbox's checked state exposing it. For a navigation item, `aria-current="page"` plus the
+  not color**: for table rows, a 3 px leading bar in `--color-accent` (drawn as a border, so it
+  survives forced-colors mode), with `aria-selected` or the checkbox's checked state exposing
+  it; a multi-select table's row also has a checked checkbox, and a single-select one (the
+  requirement tree) has none, since a checkbox there reads as multi-select (DL-244). For a
+  navigation item, `aria-current="page"` plus the
   same bar. A selected row does not also get the hover tint.
 - **UI-TOK-10** **Disabled and pending.** *Hide* an action the user may never take (a permission
   denial, or a state that rules it out for good, such as a decided request's Cancel;
@@ -833,7 +835,8 @@ Decided in screen-inventory step 5; restated so the reviewer has one list.
   clears when the query state changes** (sort, filter, page), so an action never applies to
   rows the user can no longer see. The server decides what a bulk action may do (the allowed
   actions per row come from `allowed_actions`); the UI never infers it.
-- **UI-TBL-7** A selected row is drawn per UI-TOK-9 (tint, checked box, and leading bar), with
+- **UI-TBL-7** A selected row is drawn per UI-TOK-9 (tint, leading bar, and, in a multi-select
+  table, a checked box), with
   `aria-selected` where the table role supports it.
 - **UI-TBL-8** **Selection toolbar.** The toolbar of bulk actions ("Export selected", …) sits
   inline above the table. **While rows are selected it becomes `position: sticky` just under the

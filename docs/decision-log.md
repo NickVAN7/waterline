@@ -3088,3 +3088,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   §9 (the keyboard and move/cancel row); testing strategy (the wrapper specs)
 - **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start; DC-2026-10-31c, docs-consistency
   decisions 1 to 3)
+
+### DL-244: A single-select table's selected row has no checkbox
+- **Date:** 2026-11-02
+- **Decision:** UI-TOK-9's checked checkbox marks a selected row only in a multi-select table.
+  A single-select one, such as the requirement tree (S2-C15), shows its selection with the
+  tint, the leading bar, and `aria-selected`, with no checkbox column: a checkbox there reads
+  as multi-select.
+- **Supersedes:** ui-design-guide UI-TOK-9 and UI-TBL-7 in part (a checked checkbox on every
+  selected table row)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide (UI-TOK-9, UI-TBL-7); `frontend/CLAUDE.md` (UI);
+  `.claude/agents/ui-reviewer.md` (the token checklist)
+- **Source:** owner, Nov 2, 2026 (S2-C15 review, open question 1: option (a))

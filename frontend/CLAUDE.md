@@ -85,7 +85,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   `svar-theme.css`; every move or edit goes through `api.intercept` so the server decides; the
   move alternative to a drag is our own menu outside the widget (UI-STY-7, UI-SVR-1 to 6).
 - Never color alone: a badge is icon + text + tone from the display-mapping module
-  (UI-FBK-5); a selected row also has a checked box and a leading bar (UI-TOK-9).
+  (UI-FBK-5); a selected row also has a leading bar, and a checked box when the table is multi-select
+  (UI-TOK-9).
 - Forms: visible labels; the server validates; a 422 shows inline errors, moves focus to the
   first invalid field, and has no summary box; a required field has the red asterisk; the submit
   button is `aria-disabled` while pending, never `disabled` (UI-FRM-2, UI-FRM-4 to 8).
