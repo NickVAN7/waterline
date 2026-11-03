@@ -114,6 +114,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { settlesItself: true },
   },
   {
+    path: '/:orgSlug/projects/:key/requirements/new',
+    name: 'project-requirement-new',
+    component: () => import('@/views/requirement/NewRequirementView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
     path: '/:orgSlug/projects/:key/requirements/:number(\\d+)',
     name: 'project-requirement',
     component: () => import('@/views/requirement/RequirementView.vue'),

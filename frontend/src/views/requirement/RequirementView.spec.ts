@@ -473,4 +473,241 @@ describe('RequirementView', () => {
       )
     })
   })
+
+  describe('editing (DL-263)', () => {
+    const EDITOR = withActions('requirement.update')
+    const title = () => document.querySelector<HTMLInputElement>('#edit-requirement-title')!
+    const description = () =>
+      document.querySelector<HTMLTextAreaElement>('#edit-requirement-description')!
+    const note = () => document.querySelector<HTMLInputElement>('#edit-requirement-change-note')!
+    async function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
+      field.value = value
+      field.dispatchEvent(new Event('input'))
+      await flushPromises()
+    }
+    async function choosePriority(value: string) {
+      document
+        .querySelector<HTMLInputElement>(`input[name=edit-requirement-priority][value=${value}]`)!
+        .click()
+      await flushPromises()
+    }
+    async function edit() {
+      button('Edit')!.click()
+      await flushPromises()
+    }
+    async function save() {
+      document
+        .querySelector<HTMLFormElement>('form[aria-label="Edit the requirement"]')!
+        .requestSubmit()
+      await flushPromises()
+    }
+    const conflict = () => failed(409, { code: 'conflict', message: '', details: {} })
+
+    it('is only for those who may update the requirement', async () => {
+      await mountAt([READER], [ok(REFUNDS)])
+      expect(button('Edit')).toBeUndefined()
+      document.body.innerHTML = ''
+
+      await mountAt([READER], [ok(EDITOR)])
+      expect(button('Edit')).toBeDefined()
+    })
+
+    it('turns the title, description, and priority into a form, focus on the title', async () => {
+      const { wrapper } = await mountAt([READER], [ok(EDITOR)])
+
+      await edit()
+
+      expect(title().value).toBe('Refunds')
+      expect(description().value).toBe(REFUNDS.description_md)
+      expect(
+        document.querySelector<HTMLInputElement>('input[name=edit-requirement-priority]:checked')!
+          .value,
+      ).toBe('high')
+      expect(note().value).toBe('')
+      expect(document.activeElement).toBe(title())
+      // The status menu waits: its change would make the save a 409.
+      expect(button('Edit')).toBeUndefined()
+      expect(wrapper.find('[aria-haspopup]').exists()).toBe(false)
+      expect(wrapper.find('#description-heading').exists()).toBe(false)
+      await expectNoA11yViolations(wrapper)
+    })
+
+    it('sends only what changed, with the version it started from and the note, then shows it and says so', async () => {
+      const saved = { ...EDITOR, title: 'Refunds and returns', version: 2 }
+      const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok(saved))
+      const { wrapper } = await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await type(title(), 'Refunds and returns')
+      await type(note(), 'Returns too')
+
+      await save()
+
+      expect(patch).toHaveBeenCalledWith('/api/projects/{key}/requirements/{number}', {
+        params: { path: { key: 'ERP', number: 7 } },
+        body: { version: 1, title: 'Refunds and returns', change_note: 'Returns too' },
+      })
+      expect(wrapper.get('h1').text()).toBe('Refunds and returns')
+      expect(document.title).toBe('Refunds and returns · Waterline')
+      expect(document.querySelector('#edit-requirement-title')).toBeNull()
+      expect(document.activeElement).toBe(button('Edit'))
+      await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_DELAY_MS * 2))
+      expect(live()).toBe('Requirement saved.')
+    })
+
+    it('sends a description change, and a priority change without the note (design-doc §6.1)', async () => {
+      const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok(EDITOR))
+      await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await type(description(), 'Shorter')
+      await save()
+      await edit()
+      await choosePriority('low')
+      await type(note(), 'Not a revision')
+      await save()
+
+      expect(patch.mock.calls.map((call) => (call[1] as { body: unknown }).body)).toEqual([
+        { version: 1, description_md: 'Shorter' },
+        { version: 1, priority: 'low' },
+      ])
+    })
+
+    it('saving with nothing changed closes the form without a request', async () => {
+      const patch = vi.spyOn(client, 'PATCH')
+      await mountAt([READER], [ok(EDITOR)])
+      await edit()
+
+      await save()
+
+      expect(patch).not.toHaveBeenCalled()
+      expect(document.querySelector('#edit-requirement-title')).toBeNull()
+      expect(document.activeElement).toBe(button('Edit'))
+    })
+
+    it('Cancel drops what was typed, focus back on Edit', async () => {
+      const patch = vi.spyOn(client, 'PATCH')
+      const { wrapper } = await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await type(title(), 'Something else')
+
+      button('Cancel')!.click()
+      await flushPromises()
+
+      expect(patch).not.toHaveBeenCalled()
+      expect(wrapper.get('h1').text()).toBe('Refunds')
+      expect(document.activeElement).toBe(button('Edit'))
+      await edit()
+      expect(title().value).toBe('Refunds')
+    })
+
+    it('asks for a title before sending anything', async () => {
+      const patch = vi.spyOn(client, 'PATCH')
+      await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await type(title(), '  ')
+
+      await save()
+
+      expect(patch).not.toHaveBeenCalled()
+      expect(title().getAttribute('aria-invalid')).toBe('true')
+      expect(document.activeElement).toBe(title())
+    })
+
+    it("shows the server's 422 on the change note, with focus there", async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        failed(422, {
+          code: 'validation_error',
+          message: 'The request is invalid.',
+          details: {
+            fields: [
+              {
+                loc: ['body', 'change_note'],
+                message: 'At most 500 characters.',
+                type: 'string_too_long',
+              },
+            ],
+          },
+        }),
+      )
+      await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await type(title(), 'Refunds and returns')
+      await type(note(), 'x'.repeat(501))
+
+      await save()
+
+      expect(note().getAttribute('aria-invalid')).toBe('true')
+      expect(document.activeElement).toBe(note())
+    })
+
+    it('a 409 says someone else changed it, with Reload, and keeps what was typed (UI-FRM-7)', async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(conflict())
+      const { wrapper } = await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await type(title(), 'Refunds and returns')
+
+      await save()
+
+      const alert = wrapper.get('form[aria-label="Edit the requirement"] [role=alert]')
+      expect(alert.text()).toContain('Someone else changed this while you were editing.')
+      expect(alert.text()).toContain('Reload')
+      expect(alert.element.contains(document.activeElement)).toBe(true)
+      expect(title().value).toBe('Refunds and returns')
+    })
+
+    it('after a 403 it keeps the form and the version it started from while they still may edit', async () => {
+      const patch = vi
+        .spyOn(client, 'PATCH')
+        .mockResolvedValueOnce(failed(403, { code: 'forbidden', message: '', details: {} }))
+        .mockResolvedValue(conflict())
+      const { get } = await mountAt(
+        [READER],
+        [ok(EDITOR), ok({ ...EDITOR, title: 'Changed meanwhile', version: 3 })],
+      )
+      await edit()
+      await type(title(), 'Refunds and returns')
+
+      await save()
+      await save()
+
+      expect(get.mock.calls.filter((c) => c[0] === '/api/projects/{key}')).toHaveLength(2)
+      expect(title().value).toBe('Refunds and returns')
+      // Someone else's save in between is still a conflict, not overwritten.
+      expect((patch.mock.calls[1]![1] as { body: { version: number } }).body.version).toBe(1)
+    })
+
+    it('after a 403 that takes the permission, the form goes and the alert says why, with focus', async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        failed(403, { code: 'forbidden', message: '', details: {} }),
+      )
+      const { wrapper } = await mountAt([READER], [ok(EDITOR), ok(REFUNDS)])
+      await edit()
+      await type(title(), 'Refunds and returns')
+
+      await save()
+
+      expect(document.querySelector('#edit-requirement-title')).toBeNull()
+      expect(button('Edit')).toBeUndefined()
+      const alert = wrapper.get('[role=alert]')
+      expect(alert.text()).toContain("You don't have permission to edit this requirement.")
+      expect(document.activeElement).toBe(alert.element)
+    })
+
+    it('a 404 means it was deleted since: the not-found page, settled', async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        failed(404, { code: 'not_found', message: '', details: {} }),
+      )
+      const { wrapper } = await mountAt(
+        [READER],
+        [ok(EDITOR), failed(404, { code: 'not_found', message: '', details: {} })],
+      )
+      await edit()
+      await type(title(), 'Refunds and returns')
+
+      await save()
+
+      expect(document.querySelector('#edit-requirement-title')).toBeNull()
+      expect(wrapper.get('h1').text()).not.toBe('Refunds')
+      expect(document.activeElement).toBe(wrapper.get('h1').element)
+    })
+  })
 })

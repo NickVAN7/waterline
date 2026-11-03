@@ -31,6 +31,11 @@ export async function testRouter(path = '/') {
         component: Page,
       },
       {
+        path: '/:orgSlug/projects/:key/requirements/new',
+        name: 'project-requirement-new',
+        component: Page,
+      },
+      {
         path: '/:orgSlug/projects/:key/requirements/:number',
         name: 'project-requirement',
         component: Page,

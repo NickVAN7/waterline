@@ -8,6 +8,7 @@ import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { requirementId, requirementItem, requirementRead } from '@/test/requirements'
+import { testRouter } from '@/test/router'
 
 import CreateRequirementDialog from './CreateRequirementDialog.vue'
 
@@ -16,23 +17,41 @@ type ProjectType = components['schemas']['ProjectType']
 const id = requirementId
 const item = requirementItem
 
+const LIST = '/acme/projects/ERP/requirements'
+let router: Awaited<ReturnType<typeof testRouter>>
+
 async function openDialog(type: ProjectType = 'software', items = [item(1, 'Invoicing')]) {
+  router = await testRouter(LIST)
   const wrapper = mount(CreateRequirementDialog, {
     props: { projectKey: 'ERP', projectType: type, items },
-    global: { plugins: [PrimeVue] },
+    global: { plugins: [router, PrimeVue] },
     attachTo: document.body,
   })
   await (wrapper.vm as unknown as { open: () => Promise<void> }).open()
   await flushPromises()
   return wrapper
 }
+const path = () => router.currentRoute.value.fullPath
 
 const field = (selector: string) => document.querySelector<HTMLInputElement>(selector)!
 const title = () => field('#create-requirement-title')
 const description = () =>
   document.querySelector<HTMLTextAreaElement>('#create-requirement-description')!
 const parent = () => document.querySelector<HTMLSelectElement>('#create-requirement-parent')!
-const priority = () => document.querySelector<HTMLSelectElement>('#create-requirement-priority')!
+const priorities = () => [
+  ...document.querySelectorAll<HTMLInputElement>('input[name=create-requirement-priority]'),
+]
+const checkedPriority = () => priorities().find((radio) => radio.checked)!.value
+async function choosePriority(value: string) {
+  priorities()
+    .find((radio) => radio.value === value)!
+    .click()
+  await flushPromises()
+}
+const button = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('dialog[open] button')].find(
+    (b) => b.textContent!.trim() === label,
+  )!
 async function fillTitle(value: string) {
   title().value = value
   title().dispatchEvent(new Event('input'))
@@ -68,8 +87,9 @@ describe('CreateRequirementDialog', () => {
       expect(document.querySelector('dialog[open] h2')!.textContent).toBe('Create a requirement')
       expect(document.activeElement).toBe(title())
       expect(description().value).toBe(template)
-      expect(priority().value).toBe('medium')
-      expect([...priority().options].map((o) => o.text)).toEqual([
+      expect(checkedPriority()).toBe('medium')
+      // Four choices: radios (UI-FRM-12).
+      expect(priorities().map((radio) => radio.closest('label')!.textContent!.trim())).toEqual([
         'Critical',
         'High',
         'Medium',
@@ -85,12 +105,11 @@ describe('CreateRequirementDialog', () => {
     },
   )
 
-  it('creates it, sending what was entered, then closes and says which row is new', async () => {
+  it("creates it, sending what was entered, then lands on the new requirement's page (DL-250)", async () => {
     const post = vi.spyOn(client, 'POST').mockResolvedValue(ok(requirementRead(7, 'Refunds')))
-    const wrapper = await openDialog()
+    await openDialog()
     await fillTitle('Refunds')
-    priority().value = 'high'
-    priority().dispatchEvent(new Event('change'))
+    await choosePriority('high')
     parent().value = id(1)
     parent().dispatchEvent(new Event('change'))
 
@@ -106,8 +125,30 @@ describe('CreateRequirementDialog', () => {
         restriction_categories: [],
       },
     })
-    expect(wrapper.emitted('created')).toEqual([[requirementRead(7, 'Refunds')]])
+    expect(path()).toBe('/acme/projects/ERP/requirements/7')
     expect(document.querySelector('dialog[open]')).toBeNull()
+  })
+
+  it('opens as a full page, carrying what was typed (UI-SHL-12)', async () => {
+    const post = vi.spyOn(client, 'POST')
+    await openDialog()
+    await fillTitle('Refunds')
+    await choosePriority('low')
+    parent().value = id(1)
+    parent().dispatchEvent(new Event('change'))
+
+    button('Open as a full page').click()
+    await flushPromises()
+
+    expect(path()).toBe('/acme/projects/ERP/requirements/new')
+    expect(router.options.history.state.draft).toEqual({
+      title: 'Refunds',
+      description_md: '## Context\n\n\n## Acceptance Criteria\n\n1. ',
+      priority: 'low',
+      parent_id: id(1),
+    })
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(post).not.toHaveBeenCalled()
   })
 
   it('sends no parent for the top level', async () => {
@@ -148,7 +189,7 @@ describe('CreateRequirementDialog', () => {
         },
       }),
     )
-    const wrapper = await openDialog()
+    await openDialog()
     await fillTitle('x'.repeat(201))
 
     await submit()
@@ -158,7 +199,7 @@ describe('CreateRequirementDialog', () => {
       'At most 200 characters.',
     )
     expect(document.activeElement).toBe(title())
-    expect(wrapper.emitted('created')).toBeUndefined()
+    expect(path()).toBe(LIST)
   })
 
   it('a 422 on the description returns to Write and focuses the editor', async () => {
@@ -199,7 +240,7 @@ describe('CreateRequirementDialog', () => {
     expect(alert.textContent).toContain("You don't have permission")
     expect(alert.contains(document.activeElement)).toBe(true)
     expect(wrapper.emitted('refused')).toHaveLength(1)
-    expect(wrapper.emitted('created')).toBeUndefined()
+    expect(path()).toBe(LIST)
   })
 
   it('a 404 with a parent chosen: the page reloads the tree, and the field goes back to the top level, saying why', async () => {
@@ -222,22 +263,36 @@ describe('CreateRequirementDialog', () => {
     )
   })
 
+  it('ignores Open as a full page while it is creating, then lands on the new requirement', async () => {
+    let answer: (value: unknown) => void = () => {}
+    vi.spyOn(client, 'POST').mockReturnValue(new Promise((resolve) => (answer = resolve)) as never)
+    await openDialog()
+    await fillTitle('Refunds')
+    document.querySelector('form')!.requestSubmit()
+
+    button('Open as a full page').click()
+    await flushPromises()
+    expect(path()).toBe(LIST)
+    answer(ok(requirementRead(7, 'Refunds')))
+    await flushPromises()
+
+    expect(path()).toBe('/acme/projects/ERP/requirements/7')
+  })
+
   it('a network failure offers Retry, which sends it again', async () => {
     const post = vi
       .spyOn(client, 'POST')
       .mockResolvedValueOnce(failed(503, { code: 'network_error', message: '', details: {} }))
       .mockResolvedValue(ok(requirementRead(7, 'Refunds')))
-    const wrapper = await openDialog()
+    await openDialog()
     await fillTitle('Refunds')
     await submit()
 
-    ;[...document.querySelectorAll<HTMLButtonElement>('dialog[open] button')]
-      .find((b) => b.textContent!.trim() === 'Retry')!
-      .click()
+    button('Retry').click()
     await flushPromises()
 
     expect(post).toHaveBeenCalledTimes(2)
-    expect(wrapper.emitted('created')).toHaveLength(1)
+    expect(path()).toBe('/acme/projects/ERP/requirements/7')
   })
 
   it("a 404 at the top level doesn't blame a parent: the page reloads, which shows the project gone", async () => {

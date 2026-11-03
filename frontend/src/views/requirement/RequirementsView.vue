@@ -2,24 +2,22 @@
 // A project's requirements (`/{org_slug}/projects/{key}/requirements`; screen inventory, "Requirement
 // tree"): the tree, complete up to 2,000 rows with a note above it (DL-159), every branch closed
 // at first (DL-175), the move menu for those who may move requirements (`requirement.update`,
-// DL-243), and New requirement for those who may create them (`requirement.create`), which
-// closes onto the new row (DL-255). For those who may read the project's content (`requirement.view`); anyone else who sees
+// DL-243), and New requirement for those who may create them (`requirement.create`), whose
+// dialog lands on the new requirement's page (DL-250). For those who may read the project's content (`requirement.view`); anyone else who sees
 // the project gets the 403 page (an export-controlled project's inherited admins, design-doc
 // §3.1). A refused move tells the page (TD-85): a stale tree is reloaded, and after a 403 so is
 // what the user may do, the shell's project with it; a reload that changes the page settles it
 // as a navigation does (UI-SHL-9). Loading, the not-found page, and the redirect are
 // `useProjectPage`'s.
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import type { components } from '@/api/schema'
 import { focusHeading, syncTitle } from '@/app/routeFocus'
 import Alert from '@/components/Alert.vue'
 import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import RequirementsTree from '@/components/RequirementsTree.vue'
-import SuccessStatus from '@/components/SuccessStatus.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
 import { useLoad } from '@/composables/useLoad'
@@ -75,23 +73,6 @@ watch(
 )
 
 const creating = ref<InstanceType<typeof CreateRequirementDialog>>()
-const treeView = ref<InstanceType<typeof RequirementsTree>>()
-
-// The new row, in the reloaded tree: revealed, selected, and focused. Past the cap, or with the
-// reload failed, it isn't there: a message says it was created (a success with no other trace),
-// and focus goes to the h1, or stays on a failed reload's Try again.
-const createdMessage = ref('')
-async function created(requirement: components['schemas']['RequirementRead']) {
-  createdMessage.value = ''
-  await tree.run()
-  await nextTick()
-  if (await treeView.value?.show(requirement.id)) return
-  const name = `${loaded.value!.key}-RQ-${requirement.number} ${requirement.title}`
-  createdMessage.value = tree.data.value?.truncated
-    ? `${name} was created. It's past the first 2,000 requirements, so the tree doesn't show it.`
-    : `${name} was created.`
-  if (!tree.error.value) await focusHeading()
-}
 </script>
 
 <template>
@@ -124,7 +105,6 @@ async function created(requirement: components['schemas']['RequirementRead']) {
           >New requirement</Button
         >
       </ProjectHeader>
-      <SuccessStatus :message="createdMessage" />
       <section
         aria-labelledby="requirements-heading"
         :aria-busy="tree.loading.value && !tree.data.value ? 'true' : 'false'"
@@ -156,7 +136,6 @@ async function created(requirement: components['schemas']['RequirementRead']) {
             This project has more than 2,000 requirements. The tree shows the first 2,000.
           </Alert>
           <RequirementsTree
-            ref="treeView"
             :project-key="loaded.key"
             :items="tree.data.value.items"
             :movable="allows(loaded, 'requirement.update')"
@@ -172,7 +151,6 @@ async function created(requirement: components['schemas']['RequirementRead']) {
         :project-type="loaded.type"
         :items="tree.data.value?.items ?? []"
         :fallback-focus="focusHeading"
-        @created="created"
         @refused="reloadProject"
         @stale="tree.run"
       />

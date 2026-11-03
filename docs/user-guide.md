@@ -100,9 +100,10 @@ project type's template: **Context** and **Acceptance Criteria** for software an
 projects; **Business Process**, **Current State**, **Future State**, and **Acceptance Criteria**
 for ERP implementations. Write the criteria as a numbered list. The description is markdown:
 **Write** is the text, **Preview** shows how it will read (raw HTML shows as text, images as
-links, and `- [ ]` and `- [x]` as "not done" and "done" marks). **Create requirement** adds it,
-numbered `ERP-RQ-<n>`, and the form closes onto its row in the tree, selected. A new requirement
-is a draft, at the bottom of its level, with the project's restriction.
+links, and `- [ ]` and `- [x]` as "not done" and "done" marks). **Open as a full page** moves the
+form, with what you've typed, to a page of its own (`…/requirements/new`). **Create requirement**
+adds it, numbered `ERP-RQ-<n>`, and opens its page. A new requirement is a draft, at the bottom of
+its level, with the project's restriction.
 
 If you may edit requirements (members and admins), select a row and use **Move** (named after
 the requirement, "Move ERP-RQ-7") to reorder it among the requirements at its level: **Move to
@@ -124,6 +125,14 @@ it, only the project's admins can lower it, and it is never below the project's 
 shows the restriction that applies, the stricter of the requirement's and the project's levels
 with both sets of categories, so a requirement on a Confidential project reads Confidential
 without one of its own; **None** in Change restriction means "same as the project".
+
+**Edit** (members and admins) turns the requirement's title, description, and priority into a
+form on its page, with a **Change note**. **Save** keeps your changes; a changed title or
+description is saved as a new version, with the note, while a priority change alone isn't (and
+keeps no note). **Cancel** drops them. If someone else saved the requirement while you were
+editing, Save is refused: **Reload** shows the latest, and your changes are lost once you press
+it, so copy anything you need first. While you edit, Change status waits until you save or
+cancel.
 
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The

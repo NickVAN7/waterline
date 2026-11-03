@@ -6,7 +6,9 @@
 // has no "Acceptance Criteria" heading (DL-149). The status menu (`requirement.update`) and the
 // restriction control (`requirement.raise_restriction` or `.lower_restriction`, DL-251) act on it;
 // the server decides each change. A requirement missing or hidden from the user is the same
-// not-found page (UI-FBK-14). Editing is S2-C18a's (DL-261).
+// not-found page (UI-FBK-14). Edit (`requirement.update`) turns the title, description, and
+// priority into a form in place (DL-263); the status menu waits while it's open, since its change
+// would make the form's save a 409.
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -36,6 +38,7 @@ import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RestrictionBadge from '@/views/project/RestrictionBadge.vue'
 import { useProjectPage } from '@/views/project/useProjectPage'
 
+import EditRequirementForm from './EditRequirementForm.vue'
 import RestrictionDialog from './RestrictionDialog.vue'
 import StatusMenu from './StatusMenu.vue'
 
@@ -70,6 +73,13 @@ watch(
   () => !!item.data.value,
   async (has, had) => {
     if (has && !had) await settlePage()
+  },
+)
+// A title changed in place (a save, a reload) renames the page too (UI-SHL-9).
+watch(
+  () => item.data.value?.title,
+  async (title, was) => {
+    if (title && was && title !== was) await syncTitle()
   },
 )
 // Any failure, not only a 404: its page or error state has an h1 of its own to settle on.
@@ -170,6 +180,45 @@ function dismiss() {
   else void focusHeading()
 }
 
+const editing = ref(false)
+const editButton = ref<InstanceType<typeof Button>>()
+const editForm = ref<InstanceType<typeof EditRequirementForm>>()
+async function edit() {
+  failure.value = ''
+  editing.value = true
+  await nextTick()
+  await editForm.value?.focus()
+}
+// Back to the page, focus on Edit, or on the h1 when Edit has gone with the permission.
+async function closeEdit() {
+  editing.value = false
+  await nextTick()
+  if (editButton.value) editButton.value.focus()
+  else await focusHeading()
+}
+async function edited(saved: components['schemas']['RequirementRead']) {
+  item.data.value = saved
+  announce('Requirement saved.')
+  await closeEdit()
+}
+// Refused: the page reloads what the user may do; the form stays, with what was typed, while
+// they still may edit (UI-FRM-7), or goes with its alert, the page's own saying why.
+async function editRefused() {
+  await reload()
+  if (allows(requirement.value, 'requirement.update')) return
+  editing.value = false
+  failures.value += 1
+  failure.value = "You don't have permission to edit this requirement."
+  await nextTick()
+  if (document.activeElement === document.body) failureAlert.value?.focus()
+}
+// Gone since it loaded: the reload brings the not-found page, which settles (UI-SHL-9).
+async function editGone() {
+  editing.value = false
+  await item.run()
+  await settlePage()
+}
+
 const restricting = ref<InstanceType<typeof RestrictionDialog>>()
 function restrictionSaved(saved: components['schemas']['RequirementRead']) {
   item.data.value = saved
@@ -221,8 +270,15 @@ function restrictionSaved(saved: components['schemas']['RequirementRead']) {
       <Alert v-if="loaded.archived" tone="info">{{ ARCHIVED_BANNER }}</Alert>
       <header class="flex flex-col gap-2">
         <PageHeader :title="requirement.title">
+          <Button
+            v-if="!editing && allows(requirement, 'requirement.update')"
+            ref="editButton"
+            variant="secondary"
+            @click="edit"
+            >Edit</Button
+          >
           <StatusMenu
-            v-if="allows(requirement, 'requirement.update')"
+            v-if="!editing && allows(requirement, 'requirement.update')"
             ref="statusMenu"
             :name="id"
             :status="requirement.status"
@@ -256,8 +312,18 @@ function restrictionSaved(saved: components['schemas']['RequirementRead']) {
         @dismiss="dismiss"
         >{{ failure }}</Alert
       >
+      <EditRequirementForm
+        v-if="editing"
+        ref="editForm"
+        :project-key="loaded.key"
+        :requirement="requirement"
+        @saved="edited"
+        @cancel="closeEdit"
+        @refused="editRefused"
+        @gone="editGone"
+      />
       <dl class="m-0 flex flex-col gap-1">
-        <div class="flex flex-wrap gap-2">
+        <div v-if="!editing" class="flex flex-wrap gap-2">
           <dt class="font-medium">Priority:</dt>
           <dd class="m-0">{{ PRIORITY[requirement.priority] }}</dd>
         </div>
@@ -274,7 +340,7 @@ function restrictionSaved(saved: components['schemas']['RequirementRead']) {
           </dd>
         </div>
       </dl>
-      <section aria-labelledby="description-heading" class="flex flex-col gap-3">
+      <section v-if="!editing" aria-labelledby="description-heading" class="flex flex-col gap-3">
         <h2 id="description-heading" class="m-0 text-lg font-semibold">Description</h2>
         <Alert v-if="!hasCriteria" tone="info"
           >No acceptance criteria: the description has no "Acceptance Criteria" heading.</Alert

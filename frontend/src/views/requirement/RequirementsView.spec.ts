@@ -94,7 +94,7 @@ async function mountAt(
   )
   await router.push(`/acme/projects/ERP/requirements`)
   await flushPromises()
-  return { wrapper, get }
+  return { wrapper, get, router }
 }
 
 type Spy = { mock: { calls: unknown[][] } }
@@ -350,26 +350,13 @@ describe('RequirementsView', () => {
       },
     )
 
-    it('creates one and closes onto it: the tree reloads with the new row selected and focused (DL-255)', async () => {
-      const refunds = item(7, 'Refunds')
+    it('creates one and lands on its page (DL-250)', async () => {
       vi.spyOn(client, 'POST').mockResolvedValue(ok(requirementRead(7, 'Refunds')))
-      const { wrapper, get } = await mountAt(
-        [CREATOR],
-        [ok(TREE), ok({ items: [...TREE.items, refunds], truncated: false })],
-      )
+      const { router } = await mountAt([CREATOR])
 
-      newButton()[0]!.click()
-      await flushPromises()
-      const title = document.querySelector<HTMLInputElement>('#create-requirement-title')!
-      title.value = 'Refunds'
-      title.dispatchEvent(new Event('input'))
-      document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit()
-      await flushPromises()
+      await create()
 
-      expect(treeCalls(get)).toHaveLength(2)
-      const row = wrapper.findAll('tbody tr').find((r) => r.text().includes('Refunds'))!
-      expect(row.attributes('aria-selected')).toBe('true')
-      expect(document.activeElement).toBe(row.element)
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements/7')
       expect(document.querySelector('dialog[open]')).toBeNull()
     })
 
@@ -404,31 +391,6 @@ describe('RequirementsView', () => {
       await create()
 
       expect(treeCalls(get)).toHaveLength(2)
-    })
-
-    it('says it was created when the tree past the cap does not show it, focus on the h1', async () => {
-      vi.spyOn(client, 'POST').mockResolvedValue(ok(requirementRead(7, 'Refunds')))
-      const { wrapper } = await mountAt([CREATOR], [ok(TREE), ok({ ...TREE, truncated: true })])
-
-      await create()
-
-      expect(wrapper.text()).toContain(
-        "ERP-RQ-7 Refunds was created. It's past the first 2,000 requirements, so the tree doesn't show it.",
-      )
-      expect(document.activeElement).toBe(wrapper.get('h1').element)
-    })
-
-    it("says it was created when the tree's reload fails, focus staying on Try again (UI-FBK-15)", async () => {
-      vi.spyOn(client, 'POST').mockResolvedValue(ok(requirementRead(7, 'Refunds')))
-      const { wrapper } = await mountAt(
-        [CREATOR],
-        [ok(TREE), failed(503, { code: 'network_error', message: '', details: {} })],
-      )
-
-      await create()
-
-      expect(wrapper.text()).toContain('ERP-RQ-7 Refunds was created.')
-      expect(document.activeElement!.textContent!.trim()).toBe('Try again')
     })
   })
 })

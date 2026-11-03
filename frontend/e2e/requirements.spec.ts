@@ -152,8 +152,9 @@ test('Expand all opens 2,000 rows without freezing the page', async ({ page }, t
 })
 
 // S2-C17a and TD-88: the create dialog, the first page showing the markdown editor and its
-// Preview, checked in a browser in both themes.
-test('creating a requirement: the editor and its Preview, then the new row', async ({
+// Preview, checked in a browser in both themes; then its full page, the new requirement's page,
+// and editing it (S2-C18a).
+test('creating a requirement: the editor and its Preview, its full page, then editing it', async ({
   page,
 }, testInfo) => {
   const { user, key } = runFor(testInfo)
@@ -224,11 +225,29 @@ test('creating a requirement: the editor and its Preview, then the new row', asy
   expect(await preview.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
   await page.setViewportSize(size)
 
-  await dialog.getByRole('button', { name: 'Create requirement' }).click()
-  await expect(dialog).toBeHidden()
-  const row = page.getByRole('row', { name: /Refunds/ })
-  await expect(row).toBeFocused()
-  await expect(row).toHaveAttribute('aria-selected', 'true')
+  // Expanded into a full page, what was typed comes along (UI-SHL-12).
+  await dialog.getByRole('button', { name: 'Open as a full page' }).click()
+  await expect(page).toHaveURL(new RegExp(`/acme/projects/${key}/requirements/new$`))
+  await expect(page.getByRole('heading', { level: 1, name: 'Create a requirement' })).toBeFocused()
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue('Refunds')
+  await expectNoA11yViolations(page)
+
+  // Created, it lands on the new requirement's page (DL-250).
+  await page.getByRole('button', { name: 'Create requirement' }).click()
+  const heading = page.getByRole('heading', { level: 1, name: 'Refunds' })
+  await expect(heading).toBeFocused()
+  await expect(page).toHaveURL(new RegExp(`/acme/projects/${key}/requirements/\\d+$`))
+
+  // Edited in place, with a change note (DL-263).
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  const title = page.getByRole('textbox', { name: 'Title', exact: true })
+  await expect(title).toBeFocused()
+  await expectNoA11yViolations(page)
+  await title.fill('Refunds and returns')
+  await page.getByRole('textbox', { name: 'Change note' }).fill('Returns too')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Refunds and returns' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeFocused()
 })
 
 // S2-C18: the requirement's page, opened from the tree, and a stored XSS payload that doesn't run
