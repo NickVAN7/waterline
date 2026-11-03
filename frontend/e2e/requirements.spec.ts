@@ -252,7 +252,7 @@ test('creating a requirement: the editor and its Preview, its full page, then ed
 
 // S2-C18: the requirement's page, opened from the tree, and a stored XSS payload that doesn't run
 // (DL-245, UI-MD-1): markdown-it with raw HTML off, then DOMPurify, then the CSP.
-test("a requirement's page: a stored payload doesn't run, and its status changes", async ({
+test("a requirement's side panel and page: a stored payload doesn't run, and its status changes", async ({
   page,
 }, testInfo) => {
   const { user, key } = runFor(testInfo)
@@ -275,8 +275,73 @@ test("a requirement's page: a stored payload doesn't run, and its status changes
   expect(patched.status()).toBe(200)
 
   await page.goto(`/acme/projects/${key}/requirements`)
-  await page.getByRole('link', { name: `${key}-RQ-${created.number}` }).click()
+  const listUrl = page.url()
+  const idLink = page.getByRole('link', { name: `${key}-RQ-${created.number}` })
 
+  // The ID opens the side panel over the list (UI-SHL-11): its own URL, focus on its title.
+  await idLink.focus()
+  await page.keyboard.press('Enter')
+  const panel = page.getByRole('dialog', { name: 'Stored payload' })
+  await expect(panel).toBeVisible()
+  await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
+  await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
+  await expect(panel.locator('.markdown')).toContainText('Works')
+  expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, 'dialog[open]')
+
+  // A change in the panel, from the keyboard: its menu works over the inert page, and the row
+  // under it follows.
+  const change = panel.getByRole('button', { name: `Change status of ${key}-RQ-${created.number}` })
+  await change.focus()
+  await page.keyboard.press('Enter')
+  await expect(panel.getByRole('menu')).toBeFocused()
+  // Under its button, not where PrimeVue's document coordinates would put it in a fixed panel.
+  const button = (await change.boundingBox())!
+  const opened = (await panel.getByRole('menu').boundingBox())!
+  expect(Math.abs(opened.y - (button.y + button.height))).toBeLessThan(12)
+  expect(Math.abs(opened.x - button.x)).toBeLessThan(12)
+  await expectNoA11yViolations(page)
+  // Esc closes the menu alone, not the panel around it.
+  await page.keyboard.press('Escape')
+  await expect(panel.getByRole('menu')).toBeHidden()
+  await expect(panel).toBeVisible()
+  await expect(change).toBeFocused()
+  await page.keyboard.press('Enter')
+  await panel.getByRole('menu').getByRole('menuitem', { name: 'Deferred' }).click()
+  await expect(panel.getByText('Status: Deferred')).toBeVisible()
+  await expect(change).toBeFocused()
+  await expect(page.getByRole('row', { name: /Stored payload/ })).toContainText('Deferred')
+
+  // Esc in the edit form keeps the panel and what was typed; Cancel ends the edit.
+  await panel.getByRole('button', { name: 'Edit' }).click()
+  const title = panel.getByLabel('Title')
+  await title.fill('Stored payload, edited')
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeVisible()
+  await expect(title).toHaveValue('Stored payload, edited')
+  await panel.getByRole('button', { name: 'Cancel' }).click()
+  await expect(panel.getByRole('button', { name: 'Edit' })).toBeFocused()
+
+  // Esc closes it as Back would: focus back on the ID, and no history entry left behind.
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  await expect(page).toHaveURL(listUrl)
+  await expect(idLink).toBeFocused()
+  await page.goBack()
+  await expect(page).not.toHaveURL(listUrl)
+  await page.goForward()
+
+  // Browser Back closes it too; Open full page goes to the requirement's page.
+  await idLink.click()
+  await expect(panel).toBeVisible()
+  await page.goBack()
+  await expect(panel).toBeHidden()
+  await expect(page).toHaveURL(listUrl)
+  await idLink.click()
+  await panel.getByRole('link', { name: 'Open full page' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`/requirements/${created.number}$`))
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Stored payload')
   await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
   const description = page.locator('.markdown')
@@ -289,14 +354,16 @@ test("a requirement's page: a stored payload doesn't run, and its status changes
   await expectFocusNotObscured(page)
 
   // The status menu from the keyboard: focus goes into the menu, then back to its button.
-  const change = page.getByRole('button', { name: `Change status of ${key}-RQ-${created.number}` })
-  await change.focus()
+  const changeOnPage = page.getByRole('button', {
+    name: `Change status of ${key}-RQ-${created.number}`,
+  })
+  await changeOnPage.focus()
   await page.keyboard.press('Enter')
   const menu = page.getByRole('menu')
   await expect(menu).toBeFocused()
   await expectNoA11yViolations(page)
   await menu.getByRole('menuitem', { name: 'In progress' }).click()
   await expect(page.getByText('Status: In progress')).toBeVisible()
-  await expect(change).toBeFocused()
+  await expect(changeOnPage).toBeFocused()
   await expectNoA11yViolations(page)
 })

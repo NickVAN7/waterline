@@ -39,8 +39,12 @@ export function useProjectPage(
     const orgSlug = nav.orgs.find((o) => o.id === loaded.organization_id)?.slug
     if (orgSlug && (orgSlug !== route.params.orgSlug || key !== loaded.key)) {
       await redirectInPlace(() =>
-        // The route's other params (a requirement's number) come along.
-        router.replace({ name: routeName, params: { ...route.params, orgSlug, key: loaded.key } }),
+        // The route's other params (a requirement's number) and its query (an open item) come along.
+        router.replace({
+          name: routeName,
+          params: { ...route.params, orgSlug, key: loaded.key },
+          query: route.query,
+        }),
       )
       return false
     }

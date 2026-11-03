@@ -50,20 +50,25 @@ const MOVER = project({
   allowed_actions: ['project.view', 'requirement.view', 'requirement.update'],
 })
 
-/** Mounts the page; `trees` and `projects` answer the GETs in turn, the last one repeating. */
+/** Mounts the page at `at`; `trees`, `projects`, and `requirements` (one's read) answer the GETs
+ * in turn, the last one repeating. */
 async function mountAt(
   projects: Project[],
   trees: unknown[] = [ok(TREE)],
-  { direct = false } = {},
+  { direct = false, at = '/acme/projects/ERP/requirements', requirements = [] as unknown[] } = {},
 ) {
   useCurrentUserStore().me = me()
-  const answers = { project: projects.map((p) => ok(p)), tree: [...trees] }
+  const answers = { project: projects.map((p) => ok(p)), tree: [...trees], requirements }
   const next = (list: unknown[]) => (list.length > 1 ? list.shift() : list[0])
   const get = vi
     .spyOn(client, 'GET')
     .mockImplementation(((path: string) =>
       Promise.resolve(
-        path === '/api/projects/{key}/requirements' ? next(answers.tree) : next(answers.project),
+        path === '/api/projects/{key}/requirements'
+          ? next(answers.tree)
+          : path === '/api/projects/{key}/requirements/{number}'
+            ? next(answers.requirements)
+            : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
@@ -87,12 +92,12 @@ async function mountAt(
   // Arrived at from another page, as a reload after an action finds it: focus then settles on the
   // page's h1 (the first page of a visit keeps the browser's own focus, UI-SHL-9).
   // `direct`: the visit's first page, opened from a link.
-  await router.push(direct ? '/acme/projects/ERP/requirements' : '/')
+  await router.push(direct ? at : '/')
   const wrapper = mount(
     { template: '<main><RouterView /></main>' },
     { global: { plugins: [router, PrimeVue] }, attachTo: document.body },
   )
-  await router.push(`/acme/projects/ERP/requirements`)
+  await router.push(at)
   await flushPromises()
   return { wrapper, get, router }
 }
@@ -391,6 +396,239 @@ describe('RequirementsView', () => {
       await create()
 
       expect(treeCalls(get)).toHaveLength(2)
+    })
+  })
+  describe('the side panel (UI-SHL-11, DL-262)', () => {
+    const PAYMENTS = {
+      ...requirementRead(2, 'Payments'),
+      description_md: '## Acceptance Criteria\n\n1. Pays the invoice',
+    }
+    const UPDATABLE = { ...PAYMENTS, allowed_actions: ['requirement.update'] }
+    const panel = () => document.querySelector<HTMLDialogElement>('dialog[open]')
+    const idLink = (number: number) =>
+      [...document.querySelectorAll<HTMLAnchorElement>('tbody a')].find(
+        (a) => a.textContent === `ERP-RQ-${number}`,
+      )!
+    const inPanel = (label: string) =>
+      [...panel()!.querySelectorAll<HTMLElement>('button, a')].find(
+        (b) => b.textContent!.trim() === label,
+      )
+    const requirementCalls = (get: Spy) =>
+      get.mock.calls.filter((call) => call[0] === '/api/projects/{key}/requirements/{number}')
+    async function openFromTree(number: number) {
+      idLink(number).focus()
+      idLink(number).click()
+      await flushPromises()
+    }
+    const NOT_FOUND = failed(404, { code: 'not_found', message: '', details: {} })
+
+    it('an ID opens its requirement in the panel over the tree, named by its title, which takes focus', async () => {
+      const { router, get } = await mountAt([READER], [ok(TREE)], {
+        requirements: [ok(PAYMENTS)],
+      })
+
+      await openFromTree(2)
+
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements?open=RQ-2')
+      const dialog = panel()!
+      const name = document.getElementById(dialog.getAttribute('aria-labelledby')!)!
+      expect(name.textContent).toBe('Payments')
+      expect(document.activeElement).toBe(name)
+      expect(dialog.textContent).toContain('ERP-RQ-2')
+      expect(dialog.textContent).toContain('Pays the invoice')
+      expect(requirementCalls(get)[0]![1]).toEqual({ params: { path: { key: 'ERP', number: 2 } } })
+      // The list keeps its place under it.
+      expect(document.querySelectorAll('tbody tr[role=row]')).toHaveLength(2)
+      expect(document.querySelector('main h1')!.textContent).toBe('ERP rollout requirements')
+      await expectNoA11yViolations(document.body)
+    })
+
+    it("links Open full page to the requirement's page", async () => {
+      await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+
+      await openFromTree(2)
+
+      expect(inPanel('Open full page')!.getAttribute('href')).toBe(
+        '/acme/projects/ERP/requirements/2',
+      )
+    })
+
+    it('Back closes it, and focus goes back to the ID that opened it', async () => {
+      const { router } = await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+      await openFromTree(2)
+
+      router.back()
+      await flushPromises()
+
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements')
+      expect(panel()).toBeNull()
+      expect(document.activeElement).toBe(idLink(2))
+    })
+
+    it('Esc after opening it here goes Back, so history gains no entry', async () => {
+      const { router } = await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+      await openFromTree(2)
+      // The web history records the entry before; the memory history the specs use doesn't.
+      vi.spyOn(router.options.history, 'state', 'get').mockReturnValue({
+        back: '/acme/projects/ERP/requirements',
+      })
+      const back = vi.spyOn(router, 'back')
+      const replace = vi.spyOn(router, 'replace')
+
+      panel()!.close()
+      await flushPromises()
+
+      expect(back).toHaveBeenCalledOnce()
+      expect(replace).not.toHaveBeenCalled()
+    })
+
+    it('Close on a shared link replaces it with the list, focus on its h1', async () => {
+      const { router } = await mountAt([READER], [ok(TREE)], {
+        direct: true,
+        at: '/acme/projects/ERP/requirements?open=RQ-2',
+        requirements: [ok(PAYMENTS)],
+      })
+      expect(panel()).not.toBeNull()
+      const replace = vi.spyOn(router, 'replace')
+
+      inPanel('Close')!.click()
+      await flushPromises()
+
+      expect(replace).toHaveBeenCalledOnce()
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements')
+      expect(panel()).toBeNull()
+      expect(document.activeElement).toBe(document.querySelector('main h1'))
+    })
+
+    it.each(['RQ-x', 'TA-2', '2', 'RQ-2x'])('?open=%s opens nothing', async (open) => {
+      const { get } = await mountAt([READER], [ok(TREE)], {
+        at: `/acme/projects/ERP/requirements?open=${open}`,
+        requirements: [ok(PAYMENTS)],
+      })
+
+      expect(panel()).toBeNull()
+      expect(requirementCalls(get)).toEqual([])
+    })
+
+    it('opens nothing for someone who may not read the content', async () => {
+      const { get } = await mountAt([READER_ONLY_PROJECT()], [ok(TREE)], {
+        at: '/acme/projects/ERP/requirements?open=RQ-2',
+        requirements: [ok(PAYMENTS)],
+      })
+
+      expect(panel()).toBeNull()
+      expect(requirementCalls(get)).toEqual([])
+    })
+
+    it('keeps the open requirement when the URL is corrected (a lowercase key)', async () => {
+      const { router } = await mountAt([READER], [ok(TREE)], {
+        direct: true,
+        at: '/acme/projects/erp/requirements?open=RQ-2',
+        requirements: [ok(PAYMENTS)],
+      })
+
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements?open=RQ-2')
+      expect(panel()).not.toBeNull()
+    })
+
+    it("a change made in the panel shows in the tree's row", async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        ok({ ...UPDATABLE, title: 'Card payments', status: 'in_progress', version: 2 }),
+      )
+      await mountAt([MOVER], [ok(TREE)], { requirements: [ok(UPDATABLE)] })
+      await openFromTree(2)
+
+      panel()!
+        .querySelector<HTMLButtonElement>('button[aria-label="Change status of ERP-RQ-2"]')!
+        .click()
+      await flushPromises()
+      ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
+        .find((li) => li.textContent!.trim() === 'In progress')!
+        .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+        .click()
+      await flushPromises()
+
+      const row = idLink(2).closest('tr')!
+      expect(row.textContent).toContain('Card payments')
+      expect(row.textContent).toContain('In progress')
+      expect(document.getElementById(panel()!.getAttribute('aria-labelledby')!)!.textContent).toBe(
+        'Card payments',
+      )
+    })
+
+    it("a Try again that loads it sends focus to the panel's title, not the page behind (UI-FBK-15)", async () => {
+      await mountAt([READER], [ok(TREE)], {
+        requirements: [
+          failed(503, { code: 'unavailable', message: '', details: {} }),
+          ok(PAYMENTS),
+        ],
+      })
+      await openFromTree(2)
+      const tryAgain = inPanel('Try again')!
+      tryAgain.focus()
+
+      tryAgain.click()
+      await flushPromises()
+
+      expect(panel()!.textContent).toContain('Pays the invoice')
+      expect(document.activeElement).toBe(
+        document.getElementById(panel()!.getAttribute('aria-labelledby')!),
+      )
+    })
+
+    it("Esc in its edit form is the form's, so the panel keeps what was typed", async () => {
+      await mountAt([MOVER], [ok(TREE)], { requirements: [ok(UPDATABLE)] })
+      await openFromTree(2)
+      inPanel('Edit')!.click()
+      await flushPromises()
+      const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+
+      document.querySelector('#edit-requirement-title')!.dispatchEvent(esc)
+
+      // Not cancelled, the browser would close the modal panel.
+      expect(esc.defaultPrevented).toBe(true)
+    })
+
+    it("shows an archived project's banner in the panel, the list's being behind it", async () => {
+      await mountAt([{ ...READER, archived: true }], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+
+      await openFromTree(2)
+
+      expect(panel()!.textContent).toContain('This project is archived. It is read-only.')
+    })
+
+    it("says so in the panel when the requirement isn't there, and reloads the tree", async () => {
+      const { get } = await mountAt([READER], [ok(TREE)], { requirements: [NOT_FOUND] })
+
+      await openFromTree(2)
+
+      expect(panel()!.textContent).toContain("This requirement isn't there any more")
+      expect(treeCalls(get)).toHaveLength(2)
+      expect(document.querySelector('main h1')!.textContent).toBe('ERP rollout requirements')
+    })
+
+    it('a 403 that closes the content to them replaces the list, panel and all, with the 403 page', async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        failed(403, { code: 'forbidden', message: '', details: {} }),
+      )
+      const { wrapper } = await mountAt([MOVER, READER_ONLY_PROJECT()], [ok(TREE)], {
+        requirements: [ok(UPDATABLE)],
+      })
+      await openFromTree(2)
+
+      panel()!
+        .querySelector<HTMLButtonElement>('button[aria-label="Change status of ERP-RQ-2"]')!
+        .click()
+      await flushPromises()
+      ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
+        .find((li) => li.textContent!.trim() === 'In progress')!
+        .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+        .click()
+      await flushPromises()
+
+      expect(panel()).toBeNull()
+      expect(wrapper.get('h1').text()).toBe("You can't open this page")
+      expect(document.activeElement).toBe(wrapper.get('h1').element)
     })
   })
 })

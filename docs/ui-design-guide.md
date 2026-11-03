@@ -512,8 +512,8 @@ render inside the full shell when signed in.
   the board opens a **side panel** over the list, so the list keeps its place, with **Open full
   page** (DL-202). The panel has its own URL, the list's route with the item open (e.g.
   `?open=TA-45`), so Back closes it and the address can be shared. A direct link to an item, and
-  **Copy link**, use the full-page route. For requirements, the panel comes in S2-C18b; until then
-  a requirement opens as its full page (DL-262).
+  **Copy link**, use the full-page route. For requirements, the tree's ID opens it at
+  `…/requirements?open=RQ-<n>` (DL-262).
 - **UI-SHL-12** **Creating an item** is a dialog with the essential fields that the user can
   **expand into a full page**, keeping what they typed; after creating, they land on the new
   item to fill in the rest (DL-202). For requirements, **Open as a full page** carries what was

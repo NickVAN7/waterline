@@ -1192,3 +1192,14 @@ Entry format:
 - **Fix by:** S2-C22 (the manual keyboard and screen-reader pass): a base level on
   `MarkdownView`, if the pass finds the outline confusing
 - **Status:** open
+
+### TD-92: Closing the side panel drops an open edit
+- **Added:** S2-C18b
+- **What:** while the requirement's edit form is open in the side panel, **Close**, the browser's
+  Back, and **Open full page** close the panel and drop what was typed, without asking. Esc in
+  the form is the form's (it does nothing, as on the page), so it no longer closes the panel.
+- **Why:** no rule says what an item's panel does with unsaved changes (keep them, or ask
+  first); that's the owner's to decide (S2-C18b review, `ui-reviewer`'s proposed UI-SHL-11
+  addition), and the panel is the shared one tasks reuse in Slice 3.
+- **Fix by:** Slice 3 (the task panel, which reuses `ItemPanel`)
+- **Status:** open

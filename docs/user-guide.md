@@ -113,8 +113,12 @@ children move with it. A move that doesn't apply says why in the menu ("already 
 If a requirement's place changed since you opened the page, the move is refused and the tree
 reloads to show where things are now.
 
-A requirement's ID in the tree opens its page (`…/requirements/<n>`; clicking elsewhere on the
-row only selects it). The page shows its title, ID, status, restriction, priority, reporter (with
+A requirement's ID in the tree opens it in a side panel over the tree, which keeps its place
+(clicking elsewhere on the row only selects it). The panel has its own address
+(`…/requirements?open=RQ-<n>`), so the browser's Back closes it, as do **Close** and Esc; a change
+you make there shows in the tree. **Open full page** goes to the requirement's page
+(`…/requirements/<n>`), and **Copy link** copies that page's address, for sharing. The panel and
+the page show the same: its title, ID, status, restriction, priority, reporter (with
 "Deactivated" after a deactivated reporter's name), and its description. A status reads
 **Approved · modified** when the requirement was approved and has changed since. If the
 description has no "Acceptance Criteria" heading, a note says so. **Change status** (members and
@@ -127,12 +131,13 @@ with both sets of categories, so a requirement on a Confidential project reads C
 without one of its own; **None** in Change restriction means "same as the project".
 
 **Edit** (members and admins) turns the requirement's title, description, and priority into a
-form on its page, with a **Change note**. **Save** keeps your changes; a changed title or
+form in place, with a **Change note**. **Save** keeps your changes; a changed title or
 description is saved as a new version, with the note, while a priority change alone isn't (and
 keeps no note). **Cancel** drops them. If someone else saved the requirement while you were
 editing, Save is refused: **Reload** shows the latest, and your changes are lost once you press
 it, so copy anything you need first. While you edit, Change status waits until you save or
-cancel.
+cancel. In the side panel, Esc doesn't close the panel while you edit; **Close**, Back, or
+**Open full page** closes it and drops what you typed.
 
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The

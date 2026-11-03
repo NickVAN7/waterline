@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C18a (Edit requirement) built; next is S2-C18b (history: `docs/reviews/`).
+> **Status:** S2-C18b (Item side panel) built; next is S2-C19 (history: `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -811,7 +811,7 @@ frontend/src/
   components/        shared UI components: Button, Alert, FormAlert, FormField, TextField,
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
-                     Pagination, SuccessStatus, PageHeader, ModalDialog,
+                     Pagination, SuccessStatus, PageHeader, ModalDialog, ItemPanel,
                      ConfirmDialog, GroupError, RowActions, Icon, NameSlugSettings
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
                      useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
@@ -948,6 +948,13 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A form
   alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
   before repeating the action (UI-FRM-7).
+- **Side panels** (UI-SHL-11): `ItemPanel` is `ModalDialog` with `panel` (docked at the right,
+  opening on its title), Open full page, Copy link, and Close. The list page owns it from its URL
+  (`?open=RQ-7`): it opens the panel when the query names an item and closes it when the query
+  goes; the panel's `close` (Esc, Close) goes Back when the entry before is the list without it,
+  else replaces the URL. The item's view is shared with its full page (`RequirementDetail`, with
+  `inPanel`), and tells the list what it shows (`changed`), so the list updates its row in place
+  (`RequirementsTree`'s `update()`; the tree's data is a shallow ref).
 - **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
   only the latest answer, and gives the message for a polite live region under the field; `skip`
   leaves out a value that needs no check (the person's own username).

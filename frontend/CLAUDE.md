@@ -178,7 +178,14 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   unnamed container (S2-C0h e2e).
 - A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets
   `append-to="self"`: the page behind a `showModal()` dialog is inert, so an overlay appended to
-  `<body>` can't be used (S1-C16b).
+  `<body>` can't be used (S1-C16b). A popup `Menu` places itself in document coordinates, so
+  `self` puts it off to the side, and the dialog scrolling to it closes it: it goes in a fixed
+  layer whose corner is kept at the document's (`StatusMenu`), checked end to end inside the
+  side panel (S2-C18b).
+- Inside a modal dialog, a PrimeVue popup's Escape is cancelled at the popup (`StatusMenu`'s
+  layer, `@keydown.esc.prevent`), and so is an in-place edit form's (`RequirementDetail`):
+  PrimeVue doesn't cancel it, and an uncancelled Escape also closes the dialog. The e2e presses
+  Esc in the open popup and expects the dialog to stay (S2-C18b review).
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.

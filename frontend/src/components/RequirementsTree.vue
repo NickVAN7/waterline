@@ -86,6 +86,14 @@ function everyNode(list: Node[]): Node[] {
   return list.flatMap((node) => [node, ...everyNode(node.children)])
 }
 
+/** A requirement changed elsewhere (the side panel): its row shows it, through the node's own
+ * reactive data, so only that row redraws (the page's list is a shallow ref). */
+function update(changed: Pick<Item, 'id'> & Partial<Item>) {
+  const found = locate(nodes.value, changed.id)
+  if (found) Object.assign(found[0][found[1]]!.data, changed)
+}
+defineExpose({ update })
+
 const selected = computed(() => {
   const key = Object.keys(selectionKeys.value)[0]
   return key ? locate(nodes.value, key) : null
@@ -374,13 +382,14 @@ const headerPt = { headerCell: { scope: 'col' } }
       <Column field="title" header="Title" expander :pt="{ ...columnPt, ...headerPt }" />
       <Column header="ID" :pt="headerPt">
         <template #body="{ node }">
-          <!-- The ID opens the requirement; a click elsewhere on the row selects it (DL-264), and
-               only the focused row's link is a Tab stop (DL-266). The
+          <!-- The ID opens the requirement, in the list's side panel (`?open=RQ-7`, UI-SHL-11); a
+               click elsewhere on the row selects it (DL-264), and only the focused row's link is a
+               Tab stop (DL-266). The
                cells are memoized: TreeTable redraws every row on each Expand all frame, and a
                component with slot content would re-render each time (DL-253's pass mark). -->
           <RouterLink
             v-memo="[node.data.number, focusedKey === node.key]"
-            :to="{ name: 'project-requirement', params: { number: node.data.number } }"
+            :to="{ query: { open: `RQ-${node.data.number}` } }"
             :data-requirement-row="node.key"
             :tabindex="focusedKey === node.key ? undefined : -1"
             class="font-mono"

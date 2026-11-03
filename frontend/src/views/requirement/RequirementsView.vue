@@ -3,20 +3,25 @@
 // tree"): the tree, complete up to 2,000 rows with a note above it (DL-159), every branch closed
 // at first (DL-175), the move menu for those who may move requirements (`requirement.update`,
 // DL-243), and New requirement for those who may create them (`requirement.create`), whose
-// dialog lands on the new requirement's page (DL-250). For those who may read the project's content (`requirement.view`); anyone else who sees
+// dialog lands on the new requirement's page (DL-250). A requirement's ID opens it in a side panel
+// over the tree (`?open=RQ-7`, UI-SHL-11, DL-262), so Back closes it and the tree keeps its
+// place; a change made there shows in its row. For those who may read the project's content (`requirement.view`); anyone else who sees
 // the project gets the 403 page (an export-controlled project's inherited admins, design-doc
 // §3.1). A refused move tells the page (TD-85): a stale tree is reloaded, and after a 403 so is
 // what the user may do, the shell's project with it; a reload that changes the page settles it
 // as a navigation does (UI-SHL-9). Loading, the not-found page, and the redirect are
 // `useProjectPage`'s.
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
+import type { components } from '@/api/schema'
 import { focusHeading, syncTitle } from '@/app/routeFocus'
 import Alert from '@/components/Alert.vue'
 import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
+import ItemPanel from '@/components/ItemPanel.vue'
 import RequirementsTree from '@/components/RequirementsTree.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
@@ -28,6 +33,9 @@ import ProjectHeader from '@/views/project/ProjectHeader.vue'
 import { useProjectPage } from '@/views/project/useProjectPage'
 
 import CreateRequirementDialog from './CreateRequirementDialog.vue'
+import RequirementDetail from './RequirementDetail.vue'
+
+type Requirement = components['schemas']['RequirementRead']
 
 const WHO_TO_ASK_EXPORT =
   "This project's content is export-controlled: only its members can read it. Ask one of its admins to add you."
@@ -73,6 +81,55 @@ watch(
 )
 
 const creating = ref<InstanceType<typeof CreateRequirementDialog>>()
+
+// The requirement open in the side panel, from the URL (`?open=RQ-7`), or null.
+const route = useRoute()
+const router = useRouter()
+const openNumber = computed(() => {
+  const match = /^RQ-(\d+)$/.exec(String(route.query.open ?? ''))
+  return match ? Number(match[1]) : null
+})
+const panel = ref<InstanceType<typeof ItemPanel>>()
+const treeView = ref<InstanceType<typeof RequirementsTree>>()
+// What the panel holds: kept while it closes, so focus goes back before its content does.
+const panelNumber = ref<number | null>(null)
+const shown = ref<Requirement>()
+watch(
+  () => (allowed.value ? openNumber.value : null),
+  async (number, was) => {
+    if (!number) return panel.value?.close()
+    shown.value = undefined
+    panelNumber.value = number
+    await nextTick()
+    if (!was) await panel.value?.open()
+  },
+  { immediate: true },
+)
+function panelClosed() {
+  panelNumber.value = null
+  closePanel()
+}
+// Esc or Close: Back, when the entry before is the list without the panel (it was opened here),
+// so history doesn't gain an entry per opening; otherwise (a shared link) the list replaces it.
+function closePanel() {
+  if (!route.query.open) return
+  const query = { ...route.query }
+  delete query.open
+  const list = router.resolve({ query })
+  if (router.options.history.state.back === list.fullPath) router.back()
+  else void router.replace(list)
+}
+// What the panel shows names it, and a change made there shows in the tree's row.
+function shownChanged(requirement: Requirement) {
+  shown.value = requirement
+  const { id, title, status, priority, current_revision_id, approved_revision_id } = requirement
+  treeView.value?.update({ id, title, status, priority, current_revision_id, approved_revision_id })
+}
+// False: the requirement has gone with the permission, and this page with it.
+async function panelReload(): Promise<boolean> {
+  await reloadProject()
+  return !notFound.value && allowed.value
+}
 </script>
 
 <template>
@@ -136,6 +193,7 @@ const creating = ref<InstanceType<typeof CreateRequirementDialog>>()
             This project has more than 2,000 requirements. The tree shows the first 2,000.
           </Alert>
           <RequirementsTree
+            ref="treeView"
             :project-key="loaded.key"
             :items="tree.data.value.items"
             :movable="allows(loaded, 'requirement.update')"
@@ -144,6 +202,28 @@ const creating = ref<InstanceType<typeof CreateRequirementDialog>>()
           />
         </template>
       </section>
+      <ItemPanel
+        v-if="panelNumber"
+        ref="panel"
+        :title="shown?.title ?? `${loaded.key}-RQ-${panelNumber}`"
+        :full-page="{
+          name: 'project-requirement',
+          params: { key: loaded.key, number: panelNumber },
+        }"
+        :fallback-focus="focusHeading"
+        @close="panelClosed"
+      >
+        <RequirementDetail
+          :key="panelNumber"
+          in-panel
+          :project="loaded"
+          :number="panelNumber"
+          :reload-project="panelReload"
+          :focus-heading="() => panel?.focusTitle()"
+          @changed="shownChanged"
+          @gone="tree.run"
+        />
+      </ItemPanel>
       <!-- Not behind the create action: a 403 may reload it away while the dialog is open. -->
       <CreateRequirementDialog
         ref="creating"

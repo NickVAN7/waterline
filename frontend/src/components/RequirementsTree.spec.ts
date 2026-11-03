@@ -149,13 +149,13 @@ describe('RequirementsTree', () => {
     await expectNoA11yViolations(document.body)
   })
 
-  it("links each ID to its requirement's page (DL-264)", async () => {
+  it('links each ID to its requirement, open in the side panel (DL-264, UI-SHL-11)', async () => {
     mountTree()
     await flushPromises()
 
     const link = row('Payments').querySelector('a')!
     expect(link.textContent).toBe('PMT-RQ-2')
-    expect(link.getAttribute('href')).toBe('/acme/projects/PMT/requirements/2')
+    expect(link.getAttribute('href')).toBe('/acme/projects/PMT/requirements?open=RQ-2')
   })
 
   it("puts only the focused row's link in the Tab order (DL-266)", async () => {
