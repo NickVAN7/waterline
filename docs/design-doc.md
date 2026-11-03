@@ -326,7 +326,10 @@ v1 they drive badges, logging, and the export-control access rules below. Column
     (DL-209). A restriction change made on the item itself moves `updated_at` (DL-210).
   - **Effective restriction** = the stricter of the item's and the project's levels, plus
     the union of their categories. None with Internal is Internal (owner decision,
-    Oct 12, 2026).
+    Oct 12, 2026). An item's restriction badge shows its effective restriction; its
+    item's read returns it (computed by `effective()` in `rules/`, never in the browser), and its
+    restriction dialog edits the item's own setting, where None reads as the project's level
+    ("Same as the project (Confidential)", or "(no level)") (DL-265).
   - **Everything else inherits:** phases, milestones, workstreams, sprints, and test runs from
     the project; subtasks, comments, and links from their parent; approval requests from what
     they approve; a test result from its test case.

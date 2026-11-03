@@ -87,7 +87,8 @@ items in §10. A **second spike** covered the SVAR widgets (§7.1).
   **select** and **combobox** (fixed choices; searchable pickers for members, staff, and orgs),
   **checkbox** and **input** styling. The **toast** is our own component built to §6.2;
   PrimeVue's Toast is not used unless a check shows it meets UI-FBK-9 and UI-FBK-10. Never
-  hand-roll a focus trap, roving tabindex, or ARIA state machine. **The project selector is a
+  hand-roll a focus trap, roving tabindex, or ARIA state machine; the one exception is the
+  requirement tree's ID links, of which only one is in the Tab order (DL-266). **The project selector is a
   disclosure popover of links, not a PrimeVue Select**, because a listbox is the wrong
   semantics for navigation (UI-SHL-6).
 - **UI-STY-4** No icon font. Icons are inline SVG through one `<Icon>` component, and PrimeVue
@@ -739,7 +740,9 @@ render inside the full shell when signed in.
   and each category as text, with the tone's icon (Internal info, Confidential warning;
   categories with no level show "No restriction level" in Internal's tone; a project with no
   level and no categories has none), never color alone. The badge starts with a visually hidden
-  "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A "Deactivated" neutral badge follows a deactivated
+  "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A content item's
+  badge (a requirement's, from S2-C18) shows its effective restriction, its own with the
+  project's (design-doc §3.1, DL-265). A "Deactivated" neutral badge follows a deactivated
   user's name everywhere it appears, except the workspace users list, where it is in the Status
   column (DL-137, from S2-C0g), and whose Role column shows the workspace role and system
   admin as text ("Owner, System admin", "System admin", "Admin"), or "User" for neither, with
@@ -1039,7 +1042,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | `EmptyState`, `ErrorState`, `ForbiddenView`, `NotFoundView`, `NoAccessView` | §6.1, UI-FBK-8, UI-FBK-14, UI-FBK-15 |
 | `DataTable`, `SelectionToolbar`, `Pagination` | §7 |
 | `TaskBoard`, `MoveToMenu` | The SVAR Kanban wrapper and the non-drag "Move to…" menu it shares with `RequirementsTree` (UI-SVR-4, UI-SVR-6); `TaskBoard` and any DataGrid wrapper are the only files that import `@svar-ui/*` |
-| `RequirementsTree` | The PrimeVue TreeTable wrapper for the requirement tree, with `MoveToMenu` (DL-174; UI-SVR-5, UI-SVR-6) |
+| `RequirementsTree` | The PrimeVue TreeTable wrapper for the requirement tree, with `MoveToMenu` (DL-174; UI-SVR-5, UI-SVR-6); one Tab stop for the rows, and only the focused row's ID link after it (DL-266) |
 | `ScheduleChart`, `ScheduleTable` (V2) | SVAR Gantt wrapper and the table that always stands beside it (§7.2, UI-SVR-9) |
 
 ---

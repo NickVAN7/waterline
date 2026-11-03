@@ -3323,3 +3323,28 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C18)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C18 re-cut)
+
+### DL-265: An item's restriction badge shows its effective restriction
+- **Date:** 2026-11-03
+- **Decision:** A content item's restriction badge shows its effective restriction (design-doc
+  §3.1: the stricter of its and the project's levels, plus the union of their categories), not
+  the one stored on it. The item's read returns it, computed by `rules/restriction.py`'s
+  `effective()` (`effective_restriction_level` and `effective_restriction_categories` on
+  `RequirementRead`), so the browser never combines them itself. The item's restriction dialog
+  still edits the item's own setting, its None worded as the project's level: "Same as the
+  project (Confidential)", or "Same as the project (no level)" when the project has none.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §3.1; ui-design-guide UI-FBK-6; build plan (S2-C18, its API field)
+- **Source:** owner, Nov 3, 2026 (S2-C18 review, checkpoint-reviewer finding 1)
+
+### DL-266: The requirement tree's rows keep one Tab stop, plus the focused row's link
+- **Date:** 2026-11-03
+- **Decision:** Only the focused row's ID link (DL-264) is in the Tab order; every other row's
+  link is `tabindex="-1"`. Tab from the focused row reaches its link, and the next Tab leaves
+  the tree. The S2-C0b spike's one Tab stop was the rows', measured before the links existed.
+- **Supersedes:** UI-STY-3 in part (the tree's ID links: a roving tabindex of our own)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-STY-3 and `RequirementsTree`; `ui-reviewer`; build plan (S2-C18)
+- **Source:** owner, Nov 3, 2026 (S2-C18 review, checkpoint-reviewer finding 2, ui-reviewer note;
+  the focused row, not the selected one, from docs-consistency's DC-2026-11-03 decision 1)

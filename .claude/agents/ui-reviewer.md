@@ -47,7 +47,8 @@ correct; you decide whether the code does it.
 - Is any click handler on a non-interactive element (`<div @click>`, `<span @click>`)? Any
   `tabindex` above 0? Any link used as a button, or a button used to navigate? (UI-FRM-15)
 - Does any custom code hand-roll a focus trap, roving tabindex, or ARIA state for a menu,
-  combobox, popover, or toast instead of using a native element or PrimeVue? Is a PrimeVue
+  combobox, popover, or toast instead of using a native element or PrimeVue? (Exception: the
+  requirement tree's ID links, one in the Tab order, DL-266.) Is a PrimeVue
   Select used for the project selector or any other navigation? (UI-STY-3, UI-SHL-6)
 - On navigation, does focus move to the new `h1` and does the title change (`<h1> · Waterline`)?
   Does a change that only alters `useListQuery` state leave focus alone and announce the result
