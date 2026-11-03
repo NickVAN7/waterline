@@ -9431,6 +9431,10 @@
             "type": "string",
             "title": "Reporter Name"
           },
+          "reporter_is_active": {
+            "type": "boolean",
+            "title": "Reporter Is Active"
+          },
           "restriction_level": {
             "anyOf": [
               {
@@ -9447,6 +9451,23 @@
             },
             "type": "array",
             "title": "Restriction Categories"
+          },
+          "effective_restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Effective Restriction Categories"
           },
           "current_revision_id": {
             "anyOf": [
@@ -9521,8 +9542,11 @@
           "priority",
           "reporter_id",
           "reporter_name",
+          "reporter_is_active",
           "restriction_level",
           "restriction_categories",
+          "effective_restriction_level",
+          "effective_restriction_categories",
           "current_revision_id",
           "approved_revision_id",
           "can_delete_children",

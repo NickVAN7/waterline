@@ -42,6 +42,15 @@ test('the requirements page: the tree and its moves, in our colors', async ({ pa
   await expectOnlyTokenColors(page, '.p-treetable')
   await expectFocusNotObscured(page)
 
+  // One Tab stop for the rows, then the focused row's link, then out of the tree (DL-266).
+  await page.getByRole('row', { name: /Billing/ }).focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('row', { name: /Shipping/ })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: `${key}-RQ-${shipping.number}` })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.locator('.p-treetable :focus')).toHaveCount(0)
+
   // Select a row and open the move menu from the keyboard: focus goes into the menu.
   await page.getByRole('row', { name: /Shipping/ }).click()
   const move = page.getByRole('button', { name: `Move ${key}-RQ-${shipping.number}` })
@@ -220,4 +229,55 @@ test('creating a requirement: the editor and its Preview, then the new row', asy
   const row = page.getByRole('row', { name: /Refunds/ })
   await expect(row).toBeFocused()
   await expect(row).toHaveAttribute('aria-selected', 'true')
+})
+
+// S2-C18: the requirement's page, opened from the tree, and a stored XSS payload that doesn't run
+// (DL-245, UI-MD-1): markdown-it with raw HTML off, then DOMPurify, then the CSP.
+test("a requirement's page: a stored payload doesn't run, and its status changes", async ({
+  page,
+}, testInfo) => {
+  const { user, key } = runFor(testInfo)
+  await signIn(page, user)
+  const payload = [
+    '## Acceptance Criteria',
+    '',
+    '<script>window.__xss = "script"</script>',
+    '<img src=x onerror="window.__xss = \'img\'">',
+    '<svg onload="window.__xss = \'svg\'"></svg>',
+    "[click](javascript:window.__xss='link')",
+    "![x](javascript:window.__xss='image')",
+    '1. Works',
+  ].join('\n')
+  const created = await createRequirement(page, key, 'Stored payload')
+  const patched = await page.request.patch(`/api/projects/${key}/requirements/${created.number}`, {
+    headers: { Origin: new URL(page.url()).origin },
+    data: { version: 1, description_md: payload },
+  })
+  expect(patched.status()).toBe(200)
+
+  await page.goto(`/acme/projects/${key}/requirements`)
+  await page.getByRole('link', { name: `${key}-RQ-${created.number}` }).click()
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Stored payload')
+  await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
+  const description = page.locator('.markdown')
+  await expect(description).toContainText('Works')
+  // The payloads show as text, or not at all; none runs.
+  await expect(description.locator('script, img, svg')).toHaveCount(0)
+  await expect(description.getByRole('link', { name: 'click' })).toHaveCount(0)
+  expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
+  await expectNoA11yViolations(page)
+  await expectFocusNotObscured(page)
+
+  // The status menu from the keyboard: focus goes into the menu, then back to its button.
+  const change = page.getByRole('button', { name: `Change status of ${key}-RQ-${created.number}` })
+  await change.focus()
+  await page.keyboard.press('Enter')
+  const menu = page.getByRole('menu')
+  await expect(menu).toBeFocused()
+  await expectNoA11yViolations(page)
+  await menu.getByRole('menuitem', { name: 'In progress' }).click()
+  await expect(page.getByText('Status: In progress')).toBeVisible()
+  await expect(change).toBeFocused()
+  await expectNoA11yViolations(page)
 })

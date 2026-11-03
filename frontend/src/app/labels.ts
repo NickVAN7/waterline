@@ -5,6 +5,7 @@ import type { IconName } from '@/components/Icon.vue'
 type ProjectStatus = components['schemas']['ProjectStatus']
 type ProjectType = components['schemas']['ProjectType']
 type Priority = components['schemas']['Priority']
+type RequirementStatus = components['schemas']['RequirementStatus']
 type RestrictionLevel = components['schemas']['RestrictionLevel']
 type RestrictionCategory = components['schemas']['RestrictionCategory']
 export type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info'
@@ -34,6 +35,39 @@ export const PRIORITY: Record<Priority, string> = {
   high: 'High',
   medium: 'Medium',
   low: 'Low',
+}
+
+/** Requirement statuses (design-doc §7) as badges, never color alone (UI-FBK-5; DL-148's tones). */
+export const REQUIREMENT_STATUS: Record<RequirementStatus, BadgeLabel> = {
+  draft: { label: 'Draft', tone: 'neutral', icon: 'circle' },
+  approved: { label: 'Approved', tone: 'success', icon: 'check' },
+  in_progress: { label: 'In progress', tone: 'info', icon: 'info' },
+  done: { label: 'Done', tone: 'success', icon: 'check' },
+  rejected: { label: 'Rejected', tone: 'danger', icon: 'x' },
+  deferred: { label: 'Deferred', tone: 'neutral', icon: 'pause' },
+}
+
+/** An approved requirement edited since its approval (design-doc §6.1): the status badge's place
+ * takes this, in the warning tone (DL-148). */
+export const APPROVED_MODIFIED: BadgeLabel = {
+  label: 'Approved · modified',
+  tone: 'warning',
+  icon: 'warning',
+}
+
+/** A requirement's status badge: "Approved · modified" when approved, then edited (design-doc
+ * §6.1: an approved revision that isn't the current one). */
+export function requirementStatusBadge(requirement: {
+  status: RequirementStatus
+  approved_revision_id: string | null
+  current_revision_id: string | null
+}): BadgeLabel {
+  const modified =
+    requirement.approved_revision_id !== null &&
+    requirement.approved_revision_id !== requirement.current_revision_id
+  return requirement.status === 'approved' && modified
+    ? APPROVED_MODIFIED
+    : REQUIREMENT_STATUS[requirement.status]
 }
 
 /** Module names (design-doc §1.1), v2 ones included: module guidance lists them all. */
@@ -76,6 +110,11 @@ export const RESTRICTION_LEVEL: Record<
 export const NO_RESTRICTION = {
   label: 'None',
   description: 'Not yet restricted; treated like Internal for every rule.',
+}
+
+/** An item's None: it inherits the project's level (DL-265). */
+export function sameAsProject(level: RestrictionLevel | null): string {
+  return `Same as the project (${level ? RESTRICTION_LEVEL[level].label : 'no level'})`
 }
 
 /** The badge for categories with no level, in Internal's tone (UI-FBK-6). */

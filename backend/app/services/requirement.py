@@ -44,7 +44,7 @@ from app.repositories.requirement import RequirementRepository
 from app.repositories.user import UserRepository
 from app.rules.approval_policy import status_after_rejection
 from app.rules.rank import rank_between
-from app.rules.restriction import Restriction, change, levels_below
+from app.rules.restriction import Restriction, change, effective, levels_below
 from app.schemas.approval import (
     ApprovalDecisionCreate,
     ApprovalRead,
@@ -758,6 +758,13 @@ class RequirementService:
         project = await self._project(requirement)
         # A foreign key, so never None.
         reporter = cast(User, await self.session.get(User, requirement.reporter_id))
+        applies = effective(
+            Restriction(requirement.restriction_level, frozenset(_categories(requirement))),
+            Restriction(
+                project.restriction_level,
+                frozenset(RestrictionCategory(c) for c in project.restriction_categories),
+            ),
+        )
         return RequirementRead(
             id=requirement.id,
             number=requirement.number,
@@ -768,8 +775,11 @@ class RequirementService:
             priority=requirement.priority,
             reporter_id=requirement.reporter_id,
             reporter_name=reporter.name,
+            reporter_is_active=reporter.is_active,
             restriction_level=requirement.restriction_level,
             restriction_categories=_categories(requirement),
+            effective_restriction_level=applies.level,
+            effective_restriction_categories=sorted(applies.categories),
             current_revision_id=requirement.current_revision_id,
             approved_revision_id=requirement.approved_revision_id,
             can_delete_children=await self._can_delete_children(ctx, project, requirement),

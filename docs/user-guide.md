@@ -85,7 +85,7 @@ or a lowercase key takes you to the project's own address. A project you can't s
 not found", the same as one that doesn't exist.
 
 **Requirements**, in the sidebar under the project (`/<organization>/projects/<KEY>/requirements`),
-shows its requirements as a tree, each with its ID (`ERP-RQ-7`). It opens with only the top-level
+shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status. It opens with only the top-level
 requirements showing: open a branch with its arrow, or with the Right arrow key on its row
 (Left closes it). **Expand all** opens every branch; on a very large project it takes a few
 seconds, and the button says "Expanding…" until it's done. A project with more than 2,000
@@ -111,6 +111,19 @@ to place it after. **Move to…** gives it a new parent, or takes it to the top 
 children move with it. A move that doesn't apply says why in the menu ("already first").
 If a requirement's place changed since you opened the page, the move is refused and the tree
 reloads to show where things are now.
+
+A requirement's ID in the tree opens its page (`…/requirements/<n>`; clicking elsewhere on the
+row only selects it). The page shows its title, ID, status, restriction, priority, reporter (with
+"Deactivated" after a deactivated reporter's name), and its description. A status reads
+**Approved · modified** when the requirement was approved and has changed since. If the
+description has no "Acceptance Criteria" heading, a note says so. **Change status** (members and
+admins) sets any status but its own and Approved, which comes only from an approval. If someone
+changed the requirement since you opened it, the change is refused and the page shows the latest.
+**Change restriction** sets the requirement's restriction level and categories: members can raise
+it, only the project's admins can lower it, and it is never below the project's own. The badge
+shows the restriction that applies, the stricter of the requirement's and the project's levels
+with both sets of categories, so a requirement on a Confidential project reads Confidential
+without one of its own; **None** in Change restriction means "same as the project".
 
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The

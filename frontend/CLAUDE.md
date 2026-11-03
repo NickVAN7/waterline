@@ -143,6 +143,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   names both fields (S1-C16).
 - A page with more than one paged list names each `Pagination` after its list (`label`,
   "Archived pagination"): two landmarks never share a name (UI-TBL-3; S2-C0g review).
+- A reload after a 403 that removes the control holding focus, while the page stays, moves focus
+  to the failure alert when focus is left on `<body>` (`RequirementsTree`'s `movable` watch,
+  `RequirementView`'s status change): never leave it there (UI-FRM-7; S2-C18 review).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).

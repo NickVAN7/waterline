@@ -995,9 +995,10 @@ Entry format:
   the revision rows (`created_by_is_active`, S2-C9) do.
 - **Why:** both are from earlier checkpoints (S2-C5, S2-C8), fixed only when needed (DL-106);
   their screens come in S2-C18 and S2-C21.
-- **Fix by:** S2-C18 (`reporter_is_active`) and S2-C21 (`deleted_by_is_active`), each with its
-  screen
-- **Status:** open
+- **Fix by:** S2-C21 (`deleted_by_is_active`, with the Trash page); the reporter's half was due
+  in S2-C18, with the requirement's page
+- **Status:** open (`reporter_is_active` resolved in S2-C18: `RequirementRead` carries it, and the
+  requirement's page shows "Deactivated" after the reporter's name)
 
 ### TD-78: Each authorization spec test spells out every action a role holds
 - **Added:** S2-C10 (owner, chat)
@@ -1179,4 +1180,15 @@ Entry format:
   and a refusal that changes the page.
 - **Fix by:** S2-C22 (the tech-debt review): the same direct `syncTitle()` and `focusHeading()`,
   with a first-visit spec
+- **Status:** open
+
+### TD-91: A description's headings sit one level below the page's h1, not below its section
+- **Added:** S2-C18 (ui-reviewer note)
+- **What:** `MarkdownView` shifts a description's headings down one level, so its `#` renders as
+  an `h2`, a sibling of the requirement page's "Description" `h2` rather than under it. UI-MD-1
+  holds (no second `h1`), but the outline is off by one there.
+- **Why:** UI-MD-1 asks only for no second `h1`; a base-level option on the shared renderer is
+  a change to S2-C16's component for one page, and the manual screen-reader pass judges it.
+- **Fix by:** S2-C22 (the manual keyboard and screen-reader pass): a base level on
+  `MarkdownView`, if the pass finds the outline confusing
 - **Status:** open

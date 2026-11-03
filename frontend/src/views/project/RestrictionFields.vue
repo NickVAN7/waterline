@@ -4,7 +4,10 @@
 // Export control isn't offered (DL-133): a project made export-controlled through the API keeps
 // it in `categories`, since a checkbox array only changes the values it renders. The groups' ids
 // are `{prefix}-restriction-level` and `{prefix}-restriction-categories`, for focus after a
-// failed submit.
+// failed submit. A requirement's dialog uses them too, its None inheriting the project's level
+// (`noneDescription`, DL-265).
+import { computed } from 'vue'
+
 import type { components } from '@/api/schema'
 import { NO_RESTRICTION, RESTRICTION_CATEGORY, RESTRICTION_LEVEL } from '@/app/labels'
 import GroupError from '@/components/GroupError.vue'
@@ -12,19 +15,29 @@ import GroupError from '@/components/GroupError.vue'
 type Level = components['schemas']['RestrictionLevel']
 type Category = components['schemas']['RestrictionCategory']
 
-defineProps<{ prefix: string; levelError?: string; categoriesError?: string }>()
+const props = defineProps<{
+  prefix: string
+  levelError?: string
+  categoriesError?: string
+  // An item's None, which inherits the project's level (DL-265).
+  noneDescription?: string
+}>()
 const emit = defineEmits<{ editLevel: []; editCategories: [] }>()
 
 const level = defineModel<Level | ''>('level', { required: true })
 const categories = defineModel<Category[]>('categories', { required: true })
 
-const LEVELS = [
-  { value: '' as const, ...NO_RESTRICTION },
+const LEVELS = computed(() => [
+  {
+    value: '' as const,
+    ...NO_RESTRICTION,
+    description: props.noneDescription ?? NO_RESTRICTION.description,
+  },
   ...(Object.keys(RESTRICTION_LEVEL) as Level[]).map((value) => ({
     value,
     ...RESTRICTION_LEVEL[value],
   })),
-]
+])
 const OFFERED = (Object.keys(RESTRICTION_CATEGORY) as Category[]).filter(
   (c) => c !== 'export_controlled',
 )

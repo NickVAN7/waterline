@@ -16,6 +16,7 @@ export function useProjectPage(
   routeName:
     | 'project-home'
     | 'project-requirements'
+    | 'project-requirement'
     | 'project-members'
     | 'project-access'
     | 'project-settings',
@@ -37,7 +38,8 @@ export function useProjectPage(
     const orgSlug = nav.orgs.find((o) => o.id === loaded.organization_id)?.slug
     if (orgSlug && (orgSlug !== route.params.orgSlug || key !== loaded.key)) {
       await redirectInPlace(() =>
-        router.replace({ name: routeName, params: { orgSlug, key: loaded.key } }),
+        // The route's other params (a requirement's number) come along.
+        router.replace({ name: routeName, params: { ...route.params, orgSlug, key: loaded.key } }),
       )
       return false
     }

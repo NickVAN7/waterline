@@ -11,9 +11,11 @@ import { computed, nextTick, ref, watch } from 'vue'
 
 import { ApiError, NETWORK_ERROR, api, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { requirementStatusBadge } from '@/app/labels'
 import { focusHeading } from '@/app/routeFocus'
 
 import Alert from './Alert.vue'
+import Badge from './Badge.vue'
 import Button from './Button.vue'
 import MovePickerDialog from './MovePickerDialog.vue'
 import MoveToMenu, { type MoveAction } from './MoveToMenu.vue'
@@ -51,6 +53,15 @@ const failureAlert = ref<InstanceType<typeof Alert>>()
 const root = ref<HTMLElement>()
 const expandedKeys = ref<Record<string, boolean>>({})
 const selectionKeys = ref<Record<string, boolean>>({})
+// The row focus is on: only its ID link is in the Tab order, so Tab leaves the tree after one
+// link, not one per row (DL-266).
+const focusedKey = ref<string | null>(null)
+function onFocusin(event: FocusEvent) {
+  const link = (event.target as HTMLElement)
+    .closest('tr')
+    ?.querySelector<HTMLElement>('[data-requirement-row]')
+  if (link) focusedKey.value = link.dataset.requirementRow!
+}
 // A reload keeps the failure that caused it: the message says what happened.
 watch(
   () => props.items,
@@ -371,11 +382,38 @@ const headerPt = { headerCell: { scope: 'col' } }
       selection-mode="single"
       :pt="{ ...tablePt, ...rowPt }"
       @keydown.capture="onKeydown"
+      @focusin="onFocusin"
     >
       <Column field="title" header="Title" expander :pt="{ ...columnPt, ...headerPt }" />
       <Column header="ID" :pt="headerPt">
         <template #body="{ node }">
-          <span :data-requirement-row="node.key">{{ displayId(node.data) }}</span>
+          <!-- The ID opens the requirement; a click elsewhere on the row selects it (DL-264), and
+               only the focused row's link is a Tab stop (DL-266). The
+               cells are memoized: TreeTable redraws every row on each Expand all frame, and a
+               component with slot content would re-render each time (DL-253's pass mark). -->
+          <RouterLink
+            v-memo="[node.data.number, focusedKey === node.key]"
+            :to="{ name: 'project-requirement', params: { number: node.data.number } }"
+            :data-requirement-row="node.key"
+            :tabindex="focusedKey === node.key ? undefined : -1"
+            class="font-mono"
+            >{{ displayId(node.data) }}</RouterLink
+          >
+        </template>
+      </Column>
+      <Column header="Status" :pt="headerPt">
+        <template #body="{ node }">
+          <!-- The status badge (DL-148, DL-252), memoized as the ID cell is. -->
+          <Badge
+            v-memo="[
+              node.data.status,
+              node.data.approved_revision_id,
+              node.data.current_revision_id,
+            ]"
+            :tone="requirementStatusBadge(node.data).tone"
+            :icon="requirementStatusBadge(node.data).icon"
+            >{{ requirementStatusBadge(node.data).label }}</Badge
+          >
         </template>
       </Column>
     </TreeTable>

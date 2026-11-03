@@ -76,6 +76,11 @@ async function mountAt(
         component: RequirementsView,
         meta: { settlesItself: true },
       },
+      {
+        path: '/:orgSlug/projects/:key/requirements/:number',
+        name: 'project-requirement',
+        component: Page,
+      },
     ],
   })
   installRouteFocus(router)

@@ -87,8 +87,13 @@ class RequirementRead(BaseModel):
     priority: Priority
     reporter_id: uuid.UUID
     reporter_name: str
+    # False shows the "Deactivated" badge after the reporter's name (TD-77).
+    reporter_is_active: bool
     restriction_level: RestrictionLevel | None
     restriction_categories: list[RestrictionCategory]
+    # What applies: the stricter of its and the project's levels, all their categories (DL-265).
+    effective_restriction_level: RestrictionLevel | None
+    effective_restriction_categories: list[RestrictionCategory]
     current_revision_id: uuid.UUID | None
     approved_revision_id: uuid.UUID | None
     # Whether the caller may delete the whole subtree with it (`?children=delete`, DL-222).

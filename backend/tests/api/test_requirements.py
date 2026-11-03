@@ -11,7 +11,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import ActivityAction, ActivityEntityType, ProjectRole
+from app.enums import ActivityAction, ActivityEntityType, ProjectRole, RestrictionLevel
 from app.models.requirement import Requirement, RequirementRevision
 from app.models.user import User
 from app.services import requirement as requirement_service
@@ -263,6 +263,56 @@ async def test_the_read_returns_the_requirement(
         str(parent.id),
     )
     assert (body["reporter_id"], body["reporter_name"]) == (str(reporter.id), "Ali Khan")
+
+
+@pytest.mark.parametrize("is_active", [True, False])
+async def test_the_read_says_whether_the_reporter_is_active(
+    client: AsyncClient, t: Tenancy, member: User, is_active: bool
+) -> None:
+    """Bug: a deactivated reporter's name shows without its "Deactivated" badge (TD-77)."""
+    reporter = await UserFactory.create_async(is_active=is_active)
+    await RequirementFactory.create_async(project=t.project, number=4, reporter=reporter)
+
+    response = await client.get(f"{REQUIREMENTS}/4")
+
+    assert response.json()["reporter_is_active"] is is_active
+
+
+# A level and categories, as stored on a project or requirement.
+_Restriction = tuple[RestrictionLevel | None, list[str]]
+_CONFIDENTIAL, _INTERNAL = RestrictionLevel.CONFIDENTIAL, RestrictionLevel.INTERNAL
+_EFFECTIVE: list[tuple[_Restriction, _Restriction, _Restriction]] = [
+    ((None, []), (None, []), (None, [])),
+    ((_CONFIDENTIAL, ["financial"]), (None, []), (_CONFIDENTIAL, ["financial"])),
+    ((_INTERNAL, ["pii"]), (_CONFIDENTIAL, ["financial"]), (_CONFIDENTIAL, ["financial", "pii"])),
+]
+
+
+@pytest.mark.parametrize(("project", "item", "applies"), _EFFECTIVE)
+async def test_the_read_returns_the_effective_restriction(
+    client: AsyncClient,
+    session: AsyncSession,
+    t: Tenancy,
+    member: User,
+    project: _Restriction,
+    item: _Restriction,
+    applies: _Restriction,
+) -> None:
+    """Bug: a requirement that only inherits a Confidential project's restriction shows none
+    (DL-265; design-doc §3.1: the stricter level, the union of the categories)."""
+    t.project.restriction_level, t.project.restriction_categories = project
+    await session.flush()
+    await RequirementFactory.create_async(
+        project=t.project, number=4, restriction_level=item[0], restriction_categories=item[1]
+    )
+
+    body = (await client.get(f"{REQUIREMENTS}/4")).json()
+
+    assert (
+        body["effective_restriction_level"],
+        body["effective_restriction_categories"],
+    ) == applies
+    assert (body["restriction_level"], body["restriction_categories"]) == item
 
 
 @pytest.mark.parametrize(

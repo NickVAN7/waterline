@@ -1,6 +1,7 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Router } from 'vue-router'
 
 import { client } from '@/api/client'
 import * as routeFocus from '@/app/routeFocus'
@@ -8,6 +9,7 @@ import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { testRouter } from '@/test/router'
 
 import RequirementsTree from './RequirementsTree.vue'
 
@@ -53,10 +55,12 @@ const NOT_SIBLING = failed(422, {
 })
 const STALE = "This requirement's place had changed, so the tree has been reloaded."
 
+let router: Router
+
 function mountTree(items: Item[] = TREE, movable = true) {
   return mount(RequirementsTree, {
     props: { projectKey: 'PMT', items, movable },
-    global: { plugins: [PrimeVue], stubs: { transition: false } },
+    global: { plugins: [PrimeVue, router], stubs: { transition: false } },
     attachTo: document.body,
   })
 }
@@ -83,9 +87,10 @@ async function choose(label: string) {
   await flushPromises()
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   stubResizeObserver()
   stubDialog()
+  router = await testRouter('/acme/projects/PMT/requirements')
 })
 afterEach(() => {
   document.body.innerHTML = ''
@@ -139,10 +144,73 @@ describe('RequirementsTree', () => {
     expect(document.querySelector('table')!.getAttribute('aria-label')).toBe('Requirements')
     expect(
       [...document.querySelectorAll('thead th')].map((th) => th.getAttribute('scope')),
-    ).toEqual(['col', 'col'])
+    ).toEqual(['col', 'col', 'col'])
     expect(row('Card payments').getAttribute('aria-selected')).toBe('true')
     await expectNoA11yViolations(document.body)
   })
+
+  it("links each ID to its requirement's page (DL-264)", async () => {
+    mountTree()
+    await flushPromises()
+
+    const link = row('Payments').querySelector('a')!
+    expect(link.textContent).toBe('PMT-RQ-2')
+    expect(link.getAttribute('href')).toBe('/acme/projects/PMT/requirements/2')
+  })
+
+  it("puts only the focused row's link in the Tab order (DL-266)", async () => {
+    mountTree()
+    await flushPromises()
+    const tabbable = () =>
+      [...document.querySelectorAll<HTMLElement>('tbody a')]
+        .filter((a) => a.tabIndex === 0)
+        .map((a) => a.textContent)
+
+    // Before any row has focus, no link is a Tab stop: Tab reaches the row first.
+    expect(tabbable()).toEqual([])
+    row('Payments').focus()
+    await flushPromises()
+    expect(tabbable()).toEqual(['PMT-RQ-2'])
+    row('Reporting').focus()
+    await flushPromises()
+    expect(tabbable()).toEqual(['PMT-RQ-3'])
+  })
+
+  it("puts a one-row tree's link in the Tab order once its row has focus (DL-266)", async () => {
+    // One row: the link's memo matches between renders, so only its focus key re-renders it.
+    mountTree([TREE[0]!])
+    await flushPromises()
+
+    row('Invoicing').focus()
+    await flushPromises()
+
+    expect(row('Invoicing').querySelector('a')!.tabIndex).toBe(0)
+  })
+
+  it.each([
+    ['draft', null, null, 'Draft'],
+    ['approved', 'r1', 'r1', 'Approved'],
+    ['approved', 'r1', 'r2', 'Approved · modified'],
+    ['deferred', null, null, 'Deferred'],
+  ] as const)(
+    'shows a %s requirement (approved %s, current %s) as %s (DL-148, DL-252)',
+    async (status, approved, current, label) => {
+      mountTree([
+        {
+          ...item(1, 'Invoicing'),
+          status,
+          approved_revision_id: approved,
+          current_revision_id: current,
+        },
+      ])
+      await flushPromises()
+
+      const cell = row('Invoicing').querySelectorAll('td')[2]!
+      expect(cell.textContent!.trim()).toBe(label)
+      // A badge, icon and text together, never the text alone (UI-FBK-5).
+      expect(cell.querySelector('span.border svg')).not.toBeNull()
+    },
+  )
 
   it('marks the selected row with the leading bar, not color alone (UI-TOK-9)', async () => {
     mountTree()

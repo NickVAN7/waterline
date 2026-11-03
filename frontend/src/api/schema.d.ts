@@ -2410,9 +2410,14 @@ export interface components {
             reporter_id: string;
             /** Reporter Name */
             reporter_name: string;
+            /** Reporter Is Active */
+            reporter_is_active: boolean;
             restriction_level: components["schemas"]["RestrictionLevel"] | null;
             /** Restriction Categories */
             restriction_categories: components["schemas"]["RestrictionCategory"][];
+            effective_restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Effective Restriction Categories */
+            effective_restriction_categories: components["schemas"]["RestrictionCategory"][];
             /** Current Revision Id */
             current_revision_id: string | null;
             /** Approved Revision Id */

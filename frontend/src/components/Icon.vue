@@ -17,6 +17,7 @@ export type IconName =
   | 'home'
   | 'more'
   | 'sign-out'
+  | 'pause'
 
 const props = defineProps<{ name: IconName; label?: string }>()
 
@@ -38,6 +39,7 @@ const PATHS: Record<IconName, string[]> = {
     'M9.9 9.9a3 3 0 0 0 4.2 4.2',
   ],
   x: ['M6 6l12 12', 'M18 6 6 18'],
+  pause: ['M9 6v12', 'M15 6v12'],
   spinner: ['M12 3a9 9 0 1 0 9 9'],
   'chevron-down': ['M6 9l6 6 6-6'],
   menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],

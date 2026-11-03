@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// A project's restriction badge in the project header (design-doc §3.1, UI-FBK-6, DL-137): its
+// A restriction badge: a project's in the project header, an item's effective one on its page
+// (design-doc §3.1, UI-FBK-6, DL-137, DL-265): its
 // level and categories as text, with the level's tone and icon, never color alone. None for a
 // project with no level and no categories; categories with no level show "No restriction level"
 // in Internal's tone, as every rule treats it as Internal. A visually hidden "Restriction: " says
