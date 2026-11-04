@@ -1902,7 +1902,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the selected revision vs the one before; the older one is always From. API: the revision list
   (cursor-paged) and one revision's read; no compare endpoint.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-267 (in part: in S2-C19a, not S2-C19)
 - **Applies to:** design-doc §6.1; ui-design-guide (UI-MD-3); build plan (S2-C9, S2-C19)
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
 
@@ -3348,3 +3348,32 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide UI-STY-3 and `RequirementsTree`; `ui-reviewer`; build plan (S2-C18)
 - **Source:** owner, Nov 3, 2026 (S2-C18 review, checkpoint-reviewer finding 2, ui-reviewer note;
   the focused row, not the selected one, from docs-consistency's DC-2026-11-03 decision 1)
+
+### DL-267: S2-C19 splits: the History tab, then Revisions and compare (S2-C19a)
+- **Date:** 2026-11-04
+- **Decision:** S2-C19 builds the tab strip and the History tab; a new row, S2-C19a, builds the
+  Revisions tab: the revision list and the compare (DL-145), with `jsdiff`.
+- **Supersedes:** DL-145 in part (in S2-C19a, not S2-C19); build plan S2-C19 in part (the
+  Revisions tab)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C19, S2-C19a); ui-design-guide §7.3
+- **Source:** owner, Nov 4, 2026 (chat session, S2-C19 re-cut)
+
+### DL-268: History and Revisions sit below the requirement's description
+- **Date:** 2026-11-04
+- **Decision:** The History and Revisions tabs sit below the requirement's details and
+  description, on its full page and in its side panel alike (both show `RequirementDetail`);
+  the details, the description, and the edit mode (DL-263) stay as they are, outside the tabs.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; build plan (S2-C19)
+- **Source:** owner, Nov 4, 2026 (chat session, S2-C19 re-cut)
+
+### DL-269: The selected tab isn't in the URL
+- **Date:** 2026-11-04
+- **Decision:** The requirement's tabs keep the selected tab in the page only, not in the URL;
+  the page and the side panel open on the first tab, History.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; build plan (S2-C19)
+- **Source:** owner, Nov 4, 2026 (chat session, S2-C19 re-cut)

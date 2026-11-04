@@ -947,7 +947,9 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
 - **History** (DL-147): the requirement's detail page has a History tab (its activity entries,
   §10, in plain language, the server resolving the names of the actor and of user fields, former
   members' included, with the "Deactivated" badge where it applies, DL-160) beside a Revisions
-  tab (the list and the compare above).
+  tab (the list and the compare above). The tabs sit below the requirement's details and
+  description, on its page and in its side panel (DL-268), and open on History; the selected tab
+  isn't in the URL (DL-269).
 - Status and priority changes are *not* revisions — they go to `activity_log`.
 
 ### 6.2 Approvals

@@ -998,7 +998,7 @@ Not in V1. This is the plan so that V2 starts from decisions, not research.
 ### 7.3 Rendered markdown and revision compare
 
 Markdown is rendered in the browser (design-doc §3, "Markdown"; DL-140). Built in S2-C16, with
-the revision compare in S2-C19.
+the revision compare in S2-C19a (DL-267).
 
 - **UI-MD-1** **One renderer, `MarkdownView`:** `markdown-it` with raw HTML off, then DOMPurify
   on its output; never `v-html` on anything else. No remote images (image syntax renders as a
