@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C18b (Item side panel) built; next is S2-C18c (Expand all's limit; `docs/reviews/`).
+> **Status:** S2-C18b (Item side panel) built; next is S2-C18c (Expand requirement; `docs/reviews/`).
 
 ## 1. Workstation setup
 

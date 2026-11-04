@@ -2243,7 +2243,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the page never freezes (the data is already loaded, DL-159; the cost is drawing rows), and
   S2-C17 measures it at the 2,000-row cap.
 - **Supersedes:** none (confirms DL-174)
-- **Superseded by:** DL-253 (in part: the pass mark); DL-270 (in part: Expand all stops at 500 rows)
+- **Superseded by:** DL-253 (in part: the pass mark); DL-271 (in part: "Expand requirement" replaces "Expand all")
 - **Applies to:** build plan (S2-C17); `docs/reviews/s2/S2-C0b.md`
 - **Source:** owner, Oct 22, 2026 (answers to S2-C0b's open questions)
 
@@ -3199,7 +3199,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   nearing the cap revisits it (TD-89).
 - **Supersedes:** DL-175 in part ("so the page never freezes"); answers DC-2026-10-22f's
   decision 1 (the pass mark)
-- **Superseded by:** DL-254 (in part: the guard's limit in CI); DL-270 (in part: Expand all stops at 500 rows)
+- **Superseded by:** DL-254 (in part: the guard's limit in CI); DL-271 (in part: "Expand requirement" replaces "Expand all")
 - **Applies to:** build plan (S2-C17); tech debt (TD-89)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17's measurement)
 
@@ -3390,8 +3390,27 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   requirement's whole branch), is revisited (TD-93).
 - **Supersedes:** DL-175 and DL-253 in part (Expand all opens every branch; the guard measures
   opening all 2,000 rows)
-- **Superseded by:** none
+- **Superseded by:** DL-271 (before it was built)
 - **Applies to:** build plan (S2-C17, S2-C18c); testing strategy ("Flaky tests are bugs"); user
   guide (Requirements); tech debt (TD-89, TD-93); `RequirementsTree`; `e2e/requirements.spec.ts`
 - **Source:** owner, Nov 4, 2026 (chat session, the timing test red on DC-2026-11-04's CI and
   its rerun)
+
+### DL-271: "Expand requirement" replaces "Expand all"
+- **Date:** 2026-11-04
+- **Decision:** The tree's "Expand all" is removed. A button, "Expand requirement", in Expand all's
+  place beside the move menu (a plain button, not a `toolbar`), opens the selected requirement's whole branch, level by level (breadth first),
+  stopping before it would show more than 500 rows under it; when it stops short, the page says
+  that deeper rows stay closed. With nothing selected, or a selected requirement with no
+  children, the button is disabled by state with its reason (UI-TOK-10). No keyboard shortcut:
+  the button is reached by Tab like the move menu. Expanding several requirements at once (a
+  multi-select) may come later if users need it. The end-to-end guard keeps its limits (no task
+  over 1 s on the workstation, 3 s in CI, DL-253, DL-254) on a 2,000-row tree whose rows sit
+  under one top-level requirement; DL-257 still holds for it. Built in S2-C18c, before S2-C19
+  (DL-131).
+- **Supersedes:** DL-270 (before it was built); DL-175 and DL-253 in part ("Expand all")
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17, S2-C18c); testing strategy ("Flaky tests are bugs"); user
+  guide (Requirements); tech debt (TD-89, TD-93); developer guide (Status);
+  `RequirementsTree`; `e2e/requirements.spec.ts`
+- **Source:** owner, Nov 4, 2026 (chat session, in place of DL-270)

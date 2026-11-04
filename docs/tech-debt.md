@@ -1164,7 +1164,7 @@ Entry format:
 - **What:** at the cap, "Expand all" takes about 5.5 s to show every row, with single pauses of
   up to about 0.8 s, since PrimeVue TreeTable re-renders every visible row each frame.
 - **Why:** v1 projects are far below the cap; a fix (virtual scrolling, or a widget that draws
-  only the rows in view) is a widget change. Since DL-270, Expand all stops at 500 rows (TD-93);
+  only the rows in view) is a widget change. Since DL-271, "Expand requirement" opens at most 500 rows (TD-93);
   opening branches by hand can still reach the cap.
 - **Fix by:** Slice 7 (the end of v1), or sooner if a project nears 1,000 requirements:
   measure again with the largest real project, and change the tree's rendering only if one
@@ -1207,12 +1207,9 @@ Entry format:
 
 ### TD-93: Expand all may not be the right action for the tree
 - **Added:** DC-2026-11-04b (DL-270)
-- **What:** "Expand all" opens the tree level by level up to 500 rows (DL-270), a limit set to
-  keep the page responsive (PrimeVue TreeTable redraws every visible row, TD-89), not from what
-  users need. It may have no real use case; opening one requirement's whole branch may serve
-  better.
-- **Why:** the limit fixes the freeze now; the right behavior needs real use to judge.
-- **Fix by:** S2-C22 (the tech-debt review and retro): decide whether to keep Expand all, replace
-  it (e.g. with opening a requirement's whole branch), or drop it, then build the choice in its
-  own checkpoint
+- **What:** "Expand all" opens every branch, which near the 2,000-row cap freezes the page for up
+  to about 3 s in CI (TD-89); DL-270's 500-row limit on it was set to keep the page responsive,
+  not from what users need.
+- **Why:** the owner judged opening one requirement's branch the more useful action (DL-271).
+- **Fix by:** S2-C18c: "Expand requirement" replaces "Expand all" (DL-271)
 - **Status:** open

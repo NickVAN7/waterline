@@ -209,7 +209,7 @@ Then:
   (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
   report. Never report a checkpoint whose CI isn't green. The one exception: CI red from the
-  Expand all timing test (`e2e/requirements.spec.ts`) gets no `fix(<ID>)` commit: rerun the
+  tree's timing test (`e2e/requirements.spec.ts`; DL-257, DL-271) gets no `fix(<ID>)` commit: rerun the
   job once, then stop and send both runs' numbers to the owner, whatever the rerun shows
   (DL-257).
 - Never merge. At the slice's last checkpoint, the owner's approval decides the merge. Any
