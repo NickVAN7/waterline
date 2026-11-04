@@ -8,7 +8,7 @@
   code, so no `checkpoint-reviewer`, DL-18).
 - **Base commit:** `843781f` (DC-2026-11-04b).
 - **Reviewers:** `docs-consistency` (trigger `design-change`), on one snapshot (DL-105).
-- **Totals:** 1 fix, fixed; 1 note, fixed; 3 decisions for the owner.
+- **Totals:** 1 fix, fixed; 1 note, fixed; 3 decisions for the owner, answered in DL-272.
 - **Gates at close:** `uv run wl check` green; CI on the commit stays red on the timing test until
   S2-C18c (DL-257, DL-271).
 
@@ -33,6 +33,6 @@
 
 | # | Kind | Question | Options | Resolution |
 |---|---|---|---|---|
-| 1 | gap | What the guard asserts about the stop; whether the level it stops in may be partly open; what happens when the selected requirement has more than 500 direct children (DC-2026-11-04b decision 1, carried) | (a) at most 500 plus the note, partial levels allowed; (b) a fixture stopping on exactly 500, asserted; for more than 500 children: open nothing, open the first level anyway, or disable with a reason | **Open:** to the owner, before S2-C18c starts |
-| 2 | gap | Whether "Expand requirement" keeps DL-253's mechanism (the second level at once, deeper 25 a frame, "Expanding…") | (a) keep it; (b) drop it, drawing at most 500 rows in one pass | **Open:** to the owner, before S2-C18c starts |
-| 3 | gap | The button when the branch is already fully open, and whether the 500 counts rows already open | (a) enabled, doing nothing; the count includes open rows; (b) disabled with "Everything under it is open" | **Open:** to the owner, before S2-C18c starts |
+| 1 | gap | What the guard asserts about the stop; whether the level it stops in may be partly open; what happens when the selected requirement has more than 500 direct children (DC-2026-11-04b decision 1, carried) | (a) at most 500 plus the note, partial levels allowed; (b) a fixture stopping on exactly 500, asserted; for more than 500 children: open nothing, open the first level anyway, or disable with a reason | **Answered:** DL-272 (partial levels, from (a); the exact 500, from (b); the first level anyway): the first level always, as its arrow does; a level partly open; the fixture stops on exactly 500, asserted |
+| 2 | gap | Whether "Expand requirement" keeps DL-253's mechanism (the second level at once, deeper 25 a frame, "Expanding…") | (a) keep it; (b) drop it, drawing at most 500 rows in one pass | **Answered:** DL-272 (a): kept: the first level at once, deeper 25 a frame, "Expanding…" |
+| 3 | gap | The button when the branch is already fully open, and whether the 500 counts rows already open | (a) enabled, doing nothing; the count includes open rows; (b) disabled with "Everything under it is open" | **Answered:** DL-272 (a): enabled, changing nothing; rows already open count |

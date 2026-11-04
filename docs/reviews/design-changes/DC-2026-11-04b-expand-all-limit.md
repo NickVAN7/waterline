@@ -7,7 +7,7 @@
 - **Kind:** docs only (no tooling code, so no `checkpoint-reviewer`, DL-18).
 - **Base commit:** `e5645c9` (DC-2026-11-04).
 - **Reviewers:** `docs-consistency` (trigger `design-change`), on one snapshot (DL-105).
-- **Totals:** 1 fix, fixed; 1 decision for the owner.
+- **Totals:** 1 fix, fixed; 1 decision for the owner, answered in DL-272.
 - **Gates at close:** `uv run wl check` green; CI on the commit stays red on the Expand all timing
   test until S2-C18c (DL-257, DL-270).
 
@@ -31,4 +31,4 @@
 
 | # | Kind | Question | Options | Resolution |
 |---|---|---|---|---|
-| 1 | gap | What the guard asserts about "the stop at 500" (the visible count can end below 500), and what Expand all does when the top level alone has more than 500 rows | (a) at most 500 visible rows plus the note; (b) a fixture shaped to stop on exactly 500, asserted; (c) either, plus a rule for more than 500 top-level rows (opens nothing with the note, or the button disabled) | **Open:** to the owner, before S2-C18c starts |
+| 1 | gap | What the guard asserts about "the stop at 500" (the visible count can end below 500), and what Expand all does when the top level alone has more than 500 rows | (a) at most 500 visible rows plus the note; (b) a fixture shaped to stop on exactly 500, asserted; (c) either, plus a rule for more than 500 top-level rows (opens nothing with the note, or the button disabled) | **Answered:** DL-272 (with DC-2026-11-04c's decision 1): the first level always; a level partly open; the fixture stops on exactly 500 |

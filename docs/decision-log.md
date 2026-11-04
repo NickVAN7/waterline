@@ -3409,8 +3409,25 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   under one top-level requirement; DL-257 still holds for it. Built in S2-C18c, before S2-C19
   (DL-131).
 - **Supersedes:** DL-270 (before it was built); DL-175 and DL-253 in part ("Expand all")
-- **Superseded by:** none
+- **Superseded by:** DL-272 (in part: the first level always opens, even over 500)
 - **Applies to:** build plan (S2-C17, S2-C18c); testing strategy ("Flaky tests are bugs"); user
   guide (Requirements); tech debt (TD-89, TD-93); developer guide (Status);
   `RequirementsTree`; `e2e/requirements.spec.ts`
 - **Source:** owner, Nov 4, 2026 (chat session, in place of DL-270)
+
+### DL-272: How "Expand requirement" stops, and its button
+- **Date:** 2026-11-04
+- **Decision:** "Expand requirement" always opens the selected requirement's first level, as its
+  arrow does, even when that's over 500 rows, and then no deeper level. Below it, it opens
+  branches in tree order, level by level, until the next would pass 500 rows under the
+  requirement, so the level it stops in may be only partly open; rows already open count toward
+  the 500. It keeps DL-253's mechanism: the first level at once, the deeper branches 25 a frame,
+  the button showing "Expanding…" until done. On a branch already fully open it stays enabled
+  and changes nothing. The end-to-end guard's fixture is shaped so the stop lands on exactly 500
+  rows, and it asserts that count.
+- **Supersedes:** DL-271 in part (the first level over 500); completes it otherwise
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C18c); testing strategy ("Flaky tests are bugs"); tech debt
+  (TD-89); `RequirementsTree`; `e2e/requirements.spec.ts`
+- **Source:** owner, Nov 4, 2026 (DC-2026-11-04c, docs-consistency decisions 1 to 3: decision 1
+  partial levels with an exact count, decisions 2 and 3 option (a); DC-2026-11-04b's decision 1)
