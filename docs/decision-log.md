@@ -2243,7 +2243,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the page never freezes (the data is already loaded, DL-159; the cost is drawing rows), and
   S2-C17 measures it at the 2,000-row cap.
 - **Supersedes:** none (confirms DL-174)
-- **Superseded by:** DL-253 (in part: the pass mark)
+- **Superseded by:** DL-253 (in part: the pass mark); DL-270 (in part: Expand all stops at 500 rows)
 - **Applies to:** build plan (S2-C17); `docs/reviews/s2/S2-C0b.md`
 - **Source:** owner, Oct 22, 2026 (answers to S2-C0b's open questions)
 
@@ -3199,7 +3199,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   nearing the cap revisits it (TD-89).
 - **Supersedes:** DL-175 in part ("so the page never freezes"); answers DC-2026-10-22f's
   decision 1 (the pass mark)
-- **Superseded by:** DL-254 (in part: the guard's limit in CI)
+- **Superseded by:** DL-254 (in part: the guard's limit in CI); DL-270 (in part: Expand all stops at 500 rows)
 - **Applies to:** build plan (S2-C17); tech debt (TD-89)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17's measurement)
 
@@ -3377,3 +3377,21 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §6.1; build plan (S2-C19)
 - **Source:** owner, Nov 4, 2026 (chat session, S2-C19 re-cut)
+
+### DL-270: Expand all opens level by level, up to 500 rows
+- **Date:** 2026-11-04
+- **Decision:** "Expand all" opens branches level by level (breadth first) and stops before the
+  next branch would take the tree past 500 visible rows, so the level it stops in may be only
+  partly open; when it stops short, the page says that deeper rows stay closed, and the user
+  opens them by hand. The end-to-end guard keeps its limits (no task over 1 s on the
+  workstation, 3 s in CI, DL-253, DL-254) on a 2,000-row tree, and asserts that Expand all stops
+  at 500 rows; DL-257 still holds for it. Built in a new checkpoint, S2-C18c, before S2-C19
+  (DL-131). Whether the tree needs Expand all at all, or a better action (such as opening one
+  requirement's whole branch), is revisited (TD-93).
+- **Supersedes:** DL-175 and DL-253 in part (Expand all opens every branch; the guard measures
+  opening all 2,000 rows)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C17, S2-C18c); testing strategy ("Flaky tests are bugs"); user
+  guide (Requirements); tech debt (TD-89, TD-93); `RequirementsTree`; `e2e/requirements.spec.ts`
+- **Source:** owner, Nov 4, 2026 (chat session, the timing test red on DC-2026-11-04's CI and
+  its rerun)
