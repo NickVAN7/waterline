@@ -39,6 +39,20 @@ class RequirementRepository:
             .execution_options(**{INCLUDE_DELETED: True})
         )
 
+    async def get_many_in_project(
+        self, project_id: uuid.UUID, requirement_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, Requirement]:
+        """The project's requirements with these IDs, by ID, deleted ones included: History
+        names a moved requirement's parent, a deleted one with its badge (DL-276)."""
+        if not requirement_ids:
+            return {}
+        requirements = await self.session.scalars(
+            select(Requirement)
+            .where(Requirement.project_id == project_id, Requirement.id.in_(requirement_ids))
+            .execution_options(**{INCLUDE_DELETED: True})
+        )
+        return {requirement.id: requirement for requirement in requirements}
+
     async def get_in_project(
         self, project_id: uuid.UUID, requirement_id: uuid.UUID, *, hold: bool = False
     ) -> Requirement | None:
@@ -183,6 +197,20 @@ class RequirementRepository:
                 RequirementRevision.revision_number == revision_number
             )
         )
+
+    async def revision_numbers(
+        self, requirement_id: uuid.UUID, revision_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """The numbers of the requirement's revisions with these IDs, by ID (DL-276)."""
+        if not revision_ids:
+            return {}
+        rows = await self.session.execute(
+            select(RequirementRevision.id, RequirementRevision.revision_number).where(
+                RequirementRevision.requirement_id == requirement_id,
+                RequirementRevision.id.in_(revision_ids),
+            )
+        )
+        return dict(rows.all())
 
     async def revision_number(self, revision_id: uuid.UUID) -> int:
         """The number of a revision that exists (the current one)."""

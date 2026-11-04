@@ -3,6 +3,7 @@ DL-160; build plan "API conventions": cursor feeds): newest first, one requireme
 only, paged by `?before=`, with names resolved at read time. Who gets 200/404 is in
 tests/api/authz/test_requirement_activity.py (spec tests)."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -13,8 +14,8 @@ from app.models.audit import ActivityLog
 from app.models.requirement import Requirement
 from app.models.user import User
 from tests.factories.audit import ActivityLogFactory
-from tests.factories.project import ProjectMembershipFactory
-from tests.factories.requirement import RequirementFactory
+from tests.factories.project import ProjectFactory, ProjectMembershipFactory
+from tests.factories.requirement import RequirementFactory, RequirementRevisionFactory
 from tests.factories.user import UserFactory
 from tests.support.authz import Tenancy, sign_in_as, tenancy
 
@@ -170,3 +171,121 @@ async def test_a_field_that_holds_no_user_names_no_one(
         "in_progress",
     )
     assert (item["old_value_name"], item["new_value_name"]) == (None, None)
+
+
+def names(item: dict[str, Any]) -> tuple[object, ...]:
+    return (
+        item["old_value_name"],
+        item["old_value_is_active"],
+        item["new_value_name"],
+        item["new_value_is_active"],
+    )
+
+
+async def test_a_parent_change_names_both_parents_by_their_ids_a_deleted_one_badged(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-276. Bug: the parent left as a raw ID, a deleted parent dropped (soft delete filtered),
+    or its title shown, or the deleted flag missing."""
+    old = await RequirementFactory.create_async(
+        project=t.project, number=3, deleted_at=datetime(2026, 10, 1, tzinfo=UTC)
+    )
+    new = await RequirementFactory.create_async(project=t.project, number=4)
+    await entry(
+        t,
+        requirement,
+        action=ActivityAction.UPDATED,
+        field_changed=ActivityField.PARENT_REQUIREMENT_ID,
+        old_value=str(old.id),
+        new_value=str(new.id),
+    )
+
+    [item] = items(await client.get(HISTORY))
+
+    assert names(item) == ("PMT-RQ-3", False, "PMT-RQ-4", True)
+
+
+async def test_a_move_to_the_top_level_names_no_new_parent(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-276: no parent reads "the top level" in the browser. Bug: a 500 on the empty value."""
+    old = await RequirementFactory.create_async(project=t.project, number=3)
+    await entry(
+        t,
+        requirement,
+        action=ActivityAction.UPDATED,
+        field_changed=ActivityField.PARENT_REQUIREMENT_ID,
+        old_value=str(old.id),
+        new_value=None,
+    )
+
+    [item] = items(await client.get(HISTORY))
+
+    assert names(item) == ("PMT-RQ-3", True, None, None)
+
+
+@pytest.mark.security
+async def test_a_requirement_in_another_project_is_never_named(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-276, design-doc §5: names come from this project only. Bug: an unscoped lookup tells
+    the reader another project's requirement number (one they may not read)."""
+    ledger = await ProjectFactory.create_async(organization=t.org, key="LDG")
+    elsewhere = await RequirementFactory.create_async(project=ledger, number=9)
+    await entry(
+        t,
+        requirement,
+        action=ActivityAction.UPDATED,
+        field_changed=ActivityField.PARENT_REQUIREMENT_ID,
+        old_value=str(elsewhere.id),
+        new_value=None,
+    )
+
+    [item] = items(await client.get(HISTORY))
+
+    assert names(item) == (None, None, None, None)
+    assert "RQ-9" not in str(item)
+
+
+async def test_an_approval_names_its_revision_by_number(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-276. Bug: the revision left as a raw ID, or flagged like a user."""
+    revision = await RequirementRevisionFactory.create_async(
+        requirement=requirement, revision_number=3, creator=viewer
+    )
+    await entry(
+        t,
+        requirement,
+        action=ActivityAction.UPDATED,
+        field_changed=ActivityField.APPROVED_REVISION_ID,
+        old_value=None,
+        new_value=str(revision.id),
+    )
+
+    [item] = items(await client.get(HISTORY))
+
+    assert names(item) == (None, None, "3", None)
+
+
+@pytest.mark.security
+async def test_another_requirements_revision_is_never_named(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-276: revisions come from this requirement only. Bug: an unscoped lookup."""
+    other = await RequirementFactory.create_async(project=t.project, number=8)
+    revision = await RequirementRevisionFactory.create_async(
+        requirement=other, revision_number=5, creator=viewer
+    )
+    await entry(
+        t,
+        requirement,
+        action=ActivityAction.UPDATED,
+        field_changed=ActivityField.APPROVED_REVISION_ID,
+        old_value=None,
+        new_value=str(revision.id),
+    )
+
+    [item] = items(await client.get(HISTORY))
+
+    assert names(item) == (None, None, None, None)

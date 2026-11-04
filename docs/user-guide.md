@@ -141,6 +141,16 @@ it, so copy anything you need first. While you edit, Change status waits until y
 cancel. In the side panel, Esc doesn't close the panel while you edit; **Close**, Back, or
 **Open full page** closes it and drops what you typed.
 
+Below the description, the **History** tab lists every change to the requirement, newest first,
+with who made it and when: "Ben Ortiz changed the status from Draft to In progress". A person
+since deactivated keeps their name, with "Deactivated" after it, and a change made by an app
+command reads **System**. A move names the old and the new parent by their IDs ("changed the
+parent from ERP-RQ-3 to the top level"), with "Deleted" after a parent that's in the Trash, and
+an approval names the version approved ("approved revision 3"). Saved edits to the title or
+description are versions, not History entries. History shows the latest entries first; **Show
+more** adds the next ones. A move made in the tree while a requirement's side panel is open shows
+in its History the next time you open it.
+
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The
 project's admins (and organization owners and admins, workspace owners and admins, and system

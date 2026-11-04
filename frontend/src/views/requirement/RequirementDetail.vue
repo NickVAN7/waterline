@@ -12,6 +12,11 @@
 // the panel. A refused change asks the host to reload what the user may do (`reloadProject`,
 // false when the user may no longer read it); `focusHeading` is where focus goes when the control
 // that had it is gone (the page's `h1`, the panel's title).
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
@@ -38,6 +43,7 @@ import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RestrictionBadge from '@/views/project/RestrictionBadge.vue'
 
 import EditRequirementForm from './EditRequirementForm.vue'
+import RequirementHistory from './RequirementHistory.vue'
 import RestrictionDialog from './RestrictionDialog.vue'
 import StatusMenu from './StatusMenu.vue'
 
@@ -78,6 +84,12 @@ watch(
 async function retry() {
   if (await item.run()) await props.focusHeading()
 }
+// What a change on the page alters, so History reloads to show it: a restriction change doesn't
+// bump `version` (DL-168).
+const historyStamp = computed(() => {
+  const r = item.data.value
+  return r ? [r.version, r.restriction_level, r.restriction_categories.join()].join('|') : ''
+})
 // A title changed in place (a save, a reload) renames the page too (UI-SHL-9).
 watch(
   () => item.data.value?.title,
@@ -352,6 +364,23 @@ function restrictionSaved(saved: Requirement) {
         />
         <p v-else class="m-0 text-text-muted">No description.</p>
       </section>
+      <!-- Below the details and description, on the page and in the panel, opening on History; the
+           tab isn't in the URL (DL-268, DL-269). Revisions joins it in S2-C19a (DL-267). -->
+      <Tabs value="history">
+        <TabList :pt="{ content: { 'aria-label': 'About this requirement' } }">
+          <Tab value="history">History</Tab>
+        </TabList>
+        <TabPanels class="px-0 pb-0">
+          <TabPanel value="history">
+            <RequirementHistory
+              :project-key="project.key"
+              :number="number"
+              :stamp="historyStamp"
+              :focus-heading="focusHeading"
+            />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
       <RestrictionDialog
         ref="restricting"
         :project-key="project.key"

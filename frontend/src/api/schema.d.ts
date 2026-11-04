@@ -1327,8 +1327,10 @@ export interface components {
          * @description One change, newest first in its feed. Names are resolved by the server at read time, so a
          *     former member's name stays; `*_is_active` false shows the "Deactivated" badge. `changed_by_*`
          *     is null when an app CLI command made the change. `old_value_*` and `new_value_*` name the
-         *     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`),
-         *     and are null for any other field.
+         *     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);
+         *     in `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while
+         *     it's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).
+         *     They are null for any other field, and for a value that's empty (no parent).
          */
         ActivityEntry: {
             /**

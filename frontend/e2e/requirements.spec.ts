@@ -326,6 +326,13 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(panel.getByText('Status: Deferred')).toBeVisible()
   await expect(change).toBeFocused()
   await expect(page.getByRole('row', { name: /Stored payload/ })).toContainText('Deferred')
+  // History, open below the description, shows the change, read back from the server (DL-147).
+  await expect(
+    panel.getByRole('tabpanel', { name: 'History' }).getByRole('listitem').first(),
+  ).toContainText('changed the status from Draft to Deferred')
+  // Checked once History has rendered, not on its skeleton (ui-reviewer, S2-C19).
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, 'dialog[open]')
 
   // Esc in the edit form keeps the panel and what was typed; Cancel ends the edit.
   await panel.getByRole('button', { name: 'Edit' }).click()
@@ -379,5 +386,14 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await menu.getByRole('menuitem', { name: 'In progress' }).click()
   await expect(page.getByText('Status: In progress')).toBeVisible()
   await expect(changeOnPage).toBeFocused()
+  await expectNoA11yViolations(page)
+
+  // The page's History, newest first, in our colors (DL-268, DL-269).
+  await expect(page.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true')
+  const history = page.getByRole('tabpanel', { name: 'History' }).getByRole('listitem')
+  await expect(history.first()).toContainText('changed the status from Deferred to In progress')
+  await expect(history.last()).toContainText('created the requirement')
+  await expectOnlyTokenColors(page, '[role=tablist]')
+  await expectOnlyTokenColors(page, '[role=tabpanel]')
   await expectNoA11yViolations(page)
 })

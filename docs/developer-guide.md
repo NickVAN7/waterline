@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C18c (Expand requirement) built; next is S2-C19 (History; `docs/reviews/`).
+> **Status:** S2-C19 (History) built; next is S2-C19a (Revisions & compare; `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -596,7 +596,8 @@ value needs a hand-written migration (autogenerate doesn't see CHECK changes; se
 skill).
 
 **Soft delete** (`SoftDeleteMixin`, for `deleted_at` tables). Every ORM `SELECT`, including the
-related rows a query loads, hides rows with `deleted_at` set. Trash and restore queries opt in:
+related rows a query loads, hides rows with `deleted_at` set. Trash and restore queries opt in,
+as does History's naming of a deleted parent (DL-276):
 `select(Task).execution_options(include_deleted=True)` (the key is `INCLUDE_DELETED`). Two
 caveats: `session.get()` returns an object already in the session's identity map without
 querying (so load by ID with `get_by_id`, below), and raw SQL (`text()`) is never filtered. The

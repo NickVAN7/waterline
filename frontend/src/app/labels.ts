@@ -204,6 +204,22 @@ export const NOT_EXPORT_CONTROLLED = 'Not export-controlled'
 /** The badge after a deactivated user's name, everywhere it appears (UI-FBK-6). */
 export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', icon: 'x' }
 
+/** A requirement named in another's history while it's in the trash (DL-276). */
+export const DELETED: BadgeLabel = { label: 'Deleted', tone: 'neutral', icon: 'x' }
+
+/** History's actor for a change an app command made (design-doc §10, DL-274, DL-275). */
+export const SYSTEM_ACTOR = 'System'
+
+/** The requirement fields its History names (design-doc §10, "Logged fields"). */
+export const HISTORY_FIELD: Partial<Record<components['schemas']['ActivityField'], string>> = {
+  status: 'status',
+  priority: 'priority',
+  reporter_id: 'reporter',
+  restriction_level: 'restriction level',
+  restriction_categories: 'restriction categories',
+  parent_requirement_id: 'parent',
+}
+
 /** A person's workspace role and system admin as text ("Owner, System admin"), or `none` with
  * neither: the users list's Role ("User") and the access review's ("None") (DL-188, DL-189). */
 export function workspaceRoleText(

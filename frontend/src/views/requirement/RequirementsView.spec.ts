@@ -66,9 +66,11 @@ async function mountAt(
       Promise.resolve(
         path === '/api/projects/{key}/requirements'
           ? next(answers.tree)
-          : path === '/api/projects/{key}/requirements/{number}'
-            ? next(answers.requirements)
-            : next(answers.project),
+          : path === '/api/projects/{key}/requirements/{number}/activity'
+            ? ok({ items: [], next_cursor: null })
+            : path === '/api/projects/{key}/requirements/{number}'
+              ? next(answers.requirements)
+              : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),

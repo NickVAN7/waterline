@@ -49,9 +49,11 @@ async function mountAt(
     .spyOn(client, 'GET')
     .mockImplementation(((path: string) =>
       Promise.resolve(
-        path === '/api/projects/{key}/requirements/{number}'
-          ? next(answers.item)
-          : next(answers.project),
+        path === '/api/projects/{key}/requirements/{number}/activity'
+          ? ok({ items: [], next_cursor: null })
+          : path === '/api/projects/{key}/requirements/{number}'
+            ? next(answers.item)
+            : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
@@ -116,6 +118,23 @@ describe('RequirementView', () => {
     expect(wrapper.text()).toContain('Reporter:Ben Ortiz')
     expect(wrapper.find('.markdown h3').text()).toBe('Context')
     expect(wrapper.get('a[href="/acme/projects/ERP/requirements"]').text()).toBe('Requirements')
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('has a History tab below the description, open, with its entries (DL-268, DL-269)', async () => {
+    const { wrapper } = await mountAt([READER], [ok(REFUNDS)])
+
+    const tab = wrapper.get('[role=tab]')
+    expect(tab.text()).toBe('History')
+    expect(tab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.findAll('[role=tab]')).toHaveLength(1)
+    const panel = wrapper.get('[role=tabpanel]')
+    expect(panel.text()).toContain('No history yet')
+    // After the description, in document order.
+    const description = wrapper.get('.markdown').element
+    expect(description.compareDocumentPosition(panel.element)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     await expectNoA11yViolations(wrapper)
   })
 
@@ -282,6 +301,48 @@ describe('RequirementView', () => {
       expect(document.activeElement).toBe(menuButton())
       // Said, not only shown (WCAG 4.1.3).
       await vi.waitFor(() => expect(live()).toBe('Status: Deferred'))
+    })
+
+    it('reloads History after a change, so it shows there', async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        ok({ ...withActions('requirement.update'), status: 'deferred', version: 2 }),
+      )
+      const { get } = await mountAt([READER], [ok(withActions('requirement.update'))])
+      const historyCalls = () =>
+        get.mock.calls.filter(
+          (call) => call[0] === '/api/projects/{key}/requirements/{number}/activity',
+        )
+      expect(historyCalls()).toHaveLength(1)
+
+      await choose('Deferred')
+      await flushPromises()
+
+      expect(historyCalls()).toHaveLength(2)
+    })
+
+    it('reloads History after a restriction change, which leaves the version as it was (DL-168)', async () => {
+      vi.spyOn(client, 'PUT').mockResolvedValue(
+        ok({
+          ...withActions('requirement.raise_restriction'),
+          restriction_level: 'confidential',
+          effective_restriction_level: 'confidential',
+        }),
+      )
+      const { get } = await mountAt([READER], [ok(withActions('requirement.raise_restriction'))])
+      const historyCalls = () =>
+        get.mock.calls.filter(
+          (call) => call[0] === '/api/projects/{key}/requirements/{number}/activity',
+        )
+      expect(historyCalls()).toHaveLength(1)
+
+      button('Change restriction')!.click()
+      await flushPromises()
+      const dialog = document.querySelector('dialog[open]')!
+      dialog.querySelector<HTMLInputElement>('input[type=radio][value=confidential]')!.click()
+      dialog.querySelector('form')!.requestSubmit()
+      await flushPromises()
+
+      expect(historyCalls()).toHaveLength(2)
     })
 
     it('a 409 says someone changed it, and shows the latest', async () => {

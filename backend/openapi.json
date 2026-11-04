@@ -6849,7 +6849,7 @@
           "new_value_is_active"
         ],
         "title": "ActivityEntry",
-        "description": "One change, newest first in its feed. Names are resolved by the server at read time, so a\nformer member's name stays; `*_is_active` false shows the \"Deactivated\" badge. `changed_by_*`\nis null when an app CLI command made the change. `old_value_*` and `new_value_*` name the\nuser in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`),\nand are null for any other field."
+        "description": "One change, newest first in its feed. Names are resolved by the server at read time, so a\nformer member's name stays; `*_is_active` false shows the \"Deactivated\" badge. `changed_by_*`\nis null when an app CLI command made the change. `old_value_*` and `new_value_*` name the\nuser in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);\nin `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while\nit's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).\nThey are null for any other field, and for a value that's empty (no parent)."
       },
       "ActivityField": {
         "type": "string",
