@@ -7,7 +7,7 @@
 - **Kind:** docs only (no tooling code, so no `checkpoint-reviewer`, DL-18).
 - **Base commit:** `dac9b8a` (DC-2026-11-04d).
 - **Reviewers:** `docs-consistency` (trigger `design-change`), on one snapshot (DL-105).
-- **Totals:** 3 fixes, all fixed; 1 decision for the owner.
+- **Totals:** 3 fixes, all fixed; 1 decision for the owner, answered in DL-275.
 - **Gates at close:** `uv run wl check` green; CI on the commit.
 
 ---
@@ -33,4 +33,4 @@
 
 | # | Kind | Question | Options | Resolution |
 |---|---|---|---|---|
-| 1 | gap | Does "System" for a missing actor reach beyond History: the Slice 3 project activity feed (`activity_log`) and the admin audit screen (`audit_event`, design-doc §10.1, "none for app CLI commands")? | (a) widen DL-274 to every screen with an actorless entry, in design-doc §10 and §10.1; (b) keep it to History, noting in §10.1 and the Slice 3 list that their label is decided when planned; (c) leave it | **Open:** to the owner, before Slice 3's planning |
+| 1 | gap | Does "System" for a missing actor reach beyond History: the Slice 3 project activity feed (`activity_log`) and the admin audit screen (`audit_event`, design-doc §10.1, "none for app CLI commands")? | (a) widen DL-274 to every screen with an actorless entry, in design-doc §10 and §10.1; (b) keep it to History, noting in §10.1 and the Slice 3 list that their label is decided when planned; (c) leave it | **Answered:** DL-275, option (a): "System" on every screen |

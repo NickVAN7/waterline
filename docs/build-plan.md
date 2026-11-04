@@ -1786,7 +1786,8 @@ notes for each slice's planning, not plans.
 - **Slice 3** (DL-216): decide which items a task rank rewrite (the tie and cap rewrites,
   DL-204, DL-213) covers (a board column, a sprint section, or the project's whole task order),
   and whether task moves run one at a time (DL-214's lock).
-- **Slice 3** (DL-155): the project activity feed's API and page, with the filter bar (DL-147);
+- **Slice 3** (DL-155): the project activity feed's API and page, with the filter bar (DL-147),
+  an actorless entry's actor shown as "System" (DL-275);
   item IDs (`WTL-RQ-12`) auto-linked in rendered markdown, once there are tasks to link (DL-144).
 - **Slice 3** (DL-239): saved filters (design-doc §11, "Lists"; their table designed with them);
   CSV export of the requirement and task lists; the project home's Get started checklist, with
@@ -1819,7 +1820,8 @@ notes for each slice's planning, not plans.
 - **Slice 6** (DL-197): comment edit and delete by their authors, with the "edited" marker
   (`comment.edited_at`), and project admins deleting any; the header search bar and its results
   page; the approver's review panel gains the item's comments (DL-196).
-- **Slice 7** (DL-239): the workspace audit log page (`/workspace/audit`), before the first
+- **Slice 7** (DL-239): the workspace audit log page (`/workspace/audit`; an actorless event's
+  actor shown as "System", DL-275), before the first
   non-local deployment.
 - **Slice 7:** the system-admin operations screen: a failure indicator and a read-only list of
   failed jobs and webhook deliveries, failed jobs read through a wrapped helper in

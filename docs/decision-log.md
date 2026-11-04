@@ -3449,6 +3449,17 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Decision:** A History entry whose `changed_by` is null (an app CLI command, design-doc §10)
   names its actor "System", without the "Deactivated" badge.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-275 (in part: every screen, not only History)
 - **Applies to:** design-doc §6.1; build plan (S2-C19); user guide (S2-C19)
 - **Source:** owner, Nov 4, 2026 (DC-2026-11-04, docs-consistency decision 2, option (a))
+
+### DL-275: Every screen names an actorless entry's actor "System"
+- **Date:** 2026-11-04
+- **Decision:** An `activity_log` entry with no `changed_by`, or an `audit_event` with no actor
+  (both from app CLI commands), names its actor "System" on every screen that shows it: the
+  requirement's History (DL-274), the project activity feed (Slice 3), and the admin audit
+  screen (design-doc §10.1).
+- **Supersedes:** DL-274 in part (History only)
+- **Superseded by:** none
+- **Applies to:** design-doc §10, §10.1; build plan (Slice 3 and Slice 7 notes)
+- **Source:** owner, Nov 4, 2026 (DC-2026-11-04e, docs-consistency decision 1, option (a))

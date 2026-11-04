@@ -1372,7 +1372,8 @@ what was deleted, by whom, and when, and restoring the item brings its history b
     requirement, by a project admin approving the requirement by hand, or by cancelling a test
     run; approved also when a replacement completes it), and `approver_id` when an approver
     who lost the access needed to decide is replaced (old and new values: the two user IDs, §6.2). For
-    changes caused by an app CLI command (e.g. `revoke-system-admin`), `changed_by` is null.
+    changes caused by an app CLI command (e.g. `revoke-system-admin`), `changed_by` is null,
+    and every screen that shows the entry names its actor "System" (DL-274, DL-275).
     Individual decisions stay in the `approval` rows.
   - **Phase / milestone:** `status`, `start_date`, `end_date`, `baseline_start`,
     `baseline_end`, `target_date`, `baseline_date`.
@@ -1425,7 +1426,7 @@ table, `audit_event` (schema-doc, "Audit").
   email, by the user or by an admin, is one `user_updated` event per request, carrying the old
   and new value of every field it changed: one per org when an admin acts through the owner/admin
   roles of several orgs, so each org's admins see it (DL-75).
-- **Content:** the actor (none for app CLI commands), the target user, the entity, and
+- **Content:** the actor (none for app CLI commands, shown as "System", DL-275), the target user, the entity, and
   action-specific details (e.g. old and new role). Never passwords, hashes, or tokens.
 - **Write path:** only `log_admin_event()`, in the same transaction as the change (the same
   rule as `log_change()`).
