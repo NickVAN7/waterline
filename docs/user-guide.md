@@ -87,8 +87,10 @@ not found", the same as one that doesn't exist.
 **Requirements**, in the sidebar under the project (`/<organization>/projects/<KEY>/requirements`),
 shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status. It opens with only the top-level
 requirements showing: open a branch with its arrow, or with the Right arrow key on its row
-(Left closes it). **Expand all** opens every branch; on a very large project it takes a few
-seconds, and the button says "Expanding…" until it's done. A project with more than 2,000
+(Left closes it). To open a requirement's whole branch at once, select its row and choose
+**Expand requirement**; the button says "Expanding…" until it's done. It opens up to 500 rows
+under the requirement, level by level; past that it says that deeper rows stay closed, and you
+open them with their arrows or the Right arrow key. A project with more than 2,000
 requirements shows the first 2,000, with a note saying so; there, a requirement you move to the
 bottom of its level can fall past the first 2,000 and leave the tree the next time it loads. Anyone who can read the project's
 content can open it; on an export-controlled project, that's only its members.

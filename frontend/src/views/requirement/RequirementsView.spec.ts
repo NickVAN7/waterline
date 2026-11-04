@@ -147,12 +147,12 @@ describe('RequirementsView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
-  it('has no move menu for someone who may only read, but still Expand all', async () => {
+  it('has no move menu for someone who may only read, but still Expand requirement', async () => {
     const { wrapper } = await mountAt([READER])
 
     expect(wrapper.findAll('tbody tr')).toHaveLength(2)
     expect(wrapper.find('button[aria-haspopup=menu]').exists()).toBe(false)
-    expect(wrapper.findAll('button').map((b) => b.text())).toContain('Expand all')
+    expect(wrapper.findAll('button').map((b) => b.text())).toContain('Expand requirement')
   })
 
   it("is the 403 page, without asking for the tree, for someone who can't read an export-controlled project's content", async () => {

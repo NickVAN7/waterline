@@ -7,12 +7,13 @@
 // date: reload it) or `refused` (a 403: reload what the user may do).
 import Column from 'primevue/column'
 import TreeTable from 'primevue/treetable'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 
 import { ApiError, NETWORK_ERROR, api, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { requirementStatusBadge } from '@/app/labels'
 import { focusHeading } from '@/app/routeFocus'
+import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 
 import Alert from './Alert.vue'
 import Badge from './Badge.vue'
@@ -304,23 +305,74 @@ function dismiss() {
   else void focusHeading()
 }
 
-// Expand all (DL-175): the second level at once, then the deeper branches a batch per frame, so
-// drawing up to 2,000 rows never holds the page up for long.
+// Expand requirement (DL-271, DL-272): the selected requirement's first level at once, as its
+// arrow opens it, then its deeper branches level by level in tree order, a batch per frame, until
+// the next would show more than EXPAND_LIMIT rows under it. TreeTable redraws every visible row
+// each frame (TD-89), so the limit, not the batch, keeps a frame short.
 const EXPAND_BATCH = 25
+const EXPAND_LIMIT = 500
 const expanding = ref(false)
+const expandNote = ref('')
+const expandReasonId = useId()
+let announcing: ReturnType<typeof setTimeout> | undefined
+function clearNote() {
+  clearTimeout(announcing)
+  expandNote.value = ''
+}
+onBeforeUnmount(() => clearTimeout(announcing))
+// The note is about the requirement selected: another selection, or a reload (which clears the
+// selection), makes it stale.
+watch(selectionKeys, clearNote)
 
-async function expandAll() {
+const expandBlocked = computed(() => {
+  if (!selected.value) return 'Select a requirement to expand it.'
+  const node = selected.value[0][selected.value[1]]!
+  return node.children.length ? '' : `${displayId(node.data)} has no requirements under it.`
+})
+
+// The rows shown under a node, given which branches are open.
+function shownUnder(node: Node, open: Record<string, boolean>): number {
+  if (!open[node.key]) return 0
+  return node.children.reduce((sum, child) => sum + 1 + shownUnder(child, open), 0)
+}
+
+// The branches to open below `node`, and whether the limit left any closed. Rows already open
+// count toward the limit (DL-272).
+function planExpand(node: Node) {
+  const open: Record<string, boolean> = { ...expandedKeys.value, [node.key]: true }
+  let shown = shownUnder(node, open)
+  const branches: Node[] = []
+  for (let level = node.children; level.length; level = level.flatMap((n) => n.children)) {
+    for (const branch of level) {
+      if (!branch.children.length || open[branch.key]) continue
+      open[branch.key] = true
+      const adds = shownUnder(branch, open)
+      if (shown + adds > EXPAND_LIMIT) return { branches, stopped: true }
+      shown += adds
+      branches.push(branch)
+    }
+  }
+  return { branches, stopped: false }
+}
+
+async function expandRequirement() {
+  const node = selected.value![0][selected.value![1]]!
   expanding.value = true
-  const open = (list: Node[]) =>
-    Object.fromEntries(list.filter((n) => n.children.length).map((n) => [n.key, true]))
-  expandedKeys.value = { ...expandedKeys.value, ...open(nodes.value) }
-  const deeper = nodes.value.flatMap((node) => everyNode(node.children))
-  const branches = deeper.filter((node) => node.children.length)
+  clearNote()
+  const { branches, stopped } = planExpand(node)
+  const open = (list: Node[]) => Object.fromEntries(list.map((n) => [n.key, true]))
+  expandedKeys.value = { ...expandedKeys.value, [node.key]: true }
   for (let at = 0; at < branches.length; at += EXPAND_BATCH) {
     await new Promise(requestAnimationFrame)
     expandedKeys.value = { ...expandedKeys.value, ...open(branches.slice(at, at + EXPAND_BATCH)) }
   }
   expanding.value = false
+  // Set after a pause, so the same note again is announced again (UI-FBK-2); not if another
+  // selection, or a reload, came while it ran: the note would be about a row no longer selected.
+  if (stopped && selected.value?.[0][selected.value[1]] === node) {
+    const text = `Deeper rows under ${displayId(node.data)} stay closed: open them with their arrows or the Right arrow key.`
+    announcing = setTimeout(() => (expandNote.value = text), ANNOUNCE_DELAY_MS)
+  }
 }
 
 // Right on a closed row only opens it (WAI treegrid): TreeTable also moves focus to the next row.
@@ -350,9 +402,18 @@ const headerPt = { headerCell: { scope: 'col' } }
 <template>
   <div ref="root" class="flex flex-col gap-3">
     <div class="flex flex-wrap items-center gap-3">
-      <Button variant="secondary" :pending="expanding" pending-label="Expanding…" @click="expandAll"
-        >Expand all</Button
+      <Button
+        variant="secondary"
+        :pending="expanding"
+        pending-label="Expanding…"
+        :blocked="Boolean(expandBlocked)"
+        :aria-describedby="expandBlocked ? expandReasonId : undefined"
+        @click="expandRequirement"
+        >Expand requirement</Button
       >
+      <span v-if="expandBlocked" :id="expandReasonId" class="text-sm text-text-muted">{{
+        expandBlocked
+      }}</span>
       <MoveToMenu
         v-if="movable"
         ref="moveMenu"
@@ -361,6 +422,8 @@ const headerPt = { headerCell: { scope: 'col' } }
         blocked-reason="Select a requirement to move it."
         :pending="pending"
       />
+      <!-- In the controls row: an empty item here adds no gap above the tree. -->
+      <p class="m-0 text-sm" aria-live="polite">{{ expandNote }}</p>
     </div>
     <Alert v-if="failure" ref="failureAlert" :key="failures" live dismissible @dismiss="dismiss">{{
       failure
@@ -385,7 +448,7 @@ const headerPt = { headerCell: { scope: 'col' } }
           <!-- The ID opens the requirement, in the list's side panel (`?open=RQ-7`, UI-SHL-11); a
                click elsewhere on the row selects it (DL-264), and only the focused row's link is a
                Tab stop (DL-266). The
-               cells are memoized: TreeTable redraws every row on each Expand all frame, and a
+               cells are memoized: TreeTable redraws every row on each expand frame, and a
                component with slot content would re-render each time (DL-253's pass mark). -->
           <RouterLink
             v-memo="[node.data.number, focusedKey === node.key]"

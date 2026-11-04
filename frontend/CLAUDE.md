@@ -186,6 +186,9 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   layer, `@keydown.esc.prevent`), and so is an in-place edit form's (`RequirementDetail`):
   PrimeVue doesn't cancel it, and an uncancelled Escape also closes the dialog. The e2e presses
   Esc in the open popup and expects the dialog to stay (S2-C18b review).
+- A status note that reports an action's result (not a form alert) is cleared when what it
+  describes changes: a new selection, a reload, or the next run of the action
+  (`RequirementsTree`'s expand note; S2-C18c review).
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.

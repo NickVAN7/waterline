@@ -10,6 +10,7 @@ import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { testRouter } from '@/test/router'
+import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 
 import RequirementsTree from './RequirementsTree.vue'
 
@@ -767,8 +768,12 @@ describe('RequirementsTree', () => {
     })
   })
 
-  describe('Expand all (DL-175)', () => {
-    afterEach(() => vi.unstubAllGlobals())
+  describe('Expand requirement (DL-271, DL-272)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      // A failed assertion would otherwise leave a test's fake timers to the next.
+      vi.useRealTimers()
+    })
 
     // Two top-level branches, each with a child that has children of its own.
     const DEEP = [
@@ -780,57 +785,225 @@ describe('RequirementsTree', () => {
       item(211, 'Refunds', 21),
       item(3, 'Reporting'),
     ]
-    const expandAll = () =>
-      [...document.querySelectorAll<HTMLButtonElement>('button')]
-        .find((b) => b.textContent!.trim() === 'Expand all')!
-        .click()
+    // `count` leaves titled `<prefix> <n>` under `parent`, numbered from `from`.
+    const leaves = (parent: number, from: number, count: number, prefix: string) =>
+      Array.from({ length: count }, (_, n) => item(from + n, `${prefix} ${n + 1}`, parent))
+    const expandButton = () =>
+      [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
+        b.textContent!.includes('Expand'),
+      )!
+    const note = () => document.querySelector('p[aria-live=polite]')!.textContent!.trim()
+    const openByHand = async (title: string) => {
+      key(row(title), 'ArrowRight')
+      await flushPromises()
+    }
 
-    it('opens every branch, the deeper ones over later frames', async () => {
+    it('is blocked, with its reason, until a requirement is selected', async () => {
+      mountTree(DEEP)
+      await flushPromises()
+
+      const button = expandButton()
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      const reason = document.getElementById(button.getAttribute('aria-describedby')!)!
+      expect(reason.textContent!.trim()).toBe('Select a requirement to expand it.')
+      button.click()
+      await flushPromises()
+      expect(shown()).toEqual(['Invoicing', 'Payments', 'Reporting'])
+    })
+
+    it('is blocked on a requirement with nothing under it', async () => {
+      mountTree(DEEP)
+      await flushPromises()
+
+      await select('Reporting')
+
+      const button = expandButton()
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      const reason = document.getElementById(button.getAttribute('aria-describedby')!)!
+      expect(reason.textContent!.trim()).toBe('PMT-RQ-3 has no requirements under it.')
+      await expectNoA11yViolations(document.body)
+    })
+
+    it("opens only the selected requirement's branch, its deeper levels over later frames", async () => {
       // The test runs each frame, so what one frame shows is checked exactly.
       const frames: FrameRequestCallback[] = []
       vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => frames.push(run))
       mountTree(DEEP)
       await flushPromises()
+      await select('Payments')
 
-      expandAll()
+      expandButton().click()
       await flushPromises()
-      // The second level at once; the deeper branches wait for a frame.
-      expect(shown()).toEqual([
-        'Invoicing',
-        'Invoice runs',
-        'Payments',
-        'Card payments',
-        'Reporting',
-      ])
-      const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
-        b.textContent!.includes('Expand'),
-      )!
-      expect(button.textContent!.trim()).toBe('Expanding…')
-      expect(button.getAttribute('aria-disabled')).toBe('true')
+      // Its first level at once; the deeper branches wait for a frame.
+      expect(shown()).toEqual(['Invoicing', 'Payments', 'Card payments', 'Reporting'])
+      expect(expandButton().textContent!.trim()).toBe('Expanding…')
+      expect(expandButton().getAttribute('aria-disabled')).toBe('true')
       // Every frame queued so far (PrimeVue queues its own too).
       frames.splice(0).forEach((run) => run(0))
       await flushPromises()
 
-      expect(shown()).toEqual([
-        'Invoicing',
-        'Invoice runs',
-        'Monthly run',
-        'Payments',
-        'Card payments',
-        'Refunds',
-        'Reporting',
-      ])
-      expect(button.textContent!.trim()).toBe('Expand all')
-      expect(button.getAttribute('aria-disabled')).toBeNull()
+      expect(shown()).toEqual(['Invoicing', 'Payments', 'Card payments', 'Refunds', 'Reporting'])
+      expect(expandButton().textContent!.trim()).toBe('Expand requirement')
+      expect(expandButton().getAttribute('aria-disabled')).toBeNull()
+      expect(note()).toBe('')
     })
+
+    it('says nothing once it has opened the whole branch', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      mountTree(DEEP)
+      await flushPromises()
+      await select('Payments')
+
+      expandButton().click()
+      await vi.waitFor(() => expect(rows()).toHaveLength(5))
+      await vi.waitFor(() => expect(expandButton().textContent!.trim()).toBe('Expand requirement'))
+      vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
+      await flushPromises()
+
+      expect(note()).toBe('')
+    })
+
+    it('stays enabled on a branch already open, and changes nothing', async () => {
+      mountTree(DEEP)
+      await flushPromises()
+      await select('Payments')
+      expandButton().click()
+      await vi.waitFor(() => expect(rows()).toHaveLength(5))
+
+      expandButton().click()
+      await vi.waitFor(() => expect(expandButton().textContent!.trim()).toBe('Expand requirement'))
+
+      expect(expandButton().getAttribute('aria-disabled')).toBeNull()
+      expect(shown()).toEqual(['Invoicing', 'Payments', 'Card payments', 'Refunds', 'Reporting'])
+    })
+
+    // RQ-1 holds A (300 rows) and B (250): opening A takes it to 302 rows under RQ-1, and B
+    // would take it to 552, past 500. jsdom draws a few hundred rows slowly, so these tests
+    // get 20 s.
+    const WIDE = [
+      item(1, 'Root'),
+      item(2, 'Branch A', 1),
+      item(3, 'Branch B', 1),
+      ...leaves(2, 1000, 300, 'A leaf'),
+      ...leaves(3, 2000, 250, 'B leaf'),
+    ]
+
+    it('stops before the next branch would pass 500 rows under it, and says so', async () => {
+      mountTree(WIDE)
+      await flushPromises()
+      await select('Root')
+
+      expandButton().click()
+      // jsdom draws a few hundred rows slowly.
+      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+
+      // Root, its two branches, and A's 300; B stays closed.
+      expect(rows()).toHaveLength(303)
+      expect(row('Branch B').getAttribute('aria-expanded')).toBe('false')
+      expect(note()).toBe(
+        'Deeper rows under PMT-RQ-1 stay closed: open them with their arrows or the Right arrow key.',
+      )
+    }, 20_000)
+
+    it('announces the note again on a second press, after clearing it', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      mountTree(WIDE)
+      await flushPromises()
+      await select('Root')
+      expandButton().click()
+      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+
+      expandButton().click()
+      await flushPromises()
+
+      // Cleared at once, then set again after the pause, so a screen reader reads it again.
+      expect(note()).toBe('')
+      vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
+      await flushPromises()
+      expect(note()).toBe(
+        'Deeper rows under PMT-RQ-1 stay closed: open them with their arrows or the Right arrow key.',
+      )
+    }, 20_000)
+
+    it('clears the note when another requirement is selected', async () => {
+      mountTree(WIDE)
+      await flushPromises()
+      await select('Root')
+      expandButton().click()
+      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+
+      await select('Branch A')
+
+      expect(note()).toBe('')
+    }, 20_000)
+
+    it('says nothing if another requirement is selected while it runs', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const frames: FrameRequestCallback[] = []
+      vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => frames.push(run))
+      mountTree(WIDE)
+      await flushPromises()
+      await select('Root')
+      expandButton().click()
+      await flushPromises()
+      expect(expandButton().textContent!.trim()).toBe('Expanding…')
+
+      await select('Branch B')
+      frames.splice(0).forEach((run) => run(0))
+      await flushPromises()
+      vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
+      await flushPromises()
+
+      expect(expandButton().textContent!.trim()).toBe('Expand requirement')
+      expect(note()).toBe('')
+    }, 20_000)
+
+    it('counts the rows already open toward the 500', async () => {
+      mountTree(WIDE)
+      await flushPromises()
+      await openByHand('Root')
+      await openByHand('Branch B')
+      await select('Root')
+
+      expandButton().click()
+      // jsdom draws a few hundred rows slowly.
+      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+
+      // B's 250 already show, so A's 300 would pass 500: A stays closed.
+      expect(rows()).toHaveLength(253)
+      expect(row('Branch A').getAttribute('aria-expanded')).toBe('false')
+    }, 20_000)
+
+    it('opens the first level even when it is over 500 rows, and nothing deeper', async () => {
+      mountTree([item(1, 'Root'), ...leaves(1, 1000, 501, 'Child'), item(5000, 'Grandchild', 1000)])
+      await flushPromises()
+      await select('Root')
+
+      expandButton().click()
+      // jsdom draws a few hundred rows slowly.
+      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+
+      expect(rows()).toHaveLength(502)
+      expect(shown()).not.toContain('Grandchild')
+    }, 20_000)
 
     it('is there for someone who may not move requirements', async () => {
       mountTree(DEEP, false)
       await flushPromises()
+      await select('Invoicing')
 
-      expandAll()
+      expandButton().click()
 
-      await vi.waitFor(() => expect(rows()).toHaveLength(7))
+      await vi.waitFor(() =>
+        expect(shown()).toEqual([
+          'Invoicing',
+          'Invoice runs',
+          'Monthly run',
+          'Payments',
+          'Reporting',
+        ]),
+      )
+      await expectNoA11yViolations(document.body)
     })
   })
 })

@@ -83,8 +83,10 @@ test('the requirements page: the tree and its moves, in our colors', async ({ pa
   await expectOnlyTokenColors(page, '.p-treetable')
 })
 
-// Expand all at the ranked view's cap (DL-159, DL-175): 20 top-level rows, each with 9 children
-// of 10 children each, 2,000 in all, served to the page as the API would.
+// Expand requirement at the ranked view's cap (DL-159, DL-271, DL-272): one top-level requirement
+// with 20 children, each with 9 children of 10 children each, less the last leaf, 2,000 in all,
+// served to the page as the API would. Opening it shows its 20, then 180 more, then 10 under each
+// of the next 30 branches: 500 rows under it, where it stops.
 function treeAtCap() {
   const items: object[] = []
   const id = (n: number) => `0190f0a0-0000-7000-8000-${String(n).padStart(12, '0')}`
@@ -105,17 +107,21 @@ function treeAtCap() {
     })
     return id(number)
   }
-  for (let top = 0; top < 20; top++) {
-    const a = add(null)
-    for (let child = 0; child < 9; child++) {
+  const root = add(null)
+  for (let child = 0; child < 20; child++) {
+    const a = add(root)
+    for (let grandchild = 0; grandchild < 9; grandchild++) {
       const b = add(a)
       for (let leaf = 0; leaf < 10; leaf++) add(b)
     }
   }
+  items.pop()
   return { items, truncated: false }
 }
 
-test('Expand all opens 2,000 rows without freezing the page', async ({ page }, testInfo) => {
+test('Expand requirement stops at 500 rows without freezing the page', async ({
+  page,
+}, testInfo) => {
   const { user, key } = runFor(testInfo)
   await signIn(page, user)
   await page.route(`**/api/projects/${key}/requirements`, (route) =>
@@ -129,26 +135,34 @@ test('Expand all opens 2,000 rows without freezing the page', async ({ page }, t
     }).observe({ type: 'longtask', buffered: true })
   })
   await page.goto(`/acme/projects/${key}/requirements`)
-  await expect(titles(page)).toHaveCount(20)
+  await expect(titles(page)).toHaveCount(1)
+  await titles(page).first().click()
   await page.evaluate(() => ((window as unknown as { longest: { ms: number } }).longest.ms = 0))
 
   const started = Date.now()
-  await page.getByRole('button', { name: 'Expand all' }).click()
-  await expect(titles(page)).toHaveCount(2000, { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Expand requirement' }).click()
+  await expect(
+    page.getByText(
+      `Deeper rows under ${key}-RQ-1 stay closed: open them with their arrows or the Right arrow key.`,
+    ),
+  ).toBeVisible({ timeout: 30_000 })
   const elapsed = Date.now() - started
+  await expect(titles(page)).toHaveCount(501)
   const longest = await page.evaluate(
     () => (window as unknown as { longest: { ms: number } }).longest.ms,
   )
 
   testInfo.annotations.push({
     type: 'measure',
-    description: `Expand all at 2,000 rows: ${elapsed} ms to the last row, longest task ${Math.round(longest)} ms`,
+    description: `Expand requirement at 2,000 rows: ${elapsed} ms to the note, longest task ${Math.round(longest)} ms`,
   })
   console.log(
-    `[${testInfo.project.name}] Expand all at 2,000: ${elapsed} ms, longest task ${Math.round(longest)} ms`,
+    `[${testInfo.project.name}] Expand requirement at 2,000: ${elapsed} ms, longest task ${Math.round(longest)} ms`,
   )
   // 1 s on the workstation; CI's shared runner is about 2.5 times slower (DL-254).
   expect(longest).toBeLessThan(process.env.CI ? 3000 : 1000)
+  // The stopped state, its note showing (ui-reviewer, S2-C18c).
+  await expectNoA11yViolations(page)
 })
 
 // S2-C17a and TD-88: the create dialog, the first page showing the markdown editor and its

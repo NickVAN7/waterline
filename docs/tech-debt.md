@@ -1159,14 +1159,15 @@ Entry format:
   drawn in tokens, named "Done" or "Not done", rather than measured: the browser's disabled look
   isn't reachable by our tokens)
 
-### TD-89: Expand all pauses near the 2,000-row cap
+### TD-89: Opening branches near the 2,000-row cap pauses the page
 - **Added:** DC-2026-11-02f (DL-253)
-- **What:** at the cap, "Expand all" takes about 5.5 s to show every row, with single pauses of
-  up to about 0.8 s, since PrimeVue TreeTable re-renders every visible row each frame.
+- **What:** PrimeVue TreeTable re-renders every visible row each frame, so a tree open near the
+  cap pauses: "Expand all" took about 5.5 s to show 2,000 rows, with single pauses of up to about
+  0.8 s. Since DL-271 and DL-272, "Expand requirement" opens no more than 500 rows under a
+  requirement beyond its first level (TD-93), but opening branches by hand can still reach the
+  cap.
 - **Why:** v1 projects are far below the cap; a fix (virtual scrolling, or a widget that draws
-  only the rows in view) is a widget change. Since DL-271 and DL-272, "Expand requirement" opens no more than 500 rows
-  under a requirement beyond its first level (TD-93);
-  opening branches by hand can still reach the cap.
+  only the rows in view) is a widget change.
 - **Fix by:** Slice 7 (the end of v1), or sooner if a project nears 1,000 requirements:
   measure again with the largest real project, and change the tree's rendering only if one
   nears the cap
@@ -1213,4 +1214,15 @@ Entry format:
   not from what users need.
 - **Why:** the owner judged opening one requirement's branch the more useful action (DL-271).
 - **Fix by:** S2-C18c: "Expand requirement" replaces "Expand all" (DL-271)
+- **Status:** resolved in S2-C18c ("Expand requirement" in place of "Expand all", DL-271, DL-272)
+
+### TD-94: "Expand requirement" announces nothing when it opens the whole branch
+- **Added:** S2-C18c (ui-reviewer, minor)
+- **What:** the expand note is set only when the 500-row limit leaves rows closed (DL-271). When
+  the whole branch opens, focus stays on the button and a screen reader hears only "Expanding…"
+  and then the button's name again, with no outcome.
+- **Why:** an outcome message ("Opened 12 rows under PMT-RQ-1.") is copy and behavior DL-271 and
+  DL-272 don't specify; whether it's needed is best judged with a screen reader.
+- **Fix by:** S2-C22 (the manual keyboard and screen-reader pass): decide with the owner whether
+  to announce the outcome, and build it if so
 - **Status:** open
