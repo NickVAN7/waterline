@@ -947,7 +947,9 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
 - **History** (DL-147): the requirement's detail page has a History tab (its activity entries,
   §10, in plain language, the server resolving the names of the actor and of user fields, former
   members' included, with the "Deactivated" badge where it applies, DL-160; "System" for a change
-  an app CLI command made, DL-274) beside a Revisions
+  an app CLI command made, DL-274; a moved requirement's parent by its ID, with a "Deleted"
+  badge while it's deleted, and no parent as "the top level"; an approval's revision by its
+  number, DL-276) beside a Revisions
   tab (the list and the compare above). The tabs sit below the requirement's details and
   description, on its page and in its side panel (DL-268), and open on History; the selected tab
   isn't in the URL (DL-269).

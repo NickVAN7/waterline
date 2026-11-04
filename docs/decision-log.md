@@ -3463,3 +3463,22 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §10, §10.1; build plan (Slice 3 and Slice 7 notes)
 - **Source:** owner, Nov 4, 2026 (DC-2026-11-04e, docs-consistency decision 1, option (a))
+
+### DL-276: History names a moved requirement's parent and an approval's revision
+- **Date:** 2026-11-04
+- **Decision:** The activity entry's `old_value_name` and `new_value_name` also carry what the
+  server resolves for two ID fields, read when the entry is read: for `parent_requirement_id`,
+  the parent's display ID (`ERP-RQ-12`, never its title), with `*_is_active` false when that
+  requirement is deleted, which History shows as a "Deleted" badge beside the ID (as a
+  deactivated user's "Deactivated"); no parent at all reads "the top level". For
+  `approved_revision_id`, the revision's number, `*_is_active` null. In v1 anyone who can read
+  the History can read the whole project, so the parent's ID is always shown; per-person item
+  visibility (v2, design-doc §3.1) revisits this. The Slice 3 project activity feed uses the
+  same rule. Built in S2-C19 (backend, with API tests and `wl gen-client`), which
+  `security-reviewer` joins.
+- **Supersedes:** none (extends DL-147's server-resolved names)
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; build plan (S2-C19; the security-reviewer list; the Slice 3
+  note)
+- **Source:** owner, Nov 4, 2026 (chat session, S2-C19's start; DC-2026-11-04g, docs-consistency
+  decisions 1, the owner's own option, and 2, option (a))
