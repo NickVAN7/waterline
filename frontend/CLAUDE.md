@@ -232,6 +232,11 @@ base`: PrimeVue's layer comes later and wins over `base`, and `!important` isn't
 - An e2e step after a dialog closes waits for the dialog to be hidden and focus to be back on
   its opener before it moves focus: the close event returns focus a task later, and would take
   it back (S1-C16b).
+- jsdom draws table rows slowly, and CI's runner about 2.5 times slower again: a spec draws only
+  the rows it needs. A spec of a row limit puts the big branch where the limit leaves it closed,
+  since TreeTable draws only open rows; one that must draw hundreds says why and sets its own
+  timeout with 4 times the CI time as headroom (`RequirementsTree`'s Expand requirement specs;
+  S2-C18c's CI).
 - A mocked 422 has the server's real shape: the top-level `message` is "The request is invalid.",
   and the reason is in `details.fields` (S2-C15 review).
 - An e2e reflow check on content in a modal dialog measures the dialog and its panels

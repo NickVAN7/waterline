@@ -877,15 +877,15 @@ describe('RequirementsTree', () => {
       expect(shown()).toEqual(['Invoicing', 'Payments', 'Card payments', 'Refunds', 'Reporting'])
     })
 
-    // RQ-1 holds A (300 rows) and B (250): opening A takes it to 302 rows under RQ-1, and B
-    // would take it to 552, past 500. jsdom draws a few hundred rows slowly, so these tests
-    // get 20 s.
+    // RQ-1 holds A (1 row) and B (600): opening A takes it to 3 rows under RQ-1, and B would
+    // take it to 603, past 500. B is the branch left closed, so its rows are never drawn and the
+    // spec stays quick: jsdom draws rows slowly.
     const WIDE = [
       item(1, 'Root'),
       item(2, 'Branch A', 1),
       item(3, 'Branch B', 1),
-      ...leaves(2, 1000, 300, 'A leaf'),
-      ...leaves(3, 2000, 250, 'B leaf'),
+      item(1000, 'A leaf 1', 2),
+      ...leaves(3, 2000, 600, 'B leaf'),
     ]
 
     it('stops before the next branch would pass 500 rows under it, and says so', async () => {
@@ -894,16 +894,15 @@ describe('RequirementsTree', () => {
       await select('Root')
 
       expandButton().click()
-      // jsdom draws a few hundred rows slowly.
-      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+      await vi.waitFor(() => expect(note()).not.toBe(''))
 
-      // Root, its two branches, and A's 300; B stays closed.
-      expect(rows()).toHaveLength(303)
+      // Root, its two branches, and A's row: the level is partly open, B closed.
+      expect(shown()).toEqual(['Root', 'Branch A', 'A leaf 1', 'Branch B'])
       expect(row('Branch B').getAttribute('aria-expanded')).toBe('false')
       expect(note()).toBe(
         'Deeper rows under PMT-RQ-1 stay closed: open them with their arrows or the Right arrow key.',
       )
-    }, 20_000)
+    })
 
     it('announces the note again on a second press, after clearing it', async () => {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -911,7 +910,7 @@ describe('RequirementsTree', () => {
       await flushPromises()
       await select('Root')
       expandButton().click()
-      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+      await vi.waitFor(() => expect(note()).not.toBe(''))
 
       expandButton().click()
       await flushPromises()
@@ -923,19 +922,19 @@ describe('RequirementsTree', () => {
       expect(note()).toBe(
         'Deeper rows under PMT-RQ-1 stay closed: open them with their arrows or the Right arrow key.',
       )
-    }, 20_000)
+    })
 
     it('clears the note when another requirement is selected', async () => {
       mountTree(WIDE)
       await flushPromises()
       await select('Root')
       expandButton().click()
-      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+      await vi.waitFor(() => expect(note()).not.toBe(''))
 
       await select('Branch A')
 
       expect(note()).toBe('')
-    }, 20_000)
+    })
 
     it('says nothing if another requirement is selected while it runs', async () => {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -956,23 +955,30 @@ describe('RequirementsTree', () => {
 
       expect(expandButton().textContent!.trim()).toBe('Expand requirement')
       expect(note()).toBe('')
-    }, 20_000)
+    })
 
     it('counts the rows already open toward the 500', async () => {
-      mountTree(WIDE)
+      // A (5 rows) opened by hand: B's 498 would take RQ-1 to 505. Counted from RQ-1's own two
+      // children instead, B would come to exactly 500 and open.
+      mountTree([
+        item(1, 'Root'),
+        item(2, 'Branch A', 1),
+        item(3, 'Branch B', 1),
+        ...leaves(2, 1000, 5, 'A leaf'),
+        ...leaves(3, 2000, 498, 'B leaf'),
+      ])
       await flushPromises()
       await openByHand('Root')
-      await openByHand('Branch B')
+      await openByHand('Branch A')
       await select('Root')
 
       expandButton().click()
-      // jsdom draws a few hundred rows slowly.
-      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+      await vi.waitFor(() => expect(note()).not.toBe(''))
 
-      // B's 250 already show, so A's 300 would pass 500: A stays closed.
-      expect(rows()).toHaveLength(253)
-      expect(row('Branch A').getAttribute('aria-expanded')).toBe('false')
-    }, 20_000)
+      // Root, its two branches, and A's 5; B stays closed.
+      expect(rows()).toHaveLength(8)
+      expect(row('Branch B').getAttribute('aria-expanded')).toBe('false')
+    })
 
     it('opens the first level even when it is over 500 rows, and nothing deeper', async () => {
       mountTree([item(1, 'Root'), ...leaves(1, 1000, 501, 'Child'), item(5000, 'Grandchild', 1000)])
@@ -980,12 +986,13 @@ describe('RequirementsTree', () => {
       await select('Root')
 
       expandButton().click()
-      // jsdom draws a few hundred rows slowly.
-      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 10_000 })
+      // The only spec that must draw over 500 rows, which jsdom does slowly: 14.7 s on CI's
+      // runner, so a 60 s limit (S2-C18c's CI).
+      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 55_000 })
 
       expect(rows()).toHaveLength(502)
       expect(shown()).not.toContain('Grandchild')
-    }, 20_000)
+    }, 60_000)
 
     it('is there for someone who may not move requirements', async () => {
       mountTree(DEEP, false)
