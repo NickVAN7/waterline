@@ -52,7 +52,8 @@ correct; you decide whether the code does it.
   Select used for the project selector or any other navigation? (UI-STY-3, UI-SHL-6)
 - On navigation, does focus move to the new `h1` and does the title change (`<h1> · Waterline`)?
   Does a change that only alters `useListQuery` state leave focus alone and announce the result
-  count? (UI-SHL-9, UI-TBL-3)
+  count? (UI-SHL-9, UI-TBL-3) Does a cursor-paged feed's "Show more" move focus to the first
+  new entry and announce how many were added? (UI-TBL-9)
 - Are tables semantic, with an accessible name, `th scope`, `aria-sort` on sortable headers, and
   no hover-only controls? (UI-TBL-1 to 4)
 - **Bulk selection:** a checkbox column with a tri-state header named "Select all rows on this

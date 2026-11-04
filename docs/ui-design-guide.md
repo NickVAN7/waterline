@@ -122,7 +122,7 @@ screen-reader pass at slice verification, **R** the `ui-reviewer` agent.
 | 2.1.1 / 2.1.2 Keyboard | Everything operable by keyboard; no traps outside modals | UI-STY-3 | M, R |
 | 2.2.1 Timing adjustable | Toasts pause on hover and focus, can be dismissed, and never carry the only copy of a message | UI-FBK-9 | R |
 | 2.4.1 Bypass blocks | Skip link first | UI-SHL-1 | A, M |
-| 2.4.2 / 2.4.3 Page titled, focus order | Title per route; focus moves to the page heading on navigation; dialogs return focus | UI-SHL-9, UI-FRM-14 | M, R |
+| 2.4.2 / 2.4.3 Page titled, focus order | Title per route; focus moves to the page heading on navigation; dialogs return focus | UI-SHL-9, UI-FRM-14, UI-TBL-9 | M, R |
 | 2.4.7 / 2.4.11 Focus visible, not obscured | Ring on every control; sticky header, selection toolbar, and toasts never cover the focused element | UI-TOK-5, UI-SHL-3, UI-TBL-8, UI-FBK-10 | E, M |
 | 2.5.7 Dragging | Every drag has a single-pointer alternative (design-doc §6) | UI-TBL-5 | R, M |
 | 2.5.8 Target size | At least 24×24 CSS px | UI-TOK-6 | A (browser only), R |
@@ -130,7 +130,7 @@ screen-reader pass at slice verification, **R** the `ui-reviewer` agent.
 | 3.3.1 / 3.3.2 / 3.3.3 Errors and labels | Visible labels; errors named in text, tied to the field, with a way to fix | UI-FRM-1 to 7 | A (partly), R, M |
 | 3.3.7 Redundant entry | Never ask again for what the user already gave in the same flow | UI-FRM-13 | R |
 | 3.3.8 Accessible authentication | Password fields allow paste and password managers | UI-FRM-10 | R |
-| 4.1.2 / 4.1.3 Name, role, value; status messages | Controls named; results announced through live regions | UI-FRM-9, UI-FBK-2, UI-TBL-3, UI-TBL-6 | A (partly), M |
+| 4.1.2 / 4.1.3 Name, role, value; status messages | Controls named; results announced through live regions | UI-FRM-9, UI-FBK-2, UI-TBL-3, UI-TBL-6, UI-TBL-9 | A (partly), M |
 
 **What axe cannot do** (so the manual pass and the reviewer exist): judge whether a label or
 heading makes sense, check focus order or focus return, check that a live region announces the
@@ -827,9 +827,10 @@ Decided in screen-inventory step 5; restated so the reviewer has one list.
   `aria-label`; a `<caption>` also works and may be visually hidden), `<th scope>` cells, and no
   layout tables.
 - **UI-TBL-2** A sortable column header contains a button; the `<th>` carries `aria-sort`.
-  Sort, filter, and page state live in the URL through `useListQuery`.
+  Sort, filter, and page state of an offset-paged table live in the URL through `useListQuery`
+  (a cursor-paged feed: UI-TBL-9).
 - **UI-TBL-3** After a sort, filter, or page change, focus stays on the control used and a
-  polite live region announces the result count ("12 projects"). Pagination is a
+  polite live region announces the result count ("12 projects"). An offset-paged table's pagination is a
   `nav aria-label="Pagination"` showing "Showing 1–50 of 132" with Previous and Next.
 - **UI-TBL-4** **Row actions.** A row with several actions has one menu button named with the
   row's identity ("Actions for Jane Doe"). A row with one obvious action may use a **named icon
@@ -860,6 +861,12 @@ Decided in screen-inventory step 5; restated so the reviewer has one list.
   and is `aria-disabled` with its reason as the status text ("No members selected") tied by
   `aria-describedby` (UI-TOK-10). The focus check in UI-SHL-3 covers the header plus the toolbar
   while rows are selected.
+- **UI-TBL-9** **A cursor-paged feed** (an item's History, its revision list) shows its first
+  page and, while there is a next cursor, a **"Show more"** button that appends the next page;
+  focus moves to the first new entry (so the button's going after the last page never drops
+  focus), and a polite live region announces how many were added ("20 more entries"). Its paging
+  stays in the page, not the URL, and it shows no total, which a cursor feed doesn't have: UI-TBL-2's URL
+  state and UI-TBL-3's pagination are for offset-paged tables (DL-273).
 
 ### 7.1 SVAR widgets: Kanban, DataGrid, Gantt
 

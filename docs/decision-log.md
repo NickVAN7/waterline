@@ -3431,3 +3431,24 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   (TD-89); `RequirementsTree`; `e2e/requirements.spec.ts`
 - **Source:** owner, Nov 4, 2026 (DC-2026-11-04c, docs-consistency decisions 1 to 3: decision 1
   partial levels with an exact count, decisions 2 and 3 option (a); DC-2026-11-04b's decision 1)
+
+### DL-273: A cursor-paged feed shows more with "Show more"
+- **Date:** 2026-11-04
+- **Decision:** A cursor-paged feed (a requirement's History, its revision list) shows its first
+  page and, while the server returns a next cursor, a "Show more" button that appends the next
+  page; focus moves to the first new entry, and a polite live region announces how many were
+  added. Its paging stays in the page, not the URL, and it shows no total, which a cursor feed
+  doesn't have: an exception to UI-TBL-2's URL state and UI-TBL-3's pagination (UI-TBL-9).
+- **Supersedes:** none (UI-TBL-2 and UI-TBL-3 cover offset-paged tables only)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-TBL-9; `ui-reviewer`; build plan (S2-C19, S2-C19a)
+- **Source:** owner, Nov 4, 2026 (DC-2026-11-04, docs-consistency decision 1, option (a))
+
+### DL-274: A change made by an app command shows "System" as its actor
+- **Date:** 2026-11-04
+- **Decision:** A History entry whose `changed_by` is null (an app CLI command, design-doc §10)
+  names its actor "System", without the "Deactivated" badge.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.1; build plan (S2-C19); user guide (S2-C19)
+- **Source:** owner, Nov 4, 2026 (DC-2026-11-04, docs-consistency decision 2, option (a))
