@@ -4845,6 +4845,92 @@
         }
       }
     },
+    "/api/me/work/decisions": {
+      "get": {
+        "tags": [
+          "my_work"
+        ],
+        "summary": "My Decisions",
+        "description": "The caller's past decisions, newest first (DL-286).",
+        "operationId": "my_decisions_api_me_work_decisions_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: decided_at. Default: -decided_at",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: decided_at. Default: -decided_at"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DecisionWorkItem_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/{key}/requirements/{number}/activity": {
       "get": {
         "tags": [
@@ -7329,6 +7415,81 @@
         ],
         "title": "ChangePasswordRequest"
       },
+      "DecisionWorkItem": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/ApprovalDecision"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "request_status": {
+            "$ref": "#/components/schemas/ApprovalRequestStatus"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/ApprovalEntityType"
+          },
+          "entity_number": {
+            "type": "integer",
+            "title": "Entity Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "revision_number": {
+            "type": "integer",
+            "title": "Revision Number"
+          },
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "organization_slug": {
+            "type": "string",
+            "title": "Organization Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "decision",
+          "decided_at",
+          "comment",
+          "request_status",
+          "entity_type",
+          "entity_number",
+          "title",
+          "revision_number",
+          "project_key",
+          "project_name",
+          "organization_slug"
+        ],
+        "title": "DecisionWorkItem",
+        "description": "One of the caller's past decisions, in My work (design-doc §11; DL-286): `title` and\n`revision_number` are the decided revision's, `request_status` the request's now."
+      },
       "DeletedChildren": {
         "type": "string",
         "enum": [
@@ -8140,6 +8301,37 @@
           "offset"
         ],
         "title": "Page[ApprovalWorkItem]"
+      },
+      "Page_DecisionWorkItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionWorkItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[DecisionWorkItem]"
       },
       "Page_MemberCandidate_": {
         "properties": {
@@ -10365,6 +10557,32 @@
         ],
         "title": "WorkSection[ApprovalWorkItem]"
       },
+      "WorkSection_DecisionWorkItem_": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionWorkItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "WorkSection[DecisionWorkItem]"
+      },
       "WorkSection_ProjectItem_": {
         "properties": {
           "available": {
@@ -10398,12 +10616,16 @@
           },
           "approvals": {
             "$ref": "#/components/schemas/WorkSection_ApprovalWorkItem_"
+          },
+          "decisions": {
+            "$ref": "#/components/schemas/WorkSection_DecisionWorkItem_"
           }
         },
         "type": "object",
         "required": [
           "projects",
-          "approvals"
+          "approvals",
+          "decisions"
         ],
         "title": "WorkSections"
       },

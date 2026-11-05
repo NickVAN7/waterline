@@ -3,6 +3,7 @@ No tables; it reads through other areas' repositories and calls no service. The 
 spec and rows live here so the project area (a higher layer) can share them."""
 
 from collections.abc import Awaitable
+from datetime import datetime
 from typing import cast
 
 from sqlalchemy.exc import DBAPIError
@@ -17,7 +18,7 @@ from app.models.project import Project
 from app.models.requirement import RequirementRevision
 from app.repositories.approval import ApprovalRepository
 from app.repositories.project import ProjectRepository
-from app.schemas.approval import ApprovalWorkItem
+from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
 from app.schemas.project import INHERITED_ADMIN, MyWork, ProjectItem, WorkSection, WorkSections
 
 PROJECTS = ListSpec(
@@ -35,6 +36,12 @@ APPROVALS = ListSpec(
     id_column=Approval.id,  # pyright: ignore[reportArgumentType]
     sorts={"requested_at": ApprovalRequest.created_at},  # pyright: ignore[reportArgumentType]
     default_sort=("requested_at",),
+)
+DECISIONS = ListSpec(
+    name="MyDecision",
+    id_column=Approval.id,  # pyright: ignore[reportArgumentType]
+    sorts={"decided_at": Approval.decided_at},  # pyright: ignore[reportArgumentType]
+    default_sort=("-decided_at",),
 )
 FIRST_ITEMS = 10  # each section's items in `GET /api/me/work` (DL-76)
 
@@ -85,6 +92,26 @@ def approval_item(row: Approval) -> ApprovalWorkItem:
     )
 
 
+def decision_item(row: Approval) -> DecisionWorkItem:
+    """A past decision as My work shows it (DL-286), loaded as `approval_item`'s row."""
+    request = row.approval_request
+    revision = cast(RequirementRevision, request.requirement_revision)
+    return DecisionWorkItem(
+        request_id=request.id,
+        decision=row.decision,
+        decided_at=cast(datetime, row.decided_at),  # the decision sets it (ApprovalService)
+        comment=row.comment,
+        request_status=request.status,
+        entity_type=request.entity_type,
+        entity_number=revision.requirement.number,
+        title=revision.title,
+        revision_number=revision.revision_number,
+        project_key=request.project.key,
+        project_name=request.project.name,
+        organization_slug=request.project.organization.slug,
+    )
+
+
 class MyWorkService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -100,6 +127,9 @@ class MyWorkService:
                 ),
                 approvals=await self._section(
                     self.approvals(ctx, APPROVALS.query_model(limit=FIRST_ITEMS))
+                ),
+                decisions=await self._section(
+                    self.decisions(ctx, DECISIONS.query_model(limit=FIRST_ITEMS))
                 ),
             )
         )
@@ -125,3 +155,10 @@ class MyWorkService:
         statement = ApprovalRepository(self.session).pending_for(ctx.user_id, content_scope(ctx))
         page = await fetch_page(self.session, statement, APPROVALS, query)  # pyright: ignore[reportArgumentType] -- APPROVALS.query_model
         return page.with_items([approval_item(row) for row in page.items])
+
+    async def decisions(self, ctx: AuthzContext, query: object) -> Page[DecisionWorkItem]:
+        """The caller's past decisions in projects whose content they can see, newest first
+        (DL-286)."""
+        statement = ApprovalRepository(self.session).decided_for(ctx.user_id, content_scope(ctx))
+        page = await fetch_page(self.session, statement, DECISIONS, query)  # pyright: ignore[reportArgumentType] -- DECISIONS.query_model
+        return page.with_items([decision_item(row) for row in page.items])

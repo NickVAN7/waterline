@@ -4,7 +4,8 @@ import { expectFocusNotObscured, expectNoA11yViolations } from './support/a11y'
 import { signIn } from './support/demo'
 import { expectOnlyTokenColors } from './support/theme'
 
-// Requesting and deciding an approval (build plan Slice 2, "End-to-end tests"; S2-C20, S2-C20a).
+// Requesting and deciding an approval (build plan Slice 2, "End-to-end tests"; S2-C20, S2-C20a,
+// S2-C20b: the approver finds it on My work, and it's in their past decisions after).
 // In Globex's INV, which no other test's requirements use (the tree tests count ERP's and PORTAL's,
 // DL-87): its admin requests, and each theme run's own approver decides on its own requirement,
 // a viewer in one (a viewer may be an approver, design-doc §6.2).
@@ -52,9 +53,15 @@ test('an admin requests approval, and the approver reviews and decides', async (
   await expect(section).toContainText(/Latest request:\s*Pending/)
   await signOut(page)
 
-  // The approver's side: the revision under approval, then the decision.
+  // The approver's side: on My work, then the revision under approval, then the decision.
   await signIn(page, approver)
-  await page.goto(url)
+  const waiting = page.getByRole('region', { name: 'Approvals waiting for you' })
+  const item = waiting.locator(`a[href="${url}"]`)
+  await expect(item).toHaveText('Refund by card')
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, 'main')
+  await item.click()
+  await expect(page).toHaveURL(url)
   await expect(section.getByRole('heading', { name: 'Revision 1, under approval' })).toBeVisible()
   await expect(section.locator('strong')).toHaveText('14 days')
   await expectNoA11yViolations(page)
@@ -77,4 +84,14 @@ test('an admin requests approval, and the approver reviews and decides', async (
   await expect(section).toContainText('Last approved: revision 1')
   await expect(section).toContainText('Matches the card rules.')
   await expect(section.getByRole('button', { name: 'Approve' })).toHaveCount(0)
+
+  // My work: no longer waiting, now a past decision (DL-286).
+  await page.getByRole('link', { name: 'My work' }).first().click()
+  const past = page.getByRole('region', { name: 'My past decisions' }).locator('li', {
+    has: page.locator(`a[href="${url}"]`),
+  })
+  await expect(past).toContainText('Your decision: Approved')
+  await expect(past).toContainText('Your comment: Matches the card rules.')
+  await expect(waiting.locator(`a[href="${url}"]`)).toHaveCount(0)
+  await expectNoA11yViolations(page)
 })

@@ -13,7 +13,7 @@ from app.enums import (
     RestrictionCategory,
     RestrictionLevel,
 )
-from app.schemas.approval import ApprovalWorkItem
+from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
 from app.schemas.limits import NAME_MAX, PROJECT_DESCRIPTION_MAX
 from app.schemas.user import AccessReason
 from app.schemas.workspace import NewUser
@@ -128,6 +128,7 @@ class WorkSection[T](BaseModel):
 class WorkSections(BaseModel):
     projects: WorkSection[ProjectItem]
     approvals: WorkSection[ApprovalWorkItem]
+    decisions: WorkSection[DecisionWorkItem]
 
 
 class MyWork(BaseModel):

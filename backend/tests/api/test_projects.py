@@ -680,6 +680,7 @@ async def test_a_section_whose_query_fails_is_unavailable(
             "projects": {"available": False, "items": [], "total": 0},
             # TD-40: the other sections still show.
             "approvals": {"available": True, "items": [], "total": 0},
+            "decisions": {"available": True, "items": [], "total": 0},
         },
     )
 

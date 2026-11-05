@@ -314,8 +314,8 @@ Any project role can be a named approver, viewers included (design-doc §6.2).
 
 **Finding what's waiting**
 - See the **approvals I owe on My work**, across projects: what the item is, who asked, and
-  how long it has waited.
-- Open the item from there, including as a viewer with read-only access.
+  how long it has waited. *Built* (S2-C20b).
+- Open the item from there, including as a viewer with read-only access. *Built.*
 - Requests on archived projects never appear: archiving cancels them (below).
 
 **Reviewing before deciding**
@@ -336,7 +336,7 @@ Any project role can be a named approver, viewers included (design-doc §6.2).
   asks the approver to confirm.** A rejection ends the whole request.
 - **A decision is final: there is no "unapprove."** Instead, an approved item can be
   re-opened (below).
-- See my past decisions (on My work, DL-286).
+- See my past decisions (on My work, DL-286), each opening its requirement (owner, Nov 5, 2026). *Built.*
 
 **Edge cases the approver runs into**
 - The request was cancelled, or made moot by a hand approval, while I was reviewing it. I'm
@@ -416,8 +416,9 @@ already exists; everything else is still to build.
 **Getting around**
 - The header (org switcher), the sidebar (My work, the project selector with a filter past
   eight projects), the skip link, and the Menu button on narrow screens. *Built.*
-- My work's Projects section: key, org, my access, status. *Built.* Its work sections (tasks,
-  reviews, approvals, past decisions, test cases) come with their slices.
+- My work's Projects section: key, org, my access, status. *Built.* Its approvals and past
+  decisions sections. *Built* (S2-C20b). Its other work sections (tasks, reviews, test cases)
+  come with their slices.
 - **Favorite projects on My work** (v1): star a project to keep it at the top. Favoriting
   items (requirements, tasks, test cases) is v1.5+. (Recently viewed is not needed.)
 - Open any item from a shared link; if I can't see it, I get the same 404 as for an item that
@@ -526,7 +527,7 @@ panel vs. dialog.
 
 | View | Combines | Slice |
 |---|---|---|
-| **My work** | favorite projects, my projects, my tasks, reviews I owe, approvals I owe, my past decisions, test cases assigned to me | Projects section built (S1); other sections with their slices (2, 3, 5) |
+| **My work** | favorite projects, my projects, my tasks, reviews I owe, approvals I owe, my past decisions, test cases assigned to me | Projects (S1), approvals I owe and my past decisions (S2-C20b) built; other sections with their slices (3, 5) |
 | **Project home** | status, lead, current phase, milestone, and sprint; headline numbers: blocked work, untested requirements, pending approvals | Shell built (S1); numbers fill in with their slices |
 | **Org overview** | the org's projects with status and lead; archived projects below | Built (S1) |
 | **Board** | tasks by status; filter by sprint, assignee, workstream | 3 |
@@ -634,7 +635,7 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | GitHub account link / unlink | section of Account settings | `/account` | 7 | — |
 | Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (DL-239) | — |
 | No access | page | `/account/no-access` | 1 | Built |
-| My work | page | `/` | 1, sections in 2, 3, 5 | Projects built |
+| My work | page | `/` | 1, sections in 2, 3, 5 | Projects, approvals, past decisions built |
 | Favorite projects | section of My work; star on project rows | `/` | 2 (S2-C21c, DL-238) | — |
 | Documentation (user guide) | page, from the user menu | `/docs` | 2 (S2-C21d, DL-238) | — |
 | Search results | page, from the header search bar | `/search` | 6 | — |

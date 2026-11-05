@@ -522,13 +522,15 @@ Entry format:
 - **Status:** resolved in S1-C14a: a query-only navigation moves neither focus nor the title; the list
   announces its count instead
 
-### TD-37: My work has no "see all" for its projects
+### TD-37: My work has no "see all" for its sections
 - **Added:** S1-C14a
 - **What:** My work's projects section shows the first 10 projects (`GET /api/me/work`) and says
   how many there are, but has no "see all" list over `GET /api/me/work/{section}` (design-doc
-  §11); a user on more than 10 projects finds the rest on each org's project list.
+  §11); a user on more than 10 projects finds the rest on each org's project list. From S2-C20b,
+  the approvals and past decisions sections too (`/approvals`, `/decisions`): past 10, the page
+  says how many there are; an approval past the first 10 shows once an older one is decided.
 - **Why:** smallest complete change: no demo user is on more than two projects, and the org list
-  already shows them all. The "see all" list belongs with the sections that need one most.
+  already shows them all; no demo user has more than a few approvals. The "see all" list belongs with the sections that need one most.
 - **Fix by:** Slice 3 (with My work's tasks section, whose lists are long)
 - **Status:** open
 

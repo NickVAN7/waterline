@@ -57,6 +57,21 @@ archived projects are left out. If you're on more than 10, it
 says how many there are, and each organization's project list has the rest. If the list can't
 be loaded, **Try again** loads it again.
 
+**Approvals waiting for you** lists the approval requests that name you and that you haven't
+decided yet, across your projects, the longest-waiting first: each shows the requirement's title
+(as in the revision under approval), its ID, the revision's number, its project, who asked and
+when, and their note. Open one to review it and decide (see "Deciding", under
+Requirements). A request on a project whose content you can no longer see isn't listed.
+
+**My past decisions**, under it, lists the requests you approved or rejected, newest first: each
+shows the requirement and revision you decided on, your decision, when, the request's status now
+(it may have been cancelled or approved by hand since), and your comment. Open one to see its
+requirement.
+
+Each section shows its first 10; if there are more, it says how many. If one section can't be
+loaded, it shows **Try again** and the others still show; if the whole page can't be loaded, one
+**Try again** loads it again.
+
 ## Projects
 
 An organization's project list (`/<organization>/projects`) shows its projects that you can
@@ -173,7 +188,8 @@ you picked can no longer be named when you send the request, the dialog says so 
 those who can.
 
 **Deciding.** When you're a named approver and haven't decided yet, whatever your role (viewers
-included), the Approval section shows the request for you to decide on:
+included), the request is in **Approvals waiting for you** on My work, and the Approval section
+shows it for you to decide on:
 
 - **Revision N, under approval** shows the title and description you're approving, which may be
   older than the requirement's current one.

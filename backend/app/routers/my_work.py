@@ -8,9 +8,9 @@ from app.core.db import SessionDep
 from app.core.errors import ErrorBody
 from app.core.lists import Page
 from app.routers.deps import AuthzContextDep
-from app.schemas.approval import ApprovalWorkItem
+from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
 from app.schemas.project import MyWork, ProjectItem
-from app.services.my_work import APPROVALS, PROJECTS, MyWorkService
+from app.services.my_work import APPROVALS, DECISIONS, PROJECTS, MyWorkService
 
 router = APIRouter(prefix="/me/work", tags=["my_work"])
 
@@ -20,6 +20,7 @@ _ERRORS: dict[int | str, dict[str, Any]] = {
 }
 ProjectQuery = Annotated[PROJECTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 ApprovalQuery = Annotated[APPROVALS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+DecisionQuery = Annotated[DECISIONS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
 @router.get("", responses=_ERRORS)
@@ -42,3 +43,11 @@ async def my_approvals(
 ) -> Page[ApprovalWorkItem]:
     """The caller's pending approvals, oldest request first (DL-236)."""
     return await MyWorkService(session).approvals(ctx, query)
+
+
+@router.get("/decisions", responses=_ERRORS)
+async def my_decisions(
+    ctx: AuthzContextDep, query: DecisionQuery, session: SessionDep
+) -> Page[DecisionWorkItem]:
+    """The caller's past decisions, newest first (DL-286)."""
+    return await MyWorkService(session).decisions(ctx, query)

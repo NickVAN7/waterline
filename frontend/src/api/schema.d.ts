@@ -943,6 +943,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/work/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Decisions
+         * @description The caller's past decisions, newest first (DL-286).
+         */
+        get: operations["my_decisions_api_me_work_decisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/requirements/{number}/activity": {
         parameters: {
             query?: never;
@@ -1570,6 +1590,40 @@ export interface components {
             new_password: string;
         };
         /**
+         * DecisionWorkItem
+         * @description One of the caller's past decisions, in My work (design-doc §11; DL-286): `title` and
+         *     `revision_number` are the decided revision's, `request_status` the request's now.
+         */
+        DecisionWorkItem: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            decision: components["schemas"]["ApprovalDecision"];
+            /**
+             * Decided At
+             * Format: date-time
+             */
+            decided_at: string;
+            /** Comment */
+            comment: string | null;
+            request_status: components["schemas"]["ApprovalRequestStatus"];
+            entity_type: components["schemas"]["ApprovalEntityType"];
+            /** Entity Number */
+            entity_number: number;
+            /** Title */
+            title: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Project Key */
+            project_key: string;
+            /** Project Name */
+            project_name: string;
+            /** Organization Slug */
+            organization_slug: string;
+        };
+        /**
          * DeletedChildren
          * @description What a requirement's delete does with its children (design-doc §9).
          * @enum {string}
@@ -1915,6 +1969,17 @@ export interface components {
         Page_ApprovalWorkItem_: {
             /** Items */
             items: components["schemas"]["ApprovalWorkItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[DecisionWorkItem] */
+        Page_DecisionWorkItem_: {
+            /** Items */
+            items: components["schemas"]["DecisionWorkItem"][];
             /** Total */
             total: number;
             /** Limit */
@@ -2774,6 +2839,21 @@ export interface components {
              */
             total: number;
         };
+        /** WorkSection[DecisionWorkItem] */
+        WorkSection_DecisionWorkItem_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["DecisionWorkItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** WorkSection[ProjectItem] */
         WorkSection_ProjectItem_: {
             /** Available */
@@ -2793,6 +2873,7 @@ export interface components {
         WorkSections: {
             projects: components["schemas"]["WorkSection_ProjectItem_"];
             approvals: components["schemas"]["WorkSection_ApprovalWorkItem_"];
+            decisions: components["schemas"]["WorkSection_DecisionWorkItem_"];
         };
         /** WorkspaceRead */
         WorkspaceRead: {
@@ -5895,6 +5976,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ApprovalWorkItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_decisions_api_me_work_decisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: decided_at. Default: -decided_at */
+                sort?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DecisionWorkItem_"];
                 };
             };
             /** @description Unauthorized */
