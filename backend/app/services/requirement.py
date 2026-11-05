@@ -782,6 +782,7 @@ class RequirementService:
             effective_restriction_categories=sorted(applies.categories),
             current_revision_id=requirement.current_revision_id,
             approved_revision_id=requirement.approved_revision_id,
+            approved_revision_number=await self._revision_number(requirement.approved_revision_id),
             can_delete_children=await self._can_delete_children(ctx, project, requirement),
             approved_at=requirement.approved_at,
             version=requirement.version,
@@ -789,6 +790,15 @@ class RequirementService:
             updated_at=requirement.updated_at,
             allowed_actions=allowed_actions(ctx, project_target(project, requirement)),
         )
+
+    async def _revision_number(self, revision_id: uuid.UUID | None) -> int | None:
+        if revision_id is None:
+            return None
+        # A foreign key's row, so never None.
+        revision = cast(
+            RequirementRevision, await self.session.get(RequirementRevision, revision_id)
+        )
+        return revision.revision_number
 
     # --- Approval requests (design-doc §6.2; S2-C10) -------------------------------------------
 
@@ -975,8 +985,14 @@ class RequirementService:
             APPROVAL_REQUESTS,
             query,
         )
+        flagged = await ApprovalService(self.session).flagged(
+            await self._project(requirement), page.items
+        )
         return Page[ApprovalRequestItem](
-            items=[_approval_request(row, requirement.current_revision_id) for row in page.items],
+            items=[
+                _approval_request(row, requirement.current_revision_id, row.id in flagged)
+                for row in page.items
+            ],
             total=page.total,
             limit=page.limit,
             offset=page.offset,
@@ -1022,14 +1038,19 @@ class RequirementService:
             # Ruled out for good by its state (DL-231, DL-232).
             actions = [a for a in actions if a is not Action.APPROVAL_REQUEST_CANCEL]
         requirement = cast(Requirement, target.entity)
+        flagged = await ApprovalService(self.session).flagged(
+            await self._project(requirement), [request]
+        )
         return ApprovalRequestRead(
-            **_approval_request(request, requirement.current_revision_id).model_dump(),
+            **_approval_request(
+                request, requirement.current_revision_id, request.id in flagged
+            ).model_dump(),
             allowed_actions=actions,
         )
 
 
 def _approval_request(
-    request: ApprovalRequest, current_revision_id: uuid.UUID | None
+    request: ApprovalRequest, current_revision_id: uuid.UUID | None, flagged: bool
 ) -> ApprovalRequestItem:
     # A requirement's request is bound to a revision (the CHECK `requirement_revision`).
     revision = cast(RequirementRevision, request.requirement_revision)
@@ -1045,6 +1066,7 @@ def _approval_request(
         created_at=request.created_at,
         completed_at=request.completed_at,
         newer_revision_exists=revision.id != current_revision_id,
+        flagged=flagged,
         approvals=[
             ApprovalRead(
                 id=row.id,

@@ -49,12 +49,14 @@ async function mountAt(
     .spyOn(client, 'GET')
     .mockImplementation(((path: string) =>
       Promise.resolve(
-        path === '/api/projects/{key}/requirements/{number}/activity' ||
-          path === '/api/projects/{key}/requirements/{number}/revisions'
-          ? ok({ items: [], next_cursor: null })
-          : path === '/api/projects/{key}/requirements/{number}'
-            ? next(answers.item)
-            : next(answers.project),
+        path === '/api/projects/{key}/requirements/{number}/approval-requests'
+          ? ok({ items: [], total: 0, limit: 1, offset: 0 })
+          : path === '/api/projects/{key}/requirements/{number}/activity' ||
+              path === '/api/projects/{key}/requirements/{number}/revisions'
+            ? ok({ items: [], next_cursor: null })
+            : path === '/api/projects/{key}/requirements/{number}'
+              ? next(answers.item)
+              : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
@@ -186,7 +188,15 @@ describe('RequirementView', () => {
     async (_case, status, approved, from) => {
       const { wrapper, get } = await mountAt(
         [READER],
-        [ok({ ...REFUNDS, status, approved_revision_id: approved, current_revision_id: 'r3' })],
+        [
+          ok({
+            ...REFUNDS,
+            status,
+            approved_revision_id: approved,
+            approved_revision_number: Number(approved.slice(1)),
+            current_revision_id: 'r3',
+          }),
+        ],
       )
       const answer = get.getMockImplementation() as (...args: unknown[]) => unknown
       const revision = (n: number) => ({
@@ -310,6 +320,28 @@ describe('RequirementView', () => {
     const { wrapper } = await mountAt([{ ...READER, archived: true }], [ok(REFUNDS)])
 
     expect(wrapper.text()).toContain('This project is archived. It is read-only.')
+  })
+
+  // S2-C20's review: the Approval section's approval reaches the page's own status. Bug: the
+  // section's `changed` not wired to the requirement shown.
+  it('shows Approved once the Approval section approves it by hand', async () => {
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      ok({ ...withActions('requirement.approve_manually'), status: 'approved', version: 2 }),
+    )
+    const { wrapper } = await mountAt([READER], [ok(withActions('requirement.approve_manually'))])
+
+    const approve = [...document.querySelectorAll('button')].find(
+      (b) => !b.closest('dialog') && b.textContent!.trim() === 'Approve by hand',
+    )!
+    approve.focus()
+    approve.click()
+    await flushPromises()
+    ;[...document.querySelector('dialog[open]')!.querySelectorAll('button')]
+      .find((b) => b.textContent!.trim() === 'Approve')!
+      .click()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Status: Approved')
   })
 
   describe('the status menu (DL-148)', () => {

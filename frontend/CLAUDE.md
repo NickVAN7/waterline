@@ -195,6 +195,16 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.
+- A child that asks its host to reload `allowed_actions` after a 403 waits for that reload (a
+  function prop it awaits, `ApprovalSection`'s `reloadPage`) and reloads its own entity's actions
+  too, before it looks where focus is: an emitted event returns before the reload removes the
+  control that held focus (UI-FRM-7; S2-C20 review).
+- A dialog whose first field loads after it opens moves focus to that field once loaded
+  (`RequestApprovalDialog`'s `focusList`), and marks the loading group `data-autofocus`, so the
+  first focus doesn't pass through a later field: ModalDialog picks before the load (S2-C20
+  review).
+- A required checkbox group can't take `aria-required`: its legend carries a visually hidden
+  "(required)" beside the hidden asterisk (UI-FRM-2; S2-C20 review).
 - A PrimeVue table's selected-row bar goes on the row's first cell, and only on the selected
   row: its tables use `border-collapse: separate`, where a `tr`'s border isn't drawn, and forced
   colors draw a transparent border. A class check in jsdom can't show the bar is drawn

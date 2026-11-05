@@ -207,6 +207,26 @@ export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', 
 /** A requirement named in another's history while it's in the trash (DL-276). */
 export const DELETED: BadgeLabel = { label: 'Deleted', tone: 'neutral', icon: 'x' }
 
+/** An approval request's status (design-doc §6.2) as a badge. */
+export const APPROVAL_REQUEST_STATUS: Record<
+  components['schemas']['ApprovalRequestStatus'],
+  BadgeLabel
+> = {
+  pending: { label: 'Pending', tone: 'info', icon: 'circle' },
+  approved: { label: 'Approved', tone: 'success', icon: 'check' },
+  rejected: { label: 'Rejected', tone: 'danger', icon: 'x' },
+  cancelled: { label: 'Cancelled', tone: 'neutral', icon: 'x' },
+}
+
+/** One approver's decision (design-doc §6.2): `replaced` when they lost access and the requester
+ * took their place. */
+export const APPROVAL_DECISION: Record<components['schemas']['ApprovalDecision'], BadgeLabel> = {
+  pending: { label: 'Not decided', tone: 'neutral', icon: 'circle' },
+  approved: { label: 'Approved', tone: 'success', icon: 'check' },
+  rejected: { label: 'Rejected', tone: 'danger', icon: 'x' },
+  replaced: { label: 'Replaced', tone: 'neutral', icon: 'pause' },
+}
+
 /** History's actor for a change an app command made (design-doc §10, DL-274, DL-275). */
 export const SYSTEM_ACTOR = 'System'
 

@@ -96,6 +96,8 @@ class RequirementRead(BaseModel):
     effective_restriction_categories: list[RestrictionCategory]
     current_revision_id: uuid.UUID | None
     approved_revision_id: uuid.UUID | None
+    # Its number, null while never approved (DL-280).
+    approved_revision_number: int | None
     # Whether the caller may delete the whole subtree with it (`?children=delete`, DL-222).
     can_delete_children: bool
     approved_at: datetime | None

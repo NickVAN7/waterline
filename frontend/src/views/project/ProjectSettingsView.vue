@@ -32,6 +32,7 @@ import type { Project } from '@/stores/currentOrg'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
+import { allMembers } from './members'
 import ModuleFields from './ModuleFields.vue'
 import { recommendedFor } from './modules'
 import ProjectHeader from './ProjectHeader.vue'
@@ -104,20 +105,6 @@ function fillRestriction(data: Project) {
   restriction.value = {
     level: data.restriction_level ?? '',
     categories: [...data.restriction_categories],
-  }
-}
-
-/** Every explicit member, for the lead picker. */
-async function allMembers(projectKey: string): Promise<Member[]> {
-  const found: Member[] = []
-  for (;;) {
-    const page = await api(
-      client.GET('/api/projects/{key}/members', {
-        params: { path: { key: projectKey }, query: { limit: 200, offset: found.length } },
-      }),
-    )
-    found.push(...page.items)
-    if (!page.items.length || found.length >= page.total) return found
   }
 }
 

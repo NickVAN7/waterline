@@ -7088,6 +7088,10 @@
             "type": "boolean",
             "title": "Newer Revision Exists"
           },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged"
+          },
           "approvals": {
             "items": {
               "$ref": "#/components/schemas/ApprovalRead"
@@ -7109,6 +7113,7 @@
           "created_at",
           "completed_at",
           "newer_revision_exists",
+          "flagged",
           "approvals"
         ],
         "title": "ApprovalRequestItem",
@@ -7178,6 +7183,10 @@
             "type": "boolean",
             "title": "Newer Revision Exists"
           },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged"
+          },
           "approvals": {
             "items": {
               "$ref": "#/components/schemas/ApprovalRead"
@@ -7206,6 +7215,7 @@
           "created_at",
           "completed_at",
           "newer_revision_exists",
+          "flagged",
           "approvals",
           "allowed_actions"
         ],
@@ -9493,6 +9503,17 @@
             ],
             "title": "Approved Revision Id"
           },
+          "approved_revision_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Revision Number"
+          },
           "can_delete_children": {
             "type": "boolean",
             "title": "Can Delete Children"
@@ -9549,6 +9570,7 @@
           "effective_restriction_categories",
           "current_revision_id",
           "approved_revision_id",
+          "approved_revision_number",
           "can_delete_children",
           "approved_at",
           "version",

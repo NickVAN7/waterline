@@ -1239,7 +1239,8 @@ Entry format:
   didn't ask for. 50 edits after an approval is rare.
 - **Fix by:** S2-C20: the requirement's read carries `approved_revision_number`, which the
   default compare uses (DL-280)
-- **Status:** open
+- **Status:** resolved in S2-C20 (Revisions takes the approved revision's number from the
+  requirement's read)
 
 ### TD-96: The approver picker can't name an inherited project admin
 - **Added:** DC-2026-11-05 (DL-278)

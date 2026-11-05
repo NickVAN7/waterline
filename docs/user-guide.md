@@ -141,7 +141,39 @@ it, so copy anything you need first. While you edit, Change status waits until y
 cancel. In the side panel, Esc doesn't close the panel while you edit; **Close**, Back, or
 **Open full page** closes it and drops what you typed.
 
-Below the description, the **History** tab lists every change to the requirement, newest first,
+Below the description, the **Approval** section shows the revision last approved ("Last approved:
+revision 3") and the latest approval request: its status (Pending, Approved, Rejected, or
+Cancelled), the revision it's for, who requested it and when, its note, and each approver with
+their decision (**Not decided**, **Approved**, **Rejected**, or **Replaced**, for an approver who
+lost access and whose place the requester took) and comment. With no request yet it says "No
+approval has been requested." A project admin can:
+
+- **Request approval:** pick the approvers from the project's members (deactivated people aren't
+  listed; every one of them must approve), add an optional **Note**, and press **Request
+  approval**. The request is for the current revision. Only one request can be pending at a
+  time: while one is, Request approval is unavailable and says why. After a rejection, the dialog
+  opens with the same approvers ticked; anyone who can no longer be named is left out, and the
+  dialog says who.
+- **Re-open approval:** on an Approved requirement that hasn't changed since, the same dialog
+  starts a new round. The requirement stays Approved while it's pending; if it's rejected, the
+  requirement goes back to Draft.
+- **Cancel request:** after you confirm, the approvers can no longer decide on it. Decisions
+  already made stay on record. **Keep request** leaves it as it is.
+- **Approve by hand:** after you confirm, the requirement is approved at its current revision
+  without a request, with you as the approver (to record a sign-off made outside Waterline). A
+  pending request is cancelled.
+
+If the requirement changed after approval was requested, a warning says approvers still decide
+on the requested revision; cancel and request again to have them review the latest. If an
+approver lost access and the requester is no longer a project admin to take their place, the
+request can't complete: it says **An approver no longer has access**, and **Re-request** cancels
+it and opens the dialog with its approvers ticked, leaving out anyone who can no longer be named;
+the dialog says the earlier request is cancelled, and closing it leaves it cancelled. If someone
+you picked can no longer be named when you send the request, the dialog says so and lists only
+those who can.
+The Approval section waits while you edit, as Change status does.
+
+Below the Approval section, the **History** tab lists every change to the requirement, newest first,
 with who made it and when: "Ben Ortiz changed the status from Draft to In progress". A person
 since deactivated keeps their name, with "Deactivated" after it, and a change made by an app
 command reads **System**. A move names the old and the new parent by their IDs ("changed the

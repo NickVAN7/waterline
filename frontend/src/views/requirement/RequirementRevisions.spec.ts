@@ -42,7 +42,7 @@ type Params = { params: { path: { revision_number?: number }; query?: { before?:
 function mountRevisions(
   pages: unknown[],
   revisions: Record<number, unknown> = {},
-  props: { approvedRevisionId?: string | null; stamp?: string } = {},
+  props: { approvedRevisionNumber?: number | null; stamp?: string } = {},
 ) {
   const queue = [...pages]
   const get = vi
@@ -61,7 +61,7 @@ function mountRevisions(
       projectKey: 'ERP',
       number: 7,
       stamp: props.stamp ?? 'a',
-      approvedRevisionId: props.approvedRevisionId ?? null,
+      approvedRevisionNumber: props.approvedRevisionNumber ?? null,
       focusHeading,
     },
     attachTo: document.body,
@@ -142,9 +142,7 @@ describe('RequirementRevisions', () => {
     const { get } = mountRevisions(
       [feed([item(4), item(3), item(2), item(1)])],
       {},
-      {
-        approvedRevisionId: id(2),
-      },
+      { approvedRevisionNumber: 2 },
     )
     await flushPromises()
 
@@ -152,6 +150,23 @@ describe('RequirementRevisions', () => {
     expect(select('To').value).toBe('4')
     expect(select('From').selectedOptions[0]!.text.trim()).toBe('Revision 2 (approved)')
     expect(reads(get).sort()).toEqual([2, 4])
+  })
+
+  // TD-95: the approved revision's number comes from the requirement's read (DL-280), so one
+  // past the first page is still the default. Bug: looked up in the loaded page alone.
+  it('defaults to the approved revision when it is past the first page', async () => {
+    const { get } = mountRevisions(
+      [feed([item(60), item(59)], 'cursor')],
+      {},
+      {
+        approvedRevisionNumber: 3,
+      },
+    )
+    await flushPromises()
+
+    expect(select('From').value).toBe('3')
+    expect(select('From').selectedOptions[0]!.text.trim()).toBe('Revision 3 (approved)')
+    expect(reads(get).sort()).toEqual([3, 60])
   })
 
   it('offers every revision up to the newest, loaded or not, and reads the one picked', async () => {

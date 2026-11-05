@@ -1468,6 +1468,8 @@ export interface components {
             completed_at: string | null;
             /** Newer Revision Exists */
             newer_revision_exists: boolean;
+            /** Flagged */
+            flagged: boolean;
             /** Approvals */
             approvals: components["schemas"]["ApprovalRead"][];
         };
@@ -1509,6 +1511,8 @@ export interface components {
             completed_at: string | null;
             /** Newer Revision Exists */
             newer_revision_exists: boolean;
+            /** Flagged */
+            flagged: boolean;
             /** Approvals */
             approvals: components["schemas"]["ApprovalRead"][];
             /** Allowed Actions */
@@ -2424,6 +2428,8 @@ export interface components {
             current_revision_id: string | null;
             /** Approved Revision Id */
             approved_revision_id: string | null;
+            /** Approved Revision Number */
+            approved_revision_number: number | null;
             /** Can Delete Children */
             can_delete_children: boolean;
             /** Approved At */

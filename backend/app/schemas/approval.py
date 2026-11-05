@@ -56,6 +56,9 @@ class ApprovalRequestItem(BaseModel):
     # The UI warns approvers when the requirement has a newer revision (design-doc §6.2, "Stale
     # requests").
     newer_revision_exists: bool
+    # Pending, with a pending row whose approver can no longer decide it ("An approver no longer
+    # has access", design-doc §6.2, DL-279).
+    flagged: bool
     approvals: list[ApprovalRead]
 
 

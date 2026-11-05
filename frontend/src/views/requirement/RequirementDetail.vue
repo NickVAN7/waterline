@@ -43,6 +43,7 @@ import { useLoad } from '@/composables/useLoad'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RestrictionBadge from '@/views/project/RestrictionBadge.vue'
 
+import ApprovalSection from './ApprovalSection.vue'
 import EditRequirementForm from './EditRequirementForm.vue'
 import RequirementHistory from './RequirementHistory.vue'
 import RequirementRevisions from './RequirementRevisions.vue'
@@ -241,6 +242,10 @@ async function editGone() {
   else await settlePage()
 }
 
+function approvalChanged(saved: Requirement) {
+  item.data.value = saved
+}
+
 const restricting = ref<InstanceType<typeof RestrictionDialog>>()
 function restrictionSaved(saved: Requirement) {
   item.data.value = saved
@@ -375,6 +380,16 @@ function restrictionSaved(saved: Requirement) {
         />
         <p v-else class="m-0 text-text-muted">No description.</p>
       </section>
+      <!-- The requester's side of approvals (S2-C20); it waits while the edit form is open, as the
+           status menu does: its approval would make the form's save a 409. -->
+      <ApprovalSection
+        v-if="!editing"
+        :project-key="project.key"
+        :requirement="requirement"
+        :reload-page="reload"
+        :reload-requirement="item.run"
+        @changed="approvalChanged"
+      />
       <!-- Below the details and description, on the page and in the panel, opening on History; the
            tab isn't in the URL (DL-268, DL-269). -->
       <Tabs v-model:value="tab">
@@ -397,8 +412,8 @@ function restrictionSaved(saved: Requirement) {
               :project-key="project.key"
               :number="number"
               :stamp="revisionsStamp"
-              :approved-revision-id="
-                statusBadge === APPROVED_MODIFIED ? requirement.approved_revision_id : null
+              :approved-revision-number="
+                statusBadge === APPROVED_MODIFIED ? requirement.approved_revision_number : null
               "
               :focus-heading="focusHeading"
             />

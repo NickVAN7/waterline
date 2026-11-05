@@ -147,27 +147,9 @@ class ApprovalService:
         transaction of the change that took the access away, which holds the project's lock, so
         no decision is in flight; `actor_id` is None only for an app CLI command. A replacement
         that leaves every counted row approved completes the request."""
-        users = UserRepository(self.session)
-        contexts: dict[uuid.UUID, AuthzContext | None] = {}
-
-        async def context(id_: uuid.UUID) -> AuthzContext | None:
-            # None for a deactivated account: it has lost access, whatever it holds.
-            if id_ not in contexts:
-                user = await users.get(id_)
-                contexts[id_] = (
-                    await users.authz_context(user) if user is not None and user.is_active else None
-                )
-            return contexts[id_]
-
+        context = self._contexts()
         for request in await self.repository.lock_pending_in_project(project.id):
-            target = project_target(project, request)
-            lost: set[uuid.UUID] = set()
-            for row in request.approvals:
-                if row.decision is ApprovalDecision.PENDING:
-                    approver = await context(row.approver_id)
-                    if approver is None or not authorize(approver, Action.APPROVAL_DECIDE, target):
-                        lost.add(row.approver_id)
-            if lost:
+            if lost := await self._lost(project, request, context):
                 requester = await context(request.requested_by)
                 await self._replace(
                     request,
@@ -179,6 +161,52 @@ class ApprovalService:
                     actor_id=actor_id,
                 )
         await self.session.flush()
+
+    async def flagged(
+        self, project: Project, requests: Collection[ApprovalRequest]
+    ) -> set[uuid.UUID]:
+        """The IDs of those requests that are flagged (design-doc §6.2, DL-279): pending, with a
+        pending row whose approver can no longer decide it, which replacement left because the
+        requester no longer holds project admin either. Computed when read."""
+        context = self._contexts()
+        return {
+            request.id
+            for request in requests
+            if request.status is ApprovalRequestStatus.PENDING
+            and await self._lost(project, request, context)
+        }
+
+    def _contexts(self) -> Callable[[uuid.UUID], Awaitable[AuthzContext | None]]:
+        """Each user's authorization context, loaded once; None for a deactivated account: it
+        has lost access, whatever it holds."""
+        users = UserRepository(self.session)
+        contexts: dict[uuid.UUID, AuthzContext | None] = {}
+
+        async def context(id_: uuid.UUID) -> AuthzContext | None:
+            if id_ not in contexts:
+                user = await users.get(id_)
+                contexts[id_] = (
+                    await users.authz_context(user) if user is not None and user.is_active else None
+                )
+            return contexts[id_]
+
+        return context
+
+    async def _lost(
+        self,
+        project: Project,
+        request: ApprovalRequest,
+        context: Callable[[uuid.UUID], Awaitable[AuthzContext | None]],
+    ) -> set[uuid.UUID]:
+        """The approvers whose pending row on the request they can no longer decide."""
+        target = project_target(project, request)
+        lost: set[uuid.UUID] = set()
+        for row in request.approvals:
+            if row.decision is ApprovalDecision.PENDING:
+                approver = await context(row.approver_id)
+                if approver is None or not authorize(approver, Action.APPROVAL_DECIDE, target):
+                    lost.add(row.approver_id)
+        return lost
 
     async def _replace(
         self,

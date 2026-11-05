@@ -3,7 +3,7 @@
 // each with its number, author (the "Deactivated" badge, DL-160), date, and change note, a
 // cursor feed ("Show more", UI-TBL-9); and the compare, From and To picking any two. They default
 // to the approved revision against the current one when it's "Approved · modified"
-// (`approvedRevisionId`), otherwise the current one against the one before; a revision's
+// (`approvedRevisionNumber`, DL-280), otherwise the current one against the one before; a revision's
 // "Compare revision N with revision N-1" picks it against the one before. The older one is always From.
 // Revision numbers run 1, 2, 3… with no gaps (design-doc §6.1), so every number up to the
 // newest is a choice, loaded or not.
@@ -28,7 +28,7 @@ const props = defineProps<{
   // Its current revision and approved one: a change to either reloads the list.
   stamp: string
   // Set only while it's "Approved · modified".
-  approvedRevisionId: string | null
+  approvedRevisionNumber: number | null
   focusHeading: () => void | Promise<void>
 }>()
 
@@ -40,15 +40,12 @@ const fetchPage = (before?: string) =>
   )
 
 const newest = ref(0)
-const approved = ref<number>()
+const approved = computed(() => props.approvedRevisionNumber ?? undefined)
 const from = ref('')
 const to = ref('')
 
 function loaded(feed: Feed) {
   newest.value = feed.items[0]?.revision_number ?? 0
-  // shortcut: an approved revision past the first page (50 revisions on since) isn't found, so
-  // the default is the one before; TD-95.
-  approved.value = feed.items.find((r) => r.id === props.approvedRevisionId)?.revision_number
   from.value = String(approved.value ?? newest.value - 1)
   to.value = String(newest.value)
 }

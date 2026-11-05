@@ -32,6 +32,7 @@ export function requirementRead(number: number, title: string): Requirement {
     reporter_is_active: true,
     effective_restriction_level: null,
     effective_restriction_categories: [],
+    approved_revision_number: null,
     can_delete_children: false,
     approved_at: null,
     version: 1,

@@ -734,6 +734,19 @@ render inside the full shell when signed in.
   | `rejected` | danger | Rejected |
   | `deferred` | neutral, with a pause icon | Deferred |
 
+  An approval request's status, and one approver's decision (design-doc §6.2; S2-C20):
+
+  | Value | Tone | Label |
+  |---|---|---|
+  | request `pending` | info | Pending |
+  | request `approved` | success | Approved |
+  | request `rejected` | danger | Rejected |
+  | request `cancelled` | neutral, with an x icon | Cancelled |
+  | decision `pending` | neutral | Not decided |
+  | decision `approved` | success | Approved |
+  | decision `rejected` | danger | Rejected |
+  | decision `replaced` | neutral, with a pause icon | Replaced |
+
 - **UI-FBK-6** **Persistent banners** sit at the top of `main` and are text plus icon plus
   tone: the archived project (info tone, "This project is archived. It is read-only."). **They
   are not dismissible**: they state what the page is, not that something happened. A project's
