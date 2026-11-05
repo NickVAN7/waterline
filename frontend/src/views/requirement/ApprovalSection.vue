@@ -8,7 +8,9 @@
 // flagged one, which cancels and opens the dialog pre-filled (DL-281); and Approve by hand
 // (DL-148), whose change it tells the host (`changed`). A 403 waits for the host's reload of what
 // the user may do (`reloadPage`) and reloads the request's own; a 409 waits for the requirement's
-// (`reloadRequirement`); only then does it look where focus is (UI-FRM-7).
+// (`reloadRequirement`); only then does it look where focus is (UI-FRM-7). A named approver whose
+// row is pending decides in the decide panel (S2-C20a, DL-284); a decision that ends the request
+// reloads the requirement, whose status it may change (design-doc §6.2).
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
@@ -30,6 +32,7 @@ import { allows } from '@/composables/allowedActions'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
 
+import DecidePanel from './DecidePanel.vue'
 import RequestApprovalDialog, { type Earlier } from './RequestApprovalDialog.vue'
 
 type Requirement = components['schemas']['RequirementRead']
@@ -87,6 +90,7 @@ const reopens = computed(
 const canRequest = computed(() => allows(props.requirement, 'approval_request.create'))
 const canCancel = computed(() => allows(request.value, 'approval_request.cancel'))
 const canApprove = computed(() => allows(props.requirement, 'requirement.approve_manually'))
+const canDecide = computed(() => allows(request.value, 'approval.decide'))
 
 // The approvers still counted on a request: a replaced row's person left it (design-doc §6.2).
 const approversOf = (shown: Request): Earlier[] =>
@@ -140,6 +144,8 @@ async function fail(error: unknown, retryText: string) {
     ((error.details.fields ?? []) as { type: string }[]).some((f) => f.type === 'not_pending')
   ) {
     failure.value = "This request isn't pending any more. The section now shows where it stands."
+    // What ended it (an approval by hand, say) may have changed the requirement too.
+    await props.reloadRequirement()
     await latest.run()
   } else {
     failure.value = retryText
@@ -179,6 +185,19 @@ function openRequest() {
 async function requested(made: Request) {
   latest.data.value = made
   announce('Approval requested.')
+  await keepFocus()
+}
+
+async function decided(made: Request, decision: 'approved' | 'rejected') {
+  latest.data.value = made
+  const outcome =
+    made.status === 'approved'
+      ? ' Everyone has approved, so the requirement is approved.'
+      : made.status === 'pending'
+        ? ' The request waits for the other approvers.'
+        : ''
+  announce(`You ${decision === 'approved' ? 'approved' : 'rejected'} the request.${outcome}`)
+  if (made.status !== 'pending') await props.reloadRequirement()
   await keepFocus()
 }
 
@@ -359,6 +378,16 @@ async function dismiss() {
             <p v-if="row.comment" class="m-0 text-sm">{{ row.comment }}</p>
           </li>
         </ul>
+        <DecidePanel
+          v-if="canDecide"
+          :key="request.id"
+          :project-key="projectKey"
+          :number="requirement.number"
+          :request="request"
+          :approved-revision-number="requirement.approved_revision_number"
+          @decided="decided"
+          @failed="(error) => fail(error, '')"
+        />
       </template>
     </div>
     <div v-if="canRequest || canCancel || canApprove" class="flex flex-wrap items-center gap-3">

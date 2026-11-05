@@ -49,6 +49,19 @@ describe('MarkdownView', () => {
     expect(view.find(tag).exists()).toBe(true)
   })
 
+  it.each([
+    ['# One', 'h4'],
+    ['### Three', 'h6'],
+  ])(
+    "under an h3 (`level` 3), shifts %s to %s, keeping the page's heading order",
+    (source, tag) => {
+      const view = mount(MarkdownView, { props: { source, level: 3 } })
+
+      expect(view.find(tag).exists()).toBe(true)
+      expect(view.findAll('h2, h3')).toHaveLength(0)
+    },
+  )
+
   it("drops the inline style a table column's alignment would set", () => {
     const view = render('| H |\n|:-:|\n| d |')
 

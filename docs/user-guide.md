@@ -171,6 +171,22 @@ it and opens the dialog with its approvers ticked, leaving out anyone who can no
 the dialog says the earlier request is cancelled, and closing it leaves it cancelled. If someone
 you picked can no longer be named when you send the request, the dialog says so and lists only
 those who can.
+
+**Deciding.** When you're a named approver and haven't decided yet, whatever your role (viewers
+included), the Approval section shows the request for you to decide on:
+
+- **Revision N, under approval** shows the title and description you're approving, which may be
+  older than the requirement's current one.
+- On a requirement approved before, **Changes since approved revision N** compares the approved
+  revision with the one under approval, as the Revisions tab's compare does.
+- Under **Your decision**, add an optional **Comment** (the requester and the other approvers
+  see it), then press **Approve** or **Reject**. A decision is final. Rejecting ends the whole
+  request; with no comment, Waterline asks first: **Reject without a comment** goes ahead, and
+  **Add a comment** takes you back to the comment.
+- Once everyone has approved, the requirement is approved at that revision. If the request was
+  cancelled or decided meanwhile, the section says it isn't pending any more and shows where it
+  stands.
+
 The Approval section waits while you edit, as Change status does.
 
 Below the Approval section, the **History** tab lists every change to the requirement, newest first,

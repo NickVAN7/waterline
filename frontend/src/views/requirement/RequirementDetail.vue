@@ -368,8 +368,8 @@ function restrictionSaved(saved: Requirement) {
         </div>
       </dl>
       <section v-if="!editing" :aria-labelledby="descriptionId" class="flex flex-col gap-3">
-        <!-- An h2 in the panel too, beside its title: the description's own headings are shifted
-             to h3 (UI-MD-1), so they stay under it. -->
+        <!-- An h2 in the panel too, beside its title: the description's own headings start at h3
+             (`level` 2, UI-MD-1), so they stay under it. -->
         <h2 :id="descriptionId" class="m-0 text-lg font-semibold">Description</h2>
         <Alert v-if="!hasCriteria" tone="info"
           >No acceptance criteria: the description has no "Acceptance Criteria" heading.</Alert
@@ -377,6 +377,7 @@ function restrictionSaved(saved: Requirement) {
         <MarkdownView
           v-if="requirement.description_md.trim()"
           :source="requirement.description_md"
+          :level="2"
         />
         <p v-else class="m-0 text-text-muted">No description.</p>
       </section>

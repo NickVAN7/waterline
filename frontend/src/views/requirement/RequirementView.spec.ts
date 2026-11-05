@@ -119,7 +119,9 @@ describe('RequirementView', () => {
     expect(wrapper.text()).toContain('Status: Draft')
     expect(wrapper.text()).toContain('Priority:High')
     expect(wrapper.text()).toContain('Reporter:Ben Ortiz')
-    expect(wrapper.find('.markdown h3').text()).toBe('Context')
+    // Under the Description h2, the description's ## is an h4 (UI-MD-1, UI-SHL-8).
+    expect(wrapper.find('.markdown h4').text()).toBe('Context')
+    expect(wrapper.findAll('.markdown h2, .markdown h3')).toHaveLength(0)
     expect(wrapper.get('a[href="/acme/projects/ERP/requirements"]').text()).toBe('Requirements')
     await expectNoA11yViolations(wrapper)
   })

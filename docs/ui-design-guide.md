@@ -1023,7 +1023,8 @@ the revision compare in S2-C19a (DL-267).
 - **UI-MD-1** **One renderer, `MarkdownView`:** `markdown-it` with raw HTML off, then DOMPurify
   on its output; never `v-html` on anything else. No remote images (image syntax renders as a
   link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
-  shifted down one level, so a description never adds a second `h1` (UI-SHL-8); code blocks in
+  shifted below the heading the content sits under (`level`, an `h1` by default), so a
+  description never adds a second `h1` nor breaks the page's heading order (UI-SHL-8); code blocks in
   the monospace font, with no syntax highlighting. A task-list item's `[ ]` or `[x]` is a mark
   drawn in tokens and named "Not done" or "Done" (`role="img"`), not a disabled checkbox, whose
   look the tokens can't reach (DL-258). A component test runs a corpus of known XSS

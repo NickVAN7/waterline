@@ -203,6 +203,9 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   (`RequestApprovalDialog`'s `focusList`), and marks the loading group `data-autofocus`, so the
   first focus doesn't pass through a later field: ModalDialog picks before the load (S2-C20
   review).
+- `MarkdownView` under a heading gets that heading's `level` (`:level="2"` under an `h2`): its
+  default shift only keeps content off `h1`, and a `#` under an `h3` would read as the page's
+  next section (UI-MD-1, UI-SHL-8; S2-C20a review).
 - A required checkbox group can't take `aria-required`: its legend carries a visually hidden
   "(required)" beside the hidden asterisk (UI-FRM-2; S2-C20 review).
 - A PrimeVue table's selected-row bar goes on the row's first cell, and only on the selected

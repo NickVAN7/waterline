@@ -22,9 +22,10 @@ md.renderer.rules.image = (tokens, idx) => {
 md.core.ruler.push('waterline', (state) => {
   const tokens = state.tokens
   tokens.forEach((token, i) => {
-    // Headings shift down one level, so content never adds a second h1 (UI-SHL-8).
+    // Headings shift below the heading the content sits under (`level`, an h1 by default), so
+    // content never adds a second h1 nor breaks the page's heading order (UI-SHL-8).
     if (token.type === 'heading_open' || token.type === 'heading_close') {
-      token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + 1)}`
+      token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + (state.env as { level: number }).level)}`
     }
     // Task lists: "[ ]" or "[x]" opening a list item becomes a box drawn in our tokens, named
     // "Done" or "Not done": a disabled checkbox wears the browser's grey, under 3:1 (TD-88).
@@ -57,16 +58,17 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 })
 
 /** The markdown as sanitized HTML. */
-function renderMarkdown(source: string): string {
-  return DOMPurify.sanitize(md.render(source), sanitizeOptions)
+function renderMarkdown(source: string, level: number): string {
+  return DOMPurify.sanitize(md.render(source, { level }), sanitizeOptions)
 }
 </script>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps<{ source: string }>()
-const html = computed(() => renderMarkdown(props.source))
+// `level`: the heading level the content sits under.
+const props = withDefaults(defineProps<{ source: string; level?: number }>(), { level: 1 })
+const html = computed(() => renderMarkdown(props.source, props.level))
 </script>
 
 <template>
