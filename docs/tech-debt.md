@@ -1237,6 +1237,17 @@ Entry format:
 - **Why:** the requirement's read carries no approved revision number, and adding one is an API
   change S2-C19a's row doesn't include; paging the list until it's found loads pages the user
   didn't ask for. 50 edits after an approval is rare.
-- **Fix by:** S2-C20 (Approvals UI, which shows the approved revision): decide with the owner
-  whether the requirement's read carries the approved revision's number
+- **Fix by:** S2-C20: the requirement's read carries `approved_revision_number`, which the
+  default compare uses (DL-280)
+- **Status:** open
+
+### TD-96: The approver picker can't name an inherited project admin
+- **Added:** DC-2026-11-05 (DL-278)
+- **What:** the request dialog's approver picker lists the project's explicit members only, so an
+  inherited project admin without a membership, whom design-doc §6.2 lets a request name, can't
+  be picked in the UI; the API accepts them.
+- **Why:** the members list already exists; a candidates endpoint for everyone §6.2 allows is a
+  new endpoint the owner chose not to build in S2-C20 (DL-278).
+- **Fix by:** S2-C22 (the tech-debt review): decide with the owner whether to add an approver
+  candidates endpoint
 - **Status:** open

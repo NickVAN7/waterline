@@ -3001,7 +3001,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Decision:** On the My work page, S2-C14 gives each section its own error state (TD-40), so
   an unavailable section no longer fails the page; the approvals section's UI stays in S2-C20.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-277 (in part: the approvals section's UI in S2-C20a)
 - **Applies to:** build plan (S2-C14)
 - **Source:** owner, Oct 30, 2026 (chat session, S2-C14 start)
 
@@ -3482,3 +3482,83 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   note)
 - **Source:** owner, Nov 4, 2026 (chat session, S2-C19's start; DC-2026-11-04g, docs-consistency
   decisions 1, the owner's own option, and 2, option (a))
+
+### DL-277: S2-C20 splits: the requester's side, then the approver's (S2-C20a)
+- **Date:** 2026-11-05
+- **Decision:** S2-C20 builds the requester's side of approvals on the requirement: its Approval
+  section (the latest request, its approvers and their decisions, the stale-revision warning),
+  the request dialog with the approver picker, re-open (DL-195), cancel, approve by hand, and the
+  flagged state (DL-279). A new row, S2-C20a, builds the approver's side: the decide panel
+  (rejecting prompts for a comment and asks to confirm without one, DL-196) and My work's
+  approvals section.
+- **Supersedes:** DL-237 in part (the approvals section's UI in S2-C20a, not S2-C20); build plan
+  S2-C20 in part (the decide panel and My work's approvals section)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C20, S2-C20a)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20 re-cut)
+
+### DL-278: The approver picker lists the project's explicit members
+- **Date:** 2026-11-05
+- **Decision:** The request dialog's approver picker draws on the project's explicit memberships
+  (`GET /api/projects/{key}/members`), deactivated people left out; no new candidates endpoint.
+  An inherited project admin without a membership can't be named from the UI, though the API
+  still accepts them (design-doc §6.2), logged as TD-96.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C20); tech-debt (TD-96)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20 re-cut)
+
+### DL-279: The approval request's read says whether it's flagged
+- **Date:** 2026-11-05
+- **Decision:** The approval request's item and read carry `flagged`, computed by the server when
+  read: true while the request is pending and one of its pending rows is held by an approver
+  who no longer has content access to the project (design-doc §6.2, §3.1). The requirement's
+  Approval section shows it as "An approver no longer has access", with Cancel and Re-request
+  for a project admin. Built in S2-C20 (backend, with API tests and `wl gen-client`), which
+  `security-reviewer` joins.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2; build plan (S2-C20; the security-reviewer list)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20 re-cut)
+
+### DL-280: The requirement's read carries its approved revision's number
+- **Date:** 2026-11-05
+- **Decision:** `RequirementRead` gains `approved_revision_number` (null while never approved),
+  which the Approval section shows and Revisions' default compare uses in place of searching the
+  revision list's first page; this resolves TD-95. Built in S2-C20 (backend, with API tests and
+  `wl gen-client`).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C20); tech-debt (TD-95)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20 re-cut; S2-C19a open question 2)
+
+### DL-281: Re-request on a flagged request cancels it, then opens the request dialog
+- **Date:** 2026-11-05
+- **Decision:** On a flagged request (DL-279), Re-request cancels the request and then opens the
+  request dialog pre-filled from it (DL-282): two calls, not one transaction, so closing the
+  dialog leaves the request cancelled with no new one. No new endpoint.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C20)
+- **Source:** owner, Nov 5, 2026 (DC-2026-11-05, docs-consistency decision 1, option (a))
+
+### DL-282: A pre-filled request dialog drops approvers who can no longer be named
+- **Date:** 2026-11-05
+- **Decision:** When the request dialog opens pre-filled (after a rejection, screen inventory
+  Piece 6, or on Re-request, DL-281), it names only the earlier approvers still in the picker
+  (DL-278), and a note names anyone it dropped.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C20)
+- **Source:** owner, Nov 5, 2026 (DC-2026-11-05, docs-consistency decision 2, option (a))
+
+### DL-283: S2-C20a builds the approver's review items from screen inventory Piece 6
+- **Date:** 2026-11-05
+- **Decision:** S2-C20a also builds, for the approver: the exact revision the request is bound
+  to, the diff against the last approved revision on a re-approval, and "See my past decisions",
+  whose endpoint (a backend change, with API tests and `wl gen-client`) and place are specified
+  at S2-C20a's re-cut; `security-reviewer` joins S2-C20a.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C20a; the security-reviewer list)
+- **Source:** owner, Nov 5, 2026 (DC-2026-11-05, docs-consistency decision 3, option (a))

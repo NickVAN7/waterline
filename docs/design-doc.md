@@ -1002,7 +1002,8 @@ requirement approval.
     are never replaced.
   - **If the requester no longer holds project admin either,** the row stays pending and the
     request is flagged in the UI ("an approver no longer has access") for any project admin to
-    cancel or re-request. Nothing else is reassigned automatically.
+    cancel or re-request; the request's read carries `flagged`, computed when read (DL-279).
+    Nothing else is reassigned automatically.
   - **Logged** on the request: `field_changed = approver_id`, old and new values the two user
     IDs (§10). `changed_by` is the user whose action took the access away; it is null only
     when an app CLI command caused it (as for `audit_event.actor_id`, §10.1).
