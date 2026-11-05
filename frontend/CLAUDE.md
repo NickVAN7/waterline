@@ -189,6 +189,9 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
 - A status note that reports an action's result (not a form alert) is cleared when what it
   describes changes: a new selection, a reload, or the next run of the action
   (`RequirementsTree`'s expand note; S2-C18c review).
+- A control that rewrites another control's value, or its own, after the user's input (the
+  compare's From and To swap) says the new values in a polite live region: the user heard the
+  value they picked, not the one it became (S2-C19a review).
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.

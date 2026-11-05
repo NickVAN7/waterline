@@ -22,6 +22,7 @@ import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import {
+  APPROVED_MODIFIED,
   ARCHIVED_BANNER,
   DEACTIVATED,
   PRIORITY,
@@ -44,6 +45,7 @@ import RestrictionBadge from '@/views/project/RestrictionBadge.vue'
 
 import EditRequirementForm from './EditRequirementForm.vue'
 import RequirementHistory from './RequirementHistory.vue'
+import RequirementRevisions from './RequirementRevisions.vue'
 import RestrictionDialog from './RestrictionDialog.vue'
 import StatusMenu from './StatusMenu.vue'
 
@@ -89,6 +91,15 @@ async function retry() {
 const historyStamp = computed(() => {
   const r = item.data.value
   return r ? [r.version, r.restriction_level, r.restriction_categories.join()].join('|') : ''
+})
+// Revisions loads once it's first opened, then stays, its "Show more" pages and picks too.
+const tab = ref<string | number>('history')
+const revisionsOpened = ref(false)
+watch(tab, (open) => open === 'revisions' && (revisionsOpened.value = true))
+// A new revision or an approval reloads Revisions.
+const revisionsStamp = computed(() => {
+  const r = item.data.value
+  return r ? `${r.current_revision_id}|${r.approved_revision_id}` : ''
 })
 // A title changed in place (a save, a reload) renames the page too (UI-SHL-9).
 watch(
@@ -365,10 +376,11 @@ function restrictionSaved(saved: Requirement) {
         <p v-else class="m-0 text-text-muted">No description.</p>
       </section>
       <!-- Below the details and description, on the page and in the panel, opening on History; the
-           tab isn't in the URL (DL-268, DL-269). Revisions joins it in S2-C19a (DL-267). -->
-      <Tabs value="history">
+           tab isn't in the URL (DL-268, DL-269). -->
+      <Tabs v-model:value="tab">
         <TabList :pt="{ content: { 'aria-label': 'About this requirement' } }">
           <Tab value="history">History</Tab>
+          <Tab value="revisions">Revisions</Tab>
         </TabList>
         <TabPanels class="px-0 pb-0">
           <TabPanel value="history">
@@ -376,6 +388,18 @@ function restrictionSaved(saved: Requirement) {
               :project-key="project.key"
               :number="number"
               :stamp="historyStamp"
+              :focus-heading="focusHeading"
+            />
+          </TabPanel>
+          <TabPanel value="revisions">
+            <RequirementRevisions
+              v-if="revisionsOpened"
+              :project-key="project.key"
+              :number="number"
+              :stamp="revisionsStamp"
+              :approved-revision-id="
+                statusBadge === APPROVED_MODIFIED ? requirement.approved_revision_id : null
+              "
               :focus-heading="focusHeading"
             />
           </TabPanel>

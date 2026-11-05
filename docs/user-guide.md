@@ -151,6 +151,19 @@ description are versions, not History entries. History shows the latest entries 
 more** adds the next ones. A move made in the tree while a requirement's side panel is open shows
 in its History the next time you open it.
 
+The **Revisions** tab beside it lists the saved versions of the title and description, newest
+first: each one's number, who saved it and when, and its change note ("No change note." when
+there's none); **Show more** adds older ones. **Compare revisions** shows what changed between
+any two: pick them in **From** and **To** (the older one is always From). It opens on the current revision against the one before, or, when the
+requirement is "Approved · modified", on the approved revision against the current one; a
+revision's **Compare revision 3 with revision 2** picks it against the one before. The title
+shows on its own, and the description as its markdown text, inline: added words are underlined
+and removed ones struck through, and a screen reader says "Added:" or "Removed:" before each; a
+removed or added blank line shows as "(blank line)". Picking a From newer than To swaps the two,
+and a screen reader says so.
+Runs of more than three unchanged lines fold away behind **Show 12 unchanged lines**. With only
+one revision there's nothing to compare yet.
+
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The
 project's admins (and organization owners and admins, workspace owners and admins, and system

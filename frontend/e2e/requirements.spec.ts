@@ -262,6 +262,26 @@ test('creating a requirement: the editor and its Preview, its full page, then ed
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Refunds and returns' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeFocused()
+
+  // Revisions: the edit is revision 2, compared with revision 1 by default, the title its own
+  // field, word by word (DL-145, DL-267).
+  await page.getByRole('tab', { name: 'Revisions' }).click()
+  const revisions = page.getByRole('tabpanel', { name: 'Revisions' })
+  await expect(revisions.getByRole('listitem').first()).toContainText('Revision 2 by')
+  await expect(revisions.getByRole('listitem').first()).toContainText('Returns too')
+  await expect(revisions.getByRole('listitem').last()).toContainText('No change note.')
+  await expect(revisions.getByRole('combobox', { name: 'From' })).toHaveValue('1')
+  await expect(revisions.getByRole('combobox', { name: 'To' })).toHaveValue('2')
+  await expect(revisions.locator('ins').first()).toHaveText('Added: and returns')
+  await expect(revisions.getByText("The description didn't change.")).toBeVisible()
+  await expectOnlyTokenColors(page, '[role=tabpanel]')
+  await expectNoA11yViolations(page)
+  // At 320 px the compare reflows: no sideways scroll (WCAG 1.4.10, UI-MD-3).
+  await page.setViewportSize({ width: 320, height: size.height })
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+  ).toBeLessThanOrEqual(0)
+  await page.setViewportSize(size)
 })
 
 // S2-C18: the requirement's page, opened from the tree, and a stored XSS payload that doesn't run

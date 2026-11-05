@@ -3,11 +3,9 @@
 // entries newest first, in plain language, the names resolved by the server (a former member's
 // included, with the "Deactivated" badge; "System" for an app command; a parent by its ID, with
 // "Deleted" while it's in the trash; an approval's revision by its number). A cursor feed: "Show
-// more" appends the next page and moves focus to its first entry (UI-TBL-9). It reloads when the
-// requirement changes (`stamp`), so a change made on the page shows here.
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-
-import { api, ApiError, client, NETWORK_ERROR } from '@/api/client'
+// more" appends the next page (`CursorFeed`, UI-TBL-9). It reloads when the requirement changes
+// (`stamp`), so a change made on the page shows here.
+import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import {
   DEACTIVATED,
@@ -20,17 +18,10 @@ import {
   SYSTEM_ACTOR,
   type BadgeLabel,
 } from '@/app/labels'
-import Alert from '@/components/Alert.vue'
 import Badge from '@/components/Badge.vue'
-import Button from '@/components/Button.vue'
-import EmptyState from '@/components/EmptyState.vue'
-import ErrorState from '@/components/ErrorState.vue'
-import Skeleton from '@/components/Skeleton.vue'
-import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
-import { useLoad } from '@/composables/useLoad'
+import CursorFeed from '@/components/CursorFeed.vue'
 
 type Entry = components['schemas']['ActivityEntry']
-type Feed = components['schemas']['Feed_ActivityEntry_']
 // A part of an entry's sentence: plain words, or a value that may carry a badge.
 type Part = string | { text: string; badge?: BadgeLabel }
 
@@ -47,89 +38,6 @@ const fetchPage = (before?: string) =>
       params: { path: { key: props.projectKey, number: props.number }, query: { before } },
     }),
   )
-
-const first = useLoad(() => fetchPage())
-const entries = ref<Entry[]>([])
-const nextCursor = ref<string | null>(null)
-const more = ref(false)
-const moreFailed = ref('')
-const said = ref('')
-const list = ref<HTMLOListElement>()
-const moreButton = ref<InstanceType<typeof Button>>()
-let announcing: ReturnType<typeof setTimeout> | undefined
-onBeforeUnmount(() => clearTimeout(announcing))
-
-// The entry at `index`, focused; the host's heading when there's none to take it.
-async function focusEntry(index: number) {
-  await nextTick()
-  const entry = list.value?.querySelectorAll<HTMLElement>(':scope > li')[index]
-  if (entry) entry.focus()
-  else await props.focusHeading()
-}
-
-function show(feed: Feed) {
-  entries.value = feed.items
-  nextCursor.value = feed.next_cursor
-}
-
-// Each load starts a new generation, and its answer another: a "Show more" begun before either
-// answers for a list no longer shown (one clicked mid-reload sent the old list's cursor), so it's
-// dropped.
-let generation = 0
-
-async function load() {
-  generation += 1
-  moreFailed.value = ''
-  // A reload makes "2 more entries" stale (frontend/CLAUDE.md, result notes).
-  clearTimeout(announcing)
-  said.value = ''
-  if (await first.run()) {
-    generation += 1
-    show(first.data.value!)
-  }
-}
-watch(() => props.stamp, load, { immediate: true })
-
-// A successful Try again goes to the host's heading (UI-FBK-15).
-async function retry() {
-  await load()
-  if (!first.error.value) await props.focusHeading()
-}
-
-function dismissMore() {
-  moreFailed.value = ''
-  moreButton.value?.focus()
-}
-
-async function showMore() {
-  more.value = true
-  moreFailed.value = ''
-  clearTimeout(announcing)
-  said.value = ''
-  const started = generation
-  try {
-    const page = await fetchPage(nextCursor.value!)
-    if (started !== generation) return
-    const at = entries.value.length
-    entries.value = [...entries.value, ...page.items]
-    nextCursor.value = page.next_cursor
-    await focusEntry(at)
-    const count = page.items.length
-    announcing = setTimeout(
-      () => (said.value = `${count} more ${count === 1 ? 'entry' : 'entries'}`),
-      ANNOUNCE_DELAY_MS,
-    )
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-    if (started !== generation) return
-    moreFailed.value =
-      error.code === NETWORK_ERROR
-        ? "Couldn't load more entries. Check your connection, then try again."
-        : "Couldn't load more entries. Try again in a moment."
-  } finally {
-    more.value = false
-  }
-}
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -177,71 +85,44 @@ function sentence(entry: Entry): Part[] {
 <template>
   <div class="flex flex-col gap-3">
     <h2 class="sr-only">History</h2>
-    <div :aria-busy="first.loading.value && !entries.length ? 'true' : undefined">
-      <ErrorState
-        v-if="first.error.value"
-        :key="first.failures.value"
-        :live="first.failures.value > 1"
-        thing="the history"
-        :pending="first.loading.value"
-        @retry="retry"
-      />
-      <Skeleton v-else-if="!first.data.value" :rows="4" />
-      <EmptyState v-else-if="!entries.length" heading="No history yet" :level="3"
-        >Changes to this requirement show here.</EmptyState
-      >
-      <ol v-else ref="list" class="m-0 flex list-none flex-col gap-3 p-0">
-        <li
-          v-for="entry in entries"
-          :key="entry.id"
-          tabindex="-1"
-          class="flex flex-col gap-1 rounded-md"
-        >
-          <!-- Running text with real spaces, not a flex row's gaps: the words are read as a
-               sentence ("Ben Ortiz changed…"), not run together. -->
-          <p class="m-0">
-            <span class="font-medium">{{ entry.changed_by_name ?? SYSTEM_ACTOR }}</span>
-            <template v-if="entry.changed_by_is_active === false"
-              >{{ ' '
-              }}<Badge :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{
-                DEACTIVATED.label
-              }}</Badge></template
-            >
-            <template v-for="(part, index) in sentence(entry)" :key="index"
-              >{{ ' ' }}<template v-if="typeof part === 'string'">{{ part }}</template
-              ><template v-else
-                ><span class="font-medium">{{ part.text }}</span
-                ><template v-if="part.badge"
-                  >{{ ' '
-                  }}<Badge :tone="part.badge.tone" :icon="part.badge.icon">{{
-                    part.badge.label
-                  }}</Badge></template
-                ></template
-              ></template
-            >
-          </p>
-          <time :datetime="entry.changed_at" class="text-sm text-text-muted">{{
-            timeFormat.format(new Date(entry.changed_at))
-          }}</time>
-        </li>
-      </ol>
-    </div>
-    <Alert v-if="moreFailed" tone="danger" live dismissible @dismiss="dismissMore">{{
-      moreFailed
-    }}</Alert>
-    <Button
-      v-if="nextCursor && !first.error.value"
-      ref="moreButton"
-      variant="secondary"
-      class="self-start"
-      :pending="more"
-      pending-label="Loading…"
-      @click="showMore"
-      >Show more</Button
+    <CursorFeed
+      :fetch-page="fetchPage"
+      :stamp="stamp"
+      :focus-heading="focusHeading"
+      thing="the history"
+      :noun="['entry', 'entries']"
+      empty-heading="No history yet"
+      empty-text="Changes to this requirement show here."
+      :empty-level="3"
     >
-    <!-- Outside the busy region, where a screen reader holds changes back until they're done. -->
-    <p class="sr-only" aria-live="polite">
-      {{ first.loading.value && !entries.length ? 'Loading the history…' : said }}
-    </p>
+      <template #item="{ item: entry }">
+        <!-- Running text with real spaces, not a flex row's gaps: the words are read as a
+             sentence ("Ben Ortiz changed…"), not run together. -->
+        <p class="m-0">
+          <span class="font-medium">{{ entry.changed_by_name ?? SYSTEM_ACTOR }}</span>
+          <template v-if="entry.changed_by_is_active === false"
+            >{{ ' '
+            }}<Badge :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{
+              DEACTIVATED.label
+            }}</Badge></template
+          >
+          <template v-for="(part, index) in sentence(entry)" :key="index"
+            >{{ ' ' }}<template v-if="typeof part === 'string'">{{ part }}</template
+            ><template v-else
+              ><span class="font-medium">{{ part.text }}</span
+              ><template v-if="part.badge"
+                >{{ ' '
+                }}<Badge :tone="part.badge.tone" :icon="part.badge.icon">{{
+                  part.badge.label
+                }}</Badge></template
+              ></template
+            ></template
+          >
+        </p>
+        <time :datetime="entry.changed_at" class="text-sm text-text-muted">{{
+          timeFormat.format(new Date(entry.changed_at))
+        }}</time>
+      </template>
+    </CursorFeed>
   </div>
 </template>

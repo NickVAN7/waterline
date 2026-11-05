@@ -1226,3 +1226,17 @@ Entry format:
 - **Fix by:** S2-C22 (the manual keyboard and screen-reader pass): decide with the owner whether
   to announce the outcome, and build it if so
 - **Status:** open
+
+### TD-95: Revisions' default From misses an approved revision past the first page
+- **Added:** S2-C19a
+- **What:** while a requirement is "Approved · modified", Revisions' compare opens on the approved
+  revision against the current one (DL-145). The page knows only the approved revision's id, so
+  it finds its number in the revision list's first page (50 revisions); when 50 or more revisions
+  came after the approval, the compare opens on the current one against the one before instead.
+  The approved revision can still be picked in From.
+- **Why:** the requirement's read carries no approved revision number, and adding one is an API
+  change S2-C19a's row doesn't include; paging the list until it's found loads pages the user
+  didn't ask for. 50 edits after an approval is rare.
+- **Fix by:** S2-C20 (Approvals UI, which shows the approved revision): decide with the owner
+  whether the requirement's read carries the approved revision's number
+- **Status:** open

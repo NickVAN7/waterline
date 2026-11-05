@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C19 (History) built; next is S2-C19a (Revisions & compare; `docs/reviews/`).
+> **Status:** S2-C19a (Revisions & compare) built; next is S2-C20 (Approvals UI; `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -813,7 +813,8 @@ frontend/src/
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
                      Pagination, SuccessStatus, PageHeader, ModalDialog, ItemPanel,
-                     ConfirmDialog, GroupError, RowActions, Icon, NameSlugSettings
+                     ConfirmDialog, GroupError, RowActions, Icon, NameSlugSettings,
+                     CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9)
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
                      useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
                      useUsernameSuggestion, useWorkspace,

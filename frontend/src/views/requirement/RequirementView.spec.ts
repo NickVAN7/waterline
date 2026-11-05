@@ -49,7 +49,8 @@ async function mountAt(
     .spyOn(client, 'GET')
     .mockImplementation(((path: string) =>
       Promise.resolve(
-        path === '/api/projects/{key}/requirements/{number}/activity'
+        path === '/api/projects/{key}/requirements/{number}/activity' ||
+          path === '/api/projects/{key}/requirements/{number}/revisions'
           ? ok({ items: [], next_cursor: null })
           : path === '/api/projects/{key}/requirements/{number}'
             ? next(answers.item)
@@ -127,7 +128,6 @@ describe('RequirementView', () => {
     const tab = wrapper.get('[role=tab]')
     expect(tab.text()).toBe('History')
     expect(tab.attributes('aria-selected')).toBe('true')
-    expect(wrapper.findAll('[role=tab]')).toHaveLength(1)
     const panel = wrapper.get('[role=tabpanel]')
     expect(panel.text()).toContain('No history yet')
     // After the description, in document order.
@@ -135,6 +135,29 @@ describe('RequirementView', () => {
     expect(description.compareDocumentPosition(panel.element)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('has a Revisions tab beside History, loaded only once it is opened (DL-267)', async () => {
+    const { wrapper, get } = await mountAt([READER], [ok(REFUNDS)])
+    const revisionCalls = () =>
+      get.mock.calls.filter(
+        (call) => call[0] === '/api/projects/{key}/requirements/{number}/revisions',
+      )
+    expect(wrapper.findAll('[role=tab]').map((t) => t.text())).toEqual(['History', 'Revisions'])
+    expect(revisionCalls()).toHaveLength(0)
+
+    await wrapper.findAll('[role=tab]')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(revisionCalls()).toHaveLength(1)
+    const open = wrapper.findAll('[role=tabpanel]').find((p) => p.isVisible())!
+    expect(open.text()).toContain('All revisions')
+    // Back to History and again: Revisions is kept, not loaded again.
+    await wrapper.findAll('[role=tab]')[0]!.trigger('click')
+    await wrapper.findAll('[role=tab]')[1]!.trigger('click')
+    await flushPromises()
+    expect(revisionCalls()).toHaveLength(1)
     await expectNoA11yViolations(wrapper)
   })
 
@@ -153,6 +176,47 @@ describe('RequirementView', () => {
 
     expect(wrapper.text()).toContain('Status: Approved · modified')
   })
+
+  it.each([
+    ['"Approved · modified"', 'approved', 'r1', '1'],
+    ['approved, not edited since', 'approved', 'r3', '2'],
+    ['approved before, now in progress', 'in_progress', 'r1', '2'],
+  ] as const)(
+    'Revisions compares from the approved revision only while %s',
+    async (_case, status, approved, from) => {
+      const { wrapper, get } = await mountAt(
+        [READER],
+        [ok({ ...REFUNDS, status, approved_revision_id: approved, current_revision_id: 'r3' })],
+      )
+      const answer = get.getMockImplementation() as (...args: unknown[]) => unknown
+      const revision = (n: number) => ({
+        id: `r${n}`,
+        revision_number: n,
+        title: 'Refunds',
+        change_note: null,
+        created_by_id: 'u-ben',
+        created_by_name: 'Ben Ortiz',
+        created_by_is_active: true,
+        created_at: '2026-11-03T14:30:00Z',
+      })
+      get.mockImplementation(((path: string, options: never) =>
+        path === '/api/projects/{key}/requirements/{number}/revisions'
+          ? Promise.resolve(
+              ok({ items: [revision(3), revision(2), revision(1)], next_cursor: null }),
+            )
+          : path === '/api/projects/{key}/requirements/{number}/revisions/{revision_number}'
+            ? Promise.resolve(ok({ ...revision(1), description_md: '' }))
+            : answer(path, options)) as never)
+
+      await wrapper.findAll('[role=tab]')[1]!.trigger('click')
+      await flushPromises()
+
+      const label = wrapper.findAll('label').find((l) => l.text() === 'From')!
+      expect((document.getElementById(label.attributes('for')!) as HTMLSelectElement).value).toBe(
+        from,
+      )
+    },
+  )
 
   it('marks a deactivated reporter (TD-77)', async () => {
     const { wrapper } = await mountAt([READER], [ok({ ...REFUNDS, reporter_is_active: false })])
@@ -613,6 +677,30 @@ describe('RequirementView', () => {
       expect(document.activeElement).toBe(button('Edit'))
       await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_DELAY_MS * 2))
       expect(live()).toBe('Requirement saved.')
+    })
+
+    it.each([
+      ['a saved title, a new revision, reloads it', 'r2', 2],
+      ['a priority change, no new revision, leaves it', 'r1', 1],
+    ] as const)('Revisions: %s', async (_case, current, loads) => {
+      const before = { ...EDITOR, current_revision_id: 'r1' }
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        ok({ ...before, current_revision_id: current, version: 2 }),
+      )
+      const { wrapper, get } = await mountAt([READER], [ok(before)])
+      const revisionCalls = () =>
+        get.mock.calls.filter(
+          (call) => call[0] === '/api/projects/{key}/requirements/{number}/revisions',
+        )
+      await wrapper.findAll('[role=tab]')[1]!.trigger('click')
+      await flushPromises()
+      expect(revisionCalls()).toHaveLength(1)
+
+      await edit()
+      await type(title(), 'Refunds and returns')
+      await save()
+
+      expect(revisionCalls()).toHaveLength(loads)
     })
 
     it('sends a description change, and a priority change without the note (design-doc §6.1)', async () => {
