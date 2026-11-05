@@ -1502,7 +1502,7 @@ Journey decisions, Oct 6–7, 2026. **My work is the home page after sign-in for
 - the projects they can open;
 - their outstanding work across projects: tasks assigned to them (any status but `done` or
   `cancelled`), tasks awaiting their review (`in_review` with them as reviewer), approvals
-  pending their decision, and test cases assigned to them in open runs (`not_run` results in
+  pending their decision (and, below them, their past decisions, DL-286), and test cases assigned to them in open runs (`not_run` results in
   runs that are `planned` or `in_progress`, §8).
 
 Each project shows its org, status, lead, and the user's access (their explicit project role,

@@ -3493,7 +3493,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   approvals section.
 - **Supersedes:** DL-237 in part (the approvals section's UI in S2-C20a, not S2-C20); build plan
   S2-C20 in part (the decide panel and My work's approvals section)
-- **Superseded by:** none
+- **Superseded by:** DL-284 (in part: My work's approvals section in S2-C20b)
 - **Applies to:** build plan (S2-C20, S2-C20a)
 - **Source:** owner, Nov 5, 2026 (chat session, S2-C20 re-cut)
 
@@ -3559,6 +3559,48 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   whose endpoint (a backend change, with API tests and `wl gen-client`) and place are specified
   at S2-C20a's re-cut; `security-reviewer` joins S2-C20a.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-284 (in part: "See my past decisions" and `security-reviewer` in S2-C20b)
 - **Applies to:** build plan (S2-C20a; the security-reviewer list)
 - **Source:** owner, Nov 5, 2026 (DC-2026-11-05, docs-consistency decision 3, option (a))
+
+### DL-284: S2-C20a splits: deciding on the requirement, then My work (S2-C20b)
+- **Date:** 2026-11-05
+- **Decision:** S2-C20a builds what the approver does on the requirement, with no backend
+  change: the decide panel, the approver's review in it (DL-285), and the approvals end-to-end
+  test ("requesting and deciding an approval"). A new row, S2-C20b, builds My work's side: the
+  approvals section (S2-C14's endpoints, DL-236) and "See my past decisions" (DL-286), the new
+  endpoint. `security-reviewer` moves from S2-C20a to S2-C20b, the row with the endpoint.
+- **Supersedes:** DL-277 in part (My work's approvals section in S2-C20b, not S2-C20a); DL-283 in
+  part ("See my past decisions" and `security-reviewer` in S2-C20b)
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C14's pointer, S2-C20a, S2-C20b; the security-reviewer list)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20a re-cut)
+
+### DL-285: The approver's review sits in the decide panel
+- **Date:** 2026-11-05
+- **Decision:** The decide panel shows the revision the request is bound to, its title and
+  description (`GET /api/projects/{key}/requirements/{number}/revisions/{revision_number}`).
+  On a re-approval (the requirement has an approved revision other than the bound one) it also
+  shows the changes since the last approved revision, through S2-C19a's compare view. No new
+  endpoint.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C20a); screen inventory Piece 6
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20a re-cut)
+
+### DL-286: "See my past decisions" is a section on My work
+- **Date:** 2026-11-05
+- **Decision:** My work gains a `decisions` section (in `GET /api/me/work`, and
+  `GET /api/me/work/decisions`, offset-paged): the caller's `approval` rows they decided
+  (`approved` or `rejected`; pending and `replaced` rows left out), each `request_id`,
+  `decision`, `decided_at`, `comment`, `request_status`, `entity_type` (`requirement`),
+  `entity_number`, `title` (the bound revision's), `revision_number`, `project_key`,
+  `project_name`, and `organization_slug`; sorted by `decided_at`, newest first. Left out, as
+  for the approvals section (DL-236): deleted requirements, archived projects, and every project
+  whose content the caller can't see (§5, §3.1). Shown on My work as "My past decisions", under
+  the approvals the user owes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §11; build plan ("API conventions" My work row, S2-C20b); screen
+  inventory Piece 6
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20a re-cut)

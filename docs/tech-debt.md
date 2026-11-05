@@ -1250,5 +1250,6 @@ Entry format:
 - **Why:** the members list already exists; a candidates endpoint for everyone §6.2 allows is a
   new endpoint the owner chose not to build in S2-C20 (DL-278).
 - **Fix by:** S2-C22 (the tech-debt review): decide with the owner whether to add an approver
-  candidates endpoint
+  candidates endpoint. The owner's direction (S2-C20 review): the picker becomes a searchable
+  dropdown list in time, in place of the flat checkbox list
 - **Status:** open

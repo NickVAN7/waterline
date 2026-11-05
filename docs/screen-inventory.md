@@ -336,7 +336,7 @@ Any project role can be a named approver, viewers included (design-doc §6.2).
   asks the approver to confirm.** A rejection ends the whole request.
 - **A decision is final: there is no "unapprove."** Instead, an approved item can be
   re-opened (below).
-- See my past decisions.
+- See my past decisions (on My work, DL-286).
 
 **Edge cases the approver runs into**
 - The request was cancelled, or made moot by a hand approval, while I was reviewing it. I'm
@@ -417,7 +417,7 @@ already exists; everything else is still to build.
 - The header (org switcher), the sidebar (My work, the project selector with a filter past
   eight projects), the skip link, and the Menu button on narrow screens. *Built.*
 - My work's Projects section: key, org, my access, status. *Built.* Its work sections (tasks,
-  reviews, approvals, test cases) come with their slices.
+  reviews, approvals, past decisions, test cases) come with their slices.
 - **Favorite projects on My work** (v1): star a project to keep it at the top. Favoriting
   items (requirements, tasks, test cases) is v1.5+. (Recently viewed is not needed.)
 - Open any item from a shared link; if I can't see it, I get the same 404 as for an item that
@@ -526,7 +526,7 @@ panel vs. dialog.
 
 | View | Combines | Slice |
 |---|---|---|
-| **My work** | favorite projects, my projects, my tasks, reviews I owe, approvals I owe, test cases assigned to me | Projects section built (S1); other sections with their slices (2, 3, 5) |
+| **My work** | favorite projects, my projects, my tasks, reviews I owe, approvals I owe, my past decisions, test cases assigned to me | Projects section built (S1); other sections with their slices (2, 3, 5) |
 | **Project home** | status, lead, current phase, milestone, and sprint; headline numbers: blocked work, untested requirements, pending approvals | Shell built (S1); numbers fill in with their slices |
 | **Org overview** | the org's projects with status and lead; archived projects below | Built (S1) |
 | **Board** | tasks by status; filter by sprint, assignee, workstream | 3 |
