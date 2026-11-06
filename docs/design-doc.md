@@ -468,9 +468,11 @@ Workspace (the firm: tenant boundary)
   reassignment. Their pending approvals are replaced (§6.2; an archived project has none,
   DL-194). They're left out of every picker (assignee, reviewer, approver, lead, member) and of
   the member and user lists (org members, project members, workspace staff and users), which
-  show active people only; that scope's admins get a "Show deactivated" filter on those lists,
-  which is how they find someone to reactivate, and no one else sees deactivated people listed
-  (DL-200).
+  show active people only; that scope's admins get a "Show deactivated" filter on those lists
+  (`include_deactivated`, refused to anyone else; DL-293, DL-294), which is how they find
+  someone to reactivate, and no one else sees deactivated people listed (DL-200). A lead who has
+  been deactivated stays in the lead picker, marked, until replaced (§1.1); the access reviews
+  keep listing deactivated people (DL-296).
 - `is_system_admin` — may perform any action in any workspace, org, or project, except
   personal actions such as deciding another person's approval (§5) and the content of an
   export-controlled project they aren't an explicit member of (§3.1). Workspaces and orgs

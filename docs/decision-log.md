@@ -3667,3 +3667,69 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** screen inventory Piece 6
 - **Source:** owner, Nov 5, 2026 (chat session, S2-C20b report)
+
+### DL-293: The people lists hide deactivated people unless asked, with `include_deactivated`
+- **Date:** 2026-11-06
+- **Decision:** The org members, project members, workspace staff, and workspace users lists
+  return active people only. `?include_deactivated=true` returns active and deactivated people
+  together, each row with its `is_active`. It's declared on `ListSpec`, like `archived_column`
+  (DL-181), so each list states the column it uses. The users list's `is_active` filter is
+  removed, and the create-org dialog stops sending `is_active=true`, which is now the default.
+- **Supersedes:** none (specifies DL-200's change to the built lists, placed by DL-238)
+- **Superseded by:** none
+- **Applies to:** design-doc §4 (`user.is_active`); build plan (API conventions, "Hidden rows";
+  the staff, org member, users, and project member list endpoints; S2-C21a)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21a re-cut)
+
+### DL-294: Only that list's admins may ask for deactivated people
+- **Date:** 2026-11-06
+- **Decision:** `include_deactivated=true` from someone who isn't an admin of that list is a 422
+  `not_permitted` on the parameter, through `check_permitted`, the path a `restricted` filter and
+  `include_deleted` take (build plan, "Filters are declared"). Each list's admins are the people its manage action allows:
+  `org_member.manage` for org members, `project_member.manage` for project members, and
+  `workspace_staff.manage` for workspace staff and users (`workspace.view`, which both lists
+  require, allows the same people).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 (`user.is_active`); build plan (the four list endpoints; S2-C21a)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21a re-cut)
+
+### DL-295: "Show deactivated" is a checkbox above the list
+- **Date:** 2026-11-06
+- **Decision:** On the four list pages, a list's admins (DL-294) get a "Show deactivated"
+  checkbox above the list. Ticked, deactivated people appear among the active ones, with the
+  "Deactivated" badge after their name (the users list shows it in its Status column). Like
+  every list filter, it lives in the URL through `useListQuery` (UI-TBL-2), and changing it
+  returns the list to page 1 (TD-58). The filter bar arrives in Slice 3, which moves the
+  checkbox into it (TD-97).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; screen inventory step 5 (deactivated users);
+  build plan (S2-C21a); tech debt (TD-97)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21a re-cut; first decided as not in the URL,
+  then changed to UI-TBL-2's rule once the conflict was raised; "above the list" in place of
+  "in the filter bar" decided from the re-cut's docs-consistency review)
+
+### DL-296: A deactivated lead stays in the lead picker; the access reviews are unchanged
+- **Date:** 2026-11-06
+- **Decision:** The lead picker leaves deactivated members out, except a current lead who has
+  been deactivated. That lead stays listed, with the "Deactivated" badge, until someone replaces
+  them (design-doc §1.1). The per-project and per-person access reviews aren't among DL-200's
+  lists, so they keep showing deactivated people.
+- **Supersedes:** none (narrows DL-200's "every picker" for the current lead; DL-113's marking
+  stays for that one row)
+- **Superseded by:** none
+- **Applies to:** design-doc §4 (`user.is_active`); screen inventory step 5; ui-design-guide
+  UI-FBK-6; build plan (S2-C21a)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21a re-cut)
+
+### DL-297: A list with only deactivated people shows "nothing yet", with a hint for its admins
+- **Date:** 2026-11-06
+- **Decision:** A people list whose only members are deactivated, with "Show deactivated"
+  unticked, shows UI-FBK-8's "nothing exists yet" empty state ("No members yet"). An admin of
+  that list, who has the checkbox (DL-295), also gets one sentence pointing to "Show
+  deactivated". No one else learns that hidden people exist (DL-200).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FBK-6; build plan (S2-C21a)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21a re-cut's docs-consistency review)

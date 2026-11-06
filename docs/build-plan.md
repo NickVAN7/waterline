@@ -741,8 +741,8 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   generated client) and drives one shared translator to SQL; endpoints never hand-write filter
   logic. Only declared fields are filterable, never arbitrary columns; a declared field can require
   an action (`restricted=True`, applied only when the endpoint passes it in `permitted`, decided
-  through `authorize()`; otherwise a 422 `not_permitted`), and `include_deleted` always does. A
-  restricted field is never sortable or searchable (that would reveal what the restriction hides);
+  through `authorize()`; otherwise a 422 `not_permitted`), and `include_deleted` and `include_deactivated` (DL-294)
+  always do. A restricted field is never sortable or searchable (that would reveal what the restriction hides);
   `ListSpec` refuses it. Filters that need another table (e.g. tasks by tag) are declared as
   custom filters backed by a function, which filters with `EXISTS`, never a join: a join returns
   an item once per matching row, so it would repeat in `items` and inflate `total` (DL-35). Each
@@ -755,8 +755,9 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   OR across fields in v1.
 - **Free-text search:** `?q=`, a simple name/title match until Slice 6 swaps in full-text
   search behind the same parameter.
-- **Hidden rows:** `?include_archived=true` (projects, workstreams) and `?include_deleted=true`
-  (soft-deleted items); `?archived_only=true` returns only the archived rows (from S2-C0g,
+- **Hidden rows:** `?include_archived=true` (projects, workstreams), `?include_deleted=true`
+  (soft-deleted items), and `?include_deactivated=true` (deactivated people on the people lists,
+  from S2-C21a, for that list's admins only, DL-293, DL-294); `?archived_only=true` returns only the archived rows (from S2-C0g,
   DL-181), for a page's own archived section, on any list whose `ListSpec` has an
   `archived_column`; sending it with `include_archived=true` is a 422 of type `conflict` on
   `archived_only` (DL-182).
@@ -765,7 +766,8 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 - **Scoping before paging:** access scoping applies first, so `total` counts only rows the user
   can see.
 - **Frontend:** `useListQuery` keeps paging, sort, and filters in the URL's query string; one
-  filter bar per list (built in Slice 3) adds any number of declared filters as chips.
+  filter bar per list (built in Slice 3) adds any number of declared filters as chips, and takes
+  in the people lists' "Show deactivated" checkbox (TD-97).
 
 **Errors from constraints**
 - A uniqueness, CHECK, or user-triggerable foreign-key violation returns **422** in the
@@ -1146,7 +1148,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | `GET /api/workspaces/{workspace_id}` | the workspace (name, slug) with its `allowed_actions` | `workspace.view` |
   | `PATCH /api/workspaces/{workspace_id}` | rename, change slug (`workspace_updated`, old and new values) | `workspace.update` |
   | `GET /api/workspaces/{workspace_id}/slug-availability?slug=` | `{available, problem}`: the slug rule's problem, or `taken` (the workspace's own slug counts as available) | `workspace.update` |
-  | `GET /api/workspaces/{workspace_id}/staff` | the staff list (offset paging, `ListSpec`: sort by name or email, filter by role), each row with its `is_active` and `allowed_actions` (from S1-C15, DL-102) | `workspace.view` |
+  | `GET /api/workspaces/{workspace_id}/staff` | the staff list (offset paging, `ListSpec`: sort by name or email, filter by role; deactivated people only with `include_deactivated=true`, from S2-C21a, DL-293, DL-294), each row with its `is_active` and `allowed_actions` (from S1-C15, DL-102) | `workspace.view` |
   | `POST /api/workspaces/{workspace_id}/staff` | add an existing account, email first (design-doc §4): `email`, `role`; already staff is a 422 `already_member` on `email`, no account a 422 `no_account` on `email` (the form goes on to create one), a deactivated account a 422 `account_inactive` on `email`; the web form first checks the email (S1-C9's user check, DL-66) and confirms adding that person by the email alone (design-doc §4), then posts (`workspace_member_added`) | `workspace_staff.manage` |
   | `POST /api/workspaces/{workspace_id}/staff/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `workspace_member_added`) | `workspace_staff.manage` |
   | `PATCH /api/workspaces/{workspace_id}/staff/{user_id}` | change the role (`workspace_member_role_changed`) | `workspace_staff.manage` |
@@ -1184,7 +1186,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
   | Endpoint | Does | Action |
   |---|---|---|
-  | `GET /api/orgs/{org_id}/members` | the member list (offset paging, `ListSpec`: sort by name or email, filter by role), each row with its `is_active` and `allowed_actions` (from S1-C15, DL-102) | `org_member.manage` |
+  | `GET /api/orgs/{org_id}/members` | the member list (offset paging, `ListSpec`: sort by name or email, filter by role; deactivated people only with `include_deactivated=true`, from S2-C21a, DL-293, DL-294), each row with its `is_active` and `allowed_actions` (from S1-C15, DL-102) | `org_member.manage` |
   | `POST /api/orgs/{org_id}/members` | add an existing account, email first (design-doc §4): `email`, `role`; already a member is a 422 `already_member` on `email`, no account a 422 `no_account` on `email` (the form goes on to create one), a deactivated account a 422 `account_inactive` on `email`; the web form first checks the email (the user check, DL-66) and confirms by the email alone (`org_member_added`) | `org_member.manage` |
   | `POST /api/orgs/{org_id}/members/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `org_member_added`) | `org_member.manage` |
   | `PATCH /api/orgs/{org_id}/members/{user_id}` | change the role, with an optional `new_owner_id` (`org_member_role_changed`) | `org_member.manage` |
@@ -1244,7 +1246,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
   | Endpoint | Does | Action |
   |---|---|---|
-  | `GET /api/workspaces/{workspace_id}/users` | the users list: everyone with a membership in the workspace (staff, org members, project members) and every account with no memberships; each row `id`, `email`, `username`, `name`, `is_active`, `is_system_admin` (read-only), `workspace_role` (the person's staff role, or null; from S2-C0h, DL-183), and its `allowed_actions` (offset paging, `ListSpec`: sort by name or email, with system admins who have no workspace role after everyone else, from S2-C0j, DL-188; filter by `is_active`) | `workspace.view` |
+  | `GET /api/workspaces/{workspace_id}/users` | the users list: everyone with a membership in the workspace (staff, org members, project members) and every account with no memberships; each row `id`, `email`, `username`, `name`, `is_active`, `is_system_admin` (read-only), `workspace_role` (the person's staff role, or null; from S2-C0h, DL-183), and its `allowed_actions` (offset paging, `ListSpec`: sort by name or email, with system admins who have no workspace role after everyone else, from S2-C0j, DL-188; deactivated people only with `include_deactivated=true`, which replaces the `is_active` filter, from S2-C21a, DL-293, DL-294) | `workspace.view` |
   | `POST /api/users/{user_id}/deactivate` | set `is_active` false and delete the user's sessions (`user_deactivated`); already inactive changes and records nothing | `user.manage` |
   | `POST /api/users/{user_id}/reactivate` | set `is_active` true (`user_reactivated`); already active changes and records nothing | `user.manage` |
   | `POST /api/users/{user_id}/reset-password` | `password` (the temporary password the form generates, under the password policy): set it and `must_change_password`, and delete the user's sessions (`password_reset`) | `user.manage` |
@@ -1355,7 +1357,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
   | Endpoint | Does | Action |
   |---|---|---|
-  | `GET /api/projects/{key}/members` | the explicit project memberships (offset paging, `ListSpec`: sort by name or email, filter by role), each row (`user_id`, `email`, `username`, `name`, `role`, and, from S1-C16a, `is_active`, DL-113) with its `allowed_actions` (never the `user`-level actions, DL-102); inherited admins without a membership aren't listed (the access review shows them) | `project.view` |
+  | `GET /api/projects/{key}/members` | the explicit project memberships (offset paging, `ListSpec`: sort by name or email, filter by role; deactivated people only with `include_deactivated=true`, for `project_member.manage`, from S2-C21a, DL-293, DL-294), each row (`user_id`, `email`, `username`, `name`, `role`, and, from S1-C16a, `is_active`, DL-113) with its `allowed_actions` (never the `user`-level actions, DL-102); inherited admins without a membership aren't listed (the access review shows them) | `project.view` |
   | `GET /api/projects/{key}/member-candidates?q=` | the picker: the project org's members and the workspace's staff not yet on the project (offset paging, sort by name, `q` over name, email, and username) | `project_member.manage` |
   | `POST /api/projects/{key}/members` | add with a `role` and exactly one of `user_id` (from the picker, which hides deactivated users; checked in this order: anyone outside the org's members and the staff, a 404; already on the project, a 422 `already_member` on `user_id`; a deactivated account, `account_inactive` on `user_id`) or `email` (email first, design-doc §4, checked in this order: already on the project, `already_member`; no account, `no_account`; a deactivated account, `account_inactive`; an account outside the org and the staff, `outside_org`, each a 422 on `email`, unless `join_org: true` confirms the last, which adds them to the org as a member too, `org_member_added`; since `account_inactive` is checked first, `join_org` never adds a deactivated account); an org member's or staff member's email adds only the project membership (`project_member_added`); 201 with the row | `project_member.manage` |
   | `POST /api/projects/{key}/members/new` | create the user (email, username, name, temporary password; `must_change_password` set), their org membership (role member) through the org service, and the project membership (`role`) through the roster, in one step (`user_created`, `org_member_added`, `project_member_added`); 201 with the row | `project_member.manage` |
@@ -1606,7 +1608,7 @@ before the features.
 | 20a | Approvals: approver *(provisional)* | DL-277, DL-284: the decide panel on the requirement for a named approver whose row is pending (`approval.decide`; approve with an optional comment; rejecting prompts for a comment and asks to confirm without one, DL-196; a request no longer pending says so, design-doc §6.2); the approver's review in the panel (DL-283, DL-285, screen inventory Piece 6): the bound revision's title and description, and on a re-approval the changes since the last approved revision (S2-C19a's compare); no backend change; the approvals end-to-end test ("requesting and deciding an approval", both themes); the user guide's deciding |
 | 20b | My work: approvals *(provisional)* | DL-284: My work's approvals section (S2-C14's endpoints; its item and order, DL-236), each item opening the requirement; "See my past decisions" (DL-286): the `decisions` section (`GET /api/me/work`, `GET /api/me/work/decisions`; backend, with API tests, export control and other projects' rows left out included, and `wl gen-client`), shown as "My past decisions" under the approvals; the user guide's My work |
 | 21 | Delete dialog & trash *(provisional)* | DL-287 to DL-291: Delete in the requirement's header (page and side panel), landing on the tree with "<ID> moved to Trash." (DL-287); `has_children` on the requirement's read and `deleted_by_is_active` on a trash row ("Deactivated" after the deleter, TD-77) (backend, with API tests and `wl gen-client`, DL-288); the delete dialog (children promote or delete, shown only with children; "delete them too" only with `can_delete_children`, DL-222; the pending-request note, DL-289); the Trash page (`…/:key/trash`, newest first, Restore where allowed, an archived project's with none), the last item of the project navigation for `requirement.view` (DL-202, DL-291), and restore, reloading the list (DL-146, DL-290); the end-to-end test "deleting and restoring a tree" |
-| 21a | Show deactivated *(provisional)* | DL-200, DL-238: the built Slice 1 lists (org members, project members, workspace staff, workspace users) list active people only, with a "Show deactivated" filter for that scope's admins (backend, with API tests and `wl gen-client`), and the built pickers (add member, lead, first admin) leave deactivated people out; the badge and Status column in the filtered view; the user guide's lists; supersedes DL-102 and DL-113 in part, as DL-200 records |
+| 21a | Show deactivated *(provisional)* | DL-200, DL-238, DL-293 to DL-297: the four people lists (`GET /api/orgs/{org_id}/members`, `GET /api/projects/{key}/members`, `GET /api/workspaces/{workspace_id}/staff`, and `GET /api/workspaces/{workspace_id}/users`) return active people only; `?include_deactivated=true`, declared on `ListSpec` like `archived_column`, returns everyone (DL-293). For anyone but that list's admins it's a 422 `not_permitted` through `check_permitted`; the admins are `org_member.manage`, `project_member.manage`, and `workspace_staff.manage` for staff and users (DL-294). The users list's `is_active` filter is removed, and the create-org dialog stops sending it. Backend, with API tests and `wl gen-client`. A "Show deactivated" checkbox above each list for its admins (moved into Slice 3's filter bar, TD-97), in the URL through `useListQuery` (UI-TBL-2), mixing deactivated people in with the badge (the users list: its Status column) (DL-295); with only deactivated people, the "nothing yet" empty state, and for the list's admins one sentence pointing to the checkbox (DL-297). The built pickers leave deactivated people out: add member and first admin already do; the lead picker keeps only a current deactivated lead, with the badge (DL-296). The access reviews are unchanged (DL-296). The user guide's lists. Supersedes DL-102 and DL-113 in part, as DL-200 records |
 | 21b | Session list *(provisional)* | DL-197, DL-238: Account settings lists the user's active sessions (this one marked) and signs out the others, each shown by its device and browser, sign-in time, and last activity; `user_agent` on `session`, no IP address or location (design-doc §4, DL-242; the migration, the endpoints, and their actions specified at the re-cut, DL-139) |
 | 21c | Favorite projects *(provisional)* | DL-197, DL-238: a star on a project row of My work keeps it at the top, per user (design-doc §11); the favorite table, its endpoints, and its actions specified at the re-cut (DL-139) |
 | 21d | Documentation page *(provisional)* | DL-197, DL-238: the user menu's Documentation item opens `/docs`, the user guide rendered through `MarkdownView` (S2-C16); `docs` joins the reserved slugs (design-doc §3, `rules/identifiers.py`, test-first), with what an existing org already using that slug gets decided at the re-cut (DL-139) |
@@ -1763,8 +1765,8 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
       page.
 - [ ] A stored XSS payload in a description doesn't execute (component and end-to-end tests), and
       the CSP header is present.
-- [ ] The member and user lists and the pickers leave deactivated people out, and the scope's
-      admins find them with "Show deactivated"; a user sees their sessions and signs out the
+- [ ] The member and user lists and the pickers leave deactivated people out (the lead picker
+      keeps a current deactivated lead, DL-296), and the scope's admins find them with "Show deactivated"; a user sees their sessions and signs out the
       others; a starred project stays at the top of My work; the user menu's Documentation opens
       the user guide (DL-238).
 - [ ] No `classification` remains in the API or UI; Restricted is gone; an unshipped module can't

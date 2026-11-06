@@ -1257,3 +1257,13 @@ Entry format:
   candidates endpoint. The owner's direction (S2-C20 review): the picker becomes a searchable
   dropdown list in time, in place of the flat checkbox list
 - **Status:** open
+
+### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
+- **Added:** DC-2026-11-06 (DL-295)
+- **What:** the org members, project members, workspace staff, and workspace users lists show
+  their "Show deactivated" checkbox above the list, not in a filter bar.
+- **Why:** the filter bar is built in Slice 3 (build plan, API conventions, "Frontend"); S2-C21a
+  needs only the one checkbox.
+- **Fix by:** Slice 3, the checkpoint that builds the filter bar: the checkbox moves into it on
+  the four lists
+- **Status:** open

@@ -580,9 +580,11 @@ and fills the gaps.
   (tasks, reviews, test cases; approvals are already cancelled by archiving). They stay
   visible inside the project.
 - **Deactivated users** are **left out of every picker** (assignee, reviewer, approver, lead,
-  member pickers) and **left out of the member and user lists** (org members, project members,
-  workspace staff and users), which show active people only. **Admins of that scope** get a
-  **"Show deactivated"** filter on those lists, which is how they find someone to reactivate;
+  member pickers; a current lead who has been deactivated stays in the lead picker, marked,
+  until replaced, DL-296) and **left out of the member and user lists** (org members,
+  project members, workspace staff and users), which show active people only. **Admins of that
+  scope** get a **"Show deactivated"** checkbox above those lists (DL-295), which is
+  how they find someone to reactivate;
   no one else sees deactivated people listed. Their existing work keeps their name with the
   "Deactivated" badge (an item they're assigned, comments, history), and items still assigned
   to them are highlighted for reassignment.
@@ -647,9 +649,9 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
-| Staff (add, role, account actions, remove; "Show deactivated" for admins) | page + dialogs | `/workspace/staff` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
+| Staff (add, role, account actions, remove; "Show deactivated" for admins) | page + dialogs | `/workspace/staff` | 1 | Built (deactivated filter in S2-C21a, DL-238, DL-293 to DL-295) |
 | Organizations (list, create) | page + dialog | `/workspace/orgs` | 1 | Built |
-| Users (account actions, edit details, email; "Show deactivated" for admins) | page + dialogs | `/workspace/users` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
+| Users (account actions, edit details, email; "Show deactivated" for admins) | page + dialogs | `/workspace/users` | 1 | Built (deactivated filter in S2-C21a, DL-238, DL-293 to DL-295) |
 | Per-person access review | page | `/workspace/users/:userId/access` | 1 | Built |
 | Workspace settings | page | `/workspace/settings` | 1 | Built |
 | Audit log | page | `/workspace/audit` | 7, before the first non-local deployment (DL-239) | — |
@@ -660,7 +662,7 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
 | Org overview (projects, archived below) | page | `/:orgSlug/overview` | 1 | Built |
-| Org members ("Show deactivated" for admins) | page + dialogs | `/:orgSlug/members` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
+| Org members ("Show deactivated" for admins) | page + dialogs | `/:orgSlug/members` | 1 | Built (deactivated filter in S2-C21a, DL-238, DL-293 to DL-295) |
 | Org settings (details, tag vocabulary, GitHub installations) | page | `/:orgSlug/settings` | 1; tags 6; GitHub 7 | Details built |
 | Org projects list; create project | page + dialog | `/:orgSlug/projects` | 1 | Built |
 
@@ -669,7 +671,7 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
 | Project home (headline numbers, Get started checklist) | page | `…/:key` | 1; numbers with their slices; checklist 3 (DL-239) | Shell built |
-| Members (add, role, remove; "Show deactivated" for admins) | page + dialogs | `…/:key/members` | 1 | Built (deactivated filter in S2-C21a, DL-238) |
+| Members (add, role, remove; "Show deactivated" for admins) | page + dialogs | `…/:key/members` | 1 | Built (deactivated filter in S2-C21a, DL-238, DL-293 to DL-295) |
 | Project access review | page | `…/:key/access` | 1 | Built |
 | Project settings (details, modules, restriction, archive) | page | `…/:key/settings` | 1 | Built |
 | Workstreams | section of Settings (or its own tab) | `…/:key/settings` | 3 | — |

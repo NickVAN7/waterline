@@ -763,9 +763,13 @@ render inside the full shell when signed in.
   system admins who have no workspace role listed last (DL-183, DL-188; from S2-C0j); the
   per-person access review shows system admin as text too (DL-189, from S2-C0j). **Deactivated
   users are left out** of every picker and of the member and user lists (org members, project
-  members, workspace staff and users); that scope's admins get a "Show deactivated" filter on
-  those lists, and the badge and Status column apply there (DL-200; the built Slice 1 lists
-  change in S2-C21a, DL-238). Items still assigned to them are highlighted.
+  members, workspace staff and users); that scope's admins get a "Show deactivated" checkbox above
+  those lists, in the URL like any list filter (UI-TBL-2), which mixes deactivated people in
+  (with only deactivated people, the "nothing yet" empty state, and for those admins one
+  sentence pointing to the checkbox, DL-297), and the badge and Status column apply there (DL-200, DL-295, DL-297; the built Slice 1
+  lists change in S2-C21a, DL-238). The lead picker keeps a current lead who has been
+  deactivated, with the badge, until replaced; the access reviews keep listing deactivated
+  people (DL-296). Items still assigned to them are highlighted.
 - **UI-FBK-7** **Confirmations** for destructive or irreversible actions use a dialog
   (UI-FRM-14), never `window.confirm`, `alert`, or `prompt`.
 - **UI-FBK-8** **Empty states** distinguish two cases. *Nothing exists yet:* a heading ("No members
