@@ -1,10 +1,11 @@
 import uuid
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import AccessKind, WorkspaceRole
+from app.schemas.limits import NAME_MAX
 
 
 class EmailCheck(BaseModel):
@@ -30,6 +31,8 @@ class UserRow(BaseModel):
     name: str
     is_active: bool
     is_system_admin: bool
+    # The person's staff role in the workspace, or null (DL-183).
+    workspace_role: WorkspaceRole | None
     allowed_actions: list[Action]
 
 
@@ -37,7 +40,7 @@ class UserUpdate(BaseModel):
     """An admin's change to a user's profile: any subset of the three (DL-72)."""
 
     email: str | None = None
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=NAME_MAX)
     username: str | None = None
 
 
@@ -45,7 +48,7 @@ class OwnProfileUpdate(BaseModel):
     """The signed-in user's change to their own profile: their email isn't theirs to change in v1
     (design-doc §4)."""
 
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=NAME_MAX)
     username: str | None = None
 
 
@@ -93,6 +96,8 @@ class ProjectReach(BaseModel):
     name: str
     organization_id: uuid.UUID
     archived: bool
+    # Access is shown on export-controlled projects only (DL-177).
+    export_controlled: bool
     reasons: list[AccessReason]
     # `management`: reached as an inherited admin without an explicit membership on an
     # export-controlled project (design-doc §3.1; DL-81).

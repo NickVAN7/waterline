@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -39,7 +40,7 @@ class MeWorkspace(BaseModel):
 
 
 class MeOrg(BaseModel):
-    """An org the user sees (design-doc §4, "Visibility"), for the org switcher. `role` is null
+    """An org the user sees (design-doc §4, "Visibility"), for the org menu. `role` is null
     when the user sees it without an org membership (through a project, or as an admin above
     it)."""
 
@@ -74,3 +75,14 @@ class PasswordPolicyRead(BaseModel):
     listed; the server refuses it."""
 
     requirements: list[PasswordRequirement]
+
+
+class SessionRead(BaseModel):
+    """One of the user's live sessions (DL-298): `user_agent` as stored at sign-in, for the
+    browser's device label (DL-299); `is_current` for the session making the request."""
+
+    id: uuid.UUID
+    user_agent: str | None
+    created_at: datetime
+    last_seen_at: datetime
+    is_current: bool

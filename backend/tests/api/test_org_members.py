@@ -117,18 +117,25 @@ async def test_an_unknown_list_parameter_is_a_422(client: AsyncClient, org: Orga
     assert response.status_code == 422
 
 
-async def test_each_member_row_says_whether_the_person_is_active(
+async def test_the_member_list_leaves_out_deactivated_people_unless_asked(
     client: AsyncClient, org: Organization
 ) -> None:
-    """DL-102: the page marks a deactivated member and offers Reactivate instead."""
+    """DL-293: active members only; `include_deactivated` adds a deactivated one, marked (DL-102),
+    and `total` counts what each lists."""
     await signed_in(client, org)
     await member(org, email="on@bolt.example", is_active=True)
     await member(org, email="off@bolt.example", is_active=False)
 
-    response = await client.get(f"/api/orgs/{org.id}/members")
+    default = (await client.get(f"/api/orgs/{org.id}/members")).json()
+    everyone = (
+        await client.get(f"/api/orgs/{org.id}/members", params={"include_deactivated": "true"})
+    ).json()
 
-    active = {row["email"]: row["is_active"] for row in response.json()["items"]}
+    assert "off@bolt.example" not in {row["email"] for row in default["items"]}
+    assert default["total"] == len(default["items"])
+    active = {row["email"]: row["is_active"] for row in everyone["items"]}
     assert (active["on@bolt.example"], active["off@bolt.example"]) == (True, False)
+    assert everyone["total"] == default["total"] + 1
 
 
 async def test_an_added_members_row_carries_is_active_and_the_account_actions(

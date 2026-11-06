@@ -24,7 +24,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.enums import enum_type
-from app.enums import ClassificationCategory, ClassificationLevel
+from app.enums import RestrictionCategory, RestrictionLevel
 
 # Stable, predictable constraint names, so Alembic autogenerate and hand-written migrations
 # agree. Postgres truncates identifiers at 63 characters.
@@ -110,28 +110,28 @@ class VersionMixin:
         return {**TimestampMixin.__mapper_args__, "version_id_col": cls.__table__.c.version}  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
 
 
-class ClassificationMixin:
-    """Data classification columns (design-doc §3.1; schema-doc conventions): a nullable level
-    (null = unclassified) and a list of categories, empty by default.
+class RestrictionMixin:
+    """Data restriction columns (design-doc §3.1; schema-doc conventions): a nullable level
+    (null = None, design-doc §3.1) and a list of categories, empty by default.
 
-    Each model also adds `classification_categories_check(...)` to its `__table_args__`, with
+    Each model also adds `restriction_categories_check(...)` to its `__table_args__`, with
     the categories it allows (`export_controlled` is project-only in v1).
     """
 
-    classification_level: Mapped[ClassificationLevel | None] = mapped_column(
-        enum_type(ClassificationLevel, "classification_level")
+    restriction_level: Mapped[RestrictionLevel | None] = mapped_column(
+        enum_type(RestrictionLevel, "restriction_level")
     )
-    classification_categories: Mapped[list[str]] = mapped_column(
+    restriction_categories: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=text("'{}'")
     )
 
 
-def classification_categories_check(allowed: Iterable[ClassificationCategory]) -> CheckConstraint:
-    """`CHECK (classification_categories <@ ARRAY[...])`, named
-    `ck_<table>_classification_categories`."""
+def restriction_categories_check(allowed: Iterable[RestrictionCategory]) -> CheckConstraint:
+    """`CHECK (restriction_categories <@ ARRAY[...])`, named
+    `ck_<table>_restriction_categories`."""
     values = ", ".join(f"'{category.value}'" for category in allowed)
     return CheckConstraint(
-        f"classification_categories <@ ARRAY[{values}]::text[]", name="classification_categories"
+        f"restriction_categories <@ ARRAY[{values}]::text[]", name="restriction_categories"
     )
 
 

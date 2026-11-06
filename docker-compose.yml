@@ -95,6 +95,8 @@ services:
     environment:
       # Vite proxies /api here (frontend/vite.config.ts).
       API_PROXY_TARGET: http://api:8000
+      # The PrimeUI license key (DL-135), from .env (CI: its secret); Vite builds it into the app.
+      VITE_PRIMEUI_LICENSE: ${VITE_PRIMEUI_LICENSE:-}
     ports:
       - "127.0.0.1:${WEB_PORT:-5173}:5173"
     volumes:

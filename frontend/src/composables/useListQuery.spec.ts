@@ -1,10 +1,11 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { nextTick, shallowRef } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { useListQuery } from './useListQuery'
 
-async function setUp(path: string) {
+async function setUp(path: string, offsetKey?: string) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/acme/projects', component: { template: '<p />' } }],
@@ -14,7 +15,7 @@ async function setUp(path: string) {
   mount(
     {
       setup() {
-        list = useListQuery({ limit: 25, filters: ['status', 'type'] })
+        list = useListQuery({ limit: 25, filters: ['status', 'type'], offsetKey })
         return () => null
       },
     },
@@ -81,4 +82,44 @@ describe('useListQuery', () => {
     await router.push(list.filtered({ status: '', type: '' }))
     expect(router.currentRoute.value.fullPath).toBe('/acme/projects?view=all')
   })
+
+  it('reads and links its page under its own name, leaving the other list alone', async () => {
+    const { list } = await setUp('/acme/projects?offset=25&archived_offset=50', 'archived_offset')
+
+    expect(list.params.value).toEqual({ limit: 25, offset: 50 })
+    expect(list.linkTo(75)).toEqual({ query: { offset: '25', archived_offset: '75' } })
+  })
+
+  it('goes back to the first page when a later one loads empty (TD-58)', async () => {
+    const { router, list } = await setUp('/acme/projects?offset=50&status=active')
+    const page = shallowRef<{ items: string[] }>()
+    list.returnWhenEmpty(page)
+
+    page.value = { items: [] }
+    await nextTick()
+    await flushRouter(router)
+
+    expect(router.currentRoute.value.fullPath).toBe('/acme/projects?status=active')
+  })
+
+  it.each([
+    ['a page with rows', '/acme/projects?offset=50', ['PMT']],
+    ['the first page, empty', '/acme/projects', []],
+  ])('stays on %s', async (_, path, items) => {
+    const { router, list } = await setUp(path)
+    const page = shallowRef<{ items: string[] }>()
+    list.returnWhenEmpty(page)
+
+    page.value = { items }
+    await nextTick()
+    await flushRouter(router)
+
+    expect(router.currentRoute.value.fullPath).toBe(path)
+  })
 })
+
+/** Let a navigation started by the composable finish. */
+async function flushRouter(router: ReturnType<typeof createRouter>) {
+  await router.isReady()
+  await new Promise((resolve) => setTimeout(resolve))
+}

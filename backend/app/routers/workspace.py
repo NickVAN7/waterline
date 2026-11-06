@@ -1,15 +1,14 @@
 """The workspace and its staff (build plan, "The workspace and org API", DL-55)."""
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
 from app.authz.actions import Action
 from app.core.db import SessionDep
-from app.core.errors import ErrorBody
 from app.core.lists import Page
-from app.routers.deps import AuthzContextDep, authorized, load_workspace
+from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_workspace
 from app.schemas.org import OrgListItem
 from app.schemas.user import EmailCheck, UsernameSuggestion, UserRow
 from app.schemas.workspace import (
@@ -26,16 +25,6 @@ from app.services.workspace import ORGS, STAFF, WorkspaceEntity, WorkspaceServic
 
 router = APIRouter(prefix="/workspaces", tags=["workspace"])
 
-_ERRORS: dict[int | str, dict[str, Any]] = {
-    code: {"model": ErrorBody}
-    for code in (
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN,
-        status.HTTP_404_NOT_FOUND,
-        status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
-}
-
 Viewed = Annotated[WorkspaceEntity, Depends(authorized(load_workspace, Action.WORKSPACE_VIEW))]
 Updated = Annotated[WorkspaceEntity, Depends(authorized(load_workspace, Action.WORKSPACE_UPDATE))]
 StaffManaged = Annotated[
@@ -47,7 +36,7 @@ OrgQuery = Annotated[ORGS.query_model, Query()]  # pyright: ignore[reportInvalid
 UserQuery = Annotated[USERS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
-@router.get("/{workspace_id}", responses=_ERRORS)
+@router.get("/{workspace_id}", responses=ERRORS)
 async def get_workspace(
     workspace: Viewed, ctx: AuthzContextDep, session: SessionDep
 ) -> WorkspaceRead:
@@ -55,7 +44,7 @@ async def get_workspace(
     return WorkspaceService(session).read(ctx, workspace)
 
 
-@router.patch("/{workspace_id}", responses=_ERRORS)
+@router.patch("/{workspace_id}", responses=ERRORS)
 async def update_workspace(
     workspace: Updated, body: WorkspaceUpdate, ctx: AuthzContextDep, session: SessionDep
 ) -> WorkspaceRead:
@@ -63,7 +52,7 @@ async def update_workspace(
     return await WorkspaceService(session).update(ctx, workspace, body)
 
 
-@router.get("/{workspace_id}/slug-availability", responses=_ERRORS)
+@router.get("/{workspace_id}/slug-availability", responses=ERRORS)
 async def workspace_slug_availability(
     workspace: Updated, slug: str, session: SessionDep
 ) -> SlugAvailability:
@@ -71,7 +60,7 @@ async def workspace_slug_availability(
     return await WorkspaceService(session).slug_availability(workspace, slug)
 
 
-@router.get("/{workspace_id}/staff", responses=_ERRORS)
+@router.get("/{workspace_id}/staff", responses=ERRORS)
 async def list_staff(
     workspace: Viewed, query: StaffQuery, ctx: AuthzContextDep, session: SessionDep
 ) -> Page[StaffRead]:
@@ -79,7 +68,7 @@ async def list_staff(
     return await WorkspaceService(session).list_staff(ctx, workspace, query)
 
 
-@router.post("/{workspace_id}/staff", status_code=status.HTTP_201_CREATED, responses=_ERRORS)
+@router.post("/{workspace_id}/staff", status_code=status.HTTP_201_CREATED, responses=ERRORS)
 async def add_staff(
     workspace: StaffManaged, body: StaffAdd, ctx: AuthzContextDep, session: SessionDep
 ) -> StaffRead:
@@ -88,7 +77,7 @@ async def add_staff(
     return await WorkspaceService(session).add_staff(ctx, workspace, body.email, body.role)
 
 
-@router.post("/{workspace_id}/staff/new", status_code=status.HTTP_201_CREATED, responses=_ERRORS)
+@router.post("/{workspace_id}/staff/new", status_code=status.HTTP_201_CREATED, responses=ERRORS)
 async def create_staff(
     workspace: StaffManaged, body: StaffCreate, ctx: AuthzContextDep, session: SessionDep
 ) -> StaffRead:
@@ -97,7 +86,7 @@ async def create_staff(
     return await WorkspaceService(session).create_staff(ctx, workspace, body)
 
 
-@router.patch("/{workspace_id}/staff/{user_id}", responses=_ERRORS)
+@router.patch("/{workspace_id}/staff/{user_id}", responses=ERRORS)
 async def change_staff_role(
     workspace: StaffManaged,
     user_id: uuid.UUID,
@@ -114,7 +103,7 @@ async def change_staff_role(
 
 
 @router.delete(
-    "/{workspace_id}/staff/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=_ERRORS
+    "/{workspace_id}/staff/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=ERRORS
 )
 async def remove_staff(
     workspace: StaffManaged,
@@ -132,13 +121,13 @@ async def remove_staff(
     )
 
 
-@router.get("/{workspace_id}/orgs", responses=_ERRORS)
+@router.get("/{workspace_id}/orgs", responses=ERRORS)
 async def list_orgs(workspace: Viewed, query: OrgQuery, session: SessionDep) -> Page[OrgListItem]:
     """The workspace's orgs."""
     return await WorkspaceService(session).list_orgs(workspace, query)
 
 
-@router.get("/{workspace_id}/user-check", responses=_ERRORS)
+@router.get("/{workspace_id}/user-check", responses=ERRORS)
 async def user_check(
     _workspace: UserCheckable,
     session: SessionDep,
@@ -151,7 +140,7 @@ async def user_check(
     return await UserService(session).check(email=email, username=username, name=name)
 
 
-@router.get("/{workspace_id}/users", responses=_ERRORS)
+@router.get("/{workspace_id}/users", responses=ERRORS)
 async def list_users(
     workspace: Viewed, query: UserQuery, ctx: AuthzContextDep, session: SessionDep
 ) -> Page[UserRow]:

@@ -13,7 +13,15 @@ import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
 
 export function useProjectPage(
-  routeName: 'project-home' | 'project-members' | 'project-access' | 'project-settings',
+  routeName:
+    | 'project-home'
+    | 'project-requirements'
+    | 'project-requirement'
+    | 'project-requirement-new'
+    | 'project-members'
+    | 'project-trash'
+    | 'project-access'
+    | 'project-settings',
 ) {
   const route = useRoute()
   const router = useRouter()
@@ -32,7 +40,12 @@ export function useProjectPage(
     const orgSlug = nav.orgs.find((o) => o.id === loaded.organization_id)?.slug
     if (orgSlug && (orgSlug !== route.params.orgSlug || key !== loaded.key)) {
       await redirectInPlace(() =>
-        router.replace({ name: routeName, params: { orgSlug, key: loaded.key } }),
+        // The route's other params (a requirement's number) and its query (an open item) come along.
+        router.replace({
+          name: routeName,
+          params: { ...route.params, orgSlug, key: loaded.key },
+          query: route.query,
+        }),
       )
       return false
     }

@@ -6,7 +6,6 @@ import { safeNext } from '@/app/guards/auth'
 import Alert from '@/components/Alert.vue'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
-import PageHeader from '@/components/PageHeader.vue'
 import PasswordField from '@/components/PasswordField.vue'
 import TextField from '@/components/TextField.vue'
 import { useFormErrors } from '@/composables/useFormErrors'
@@ -70,7 +69,7 @@ function dismissAlert() {
 </script>
 
 <template>
-  <PageHeader title="Sign in" />
+  <h1 class="m-0 text-xl leading-tight font-semibold">Sign in</h1>
   <Alert v-if="sessionEnded" tone="info">Your session ended. Sign in again.</Alert>
   <form novalidate class="flex flex-col gap-4" @submit.prevent="submit">
     <FormAlert

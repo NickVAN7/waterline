@@ -2,11 +2,10 @@
 // A project's settings (`/{org_slug}/projects/{key}/settings`; build plan, "Web screens"; design-doc
 // §1.1, §3.1), each part shown only when `allowed_actions` allows it:
 // - details and modules (`project.update`): name, description, type, status, the lead (the
-//   project's members, a deactivated one marked; no lead flagged), and the modules,
+//   project's active members, and a deactivated current lead marked, DL-296; no lead flagged), and the modules,
 //   with a warning when a recommended module, or one holding data, is turned off;
-// - classification (`project.raise_classification`): marking the project export-controlled asks
-//   for the confirmation that its explicit members are authorized, in its own dialog (DL-114);
-//   removing it is confirmed too;
+// - restriction (`project.raise_restriction`): the level and the categories, without export
+//   control (DL-133), which a project made export-controlled through the API keeps;
 // - archive and unarchive (`project.archive`, `project.unarchive`), archiving confirmed first.
 // Loading, the not-found page, and the redirect are `useProjectPage`'s; the saves'
 // handling is `useSettingsSave`'s.
@@ -30,28 +29,26 @@ import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/u
 import { useSettingsSave } from '@/composables/useSettingsSave'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
 import type { Project } from '@/stores/currentOrg'
-import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
-import ClassificationFields from './ClassificationFields.vue'
-import ExportControlDialog from './ExportControlDialog.vue'
+import { allMembers } from './members'
 import ModuleFields from './ModuleFields.vue'
 import { recommendedFor } from './modules'
 import ProjectHeader from './ProjectHeader.vue'
+import RestrictionFields from './RestrictionFields.vue'
 import { hasSettings, WHO_TO_ASK } from './settings'
 import { useProjectPage } from './useProjectPage'
 
 type ProjectType = components['schemas']['ProjectType']
 type ProjectStatus = components['schemas']['ProjectStatus']
 type ProjectModule = components['schemas']['ProjectModule']
-type Level = components['schemas']['ClassificationLevel']
-type Category = components['schemas']['ClassificationCategory']
+type Level = components['schemas']['RestrictionLevel']
+type Category = components['schemas']['RestrictionCategory']
 type Member = components['schemas']['ProjectMemberRead']
 
 const { key, project, notFound, retry: retryLoad } = useProjectPage('project-settings')
 const nav = useCurrentOrgStore()
-const store = useCurrentUserStore()
 
 const values = ref({
   name: '',
@@ -61,7 +58,7 @@ const values = ref({
   lead_id: '',
   enabled_modules: [] as ProjectModule[],
 })
-const classification = ref({ level: '' as Level | '', categories: [] as Category[] })
+const restriction = ref({ level: '' as Level | '', categories: [] as Category[] })
 const guidance = ref<components['schemas']['ModuleGuidance'] | null>(null)
 const members = ref<Member[]>([])
 
@@ -73,22 +70,28 @@ const detailsErrors = useFormErrors({
   lead_id: 'Lead',
   enabled_modules: 'Modules',
 })
-const classificationErrors = useFormErrors({ level: 'Classification', categories: 'Categories' })
+const restrictionErrors = useFormErrors({ level: 'Restriction', categories: 'Categories' })
+const EXPORT_CONTROL_CHANGED =
+  "This project's export control changed since you opened it. It has been read again: save again."
 const archiveErrors = useFormErrors({})
 
 const nameField = ref<InstanceType<typeof TextField>>()
 const detailsAlert = ref<InstanceType<typeof FormAlert>>()
-const classificationAlert = ref<InstanceType<typeof FormAlert>>()
+const restrictionAlert = ref<InstanceType<typeof FormAlert>>()
 const archiveAlert = ref<InstanceType<typeof FormAlert>>()
 const detailsForm = ref<HTMLFormElement>()
-const classificationForm = ref<HTMLFormElement>()
+const restrictionForm = ref<HTMLFormElement>()
 const archiveForm = ref<HTMLFormElement>()
-const exportControl = ref<InstanceType<typeof ExportControlDialog>>()
 const confirmDialog = ref<InstanceType<typeof ConfirmDialog>>()
 
 const loaded = computed(() => project.data.value)
 
+// The project the details form was filled from: a save sends what differs from it, never from a
+// project loaded since (another section's save, a background reload), whose newer values the form
+// doesn't show and would undo (TD-56).
+let detailsBase: Project | undefined
 function fillDetails(data: Project) {
+  detailsBase = data
   values.value = {
     name: data.name,
     description: data.description ?? '',
@@ -98,24 +101,10 @@ function fillDetails(data: Project) {
     enabled_modules: [...data.enabled_modules],
   }
 }
-function fillClassification(data: Project) {
-  classification.value = {
-    level: data.classification_level ?? '',
-    categories: [...data.classification_categories],
-  }
-}
-
-/** Every explicit member (the export-control confirmation must name them all). */
-async function allMembers(projectKey: string): Promise<Member[]> {
-  const found: Member[] = []
-  for (;;) {
-    const page = await api(
-      client.GET('/api/projects/{key}/members', {
-        params: { path: { key: projectKey }, query: { limit: 200, offset: found.length } },
-      }),
-    )
-    found.push(...page.items)
-    if (!page.items.length || found.length >= page.total) return found
+function fillRestriction(data: Project) {
+  restriction.value = {
+    level: data.restriction_level ?? '',
+    categories: [...data.restriction_categories],
   }
 }
 
@@ -128,7 +117,7 @@ watch(
     const data = project.data.value
     if (loading || !data || background.value) return
     fillDetails(data)
-    fillClassification(data)
+    fillRestriction(data)
   },
 )
 // The picker's members and module guidance, once the details can be edited (an unarchive may
@@ -177,18 +166,16 @@ async function reload(): Promise<void> {
 
 const leadOptions = computed(() => {
   const current = loaded.value
-  const marked = (active: boolean | null | undefined) =>
-    active === false ? ` · ${DEACTIVATED.label}` : ''
-  // A deactivated member is listed and marked (DL-113): the server refuses naming them
-  // (`account_inactive`), but a deactivated lead stays the lead until replaced (design-doc §1.1).
+  // The member list holds active people only (DL-293). A deactivated lead stays the lead until
+  // replaced (design-doc §1.1), so they're added from the project's read, marked (DL-296).
   const people = members.value.map((m) => ({
     value: m.user_id,
-    label: `${m.name} (${m.email})${marked(m.is_active)}`,
+    label: `${m.name} (${m.email})`,
   }))
   if (current?.lead_id && !people.some((p) => p.value === current.lead_id))
     people.push({
       value: current.lead_id,
-      label: `${current.lead_name ?? ''}${marked(current.lead_is_active)}`,
+      label: `${current.lead_name ?? ''}${current.lead_is_active === false ? ` · ${DEACTIVATED.label}` : ''}`,
     })
   return [{ value: '', label: NO_LEAD.label }, ...people]
 })
@@ -221,10 +208,10 @@ async function focusDetails(target: string) {
   else document.getElementById(`project-settings-${target.replace(/_/g, '-')}`)?.focus()
 }
 
-async function focusClassification(target: string) {
+async function focusRestriction(target: string) {
   await nextTick()
-  if (target === 'alert') classificationAlert.value?.focus()
-  else document.getElementById(`project-settings-classification-${target}`)?.focus()
+  if (target === 'alert') restrictionAlert.value?.focus()
+  else document.getElementById(`project-settings-restriction-${target}`)?.focus()
 }
 
 const details = useSettingsSave({
@@ -237,14 +224,14 @@ const details = useSettingsSave({
     return allows(project.data.value, 'project.update')
   },
 })
-const classify = useSettingsSave({
-  values: classification,
-  form: classificationForm,
-  errors: classificationErrors,
-  focus: focusClassification,
+const restrict = useSettingsSave({
+  values: restriction,
+  form: restrictionForm,
+  errors: restrictionErrors,
+  focus: focusRestriction,
   reload: async () => {
     await reload()
-    return allows(project.data.value, 'project.raise_classification')
+    return allows(project.data.value, 'project.raise_restriction')
   },
 })
 
@@ -256,19 +243,27 @@ function saved(data: Project) {
 async function saveDetails(): Promise<void> {
   const current = loaded.value
   if (!current) return
+  const base = detailsBase ?? current
   await details.save({ name: values.value.name }, async () => {
+    // Only what changed since the project was read, so another admin's change stands (TD-56).
+    const next = {
+      name: values.value.name,
+      description: values.value.description || null,
+      type: values.value.type,
+      status: values.value.status,
+      lead_id: values.value.lead_id || null,
+    }
+    const body: components['schemas']['ProjectUpdate'] = {}
+    for (const field of Object.keys(next) as (keyof typeof next)[]) {
+      if (next[field] !== base[field]) Object.assign(body, { [field]: next[field] })
+    }
+    const modules = values.value.enabled_modules
+    const modulesChanged =
+      modules.length !== base.enabled_modules.length ||
+      modules.some((m) => !base.enabled_modules.includes(m))
+    if (guidance.value && modulesChanged) body.enabled_modules = modules
     const data = await api(
-      client.PATCH('/api/projects/{key}', {
-        params: { path: { key: current.key } },
-        body: {
-          name: values.value.name,
-          description: values.value.description || null,
-          type: values.value.type,
-          status: values.value.status,
-          lead_id: values.value.lead_id || null,
-          ...(guidance.value ? { enabled_modules: values.value.enabled_modules } : {}),
-        },
-      }),
+      client.PATCH('/api/projects/{key}', { params: { path: { key: current.key } }, body }),
     )
     saved(data)
     fillDetails(data)
@@ -277,69 +272,54 @@ async function saveDetails(): Promise<void> {
   })
 }
 
-// The members the export-control confirmation lists are loading: the save shows it pending.
-const checking = ref(false)
+/** A refusal because the project's export control changed since it was read: the server asks
+ * for a confirmation this form doesn't offer (DL-133), so it says what happened instead; the
+ * project is read again (DL-116), and the next save sends what it has now. */
+function exportControlChanged(error: unknown): unknown {
+  if (!(error instanceof ApiError) || error.code !== 'validation_error') return error
+  const fields = (error.details.fields ?? []) as { loc: unknown[]; type: string }[]
+  const changed = (f: { loc: unknown[]; type: string }) =>
+    f.loc.at(-1) === 'export_control_confirmed' && f.type === 'confirmation_required'
+  if (!fields.some(changed)) return error
+  return new ApiError(error.status, {
+    code: error.code,
+    message: error.message,
+    details: {
+      ...error.details,
+      fields: fields.map((f) => (changed(f) ? { ...f, message: EXPORT_CONTROL_CHANGED } : f)),
+    },
+  })
+}
 
-async function saveClassification(): Promise<void> {
+async function saveRestriction(): Promise<void> {
   const current = loaded.value
-  if (!current || classify.pending.value || checking.value) return
-  const next = classification.value
-  const was = current.classification_categories.includes('export_controlled')
-  const will = next.categories.includes('export_controlled')
-  let confirmation = {}
-  if (will && !was) {
-    let covered: Member[]
-    classificationErrors.reset()
-    checking.value = true
-    try {
-      covered = await allMembers(current.key)
-    } catch (error) {
-      classificationErrors.apply(error)
-      return focusClassification('alert')
-    } finally {
-      checking.value = false
-    }
-    const confirmed = await exportControl.value?.open(
-      covered.map((m) => ({
-        id: m.user_id,
-        name: m.name,
-        email: m.email,
-        active: m.is_active,
-        you: m.user_id === store.me?.user.id,
-      })),
-    )
-    if (!confirmed) return
-    confirmation = {
-      export_control_confirmed: true,
-      confirmed_member_ids: covered.map((m) => m.user_id),
-    }
-  } else if (
-    was &&
-    !will &&
-    !(await confirmDialog.value?.open({
-      title: 'Remove export control?',
-      text: "System, workspace, and organization admins without a membership will reach the project's content again.",
-      button: 'Remove export control',
-      variant: 'danger',
-    }))
-  )
-    return
-  await classify.save({}, async () => {
+  if (!current || restrict.pending.value) return
+  const next = restriction.value
+  // The UI never adds or removes export control (DL-133): it comes from the project as last read,
+  // never from the form, so a reload after a refusal doesn't bring a stale one back.
+  const categories: Category[] = [
+    ...next.categories.filter((c) => c !== 'export_controlled'),
+    ...(current.restriction_categories.includes('export_controlled')
+      ? (['export_controlled'] as const)
+      : []),
+  ]
+  await restrict.save({}, async () => {
     const data = await api(
-      client.PUT('/api/projects/{key}/classification', {
+      client.PUT('/api/projects/{key}/restriction', {
         params: { path: { key: current.key } },
         // Cast: the schema types `export_control_confirmed` as always sent (it has a default), but
         // the server refuses it where no confirmation is needed (`confirmation_not_needed`).
         body: {
           level: next.level || null,
-          categories: next.categories,
-          ...confirmation,
-        } as components['schemas']['ClassificationUpdate'],
+          categories,
+        } as components['schemas']['RestrictionUpdate'],
       }),
-    )
+    ).catch((error: unknown) => {
+      throw exportControlChanged(error)
+    })
     saved(data)
-    fillClassification(data)
-    return 'Classification saved.'
+    fillRestriction(data)
+    return 'Restriction saved.'
   })
 }
 
@@ -359,6 +339,8 @@ async function toggleArchive(): Promise<void> {
       title: `Archive ${current.name}?`,
       text: "It becomes read-only for everyone until it's unarchived. Nothing is deleted.",
       button: 'Archive project',
+      // A destructive confirm uses the danger button (UI-FRM-14, DL-137).
+      variant: 'danger',
     }))
   )
     return
@@ -390,12 +372,12 @@ const canArchive = computed(() =>
 // On an export-controlled project, an inherited admin without a membership may only raise (§3.1).
 const raiseOnly = computed(
   () =>
-    allows(loaded.value, 'project.raise_classification') &&
-    !allows(loaded.value, 'project.lower_classification'),
+    allows(loaded.value, 'project.raise_restriction') &&
+    !allows(loaded.value, 'project.lower_restriction'),
 )
 
 const retryDetails = retryFromSubmit(detailsForm, saveDetails)
-const retryClassification = retryFromSubmit(classificationForm, saveClassification)
+const retryRestriction = retryFromSubmit(restrictionForm, saveRestriction)
 const retryArchive = retryFromSubmit(archiveForm, toggleArchive)
 const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
 </script>
@@ -542,68 +524,59 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
         </section>
 
         <section
-          v-if="allows(loaded, 'project.raise_classification') || classificationErrors.alert.value"
-          aria-labelledby="project-classification-heading"
+          v-if="allows(loaded, 'project.raise_restriction') || restrictionErrors.alert.value"
+          aria-labelledby="project-restriction-heading"
           class="flex max-w-(--content-narrow) flex-col gap-4"
         >
-          <h2 id="project-classification-heading" class="m-0 text-xl font-semibold">
-            Classification
-          </h2>
+          <h2 id="project-restriction-heading" class="m-0 text-xl font-semibold">Restriction</h2>
           <form
-            v-if="allows(loaded, 'project.raise_classification')"
-            ref="classificationForm"
+            v-if="allows(loaded, 'project.raise_restriction')"
+            ref="restrictionForm"
             novalidate
             class="flex flex-col gap-4"
-            @submit.prevent="saveClassification"
+            @submit.prevent="saveRestriction"
           >
             <FormAlert
-              v-if="classificationErrors.alert.value"
-              :key="classificationErrors.alertKey.value"
-              ref="classificationAlert"
-              :alert="classificationErrors.alert.value"
-              @dismiss="classify.dismissed"
-              @retry="retryClassification"
+              v-if="restrictionErrors.alert.value"
+              :key="restrictionErrors.alertKey.value"
+              ref="restrictionAlert"
+              :alert="restrictionErrors.alert.value"
+              @dismiss="restrict.dismissed"
+              @retry="retryRestriction"
             />
             <p v-if="raiseOnly" class="m-0 text-text-muted">
-              You can raise this project's classification. Lowering its level or removing a category
+              You can raise this project's restriction. Lowering its level or removing a category
               needs one of its explicit project admins.
             </p>
-            <ClassificationFields
-              v-model:level="classification.level"
-              v-model:categories="classification.categories"
+            <RestrictionFields
+              v-model:level="restriction.level"
+              v-model:categories="restriction.categories"
               prefix="project-settings"
-              :level-error="classificationErrors.fieldErrors.value.level"
-              :categories-error="classificationErrors.fieldErrors.value.categories"
-              @edit-level="classify.edited('level')"
-              @edit-categories="classify.edited('categories')"
+              :level-error="restrictionErrors.fieldErrors.value.level"
+              :categories-error="restrictionErrors.fieldErrors.value.categories"
+              @edit-level="restrict.edited('level')"
+              @edit-categories="restrict.edited('categories')"
             />
             <div>
               <!-- Secondary: one primary button per page (UI-FRM-15), Save settings. -->
-              <Button
-                type="submit"
-                variant="secondary"
-                :pending="classify.pending.value || checking"
-                >Save classification</Button
+              <Button type="submit" variant="secondary" :pending="restrict.pending.value"
+                >Save restriction</Button
               >
             </div>
-            <SuccessStatus :message="classify.done.value" />
+            <SuccessStatus :message="restrict.done.value" />
             <p class="sr-only" aria-live="polite">
-              {{
-                classificationErrors.announcement.value ||
-                classify.status.value ||
-                (checking ? "Loading the project's members…" : '')
-              }}
+              {{ restrictionErrors.announcement.value || restrict.status.value }}
             </p>
           </form>
           <template v-else>
             <FormAlert
-              v-if="classificationErrors.alert.value"
-              :key="classificationErrors.alertKey.value"
-              ref="classificationAlert"
-              :alert="classificationErrors.alert.value"
-              @dismiss="classify.dismissed"
+              v-if="restrictionErrors.alert.value"
+              :key="restrictionErrors.alertKey.value"
+              ref="restrictionAlert"
+              :alert="restrictionErrors.alert.value"
+              @dismiss="restrict.dismissed"
             />
-            <p class="m-0 text-text-muted">The project's admins change its classification.</p>
+            <p class="m-0 text-text-muted">The project's admins change its restriction.</p>
           </template>
         </section>
 
@@ -613,12 +586,16 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
             allows(loaded, 'project.unarchive') ||
             archiveErrors.alert.value
           "
-          aria-labelledby="project-archive-heading"
-          class="flex max-w-(--content-narrow) flex-col gap-4"
+          aria-labelledby="project-danger-heading"
+          class="flex max-w-(--content-narrow) flex-col gap-4 rounded-lg border border-tone-danger-edge p-4"
         >
-          <h2 id="project-archive-heading" class="m-0 text-xl font-semibold">
-            {{ loaded.archived ? 'Unarchive' : 'Archive' }}
+          <!-- Archiving sits apart, in a Danger zone (UI-FRM-14, DL-137). -->
+          <h2 id="project-danger-heading" class="m-0 text-xl font-semibold text-danger">
+            Danger zone
           </h2>
+          <h3 id="project-archive-heading" class="m-0 text-lg font-semibold">
+            {{ loaded.archived ? 'Unarchive' : 'Archive' }}
+          </h3>
           <FormAlert
             v-if="archiveErrors.alert.value"
             :key="archiveErrors.alertKey.value"
@@ -655,7 +632,6 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
     <p class="sr-only" aria-live="polite">
       {{ project.loading.value && !background ? 'Loading the project…' : '' }}
     </p>
-    <ExportControlDialog ref="exportControl" />
     <ConfirmDialog ref="confirmDialog" />
   </div>
 </template>

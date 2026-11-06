@@ -97,6 +97,20 @@ describe('AddMemberDialog: the picker', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it('opens its list of candidates on focus, before anything is typed (DL-137)', async () => {
+    // The dialog starts on the picker (UI-FRM-14), so opening it focuses the picker.
+    const { wrapper, get } = await openDialog()
+
+    expect(document.activeElement?.id).toBe('add-member-person')
+    // No `q`: the API refuses an empty one.
+    expect(get).toHaveBeenCalledWith('/api/projects/{key}/member-candidates', {
+      params: { path: { key: 'ERP' }, query: { limit: 20 } },
+    })
+    expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toEqual([
+      'Ann Lee (ann@acme.example)',
+    ])
+  })
+
   it("searches the project's candidates for what's typed and adds the one chosen", async () => {
     const { wrapper, get, post } = await openDialog()
 
@@ -138,6 +152,26 @@ describe('AddMemberDialog: the picker', () => {
     expect(wrapper.get('#add-member-person-error').text()).toBe('Already on the project.')
     expect(wrapper.get('#add-member-person').attributes('aria-invalid')).toBe('true')
     expect(document.activeElement?.id).toBe('add-member-person')
+  })
+
+  it('keeps its list closed when focus comes back with someone chosen, so the error shows', async () => {
+    const { wrapper, get, post } = await openDialog()
+    post.mockResolvedValue(
+      validationFailed([
+        { loc: ['body', 'user_id'], message: 'Already on the project.', type: 'already_member' },
+      ]),
+    )
+    await choose(wrapper, 'ann')
+    const input = wrapper.get('#add-member-person')
+    await input.trigger('blur')
+    get.mockClear()
+
+    await submit(wrapper)
+    await input.trigger('focus')
+    await flushPromises()
+
+    expect(get).not.toHaveBeenCalled()
+    expect(input.attributes('aria-expanded')).toBe('false')
   })
 
   it('blocks the add on an export-controlled project until the person is confirmed authorized', async () => {

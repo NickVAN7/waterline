@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, a
 
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.settings import TEST_DATABASE_NAME, Settings
-from tests.factories import SEED, BaseFactory
+from tests.factories import BaseFactory, reset_factories
 from tests.support.concurrency import (
     check_tables_are_empty,
     concurrency_tables,
@@ -103,7 +103,7 @@ def anyio_backend() -> str:
 @pytest.fixture(autouse=True)
 def _seed_factories() -> None:
     """Fixed seed, reset per test, so generated data never depends on test order."""
-    BaseFactory.seed_random(SEED)
+    reset_factories()
 
 
 @pytest.fixture(scope="session")

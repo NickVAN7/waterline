@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.pool import QueuePool
 
 from app.core.base_model import StaleVersionError
-from app.core.db import SessionMaker
+from app.core.db import SessionDep, SessionMaker
 from app.core.errors import NotFoundError
 from app.core.settings import TEST_DATABASE_NAME, Settings
 from app.main import create_app
@@ -57,7 +57,7 @@ async def test_app_returns_409_for_a_stale_version(
     app = create_app(settings, sessionmaker=sessionmaker)
 
     @app.get("/stale")
-    async def stale() -> None:
+    async def stale(_session: SessionDep) -> None:
         raise StaleVersionError("Document is at version 2, not 1")
 
     async with api_client(app) as c:

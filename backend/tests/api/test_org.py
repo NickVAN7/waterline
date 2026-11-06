@@ -321,6 +321,23 @@ async def test_renaming_an_org_records_old_and_new_values(
     ]
 
 
+async def test_an_org_name_over_100_characters_is_a_422_and_changes_nothing(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """The request schemas' length limit (DL-143) reaches the client as a field error."""
+    await admin_of(client, workspace)
+    org = await OrganizationFactory.create_async(workspace=workspace, name="Bolt", slug="bolt")
+
+    response = await client.patch(f"/api/orgs/{org.id}", json={"name": "x" * 101})
+
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+    assert [(f["loc"], f["type"]) for f in response.json()["details"]["fields"]] == [
+        (["body", "name"], "string_too_long")
+    ]
+    assert await session.scalar(select(Organization.name)) == "Bolt"
+    assert await events(session) == []
+
+
 async def test_an_org_slug_another_org_in_the_workspace_has_is_a_422(
     client: AsyncClient, workspace: Workspace
 ) -> None:

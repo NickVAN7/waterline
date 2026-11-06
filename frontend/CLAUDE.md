@@ -33,9 +33,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   `schema.d.ts` by hand.
 - **The server is authoritative.** The UI may hide actions a user can't take, but never assumes
   it's enforcing permissions. Don't duplicate business rules; e.g. rank is computed by the
-  server (send neighbor IDs, not rank values), and transitions are validated by the server. One
-  exception: the `PasswordRequirements` list checks the requirements the server publishes as the
-  user types (DL-91).
+  server (send neighbor IDs, not rank values), and transitions are validated by the server. Two
+  exceptions: the `PasswordRequirements` list checks the requirements the server publishes as the
+  user types (DL-91), and the add-person flow checks an email's shape before its user check
+  (`useFormErrors`' `invalidate`; UI-FRM-4, UI-FRM-13).
 - **Handle the error format** (`{code, message, details}`) consistently: 409 → prompt to
   reload; 404 → `NotFoundView` in place (see `ProjectHomeView`); 422 → field errors from `details.fields`
   (`loc`, `message`, `type` per field). Forms use `useFormErrors` for all of this. A 401 and a
@@ -43,7 +44,10 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   (`src/app/session.ts`); a view never handles them itself.
 - **Requests:** same origin through the Vite proxy (`/api`), `credentials: 'include'`, JSON
   bodies only.
-- **Rendered markdown** is sanitized before display.
+- **Rendered markdown** goes only through `MarkdownView` (from S2-C16): `markdown-it` with raw
+  HTML off, then DOMPurify; never `v-html` on anything else. No remote images, links only
+  `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
+  ui-design-guide UI-MD-1). Markdown is edited only in `MarkdownEditor` (UI-MD-2).
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
   slug change to the new URL; a null org is the not-found page.
@@ -60,10 +64,11 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
   shown only after about 300 ms (fast loads don't flash), on a region with `aria-busy="true"`,
   with any shimmer off under `prefers-reduced-motion`. Actions such as saving a form show a
   pending state on the control itself, not a skeleton.
-- An enabled module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7)
-  shows its features and links greyed out or disabled (design-doc §1.1), never as broken
-  screens. Whether a module is available comes from the API's module guidance (`available`),
-  never a frontend list.
+- A module whose slice hasn't shipped yet (`sprints`, `github` before Slices 4 and 7) can't be
+  enabled (from S2-C0d, DL-136; design-doc §1.1): the API refuses it (422 `module_unavailable`)
+  and the UI shows a disabled checkbox with "Not available yet", never a broken screen. Whether
+  a module is available comes from the API's module guidance (`available`), never a frontend
+  list.
 
 ## UI
 
@@ -80,12 +85,13 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   `svar-theme.css`; every move or edit goes through `api.intercept` so the server decides; the
   move alternative to a drag is our own menu outside the widget (UI-STY-7, UI-SVR-1 to 6).
 - Never color alone: a badge is icon + text + tone from the display-mapping module
-  (UI-FBK-5); a selected row also has a checked box and a leading bar (UI-TOK-9).
+  (UI-FBK-5); a selected row also has a leading bar, and a checked box when the table is multi-select
+  (UI-TOK-9).
 - Forms: visible labels; the server validates; a 422 shows inline errors, moves focus to the
   first invalid field, and has no summary box; a required field has the red asterisk; the submit
   button is `aria-disabled` while pending, never `disabled` (UI-FRM-2, UI-FRM-4 to 8).
-- Actions: hide what a user may never do (`allowed_actions`); disable with a visible reason what
-  state blocks; never use opacity for disabled (UI-TOK-10).
+- Actions: hide what a user may never do (`allowed_actions`, which also leaves out what the
+  entity's state rules out for good, DL-232); disable with a visible reason what state blocks; never use opacity for disabled (UI-TOK-10).
 - An error is never only in a toast. A toast never takes focus or covers the focused element
   (UI-FBK-1, UI-FBK-9, UI-FBK-10). An alert that reports an event has a dismiss button; a
   persistent banner does not (UI-FBK-13).
@@ -97,6 +103,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - Loading: a skeleton after about 300 ms with `aria-busy`; a pending action shows on its
   control (UI-FBK-11, UI-FRM-8).
 - On navigation set the page title and focus the `h1`; one `h1` per page (UI-SHL-9).
+- A link inside running text (a paragraph, a list item, rendered markdown) is underlined:
+  `--color-link` against `--color-text` is about 1.7:1, so color alone can't mark it
+  (UI-TOK-13).
 - Targets at least 24×24 px; focus ring from `--color-focus`, never `outline: none` (UI-TOK-5,
   UI-TOK-6).
 - A new color pair is added to `check_contrast.py` in the same change (UI-TOK-3).
@@ -132,6 +141,21 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   keyed by id: names aren't unique (UI-FBK-6; S1-C16a review).
 - A dialog component is mounted once per page: two copies share their fields' ids, so each label
   names both fields (S1-C16).
+- A page with more than one paged list names each `Pagination` after its list (`label`,
+  "Archived pagination"): two landmarks never share a name (UI-TBL-3; S2-C0g review).
+- A dialog's 404 (the item gone since the page loaded) goes through the page's own gone handler,
+  which settles the not-found page or focuses the panel's title (`RequirementDetail`'s
+  `editGone`), never a bare reload: focus comes back to the opener a task later, and the reload
+  then removes it (UI-SHL-9; S2-C21 review).
+- A reload after a 403 that removes the control holding focus, while the page stays, moves focus
+  to the failure alert when focus is left on `<body>` (`RequirementsTree`'s `movable` watch,
+  `RequirementView`'s status change): never leave it there (UI-FRM-7; S2-C18 review).
+- A page whose `h1` changes in place (a rename saved, a reload after a 409 or 403) calls
+  `syncTitle()`, so the window title follows: settling only on the first load leaves the old name
+  (UI-SHL-9; S2-C18a review).
+- After a dialog's action reloads a list, focus moves to the row now in that position only when
+  the person or item has left the list (`useRefocusWhenGone`); one still listed, at any row,
+  keeps the focus the dialog returned to its opener (UI-FRM-14; S2-C21a review).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).
@@ -142,14 +166,66 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A confirmation the client sends (`export_control_confirmed`) comes from the current server state
   as well as the box: a reload can take the box away while it's still ticked (DL-116; S1-C16c
   review).
+- A save that sends only the changed fields compares them with the values the form was filled
+  from, never with data loaded since (another section's save, a background reload, a `/me`
+  reload): a field the form still shows the old value of would undo the newer one (TD-56; S2-C0h
+  review).
+- State that outlives a step of a multi-step dialog (an edited username, a confirmation box) is
+  the dialog's, reset in `open()`, not a child's that a `v-if` unmounts; a confirmation is
+  cleared whenever the identity it confirms changes, the email included (UI-FRM-13, design-doc
+  §3.1; S2-C0h review).
+- A value a form keeps but doesn't render (project settings' `export_controlled`, DL-133) is sent
+  from the latest server data on every save, never from the form: a reload that keeps what was
+  typed would bring a stale one back, and no control could remove it (S2-C0d review).
 - A dialog's search or lookup that fails says so at its own field, not in the form's alert, whose
   Retry and dismiss belong to the submit (UI-FRM-7; S1-C16b review).
+- A PrimeVue list that can scroll (an `AutoComplete` opened on focus) scrolls its listbox, the
+  element the combobox controls (`scroll-height="none"`, and `pt.list`'s `max-h-56
+overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not PrimeVue's
+  unnamed container (S2-C0h e2e).
 - A PrimeVue overlay inside a modal dialog (the picker's `AutoComplete`) sets
   `append-to="self"`: the page behind a `showModal()` dialog is inert, so an overlay appended to
-  `<body>` can't be used (S1-C16b).
+  `<body>` can't be used (S1-C16b). A popup `Menu` places itself in document coordinates, so
+  `self` puts it off to the side, and the dialog scrolling to it closes it: it goes in a fixed
+  layer whose corner is kept at the document's (`StatusMenu`), checked end to end inside the
+  side panel (S2-C18b).
+- Inside a modal dialog, a PrimeVue popup's Escape is cancelled at the popup (`StatusMenu`'s
+  layer, `@keydown.esc.prevent`), and so is an in-place edit form's (`RequirementDetail`):
+  PrimeVue doesn't cancel it, and an uncancelled Escape also closes the dialog. The e2e presses
+  Esc in the open popup and expects the dialog to stay (S2-C18b review).
+- A status note that reports an action's result (not a form alert) is cleared when what it
+  describes changes: a new selection, a reload, or the next run of the action
+  (`RequirementsTree`'s expand note; S2-C18c review).
+- A control that rewrites another control's value, or its own, after the user's input (the
+  compare's From and To swap) says the new values in a polite live region: the user heard the
+  value they picked, not the one it became (S2-C19a review).
 - A polite live region sits outside the `aria-busy` region it reports on: screen readers hold
   back changes inside a busy one. A success with no other visible trace shows `SuccessStatus`,
   never only hidden text.
+- A child that asks its host to reload `allowed_actions` after a 403 waits for that reload (a
+  function prop it awaits, `ApprovalSection`'s `reloadPage`) and reloads its own entity's actions
+  too, before it looks where focus is: an emitted event returns before the reload removes the
+  control that held focus (UI-FRM-7; S2-C20 review).
+- A dialog whose first field loads after it opens moves focus to that field once loaded
+  (`RequestApprovalDialog`'s `focusList`), and marks the loading group `data-autofocus`, so the
+  first focus doesn't pass through a later field: ModalDialog picks before the load (S2-C20
+  review).
+- `MarkdownView` under a heading gets that heading's `level` (`:level="2"` under an `h2`): its
+  default shift only keeps content off `h1`, and a `#` under an `h3` would read as the page's
+  next section (UI-MD-1, UI-SHL-8; S2-C20a review).
+- A required checkbox group can't take `aria-required`: its legend carries a visually hidden
+  "(required)" beside the hidden asterisk (UI-FRM-2; S2-C20 review).
+- A PrimeVue table's selected-row bar goes on the row's first cell, and only on the selected
+  row: its tables use `border-collapse: separate`, where a `tr`'s border isn't drawn, and forced
+  colors draw a transparent border. A class check in jsdom can't show the bar is drawn
+  (UI-TOK-9; S2-C15 review).
+- A rule that overrides a PrimeVue style (a forced-colors fix) is unlayered, outside `@layer
+base`: PrimeVue's layer comes later and wins over `base`, and `!important` isn't allowed
+  (`base.css`'s active-bar rule; S2-C17a review).
+- A blocked PrimeVue menu item is `aria-disabled` through `pt.item`, in the disabled tokens on
+  `pt.itemContent` (which sets its own color over the item's), and
+  stays focusable, its command doing nothing: a `disabled` item is skipped by the arrow keys and
+  faded with opacity, so the keyboard never reaches its reason (UI-TOK-10; S2-C15 review).
 
 ## Tests
 
@@ -179,6 +255,18 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - An e2e step after a dialog closes waits for the dialog to be hidden and focus to be back on
   its opener before it moves focus: the close event returns focus a task later, and would take
   it back (S1-C16b).
+- jsdom draws table rows slowly, and CI's runner about 2.5 times slower again: a spec draws only
+  the rows it needs. A spec of a row limit puts the big branch where the limit leaves it closed,
+  since TreeTable draws only open rows; one that must draw hundreds says why and sets its own
+  timeout with 4 times the CI time as headroom (`RequirementsTree`'s Expand requirement specs;
+  S2-C18c's CI).
+- A mocked 422 has the server's real shape: the top-level `message` is "The request is invalid.",
+  and the reason is in `details.fields` (S2-C15 review).
+- An e2e reflow check on content in a modal dialog measures the dialog and its panels
+  (`scrollWidth` against `clientWidth`), never the document: a top-layer dialog scrolls itself.
+  A forced-colors check compares with the system color the rule sets (a probe styled
+  `Highlight`), never only "not transparent": forced colors turn a background into an opaque
+  Canvas. Prove each can fail once (S2-C17a review).
 - Playwright covers each slice's critical flows against the full stack (`wl e2e`), in the
   `light` and `dark` projects. Find fields with `getByRole('textbox', { name, exact: true })`,
   not `getByLabel`: the label's text includes the required asterisk, the accessible name

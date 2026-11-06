@@ -16,6 +16,9 @@ test('signing in lands on My work, and signing out returns to sign-in', async ({
   await expect(page).toHaveURL('/')
   await expect(page.getByRole('heading', { level: 1, name: 'My work' })).toBeVisible()
   await expect(page).toHaveTitle('My work · Waterline')
+  // PrimeVue checks its license key offline as the app starts; without a valid one it adds this
+  // notice to the page (DL-135). By now, signed in and on a page, the check is long done.
+  await expect(page.locator('#p-license-host')).toHaveCount(0)
   await expectNoA11yViolations(page)
 
   await page.getByRole('button', { name: /Account menu/ }).click()

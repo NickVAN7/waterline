@@ -150,12 +150,31 @@ describe('ProjectMembersView', () => {
     expect(get).not.toHaveBeenCalledWith('/api/orgs/{org_id}', expect.anything())
   })
 
+  it('offers Show deactivated to its admins only (DL-294, DL-295)', async () => {
+    const viewer = await mountAt(project({ allowed_actions: ['project.view'] }), [
+      member('Ann Lee'),
+    ])
+    expect(viewer.wrapper.find('#show-deactivated').exists()).toBe(false)
+    viewer.wrapper.unmount()
+
+    const admin = await mountAt(project({ allowed_actions: ADMIN }), [member('Ann Lee')])
+
+    expect(admin.wrapper.get('label:has(#show-deactivated)').text()).toBe('Show deactivated')
+  })
+
   it("offers its admins Add member, Add by email, and the project's access review", async () => {
     const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }), [member('Ann Lee')])
 
     expect(pageButton(wrapper, 'Add member')).toBeDefined()
     expect(pageButton(wrapper, 'Add by email')).toBeDefined()
     expect(wrapper.get('a[href="/acme/projects/ERP/access"]').text()).toBe('Access review')
+    // In the header, beside the `h1`, as a page's actions are (TD-49, UI-SHL-8).
+    const actions = wrapper.get('header h1 + div')
+    expect(actions.findAll('button, a').map((el) => el.text())).toEqual([
+      'Add member',
+      'Add by email',
+      'Access review',
+    ])
   })
 
   it('adds by email with join_org once an account from outside the org is confirmed (DL-78)', async () => {
@@ -193,7 +212,7 @@ describe('ProjectMembersView', () => {
 
   it('sends the export-control confirmation with an add by email on an export-controlled project', async () => {
     const { wrapper } = await mountAt(
-      project({ allowed_actions: ADMIN, classification_categories: ['export_controlled'] }),
+      project({ allowed_actions: ADMIN, restriction_categories: ['export_controlled'] }),
       [member('Ann Lee')],
     )
     const post = vi.spyOn(client, 'POST').mockResolvedValue(ok(member('Out Side'), 201))
@@ -295,7 +314,7 @@ describe('ProjectMembersView', () => {
 
   it('sends the export-control confirmation, and no join_org, when creating an account for an export-controlled project', async () => {
     const { wrapper } = await mountAt(
-      project({ allowed_actions: ADMIN, classification_categories: ['export_controlled'] }),
+      project({ allowed_actions: ADMIN, restriction_categories: ['export_controlled'] }),
       [member('Ann Lee')],
     )
     const post = vi.spyOn(client, 'POST').mockResolvedValue(ok(member('Jane Doe'), 201))
@@ -370,7 +389,7 @@ describe('ProjectMembersView', () => {
     const { wrapper } = await mountAt(
       project({ allowed_actions: ADMIN }),
       [member('Ann Lee')],
-      [project({ allowed_actions: ADMIN, classification_categories: ['export_controlled'] })],
+      [project({ allowed_actions: ADMIN, restriction_categories: ['export_controlled'] })],
     )
     vi.spyOn(client, 'POST').mockResolvedValue(
       validationFailed([
@@ -397,7 +416,7 @@ describe('ProjectMembersView', () => {
 
   it('adds without the confirmation once a refusal says export control was removed (DL-116)', async () => {
     const { wrapper } = await mountAt(
-      project({ allowed_actions: ADMIN, classification_categories: ['export_controlled'] }),
+      project({ allowed_actions: ADMIN, restriction_categories: ['export_controlled'] }),
       [member('Ann Lee')],
       [project({ allowed_actions: ADMIN })],
     )

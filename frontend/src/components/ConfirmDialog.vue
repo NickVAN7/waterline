@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // A confirmation before an action the caller then takes (UI-FBK-7, UI-FRM-14): a title, what will
-// happen, the action's button, and Cancel, which has the initial focus. `open()` resolves true when
+// happen, the action's button, and Cancel (or `dismiss`, when "Cancel" would read as the action),
+// which has the initial focus. `open()` resolves true when
 // confirmed, false when cancelled (Cancel or Esc).
 import { ref } from 'vue'
 
@@ -12,6 +13,7 @@ export type Confirmation = {
   text: string
   button: string
   variant?: 'primary' | 'danger'
+  dismiss?: string
 }
 
 const shown = ref<Confirmation>({ title: '', text: '', button: '' })
@@ -43,7 +45,9 @@ defineExpose({ open })
       <p class="m-0">{{ shown.text }}</p>
       <div class="flex flex-wrap gap-3">
         <Button type="submit" :variant="shown.variant ?? 'primary'">{{ shown.button }}</Button>
-        <Button variant="secondary" data-autofocus @click="dialog?.close()">Cancel</Button>
+        <Button variant="secondary" data-autofocus @click="dialog?.close()">{{
+          shown.dismiss ?? 'Cancel'
+        }}</Button>
       </div>
     </form>
   </ModalDialog>

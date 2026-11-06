@@ -1,13 +1,14 @@
 /** Mounting a workspace admin page for its spec (DL-104): signed in, with the workspace in `/me`. */
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'
-import { afterEach } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import type { Component } from 'vue'
 
+import { client } from '@/api/client'
 import type { Action } from '@/composables/allowedActions'
 import { type Me, useCurrentUserStore } from '@/stores/currentUser'
 
-import { me, workspaceEntry } from './api'
+import { me, ok, workspaceEntry } from './api'
 import { testRouter } from './router'
 
 export const WORKSPACE_ID = workspaceEntry([]).id
@@ -43,6 +44,15 @@ export function cleanUpAfterEach() {
     document.body.innerHTML = ''
   })
   enableAutoUnmount(afterEach)
+}
+
+/** Every GET answered with `first`, except a list page past the first, which is empty: a page
+ * whose last row went (TD-58). */
+export function emptyPastTheFirst(first: unknown) {
+  return vi
+    .spyOn(client, 'GET')
+    .mockImplementation(((_: string, init?: { params?: { query?: { offset?: number } } }) =>
+      Promise.resolve(ok(init?.params?.query?.offset ? listPage([], 1) : first))) as never)
 }
 
 /** A page of a list endpoint's answer. */

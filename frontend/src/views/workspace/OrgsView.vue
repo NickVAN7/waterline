@@ -22,7 +22,6 @@ import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 
 import CreateOrgDialog from './CreateOrgDialog.vue'
 import { WHO_TO_ASK } from './workspaceAdmin'
-import WorkspaceNav from './WorkspaceNav.vue'
 
 const workspace = useWorkspace()
 const store = useCurrentUserStore()
@@ -44,6 +43,7 @@ watch(
   },
   { immediate: true },
 )
+list.returnWhenEmpty(page.data)
 watch(
   () => page.error.value?.status === 404,
   (gone) => {
@@ -51,7 +51,7 @@ watch(
   },
 )
 
-// A new org joins the org switcher too, through `/me`.
+// A new org joins the org menu too, through `/me`.
 async function finished(message: string) {
   done.value = message
   await Promise.all([page.run(), store.load()])
@@ -72,7 +72,6 @@ const announcement = computed(() => {
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <WorkspaceNav />
     <PageHeader title="Organizations">
       <Button v-if="allows(workspace, 'org.create')" @click="creator?.open()"
         >Create organization</Button

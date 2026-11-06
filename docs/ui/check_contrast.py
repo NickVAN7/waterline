@@ -65,6 +65,7 @@ for st in ("color-hover", "color-selected"):
         ("color-accent", st, 3.0, f"accent bar / checked box on {st[6:]} surface"),
         ("color-border", st, 3.0, f"checkbox or icon-button boundary on {st[6:]} surface"),
         ("color-focus", st, 3.0, f"focus ring on {st[6:]} surface"),
+        ("color-danger", st, 4.5, f"danger text (Sign out) on {st[6:]} surface"),
     ]
 # Disabled: WCAG exempts inactive controls; we still keep the label readable (floor 3:1)
 pairs += [

@@ -139,6 +139,12 @@ export const overrides = {
   // semantic `formField`, `overlay.select`, and `list.option` above. Its `dropdown` and `chip`
   // tokens are still Aura's: map them here before using `dropdown` or `multiple` (UI-STY-6).
   components: {
+    // The requirement tree (S2-C15): Aura's border is `{surface.800}` in dark, off our tokens.
+    treetable: { root: { borderColor: token('border-subtle') } },
+    // MarkdownEditor's Write and Preview (S2-C16): Aura marks the selected tab with accent text
+    // and a 1 px bar; 3 px makes the bar a cue of its own (base.css keeps it in forced colors).
+    // The tab's focus ring stays inset, as the menu item's does: the tab list clips overflow.
+    tabs: { activeBar: { height: '3px' } },
     button: {
       root: {
         primary: buttonSeverity('accent', 'accent-hover', 'on-accent'),

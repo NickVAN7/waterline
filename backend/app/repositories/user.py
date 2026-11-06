@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Collection
 from dataclasses import dataclass
 
-from sqlalchemy import Select, or_, select, union
+from sqlalchemy import Select, and_, exists, or_, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.authz.context import AuthzContext, ProjectAccess
@@ -37,12 +37,26 @@ class Reach:
     projects: list[Project]
 
 
+# A system admin with no workspace role (one workspace, design-doc §4): the users list's
+# `sort_first`, false before true, so they're listed last (DL-188).
+NO_ROLE_SYSTEM_ADMIN = and_(
+    User.is_system_admin, ~exists().where(WorkspaceMembership.user_id == User.id)
+)
+
+
 class UserRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
     async def get(self, user_id: uuid.UUID) -> User | None:
         return await get_by_id(self.session, User, user_id)
+
+    async def get_many(self, user_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, User]:
+        """The users with these IDs, by ID (deactivated included)."""
+        if not user_ids:
+            return {}
+        users = await self.session.scalars(select(User).where(User.id.in_(user_ids)))
+        return {user.id: user for user in users}
 
     async def get_by_email(self, email: str) -> User | None:
         """The user with exactly this email; callers lowercase it first (emails are stored
@@ -56,6 +70,18 @@ class UserRepository:
 
     async def get_by_username(self, username: str) -> User | None:
         return await self.session.scalar(select(User).where(User.username == username))
+
+    async def hold_access(self, user_id: uuid.UUID) -> None:
+        """Hold the user's row and memberships `FOR SHARE` until the transaction ends, workspace,
+        org, then project (the order a removal "with their projects" locks them), so what they
+        may do, checked now, stays true until commit (TD-72)."""
+        for statement in (
+            select(User.id).where(User.id == user_id),
+            select(WorkspaceMembership.id).where(WorkspaceMembership.user_id == user_id),
+            select(Membership.id).where(Membership.user_id == user_id),
+            select(ProjectMembership.id).where(ProjectMembership.user_id == user_id),
+        ):
+            await self.session.execute(statement.with_for_update(read=True))
 
     async def lock_active_system_admins(self) -> list[uuid.UUID]:
         """The active system admins' IDs, their rows locked until the transaction ends: two

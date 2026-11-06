@@ -1,20 +1,32 @@
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Header, Query, Response, status
 
 from app.core.errors import ErrorBody
+from app.core.lists import Page
 from app.core.settings import Settings
 from app.routers.deps import (
     SESSION_COOKIE,
     AuthServiceDep,
     SessionTokenDep,
     SettingsDep,
+    SignedInUserDep,
     UserPendingPasswordChangeDep,
 )
-from app.schemas.auth import ChangePasswordRequest, MeRead, PasswordPolicyRead, SignInRequest
-from app.services.auth import password_policy
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    MeRead,
+    PasswordPolicyRead,
+    SessionRead,
+    SignInRequest,
+)
+from app.services.auth import SESSIONS, password_policy
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+# The user's own sessions (DL-298): the `auth` area, which runs every session-ending action.
+sessions_router = APIRouter(prefix="/me/sessions", tags=["auth"])
+SessionQuery = Annotated[SESSIONS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+UserAgentHeader = Annotated[str | None, Header(include_in_schema=False)]
 
 _UNAUTHENTICATED: dict[int | str, dict[str, Any]] = {
     status.HTTP_401_UNAUTHORIZED: {"model": ErrorBody}
@@ -31,11 +43,14 @@ async def sign_in(
     auth: AuthServiceDep,
     settings: SettingsDep,
     token: SessionTokenDep = None,
+    user_agent: UserAgentHeader = None,
 ) -> MeRead:
     """Start a new session and set its cookie, ending the session the browser sent, if any. 401
     `invalid_credentials` for an unknown email or a wrong password; 403 `account_inactive` for a
     deactivated account."""
-    signed_in = await auth.sign_in(body.email, body.password, old_token=token)
+    signed_in = await auth.sign_in(
+        body.email, body.password, old_token=token, user_agent=user_agent
+    )
     _set_session_cookie(response, signed_in.token, settings)
     return signed_in.me
 
@@ -96,3 +111,22 @@ def _set_session_cookie(response: Response, token: str, settings: Settings) -> N
         httponly=True,
         samesite="lax",
     )
+
+
+@sessions_router.get("", responses=_UNAUTHENTICATED)
+async def list_sessions(
+    user: SignedInUserDep, query: SessionQuery, auth: AuthServiceDep, token: SessionTokenDep = None
+) -> Page[SessionRead]:
+    """Your live sessions, most recently active first, this one marked `is_current`."""
+    # The dependency found a live session, so the cookie is there.
+    return await auth.list_sessions(user, token or "", query)
+
+
+@sessions_router.post(
+    "/sign-out-others", status_code=status.HTTP_204_NO_CONTENT, responses=_UNAUTHENTICATED
+)
+async def sign_out_other_sessions(
+    user: SignedInUserDep, auth: AuthServiceDep, token: SessionTokenDep = None
+) -> None:
+    """End every session of yours but this one."""
+    await auth.sign_out_others(user, token or "")

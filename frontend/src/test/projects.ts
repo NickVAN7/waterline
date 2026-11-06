@@ -14,8 +14,11 @@ export function projectItem(key: string, overrides: Partial<Item> = {}): Item {
     type: 'software',
     status: 'active',
     lead_id: null,
+    lead_name: null,
     organization_id: ACME.id,
     organization_slug: ACME.slug,
+    organization_name: ACME.name,
+    my_access: 'admin',
     ...overrides,
   }
 }
@@ -34,10 +37,18 @@ export function project(overrides: Partial<Project> = {}): Project {
     lead_is_active: true,
     enabled_modules: [],
     archived: false,
-    classification_level: null,
-    classification_categories: [],
+    restriction_level: null,
+    restriction_categories: [],
     modules_holding_data: [],
     allowed_actions: [],
     ...overrides,
   }
+}
+
+/** A project on My work: a project item with its star and its allowed actions (DL-302, DL-306). */
+export function myProjectItem(
+  key: string,
+  overrides: Partial<components['schemas']['MyProjectItem']> = {},
+): components['schemas']['MyProjectItem'] {
+  return { ...projectItem(key), is_favorite: false, allowed_actions: [], ...overrides }
 }

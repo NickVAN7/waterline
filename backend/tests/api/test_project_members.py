@@ -5,6 +5,7 @@ projects" across the org, workspace, and project areas, the picker's search, and
 access review's content. Who gets 2xx/403/404 is in tests/api/authz/test_project_members.py (spec
 tests)."""
 
+import uuid
 from datetime import UTC, datetime
 
 import pytest
@@ -12,7 +13,15 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import AuditAction, OrgRole, ProjectRole, WorkspaceRole
+from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    ActivityField,
+    AuditAction,
+    OrgRole,
+    ProjectRole,
+    WorkspaceRole,
+)
 from app.models.audit_event import AuditEvent
 from app.models.org import Membership
 from app.models.project import Project, ProjectMembership
@@ -21,11 +30,18 @@ from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
+from tests.support.activity import activity
 from tests.support.authz import Tenancy, persona_user, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.usefixtures("session")]
 
 MEMBERS = "/api/projects/PMT/members"
+
+
+def lead_cleared(project_id: uuid.UUID, lead_id: uuid.UUID, by: uuid.UUID) -> tuple[object, ...]:
+    """A removal clearing the project's lead, as `activity` reads it back (design-doc §10)."""
+    entity = (ActivityEntityType.PROJECT, project_id, ActivityAction.UPDATED)
+    return (*entity, ActivityField.LEAD_ID, str(lead_id), None, by)
 
 
 @pytest.fixture
@@ -403,6 +419,7 @@ async def test_removing_the_lead_clears_the_lead_and_records_it(
             {"role": "member", "lead_cleared": True},
         )
     ]
+    assert await activity(session) == [lead_cleared(t.project.id, bob.id, admin.id)]
 
 
 async def test_removing_someone_else_leaves_the_lead(
@@ -420,6 +437,7 @@ async def test_removing_someone_else_leaves_the_lead(
     assert response.status_code == 204
     assert await lead_of(session, t.project) == admin.id
     assert [e[4] for e in await events(session)] == [{"role": "viewer"}]
+    assert await activity(session) == []
 
 
 async def test_removing_someone_not_on_the_project_is_a_404(
@@ -490,6 +508,8 @@ async def test_removing_an_org_member_with_projects_removes_them_from_the_orgs_p
         ],
         key=str,
     )
+    # The archived project's lead change is logged too (build plan, "Projects").
+    assert await activity(session) == [lead_cleared(ledger.id, bob.id, owner.id)]
 
 
 async def test_removing_an_org_member_without_projects_leaves_them(
@@ -517,6 +537,8 @@ async def test_removing_staff_with_projects_removes_them_from_every_workspace_pr
     abroad = await ProjectFactory.create_async(organization=other_org, key="ABR")
     for project in (t.project, elsewhere, abroad):
         await ProjectMembershipFactory.create_async(project=project, user=sam)
+    elsewhere.lead_id = sam.id
+    await session.flush()
     await sign_in_as(client, owner)
 
     response = await client.delete(
@@ -531,7 +553,11 @@ async def test_removing_staff_with_projects_removes_them_from_every_workspace_pr
         (e[2], e[4]) for e in await events(session) if e[0] == AuditAction.PROJECT_MEMBER_REMOVED
     ]
     via = {"role": "member", "via": "workspace_member_removed"}
-    assert sorted(removed, key=str) == sorted([(t.project.id, via), (elsewhere.id, via)], key=str)
+    cleared = {"role": "member", "lead_cleared": True, "via": "workspace_member_removed"}
+    assert sorted(removed, key=str) == sorted(
+        [(t.project.id, via), (elsewhere.id, cleared)], key=str
+    )
+    assert await activity(session) == [lead_cleared(elsewhere.id, sam.id, owner.id)]
 
 
 # --- The picker and the member list ---------------------------------------------------------------
@@ -580,20 +606,45 @@ async def test_project_member_rows_carry_no_account_actions(
     assert rows["Bea"]["allowed_actions"] == ["project_member.manage"]
 
 
-async def test_project_member_rows_say_whether_the_account_is_active(
+async def test_the_member_list_leaves_out_deactivated_people_unless_an_admin_asks(
     client: AsyncClient, t: Tenancy, admin: User
 ) -> None:
-    """DL-113: the lead picker marks a deactivated member, whom the server refuses as lead."""
+    """DL-293: active members only; the project's admin adds a deactivated one, marked."""
     for name, active in (("Bea", True), ("Gail", False)):
         user = await UserFactory.create_async(name=name, is_active=active)
         await ProjectMembershipFactory.create_async(project=t.project, user=user)
 
-    rows = (await client.get(MEMBERS)).json()["items"]
+    default = (await client.get(MEMBERS)).json()
+    everyone = (await client.get(MEMBERS, params={"include_deactivated": "true"})).json()
 
-    assert [(m["name"], m["is_active"]) for m in rows] == [
+    assert [m["name"] for m in default["items"]] == ["Ada Admin", "Bea"]
+    assert default["total"] == 2
+    assert [(m["name"], m["is_active"]) for m in everyone["items"]] == [
         ("Ada Admin", True),
         ("Bea", True),
         ("Gail", False),
+    ]
+
+
+@pytest.mark.security
+async def test_a_member_who_isnt_an_admin_cant_ask_for_deactivated_people(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-294: `project.view` lists the members, but only `project_member.manage` may ask for
+    deactivated ones: a 422 `not_permitted` on the parameter for anyone else."""
+    user = await UserFactory.create_async()
+    await ProjectMembershipFactory.create_async(
+        project=t.project, user=user, role=ProjectRole.MEMBER
+    )
+    await sign_in_as(client, user)
+
+    listed = await client.get(MEMBERS)
+    refused = await client.get(MEMBERS, params={"include_deactivated": "true"})
+
+    assert listed.status_code == 200
+    assert refused.status_code == 422
+    assert [(e["loc"], e["type"]) for e in refused.json()["details"]["fields"]] == [  # pyright: ignore[reportUnknownVariableType]
+        (["query", "include_deactivated"], "not_permitted")
     ]
 
 

@@ -3,11 +3,12 @@
 // membership in the workspace and every account with none, each with whether they're active and,
 // read-only, whether they're a system admin (granted only through the CLI, design-doc §4), and the
 // account actions their row's `allowed_actions` allow. Accounts are created through the staff and
-// org flows, never here (DL-75).
+// org flows, never here (DL-75). Active accounts only; the staff's admins get "Show
+// deactivated", kept in the URL (DL-293 to DL-295).
 import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { DEACTIVATED, SYSTEM_ADMIN } from '@/app/labels'
+import { ACTIVE, DEACTIVATED, USER, workspaceRoleText } from '@/app/labels'
 import { focusHeading, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -18,6 +19,7 @@ import Skeleton from '@/components/Skeleton.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows } from '@/composables/allowedActions'
 import { useListQuery } from '@/composables/useListQuery'
+import { useRefocusWhenGone, useShowDeactivated } from '@/composables/usePeopleList'
 import { useLoad } from '@/composables/useLoad'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useCurrentUserStore } from '@/stores/currentUser'
@@ -25,11 +27,15 @@ import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import AccountActions from '@/views/user/AccountActions.vue'
 
 import { WHO_TO_ASK } from './workspaceAdmin'
-import WorkspaceNav from './WorkspaceNav.vue'
 
 const workspace = useWorkspace()
 const store = useCurrentUserStore()
-const list = useListQuery({ limit: 25 })
+const list = useListQuery({ limit: 25, filters: ['include_deactivated'] as const })
+const canShowDeactivated = computed(() => allows(workspace.value, 'workspace_staff.manage'))
+const { show: showDeactivated, toggle: toggleDeactivated } = useShowDeactivated(
+  list,
+  () => canShowDeactivated.value,
+)
 const done = ref('')
 const account = ref<InstanceType<typeof AccountActions>>()
 
@@ -38,7 +44,12 @@ const page = useLoad(() =>
     client.GET('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: workspace.value!.id },
-        query: { ...list.params.value, sort: 'name' },
+        query: {
+          limit: list.limit,
+          offset: list.offset.value,
+          sort: 'name',
+          ...(showDeactivated.value ? { include_deactivated: true } : {}),
+        },
       },
     }),
   ),
@@ -50,6 +61,7 @@ watch(
   },
   { immediate: true },
 )
+list.returnWhenEmpty(page.data)
 watch(
   () => page.error.value?.status === 404,
   (gone) => {
@@ -57,9 +69,28 @@ watch(
   },
 )
 
-function finished(message: string) {
+type UserRow = NonNullable<typeof page.data.value>['items'][number]
+const table = ref<HTMLTableElement>()
+// The row an account action may take away (a deactivation, DL-293; UI-FRM-14).
+const refocus = useRefocusWhenGone(table)
+function actionsFor(user: UserRow) {
+  return (account.value?.actionsFor(user) ?? []).map((action) =>
+    'run' in action
+      ? {
+          ...action,
+          run: () => {
+            refocus.mark(page.data.value?.items.indexOf(user) ?? -1, user.id)
+            action.run()
+          },
+        }
+      : action,
+  )
+}
+
+async function finished(message: string) {
   done.value = message
-  void page.run()
+  await page.run()
+  await refocus.settle(page.data.value?.items.map((u) => u.id) ?? [])
 }
 
 // A 403 in a dialog: what the user may do changed, on the rows and the page (UI-FRM-7).
@@ -83,12 +114,21 @@ const announcement = computed(() => {
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <WorkspaceNav />
     <PageHeader title="Users" />
     <p class="m-0 text-text-muted">
       People join through Staff or an organization's members; their accounts are managed here.
     </p>
     <SuccessStatus :message="done" />
+    <label v-if="canShowDeactivated" class="flex items-center gap-2 self-start">
+      <input
+        id="show-deactivated"
+        type="checkbox"
+        class="size-(--target-min) shrink-0"
+        :checked="showDeactivated"
+        @change="toggleDeactivated"
+      />
+      <span>Show deactivated</span>
+    </label>
     <section
       aria-labelledby="users-heading"
       :aria-busy="page.loading.value ? 'true' : 'false'"
@@ -106,13 +146,14 @@ const announcement = computed(() => {
       <Skeleton v-else-if="!page.data.value" />
       <template v-else>
         <div role="region" aria-labelledby="users-heading" tabindex="0" class="overflow-x-auto">
-          <table aria-labelledby="users-heading" class="w-full border-collapse text-sm">
+          <table ref="table" aria-labelledby="users-heading" class="w-full border-collapse text-sm">
             <thead>
               <tr class="border-b border-border text-left">
                 <th scope="col" class="p-2">Name</th>
                 <th scope="col" class="p-2">Email</th>
                 <th scope="col" class="p-2">Username</th>
-                <th scope="col" class="p-2">System admin</th>
+                <th scope="col" class="p-2">Role</th>
+                <th scope="col" class="p-2">Status</th>
                 <th scope="col" class="p-2"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -122,30 +163,21 @@ const announcement = computed(() => {
                 :key="user.id"
                 class="border-b border-border-subtle"
               >
-                <td class="p-2">
-                  <span class="flex flex-wrap items-center gap-2">
-                    {{ user.name }}
-                    <Badge
-                      v-if="!user.is_active"
-                      :tone="DEACTIVATED.tone"
-                      :icon="DEACTIVATED.icon"
-                      >{{ DEACTIVATED.label }}</Badge
-                    >
-                  </span>
-                </td>
+                <td class="p-2">{{ user.name }}</td>
                 <td class="p-2">{{ user.email }}</td>
                 <td class="p-2 font-mono">{{ user.username }}</td>
                 <td class="p-2">
-                  <Badge
-                    v-if="user.is_system_admin"
-                    :tone="SYSTEM_ADMIN.tone"
-                    :icon="SYSTEM_ADMIN.icon"
-                    >{{ SYSTEM_ADMIN.label }}</Badge
-                  >
-                  <span v-else>No</span>
+                  <!-- The staff role and system admin as text, or "User" with neither (DL-188). -->
+                  {{ workspaceRoleText(user.workspace_role, user.is_system_admin, USER) }}
+                </td>
+                <td class="p-2">
+                  <Badge v-if="!user.is_active" :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{
+                    DEACTIVATED.label
+                  }}</Badge>
+                  <template v-else>{{ ACTIVE }}</template>
                 </td>
                 <td class="p-2 text-right">
-                  <RowActions :name="user.name" :actions="account?.actionsFor(user) ?? []" />
+                  <RowActions :name="user.name" :actions="actionsFor(user)" />
                 </td>
               </tr>
             </tbody>

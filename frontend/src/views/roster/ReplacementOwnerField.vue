@@ -27,6 +27,7 @@ defineExpose({ focus: () => field.value?.focus() })
 
 const options = computed(() => [
   { value: '', label: 'Choose a person' },
+  // The roster lists active people only (DL-293); `is_active` is kept as a second check.
   ...people.value
     .filter((p) => p.is_active && p.user_id !== props.exclude)
     .map((p) => ({ value: p.user_id, label: `${p.name} (${p.email})` })),

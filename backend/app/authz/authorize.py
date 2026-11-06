@@ -3,11 +3,11 @@ closed. Pure: it decides from the request's `AuthzContext` and the `Target`, nev
 
 from enum import StrEnum
 
-from app.authz.actions import REGISTRY, Action, Level
+from app.authz.actions import REGISTRY, Action, ActionSpec, Level
 from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target
 from app.core.errors import ForbiddenError, NotFoundError
-from app.enums import OrgRole, ProjectRole, WorkspaceRole
+from app.enums import AccessKind, OrgRole, ProjectRole, WorkspaceRole
 from app.rules.account_rank import Account, in_scope
 
 # Each level's roles, lowest first: a role grants what every role below it does.
@@ -44,15 +44,35 @@ def _project_access(ctx: AuthzContext, target: Target) -> bool:
     return target.project_id in ctx.projects or _inherits_project_admin(ctx, target)
 
 
+def _content_access(ctx: AuthzContext, target: Target) -> bool:
+    """Project access that reaches content: on an export-controlled project, only an explicit
+    membership (design-doc §3.1)."""
+    if target.export_controlled:
+        return target.project_id in ctx.projects
+    return _project_access(ctx, target)
+
+
+def _gated(ctx: AuthzContext, spec: ActionSpec, target: Target) -> bool:
+    """The export-control gate (design-doc §5, step 2): a content action on an export-controlled
+    project, by someone without an explicit membership."""
+    return (
+        spec.access is AccessKind.CONTENT
+        and target.export_controlled
+        and target.project_id not in ctx.projects
+    )
+
+
 def authorize(ctx: AuthzContext, action: str, target: Target) -> bool:
     """Whether the user may take `action` on `target`, in design-doc §5's order (the archived
-    project; an action only an explicit project role grants on an export-controlled project;
-    personal actions; system admin; workspace role; org role; project role; targeted
-    rules). An action not in the registry is denied."""
+    project; the export-control gate; an action only an explicit project role grants on an
+    export-controlled project; personal actions; system admin; workspace role; org role; project
+    role; targeted rules). An action not in the registry is denied."""
     spec = REGISTRY.get(action)
     if spec is None:
         return False
     if target.archived and spec.mutation and not spec.archive_exempt:
+        return False
+    if _gated(ctx, spec, target):
         return False
     # A None ID (a target above that level) finds nothing: no membership is keyed by None.
     project = ctx.projects.get(target.project_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
@@ -60,8 +80,8 @@ def authorize(ctx: AuthzContext, action: str, target: Target) -> bool:
         # Only the explicit project role grants it (design-doc §3.1; DL-82).
         return _at_least(project.role if project else None, spec.project_role)
     if spec.relationship is not None:
-        # Only the relationship grants a personal action, and only with access to the project.
-        return spec.relationship(ctx.user_id, target.entity) and _project_access(ctx, target)
+        # Only the relationship grants a personal action, and only with content access.
+        return spec.relationship(ctx.user_id, target.entity) and _content_access(ctx, target)
     if spec.visible and can_see(ctx, target):
         return True
     org_role = ctx.org_roles.get(target.organization_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
@@ -100,10 +120,12 @@ def can_see(ctx: AuthzContext, target: Target) -> bool:
 
 def ensure(ctx: AuthzContext, action: str, target: Target) -> None:
     """Raise unless `authorize()` allows it: `NotFoundError` (404) when the user can't see the
-    target, `ForbiddenError` (403) when they can see it but may not do this."""
+    target or its content (the export-control gate, design-doc §3.1), `ForbiddenError` (403)
+    when they can see it but may not do this."""
     if authorize(ctx, action, target):
         return
-    if not can_see(ctx, target):
+    spec = REGISTRY.get(action)
+    if (spec is not None and _gated(ctx, spec, target)) or not can_see(ctx, target):
         raise NotFoundError
     raise ForbiddenError
 

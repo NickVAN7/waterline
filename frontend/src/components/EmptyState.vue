@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Nothing to show yet (UI-FBK-8): a heading, one sentence, and an action only when allowed.
 // `level`: the heading's level, one below the section it sits in (UI-SHL-8).
-withDefaults(defineProps<{ heading: string; level?: 2 | 3 }>(), { level: 2 })
+withDefaults(defineProps<{ heading: string; level?: 2 | 3 | 4 }>(), { level: 2 })
 </script>
 
 <template>

@@ -1,18 +1,34 @@
 <script setup lang="ts">
-// The org administration section nav (UI-SHL-10, DL-104), the same for every org owner and admin:
-// Settings shows an org admin the values and who may change them.
+// The org administration pages in the sidebar, on an org admin page (UI-SHL-5, UI-SHL-10; DL-137):
+// Overview, Members, and Settings, each for whoever `org_member.manage` lets in (DL-163; Settings
+// shows an org admin the values and who may change them).
 import { computed } from 'vue'
 
-import SectionNav from '@/components/SectionNav.vue'
+import SidebarLink from '@/app/shell/SidebarLink.vue'
+import { allows } from '@/composables/allowedActions'
+import type { components } from '@/api/schema'
 
-const props = defineProps<{ orgSlug: string }>()
+const props = defineProps<{ org: components['schemas']['MeOrg'] }>()
 
-const links = computed(() => [
-  { label: 'Members', to: { name: 'org-members', params: { orgSlug: props.orgSlug } } },
-  { label: 'Settings', to: { name: 'org-settings', params: { orgSlug: props.orgSlug } } },
-])
+const links = computed(() =>
+  allows(props.org, 'org_member.manage')
+    ? [
+        { label: 'Overview', name: 'org-overview' },
+        { label: 'Members', name: 'org-members' },
+        { label: 'Settings', name: 'org-settings' },
+      ]
+    : [],
+)
 </script>
 
 <template>
-  <SectionNav label="Organization administration" :links="links" />
+  <!-- A landmark with nothing in it isn't rendered (UI-SHL-2). -->
+  <nav v-if="links.length" aria-label="Organization administration" class="flex flex-col gap-1">
+    <SidebarLink
+      v-for="link in links"
+      :key="link.name"
+      :to="{ name: link.name, params: { orgSlug: org.slug } }"
+      >{{ link.label }}</SidebarLink
+    >
+  </nav>
 </template>

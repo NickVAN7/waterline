@@ -43,8 +43,6 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = ''
-  localStorage.clear()
-  delete document.documentElement.dataset.theme
 })
 
 // Registered after the clean-up above, so it runs first (after-hooks run last to first): each
@@ -62,37 +60,8 @@ describe('UserMenu', () => {
     expect(document.querySelector('#user-menu [role=menu]')?.getAttribute('aria-label')).toBe(
       'Account menu',
     )
-    expect(items().map((li) => li.textContent?.trim())).toEqual([
-      'Account settings',
-      'System theme',
-      'Light theme',
-      'Dark theme',
-      'Sign out',
-    ])
+    expect(items().map((li) => li.textContent?.trim())).toEqual(['Account settings', 'Sign out'])
     await expectNoA11yViolations(document.body)
-  })
-
-  it('offers the themes as radio items, System checked by default', async () => {
-    await openMenu()
-
-    const themes = items().filter((li) => li.getAttribute('role') === 'menuitemradio')
-    expect(themes.map((li) => [li.textContent?.trim(), li.getAttribute('aria-checked')])).toEqual([
-      ['System theme', 'true'],
-      ['Light theme', 'false'],
-      ['Dark theme', 'false'],
-    ])
-  })
-
-  it('applies a chosen theme and checks it', async () => {
-    const { wrapper } = await openMenu()
-
-    await choose('Dark theme')
-
-    expect(document.documentElement.dataset.theme).toBe('dark')
-    await wrapper.get('button').trigger('click')
-    await flushPromises()
-    expect(item('Dark theme').getAttribute('aria-checked')).toBe('true')
-    expect(item('System theme').getAttribute('aria-checked')).toBe('false')
   })
 
   it('links to account settings', async () => {
@@ -106,9 +75,9 @@ describe('UserMenu', () => {
     expect(router.currentRoute.value.name).toBe('account')
   })
 
-  it('links to workspace administration for those who may see it (UI-SHL-10, DL-104)', async () => {
+  it('links to the workspace pages, as Administration, for those who may see them (UI-SHL-10, DL-137)', async () => {
     const { router } = await openMenu({ workspaces: [workspaceEntry(['workspace.view'])] })
-    const link = item('Workspace administration').querySelector('a')!
+    const link = item('Administration').querySelector('a')!
     expect(link.getAttribute('href')).toBe('/workspace/staff')
 
     link.click()
@@ -117,22 +86,34 @@ describe('UserMenu', () => {
     expect(router.currentRoute.value.name).toBe('workspace-staff')
   })
 
-  it("has no workspace administration for staff who can't see the workspace pages", async () => {
+  it("has no Administration for staff who can't see the workspace pages", async () => {
     await openMenu({ workspaces: [workspaceEntry([])] })
 
-    expect(items().map((li) => li.textContent?.trim())).not.toContain('Workspace administration')
+    expect(items().map((li) => li.textContent?.trim())).not.toContain('Administration')
   })
 
-  it("links to the current org's administration for those who may manage it (DL-104)", async () => {
-    const globex = { ...ACME, id: 'org-globex', name: 'Globex Retail', slug: 'globex' }
-    await openMenu({ orgs: [ACME, { ...globex, allowed_actions: ['org_member.manage'] }] })
-    expect(items().map((li) => li.textContent?.trim())).not.toContain('Organization administration')
-
-    useCurrentOrgStore().enter('globex')
+  it("leaves an org's administration to the org menu (UI-SHL-4, DL-137)", async () => {
+    await openMenu({
+      orgs: [{ ...ACME, allowed_actions: ['org_member.manage'] }],
+      workspaces: [workspaceEntry(['workspace.view'])],
+    })
+    useCurrentOrgStore().enter('acme')
     await flushPromises()
 
-    const link = item('Organization administration').querySelector('a')!
-    expect(link.getAttribute('href')).toBe('/globex/members')
+    expect(items().map((li) => li.textContent?.trim())).toEqual([
+      'Account settings',
+      'Administration',
+      'Sign out',
+    ])
+  })
+
+  it('sets Sign out apart with an icon and the danger tone (UI-SHL-4, DL-137)', async () => {
+    await openMenu()
+
+    const label = item('Sign out').querySelector('.text-danger')!
+    expect(label.textContent?.trim()).toBe('Sign out')
+    expect(label.querySelector('svg')).not.toBeNull()
+    expect(item('Account settings').querySelector('.text-danger')).toBeNull()
   })
 
   it('asks the shell to sign out', async () => {

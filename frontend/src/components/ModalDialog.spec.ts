@@ -7,14 +7,14 @@ import { stubDialog } from '@/test/overlay'
 
 import ModalDialog from './ModalDialog.vue'
 
-/** A page with a button that opens a dialog holding `content`. */
-function mountPage(content: string, fallbackFocus?: () => void) {
+/** A page with a button that opens a dialog holding `content`; `panel`, as a side panel. */
+function mountPage(content: string, fallbackFocus?: () => void, panel = false) {
   const Page = defineComponent({
     components: { ModalDialog },
-    setup: () => ({ dialog: ref<InstanceType<typeof ModalDialog>>(), fallbackFocus }),
+    setup: () => ({ dialog: ref<InstanceType<typeof ModalDialog>>(), fallbackFocus, panel }),
     template: `
       <button id="opener" type="button" @click="dialog.open()">Open</button>
-      <ModalDialog ref="dialog" title="Remove Jane?" :fallback-focus="fallbackFocus">
+      <ModalDialog ref="dialog" title="Remove Jane?" :fallback-focus="fallbackFocus" :panel="panel">
         ${content}
       </ModalDialog>`,
   })
@@ -127,5 +127,27 @@ describe('ModalDialog', () => {
     wrapper.get<HTMLDialogElement>('dialog').element.close()
 
     expect(document.activeElement?.id).toBe('opener')
+  })
+
+  it('as a side panel, opens on its title, as a page on its h1 (UI-SHL-11)', async () => {
+    const wrapper = mountPage('<input id="f" aria-label="Field" />', undefined, true)
+
+    await openFrom(wrapper)
+
+    expect(document.activeElement?.tagName).toBe('H2')
+    expect(document.activeElement?.textContent).toBe('Remove Jane?')
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('opened with nothing focused (a panel opened by its URL), sends focus to the fallback', async () => {
+    const fallback = vi.fn()
+    const wrapper = mountPage('<button type="button">Go</button>', fallback, true)
+    const dialog = wrapper.findComponent(ModalDialog)
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    await dialog.vm.open()
+
+    wrapper.get<HTMLDialogElement>('dialog').element.close()
+
+    expect(fallback).toHaveBeenCalledOnce()
   })
 })

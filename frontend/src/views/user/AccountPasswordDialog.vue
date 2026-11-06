@@ -91,10 +91,14 @@ defineExpose({ open })
     :fallback-focus="fallbackFocus"
   >
     <template v-if="shown">
-      <!-- The warning is read with Done, which gets focus (DL-118). -->
+      <!-- What was done and the warning are read with Done, which gets focus (DL-118, TD-51). -->
+      <p id="reset-password-what" class="m-0">Password reset for {{ person.name }}.</p>
       <TemporaryPasswordNotice :password="shown" warning-id="reset-password-warning" />
       <div>
-        <Button ref="doneButton" aria-describedby="reset-password-warning" @click="dialog?.close()"
+        <Button
+          ref="doneButton"
+          aria-describedby="reset-password-what reset-password-warning"
+          @click="dialog?.close()"
           >Done</Button
         >
       </div>

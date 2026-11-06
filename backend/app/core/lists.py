@@ -39,7 +39,17 @@ MAX_OFFSET = 2**63 - 1
 
 # Parameters every list has, which no filter may reuse.
 _BUILT_IN = frozenset(
-    {"limit", "offset", "sort", "before", "q", "include_archived", "include_deleted"}
+    {
+        "limit",
+        "offset",
+        "sort",
+        "before",
+        "q",
+        "include_archived",
+        "archived_only",
+        "include_deleted",
+        "include_deactivated",
+    }
 )
 
 # A mapped attribute (`Task.status`), or any SQL expression usable in WHERE and ORDER BY.
@@ -87,6 +97,9 @@ class CustomFilter:
     restricted: bool = False
 
 
+# Showing deactivated people is restricted too: only the list's admins may (DL-294).
+INCLUDE_DEACTIVATED = "include_deactivated"
+
 # Showing soft-deleted rows is always restricted: the trash view shows each user only what they
 # may restore (design-doc §9), so the endpoint decides who may ask for it.
 INCLUDE_DELETED = "include_deleted"
@@ -97,17 +110,22 @@ class ListSpec:
     """One list endpoint's declared query: everything a client may ask for, and nothing else.
 
     `sorts` maps a sort name to its column; `default_sort` uses the same names, `-` for
-    descending. `id` is always the last tiebreaker. `paging="cursor"` is for append-only feeds:
-    newest first, by `id` (UUIDv7, so creation order), with no sort parameter.
+    descending. `id` is always the last tiebreaker. `sort_first` is a fixed order ahead of the
+    requested one (the users list's system admins with no workspace role last, DL-188).
+    `paging="cursor"` is for append-only feeds: newest first, by `id` (UUIDv7, so creation
+    order), with no sort parameter. `active_column` (a people list's `User.is_active`) hides
+    the false rows unless `include_deactivated`, which is restricted (DL-293, DL-294).
     """
 
     name: str
     id_column: Column
     sorts: Mapping[str, Column] = field(default_factory=dict[str, Column])
     default_sort: tuple[str, ...] = ()
+    sort_first: tuple[ColumnElement[Any], ...] = ()
     filters: tuple[Filter | CustomFilter, ...] = ()
     search: tuple[Column, ...] = ()
     archived_column: Column | None = None
+    active_column: Column | None = None
     soft_deleted: bool = False
     paging: Literal["offset", "cursor"] = "offset"
 
@@ -156,6 +174,9 @@ class ListSpec:
             fields["q"] = (str | None, Field(None, min_length=1, max_length=MAX_TEXT_LENGTH))
         if self.archived_column is not None:
             fields["include_archived"] = (bool, False)
+            fields["archived_only"] = (bool, False)
+        if self.active_column is not None:
+            fields[INCLUDE_DEACTIVATED] = (bool, False)
         if self.soft_deleted:
             fields[INCLUDE_DELETED] = (bool, False)
         for declared in self.filters:
@@ -235,8 +256,8 @@ def _references(
 ) -> list[uuid.UUID]:
     """The IDs a reference filter names, with `me` replaced by the current user."""
     if ME in values and current_user_id is None:
-        raise ValidationFailedError(
-            [FieldError(("query", name), "`me` needs a signed-in user.", "me_unavailable")]
+        raise ValidationFailedError.on(
+            ("query", name), "`me` needs a signed-in user.", "me_unavailable"
         )
     return [current_user_id if value == ME else value for value in values]  # type: ignore[misc]
 
@@ -304,19 +325,37 @@ def apply_filters(
     permitted: Collection[str] = frozenset(),
 ) -> Select[Any]:
     """`statement` narrowed by everything in `query` except paging and sorting: filters (AND
-    across fields, OR within one), search, and hidden rows. Restricted filters and
-    `include_deleted` apply only if `permitted` names them (`check_permitted`)."""
+    across fields, OR within one), search, and hidden rows. Restricted filters,
+    `include_deleted`, and `include_deactivated` apply only if `permitted` names them
+    (`check_permitted`)."""
     check_permitted(spec, query, permitted)
     for declared in spec.filters:
         statement = _apply_filter(statement, declared, query, current_user_id)
     text = _value(query, "q")
     if text is not None:
         statement = statement.where(or_(*(_contains(column, text) for column in spec.search)))
-    if spec.archived_column is not None and not _value(query, "include_archived"):
-        statement = statement.where(spec.archived_column.is_(None))
+    if spec.archived_column is not None:
+        statement = _apply_archived(statement, spec.archived_column, query)
+    if spec.active_column is not None and not _value(query, INCLUDE_DEACTIVATED):
+        statement = statement.where(spec.active_column)
     if spec.soft_deleted and _value(query, INCLUDE_DELETED):
         statement = statement.execution_options(**{INCLUDE_DELETED_OPTION: True})
     return statement
+
+
+def _apply_archived(statement: Select[Any], column: Column, query: BaseModel) -> Select[Any]:
+    """Archived rows hidden, included with `include_archived`, or alone with `archived_only`
+    (DL-181); asking for both is a mistake, not one silently winning (DL-182)."""
+    include, only = _value(query, "include_archived"), _value(query, "archived_only")
+    if include and only:
+        raise ValidationFailedError.on(
+            ("query", "archived_only"),
+            "`archived_only` can't be sent with `include_archived`.",
+            "conflict",
+        )
+    if only:
+        return statement.where(column.is_not(None))
+    return statement if include else statement.where(column.is_(None))
 
 
 def _used_parameters(declared: Filter | CustomFilter, query: BaseModel) -> list[str]:
@@ -324,9 +363,10 @@ def _used_parameters(declared: Filter | CustomFilter, query: BaseModel) -> list[
 
 
 def check_permitted(spec: ListSpec, query: BaseModel, permitted: Collection[str]) -> None:
-    """Refuse a restricted filter (or `include_deleted`) the caller wasn't permitted: a 422 on
-    the parameter, so the list never hints at what it would have matched. `permitted` holds
-    filter names (and `include_deleted`), decided by the endpoint (through `authorize()`)."""
+    """Refuse a restricted filter (or `include_deleted`, `include_deactivated`) the caller
+    wasn't permitted: a 422 on the parameter, so the list never hints at what it would have
+    matched. `permitted` holds filter names (and those two), decided by the endpoint (through
+    `authorize()`)."""
     refused = [
         parameter
         for declared in spec.filters
@@ -335,6 +375,12 @@ def check_permitted(spec: ListSpec, query: BaseModel, permitted: Collection[str]
     ]
     if spec.soft_deleted and _value(query, INCLUDE_DELETED) and INCLUDE_DELETED not in permitted:
         refused.append(INCLUDE_DELETED)
+    if (
+        spec.active_column is not None
+        and _value(query, INCLUDE_DEACTIVATED)
+        and INCLUDE_DEACTIVATED not in permitted
+    ):
+        refused.append(INCLUDE_DEACTIVATED)
     if refused:
         raise ValidationFailedError(
             [
@@ -347,15 +393,13 @@ def check_permitted(spec: ListSpec, query: BaseModel, permitted: Collection[str]
 def order_by(spec: ListSpec, sort: str | None) -> list[ColumnElement[Any]]:
     """The ORDER BY for `?sort=` (or the default), from the spec's allowlist, with `id` last."""
     names = [part.strip() for part in sort.split(",")] if sort else list(spec.default_sort)
-    columns: list[ColumnElement[Any]] = []
+    columns: list[ColumnElement[Any]] = list(spec.sort_first)
     seen: set[str] = set()
     for name in names:
         key = name.removeprefix("-")
         if key not in spec.sorts or key in seen:
             problem = "is repeated" if key in seen else f"isn't one of: {spec.sort_names}"
-            raise ValidationFailedError(
-                [FieldError(("query", "sort"), f"`{key}` {problem}.", "invalid_sort")]
-            )
+            raise ValidationFailedError.on(("query", "sort"), f"`{key}` {problem}.", "invalid_sort")
         seen.add(key)
         column = spec.sorts[key]
         columns.append(column.desc() if name.startswith("-") else column.asc())
@@ -372,6 +416,11 @@ class PageResult[T]:
     total: int
     limit: int
     offset: int
+
+    def with_items[U](self, items: list[U]) -> Page[U]:
+        """This page as the response, with `items` (the rows built from this page's) in place
+        of its own."""
+        return Page[U](items=items, total=self.total, limit=self.limit, offset=self.offset)
 
 
 @dataclass(frozen=True)

@@ -11,12 +11,12 @@ from app.authz.context import AuthzContext
 from app.authz.scoping import org_scope
 from app.authz.target import org_target, workspace_target
 from app.core.errors import (
-    FieldError,
     ForbiddenError,
     NotFoundError,
     UnauthorizedError,
     ValidationFailedError,
 )
+from app.core.lists import ListSpec, Page, fetch_page
 from app.core.security import (
     generate_token,
     hash_password,
@@ -27,6 +27,7 @@ from app.core.security import (
 )
 from app.core.settings import LAST_SEEN_INTERVAL, Settings
 from app.enums import AuditAction
+from app.models.auth import USER_AGENT_MAX_LENGTH, UserSession
 from app.models.user import User
 from app.repositories.auth import AuthRepository
 from app.repositories.org import OrgRepository
@@ -41,12 +42,22 @@ from app.schemas.auth import (
     MeWorkspace,
     PasswordPolicyRead,
     PasswordRequirement,
+    SessionRead,
 )
+from app.services.approval import ApprovalService
 from app.services.user import (
     AccountSubject,
     UserService,
     password_errors,
     register_on_email_changed,
+)
+
+# The user's own sessions, most recently active first (DL-298).
+SESSIONS = ListSpec(
+    name="Session",
+    id_column=UserSession.id,  # pyright: ignore[reportArgumentType]
+    sorts={"last_seen_at": UserSession.last_seen_at},  # pyright: ignore[reportArgumentType]
+    default_sort=("-last_seen_at",),
 )
 
 # The user a request is authenticated as, for routers (which never import models).
@@ -91,7 +102,13 @@ class AuthService:
         self.settings = settings
         self.repository = AuthRepository(session)
 
-    async def sign_in(self, email: str, password: str, old_token: str | None = None) -> SignedIn:
+    async def sign_in(
+        self,
+        email: str,
+        password: str,
+        old_token: str | None = None,
+        user_agent: str | None = None,
+    ) -> SignedIn:
         """A new session for the account with this email and password. 401
         `invalid_credentials` for an unknown email or a wrong password (an unknown email still
         costs a password verification, so timing doesn't tell them apart); 403
@@ -121,7 +138,11 @@ class AuthService:
         # Always a new session, never an existing one reused.
         token = generate_token()
         await self.repository.add_session(
-            user.id, hash_token(token), self.settings.session_lifetime
+            user.id,
+            hash_token(token),
+            self.settings.session_lifetime,
+            # Kept for the session list's device label, cut rather than refused (DL-299).
+            user_agent[:USER_AGENT_MAX_LENGTH] if user_agent else None,
         )
         if old_token:
             # One session by its token, whoever's it is: no user-row lock needed (DL-53).
@@ -157,8 +178,8 @@ class AuthService:
         session's new token (the other sessions are deleted). 422 on `current_password`
         (`incorrect`) or on `new_password` (the password policy's problems)."""
         if not await verify_password(user.hashed_password, current_password):
-            raise ValidationFailedError(
-                [FieldError(("body", "current_password"), "This isn't your password.", "incorrect")]
+            raise ValidationFailedError.on(
+                ("body", "current_password"), "This isn't your password.", "incorrect"
             )
         problems = password_errors(
             new_password,
@@ -188,6 +209,49 @@ class AuthService:
         )
         return new_token
 
+    async def list_sessions(
+        self, user: SignedInUser, token: str, query: object
+    ) -> Page[SessionRead]:
+        """The user's live sessions, the one making the request marked (DL-298)."""
+        current = hash_token(token)
+        page = await fetch_page(
+            self.session,
+            self.repository.live_of(user.id, self.settings.session_idle_timeout),
+            SESSIONS,
+            query,  # pyright: ignore[reportArgumentType] -- SESSIONS.query_model
+        )
+        rows: list[UserSession] = page.items
+        return page.with_items(
+            [
+                SessionRead(
+                    id=row.id,
+                    user_agent=row.user_agent,
+                    created_at=row.created_at,
+                    last_seen_at=row.last_seen_at,
+                    is_current=row.token_hash == current,
+                )
+                for row in rows
+            ]
+        )
+
+    async def sign_out_others(self, user: SignedInUser, token: str) -> None:
+        """End every session of the user but this one, recorded as `signed_out_other_sessions`
+        when any ended (DL-298, DL-300). The user row is locked first, so a sign-in in flight
+        commits before and its session ends too (backend/CLAUDE.md, "Ending a user's
+        sessions")."""
+        await UserRepository(self.session).lock(user)
+        row = await self.repository.get_by_token_hash(hash_token(token))
+        if row is None:  # signed out in another request since this one authenticated
+            raise UnauthorizedError
+        if await self.repository.delete_others(user.id, keep_id=row.id):
+            log_admin_event(
+                self.session,
+                action=AuditAction.SIGNED_OUT_OTHER_SESSIONS,
+                actor_id=user.id,
+                workspace_id=await UserService(self.session).workspace_of(user.id),
+                target_user_id=user.id,
+            )
+
     async def grant_system_admin(self, email: str) -> bool:
         """Give the account with this email the system-admin flag (app CLI only, no actor);
         False if it already has it. 404 for an unknown email."""
@@ -207,11 +271,14 @@ class AuthService:
         return True
 
     async def revoke_system_admin(self, email: str) -> bool:
-        """Take the flag away (app CLI only, no actor); False if the account doesn't have it.
+        """Take the flag away (app CLI only, no actor), handing over the pending approvals it
+        gave access to (design-doc §6.2, `changed_by` null); False if the account doesn't have it.
         403 `last_system_admin` when it's the last active system admin (lockout safeguard,
         design-doc §4); 404 for an unknown email."""
         user = await self._user_by_email(email)
         users = UserRepository(self.session)
+        approvals = ApprovalService(self.session)
+        await approvals.lock_projects(user.id)
         # Every active admin's row first, in ID order (so two revocations can't deadlock), then
         # the target re-read: a revocation that committed meanwhile shows as the flag gone.
         active = await users.lock_active_system_admins()
@@ -221,6 +288,7 @@ class AuthService:
         if active == [user.id]:
             raise ForbiddenError("This is the last active system admin.", code="last_system_admin")
         await UserService(self.session).set_system_admin(user, False)
+        await approvals.replace_for(user.id, None)
         log_admin_event(
             self.session,
             action=AuditAction.SYSTEM_ADMIN_REVOKED,
@@ -279,24 +347,32 @@ class AuthService:
         )
 
     async def deactivate(self, ctx: AuthzContext, subject: AccountSubject) -> None:
-        """Deactivate the account and end its sessions (`user_deactivated`); already inactive
-        changes nothing. 422 on the path's `user_id`: `last_owner` for the last active owner of
-        the workspace or an org, `last_system_admin` for the last active system admin."""
+        """Deactivate the account, hand over its pending approvals (design-doc §6.2), and end its
+        sessions (`user_deactivated`); already inactive changes nothing. 422 on the path's
+        `user_id`: `last_owner` for the last active owner of the workspace or an org,
+        `last_system_admin` for the last active system admin."""
         user = subject.user
         if not user.is_active:
             return
+        approvals = ApprovalService(self.session)
+        await approvals.lock_projects(user.id)
         await self._guard_last_owners(subject)
         if user.is_system_admin:
             # Locked like a revocation, so two deactivations can't remove the last one.
             active = await UserRepository(self.session).lock_active_system_admins()
             if active == [user.id]:
-                raise _on_user_id("This is the last active system admin.", "last_system_admin")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"),
+                    "This is the last active system admin.",
+                    "last_system_admin",
+                )
         # The row last (owners, system admins, then the user, as a revocation takes them), and
         # read again: a deactivation that committed meanwhile leaves nothing to do or record.
         await UserRepository(self.session).lock(user)
         if not user.is_active:
             return
         await UserService(self.session).set_active(user, False)
+        await approvals.replace_for(user.id, ctx.user_id)
         await self.repository.delete_all(user.id)
         UserService(self.session).log_account_event(ctx, AuditAction.USER_DEACTIVATED, subject)
 
@@ -316,10 +392,14 @@ class AuthService:
         user_id = subject.user.id
         for workspace_id in workspace_ids:
             if await workspaces.active_owners(workspace_id) == [user_id]:
-                raise _on_user_id("The workspace needs another owner first.", "last_owner")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"), "The workspace needs another owner first.", "last_owner"
+                )
         for org_id in org_ids:
             if await orgs.active_owners(org_id) == [user_id]:
-                raise _on_user_id("The organization needs another owner first.", "last_owner")
+                raise ValidationFailedError.on(
+                    ("path", "user_id"), "The organization needs another owner first.", "last_owner"
+                )
 
     async def reset_password(
         self, ctx: AuthzContext, subject: AccountSubject, password: str
@@ -350,10 +430,6 @@ class AuthService:
         await UserRepository(self.session).lock(subject.user)
         await self.repository.delete_all(subject.user.id)
         UserService(self.session).log_account_event(ctx, AuditAction.SIGNED_OUT_EVERYWHERE, subject)
-
-
-def _on_user_id(message: str, type_: str) -> ValidationFailedError:
-    return ValidationFailedError([FieldError(("path", "user_id"), message, type_)])
 
 
 async def _end_sessions(session: AsyncSession, user: User) -> None:

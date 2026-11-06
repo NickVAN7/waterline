@@ -6,11 +6,11 @@ import type { Project } from '@/stores/currentOrg'
 export const WHO_TO_ASK =
   "Project settings are for the project's admins. Ask one of them if you need a change."
 
-/** Any of the actions the settings page offers: its details, classification, or archiving. */
+/** Any of the actions the settings page offers: its details, restriction, or archiving. */
 export function hasSettings(project: Project | null | undefined): boolean {
   return (
     allows(project, 'project.update') ||
-    allows(project, 'project.raise_classification') ||
+    allows(project, 'project.raise_restriction') ||
     allows(project, 'project.archive') ||
     allows(project, 'project.unarchive')
   )

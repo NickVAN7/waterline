@@ -71,6 +71,24 @@ describe('OrgProjectsView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it("shows each project's type, with the status last (DL-137)", async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(
+      ok({
+        items: [projectItem('ERP', { type: 'erp', status: 'planning' })],
+        total: 1,
+        limit: 25,
+        offset: 0,
+      }),
+    )
+
+    const { wrapper } = await mountAt('/acme/projects')
+
+    const spans = wrapper.get('li').findAll(':scope > span')
+    expect(spans.map((s) => s.text())).toEqual(['ERP', 'ERP implementation', 'Planning'])
+    expect(spans.at(-1)!.classes()).toContain('ml-auto')
+    expect(wrapper.get('li').text()).not.toContain('Your access')
+  })
+
   it('shows the not-found page for an org the user does not see, asking the API nothing', async () => {
     const get = vi.spyOn(client, 'GET')
 
