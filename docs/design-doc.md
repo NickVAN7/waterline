@@ -1301,12 +1301,19 @@ accurate PR status.
 **Deleting a test case:** its requirement links and recorded results remain for history; its
 `not_run` rows are removed from open runs.
 
-**Deleting a requirement** opens a dialog listing what's affected, with a choice per category:
+**Deleting a requirement** (the Delete button in its header, on the page and in the side panel,
+DL-287) opens a dialog listing what's affected, with a choice per category:
 - **Linked tasks and test cases:** *detach* them (they remain, now without a requirement, and
   are flagged in the UI) **or** soft-delete them too.
 - **Child requirements:** *promote* them to the deleted requirement's parent (or top level)
   **or** soft-delete them too: the whole subtree, grandchildren included, with the one
-  `deleted_at` that restoring brings back together (DL-221).
+  `deleted_at` that restoring brings back together (DL-221). Offered only when the requirement
+  has children (the requirement read's `has_children`, DL-288).
+
+The dialog always says a pending approval request on the requirement is cancelled, adding "and
+on its children" once their deletion is chosen (DL-289). After a delete, the requirements tree
+opens (the side panel closed), focus on its `h1`, with a status naming the item and linking to
+Trash (DL-287).
 
 Every unlink is recorded in `activity_log` (`action = unlinked`). Restoring a requirement does
 not re-link anything automatically; the log shows what was attached, and re-linking is manual.
@@ -1330,9 +1337,12 @@ see everything in the project. An archived project's trash lists the same items,
 (DL-220).
 
 **Trash** (DL-146): a project Trash page, the last item of the project's navigation (DL-202),
-lists deleted items by type (requirements from Slice 2; tasks and test
+shown to those who read the project's content (`requirement.view`, DL-291), lists deleted items
+by type (requirements from Slice 2; tasks and test
 cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
-`allowed_actions` allows it. Nothing is purged automatically in v1. **Restoring a tree:**
+`allowed_actions` allows it. Nothing is purged automatically in v1. After a restore the list
+reloads, so the descendants restored with it leave too, with a status linking to the restored
+item and focus on the row now in its place (DL-290). **Restoring a tree:**
 restoring a requirement also restores the descendants deleted in the same action, identified by
 the same `deleted_at` (one transaction's `now()`); children deleted separately stay in the trash.
 A requirement whose parent is still deleted is restored at the top level, with the parent change

@@ -314,7 +314,7 @@ Any project role can be a named approver, viewers included (design-doc §6.2).
 
 **Finding what's waiting**
 - See the **approvals I owe on My work**, across projects: what the item is, who asked, and
-  how long it has waited. *Built* (S2-C20b).
+  the day they asked (DL-292). *Built* (S2-C20b).
 - Open the item from there, including as a viewer with read-only access. *Built.*
 - Requests on archived projects never appear: archiving cancels them (below).
 

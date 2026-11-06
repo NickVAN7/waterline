@@ -3604,3 +3604,66 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §11; build plan ("API conventions" My work row, S2-C20b); screen
   inventory Piece 6
 - **Source:** owner, Nov 5, 2026 (chat session, S2-C20a re-cut)
+
+### DL-287: Delete is in the requirement's header; a delete lands on the tree
+- **Date:** 2026-11-05
+- **Decision:** A danger-tone **Delete** button in the requirement's header, on the full page and
+  in the side panel, for those whose `allowed_actions` hold `requirement.delete`; not in the
+  tree's row menu. It opens the delete dialog (design-doc §9). After a delete, the requirements
+  tree (the side panel closed), focus on its `h1`, and a polite status "<ID> moved to Trash."
+  with a link to Trash.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C21)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C21 re-cut)
+
+### DL-288: The requirement's read says whether it has children
+- **Date:** 2026-11-05
+- **Decision:** `RequirementRead` gains `has_children: bool`: whether the requirement has a
+  child not in the trash. The delete dialog shows its children choice (promote, or delete them
+  too) only when it's true. Backend with API tests and `wl gen-client`; `security-reviewer`
+  joins S2-C21, the row with the change.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C21; the security-reviewer list)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C21 re-cut)
+
+### DL-289: The delete dialog always names the approvals it cancels
+- **Date:** 2026-11-05
+- **Decision:** The delete dialog always says a pending approval request on the requirement is
+  cancelled, adding "and on its children" once "delete them too" is chosen (DL-224). No server
+  field says which requirements have one.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C21)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C21 re-cut)
+
+### DL-290: A restore reloads Trash
+- **Date:** 2026-11-05
+- **Decision:** After a restore on the Trash page, the list reloads, so the descendants restored
+  with it leave too; a polite status "Restored <ID>." with a link to it; focus on the row now in
+  its place, or the `h1` if none (UI-FRM-14).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C21)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C21 re-cut)
+
+### DL-291: Trash is in the project navigation for those who read its content
+- **Date:** 2026-11-05
+- **Decision:** The project navigation's Trash link shows for `requirement.view` on the project,
+  the trash endpoint's check, as Requirements' link does; each user's Trash lists what they may
+  restore, project admins everything (design-doc §9).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §9; build plan (S2-C21)
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C21 re-cut)
+
+### DL-292: An approval waiting on My work shows the day it was asked
+- **Date:** 2026-11-05
+- **Decision:** My work's approvals item shows the day the request was made ("Requested by Ada
+  Admin on Oct 5, 2026"), as S2-C20b built it, not a relative age; oldest first puts the longest
+  wait on top.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** screen inventory Piece 6
+- **Source:** owner, Nov 5, 2026 (chat session, S2-C20b report)
