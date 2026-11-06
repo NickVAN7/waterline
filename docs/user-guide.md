@@ -314,6 +314,11 @@ Open the menu with your name and choose **Account settings**.
   once and is remembered in this browser.
 - **Password:** **Change password** opens its own page (`/account/password`): enter your current
   password and a new one, then **Change password**. Changing it signs you out everywhere else.
+- **Sessions:** every browser you're signed in on, by its browser and system ("Firefox on
+  Windows", or "Unknown device" when it can't tell), with **This session** on the one you're
+  using, when each signed in, and when it was last active (**Active now** for this one).
+  **Sign out other sessions** signs out every one but this, and says "Your other sessions are
+  signed out."; with no others, it says "You have no other sessions."
 
 ## Choosing a password
 

@@ -1267,3 +1267,14 @@ Entry format:
 - **Fix by:** Slice 3, the checkpoint that builds the filter bar: the checkbox moves into it on
   the four lists
 - **Status:** open
+
+### TD-98: The session list shows the 200 most recently active sessions only
+- **Added:** S2-C21b
+- **What:** Account settings' Sessions asks for one page of 200, the API's page limit, and never
+  for the next, so a user with more live sessions doesn't see the rest, and "This session" may
+  be among them. Sign out other sessions still ends all of them.
+- **Why:** a user has a handful of live sessions (each ends after 7 idle days); paging a list
+  nobody fills is code with no use yet.
+- **Fix by:** Slice 7 (the operations screen), or sooner when someone has more than 200 live
+  sessions: page the list (`Pagination`, `useListQuery`)
+- **Status:** open

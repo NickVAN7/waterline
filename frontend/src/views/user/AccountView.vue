@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // Account settings (design-doc §4): your profile, the System / Light / Dark theme (UI-TOK-2,
-// DL-164: applied as soon as it's chosen), and a link to change your password, its own page
-// (DL-137).
+// DL-164: applied as soon as it's chosen), a link to change your password, its own page
+// (DL-137), and your sessions (DL-298).
 import { computed } from 'vue'
 
 import PageHeader from '@/components/PageHeader.vue'
 import { type ThemeChoice, useTheme } from '@/composables/useTheme'
 
 import ProfileForm from './ProfileForm.vue'
+import SessionsSection from './SessionsSection.vue'
 
 const { choice, choose } = useTheme()
 const theme = computed({ get: () => choice.value, set: choose })
@@ -50,5 +51,6 @@ const THEMES: { value: ThemeChoice; label: string }[] = [
         >Change password</RouterLink
       >
     </section>
+    <SessionsSection />
   </div>
 </template>

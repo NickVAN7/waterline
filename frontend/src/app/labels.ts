@@ -273,3 +273,35 @@ export const KEY_PROBLEM: Record<string, string> = {
   ...IDENTIFIER_PROBLEM,
   invalid_characters: 'may use only letters and digits',
 }
+
+/** A session's device from its stored `User-Agent` ("Firefox on Windows"), with no parsing
+ * library (DL-242, DL-299). Checked in order: Edge and Opera say "Chrome" too, Chrome says
+ * "Safari", and Android says "Linux". */
+const BROWSERS: [RegExp, string][] = [
+  [/Edg\/|EdgA\/|EdgiOS\//, 'Edge'],
+  [/OPR\/|Opera/, 'Opera'],
+  [/Firefox\/|FxiOS\//, 'Firefox'],
+  [/Chrome\/|CriOS\//, 'Chrome'],
+  [/Safari\//, 'Safari'],
+]
+const SYSTEMS: [RegExp, string][] = [
+  [/iPhone|iPad/, 'iOS'],
+  [/Android/, 'Android'],
+  [/Windows/, 'Windows'],
+  [/CrOS/, 'ChromeOS'],
+  [/Mac OS X|Macintosh/, 'macOS'],
+  [/Linux/, 'Linux'],
+]
+export const UNKNOWN_DEVICE = 'Unknown device'
+
+/** The session list's current session (DL-298). */
+export const THIS_SESSION: BadgeLabel = { label: 'This session', tone: 'info', icon: 'check' }
+
+export function deviceLabel(userAgent: string | null): string {
+  const find = (names: [RegExp, string][]) =>
+    userAgent ? names.find(([pattern]) => pattern.test(userAgent))?.[1] : undefined
+  const browser = find(BROWSERS)
+  const system = find(SYSTEMS)
+  if (browser && system) return `${browser} on ${system}`
+  return browser ?? (system ? `A browser on ${system}` : UNKNOWN_DEVICE)
+}

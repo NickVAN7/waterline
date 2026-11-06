@@ -958,3 +958,128 @@ async def test_the_password_policy_follows_the_policys_minimum(
         "label": "At least 12 characters",
         "value": 12,
     }
+
+
+# --- The user's own sessions (DL-298 to DL-300) -------------------------------------------------
+
+
+async def test_sign_in_keeps_the_user_agent_cut_to_512_characters(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-242, DL-299: a long `User-Agent` is cut, not refused."""
+    user = await UserFactory.create_async(email="ann@example.com")
+
+    response = await client.post(
+        "/api/auth/sign-in",
+        json={"email": "ann@example.com", "password": FACTORY_PASSWORD},
+        headers={"User-Agent": "M" * 600},
+    )
+
+    assert response.status_code == 200
+    [row] = await session_rows(session, user)
+    assert row.user_agent == "M" * 512
+
+
+async def test_the_session_list_has_the_users_live_sessions_newest_activity_first(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-298: this session marked; another live one listed; an idle-expired one, one past its
+    lifetime, and another user's left out."""
+    user = await UserFactory.create_async(email="ann@example.com")
+    other = await UserFactory.create_async()
+    await client.post(
+        "/api/auth/sign-in",
+        json={"email": "ann@example.com", "password": FACTORY_PASSWORD},
+        headers={"User-Agent": "Firefox here"},
+    )
+    older_token = await session_for(user, session, last_seen_at=ago(hours=1))
+    await session_for(user, session, last_seen_at=ago(days=8))
+    await session_for(user, session, expires_at=ago(minutes=1))
+    await session_for(other, session)
+    rows = await session_rows(session, user)
+    older = next(r for r in rows if r.token_hash == hash_token(older_token))
+
+    response = await client.get("/api/me/sessions")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [(s["user_agent"], s["is_current"]) for s in body["items"]] == [
+        ("Firefox here", True),
+        (None, False),
+    ]
+    assert body["items"][1]["id"] == str(older.id)
+    assert body["total"] == 2
+
+
+async def test_the_session_list_needs_a_session(client: AsyncClient) -> None:
+    response = await client.get("/api/me/sessions")
+
+    assert (response.status_code, response.json()["code"]) == (401, "not_authenticated")
+
+
+async def test_sign_out_others_ends_every_other_session_and_records_it(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-298, DL-300: this session stays; the user's others end; another user's stay; one
+    `signed_out_other_sessions` event on the user."""
+    user = await UserFactory.create_async(email="ann@example.com")
+    other = await UserFactory.create_async()
+    workspace = await belong(user, "staff")
+    await sign_in(client, "ann@example.com")
+    await session_for(user, session)
+    await session_for(user, session)
+    await session_for(other, session)
+
+    response = await client.post("/api/me/sessions/sign-out-others")
+
+    assert response.status_code == 204
+    assert len(await session_rows(session, user)) == 1
+    assert len(await session_rows(session, other)) == 1
+    assert (await client.get("/api/auth/me")).status_code == 200
+    events = await session.execute(
+        select(
+            AuditEvent.action,
+            AuditEvent.actor_id,
+            AuditEvent.target_user_id,
+            AuditEvent.workspace_id,
+        )
+    )
+    assert events.all() == [(AuditAction.SIGNED_OUT_OTHER_SESSIONS, user.id, user.id, workspace.id)]
+
+
+async def test_sign_out_others_with_no_other_session_records_nothing(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-300: the event only when a session ended."""
+    user = await UserFactory.create_async(email="ann@example.com")
+    await sign_in(client, "ann@example.com")
+
+    response = await client.post("/api/me/sessions/sign-out-others")
+
+    assert response.status_code == 204
+    assert len(await session_rows(session, user)) == 1
+    assert (await session.scalars(select(AuditEvent))).all() == []
+
+
+async def test_sign_out_others_needs_a_session(client: AsyncClient) -> None:
+    response = await client.post("/api/me/sessions/sign-out-others")
+
+    assert (response.status_code, response.json()["code"]) == (401, "not_authenticated")
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [("GET", "/api/me/sessions"), ("POST", "/api/me/sessions/sign-out-others")],
+)
+async def test_the_session_endpoints_wait_for_a_forced_password_change(
+    client: AsyncClient, session: AsyncSession, method: str, path: str
+) -> None:
+    """Only `/me` and change-password pass a pending forced change (design-doc §4)."""
+    user = await UserFactory.create_async(email="ann@example.com", must_change_password=True)
+    await sign_in(client, "ann@example.com")
+    await session_for(user, session)
+
+    response = await client.request(method, path)
+
+    assert (response.status_code, response.json()["code"]) == (403, "password_change_required")
+    assert len(await session_rows(session, user)) == 2

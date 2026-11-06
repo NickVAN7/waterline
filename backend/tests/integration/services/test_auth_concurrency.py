@@ -87,6 +87,42 @@ async def test_a_password_change_ends_a_sign_in_still_in_flight(
     assert hashes == kept
 
 
+@pytest.mark.concurrency("audit_event", "session", "user")
+async def test_signing_out_other_sessions_ends_a_sign_in_still_in_flight(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine, settings: Settings
+) -> None:
+    """A sign-in that verified the password but hasn't committed yet: sign-out-others waits on
+    the user's row, then deletes that session too (DL-298; backend/CLAUDE.md, "Ending a user's
+    sessions")."""
+    async with committing_factories(concurrency):
+        user = await UserFactory.create_async(email="ann@acme.example")
+        token = generate_token()
+        await UserSessionFactory.create_async(user=user, token_hash=hash_token(token))
+    pid: list[int] = []
+    connected = anyio.Event()
+
+    async def sign_out_others() -> None:
+        async with concurrency() as session:
+            pid.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
+            connected.set()
+            mine = (await session.execute(select(User).where(User.id == user.id))).scalar_one()
+            await AuthService(session, settings).sign_out_others(mine, token)
+            await session.commit()
+
+    async with concurrency() as signing_in:
+        await AuthService(signing_in, settings).sign_in("ann@acme.example", FACTORY_PASSWORD)
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as group:
+                group.start_soon(sign_out_others)
+                await connected.wait()
+                await wait_until_blocked_on_a_lock(concurrency_engine, pid[0])
+                await signing_in.commit()
+
+    async with concurrency() as check:
+        hashes = list(await check.scalars(select(UserSession.token_hash)))
+    assert hashes == [hash_token(token)]
+
+
 @pytest.mark.concurrency("session", "user")
 async def test_a_wrong_password_never_waits_on_the_users_row(
     concurrency: SessionMaker, settings: Settings

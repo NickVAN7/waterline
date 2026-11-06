@@ -106,6 +106,7 @@ class AuditAction(StrEnum):
     PASSWORD_RESET = "password_reset"  # noqa: S105 -- an event name, not a password
     PASSWORD_CHANGED = "password_changed"  # noqa: S105 -- an event name, not a password
     SIGNED_OUT_EVERYWHERE = "signed_out_everywhere"
+    SIGNED_OUT_OTHER_SESSIONS = "signed_out_other_sessions"
     USER_UPDATED = "user_updated"
     SYSTEM_ADMIN_GRANTED = "system_admin_granted"
     SYSTEM_ADMIN_REVOKED = "system_admin_revoked"

@@ -8,11 +8,13 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { testRouter } from '@/test/router'
+import { listPage } from '@/test/workspace'
 
 import AccountView from './AccountView.vue'
 
 async function mountView() {
-  vi.spyOn(client, 'GET').mockResolvedValue(ok(PASSWORD_POLICY))
+  vi.spyOn(client, 'GET').mockImplementation(((path: string) =>
+    Promise.resolve(path === '/api/me/sessions' ? ok(listPage([])) : ok(PASSWORD_POLICY))) as never)
   useCurrentUserStore().me = me()
   const router = await testRouter('/account')
   const wrapper = mount(AccountView, { global: { plugins: [router] }, attachTo: document.body })
@@ -53,6 +55,7 @@ describe('AccountView', () => {
       'Profile',
       'Appearance',
       'Password',
+      'Sessions',
     ])
     expect((wrapper.get('#name').element as HTMLInputElement).value).toBe('Casey Cole')
     expect((wrapper.get('#username').element as HTMLInputElement).value).toBe('casey')

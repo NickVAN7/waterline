@@ -550,11 +550,13 @@ Last active system admin cannot be deactivated or have the flag revoked (service
 | token_hash | varchar | unique; the cookie holds the raw token, only its hash is stored |
 | last_seen_at | timestamptz | |
 | expires_at | timestamptz | |
+| user_agent | varchar(512), nullable | the sign-in request's `User-Agent`, cut to 512 characters; null for a session from before S2-C21b or a request without one. Shown as the session's device in Account settings (DL-242, DL-299); no IP address or location is kept |
 | created_at / updated_at | timestamptz | |
 
 Index on `user_id`: the account actions below delete all of a user's sessions (DL-34).
 Deleted on sign-out, deactivation, admin password reset, "sign out everywhere", an admin changing
-the user's email, and (other sessions) on password change. Removing a membership leaves sessions
+the user's email, and (other sessions) on password change and on "sign out other sessions"
+(DL-298). Removing a membership leaves sessions
 alone: every request re-checks memberships (design-doc §4, "Sessions"). Session-ending account
 actions run in the `auth` area, which owns this table; an email change runs in the `user` area and
 ends sessions through the handler `auth` registers with it (build plan, "Feature map").
@@ -1016,7 +1018,8 @@ does (below), with the same limits.
 | created_at / updated_at | timestamptz | |
 
 `action` values: `workspace_created`, `user_created`, `user_deactivated`, `user_reactivated`,
-`password_reset`, `password_changed`, `signed_out_everywhere`, `user_updated` (every profile
+`password_reset`, `password_changed`, `signed_out_everywhere`, `signed_out_other_sessions`
+(DL-300), `user_updated` (every profile
 edit, by the user or an admin: one event per request, or per org for an admin acting through
 several orgs' roles, DL-75), `system_admin_granted`,
 `system_admin_revoked`, `workspace_updated`, `workspace_member_added`,
@@ -1179,7 +1182,6 @@ Signature (`X-Hub-Signature-256`) is verified before a row is written.
 | `notification` (user_id, type, entity_type, entity_id, actor_id, created_at, read_at) | v1.5 |
 | `api_token` (user_id, name, token_hash, prefix, last_used_at, expires_at, revoked_at) | first need |
 | `login_attempt` (sign-in throttling per account and per IP, design-doc §4) | before the first non-local deployment |
-| `session.user_agent` column (the active-sessions list, design-doc §4; no `ip_address`, DL-242) | S2-C21b (DL-238; specified at its re-cut, DL-139) |
 | ERP modules, design pending: `raid_item`, `entity_link`, `status_report`, `budget_line`, `cost_entry`, `data_object`, `load_cycle`, `data_load`, runbook step / rehearsal tables | v2 (design-doc §16) |
 | ERP portfolio and team tables, design pending: project portfolio fields and templates (PMO dashboard), workspace teams (resourcing), workstream members | v2 (design-doc §16) |
 | `invitation`, `time_entry`, `sprint_project`, `sprint_snapshot`, file attachments | v2+ (`time_entry` may move up with the budget module) |

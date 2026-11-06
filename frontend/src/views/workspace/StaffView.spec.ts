@@ -159,7 +159,7 @@ describe('StaffView', () => {
 
     expect(wrapper.get('h3').text()).toBe('No staff yet')
     expect(wrapper.text()).toContain(
-      'Deactivated people aren’t listed. Select Show deactivated to see them.',
+      'Deactivated people aren’t listed here. To include them, select Show deactivated.',
     )
     expect(wrapper.find('table').exists()).toBe(false)
     await expectNoA11yViolations(wrapper)
@@ -186,7 +186,7 @@ describe('StaffView', () => {
 
     expect(wrapper.get('h3').text()).toBe('No staff yet')
     expect(wrapper.text()).toContain('People added here will appear in this list.')
-    expect(wrapper.text()).not.toContain('Select Show deactivated')
+    expect(wrapper.text()).not.toContain('select Show deactivated')
   })
 
   it('gives each row the actions its allowed_actions carry, and none to a row with none', async () => {

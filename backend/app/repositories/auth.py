@@ -3,7 +3,7 @@
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager
 from sqlalchemy.orm.attributes import set_committed_value
@@ -17,13 +17,18 @@ class AuthRepository:
         self.session = session
 
     async def add_session(
-        self, user_id: uuid.UUID, token_hash: str, lifetime: timedelta
+        self,
+        user_id: uuid.UUID,
+        token_hash: str,
+        lifetime: timedelta,
+        user_agent: str | None = None,
     ) -> UserSession:
         """A new session row, timed by the database clock: seen now, ending `lifetime` from
         now at the latest."""
         row = UserSession(
             user_id=user_id,
             token_hash=token_hash,
+            user_agent=user_agent,
             last_seen_at=func.now(),
             expires_at=func.now() + lifetime,
         )
@@ -33,6 +38,14 @@ class AuthRepository:
         # lazy load later would fail.
         await self.session.refresh(row, ["last_seen_at", "expires_at"])
         return row
+
+    def live_of(self, user_id: uuid.UUID, idle_timeout: timedelta) -> Select[UserSession]:
+        """The user's sessions within their lifetime and idle timeout (for a `ListSpec`)."""
+        return select(UserSession).where(
+            UserSession.user_id == user_id,
+            UserSession.expires_at > func.now(),
+            UserSession.last_seen_at > func.now() - idle_timeout,
+        )
 
     async def find_live(self, token_hash: str, idle_timeout: timedelta) -> UserSession | None:
         """The session with this token hash, with its user loaded, if it's within its lifetime,
@@ -77,11 +90,14 @@ class AuthRepository:
     async def delete_by_token_hash(self, token_hash: str) -> None:
         await self.session.execute(delete(UserSession).where(UserSession.token_hash == token_hash))
 
-    async def delete_others(self, user_id: uuid.UUID, keep_id: uuid.UUID) -> None:
-        """Delete every session of the user except `keep_id`."""
-        await self.session.execute(
-            delete(UserSession).where(UserSession.user_id == user_id, UserSession.id != keep_id)
+    async def delete_others(self, user_id: uuid.UUID, keep_id: uuid.UUID) -> int:
+        """Delete every session of the user except `keep_id`; how many were deleted."""
+        deleted = await self.session.scalars(
+            delete(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.id != keep_id)
+            .returning(UserSession.id)
         )
+        return len(deleted.all())
 
     async def delete_all(self, user_id: uuid.UUID) -> None:
         """Delete every session of the user. The caller has updated or locked the user's row

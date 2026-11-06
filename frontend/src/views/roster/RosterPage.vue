@@ -218,7 +218,7 @@ const announcement = computed(() => {
       >
         {{
           canShowDeactivated && !showDeactivated
-            ? 'Deactivated people aren’t listed. Select Show deactivated to see them.'
+            ? 'Deactivated people aren’t listed here. To include them, select Show deactivated.'
             : 'People added here will appear in this list.'
         }}
       </EmptyState>

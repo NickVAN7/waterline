@@ -16,6 +16,7 @@ from app.core.errors import (
     UnauthorizedError,
     ValidationFailedError,
 )
+from app.core.lists import ListSpec, Page, fetch_page
 from app.core.security import (
     generate_token,
     hash_password,
@@ -26,6 +27,7 @@ from app.core.security import (
 )
 from app.core.settings import LAST_SEEN_INTERVAL, Settings
 from app.enums import AuditAction
+from app.models.auth import USER_AGENT_MAX_LENGTH, UserSession
 from app.models.user import User
 from app.repositories.auth import AuthRepository
 from app.repositories.org import OrgRepository
@@ -40,6 +42,7 @@ from app.schemas.auth import (
     MeWorkspace,
     PasswordPolicyRead,
     PasswordRequirement,
+    SessionRead,
 )
 from app.services.approval import ApprovalService
 from app.services.user import (
@@ -47,6 +50,14 @@ from app.services.user import (
     UserService,
     password_errors,
     register_on_email_changed,
+)
+
+# The user's own sessions, most recently active first (DL-298).
+SESSIONS = ListSpec(
+    name="Session",
+    id_column=UserSession.id,  # pyright: ignore[reportArgumentType]
+    sorts={"last_seen_at": UserSession.last_seen_at},  # pyright: ignore[reportArgumentType]
+    default_sort=("-last_seen_at",),
 )
 
 # The user a request is authenticated as, for routers (which never import models).
@@ -91,7 +102,13 @@ class AuthService:
         self.settings = settings
         self.repository = AuthRepository(session)
 
-    async def sign_in(self, email: str, password: str, old_token: str | None = None) -> SignedIn:
+    async def sign_in(
+        self,
+        email: str,
+        password: str,
+        old_token: str | None = None,
+        user_agent: str | None = None,
+    ) -> SignedIn:
         """A new session for the account with this email and password. 401
         `invalid_credentials` for an unknown email or a wrong password (an unknown email still
         costs a password verification, so timing doesn't tell them apart); 403
@@ -121,7 +138,11 @@ class AuthService:
         # Always a new session, never an existing one reused.
         token = generate_token()
         await self.repository.add_session(
-            user.id, hash_token(token), self.settings.session_lifetime
+            user.id,
+            hash_token(token),
+            self.settings.session_lifetime,
+            # Kept for the session list's device label, cut rather than refused (DL-299).
+            user_agent[:USER_AGENT_MAX_LENGTH] if user_agent else None,
         )
         if old_token:
             # One session by its token, whoever's it is: no user-row lock needed (DL-53).
@@ -187,6 +208,49 @@ class AuthService:
             target_user_id=user.id,
         )
         return new_token
+
+    async def list_sessions(
+        self, user: SignedInUser, token: str, query: object
+    ) -> Page[SessionRead]:
+        """The user's live sessions, the one making the request marked (DL-298)."""
+        current = hash_token(token)
+        page = await fetch_page(
+            self.session,
+            self.repository.live_of(user.id, self.settings.session_idle_timeout),
+            SESSIONS,
+            query,  # pyright: ignore[reportArgumentType] -- SESSIONS.query_model
+        )
+        rows: list[UserSession] = page.items
+        return page.with_items(
+            [
+                SessionRead(
+                    id=row.id,
+                    user_agent=row.user_agent,
+                    created_at=row.created_at,
+                    last_seen_at=row.last_seen_at,
+                    is_current=row.token_hash == current,
+                )
+                for row in rows
+            ]
+        )
+
+    async def sign_out_others(self, user: SignedInUser, token: str) -> None:
+        """End every session of the user but this one, recorded as `signed_out_other_sessions`
+        when any ended (DL-298, DL-300). The user row is locked first, so a sign-in in flight
+        commits before and its session ends too (backend/CLAUDE.md, "Ending a user's
+        sessions")."""
+        await UserRepository(self.session).lock(user)
+        row = await self.repository.get_by_token_hash(hash_token(token))
+        if row is None:  # signed out in another request since this one authenticated
+            raise UnauthorizedError
+        if await self.repository.delete_others(user.id, keep_id=row.id):
+            log_admin_event(
+                self.session,
+                action=AuditAction.SIGNED_OUT_OTHER_SESSIONS,
+                actor_id=user.id,
+                workspace_id=await UserService(self.session).workspace_of(user.id),
+                target_user_id=user.id,
+            )
 
     async def grant_system_admin(self, email: str) -> bool:
         """Give the account with this email the system-admin flag (app CLI only, no actor);

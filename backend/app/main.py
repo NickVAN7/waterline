@@ -66,6 +66,7 @@ def create_app(
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(auth.sessions_router, prefix=API_PREFIX)
     app.include_router(workspace.router, prefix=API_PREFIX)
     app.include_router(org.router, prefix=API_PREFIX)
     app.include_router(user.router, prefix=API_PREFIX)
