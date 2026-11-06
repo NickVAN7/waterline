@@ -641,8 +641,9 @@ Workspace (the firm: tenant boundary)
     implementation decision 9).
 - **Active sessions in Account settings** (v1, DL-197; S2-C21b, DL-238): the
   user sees their active sessions, each with its device and browser (from its user agent),
-  when it signed in, and when it was last active, and signs out of the others (adds
-  `user_agent` to `session`; no IP address or location is kept, DL-242). (Admin "sign out everywhere" is built in Slice 1, under the rank
+  when it signed in, and when it was last active, and signs out of the others at once, recorded
+  as `signed_out_other_sessions` (adds `user_agent` to `session`; no IP address or location is
+  kept, DL-242; DL-298 to DL-301). (Admin "sign out everywhere" is built in Slice 1, under the rank
   rule in "Account management".)
 - **Before the first non-local deployment** (features, not design questions):
   - Sign-in throttling per account and per IP, with progressive delays and no permanent
@@ -1423,9 +1424,9 @@ different kind of record, with different readers, scope, and shape, so they live
 table, `audit_event` (schema-doc, "Audit").
 
 - **What's recorded:** account actions (created, deactivated, reactivated, password reset, password
-  changed, signed out everywhere, profile edits), system-admin grants and revocations, workspace
-  creation (by the seed command) and changes (name, slug), workspace/org/project membership changes
-  (added, role changed, removed), org creation and changes, and project creation, changes (name,
+  changed, signed out everywhere, signed out of their other sessions, profile edits), system-admin
+  grants and revocations, workspace creation (by the seed command) and changes (name, slug),
+  workspace/org/project membership changes (added, role changed, removed), org creation and changes, and project creation, changes (name,
   description, type, status, lead, modules), archiving, unarchiving, and restriction changes
   (§3.1). A project member added to an export-controlled project, a project marked
   export-controlled, and a project created export-controlled (in `project_created`, with its initial

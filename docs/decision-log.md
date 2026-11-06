@@ -3733,3 +3733,51 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-FBK-6; build plan (S2-C21a)
 - **Source:** owner, Nov 6, 2026 (chat session, S2-C21a re-cut's docs-consistency review)
+
+### DL-298: The session list signs out the other sessions at once
+- **Date:** 2026-11-06
+- **Decision:** Account settings' session list has one action, **Sign out other sessions**, which
+  ends every session of the user except the one making the request:
+  `POST /api/me/sessions/sign-out-others`, 204, after which the page says "Your other sessions
+  are signed out." whatever ended (true either way once it succeeds). There's no per-session
+  sign-out. The list is
+  `GET /api/me/sessions`: the user's live sessions, each with its `id`, `user_agent`,
+  `created_at`, `last_seen_at`, and `is_current`. Both need only a signed-in user, like changing
+  your own password, with no registered action.
+- **Supersedes:** none (specifies DL-197's session list, placed in S2-C21b by DL-238)
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sessions"); build plan (S2-C21b)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21b re-cut; the fixed message decided from
+  the re-cut's docs-consistency review)
+
+### DL-299: The device label is worked out in the browser
+- **Date:** 2026-11-06
+- **Decision:** The session list's API returns each session's stored `user_agent`, the user's
+  own and nothing new to them. A small `deviceLabel()` in the frontend's labels module turns it
+  into "Firefox on Windows", with no parsing library (DL-242). A session with no user agent
+  (signed in before the column existed) shows "Unknown device".
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §4 ("Sessions"); build plan (S2-C21b)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21b re-cut)
+
+### DL-300: Signing out your other sessions is an audit event
+- **Date:** 2026-11-06
+- **Decision:** `signed_out_other_sessions` joins `audit_event`'s actions, on the user, as
+  `password_changed` and `signed_out_everywhere` are. It's recorded only when at least one other
+  session was ended.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** schema-doc (`audit_event`); design-doc §10.1; build plan (S2-C21b)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21b re-cut)
+
+### DL-301: A session's times show as a date and time
+- **Date:** 2026-11-06
+- **Decision:** Each session shows when it signed in and when it was last active as a date and
+  time in the browser's time zone ("Nov 6, 2026, 3:02 PM"), the format History and Trash use.
+  The current session's last activity reads "Active now", since `last_seen_at` is written at most
+  every five minutes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S2-C21b)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21b re-cut)
