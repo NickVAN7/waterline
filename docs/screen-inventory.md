@@ -638,7 +638,7 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (DL-239) | — |
 | No access | page | `/account/no-access` | 1 | Built |
 | My work | page | `/` | 1, sections in 2, 3, 5 | Projects, approvals, past decisions built |
-| Favorite projects | section of My work; star on project rows | `/` | 2 (S2-C21c, DL-238) | — |
+| Favorite projects | section of My work, first; star on My work's project rows (DL-302, DL-305) | `/` | 2 (S2-C21c, DL-238) | — |
 | Documentation (user guide) | page, from the user menu | `/docs` | 2 (S2-C21d, DL-238) | — |
 | Search results | page, from the header search bar | `/search` | 6 | — |
 | System status | page, no sign-in | `/status` | 0 | Built |

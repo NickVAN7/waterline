@@ -86,6 +86,10 @@ S2-C21a to S2-C21d's rows, here and in "Threat-model pass", are added at their r
 | S2-C11 | `POST /api/approval-requests/{id}/decision` | `approval.decide` (personal) | the named approver, with content access | content |
 | S2-C11 | `POST …/requirements/{number}/approve` | `requirement.approve_manually` (registered in S2-C6, DL-212) | project admins | content |
 | S2-C14 | `GET /api/me/work/approvals` | signed in (scoped to the user's pending rows and content access) | — | — |
+| S2-C21a | the four people lists with `include_deactivated=true` | the list's manage action: `org_member.manage`, `project_member.manage`, `workspace_staff.manage` (staff and users) (DL-294) | that list's admins | management |
+| S2-C21b | `GET /api/me/sessions`, `POST /api/me/sessions/sign-out-others` | signed in (the user's own sessions, DL-298) | — | — |
+| S2-C21c | `PUT /api/projects/{key}/favorite`, `DELETE /api/projects/{key}/favorite` | `project.favorite` (visible; DL-303) | anyone who sees the project, not on an archived one | management |
+| S2-C21c | `GET /api/me/work/favorites` | signed in (scoped like My work's projects, DL-302) | — | — |
 
 ## Threat-model pass
 
@@ -100,6 +104,9 @@ S2-C21a to S2-C21d's rows, here and in "Threat-model pass", are added at their r
 | Races: a replacement against a decision; a delete against a restore | Row locks in a fixed order, a race test each | S2-C8, S2-C11 to S2-C13 |
 | Names of former members in history | The server resolves names at read time; former members' names stay (Q2, DL-160) | S2-C3 |
 | A remote image revealing that a Confidential item was opened | Image syntax renders as a link (DL-140) | S2-C16 |
+| A non-admin listing deactivated people | `include_deactivated` refused with a 422 through `check_permitted` unless the list's manage action allows it (DL-294) | S2-C21a |
+| Ending or seeing another user's sessions; a session surviving sign-out-others | Every session query scoped to the caller's `user_id`; the user row locked before the delete, with a race test against a sign-in in flight; no token or hash in the response (DL-298) | S2-C21b |
+| A favorite revealing a project the user can't open | The favorites section scoped like My work's projects; `PUT` and `DELETE` load the project through the scoped lookup, a 404 for one the user can't see (DL-241, DL-302, DL-303) | S2-C21c |
 
 ## Open questions for the owner (answered before S2-C0a starts)
 

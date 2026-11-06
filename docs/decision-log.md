@@ -3781,3 +3781,68 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S2-C21b)
 - **Source:** owner, Nov 6, 2026 (chat session, S2-C21b re-cut)
+
+### DL-302: Favorite projects are their own section, first on My work
+- **Date:** 2026-11-06
+- **Decision:** My work gains a **Favorite projects** section, ahead of Projects: the user's
+  favorite projects they can still open, archived ones left out, by name (`GET /api/me/work`'s
+  `favorites` section and `GET /api/me/work/favorites`, a `WorkSection` like the approvals). Every
+  project still lists in Projects, with its star filled when it's a favorite. This is how the
+  star "keeps it at the top" (design-doc §11).
+- **Supersedes:** none (specifies DL-197's favorites, placed in S2-C21c by DL-238)
+- **Superseded by:** none
+- **Applies to:** design-doc §11; screen inventory (My work); build plan (S2-C21c)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut)
+
+### DL-303: Starring is the `project.favorite` action
+- **Date:** 2026-11-06
+- **Decision:** `project.favorite` is registered in `authz/actions.py` as a visible management
+  action: anyone who can see the project may star or unstar it, except on an archived project
+  (a mutation). It's in each My work project item's `allowed_actions` (DL-306), so the page shows
+  the star only where it works. Its tests are written first by `spec-test-writer`.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 (the actions); build plan (S2-C21c)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut)
+
+### DL-304: A favorite is set with PUT and cleared with DELETE
+- **Date:** 2026-11-06
+- **Decision:** `PUT /api/projects/{key}/favorite` and `DELETE /api/projects/{key}/favorite`,
+  both 204 and idempotent: starring a favorite, or unstarring one that isn't, changes nothing. A
+  `project_favorite` table holds them (`user_id`, `project_id`, unique together). My work's
+  project items gain `is_favorite`. Neither an audit event nor an activity entry is recorded: a
+  favorite is the user's own view, not a change to the project.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** schema-doc (a new table); build plan (S2-C21c)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut)
+
+### DL-305: The star is on My work's rows only
+- **Date:** 2026-11-06
+- **Decision:** The star is on each row of My work's Favorite projects and Projects sections. The
+  org's project list and the project header have none.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §11; screen inventory (My work); build plan (S2-C21c)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut)
+
+### DL-306: My work's project items carry their allowed actions
+- **Date:** 2026-11-06
+- **Decision:** Each project item on My work, in Projects and in Favorite projects, gains
+  `allowed_actions`, decided per item by `authorize()` (from the context already loaded, no
+  extra query). The star shows only where it holds `project.favorite`, as every other control
+  follows the server (design-doc §5).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (the projects API's My work row; S2-C21c)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut's docs-consistency review)
+
+### DL-307: The project area owns `project_favorite`
+- **Date:** 2026-11-06
+- **Decision:** `project_favorite` belongs to the `project` area: its router and service serve
+  `PUT` and `DELETE /api/projects/{key}/favorite`, and `my_work` reads the table through the
+  project repository. No new area.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Feature map"; S2-C21c)
+- **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut's docs-consistency review)

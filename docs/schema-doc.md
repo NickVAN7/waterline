@@ -629,6 +629,22 @@ project's first admin (the creator by default, or someone an org owner/admin nam
 admins (system admins, workspace owners/admins,
 owners/admins of the project's org) need no row.
 
+### `project_favorite`
+A project a user starred on My work (design-doc §11; DL-302 to DL-304). Owned by the `project`
+area (DL-307); added in S2-C21c.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → user) | |
+| project_id | UUID (FK → project) | |
+| created_at / updated_at | timestamptz | |
+
+Unique `(user_id, project_id)`, `internal_only()`: starring is idempotent (an insert that skips
+an existing row), so a clash is never a user's doing. No index on `project_id`: favorites are
+looked up by user, which the unique constraint leads with, never by project. A favorite of a
+project the user can no longer open, or one archived, stays and is left out of My work.
+
 ### `project_counter`
 | Field | Type | Notes |
 |---|---|---|

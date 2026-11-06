@@ -694,7 +694,7 @@ Workspace (the firm: tenant boundary)
      denied (404) whatever the user's admin level (§3.1). Management actions pass through.
   3. **Personal actions** (below): the relationship rule decides, for a user with content
      access to the project.
-  4. **Visible actions:** an action marked `visible` (e.g. `org.view`) is granted to anyone
+  4. **Visible actions:** an action marked `visible` (e.g. `org.view`, `project.favorite`, DL-303) is granted to anyone
      who can see the target (§4, "Visibility"). It comes after the export-control gate and is
      never used for a project content action, so it can't take an inherited admin past the
      gate (DL-58).
@@ -1525,8 +1525,8 @@ content of export-controlled projects where the user has no explicit membership 
 leaves out archived projects and every item in them (tasks, reviews, test cases; archiving
 cancels their approval requests, §6.2; DL-200), which stay visible inside the project. Until
 notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
-projects** (DL-197): a star on a project row keeps it at the top, per user (S2-C21c, DL-238;
-its table is designed there); favoriting items is v1.5 or later, and there's no "recently viewed".
+projects** (DL-197): a star on a My work project row keeps it at the top, per user: a Favorite
+projects section first, by name, archived ones left out (S2-C21c, DL-238, DL-302 to DL-305); favoriting items is v1.5 or later, and there's no "recently viewed".
 My work is the cross-project view in v1; a portfolio view comes when it outgrows the page
 (§16). It lives at the root route (`/`), so it adds nothing to the reserved-slug
 list (§3); a top-level route of its own would have to join it. Each section arrives with its
