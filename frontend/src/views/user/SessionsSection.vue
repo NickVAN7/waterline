@@ -3,7 +3,7 @@
 // with its device from its user agent, this one marked, when it signed in, and when it was last
 // active; and Sign out other sessions, which stays in place, blocked with its reason, once there
 // are none (a control isn't removed by its own action).
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref } from 'vue'
 
 import { api, ApiError, client, NETWORK_ERROR } from '@/api/client'
 import { deviceLabel, THIS_SESSION } from '@/app/labels'
@@ -13,7 +13,7 @@ import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
-import { FORM_MESSAGES } from '@/composables/useFormErrors'
+import { ANNOUNCE_DELAY_MS, FORM_MESSAGES } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
 
 // shortcut: the first 200 sessions only (the API's page limit); page them if anyone has more.
@@ -54,8 +54,15 @@ async function signOutOthers() {
   }
 }
 
+const said = ref('')
+let announcing: ReturnType<typeof setTimeout> | undefined
+onUnmounted(() => clearTimeout(announcing))
+
 function dismiss() {
   failure.value = ''
+  clearTimeout(announcing)
+  said.value = ''
+  announcing = setTimeout(() => (said.value = 'Alert dismissed'), ANNOUNCE_DELAY_MS)
   button.value?.focus()
 }
 </script>
@@ -115,5 +122,6 @@ function dismiss() {
     <p class="sr-only" aria-live="polite">
       {{ page.loading.value && !page.data.value ? 'Loading your sessions…' : '' }}
     </p>
+    <p class="sr-only" aria-live="polite">{{ said }}</p>
   </section>
 </template>

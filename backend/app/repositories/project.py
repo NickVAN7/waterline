@@ -4,14 +4,15 @@ import uuid
 from collections.abc import Collection
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, Select, exists, or_, select
+from sqlalchemy import ColumnElement, Select, delete, exists, or_, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from app.authz.scoping import Scope
 from app.enums import OrgRole, ProjectRole, RestrictionCategory, WorkspaceRole
 from app.models.org import Membership, Organization
-from app.models.project import Project, ProjectMembership
+from app.models.project import Project, ProjectFavorite, ProjectMembership
 from app.models.user import User
 from app.models.workspace import WorkspaceMembership
 from app.repositories.base import scope_clause
@@ -44,6 +45,41 @@ class ProjectRepository:
         return bool(
             await self.session.scalar(
                 select(exists().where(Project.workspace_id == workspace_id, Project.key == key))
+            )
+        )
+
+    async def add_favorite(self, user_id: uuid.UUID, project_id: uuid.UUID) -> None:
+        """Star the project for the user; already starred changes nothing (DL-304)."""
+        await self.session.execute(
+            insert(ProjectFavorite)
+            .values(id=uuid.uuid7(), user_id=user_id, project_id=project_id)
+            .on_conflict_do_nothing(index_elements=["user_id", "project_id"])
+        )
+
+    async def remove_favorite(self, user_id: uuid.UUID, project_id: uuid.UUID) -> None:
+        await self.session.execute(
+            delete(ProjectFavorite).where(
+                ProjectFavorite.user_id == user_id, ProjectFavorite.project_id == project_id
+            )
+        )
+
+    async def favorite_ids(
+        self, user_id: uuid.UUID, project_ids: Collection[uuid.UUID]
+    ) -> set[uuid.UUID]:
+        """Which of these projects the user starred."""
+        rows = await self.session.scalars(
+            select(ProjectFavorite.project_id).where(
+                ProjectFavorite.user_id == user_id, ProjectFavorite.project_id.in_(project_ids)
+            )
+        )
+        return set(rows)
+
+    @staticmethod
+    def favorites_only(statement: Select[Project], user_id: uuid.UUID) -> Select[Project]:
+        """`statement` narrowed to the projects the user starred (DL-302)."""
+        return statement.where(
+            Project.id.in_(
+                select(ProjectFavorite.project_id).where(ProjectFavorite.user_id == user_id)
             )
         )
 

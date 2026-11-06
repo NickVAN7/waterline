@@ -25,7 +25,7 @@ from app.models.project import Project, ProjectMembership
 from app.models.user import User
 from app.repositories.project import ProjectRepository
 from tests.factories.org import MembershipFactory, OrganizationFactory
-from tests.factories.project import ProjectFactory, ProjectMembershipFactory
+from tests.factories.project import ProjectFactory, ProjectFavoriteFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceMembershipFactory
 from tests.support.activity import activity
@@ -677,6 +677,8 @@ async def test_a_section_whose_query_fails_is_unavailable(
     assert (response.status_code, response.json()["sections"]) == (
         200,
         {
+            # Both read the visible projects (DL-302).
+            "favorites": {"available": False, "items": [], "total": 0},
             "projects": {"available": False, "items": [], "total": 0},
             # TD-40: the other sections still show.
             "approvals": {"available": True, "items": [], "total": 0},
@@ -743,3 +745,62 @@ async def test_first_admin_candidates_are_404_outside_the_org(
 
     assert (response.status_code, response.json()["code"]) == (404, "not_found")
     assert "Bolt Foods" not in response.text
+
+
+# --- Favorite projects on My work (DL-302, DL-306) ----------------------------------------------
+
+
+async def star(user: User, project: Project) -> None:
+    await ProjectFavoriteFactory.create_async(user_id=user.id, project_id=project.id)
+
+
+async def test_favorites_are_the_users_starred_projects_they_can_open_by_name(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-302: starred, still visible, and not archived; another user's stars and a project the
+    user can no longer open are left out."""
+    pia = await signed_in(client, await UserFactory.create_async())
+    zed = await ProjectFactory.create_async(organization=t.org, key="ZED", name="Zed")
+    abe = await ProjectFactory.create_async(organization=t.org, key="ABE", name="Abe")
+    plain = await ProjectFactory.create_async(organization=t.org, key="PLN", name="Plain")
+    archived = await ProjectFactory.create_async(
+        organization=t.org, key="ARC", name="Archived", archived_at=datetime.now(UTC)
+    )
+    gone = await ProjectFactory.create_async(organization=t.org, key="GNE", name="Gone")
+    for project in (zed, abe, plain, archived):
+        await ProjectMembershipFactory.create_async(project=project, user=pia)
+    for project in (zed, abe, archived, gone):
+        await star(pia, project)
+    await star(await UserFactory.create_async(), plain)
+
+    work = (await client.get("/api/me/work")).json()["sections"]
+    paged = (await client.get("/api/me/work/favorites", params={"limit": 1, "offset": 1})).json()
+
+    favorites = work["favorites"]
+    assert (favorites["available"], favorites["total"]) == (True, 2)
+    assert [p["key"] for p in favorites["items"]] == ["ABE", "ZED"]
+    assert ([p["key"] for p in paged["items"]], paged["total"]) == (["ZED"], 2)
+
+
+async def test_my_work_rows_say_whether_each_is_a_favorite_and_carry_their_actions(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-302, DL-306: `is_favorite` from the user's own stars; `allowed_actions` as the
+    project's read would have them, `project.favorite` included for a viewer."""
+    pia = await signed_in(client, await UserFactory.create_async())
+    starred = await ProjectFactory.create_async(organization=t.org, key="STR", name="Starred")
+    other = await ProjectFactory.create_async(organization=t.org, key="OTH", name="Other")
+    for project in (starred, other):
+        await ProjectMembershipFactory.create_async(
+            project=project, user=pia, role=ProjectRole.VIEWER
+        )
+    await star(pia, starred)
+    # Someone else's star is theirs: `is_favorite` is the caller's own (DL-304).
+    await star(await UserFactory.create_async(), other)
+
+    items = (await client.get("/api/me/work/projects", params={"sort": "key"})).json()["items"]
+    read = (await client.get("/api/projects/OTH")).json()
+
+    assert [(p["key"], p["is_favorite"]) for p in items] == [("OTH", False), ("STR", True)]
+    assert "project.favorite" in items[0]["allowed_actions"]
+    assert items[0]["allowed_actions"] == read["allowed_actions"]

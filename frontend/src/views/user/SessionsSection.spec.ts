@@ -102,6 +102,7 @@ describe('SessionsSection', () => {
     expect(alert.element.contains(document.activeElement)).toBe(true)
     await alert.get('button').trigger('click')
     expect(document.activeElement).toBe(signOut(wrapper).element)
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Alert dismissed'))
   })
 
   it("says when the server can't be reached", async () => {

@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import BaseModel, RestrictionMixin, restriction_categories_check
-from app.core.constraint_errors import user_error
+from app.core.constraint_errors import internal_only, user_error
 from app.core.enums import enum_type
 from app.enums import PROJECT_CATEGORIES, ProjectModule, ProjectRole, ProjectStatus, ProjectType
 from app.models.org import Organization
@@ -77,3 +77,15 @@ class ProjectMembership(BaseModel):
 
     project: Mapped[Project] = relationship(lazy="raise")
     user: Mapped[User] = relationship(lazy="raise")
+
+
+class ProjectFavorite(BaseModel):
+    """A project the user starred on My work (schema-doc `project_favorite`; DL-302 to DL-304)."""
+
+    __tablename__ = "project_favorite"
+    # Starring is an insert that skips an existing row, so a clash is never a user's doing; it
+    # also serves the lookups by user, which it leads with.
+    __table_args__ = (UniqueConstraint("user_id", "project_id", info=internal_only()),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(User.id))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(Project.id))

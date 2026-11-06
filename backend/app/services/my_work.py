@@ -9,8 +9,10 @@ from typing import cast
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext
 from app.authz.scoping import content_scope, project_scope
+from app.authz.target import project_target
 from app.core.lists import Filter, FilterType, ListSpec, Page, PageResult, fetch_page
 from app.enums import ProjectStatus, ProjectType
 from app.models.approval import Approval, ApprovalRequest
@@ -19,7 +21,14 @@ from app.models.requirement import RequirementRevision
 from app.repositories.approval import ApprovalRepository
 from app.repositories.project import ProjectRepository
 from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
-from app.schemas.project import INHERITED_ADMIN, MyWork, ProjectItem, WorkSection, WorkSections
+from app.schemas.project import (
+    INHERITED_ADMIN,
+    MyProjectItem,
+    MyWork,
+    ProjectItem,
+    WorkSection,
+    WorkSections,
+)
 
 PROJECTS = ListSpec(
     name="Project",
@@ -122,6 +131,9 @@ class MyWorkService:
         (backend/CLAUDE.md: the one sanctioned savepoint-and-continue)."""
         return MyWork(
             sections=WorkSections(
+                favorites=await self._section(
+                    self.favorites(ctx, PROJECTS.query_model(limit=FIRST_ITEMS))
+                ),
                 projects=await self._section(
                     self.projects(ctx, PROJECTS.query_model(limit=FIRST_ITEMS))
                 ),
@@ -143,11 +155,35 @@ class MyWorkService:
             return WorkSection[T](available=False)
         return WorkSection[T](available=True, items=page.items, total=page.total)
 
-    async def projects(self, ctx: AuthzContext, query: object) -> Page[ProjectItem]:
+    async def projects(self, ctx: AuthzContext, query: object) -> Page[MyProjectItem]:
         """The projects the user can open, archived left out."""
-        statement = ProjectRepository(self.session).visible(project_scope(ctx))
-        statement = statement.where(Project.archived_at.is_(None))
-        return page_of(ctx, await fetch_page(self.session, statement, PROJECTS, query))  # pyright: ignore[reportArgumentType] -- PROJECTS.query_model
+        return await self._my_projects(ctx, query, PROJECTS, favorites_only=False)
+
+    async def favorites(self, ctx: AuthzContext, query: object) -> Page[MyProjectItem]:
+        """The projects the user starred and can still open, archived left out (DL-302)."""
+        return await self._my_projects(ctx, query, PROJECTS, favorites_only=True)
+
+    async def _my_projects(
+        self, ctx: AuthzContext, query: object, spec: ListSpec, *, favorites_only: bool
+    ) -> Page[MyProjectItem]:
+        """My work's project rows, each with its star and its allowed actions (DL-306)."""
+        projects = ProjectRepository(self.session)
+        statement = projects.visible(project_scope(ctx)).where(Project.archived_at.is_(None))
+        if favorites_only:
+            statement = projects.favorites_only(statement, ctx.user_id)
+        page = await fetch_page(self.session, statement, spec, query)  # pyright: ignore[reportArgumentType] -- spec.query_model
+        rows: list[Project] = page.items
+        starred = await projects.favorite_ids(ctx.user_id, [p.id for p in rows])
+        return page.with_items(
+            [
+                MyProjectItem(
+                    **item(ctx, p).model_dump(),
+                    is_favorite=p.id in starred,
+                    allowed_actions=allowed_actions(ctx, project_target(p)),
+                )
+                for p in rows
+            ]
+        )
 
     async def approvals(self, ctx: AuthzContext, query: object) -> Page[ApprovalWorkItem]:
         """The caller's pending approvals in projects whose content they can see, oldest request

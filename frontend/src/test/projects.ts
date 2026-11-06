@@ -44,3 +44,11 @@ export function project(overrides: Partial<Project> = {}): Project {
     ...overrides,
   }
 }
+
+/** A project on My work: a project item with its star and its allowed actions (DL-302, DL-306). */
+export function myProjectItem(
+  key: string,
+  overrides: Partial<components['schemas']['MyProjectItem']> = {},
+): components['schemas']['MyProjectItem'] {
+  return { ...projectItem(key), is_favorite: false, allowed_actions: [], ...overrides }
+}

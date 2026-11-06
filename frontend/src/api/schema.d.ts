@@ -793,6 +793,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Favorite Project
+         * @description Star the project on your My work; starring a favorite changes nothing (DL-304).
+         */
+        put: operations["favorite_project_api_projects__key__favorite_put"];
+        post?: never;
+        /**
+         * Unfavorite Project
+         * @description Unstar the project; unstarring one that isn't a favorite changes nothing (DL-304).
+         */
+        delete: operations["unfavorite_project_api_projects__key__favorite_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/members": {
         parameters: {
             query?: never;
@@ -955,6 +979,26 @@ export interface paths {
          * @description The projects the user can open, archived left out.
          */
         get: operations["my_projects_api_me_work_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/work/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Favorites
+         * @description The projects the user starred and can open, archived left out, by name (DL-302).
+         */
+        get: operations["my_favorites_api_me_work_favorites_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1376,7 +1420,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project.favorite" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide";
         /**
          * ActivityAction
          * @enum {string}
@@ -1888,6 +1932,43 @@ export interface components {
             available: boolean;
         };
         /**
+         * MyProjectItem
+         * @description A project on My work (DL-302, DL-306): whether the user starred it, and what they may do
+         *     on it, so the star shows only where `project.favorite` is allowed.
+         */
+        MyProjectItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            type: components["schemas"]["ProjectType"];
+            status: components["schemas"]["ProjectStatus"];
+            /** Lead Id */
+            lead_id: string | null;
+            /** Lead Name */
+            lead_name: string | null;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Organization Slug */
+            organization_slug: string;
+            /** Organization Name */
+            organization_name: string;
+            /** My Access */
+            my_access: components["schemas"]["ProjectRole"] | "inherited_admin";
+            /** Is Favorite */
+            is_favorite: boolean;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
          * MyWork
          * @description `GET /api/me/work` (design-doc §11; DL-76): every section in one response.
          */
@@ -2042,6 +2123,17 @@ export interface components {
         Page_MemberRead_: {
             /** Items */
             items: components["schemas"]["MemberRead"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[MyProjectItem] */
+        Page_MyProjectItem_: {
+            /** Items */
+            items: components["schemas"]["MyProjectItem"][];
             /** Total */
             total: number;
             /** Limit */
@@ -2935,15 +3027,15 @@ export interface components {
              */
             total: number;
         };
-        /** WorkSection[ProjectItem] */
-        WorkSection_ProjectItem_: {
+        /** WorkSection[MyProjectItem] */
+        WorkSection_MyProjectItem_: {
             /** Available */
             available: boolean;
             /**
              * Items
              * @default []
              */
-            items: components["schemas"]["ProjectItem"][];
+            items: components["schemas"]["MyProjectItem"][];
             /**
              * Total
              * @default 0
@@ -2952,7 +3044,8 @@ export interface components {
         };
         /** WorkSections */
         WorkSections: {
-            projects: components["schemas"]["WorkSection_ProjectItem_"];
+            favorites: components["schemas"]["WorkSection_MyProjectItem_"];
+            projects: components["schemas"]["WorkSection_MyProjectItem_"];
             approvals: components["schemas"]["WorkSection_ApprovalWorkItem_"];
             decisions: components["schemas"]["WorkSection_DecisionWorkItem_"];
         };
@@ -5542,6 +5635,118 @@ export interface operations {
             };
         };
     };
+    favorite_project_api_projects__key__favorite_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    unfavorite_project_api_projects__key__favorite_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_project_members_api_projects__key__members_get: {
         parameters: {
             query?: {
@@ -6095,7 +6300,56 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_ProjectItem_"];
+                    "application/json": components["schemas"]["Page_MyProjectItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_favorites_api_me_work_favorites_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: key, name. Default: name */
+                sort?: string | null;
+                status?: components["schemas"]["ProjectStatus"][] | null;
+                status__not?: components["schemas"]["ProjectStatus"][] | null;
+                status__is_null?: boolean | null;
+                type?: components["schemas"]["ProjectType"][] | null;
+                type__not?: components["schemas"]["ProjectType"][] | null;
+                type__is_null?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MyProjectItem_"];
                 };
             };
             /** @description Unauthorized */

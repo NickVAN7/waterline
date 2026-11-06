@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.enums import ProjectRole, ProjectStatus
 from app.models.project import Project
 from tests.factories.org import OrganizationFactory
-from tests.factories.project import ProjectFactory, ProjectMembershipFactory
+from tests.factories.project import ProjectFactory, ProjectFavoriteFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory
 
@@ -161,3 +161,15 @@ async def test_project_role_outside_the_enum_is_rejected(session: AsyncSession) 
             text("UPDATE project_membership SET role = 'owner' WHERE id = :id"),
             {"id": membership.id},
         )
+
+
+# --- Favorites (schema-doc `project_favorite`, DL-304) ------------------------------------------
+
+
+async def test_a_user_stars_a_project_once(session: AsyncSession) -> None:
+    project = await ProjectFactory.create_async()
+    user = await UserFactory.create_async()
+    await ProjectFavoriteFactory.create_async(user_id=user.id, project_id=project.id)
+
+    with pytest.raises(IntegrityError, match="uq_project_favorite_user_id_project_id"):
+        await ProjectFavoriteFactory.create_async(user_id=user.id, project_id=project.id)

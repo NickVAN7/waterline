@@ -9,7 +9,7 @@ from app.core.errors import ErrorBody
 from app.core.lists import Page
 from app.routers.deps import AuthzContextDep
 from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
-from app.schemas.project import MyWork, ProjectItem
+from app.schemas.project import MyProjectItem, MyWork
 from app.services.my_work import APPROVALS, DECISIONS, PROJECTS, MyWorkService
 
 router = APIRouter(prefix="/me/work", tags=["my_work"])
@@ -32,9 +32,17 @@ async def my_work(ctx: AuthzContextDep, session: SessionDep) -> MyWork:
 @router.get("/projects", responses=_ERRORS)
 async def my_projects(
     ctx: AuthzContextDep, query: ProjectQuery, session: SessionDep
-) -> Page[ProjectItem]:
+) -> Page[MyProjectItem]:
     """The projects the user can open, archived left out."""
     return await MyWorkService(session).projects(ctx, query)
+
+
+@router.get("/favorites", responses=_ERRORS)
+async def my_favorites(
+    ctx: AuthzContextDep, query: ProjectQuery, session: SessionDep
+) -> Page[MyProjectItem]:
+    """The projects the user starred and can open, archived left out, by name (DL-302)."""
+    return await MyWorkService(session).favorites(ctx, query)
 
 
 @router.get("/approvals", responses=_ERRORS)

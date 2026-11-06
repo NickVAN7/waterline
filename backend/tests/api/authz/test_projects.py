@@ -13,7 +13,10 @@ DL-77; design-doc §5, "Org roles", §4 "Visibility", §9 archiving, §11 "My wo
   nothing) for who doesn't see it; an archived project is still readable, and denies every
   mutation but unarchive (archiving it again included);
 - module guidance: any signed-in user;
-- My work's projects section: the projects the user can open, archived left out.
+- My work's projects section: the projects the user can open, archived left out;
+- starring and unstarring (`project.favorite`, DL-303, DL-304): whoever sees the project, 204
+  and idempotent, only the caller's own row, no audit event or activity entry; 403 on an
+  archived project, 404 to who doesn't see it.
 
 On every denial nothing is stored and no audit event is recorded. Personas are relative to
 workspace "Acme Consulting", org "Bolt Foods" (bolt-foods), and project "Payments" (PMT)
@@ -31,12 +34,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import OrgRole, ProjectRole, WorkspaceRole
 from app.models.audit_event import AuditEvent
-from app.models.project import Project
+from app.models.project import Project, ProjectFavorite
 from app.models.user import User
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
+from tests.support.activity import activity
 from tests.support.authz import Tenancy, persona_user, project_actions, sign_in_as, tenancy
 
 pytestmark = [pytest.mark.anyio, pytest.mark.security, pytest.mark.usefixtures("session")]
@@ -709,3 +713,206 @@ async def test_my_projects_page_leaves_out_an_archived_project_the_user_is_a_mem
 
     assert response.status_code == 200
     assert (response.json()["items"], response.json()["total"]) == ([], 0)
+
+
+# --- PUT / DELETE /api/projects/{key}/favorite (project.favorite; DL-303, DL-304) ---------------
+# Whoever sees the project stars and unstars it for themself, 204 and idempotent; an archived
+# project denies both (403 to who sees it); 404 naming nothing to who doesn't. The star is the
+# caller's own `project_favorite` row; no audit event or activity entry is recorded.
+
+SEES_THE_PROJECT = [*PROJECT_ADMINS, "project_member", "project_viewer"]
+
+
+async def favorites(session: AsyncSession) -> set[tuple[uuid.UUID, uuid.UUID]]:
+    """Every `project_favorite` row, re-read: `(user_id, project_id)`."""
+    rows = await session.execute(select(ProjectFavorite.user_id, ProjectFavorite.project_id))
+    return {(row.user_id, row.project_id) for row in rows.all()}
+
+
+async def star(session: AsyncSession, user: User, project: Project) -> None:
+    session.add(ProjectFavorite(user_id=user.id, project_id=project.id))
+    await session.flush()
+
+
+async def favorite_signed_in(client: AsyncClient, who: str) -> tuple[Tenancy, User]:
+    t = await tenancy()
+    user = await persona_user(t, who)
+    await sign_in_as(client, user)
+    return t, user
+
+
+@pytest.mark.parametrize("who", SEES_THE_PROJECT)
+async def test_whoever_sees_the_project_stars_it(
+    client: AsyncClient, session: AsyncSession, who: str
+) -> None:
+    t, user = await favorite_signed_in(client, who)
+
+    response = await client.put("/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await favorites(session) == {(user.id, t.project.id)}
+
+
+@pytest.mark.parametrize("who", SEES_THE_PROJECT)
+async def test_whoever_sees_the_project_unstars_it(
+    client: AsyncClient, session: AsyncSession, who: str
+) -> None:
+    t, user = await favorite_signed_in(client, who)
+    await star(session, user, t.project)
+
+    response = await client.delete("/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await favorites(session) == set()
+
+
+@pytest.mark.parametrize("who", INHERITED_ADMINS)
+async def test_inherited_admins_star_an_export_controlled_project(
+    client: AsyncClient, session: AsyncSession, who: str
+) -> None:
+    """A management action passes the export-control gate (DL-303; design-doc §3.1)."""
+    t, user = await favorite_signed_in(client, who)
+    t.project.restriction_categories = ["export_controlled"]
+    await session.flush()
+
+    response = await client.put("/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await favorites(session) == {(user.id, t.project.id)}
+
+
+async def test_starring_a_favorite_again_leaves_one_row(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-304: idempotent; starring a favorite changes nothing."""
+    t, user = await favorite_signed_in(client, "project_viewer")
+
+    first = await client.put("/api/projects/PMT/favorite")
+    second = await client.put("/api/projects/PMT/favorite")
+
+    assert (first.status_code, second.status_code) == (204, 204)
+    assert await favorites(session) == {(user.id, t.project.id)}
+
+
+async def test_unstarring_a_project_that_is_not_a_favorite_is_204(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-304: idempotent; unstarring one that isn't a favorite changes nothing."""
+    await favorite_signed_in(client, "project_member")
+
+    response = await client.delete("/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await favorites(session) == set()
+
+
+async def test_starring_leaves_another_users_star_alone(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    t, user = await favorite_signed_in(client, "project_member")
+    other = await persona_user(t, "project_viewer")
+    await star(session, other, t.project)
+
+    response = await client.put("/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await favorites(session) == {(other.id, t.project.id), (user.id, t.project.id)}
+
+
+async def test_unstarring_removes_only_the_callers_star(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    t, user = await favorite_signed_in(client, "project_member")
+    other = await persona_user(t, "project_viewer")
+    await star(session, other, t.project)
+    await star(session, user, t.project)
+
+    response = await client.delete("/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await favorites(session) == {(other.id, t.project.id)}
+
+
+async def test_unstarring_one_project_leaves_the_callers_other_favorites(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    t, user = await favorite_signed_in(client, "org_admin")
+    ledger = await ProjectFactory.create_async(organization=t.org, key="LDG", name="Ledger")
+    await star(session, user, ledger)
+    await star(session, user, t.project)
+
+    response = await client.delete("/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await favorites(session) == {(user.id, ledger.id)}
+
+
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+async def test_a_favorite_change_records_no_audit_event_or_activity(
+    client: AsyncClient, session: AsyncSession, method: str
+) -> None:
+    """DL-304: a favorite is the user's own view, not a change to the project."""
+    await favorite_signed_in(client, "project_admin")
+
+    response = await client.request(method, "/api/projects/PMT/favorite")
+
+    assert response.status_code == 204
+    assert await audit_actions(session) == []
+    assert await activity(session) == []
+
+
+@pytest.mark.parametrize("who", PROJECT_UNSEEN)
+async def test_starring_a_project_the_user_cannot_see_is_404_and_stores_nothing(
+    client: AsyncClient, session: AsyncSession, who: str
+) -> None:
+    await favorite_signed_in(client, who)
+
+    response = await client.put("/api/projects/PMT/favorite")
+
+    assert_hidden(response, await client.put("/api/projects/ZZZ/favorite"))
+    assert await favorites(session) == set()
+    assert await audit_actions(session) == []
+
+
+@pytest.mark.parametrize("who", PROJECT_UNSEEN)
+async def test_unstarring_a_project_the_user_cannot_see_is_404_and_keeps_the_star(
+    client: AsyncClient, session: AsyncSession, who: str
+) -> None:
+    """A favorite of a project the user can no longer open stays (schema-doc
+    `project_favorite`)."""
+    t, user = await favorite_signed_in(client, who)
+    await star(session, user, t.project)
+
+    response = await client.delete("/api/projects/PMT/favorite")
+
+    assert_hidden(response, await client.delete("/api/projects/ZZZ/favorite"))
+    assert await favorites(session) == {(user.id, t.project.id)}
+
+
+@pytest.mark.parametrize("who", SEES_THE_PROJECT)
+async def test_an_archived_project_cannot_be_starred(
+    client: AsyncClient, session: AsyncSession, who: str
+) -> None:
+    """DL-303: a mutation, denied on an archived project to everyone, system admins included."""
+    t, _user = await favorite_signed_in(client, who)
+    await archive(session, t)
+
+    response = await client.put("/api/projects/PMT/favorite")
+
+    assert_forbidden(response)
+    assert await favorites(session) == set()
+
+
+@pytest.mark.parametrize("who", SEES_THE_PROJECT)
+async def test_an_archived_project_cannot_be_unstarred(
+    client: AsyncClient, session: AsyncSession, who: str
+) -> None:
+    """DL-303; the star of an archived project stays (schema-doc `project_favorite`)."""
+    t, user = await favorite_signed_in(client, who)
+    await star(session, user, t.project)
+    await archive(session, t)
+
+    response = await client.delete("/api/projects/PMT/favorite")
+
+    assert_forbidden(response)
+    assert await favorites(session) == {(user.id, t.project.id)}

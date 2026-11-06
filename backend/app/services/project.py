@@ -556,6 +556,14 @@ class ProjectService:
         self._log(AuditAction.PROJECT_ARCHIVED, ctx.user_id, project)
         await ApprovalService(self.session).cancel_pending_in_project(project.id, ctx.user_id)
 
+    async def favorite(self, ctx: AuthzContext, project: Project) -> None:
+        """Star the project for the caller; no audit event or activity entry (DL-304)."""
+        await self.repository.add_favorite(ctx.user_id, project.id)
+
+    async def unfavorite(self, ctx: AuthzContext, project: Project) -> None:
+        """Unstar the project for the caller (DL-304)."""
+        await self.repository.remove_favorite(ctx.user_id, project.id)
+
     async def unarchive(self, ctx: AuthzContext, project: Project) -> None:
         """`project_unarchived`; already unarchived changes and records nothing."""
         await self.repository.lock(project)

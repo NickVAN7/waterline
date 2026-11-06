@@ -51,7 +51,12 @@ Every page after sign-in has the same frame:
 
 ## My work
 
-My work is your home page (`/`). Its **Projects** section lists the projects you can open,
+My work is your home page (`/`). **Favorite projects**, first, lists the projects you've
+starred, by name; archived ones, and any you can no longer open, are left out. Each project row
+on My work has a star, **Favorite <project>**: select it to add the project to your favorites,
+and again to take it off. Only you see your favorites.
+
+Its **Projects** section lists the projects you can open,
 with each one's key, its organization, your access (your role on it, or "Admin (inherited)" if
 you administer it through its organization or the workspace), and its status, on the right;
 archived projects are left out. If you're on more than 10, it

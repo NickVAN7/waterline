@@ -5,21 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '@/api/schema'
 import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { failed, ok } from '@/test/api'
-import { projectItem } from '@/test/projects'
+import { failed, noContent, ok } from '@/test/api'
+import { myProjectItem as projectItem } from '@/test/projects'
 import { testRouter } from '@/test/router'
 
 import MyWorkView from './MyWorkView.vue'
 
 type Schemas = components['schemas']
 type Section<T> = { available: boolean; items: T[]; total: number }
-type Projects = Section<Schemas['ProjectItem']>
+type Projects = Section<Schemas['MyProjectItem']>
 type Approvals = Section<Schemas['ApprovalWorkItem']>
 type Decisions = Section<Schemas['DecisionWorkItem']>
 const none = <T>(): Section<T> => ({ available: true, items: [], total: 0 })
 const UNAVAILABLE = { available: false, items: [], total: 0 }
-const work = (projects: Projects, approvals: Approvals = none(), decisions: Decisions = none()) =>
-  ok({ sections: { projects, approvals, decisions } })
+const work = (
+  projects: Projects,
+  approvals: Approvals = none(),
+  decisions: Decisions = none(),
+  favorites: Projects = none(),
+) => ok({ sections: { favorites, projects, approvals, decisions } })
 const NETWORK = failed(503, { code: 'network_error', message: '', details: {} })
 
 const approval = (overrides: Partial<Schemas['ApprovalWorkItem']> = {}) => ({
@@ -100,7 +104,9 @@ describe('MyWorkView', () => {
       ['PORTAL project', '/acme/projects/PORTAL'],
     ])
     expect(projects.findAll('li')[1]!.text()).toContain('On hold')
-    expect(wrapper.get('[aria-live=polite]').text()).toBe('2 projects, 0 approvals waiting for you')
+    expect(wrapper.get('p.sr-only[aria-live=polite]').text()).toBe(
+      '2 projects, 0 approvals waiting for you',
+    )
     expect(projects.attributes('aria-busy')).toBe('false')
     await expectNoA11yViolations(wrapper)
   })
@@ -243,7 +249,7 @@ describe('MyWorkView', () => {
 
     const wrapper = await mountView()
 
-    expect(wrapper.get('[aria-live=polite]').text()).toBe(text)
+    expect(wrapper.get('p.sr-only[aria-live=polite]').text()).toBe(text)
   })
 
   it('is busy, saying so, while the page loads', async () => {
@@ -255,8 +261,9 @@ describe('MyWorkView', () => {
       'true',
       'true',
       'true',
+      'true',
     ])
-    expect(wrapper.get('[aria-live=polite]').text()).toBe('Loading your work…')
+    expect(wrapper.get('p.sr-only[aria-live=polite]').text()).toBe('Loading your work…')
   })
 
   it.each([
@@ -405,5 +412,211 @@ describe('MyWorkView', () => {
         .map((a) => a.text()),
     ).toEqual(['Three-way match'])
     expect(document.activeElement).toBe(wrapper.get('h1').element)
+  })
+
+  describe('favorite projects (DL-302, DL-305, DL-306)', () => {
+    const STARRABLE = { allowed_actions: ['project.favorite' as const] }
+    const erp = projectItem('ERP', { name: 'ERP rollout', is_favorite: true, ...STARRABLE })
+    const portal = projectItem('PORTAL', { name: 'Customer portal', ...STARRABLE })
+    const plain = projectItem('PLAIN', { name: 'Plain project' })
+    const listOf = (...items: Schemas['MyProjectItem'][]) => ({
+      available: true,
+      items,
+      total: items.length,
+    })
+    const star = (wrapper: Awaited<ReturnType<typeof mountView>>, list: string, name: string) =>
+      section(wrapper, list).get(`button[aria-label="Favorite ${name}"]`)
+
+    it('lists the favorites first, each starred, and stars only where the server allows it', async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(listOf(erp, portal, plain), none(), none(), listOf(erp)),
+      )
+
+      const wrapper = await mountView()
+
+      expect(wrapper.findAll('h2').map((h) => h.text())[0]).toBe('Favorite projects')
+      expect(star(wrapper, 'favorites', 'ERP rollout').attributes('aria-pressed')).toBe('true')
+      expect(star(wrapper, 'projects', 'ERP rollout').attributes('aria-pressed')).toBe('true')
+      expect(star(wrapper, 'projects', 'Customer portal').attributes('aria-pressed')).toBe('false')
+      expect(
+        section(wrapper, 'projects').find('button[aria-label="Favorite Plain project"]').exists(),
+      ).toBe(false)
+      await expectNoA11yViolations(wrapper)
+    })
+
+    it('says how to fill an empty favorites section', async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(work(listOf(portal)))
+
+      const wrapper = await mountView()
+
+      expect(section(wrapper, 'favorites').text()).toContain('No favorite projects')
+      expect(section(wrapper, 'favorites').text()).toContain(
+        'Star a project under Projects to keep it here, at the top.',
+      )
+    })
+
+    it('stars a project, says so, reloads, and keeps focus on its star', async () => {
+      const get = vi
+        .spyOn(client, 'GET')
+        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+      const put = vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      const starred = { ...portal, is_favorite: true }
+      get.mockResolvedValue(work(listOf(erp, starred), none(), none(), listOf(starred, erp)))
+
+      ;(star(wrapper, 'projects', 'Customer portal').element as HTMLElement).focus()
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await flushPromises()
+
+      expect(put).toHaveBeenCalledWith('/api/projects/{key}/favorite', {
+        params: { path: { key: 'PORTAL' } },
+      })
+      expect(wrapper.text()).toContain('Added Customer portal to your favorites.')
+      expect(section(wrapper, 'favorites').findAll('li')).toHaveLength(2)
+      // Said once: the reload after a star announces no count line (UI-TBL-3).
+      expect(wrapper.get('p.sr-only[aria-live=polite]').text()).toBe('')
+    })
+
+    it('unstars from the favorites, and focus goes to the star now in its place, or the h1', async () => {
+      const get = vi
+        .spyOn(client, 'GET')
+        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+      const del = vi.spyOn(client, 'DELETE').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      get.mockResolvedValue(work(listOf({ ...erp, is_favorite: false }, portal)))
+
+      await star(wrapper, 'favorites', 'ERP rollout').trigger('click')
+      await flushPromises()
+
+      expect(del).toHaveBeenCalledWith('/api/projects/{key}/favorite', {
+        params: { path: { key: 'ERP' } },
+      })
+      expect(wrapper.text()).toContain('Removed ERP rollout from your favorites.')
+      expect(document.activeElement).toBe(wrapper.get('h1').element)
+    })
+
+    it('says a failed change in an alert that takes focus, and its dismiss returns to the star', async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(listOf(erp, portal), none(), none(), listOf(erp)),
+      )
+      vi.spyOn(client, 'PUT').mockResolvedValue(
+        failed(500, { code: 'internal_error', message: '', details: {} }),
+      )
+      const wrapper = await mountView()
+
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await flushPromises()
+
+      const alert = wrapper.get('[role=alert]')
+      expect(alert.text()).toContain(
+        "Couldn't change the star on Customer portal. Something went wrong. Try again.",
+      )
+      expect(alert.element.contains(document.activeElement)).toBe(true)
+      await alert.get('button').trigger('click')
+      await flushPromises()
+      expect(document.activeElement).toBe(star(wrapper, 'projects', 'Customer portal').element)
+      await vi.waitFor(() => expect(wrapper.text()).toContain('Alert dismissed'))
+    })
+
+    it('moves focus to the star now in its place when an unstarred favorite leaves the list', async () => {
+      const both = listOf(erp, { ...portal, is_favorite: true })
+      const get = vi.spyOn(client, 'GET').mockResolvedValue(work(both, none(), none(), both))
+      vi.spyOn(client, 'DELETE').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      const left = { ...portal, is_favorite: true }
+      get.mockResolvedValue(
+        work(listOf({ ...erp, is_favorite: false }, left), none(), none(), listOf(left)),
+      )
+
+      await star(wrapper, 'favorites', 'ERP rollout').trigger('click')
+      await flushPromises()
+
+      expect(document.activeElement).toBe(star(wrapper, 'favorites', 'Customer portal').element)
+    })
+
+    it('ignores a second press while the first is being sent', async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(listOf(erp, portal), none(), none(), listOf(erp)),
+      )
+      let answer: (value: unknown) => void = () => {}
+      const put = vi
+        .spyOn(client, 'PUT')
+        .mockReturnValue(new Promise((resolve) => (answer = resolve)) as never)
+      const wrapper = await mountView()
+
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      answer(noContent())
+      await flushPromises()
+
+      expect(put).toHaveBeenCalledTimes(1)
+    })
+
+    it('says a refused change in its own words (a 403: archived or access lost)', async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(listOf(erp, portal), none(), none(), listOf(erp)),
+      )
+      vi.spyOn(client, 'PUT').mockResolvedValue(
+        failed(403, { code: 'forbidden', message: '', details: {} }),
+      )
+      const wrapper = await mountView()
+
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role=alert]').text()).toContain(
+        "You don't have permission to change the star on Customer portal.",
+      )
+    })
+
+    it('makes the page error the one live alert when the reload after a star fails', async () => {
+      const get = vi
+        .spyOn(client, 'GET')
+        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+      vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      get.mockResolvedValue(failed(500, { code: 'internal_error', message: '', details: {} }))
+
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[role=alert]').text()).toContain("Couldn't load your work")
+      expect(document.activeElement).toBe(tryAgain(wrapper).element)
+    })
+
+    it("leaves a section's first error quiet after a star, so the star keeps focus (UI-FBK-15)", async () => {
+      const get = vi
+        .spyOn(client, 'GET')
+        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+      vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      get.mockResolvedValue(work(listOf(erp, portal), UNAVAILABLE, none(), listOf(erp)))
+
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[role=alert]').exists()).toBe(false)
+      expect(document.activeElement).toBe(star(wrapper, 'projects', 'Customer portal').element)
+    })
+
+    it('stays pending through the reload: no star change is sent until it ends', async () => {
+      const get = vi
+        .spyOn(client, 'GET')
+        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+      const put = vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
+      const del = vi.spyOn(client, 'DELETE').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      let reloaded: (value: unknown) => void = () => {}
+      get.mockReturnValue(new Promise((resolve) => (reloaded = resolve)) as never)
+
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await flushPromises()
+      await star(wrapper, 'projects', 'Customer portal').trigger('click')
+      await star(wrapper, 'projects', 'ERP rollout').trigger('click')
+      reloaded(work(listOf(erp, portal), none(), none(), listOf(erp)))
+      await flushPromises()
+
+      expect([put.mock.calls.length, del.mock.calls.length]).toEqual([1, 0])
+    })
   })
 })

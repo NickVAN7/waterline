@@ -157,6 +157,8 @@ EXPECTED: dict[str, Expected] = {
     "project.update": Expected(_P, project_role=_ADMIN),
     "project.archive": Expected(_P),
     "project.unarchive": Expected(_P, archive_exempt=True),
+    # S2-C21c, DL-303 (owner-approved addition to the spec table).
+    "project.favorite": Expected(_P, project_role=_VIEWER),
     "project_member.manage": Expected(_P, project_role=_ADMIN),
     "project.view_access": Expected(_P, project_role=_ADMIN, mutation=False),
     "project.raise_restriction": Expected(_P, project_role=_ADMIN),

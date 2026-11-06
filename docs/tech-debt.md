@@ -1278,3 +1278,15 @@ Entry format:
 - **Fix by:** Slice 7 (the operations screen), or sooner when someone has more than 200 live
   sessions: page the list (`Pagination`, `useListQuery`)
 - **Status:** open
+
+### TD-99: A row action's network failure has no Retry
+- **Added:** S2-C21c
+- **What:** My work's star, Account settings' Sign out other sessions, and Trash's Restore say
+  "We couldn't reach the server." (or "Try again in a moment") in their alert, with no Retry
+  button there, which UI-FRM-7 gives a form's network failure.
+- **Why:** each control stays in place beside the alert, so pressing it again is the retry;
+  a Retry that focuses the control and repeats it is the same code in three places, better built
+  once.
+- **Fix by:** S2-C22 (the slice's tech-debt review): one shared retry for a row action's alert,
+  or UI-FRM-7 reworded for row actions
+- **Status:** open

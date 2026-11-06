@@ -86,6 +86,7 @@ class Action(StrEnum):
     PROJECT_UPDATE = "project.update"
     PROJECT_ARCHIVE = "project.archive"
     PROJECT_UNARCHIVE = "project.unarchive"
+    PROJECT_FAVORITE = "project.favorite"
     PROJECT_MEMBER_MANAGE = "project_member.manage"
     PROJECT_VIEW_ACCESS = "project.view_access"
     PROJECT_RAISE_RESTRICTION = "project.raise_restriction"
@@ -261,6 +262,10 @@ REGISTRY: dict[str, ActionSpec] = {
         workspace_role=WorkspaceRole.ADMIN,
         org_role=OrgRole.ADMIN,
         archive_exempt=True,
+    ),
+    # Starring on My work: anyone who sees the project (DL-303); a mutation, so not when archived.
+    Action.PROJECT_FAVORITE: ActionSpec(
+        Level.PROJECT, access=AccessKind.MANAGEMENT, project_role=ProjectRole.VIEWER, visible=True
     ),
     # Project admins, inherited included (§5; DL-79): a mutation, so an archived project denies it.
     Action.PROJECT_MEMBER_MANAGE: ActionSpec(

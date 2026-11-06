@@ -3,7 +3,7 @@ from typing import ClassVar
 from polyfactory import Use
 
 from app.enums import ProjectRole, ProjectType
-from app.models.project import Project, ProjectMembership
+from app.models.project import Project, ProjectFavorite, ProjectMembership
 from tests.factories import BaseFactory
 
 
@@ -35,3 +35,9 @@ class ProjectMembershipFactory(BaseFactory[ProjectMembership]):
     __set_as_default_factory_for_type__: ClassVar[bool] = True
 
     role = ProjectRole.MEMBER
+
+
+class ProjectFavoriteFactory(BaseFactory[ProjectFavorite]):
+    """A star; the test passes `user_id` and `project_id` (DL-304)."""
+
+    __model__ = ProjectFavorite

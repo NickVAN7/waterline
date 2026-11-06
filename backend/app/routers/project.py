@@ -52,6 +52,7 @@ Viewed = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJEC
 Updated = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_UPDATE))]
 Archived = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_ARCHIVE))]
 Unarchived = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_UNARCHIVE))]
+Favorited = Annotated[ProjectEntity, Depends(authorized(load_project, Action.PROJECT_FAVORITE))]
 MembersManaged = Annotated[
     ProjectEntity, Depends(authorized(load_project, Action.PROJECT_MEMBER_MANAGE))
 ]
@@ -138,6 +139,18 @@ async def archive_project(project: Archived, ctx: AuthzContextDep, session: Sess
 async def unarchive_project(project: Unarchived, ctx: AuthzContextDep, session: SessionDep) -> None:
     """Unarchive the project."""
     await ProjectService(session).unarchive(ctx, project)
+
+
+@router.put("/projects/{key}/favorite", status_code=status.HTTP_204_NO_CONTENT, responses=ERRORS)
+async def favorite_project(project: Favorited, ctx: AuthzContextDep, session: SessionDep) -> None:
+    """Star the project on your My work; starring a favorite changes nothing (DL-304)."""
+    await ProjectService(session).favorite(ctx, project)
+
+
+@router.delete("/projects/{key}/favorite", status_code=status.HTTP_204_NO_CONTENT, responses=ERRORS)
+async def unfavorite_project(project: Favorited, ctx: AuthzContextDep, session: SessionDep) -> None:
+    """Unstar the project; unstarring one that isn't a favorite changes nothing (DL-304)."""
+    await ProjectService(session).unfavorite(ctx, project)
 
 
 @router.get("/projects/{key}/members", responses=ERRORS)

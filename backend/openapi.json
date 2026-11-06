@@ -3884,6 +3884,136 @@
         }
       }
     },
+    "/api/projects/{key}/favorite": {
+      "put": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Favorite Project",
+        "description": "Star the project on your My work; starring a favorite changes nothing (DL-304).",
+        "operationId": "favorite_project_api_projects__key__favorite_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Unfavorite Project",
+        "description": "Unstar the project; unstarring one that isn't a favorite changes nothing (DL-304).",
+        "operationId": "unfavorite_project_api_projects__key__favorite_delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/{key}/members": {
       "get": {
         "tags": [
@@ -4876,7 +5006,205 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_ProjectItem_"
+                  "$ref": "#/components/schemas/Page_MyProjectItem_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/me/work/favorites": {
+      "get": {
+        "tags": [
+          "my_work"
+        ],
+        "summary": "My Favorites",
+        "description": "The projects the user starred and can open, archived left out, by name (DL-302).",
+        "operationId": "my_favorites_api_me_work_favorites_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: key, name. Default: name",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: key, name. Default: name"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectStatus"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "status__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectStatus"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status  Not"
+            }
+          },
+          {
+            "name": "status__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status  Is Null"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "type__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type  Not"
+            }
+          },
+          {
+            "name": "type__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type  Is Null"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MyProjectItem_"
                 }
               }
             }
@@ -6905,6 +7233,7 @@
           "project.update",
           "project.archive",
           "project.unarchive",
+          "project.favorite",
           "project_member.manage",
           "project.view_access",
           "project.raise_restriction",
@@ -8137,6 +8466,106 @@
         ],
         "title": "ModuleNote"
       },
+      "MyProjectItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ProjectType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProjectStatus"
+          },
+          "lead_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Id"
+          },
+          "lead_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Name"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Organization Id"
+          },
+          "organization_slug": {
+            "type": "string",
+            "title": "Organization Slug"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name"
+          },
+          "my_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectRole"
+              },
+              {
+                "type": "string",
+                "const": "inherited_admin"
+              }
+            ],
+            "title": "My Access"
+          },
+          "is_favorite": {
+            "type": "boolean",
+            "title": "Is Favorite"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "type",
+          "status",
+          "lead_id",
+          "lead_name",
+          "organization_id",
+          "organization_slug",
+          "organization_name",
+          "my_access",
+          "is_favorite",
+          "allowed_actions"
+        ],
+        "title": "MyProjectItem",
+        "description": "A project on My work (DL-302, DL-306): whether the user starred it, and what they may do\non it, so the star shows only where `project.favorite` is allowed."
+      },
       "MyWork": {
         "properties": {
           "sections": {
@@ -8539,6 +8968,37 @@
           "offset"
         ],
         "title": "Page[MemberRead]"
+      },
+      "Page_MyProjectItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyProjectItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[MyProjectItem]"
       },
       "Page_OrgListItem_": {
         "properties": {
@@ -10820,7 +11280,7 @@
         ],
         "title": "WorkSection[DecisionWorkItem]"
       },
-      "WorkSection_ProjectItem_": {
+      "WorkSection_MyProjectItem_": {
         "properties": {
           "available": {
             "type": "boolean",
@@ -10828,7 +11288,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ProjectItem"
+              "$ref": "#/components/schemas/MyProjectItem"
             },
             "type": "array",
             "title": "Items",
@@ -10844,12 +11304,15 @@
         "required": [
           "available"
         ],
-        "title": "WorkSection[ProjectItem]"
+        "title": "WorkSection[MyProjectItem]"
       },
       "WorkSections": {
         "properties": {
+          "favorites": {
+            "$ref": "#/components/schemas/WorkSection_MyProjectItem_"
+          },
           "projects": {
-            "$ref": "#/components/schemas/WorkSection_ProjectItem_"
+            "$ref": "#/components/schemas/WorkSection_MyProjectItem_"
           },
           "approvals": {
             "$ref": "#/components/schemas/WorkSection_ApprovalWorkItem_"
@@ -10860,6 +11323,7 @@
         },
         "type": "object",
         "required": [
+          "favorites",
           "projects",
           "approvals",
           "decisions"

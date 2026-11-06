@@ -1,14 +1,15 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends components['schemas']['ProjectItem']">
 // A list of projects, each a link to its home with its key and, right-aligned, its status (My
 // work, an org's list). My work adds each project's org and the user's access (`withAccess`);
-// an org's list, each project's type (`withType`) (DL-137, DL-153).
+// an org's list, each project's type (`withType`) (DL-137, DL-153). The `actions` slot ends a row
+// (My work's star, DL-305).
 import type { components } from '@/api/schema'
 import { MY_ACCESS, PROJECT_STATUS, PROJECT_TYPE } from '@/app/labels'
 import Badge from '@/components/Badge.vue'
 
 withDefaults(
   defineProps<{
-    projects: components['schemas']['ProjectItem'][]
+    projects: T[]
     withAccess?: boolean
     withType?: boolean
   }>(),
@@ -47,6 +48,7 @@ withDefaults(
       >
         {{ PROJECT_STATUS[project.status].label }}
       </Badge>
+      <slot name="actions" :project="project" />
     </li>
   </ul>
 </template>

@@ -125,8 +125,17 @@ class WorkSection[T](BaseModel):
     total: int = 0
 
 
+class MyProjectItem(ProjectItem):
+    """A project on My work (DL-302, DL-306): whether the user starred it, and what they may do
+    on it, so the star shows only where `project.favorite` is allowed."""
+
+    is_favorite: bool
+    allowed_actions: list[Action]
+
+
 class WorkSections(BaseModel):
-    projects: WorkSection[ProjectItem]
+    favorites: WorkSection[MyProjectItem]
+    projects: WorkSection[MyProjectItem]
     approvals: WorkSection[ApprovalWorkItem]
     decisions: WorkSection[DecisionWorkItem]
 
