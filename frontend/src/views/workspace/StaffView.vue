@@ -69,7 +69,7 @@ const roster = computed<Roster>(() => ({
     ).items,
 }))
 
-async function list(query: { limit: number; offset: number }) {
+async function list(query: { limit: number; offset: number; include_deactivated?: boolean }) {
   return api(
     client.GET('/api/workspaces/{workspace_id}/staff', { params: { path: path(), query } }),
   )
@@ -87,6 +87,7 @@ async function list(query: { limit: number; offset: number }) {
     remove-label="Remove from staff"
     :role-labels="WORKSPACE_ROLE"
     :can-add="allows(workspace, 'workspace_staff.manage')"
+    :can-show-deactivated="allows(workspace, 'workspace_staff.manage')"
     :allowed="allows(workspace, 'workspace.view')"
     :who-to-ask="WHO_TO_ASK"
   >

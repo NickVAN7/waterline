@@ -59,6 +59,7 @@ async function loadMembers() {
   loadingMembers.value = true
   loadFailed.value = false
   try {
+    // The member list holds active people only (DL-293); `is_active` is kept as a second check.
     members.value = (await allMembers(props.projectKey)).filter((m) => m.is_active)
     const named = new Set(members.value.map((m) => m.user_id))
     chosen.value = keep.filter((e) => named.has(e.approver_id)).map((e) => e.approver_id)

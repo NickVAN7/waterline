@@ -48,6 +48,7 @@ _BUILT_IN = frozenset(
         "include_archived",
         "archived_only",
         "include_deleted",
+        "include_deactivated",
     }
 )
 
@@ -96,6 +97,9 @@ class CustomFilter:
     restricted: bool = False
 
 
+# Showing deactivated people is restricted too: only the list's admins may (DL-294).
+INCLUDE_DEACTIVATED = "include_deactivated"
+
 # Showing soft-deleted rows is always restricted: the trash view shows each user only what they
 # may restore (design-doc §9), so the endpoint decides who may ask for it.
 INCLUDE_DELETED = "include_deleted"
@@ -109,7 +113,8 @@ class ListSpec:
     descending. `id` is always the last tiebreaker. `sort_first` is a fixed order ahead of the
     requested one (the users list's system admins with no workspace role last, DL-188).
     `paging="cursor"` is for append-only feeds: newest first, by `id` (UUIDv7, so creation
-    order), with no sort parameter.
+    order), with no sort parameter. `active_column` (a people list's `User.is_active`) hides
+    the false rows unless `include_deactivated`, which is restricted (DL-293, DL-294).
     """
 
     name: str
@@ -120,6 +125,7 @@ class ListSpec:
     filters: tuple[Filter | CustomFilter, ...] = ()
     search: tuple[Column, ...] = ()
     archived_column: Column | None = None
+    active_column: Column | None = None
     soft_deleted: bool = False
     paging: Literal["offset", "cursor"] = "offset"
 
@@ -169,6 +175,8 @@ class ListSpec:
         if self.archived_column is not None:
             fields["include_archived"] = (bool, False)
             fields["archived_only"] = (bool, False)
+        if self.active_column is not None:
+            fields[INCLUDE_DEACTIVATED] = (bool, False)
         if self.soft_deleted:
             fields[INCLUDE_DELETED] = (bool, False)
         for declared in self.filters:
@@ -317,8 +325,9 @@ def apply_filters(
     permitted: Collection[str] = frozenset(),
 ) -> Select[Any]:
     """`statement` narrowed by everything in `query` except paging and sorting: filters (AND
-    across fields, OR within one), search, and hidden rows. Restricted filters and
-    `include_deleted` apply only if `permitted` names them (`check_permitted`)."""
+    across fields, OR within one), search, and hidden rows. Restricted filters,
+    `include_deleted`, and `include_deactivated` apply only if `permitted` names them
+    (`check_permitted`)."""
     check_permitted(spec, query, permitted)
     for declared in spec.filters:
         statement = _apply_filter(statement, declared, query, current_user_id)
@@ -327,6 +336,8 @@ def apply_filters(
         statement = statement.where(or_(*(_contains(column, text) for column in spec.search)))
     if spec.archived_column is not None:
         statement = _apply_archived(statement, spec.archived_column, query)
+    if spec.active_column is not None and not _value(query, INCLUDE_DEACTIVATED):
+        statement = statement.where(spec.active_column)
     if spec.soft_deleted and _value(query, INCLUDE_DELETED):
         statement = statement.execution_options(**{INCLUDE_DELETED_OPTION: True})
     return statement
@@ -352,9 +363,10 @@ def _used_parameters(declared: Filter | CustomFilter, query: BaseModel) -> list[
 
 
 def check_permitted(spec: ListSpec, query: BaseModel, permitted: Collection[str]) -> None:
-    """Refuse a restricted filter (or `include_deleted`) the caller wasn't permitted: a 422 on
-    the parameter, so the list never hints at what it would have matched. `permitted` holds
-    filter names (and `include_deleted`), decided by the endpoint (through `authorize()`)."""
+    """Refuse a restricted filter (or `include_deleted`, `include_deactivated`) the caller
+    wasn't permitted: a 422 on the parameter, so the list never hints at what it would have
+    matched. `permitted` holds filter names (and those two), decided by the endpoint (through
+    `authorize()`)."""
     refused = [
         parameter
         for declared in spec.filters
@@ -363,6 +375,12 @@ def check_permitted(spec: ListSpec, query: BaseModel, permitted: Collection[str]
     ]
     if spec.soft_deleted and _value(query, INCLUDE_DELETED) and INCLUDE_DELETED not in permitted:
         refused.append(INCLUDE_DELETED)
+    if (
+        spec.active_column is not None
+        and _value(query, INCLUDE_DEACTIVATED)
+        and INCLUDE_DEACTIVATED not in permitted
+    ):
+        refused.append(INCLUDE_DEACTIVATED)
     if refused:
         raise ValidationFailedError(
             [

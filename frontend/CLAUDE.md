@@ -153,6 +153,9 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A page whose `h1` changes in place (a rename saved, a reload after a 409 or 403) calls
   `syncTitle()`, so the window title follows: settling only on the first load leaves the old name
   (UI-SHL-9; S2-C18a review).
+- After a dialog's action reloads a list, focus moves to the row now in that position only when
+  the person or item has left the list (`useRefocusWhenGone`); one still listed, at any row,
+  keeps the focus the dialog returned to its opener (UI-FRM-14; S2-C21a review).
 - A control that may hold focus isn't removed by its own action: Pagination's Previous and Next
   stay at the ends, `aria-disabled`, with the reason tied by `aria-describedby` (UI-TBL-3,
   UI-TOK-10).

@@ -150,6 +150,18 @@ describe('ProjectMembersView', () => {
     expect(get).not.toHaveBeenCalledWith('/api/orgs/{org_id}', expect.anything())
   })
 
+  it('offers Show deactivated to its admins only (DL-294, DL-295)', async () => {
+    const viewer = await mountAt(project({ allowed_actions: ['project.view'] }), [
+      member('Ann Lee'),
+    ])
+    expect(viewer.wrapper.find('#show-deactivated').exists()).toBe(false)
+    viewer.wrapper.unmount()
+
+    const admin = await mountAt(project({ allowed_actions: ADMIN }), [member('Ann Lee')])
+
+    expect(admin.wrapper.get('label:has(#show-deactivated)').text()).toBe('Show deactivated')
+  })
+
   it("offers its admins Add member, Add by email, and the project's access review", async () => {
     const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }), [member('Ann Lee')])
 

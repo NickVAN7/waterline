@@ -19,13 +19,13 @@ from sqlalchemy.orm import Mapped
 
 from app.audit.admin_event import JsonValue, log_admin_event
 from app.authz.actions import Action
-from app.authz.authorize import allowed_actions, ensure
+from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target, user_target
 from app.core.base_model import Base
 from app.core.constraint_errors import constraint_registry
 from app.core.errors import NotFoundError, ValidationFailedError, violated_constraint
-from app.core.lists import ListSpec, Page, fetch_page
+from app.core.lists import INCLUDE_DEACTIVATED, ListSpec, Page, fetch_page
 from app.enums import AuditAction, AuditEntityType
 from app.models.user import User
 from app.repositories.project import ProjectRepository
@@ -179,11 +179,15 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         )
 
     async def list(self, ctx: AuthzContext, list_spec: ListSpec, query: object) -> Page[Row]:
+        """The roster's active people; deactivated ones too for those its `manage` allows, who
+        ask with `include_deactivated` (DL-293, DL-294)."""
+        admin = authorize(ctx, self.spec.manage, self.target)
         page = await fetch_page(
             self.session,
             self.repository.members(self.scope_id),
             list_spec,
             query,  # pyright: ignore[reportArgumentType] -- list_spec.query_model
+            permitted={INCLUDE_DEACTIVATED} if admin else frozenset(),
         )
         rows: list[Row] = await self.rows(ctx, page.items)  # pyright: ignore[reportArgumentType] -- rows of M
         return page.with_items(rows)

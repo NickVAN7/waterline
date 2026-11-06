@@ -100,6 +100,14 @@ describe('OrgMembersView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it('offers its admins Show deactivated (DL-295)', async () => {
+    answers()
+
+    const { wrapper } = await mountOrgView(OrgMembersView, '/acme/members', [...ADMIN])
+
+    expect(wrapper.get('label:has(#show-deactivated)').text()).toBe('Show deactivated')
+  })
+
   it('offers each row only the roster actions its allowed_actions carry', async () => {
     answers()
 

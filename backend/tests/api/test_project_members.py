@@ -606,20 +606,45 @@ async def test_project_member_rows_carry_no_account_actions(
     assert rows["Bea"]["allowed_actions"] == ["project_member.manage"]
 
 
-async def test_project_member_rows_say_whether_the_account_is_active(
+async def test_the_member_list_leaves_out_deactivated_people_unless_an_admin_asks(
     client: AsyncClient, t: Tenancy, admin: User
 ) -> None:
-    """DL-113: the lead picker marks a deactivated member, whom the server refuses as lead."""
+    """DL-293: active members only; the project's admin adds a deactivated one, marked."""
     for name, active in (("Bea", True), ("Gail", False)):
         user = await UserFactory.create_async(name=name, is_active=active)
         await ProjectMembershipFactory.create_async(project=t.project, user=user)
 
-    rows = (await client.get(MEMBERS)).json()["items"]
+    default = (await client.get(MEMBERS)).json()
+    everyone = (await client.get(MEMBERS, params={"include_deactivated": "true"})).json()
 
-    assert [(m["name"], m["is_active"]) for m in rows] == [
+    assert [m["name"] for m in default["items"]] == ["Ada Admin", "Bea"]
+    assert default["total"] == 2
+    assert [(m["name"], m["is_active"]) for m in everyone["items"]] == [
         ("Ada Admin", True),
         ("Bea", True),
         ("Gail", False),
+    ]
+
+
+@pytest.mark.security
+async def test_a_member_who_isnt_an_admin_cant_ask_for_deactivated_people(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-294: `project.view` lists the members, but only `project_member.manage` may ask for
+    deactivated ones: a 422 `not_permitted` on the parameter for anyone else."""
+    user = await UserFactory.create_async()
+    await ProjectMembershipFactory.create_async(
+        project=t.project, user=user, role=ProjectRole.MEMBER
+    )
+    await sign_in_as(client, user)
+
+    listed = await client.get(MEMBERS)
+    refused = await client.get(MEMBERS, params={"include_deactivated": "true"})
+
+    assert listed.status_code == 200
+    assert refused.status_code == 422
+    assert [(e["loc"], e["type"]) for e in refused.json()["details"]["fields"]] == [  # pyright: ignore[reportUnknownVariableType]
+        (["query", "include_deactivated"], "not_permitted")
     ]
 
 

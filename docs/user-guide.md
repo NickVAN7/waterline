@@ -250,9 +250,12 @@ Trash comes back at the bottom of the top level. The page then says "Restored ER
 is removed from the Trash automatically.
 
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
-its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The
+its active members and their roles (Admin, Member, Viewer); anyone on the project can see it. The
 project's admins (and organization owners and admins, workspace owners and admins, and system
 admins) can also:
+
+- **Show deactivated**, above the list: deactivated members are listed too, each marked
+  **Deactivated**.
 
 - **Add member**: the list of the organization's members and the workspace's staff opens as soon
   as you're in the field; type a name, email, or username to narrow it, choose one, and give them
@@ -279,9 +282,9 @@ admins) can also:
 
 - **Details** (project admins): name, description, type (it changes labels and recommended
   modules, never data or the modules on), status (for information only), lead, and modules,
-  then **Save settings**. The lead is one of the project's members, or **No lead**, which is
-  flagged. A deactivated member is marked "Deactivated" and can't be named; a deactivated lead
-  stays the lead, marked, until you name someone else. A module that isn't built yet is greyed
+  then **Save settings**. The lead is one of the project's active members, or **No lead**, which
+  is flagged. A deactivated lead stays the lead, marked "Deactivated", until you name someone
+  else. A module that isn't built yet is greyed
   out, with "Not available yet". Turning off
   a module that holds data, or one recommended for the type, warns you what will be hidden;
   nothing is deleted, and turning it back on brings everything back.
@@ -339,7 +342,11 @@ Workspace owners and admins (and system admins) find **Administration** in the a
 the top right. Its pages are listed in the sidebar, in place of the project selector: **Staff**, **Organizations**,
 **Users**, and **Settings** (workspace admins see the settings; owners and system admins change
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
-its **Actions for …** menu, which lists only what you may do to that person.
+its **Actions for …** menu, which lists only what you may do to that person. **Staff**,
+**Users**, and an organization's **Members** list active people only: select **Show
+deactivated**, above the list, to include deactivated people, each marked **Deactivated**. That's
+how you find someone to reactivate. A list with only deactivated people shows as empty ("No
+staff yet"), with a pointer to **Show deactivated**.
 
 - **Staff** lists the workspace's staff and their roles. **Add person** asks for the email first,
   and, when you press **Continue**, tells you if it isn't an email address. If the email already has an account, you
@@ -370,8 +377,9 @@ level or below, everywhere they belong), their row offers **Edit details** (emai
 username; changing the email signs them out everywhere), **Reset password** (a new temporary
 password, shown once), **Sign out everywhere**, and **Deactivate** (they're signed out and can't
 sign in until reactivated; their work stays, and their undecided approvals go to whoever
-requested each one, if that person is still a project admin). A deactivated person shows a **Deactivated** badge
-and is offered **Reactivate** instead. The last active owner, or the last system admin, can't be
+requested each one, if that person is still a project admin). Once deactivated, they leave the
+list unless **Show deactivated** is selected, where they show a **Deactivated** badge and are
+offered **Reactivate** instead. The last active owner, or the last system admin, can't be
 deactivated.
 
 **Access review.** A person's row offers **Access review** to those who may see it: their

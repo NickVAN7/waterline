@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { failed, me, ok } from '@/test/api'
+import { failed, me, noContent, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import {
   cleanUpAfterEach,
@@ -108,6 +108,45 @@ describe('UsersView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it('offers the staff admins Show deactivated, which asks for them and keeps the choice in the URL (DL-293, DL-295)', async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(USERS)))
+    const { wrapper, router } = await mountWorkspaceView(UsersView, '/workspace/users', [
+      'workspace.view',
+      'workspace_staff.manage',
+    ])
+    const box = wrapper.get<HTMLInputElement>('#show-deactivated')
+    expect(box.element.labels?.[0]?.textContent?.trim()).toBe('Show deactivated')
+
+    await box.setValue(true)
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/users?include_deactivated=true')
+    expect(get).toHaveBeenLastCalledWith('/api/workspaces/{workspace_id}/users', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, sort: 'name', include_deactivated: true },
+      },
+    })
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('offers no Show deactivated without workspace_staff.manage, and ignores it in a link (DL-294)', async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(USERS)))
+
+    const { wrapper } = await mountWorkspaceView(
+      UsersView,
+      '/workspace/users?include_deactivated=true',
+    )
+
+    expect(wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, sort: 'name' },
+      },
+    })
+  })
+
   it('creates no accounts here (DL-75): no add button', async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(USERS)))
 
@@ -159,5 +198,31 @@ describe('UsersView', () => {
 
     expect(lists()).toBe(2)
     expect(get).toHaveBeenCalledWith('/api/auth/me')
+  })
+
+  it('focuses the h1 once a deactivated person leaves the list and no row with actions takes their place (DL-293, UI-FRM-14)', async () => {
+    const ann: Row = {
+      ...USERS[0]!,
+      id: 'u-ann',
+      name: 'Ann Lee',
+      allowed_actions: ['user.manage'],
+    }
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage([ann, USERS[0]!])))
+    vi.spyOn(client, 'POST').mockResolvedValue(noContent())
+    const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
+    await wrapper.get('button[aria-label="Actions for Ann Lee"]').trigger('click')
+    await flushPromises()
+    const deactivate = [...document.querySelectorAll<HTMLElement>('[role=menuitem]')].find(
+      (li) => li.textContent?.trim() === 'Deactivate',
+    )!
+    deactivate.querySelector<HTMLElement>('[data-pc-section=itemcontent]')!.click()
+    await flushPromises()
+    get.mockResolvedValue(ok(listPage([USERS[0]!])))
+
+    const dialog = wrapper.findAll('dialog').find((d) => d.text().includes('Deactivate Ann Lee?'))!
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(document.activeElement).toBe(wrapper.get('h1').element)
   })
 })

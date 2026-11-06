@@ -2,7 +2,7 @@
 // A project's settings (`/{org_slug}/projects/{key}/settings`; build plan, "Web screens"; design-doc
 // §1.1, §3.1), each part shown only when `allowed_actions` allows it:
 // - details and modules (`project.update`): name, description, type, status, the lead (the
-//   project's members, a deactivated one marked; no lead flagged), and the modules,
+//   project's active members, and a deactivated current lead marked, DL-296; no lead flagged), and the modules,
 //   with a warning when a recommended module, or one holding data, is turned off;
 // - restriction (`project.raise_restriction`): the level and the categories, without export
 //   control (DL-133), which a project made export-controlled through the API keeps;
@@ -166,18 +166,16 @@ async function reload(): Promise<void> {
 
 const leadOptions = computed(() => {
   const current = loaded.value
-  const marked = (active: boolean | null | undefined) =>
-    active === false ? ` · ${DEACTIVATED.label}` : ''
-  // A deactivated member is listed and marked (DL-113): the server refuses naming them
-  // (`account_inactive`), but a deactivated lead stays the lead until replaced (design-doc §1.1).
+  // The member list holds active people only (DL-293). A deactivated lead stays the lead until
+  // replaced (design-doc §1.1), so they're added from the project's read, marked (DL-296).
   const people = members.value.map((m) => ({
     value: m.user_id,
-    label: `${m.name} (${m.email})${marked(m.is_active)}`,
+    label: `${m.name} (${m.email})`,
   }))
   if (current?.lead_id && !people.some((p) => p.value === current.lead_id))
     people.push({
       value: current.lead_id,
-      label: `${current.lead_name ?? ''}${marked(current.lead_is_active)}`,
+      label: `${current.lead_name ?? ''}${current.lead_is_active === false ? ` · ${DEACTIVATED.label}` : ''}`,
     })
   return [{ value: '', label: NO_LEAD.label }, ...people]
 })

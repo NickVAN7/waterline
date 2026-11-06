@@ -6,13 +6,15 @@
 // from the row's `allowed_actions`; the page gives its endpoints through `roster` and `list`. A
 // project's page (S1-C16b) puts its own header in the `header` slot and its own dialogs in
 // `dialogs`. A 403 in a dialog reloads the list and `/me`, and tells the page (`refused`), since
-// what the user may do has changed (UI-FRM-7).
-import { computed, nextTick, ref, watch } from 'vue'
+// what the user may do has changed (UI-FRM-7). The list shows active people only; its admins get
+// "Show deactivated", kept in the URL (DL-293, DL-295).
+import { computed, ref, watch } from 'vue'
 
 import { DEACTIVATED } from '@/app/labels'
 import { focusHeading, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import Button from '@/components/Button.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -21,6 +23,7 @@ import Skeleton from '@/components/Skeleton.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows, type Action } from '@/composables/allowedActions'
 import { useListQuery } from '@/composables/useListQuery'
+import { useRefocusWhenGone, useShowDeactivated } from '@/composables/usePeopleList'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
@@ -45,7 +48,7 @@ const props = defineProps<{
   /** The list, for the loading and error words ("the staff"). */
   thing: string
   roster: Roster
-  list: (params: { limit: number; offset: number }) => Promise<{
+  list: (params: { limit: number; offset: number; include_deactivated?: boolean }) => Promise<{
     items: RosterRow[]
     total: number
   }>
@@ -55,6 +58,8 @@ const props = defineProps<{
   roleLabels: Record<string, string>
   /** May the user add people (the page-level `manage` action)? */
   canAdd?: boolean
+  /** May the user list deactivated people too (the list's admins, DL-294)? */
+  canShowDeactivated?: boolean
   /** May the user open the page at all? Otherwise, the 403 page naming `whoToAsk` (UI-FBK-14). */
   allowed: boolean
   whoToAsk: string
@@ -68,13 +73,25 @@ const props = defineProps<{
 const emit = defineEmits<{ refused: [] }>()
 
 const store = useCurrentUserStore()
-const query = useListQuery({ limit: 25 })
+const query = useListQuery({ limit: 25, filters: ['include_deactivated'] as const })
 const done = ref('')
 const table = ref<HTMLTableElement>()
+const { show: showDeactivated, toggle: toggleDeactivated } = useShowDeactivated(
+  query,
+  () => !!props.canShowDeactivated,
+)
+const refocus = useRefocusWhenGone(table)
 
-const page = useLoad(() => props.list(query.params.value))
+const page = useLoad(() =>
+  props.list({
+    limit: query.limit,
+    offset: query.offset.value,
+    ...(showDeactivated.value ? { include_deactivated: true } : {}),
+  }),
+)
+// `showDeactivated` too: losing the list's admin rights drops `include_deactivated` (DL-294).
 watch(
-  [() => props.allowed, query.params],
+  [() => props.allowed, query.params, showDeactivated],
   () => {
     if (props.allowed) void page.run()
   },
@@ -105,28 +122,37 @@ function actionsFor(row: RosterRow): RowAction[] {
         {
           label: props.removeLabel,
           run: () => {
-            removedAt = page.data.value?.items.indexOf(row) ?? -1
+            mark(row)
             void remover.value?.open(row)
           },
         },
       ]
     : []
   const person = { id: row.user_id, ...row }
-  return [...roster, ...(account.value?.actionsFor(person) ?? [])]
+  // A deactivation takes the row away too, unless deactivated people are shown (DL-293).
+  const accountActions = (account.value?.actionsFor(person) ?? []).map((action) =>
+    'run' in action
+      ? {
+          ...action,
+          run: () => {
+            mark(row)
+            action.run()
+          },
+        }
+      : action,
+  )
+  return [...roster, ...accountActions]
 }
 
-// The row a removal took away: once the list reloads, focus goes to the actions of the row now in
-// its place, or the `h1` when there's none (UI-FRM-14).
-let removedAt = -1
+// The row a removal or an account action may take away (UI-FRM-14).
+function mark(row: RosterRow) {
+  refocus.mark(page.data.value?.items.indexOf(row) ?? -1, row.user_id)
+}
 
 async function removed(message: string) {
   done.value = message
   await page.run()
-  await nextTick()
-  const row = table.value?.querySelectorAll('tbody tr')[removedAt]
-  const actions = row?.querySelector<HTMLElement>('button[aria-haspopup=menu]')
-  if (actions) actions.focus()
-  else await focusHeading()
+  await refocus.settle(page.data.value?.items.map((r) => r.user_id) ?? [])
 }
 
 function finished(message: string) {
@@ -159,6 +185,16 @@ const announcement = computed(() => {
       </PageHeader>
     </slot>
     <SuccessStatus :message="done" />
+    <label v-if="canShowDeactivated" class="flex items-center gap-2 self-start">
+      <input
+        id="show-deactivated"
+        type="checkbox"
+        class="size-(--target-min) shrink-0"
+        :checked="showDeactivated"
+        @change="toggleDeactivated"
+      />
+      <span>Show deactivated</span>
+    </label>
     <section
       aria-labelledby="roster-heading"
       :aria-busy="page.loading.value ? 'true' : 'false'"
@@ -174,6 +210,18 @@ const announcement = computed(() => {
         @retry="page.retry"
       />
       <Skeleton v-else-if="!page.data.value" />
+      <!-- Only deactivated people, unticked: "nothing yet", and its admins a pointer (DL-297). -->
+      <EmptyState
+        v-else-if="!page.data.value.total"
+        :heading="`No ${listName.toLowerCase()} yet`"
+        :level="3"
+      >
+        {{
+          canShowDeactivated && !showDeactivated
+            ? 'Deactivated people aren’t listed. Select Show deactivated to see them.'
+            : 'People added here will appear in this list.'
+        }}
+      </EmptyState>
       <template v-else>
         <div role="region" aria-labelledby="roster-heading" tabindex="0" class="overflow-x-auto">
           <table
@@ -252,7 +300,7 @@ const announcement = computed(() => {
       ref="account"
       :workspace-id="roster.workspaceId"
       :fallback-focus="focusHeading"
-      @done="finished"
+      @done="removed"
       @refused="forbidden"
     />
     <slot name="dialogs" :done="finished" :refused="forbidden" />

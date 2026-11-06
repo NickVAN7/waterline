@@ -15,11 +15,12 @@ from app.audit.admin_event import (
     changed_fields,
     log_admin_event,
 )
-from app.authz.authorize import allowed_actions
+from app.authz.actions import Action
+from app.authz.authorize import allowed_actions, authorize
 from app.authz.context import AuthzContext, rank_account
-from app.authz.target import Target, user_target
+from app.authz.target import Target, user_target, workspace_target
 from app.core.errors import FieldError, ValidationFailedError
-from app.core.lists import Filter, FilterType, ListSpec, Page, fetch_page
+from app.core.lists import INCLUDE_DEACTIVATED, ListSpec, Page, fetch_page
 from app.core.security import hash_password
 from app.enums import (
     AccessKind,
@@ -214,7 +215,7 @@ USERS = ListSpec(
     sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
     default_sort=("name",),
     sort_first=(NO_ROLE_SYSTEM_ADMIN,),
-    filters=(Filter("is_active", User.is_active, FilterType.BOOLEAN),),  # pyright: ignore[reportArgumentType]
+    active_column=User.is_active,  # pyright: ignore[reportArgumentType]
 )
 
 
@@ -406,13 +407,16 @@ class UserService:
     async def list_users(
         self, ctx: AuthzContext, workspace: Workspace, query: object
     ) -> Page[UserRow]:
-        """Everyone with a membership in the workspace, and every account with none (DL-72)."""
+        """Everyone with a membership in the workspace, and every account with none (DL-72);
+        deactivated ones with `include_deactivated`, for the staff's admins (DL-293, DL-294)."""
         users = UserRepository(self.session)
+        admin = authorize(ctx, Action.WORKSPACE_STAFF_MANAGE, workspace_target(workspace))
         page = await fetch_page(
             self.session,
             users.in_workspace(workspace.id),
             USERS,
             query,  # pyright: ignore[reportArgumentType] -- USERS.query_model
+            permitted={INCLUDE_DEACTIVATED} if admin else frozenset(),
         )
         accounts = await users.accounts(page.items)
         return page.with_items(

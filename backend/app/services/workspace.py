@@ -45,6 +45,7 @@ STAFF = ListSpec(
     sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
     default_sort=("name",),
     filters=(Filter("role", WorkspaceMembership.role, FilterType.ENUM, enum=WorkspaceRole),),  # pyright: ignore[reportArgumentType]
+    active_column=User.is_active,  # pyright: ignore[reportArgumentType]
 )
 ORGS = ListSpec(
     name="Organization",

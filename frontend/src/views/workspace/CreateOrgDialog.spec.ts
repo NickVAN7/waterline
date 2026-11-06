@@ -64,7 +64,7 @@ describe('CreateOrgDialog', () => {
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: 'ws' },
-        query: { limit: 200, is_active: true, sort: 'name' },
+        query: { limit: 200, sort: 'name' },
       },
     })
     expect(wrapper.findAll('#org-owner-id option').map((o) => o.text())).toEqual([

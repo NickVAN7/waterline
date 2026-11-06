@@ -91,6 +91,7 @@ PROJECT_MEMBERS = ListSpec(
     sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
     default_sort=("name",),
     filters=(Filter("role", ProjectMembership.role, FilterType.ENUM, enum=ProjectRole),),  # pyright: ignore[reportArgumentType]
+    active_column=User.is_active,  # pyright: ignore[reportArgumentType]
 )
 MEMBER_CANDIDATES = ListSpec(
     name="MemberCandidate",

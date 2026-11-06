@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C21 (Delete dialog & trash) built; next is S2-C21a (Show deactivated; `docs/reviews/`).
+> **Status:** S2-C21a (Show deactivated) built; next is S2-C21b (Session list; `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -640,13 +640,14 @@ module: the users list's system admins with no workspace role last, DL-188), fil
 a filter on another table, written with `EXISTS`, never a join, so no item repeats: DL-35),
 `search` columns for `?q=`, `archived_column` (archived rows hidden, with `?include_archived=true`
 or alone with `?archived_only=true`; both at once is a 422 `conflict`, DL-181, DL-182),
-`soft_deleted`, and `paging="cursor"` for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
+`active_column` (a people list's `User.is_active`: deactivated people hidden, with
+`?include_deactivated=true`, DL-293), `soft_deleted`, and `paging="cursor"` for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
 parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
 the service; the **repository** builds a statement already scoped to what the user may see and
 calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)` (newest first,
 `next_cursor`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
-some users may filter by) and `include_deleted` apply only when the
-endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
+some users may filter by), `include_deleted`, and `include_deactivated` (the list's admins only,
+DL-294; the roster's `manage` action) apply only when the endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
 `not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`;
 `page.with_items(rows)` turns a `PageResult` into the response with the rows built from it.
 Parameters by filter type: enum, reference, and user `name` (repeat for any of; a user filter

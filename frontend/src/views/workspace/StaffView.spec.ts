@@ -109,6 +109,86 @@ describe('StaffView', () => {
     expect(button(viewer.wrapper)).toBeUndefined()
   })
 
+  it('offers its admins Show deactivated, which asks for them and keeps the choice in the URL (DL-293, DL-295)', async () => {
+    const get = staffAnswers([OLGA, MO])
+    const { wrapper, router } = await mountWorkspaceView(StaffView, '/workspace/staff', [
+      'workspace.view',
+      'workspace_staff.manage',
+    ])
+    const box = wrapper.get<HTMLInputElement>('#show-deactivated')
+    expect(box.element.labels?.[0]?.textContent?.trim()).toBe('Show deactivated')
+    expect(box.element.checked).toBe(false)
+
+    box.element.focus()
+    await box.setValue(true)
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/staff?include_deactivated=true')
+    expect(get).toHaveBeenLastCalledWith('/api/workspaces/{workspace_id}/staff', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, include_deactivated: true },
+      },
+    })
+    expect(document.activeElement).toBe(box.element)
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it("offers no Show deactivated to someone who can't manage the staff, and ignores it in a link (DL-294)", async () => {
+    const get = staffAnswers([OLGA])
+
+    const { wrapper } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?include_deactivated=true',
+      ['workspace.view'],
+    )
+
+    expect(wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
+      params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
+    })
+  })
+
+  it('says nothing is listed yet, pointing its admins to Show deactivated (DL-297)', async () => {
+    staffAnswers([])
+
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff', [
+      'workspace.view',
+      'workspace_staff.manage',
+    ])
+
+    expect(wrapper.get('h3').text()).toBe('No staff yet')
+    expect(wrapper.text()).toContain(
+      'Deactivated people aren’t listed. Select Show deactivated to see them.',
+    )
+    expect(wrapper.find('table').exists()).toBe(false)
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it("never tells someone who can't show deactivated people that any are hidden (DL-297, DL-200)", async () => {
+    staffAnswers([])
+
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff', ['workspace.view'])
+
+    expect(wrapper.get('h3').text()).toBe('No staff yet')
+    expect(wrapper.text()).toContain('People added here will appear in this list.')
+    expect(wrapper.text()).not.toContain('Deactivated')
+  })
+
+  it('says nothing is listed yet without the pointer once deactivated people are shown (DL-297)', async () => {
+    staffAnswers([])
+
+    const { wrapper } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?include_deactivated=true',
+      ['workspace.view', 'workspace_staff.manage'],
+    )
+
+    expect(wrapper.get('h3').text()).toBe('No staff yet')
+    expect(wrapper.text()).toContain('People added here will appear in this list.')
+    expect(wrapper.text()).not.toContain('Select Show deactivated')
+  })
+
   it('gives each row the actions its allowed_actions carry, and none to a row with none', async () => {
     staffAnswers()
 
@@ -369,6 +449,63 @@ describe('StaffView', () => {
 
     expect(document.activeElement).toBe(
       wrapper.get('button[aria-label="Actions for Bob Ray"]').element,
+    )
+  })
+
+  it("moves focus to the next row's actions once a deactivated person leaves the list (DL-293, UI-FRM-14)", async () => {
+    const ann = row('Ann Lee', { allowed_actions: ['user.manage'] })
+    const bob = row('Bob Ray', { allowed_actions: ['user.manage'] })
+    const get = staffAnswers([ann, bob])
+    vi.spyOn(client, 'POST').mockResolvedValue(noContent())
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff', [
+      'workspace.view',
+      'workspace_staff.manage',
+    ])
+    await wrapper.get('button[aria-label="Actions for Ann Lee"]').trigger('click')
+    await flushPromises()
+    const deactivate = [...document.querySelectorAll<HTMLElement>('[role=menuitem]')].find(
+      (li) => li.textContent?.trim() === 'Deactivate',
+    )!
+    deactivate.querySelector<HTMLElement>('[data-pc-section=itemcontent]')!.click()
+    await flushPromises()
+    get.mockResolvedValue(ok(listPage([bob])))
+
+    const dialog = wrapper.findAll('dialog').find((d) => d.text().includes('Deactivate Ann Lee?'))!
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(document.activeElement).toBe(
+      wrapper.get('button[aria-label="Actions for Bob Ray"]').element,
+    )
+  })
+
+  it('leaves focus alone when the person is still listed, even at another row (UI-FRM-14)', async () => {
+    const ann = row('Ann Lee', { allowed_actions: ['user.manage'] })
+    const bob = row('Bob Ray', { allowed_actions: ['user.manage'] })
+    const get = staffAnswers([ann, bob])
+    vi.spyOn(client, 'POST').mockResolvedValue(noContent())
+    const { wrapper } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?include_deactivated=true',
+      ['workspace.view', 'workspace_staff.manage'],
+    )
+    await wrapper.get('button[aria-label="Actions for Ann Lee"]').trigger('click')
+    await flushPromises()
+    const deactivate = [...document.querySelectorAll<HTMLElement>('[role=menuitem]')].find(
+      (li) => li.textContent?.trim() === 'Deactivate',
+    )!
+    deactivate.querySelector<HTMLElement>('[data-pc-section=itemcontent]')!.click()
+    await flushPromises()
+    // Still listed, deactivated, now after Bob: Ann's old row is Bob's.
+    get.mockResolvedValue(ok(listPage([bob, { ...ann, is_active: false }])))
+
+    const dialog = wrapper.findAll('dialog').find((d) => d.text().includes('Deactivate Ann Lee?'))!
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    // The dialog returned focus to Ann's own button, which moved with her row.
+    expect(document.activeElement).toBe(
+      wrapper.get('button[aria-label="Actions for Ann Lee"]').element,
     )
   })
 })

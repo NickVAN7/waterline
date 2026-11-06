@@ -73,7 +73,7 @@ const roster = computed<Roster>(() => ({
 
 // The workspace comes first, so the rows and Add person (and their dialogs) appear only once the
 // user check can run; a failure of either is the list's error, with Try again.
-async function list(query: { limit: number; offset: number }) {
+async function list(query: { limit: number; offset: number; include_deactivated?: boolean }) {
   if (!workspaceId.value) {
     workspaceId.value = (
       await api(client.GET('/api/orgs/{org_id}', { params: { path: path() } }))
@@ -99,6 +99,7 @@ async function list(query: { limit: number; offset: number }) {
     :role-labels="ORG_ROLE"
     :can-add="allows(org, 'org_member.manage') && workspaceId !== ''"
     :allowed="allows(org, 'org_member.manage')"
+    :can-show-deactivated="allows(org, 'org_member.manage')"
     :who-to-ask="WHO_TO_ASK"
     hidden
   >

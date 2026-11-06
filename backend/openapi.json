@@ -534,6 +534,16 @@
             "description": "Comma-separated, `-` for descending: email, name. Default: name"
           },
           {
+            "name": "include_deactivated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Deactivated"
+            }
+          },
+          {
             "name": "role",
             "in": "query",
             "required": false,
@@ -1399,19 +1409,13 @@
             "description": "Comma-separated, `-` for descending: email, name. Default: name"
           },
           {
-            "name": "is_active",
+            "name": "include_deactivated",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Is Active"
+              "type": "boolean",
+              "default": false,
+              "title": "Include Deactivated"
             }
           }
         ],
@@ -1851,6 +1855,16 @@
               "title": "Sort"
             },
             "description": "Comma-separated, `-` for descending: email, name. Default: name"
+          },
+          {
+            "name": "include_deactivated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Deactivated"
+            }
           },
           {
             "name": "role",
@@ -3808,6 +3822,16 @@
               "title": "Sort"
             },
             "description": "Comma-separated, `-` for descending: email, name. Default: name"
+          },
+          {
+            "name": "include_deactivated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Deactivated"
+            }
           },
           {
             "name": "role",

@@ -59,7 +59,6 @@ function member(name: string, overrides: Partial<components['schemas']['ProjectM
 const MEMBERS = [
   member('Liam Lead', { user_id: LEAD }),
   member('Ann Lee'),
-  member('Dee Gone', { is_active: false }),
   member('Casey Cole', { user_id: ME.id, role: 'admin' }),
 ]
 
@@ -167,7 +166,7 @@ describe('ProjectSettingsView', () => {
     expect(useCurrentOrgStore().project?.name).toBe('Billing')
   })
 
-  it("offers the project's members as lead, a deactivated one marked, and No lead, which clears it (DL-113)", async () => {
+  it("offers the project's active members as lead, and No lead, which clears it (DL-293)", async () => {
     const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
     const patch = vi.spyOn(client, 'PATCH').mockResolvedValue(ok(project()))
 
@@ -175,7 +174,6 @@ describe('ProjectSettingsView', () => {
       'No lead',
       'Liam Lead (liam@acme.example)',
       'Ann Lee (ann@acme.example)',
-      'Dee Gone (dee@acme.example) · Deactivated',
       'Casey Cole (casey@acme.example)',
     ])
     await wrapper.get('#project-settings-lead-id').setValue('')
@@ -185,7 +183,7 @@ describe('ProjectSettingsView', () => {
     expect(body(patch)).toMatchObject({ lead_id: null })
   })
 
-  it('marks a deactivated lead, who stays selected until replaced (design-doc §1.1; TD-45)', async () => {
+  it('keeps a deactivated lead, from the project, marked and selected until replaced (DL-296)', async () => {
     const { wrapper } = await mountAt(
       project({
         lead_id: 'u-dee',
@@ -195,9 +193,13 @@ describe('ProjectSettingsView', () => {
       }),
     )
 
-    expect(options(wrapper, '#project-settings-lead-id')).toContain(
-      'Dee Gone (dee@acme.example) · Deactivated',
-    )
+    expect(options(wrapper, '#project-settings-lead-id')).toEqual([
+      'No lead',
+      'Liam Lead (liam@acme.example)',
+      'Ann Lee (ann@acme.example)',
+      'Casey Cole (casey@acme.example)',
+      'Dee Gone · Deactivated',
+    ])
     expect(wrapper.get<HTMLSelectElement>('#project-settings-lead-id').element.value).toBe('u-dee')
     expect(wrapper.text()).toContain(
       'Dee Gone is deactivated. Name an active member to replace them.',

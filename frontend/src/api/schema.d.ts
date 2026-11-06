@@ -3315,6 +3315,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                include_deactivated?: boolean;
                 role?: components["schemas"]["WorkspaceRole"][] | null;
                 role__not?: components["schemas"]["WorkspaceRole"][] | null;
                 role__is_null?: boolean | null;
@@ -3815,7 +3816,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
-                is_active?: boolean | null;
+                include_deactivated?: boolean;
             };
             header?: never;
             path: {
@@ -4119,6 +4120,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                include_deactivated?: boolean;
                 role?: components["schemas"]["OrgRole"][] | null;
                 role__not?: components["schemas"]["OrgRole"][] | null;
                 role__is_null?: boolean | null;
@@ -5391,6 +5393,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                include_deactivated?: boolean;
                 role?: components["schemas"]["ProjectRole"][] | null;
                 role__not?: components["schemas"]["ProjectRole"][] | null;
                 role__is_null?: boolean | null;

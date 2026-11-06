@@ -81,7 +81,7 @@ async function open(): Promise<void> {
   try {
     const users = await api(
       client.GET('/api/workspaces/{workspace_id}/users', {
-        params: { path: path(), query: { limit: 200, is_active: true, sort: 'name' } },
+        params: { path: path(), query: { limit: 200, sort: 'name' } },
       }),
     )
     people.value = users.items.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))

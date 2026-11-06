@@ -112,26 +112,41 @@ async def test_the_users_list_holds_the_workspaces_people_and_accounts_with_no_m
     ]
 
 
-async def test_the_users_list_shows_who_holds_system_admin_and_filters_by_active(
+async def test_the_users_list_shows_who_holds_system_admin_and_hides_deactivated_unless_asked(
     client: AsyncClient, t: Tenancy
 ) -> None:
+    """DL-293: active accounts only; `include_deactivated` adds a deactivated one, marked."""
     await signed_in(client, await staff(t, WorkspaceRole.OWNER, name="Ada Owner"))
     await staff(t, name="Sam System", is_system_admin=True)
     await staff(t, name="Dee Gone", is_active=False)
 
-    everyone = await client.get(f"/api/workspaces/{t.workspace.id}/users")
-    inactive = await client.get(
+    users = f"/api/workspaces/{t.workspace.id}/users"
+    default = (await client.get(users)).json()
+    everyone = (await client.get(users, params={"include_deactivated": "true"})).json()
+
+    assert [(r["name"], r["is_system_admin"]) for r in default["items"]] == [
+        ("Ada Owner", False),
+        ("Sam System", True),
+    ]
+    assert default["total"] == 2
+    assert [(r["name"], r["is_active"]) for r in everyone["items"]] == [
+        ("Ada Owner", True),
+        ("Dee Gone", False),
+        ("Sam System", True),
+    ]
+
+
+async def test_the_users_list_has_no_is_active_filter_any_more(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-293: `include_deactivated` replaces it, so the old parameter is an unknown one."""
+    await signed_in(client, await staff(t, WorkspaceRole.OWNER))
+
+    response = await client.get(
         f"/api/workspaces/{t.workspace.id}/users", params={"is_active": "false"}
     )
 
-    assert [
-        (r["name"], r["is_system_admin"], r["is_active"]) for r in everyone.json()["items"]
-    ] == [
-        ("Ada Owner", False, True),
-        ("Dee Gone", False, False),
-        ("Sam System", True, True),
-    ]
-    assert [r["name"] for r in inactive.json()["items"]] == ["Dee Gone"]
+    assert response.status_code == 422
 
 
 async def test_each_listed_user_carries_their_workspace_role_or_none(
