@@ -122,6 +122,15 @@ class RequirementRepository:
             )
         )
 
+    async def has_children(self, requirement_id: uuid.UUID) -> bool:
+        """Whether a live requirement sits directly below this one."""
+        child = await self.session.scalar(
+            select(Requirement.id)
+            .where(Requirement.parent_requirement_id == requirement_id)
+            .limit(1)
+        )
+        return child is not None
+
     async def live_descendants(self, requirement_id: uuid.UUID) -> list[Requirement]:
         """Every live requirement below this one (a recursive query, never Python recursion)."""
         chain = (

@@ -893,4 +893,143 @@ describe('RequirementView', () => {
       expect(document.activeElement).toBe(wrapper.get('h1').element)
     })
   })
+
+  describe('deleting (DL-287 to DL-289)', () => {
+    const deletable = (extra: Partial<Requirement> = {}): Requirement => ({
+      ...withActions('requirement.delete'),
+      ...extra,
+    })
+    const dialog = () => document.querySelector<HTMLDialogElement>('dialog[open]')!
+    const deleteCall = (del: { mock: { calls: unknown[][] } }) => del.mock.calls[0]
+
+    it.each<Action[]>([[], ['requirement.delete']])(
+      'offers Delete only to those who may delete it: %j',
+      async (...actions) => {
+        await mountAt([READER], [ok(withActions(...actions))])
+
+        expect(Boolean(button('Delete'))).toBe(actions.length > 0)
+      },
+    )
+
+    it('confirms, starting on Cancel, and lands on the tree saying where it went', async () => {
+      const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
+      const { router } = await mountAt([READER], [ok(deletable())])
+
+      button('Delete')!.click()
+      await flushPromises()
+      expect(dialog().querySelector('h2')!.textContent).toBe('Delete ERP-RQ-7?')
+      expect(document.activeElement!.textContent!.trim()).toBe('Cancel')
+      // No children: nothing to ask about them.
+      expect(dialog().querySelector('fieldset')).toBeNull()
+      expect(dialog().textContent).toContain("“Refunds” moves to the project's Trash")
+      expect(dialog().textContent).toContain('Any pending approval request on it is cancelled.')
+      await expectNoA11yViolations(dialog())
+      dialog().querySelector('form')!.requestSubmit()
+      await flushPromises()
+
+      expect(deleteCall(del)).toEqual([
+        '/api/projects/{key}/requirements/{number}',
+        { params: { path: { key: 'ERP', number: 7 }, query: { children: 'promote' } } },
+      ])
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements')
+      expect(router.options.history.state.deleted).toBe('ERP-RQ-7')
+    })
+
+    it('asks about its children when it has some, and deletes them too when chosen', async () => {
+      const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
+      await mountAt([READER], [ok(deletable({ has_children: true, can_delete_children: true }))])
+
+      button('Delete')!.click()
+      await flushPromises()
+      const promote = dialog().querySelector<HTMLInputElement>('input[value=promote]')!
+      expect(promote.checked).toBe(true)
+      expect(dialog().querySelector('legend')!.textContent).toBe('Its children')
+      dialog().querySelector<HTMLInputElement>('input[value=delete]')!.click()
+      await flushPromises()
+      expect(dialog().textContent).toContain(
+        'Any pending approval request on it and on its children is cancelled.',
+      )
+      await expectNoA11yViolations(dialog())
+      dialog().querySelector('form')!.requestSubmit()
+      await flushPromises()
+
+      expect(deleteCall(del)![1]).toEqual({
+        params: { path: { key: 'ERP', number: 7 }, query: { children: 'delete' } },
+      })
+    })
+
+    it("offers only promoting the children when the server says they can't all go (DL-222)", async () => {
+      const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
+      await mountAt([READER], [ok(deletable({ has_children: true, can_delete_children: false }))])
+
+      button('Delete')!.click()
+      await flushPromises()
+      expect(dialog().querySelector('input[type=radio]')).toBeNull()
+      expect(dialog().textContent).toContain(
+        "Its children move up to its parent. They can't be deleted with it",
+      )
+      dialog().querySelector('form')!.requestSubmit()
+      await flushPromises()
+
+      expect(deleteCall(del)![1]).toEqual({
+        params: { path: { key: 'ERP', number: 7 }, query: { children: 'promote' } },
+      })
+    })
+
+    it('Cancel deletes nothing and returns focus to Delete', async () => {
+      const del = vi.spyOn(client, 'DELETE')
+      await mountAt([READER], [ok(deletable())])
+
+      button('Delete')!.focus()
+      button('Delete')!.click()
+      await flushPromises()
+      ;(document.activeElement as HTMLButtonElement).click()
+      await flushPromises()
+
+      expect(del).not.toHaveBeenCalled()
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      expect(document.activeElement).toBe(button('Delete'))
+    })
+
+    it('a 403 says so in the dialog and reloads what the user may do (UI-FRM-7)', async () => {
+      vi.spyOn(client, 'DELETE').mockResolvedValue(
+        failed(403, { code: 'forbidden', message: '', details: {} }),
+      )
+      const { get, router } = await mountAt([READER], [ok(deletable()), ok(REFUNDS)])
+
+      button('Delete')!.click()
+      await flushPromises()
+      dialog().querySelector('form')!.requestSubmit()
+      await flushPromises()
+
+      expect(dialog().querySelector('[role=alert]')!.textContent).toContain(
+        "You don't have permission to do that.",
+      )
+      expect(get.mock.calls.filter((c) => c[0] === '/api/projects/{key}')).toHaveLength(2)
+      expect(itemCalls(get)).toHaveLength(2)
+      expect(button('Delete')).toBeUndefined()
+      expect(router.currentRoute.value.name).toBe('project-requirement')
+    })
+
+    it('a 404 (deleted since it loaded) closes the dialog onto the not-found page', async () => {
+      vi.spyOn(client, 'DELETE').mockResolvedValue(
+        failed(404, { code: 'not_found', message: '', details: {} }),
+      )
+      const { wrapper } = await mountAt(
+        [READER],
+        [ok(deletable()), failed(404, { code: 'not_found', message: '', details: {} })],
+      )
+
+      button('Delete')!.click()
+      await flushPromises()
+      dialog().querySelector('form')!.requestSubmit()
+      await flushPromises()
+
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      expect(wrapper.get('h1').text()).toBe('Page not found')
+      // Settled as a navigation: the Delete button that took focus back is gone (UI-SHL-9).
+      expect(document.activeElement).toBe(wrapper.get('h1').element)
+      expect(document.title).toBe('Page not found · Waterline')
+    })
+  })
 })

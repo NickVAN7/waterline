@@ -19,6 +19,7 @@ export function useProjectPage(
     | 'project-requirement'
     | 'project-requirement-new'
     | 'project-members'
+    | 'project-trash'
     | 'project-access'
     | 'project-settings',
 ) {

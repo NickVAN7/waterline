@@ -2495,6 +2495,8 @@ export interface components {
             approved_revision_id: string | null;
             /** Approved Revision Number */
             approved_revision_number: number | null;
+            /** Has Children */
+            has_children: boolean;
             /** Can Delete Children */
             can_delete_children: boolean;
             /** Approved At */
@@ -2751,6 +2753,8 @@ export interface components {
             deleted_by_id: string | null;
             /** Deleted By Name */
             deleted_by_name: string | null;
+            /** Deleted By Is Active */
+            deleted_by_is_active: boolean | null;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };

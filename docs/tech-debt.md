@@ -999,8 +999,10 @@ Entry format:
   their screens come in S2-C18 and S2-C21.
 - **Fix by:** S2-C21 (`deleted_by_is_active`, with the Trash page); the reporter's half was due
   in S2-C18, with the requirement's page
-- **Status:** open (`reporter_is_active` resolved in S2-C18: `RequirementRead` carries it, and the
-  requirement's page shows "Deactivated" after the reporter's name)
+- **Status:** resolved in S2-C21 (`reporter_is_active` in S2-C18: `RequirementRead` carries it,
+  and the requirement's page shows "Deactivated" after the reporter's name; `deleted_by_is_active`
+  in S2-C21: `TrashItem` carries it, and the Trash page shows "Deactivated" after the deleter's
+  name)
 
 ### TD-78: Each authorization spec test spells out every action a role holds
 - **Added:** S2-C10 (owner, chat)

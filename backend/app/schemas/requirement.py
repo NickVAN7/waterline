@@ -98,6 +98,8 @@ class RequirementRead(BaseModel):
     approved_revision_id: uuid.UUID | None
     # Its number, null while never approved (DL-280).
     approved_revision_number: int | None
+    # Whether it has a live child: the delete dialog asks about children only then (DL-288).
+    has_children: bool
     # Whether the caller may delete the whole subtree with it (`?children=delete`, DL-222).
     can_delete_children: bool
     approved_at: datetime | None
@@ -161,4 +163,6 @@ class TrashItem(BaseModel):
     deleted_at: datetime
     deleted_by_id: uuid.UUID | None
     deleted_by_name: str | None
+    # False shows the "Deactivated" badge after the deleter's name (TD-77).
+    deleted_by_is_active: bool | None
     allowed_actions: list[Action]

@@ -667,6 +667,7 @@ class RequirementService:
                     deleted_at=cast(datetime, row.deleted_at),
                     deleted_by_id=deleters.get(row.id),
                     deleted_by_name=user.name if (user := deleter(row)) else None,
+                    deleted_by_is_active=user.is_active if user else None,
                     allowed_actions=actions(row),
                 )
                 for row in rows
@@ -783,6 +784,7 @@ class RequirementService:
             current_revision_id=requirement.current_revision_id,
             approved_revision_id=requirement.approved_revision_id,
             approved_revision_number=await self._revision_number(requirement.approved_revision_id),
+            has_children=await self.repository.has_children(requirement.id),
             can_delete_children=await self._can_delete_children(ctx, project, requirement),
             approved_at=requirement.approved_at,
             version=requirement.version,

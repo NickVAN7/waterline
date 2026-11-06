@@ -143,6 +143,10 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
   names both fields (S1-C16).
 - A page with more than one paged list names each `Pagination` after its list (`label`,
   "Archived pagination"): two landmarks never share a name (UI-TBL-3; S2-C0g review).
+- A dialog's 404 (the item gone since the page loaded) goes through the page's own gone handler,
+  which settles the not-found page or focuses the panel's title (`RequirementDetail`'s
+  `editGone`), never a bare reload: focus comes back to the opener a task later, and the reload
+  then removes it (UI-SHL-9; S2-C21 review).
 - A reload after a 403 that removes the control holding focus, while the page stays, moves focus
   to the failure alert when focus is left on `<body>` (`RequirementsTree`'s `movable` watch,
   `RequirementView`'s status change): never leave it there (UI-FRM-7; S2-C18 review).

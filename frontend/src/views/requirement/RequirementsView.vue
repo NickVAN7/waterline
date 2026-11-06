@@ -10,8 +10,10 @@
 // §3.1). A refused move tells the page (TD-85): a stale tree is reloaded, and after a 403 so is
 // what the user may do, the shell's project with it; a reload that changes the page settles it
 // as a navigation does (UI-SHL-9). Loading, the not-found page, and the redirect are
-// `useProjectPage`'s.
-import { computed, nextTick, ref, watch } from 'vue'
+// `useProjectPage`'s. A requirement deleted in the panel, or on its page (which comes here with
+// `history.state.deleted`), is said once the page is there, with a link to Trash, and focus is
+// on the `h1` (DL-287).
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
@@ -24,7 +26,9 @@ import ErrorState from '@/components/ErrorState.vue'
 import ItemPanel from '@/components/ItemPanel.vue'
 import RequirementsTree from '@/components/RequirementsTree.vue'
 import Skeleton from '@/components/Skeleton.vue'
+import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows } from '@/composables/allowedActions'
+import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
@@ -125,6 +129,37 @@ function shownChanged(requirement: Requirement) {
   const { id, title, status, priority, current_revision_id, approved_revision_id } = requirement
   treeView.value?.update({ id, title, status, priority, current_revision_id, approved_revision_id })
 }
+// Where a deleted requirement went: set in another task once the page is there, so the live region
+// that holds it is read (UI-FRM-6).
+const done = ref('')
+let announcing: ReturnType<typeof setTimeout> | undefined
+onUnmounted(() => clearTimeout(announcing))
+function sayDeleted(id: string) {
+  clearTimeout(announcing)
+  done.value = ''
+  announcing = setTimeout(() => (done.value = `${id} moved to Trash.`), ANNOUNCE_DELAY_MS)
+}
+// From the requirement's page: said once, not again on a reload of this entry (the browser keeps
+// the entry's state).
+const arrived = router.options.history.state.deleted as string | undefined
+if (window.history.state?.deleted)
+  window.history.replaceState({ ...window.history.state, deleted: undefined }, '')
+watch(
+  () => !!loaded.value && allowed.value,
+  (shownNow) => {
+    if (shownNow && arrived && !done.value) sayDeleted(arrived)
+  },
+  { immediate: true },
+)
+// Deleted in the panel: it closes onto the tree, focus on the h1 rather than the row's link,
+// which may be gone.
+async function panelDeleted(id: string) {
+  panel.value?.close({ returnFocus: false })
+  sayDeleted(id)
+  await tree.run()
+  await focusHeading()
+}
+
 // False: the requirement has gone with the permission, and this page with it.
 async function panelReload(): Promise<boolean> {
   await reloadProject()
@@ -162,6 +197,13 @@ async function panelReload(): Promise<boolean> {
           >New requirement</Button
         >
       </ProjectHeader>
+      <SuccessStatus :message="done">
+        <RouterLink
+          :to="{ name: 'project-trash', params: { key: loaded.key } }"
+          class="ml-1 underline"
+          >Open Trash</RouterLink
+        >
+      </SuccessStatus>
       <section
         aria-labelledby="requirements-heading"
         :aria-busy="tree.loading.value && !tree.data.value ? 'true' : 'false'"
@@ -222,6 +264,7 @@ async function panelReload(): Promise<boolean> {
           :focus-heading="() => panel?.focusTitle()"
           @changed="shownChanged"
           @gone="tree.run"
+          @deleted="panelDeleted"
         />
       </ItemPanel>
       <!-- Not behind the create action: a 403 may reload it away while the dialog is open. -->

@@ -3,8 +3,10 @@
 // it's in, loaded and checked here, and the requirement itself (`RequirementDetail`, shared with
 // the list's side panel, S2-C18b). A requirement missing or hidden from the user is the same
 // not-found page (UI-FBK-14); one whose project's content is closed to them is the 403 page.
+// Deleted, it's replaced by the tree, which says where it went (DL-287): Back doesn't return to
+// its 404.
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { focusHeading, syncTitle } from '@/app/routeFocus'
 import ErrorState from '@/components/ErrorState.vue'
@@ -29,6 +31,7 @@ const exportControlled = computed(
   () => !!loaded.value?.restriction_categories.includes('export_controlled'),
 )
 const route = useRoute()
+const router = useRouter()
 const number = computed(() => Number(route.params.number))
 
 // A refused change reloads what the user may do, the shell's project with it; a reload that
@@ -44,6 +47,14 @@ async function reloadProject(): Promise<boolean> {
   }
   return true
 }
+
+function deleted(id: string) {
+  void router.replace({
+    name: 'project-requirements',
+    params: { key: loaded.value!.key },
+    state: { deleted: id },
+  })
+}
 </script>
 
 <template>
@@ -58,6 +69,7 @@ async function reloadProject(): Promise<boolean> {
     :number="number"
     :reload-project="reloadProject"
     :focus-heading="focusHeading"
+    @deleted="deleted"
   />
   <div v-else class="flex flex-col gap-6">
     <div class="flex flex-col gap-6" :aria-busy="project.loading.value ? 'true' : 'false'">

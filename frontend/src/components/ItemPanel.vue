@@ -44,7 +44,7 @@ async function copy(): Promise<void> {
 
 defineExpose({
   open: () => dialog.value?.open(),
-  close: () => dialog.value?.close(),
+  close: (options?: { returnFocus?: boolean }) => dialog.value?.close(options),
   focusTitle: () => dialog.value?.focusTitle(),
 })
 </script>

@@ -41,8 +41,9 @@ Every page after sign-in has the same frame:
 - **The sidebar**, on the left: **My work**, then the **project selector**. Open the selector to
   see the current organization's projects, under its name, and choose one, or choose **All
   projects** (a link below the list) for the organization's project list. With more than eight, a filter field narrows the list as you type.
-  Once you're in a project, its pages are listed below the selector: **Home**, **Members**, and,
-  if you may change any of its settings, **Settings**.
+  Once you're in a project, its pages are listed below the selector: **Home**, **Requirements**
+  (if you may read its content), **Members**, **Settings** (if you may change any of its
+  settings), and last **Trash** (if you may read its content).
 - On a narrow screen the sidebar is behind the **Menu** button in the header, and on a phone the
   header wraps onto more than one line and scrolls away with the page.
 - **Skip to main content** is the first thing the Tab key reaches, and jumps past the header and
@@ -227,6 +228,26 @@ removed or added blank line shows as "(blank line)". Picking a From newer than T
 and a screen reader says so.
 Runs of more than three unchanged lines fold away behind **Show 12 unchanged lines**. With only
 one revision there's nothing to compare yet.
+
+**Delete** (the requirement's reporter, while it has never been approved, and project admins), at
+the top of the requirement, on its page and in the side panel, asks first: **Delete ERP-RQ-7?**
+says it moves to the project's Trash, where it can be restored. If it has children, choose what
+happens to them: **Move them up to its parent** (the default; they take its place) or **Delete
+them too**, with their own children. When you can't delete one of them yourself, only moving them
+up is offered, and the dialog says why. Any pending approval request on it (and on its children,
+when they go too) is cancelled; restoring doesn't bring the request back. **Delete requirement**
+deletes it and opens the requirements tree, which says "ERP-RQ-7 moved to Trash." with **Open
+Trash**. A link to a deleted requirement shows the page-not-found page.
+
+**Trash**, last in the sidebar under the project (`/<organization>/projects/<KEY>/trash`), lists
+the deleted requirements you may restore, newest first: each one's ID and title, who deleted it
+("Deactivated" after someone since deactivated; **System** for an app command), and when.
+Project admins see everything; a member sees the never-approved requirements they reported.
+**Restore ERP-RQ-7** brings it back with the children deleted with it, which leave the list too;
+children deleted on their own stay in the Trash. A requirement whose parent is still in the
+Trash comes back at the bottom of the top level. The page then says "Restored ERP-RQ-7." with
+**Open ERP-RQ-7**. An archived project's Trash lists the same items, with no Restore. Nothing
+is removed from the Trash automatically.
 
 **Members**, in the sidebar under the project (`/<organization>/projects/<KEY>/members`), lists
 its members and their roles (Admin, Member, Viewer); anyone on the project can see it. The

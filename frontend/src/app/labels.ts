@@ -227,6 +227,11 @@ export const APPROVAL_DECISION: Record<components['schemas']['ApprovalDecision']
   replaced: { label: 'Replaced', tone: 'neutral', icon: 'pause' },
 }
 
+/** A Trash row's type (design-doc §9; tasks and test cases join in Slices 3 and 5). */
+export const TRASH_ITEM_TYPE: Record<components['schemas']['TrashItemType'], string> = {
+  requirement: 'Requirement',
+}
+
 /** History's actor for a change an app command made (design-doc §10, DL-274, DL-275). */
 export const SYSTEM_ACTOR = 'System'
 

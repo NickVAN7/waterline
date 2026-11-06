@@ -55,7 +55,12 @@ const MOVER = project({
 async function mountAt(
   projects: Project[],
   trees: unknown[] = [ok(TREE)],
-  { direct = false, at = '/acme/projects/ERP/requirements', requirements = [] as unknown[] } = {},
+  {
+    direct = false,
+    at = '/acme/projects/ERP/requirements',
+    requirements = [] as unknown[],
+    state = undefined as Record<string, string> | undefined,
+  } = {},
 ) {
   useCurrentUserStore().me = me()
   const answers = { project: projects.map((p) => ok(p)), tree: [...trees], requirements }
@@ -90,6 +95,7 @@ async function mountAt(
         name: 'project-requirement',
         component: Page,
       },
+      { path: '/:orgSlug/projects/:key/trash', name: 'project-trash', component: Page },
     ],
   })
   installRouteFocus(router)
@@ -101,7 +107,7 @@ async function mountAt(
     { template: '<main><RouterView /></main>' },
     { global: { plugins: [router, PrimeVue] }, attachTo: document.body },
   )
-  await router.push(at)
+  await router.push(state ? { path: at, state } : at)
   await flushPromises()
   return { wrapper, get, router }
 }
@@ -402,6 +408,21 @@ describe('RequirementsView', () => {
       expect(treeCalls(get)).toHaveLength(2)
     })
   })
+  it('says where a requirement deleted on its page went, with a link to Trash (DL-287)', async () => {
+    await mountAt([READER], [ok(TREE)], { state: { deleted: 'ERP-RQ-7' } })
+
+    const status = await vi.waitFor(() => {
+      const found = [...document.querySelectorAll('main [aria-live=polite]')].find((p) =>
+        p.textContent!.includes('moved to Trash'),
+      )
+      expect(found).toBeDefined()
+      return found!
+    })
+    expect(status.textContent!.trim()).toBe('ERP-RQ-7 moved to Trash.Open Trash')
+    expect(status.querySelector('a')!.getAttribute('href')).toBe('/acme/projects/ERP/trash')
+    expect(document.activeElement).toBe(document.querySelector('main h1'))
+  })
+
   describe('the side panel (UI-SHL-11, DL-262)', () => {
     const PAYMENTS = {
       ...requirementRead(2, 'Payments'),
@@ -633,6 +654,38 @@ describe('RequirementsView', () => {
       expect(panel()).toBeNull()
       expect(wrapper.get('h1').text()).toBe("You can't open this page")
       expect(document.activeElement).toBe(wrapper.get('h1').element)
+    })
+
+    it('a delete in the panel closes it onto the reloaded tree, focus on the h1 (DL-287)', async () => {
+      vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
+      const { router, get } = await mountAt(
+        [READER],
+        [ok(TREE), ok({ items: [item(1, 'Invoicing')], truncated: false })],
+        { requirements: [ok({ ...PAYMENTS, allowed_actions: ['requirement.delete'] })] },
+      )
+      await openFromTree(2)
+
+      inPanel('Delete')!.click()
+      await flushPromises()
+      // The delete dialog, over the panel.
+      const confirm = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)!
+      // The panel's opener doesn't take focus on the way, to be read out and then removed.
+      const openerFocused = vi.fn()
+      idLink(2).addEventListener('focus', openerFocused)
+      confirm.querySelector('form')!.requestSubmit()
+      await flushPromises()
+
+      expect(openerFocused).not.toHaveBeenCalled()
+
+      expect(document.querySelector('dialog[open]')).toBeNull()
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements')
+      expect(treeCalls(get)).toHaveLength(2)
+      expect(document.querySelectorAll('tbody tr[role=row]')).toHaveLength(1)
+      expect(document.activeElement).toBe(document.querySelector('main h1'))
+      await vi.waitFor(() =>
+        expect(document.querySelector('main')!.textContent).toContain('ERP-RQ-2 moved to Trash.'),
+      )
+      expect(document.activeElement).toBe(document.querySelector('main h1'))
     })
   })
 })

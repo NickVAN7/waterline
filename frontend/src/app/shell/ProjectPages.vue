@@ -3,7 +3,7 @@
 // Requirements for those who may read its content (`requirement.view`; an export-controlled
 // project's inherited admins may not, design-doc §3.1), then Members (`project.view`: anyone who
 // sees the project reads its members), then Settings for those it offers anything
-// (`hasSettings`). A module's link arrives with its slice: no module can be enabled before it
+// (`hasSettings`), and last Trash, as Requirements (DL-202, DL-291). A module's link arrives with its slice: no module can be enabled before it
 // ships (DL-136).
 import { allows } from '@/composables/allowedActions'
 import type { Project } from '@/stores/currentOrg'
@@ -36,6 +36,12 @@ defineProps<{ project: Project; orgSlug: string | undefined }>()
       :to="{ name: 'project-settings', params: { orgSlug, key: project.key } }"
     >
       Settings
+    </SidebarLink>
+    <SidebarLink
+      v-if="allows(project, 'requirement.view')"
+      :to="{ name: 'project-trash', params: { orgSlug, key: project.key } }"
+    >
+      Trash
     </SidebarLink>
   </nav>
 </template>

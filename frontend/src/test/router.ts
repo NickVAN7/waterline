@@ -43,6 +43,7 @@ export async function testRouter(path = '/') {
       { path: '/:orgSlug/projects/:key/members', name: 'project-members', component: Page },
       { path: '/:orgSlug/projects/:key/access', name: 'project-access', component: Page },
       { path: '/:orgSlug/projects/:key/settings', name: 'project-settings', component: Page },
+      { path: '/:orgSlug/projects/:key/trash', name: 'project-trash', component: Page },
     ],
   })
   await router.push(path)

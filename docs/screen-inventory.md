@@ -227,7 +227,7 @@ Every entity that can be created can also be updated: workspace, organization, u
   other, except that only a project admin moves a requirement into approved by hand.)
 - Set priority, workstream, tags, and restriction.
 - Delete a requirement (with the detach-or-delete choices) and restore it from **Trash**
-  (Slice 2).
+  (Slice 2). *Built* (S2-C21; the choice for linked tasks and test cases joins in Slices 3 and 5).
 - Spot the gaps: requirements with no tasks, no test cases, or failing tests.
 
 **Planning**
@@ -435,7 +435,7 @@ already exists; everything else is still to build.
   so a filtered list can be bookmarked or shared.
 - **Save a filter-bar setup by name** (v1), such as "my open bugs", and reapply it.
 - Copy a link to any item.
-- Find a deleted item in Trash and restore it, if allowed (Slice 2).
+- Find a deleted item in Trash and restore it, if allowed (Slice 2). *Built* (S2-C21).
 
 **Collaborating**
 - Comment on requirements, tasks, and test cases. **Edit or delete my own comments** (an

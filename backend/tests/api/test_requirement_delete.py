@@ -429,6 +429,27 @@ async def test_the_trash_shows_each_item_who_deleted_it_and_when_newest_first(
     )
     # Deleted outside the app (no `deleted` entry): nobody to name.
     assert (oldest["deleted_by_id"], oldest["deleted_by_name"]) == (None, None)
+    assert (newest["deleted_by_is_active"], oldest["deleted_by_is_active"]) == (True, None)
+
+
+async def test_the_trash_says_when_the_deleter_was_deactivated(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, admin: User
+) -> None:
+    """Bug: a deactivated deleter shown without the "Deactivated" badge (TD-77)."""
+    await item(t, 1, "i0")
+    await delete(client, 1)
+    other = await UserFactory.create_async(name="Ben Admin", is_system_admin=False, is_active=True)
+    await ProjectMembershipFactory.create_async(
+        project=t.project, user=other, role=ProjectRole.ADMIN
+    )
+    await sign_in_as(client, other)
+    admin.is_active = False
+    await session.flush()
+
+    response = await client.get(TRASH)
+
+    (row,) = response.json()["items"]
+    assert (row["deleted_by_name"], row["deleted_by_is_active"]) == ("Ada Admin", False)
 
 
 async def test_the_trash_pages_and_filters_by_type(
@@ -461,3 +482,38 @@ async def test_an_empty_trash_is_still_paged_as_asked(
     body = (await client.get(TRASH, params={"limit": 25, "offset": 50})).json()
 
     assert body == {"items": [], "total": 0, "limit": 25, "offset": 50}
+
+
+# --- has_children ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("deleted_at", "expected"),
+    [
+        (None, True),
+        # Bug: a child in the trash counted, so the dialog asks about children it won't touch.
+        (EARLIER, False),
+    ],
+)
+async def test_the_read_says_whether_it_has_a_live_child(
+    client: AsyncClient, t: Tenancy, admin: User, deleted_at: datetime | None, expected: bool
+) -> None:
+    """DL-288: the delete dialog asks about children only when there is one."""
+    parent = await item(t, 1, "i0")
+    await item(t, 2, "i0", parent=parent, deleted_at=deleted_at)
+
+    response = await client.get(f"{REQUIREMENTS}/1")
+
+    assert response.json()["has_children"] is expected
+
+
+async def test_a_requirement_without_children_has_none(
+    client: AsyncClient, t: Tenancy, admin: User
+) -> None:
+    """Bug: the read answering for the parent, not the requirement itself (DL-288)."""
+    top = await item(t, 1, "i0")
+    await item(t, 2, "i0", parent=top)
+
+    response = await client.get(f"{REQUIREMENTS}/2")
+
+    assert response.json()["has_children"] is False

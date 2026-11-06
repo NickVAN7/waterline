@@ -11,7 +11,8 @@
 // 409. What it shows is told to its host (`changed`), so the list's row follows a change made in
 // the panel. A refused change asks the host to reload what the user may do (`reloadProject`,
 // false when the user may no longer read it); `focusHeading` is where focus goes when the control
-// that had it is gone (the page's `h1`, the panel's title).
+// that had it is gone (the page's `h1`, the panel's title). Delete (`requirement.delete`) opens
+// the delete dialog; once deleted, the host moves to the tree (`deleted`, DL-287).
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -44,6 +45,7 @@ import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RestrictionBadge from '@/views/project/RestrictionBadge.vue'
 
 import ApprovalSection from './ApprovalSection.vue'
+import DeleteRequirementDialog from './DeleteRequirementDialog.vue'
 import EditRequirementForm from './EditRequirementForm.vue'
 import RequirementHistory from './RequirementHistory.vue'
 import RequirementRevisions from './RequirementRevisions.vue'
@@ -60,7 +62,7 @@ const props = defineProps<{
   reloadProject: () => Promise<boolean>
   focusHeading: () => void | Promise<void>
 }>()
-const emit = defineEmits<{ changed: [requirement: Requirement]; gone: [] }>()
+const emit = defineEmits<{ changed: [requirement: Requirement]; gone: []; deleted: [id: string] }>()
 
 const item = useLoad(() =>
   api(
@@ -233,8 +235,8 @@ async function editRefused() {
   await nextTick()
   if (document.activeElement === document.body) failureAlert.value?.focus()
 }
-// Gone since it loaded: the reload brings the not-found page, which settles (UI-SHL-9), or the
-// panel's note, after its title.
+// Gone since it loaded (an edit's save or a delete found it gone): the reload brings the
+// not-found page, which settles (UI-SHL-9), or the panel's note, after its title.
 async function editGone() {
   editing.value = false
   await item.run()
@@ -247,6 +249,8 @@ function approvalChanged(saved: Requirement) {
 }
 
 const restricting = ref<InstanceType<typeof RestrictionDialog>>()
+const deleting = ref<InstanceType<typeof DeleteRequirementDialog>>()
+
 function restrictionSaved(saved: Requirement) {
   item.data.value = saved
   announce('Restriction saved.')
@@ -311,6 +315,12 @@ function restrictionSaved(saved: Requirement) {
           />
           <Button v-if="canRestrict" variant="secondary" @click="restricting?.open(requirement)"
             >Change restriction</Button
+          >
+          <Button
+            v-if="!editing && allows(requirement, 'requirement.delete')"
+            variant="danger"
+            @click="deleting?.open(requirement)"
+            >Delete</Button
           >
         </component>
         <div class="flex flex-wrap items-center gap-3">
@@ -428,6 +438,15 @@ function restrictionSaved(saved: Requirement) {
         :fallback-focus="focusHeading"
         @saved="restrictionSaved"
         @refused="reload"
+      />
+      <!-- Not behind the delete action: a 403 may reload it away while the dialog is open. -->
+      <DeleteRequirementDialog
+        ref="deleting"
+        :project-key="project.key"
+        :fallback-focus="focusHeading"
+        @deleted="(deletedId) => emit('deleted', deletedId)"
+        @refused="reload"
+        @gone="editGone"
       />
     </template>
     <!-- Outside the busy region, where a screen reader holds changes back until they're done. -->
