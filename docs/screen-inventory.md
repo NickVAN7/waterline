@@ -639,7 +639,7 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | No access | page | `/account/no-access` | 1 | Built |
 | My work | page | `/` | 1, sections in 2, 3, 5 | Projects, approvals, past decisions built |
 | Favorite projects | section of My work, first; star on My work's project rows (DL-302, DL-305) | `/` | 2 (S2-C21c, DL-238) | — |
-| Documentation (user guide) | page, from the user menu | `/docs` | 2 (S2-C21d, DL-238) | — |
+| Documentation (user guide) | page, from the user menu; the guide's title, a Contents list, then the guide (DL-310, DL-311) | `/docs` | 2 (S2-C21d, DL-238) | — |
 | Search results | page, from the header search bar | `/search` | 6 | — |
 | System status | page, no sign-in | `/status` | 0 | Built |
 | Page not found (404) / Forbidden (403) | page in the shell | any | 1 | Built |

@@ -90,6 +90,7 @@ S2-C21a to S2-C21d's rows, here and in "Threat-model pass", are added at their r
 | S2-C21b | `GET /api/me/sessions`, `POST /api/me/sessions/sign-out-others` | signed in (the user's own sessions, DL-298) | — | — |
 | S2-C21c | `PUT /api/projects/{key}/favorite`, `DELETE /api/projects/{key}/favorite` | `project.favorite` (visible; DL-303) | anyone who sees the project, not on an archived one | management |
 | S2-C21c | `GET /api/me/work/favorites` | signed in (scoped like My work's projects, DL-302) | — | — |
+| S2-C21d | none: `/docs` is a browser route, the guide bundled at build time (DL-308) | signed in (the shell's guard) | — | — |
 
 ## Threat-model pass
 
@@ -107,6 +108,7 @@ S2-C21a to S2-C21d's rows, here and in "Threat-model pass", are added at their r
 | A non-admin listing deactivated people | `include_deactivated` refused with a 422 through `check_permitted` unless the list's manage action allows it (DL-294) | S2-C21a |
 | Ending or seeing another user's sessions; a session surviving sign-out-others | Every session query scoped to the caller's `user_id`; the user row locked before the delete, with a race test against a sign-in in flight; no token or hash in the response (DL-298) | S2-C21b |
 | A favorite revealing a project the user can't open | The favorites section scoped like My work's projects; `PUT` and `DELETE` load the project through the scoped lookup, a 404 for one the user can't see (DL-241, DL-302, DL-303) | S2-C21c |
+| Heading ids clobbering the page's DOM or ids | Ids only on the Documentation page's own guide, never on user content, each prefixed `docs-`; still sanitized by DOMPurify, with heading-id cases in the XSS corpus (DL-311) | S2-C21d |
 
 ## Open questions for the owner (answered before S2-C0a starts)
 

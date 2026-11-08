@@ -252,7 +252,8 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   only to keep root-level workspace URLs possible later; in v1 workspace pages are `/workspace/…`.
   The system-status page (the API and database health check) is at `/status`, which is on the list;
   My work is the root route (`/`, §11), and the Documentation page's `docs` joins the list in
-  S2-C21d (DL-238). The list lives in `rules/identifiers.py` and is exported
+  S2-C21d (DL-238); an org or workspace already using `docs` keeps it, since `/docs` matches
+  only itself, but no new one or rename can take it (DL-309). The list lives in `rules/identifiers.py` and is exported
   through the OpenAPI schema (an enum), so a frontend test checks every top-level route in the
   router against the generated list.
 - **Timestamps:** `timestamptz` everywhere. Every table has `created_at`/`updated_at`, with
@@ -286,7 +287,8 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   syntax, strikethrough, and autolinks. **No remote images**: image syntax renders as a link,
   since a remote image tracks who opens the page and leaks that a Confidential item was opened
   (uploads are v2). Links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`.
-  Headings shift down one level, so a description never adds a second `h1`. Code blocks are
+  Headings in stored content shift down one level, so a description never adds a second `h1`
+  (the bundled user guide on `/docs` is rendered at its own levels, DL-310). Code blocks are
   monospace, with no syntax highlighting. A server-side renderer (`markdown-it-py` and `nh3`)
   is added only when something server-side shows content (v1.5 notifications, exports). A
   Content-Security-Policy is the second layer (§4).
@@ -1557,7 +1559,9 @@ GitHub is not part of it.
 
 ### Documentation
 The user menu's **Documentation** item renders the user guide inside the app (DL-197), at
-`/docs` (S2-C21d, DL-238; `docs` joins the reserved slugs there, §3).
+`/docs` (S2-C21d, DL-238; `docs` joins the reserved slugs there, §3). The guide is bundled into
+the web app at build time, the same for every signed-in user, with no endpoint (DL-308); its own
+heading (**User guide**) is the page's, and a Contents list after it links to each section (DL-310, DL-311).
 
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).

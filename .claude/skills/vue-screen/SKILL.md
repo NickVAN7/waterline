@@ -31,7 +31,7 @@ reference screen for your kind before writing anything, and copy its shape.
   `useProjectPage`), or the title and focus settle before there's an `h1`; an org page finds its
   org with `useRouteOrg`.
 - The page title and the focus on its one `h1` come from `PageHeader` (or `ProjectHeader`) and
-  `routeFocus` (UI-SHL-9).
+  `routeFocus` (UI-SHL-9); the auth card's pages and `/docs` are the exceptions (UI-SHL-8).
 
 ## 3. The page states, in this order in the template
 

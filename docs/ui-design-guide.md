@@ -451,8 +451,9 @@ render inside the full shell when signed in.
   **Members**, and **Settings** (UI-SHL-10). Past about eight orgs (workspace admins see all of
   them) the popover gains a filter field. With one org and no org admin rights it is plain text,
   not a control. The current org's name is always visible. There is no separate org switcher;
-  the user menu keeps workspace "Administration" only, and from S2-C21d **Documentation**
-  (DL-238; the theme choice moved to account settings in S2-C0g, DL-164), and its **Sign out** has an icon and the danger tone.
+  the user menu holds, in order, **Account settings** (the theme choice moved there in S2-C0g,
+  DL-164), workspace **Administration** (when `allowed_actions` allows), from S2-C21d
+  **Documentation** (DL-238, DL-308), and **Sign out**, with an icon and the danger tone.
 - **UI-SHL-5** **Sidebar** (`--sidebar-width`), top to bottom: **My work** (an icon, bolder
   text, and a divider below it, so it reads as separate from project navigation); the **project
   selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). **On an admin page**
@@ -485,15 +486,18 @@ render inside the full shell when signed in.
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
   page's primary action(s) on the right (wrapping below at narrow widths); a project page's
-  `ProjectHeader` holds them the same way (from S2-C0g, TD-49). The one exception is
-  the auth card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
-  size below the app's name, the card's largest text (`text-xl`; DL-176). Sections use `h2`
+  `ProjectHeader` holds them the same way (from S2-C0g, TD-49). Two exceptions: the auth
+  card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
+  size below the app's name, the card's largest text (`text-xl`; DL-176); and the
+  Documentation page (`/docs`), whose `h1` is the user guide's own, rendered by `MarkdownView`
+  at level 0, with no `PageHeader` (DL-310). Sections use `h2`
   and nest in order. The help link (3.2.6) is the user menu's **Documentation** item (S2-C21d,
   DL-238), in the same place on every page.
 - **UI-SHL-9** **Route changes:** on navigation, set `document.title` to
   `<h1 text> · Waterline` and move focus to the new `h1` (`tabindex="-1"`) once the view has
   rendered. A change that only alters list state through `useListQuery` (sort, filter, page)
-  does not move focus; it updates a polite live region instead ("12 projects").
+  does not move focus; it updates a polite live region instead ("12 projects"). On `/docs`, a
+  hash (`#docs-<section>`) moves focus to that section's heading instead (DL-311).
 - **UI-SHL-10** **Admin pages.** Organization administration (overview, members, settings) and
   workspace administration (staff, orgs, users, settings) are separate pages. The entry points
   (DL-137): the org menu in the header (UI-SHL-4) for the current org's pages, and the user
@@ -1028,8 +1032,11 @@ the revision compare in S2-C19a (DL-267).
   on its output; never `v-html` on anything else. No remote images (image syntax renders as a
   link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
   shifted below the heading the content sits under (`level`, an `h1` by default), so a
-  description never adds a second `h1` nor breaks the page's heading order (UI-SHL-8); code blocks in
-  the monospace font, with no syntax highlighting. A task-list item's `[ ]` or `[x]` is a mark
+  description never adds a second `h1` nor breaks the page's heading order (UI-SHL-8); `level`
+  0 only on the Documentation page, for the bundled guide, never for stored content (DL-310); code blocks in
+  the monospace font, with no syntax highlighting. Headings get ids only when the caller asks
+  (the Documentation page, from S2-C21d): `docs-` plus the text's words, `-2` on a repeat, so
+  user content never sets an id (DL-311). A task-list item's `[ ]` or `[x]` is a mark
   drawn in tokens and named "Not done" or "Done" (`role="img"`), not a disabled checkbox, whose
   look the tokens can't reach (DL-258). A component test runs a corpus of known XSS
   payloads (the OWASP cheat sheet's) through it, and an end-to-end test (S2-C18, DL-245) proves a

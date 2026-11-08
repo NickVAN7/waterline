@@ -3846,3 +3846,62 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan ("Feature map"; S2-C21c)
 - **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut's docs-consistency review)
+
+### DL-308: The Documentation page bundles the user guide
+- **Date:** 2026-11-07
+- **Decision:** `/docs` imports `docs/user-guide.md` with Vite's `?raw` at build time, in the
+  page's own lazy chunk, and renders it through `MarkdownView`. The web service mounts the file
+  read-only (`./docs/user-guide.md:/docs/user-guide.md:ro`, so `../docs/` resolves the same in
+  the container as on the host; the e2e stack inherits it), and Vite's `server.fs.allow` lists
+  it beside Vite's own workspace root (`searchForWorkspaceRoot`). There's no endpoint and no
+  registered action: the page is behind the signed-in shell like every other, and the guide is
+  the same for everyone. (`wl gen-client` still runs, for the `ReservedSlug` enum gaining
+  `docs`, DL-309.)
+- **Supersedes:** none (specifies DL-197's Documentation, placed in S2-C21d by DL-238)
+- **Superseded by:** none
+- **Applies to:** design-doc §11 ("Documentation"); build plan (S2-C21d)
+- **Source:** owner, Nov 7, 2026 (chat session, S2-C21d re-cut)
+
+### DL-309: An org or workspace already using the slug `docs` keeps it
+- **Date:** 2026-11-07
+- **Decision:** `docs` joins `RESERVED_SLUGS` with no migration and no forced rename. `/docs` is
+  a static route and there's no bare `/:orgSlug` route, so an existing `docs` org's URLs
+  (`/docs/overview`, `/docs/projects`, …) still resolve, and its settings still save, since the
+  form sends the slug only when it changes. No new org or workspace can take `docs`, nor can a
+  rename. A test covers the existing org.
+- **Supersedes:** none (answers what DL-238 left to the re-cut)
+- **Superseded by:** none
+- **Applies to:** design-doc §3 ("Reserved slugs"); build plan (S2-C21d)
+- **Source:** owner, Nov 7, 2026 (chat session, S2-C21d re-cut)
+
+### DL-310: The user guide's own h1 is the page's, and its opening is for readers
+- **Date:** 2026-11-07
+- **Decision:** The page renders the guide at heading level 0, so the guide's `#` heading is the
+  page's `h1` (UI-SHL-8, UI-SHL-9). The guide's opening is rewritten for its readers in
+  S2-C21d: its `#` heading becomes **User guide** (the tab reads "User guide · Waterline"), the
+  "Kept current at every checkpoint" line goes, and the Status block (still Slice 1's) becomes
+  one short line on what the app covers. It's the one page whose `h1` isn't in a `PageHeader`
+  (UI-SHL-8), and the one `MarkdownView` at level 0: stored content never is.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** user guide (its opening); build plan (S2-C21d)
+- **Source:** owner, Nov 7, 2026 (chat session, S2-C21d re-cut)
+
+### DL-311: The Documentation page has a contents list
+- **Date:** 2026-11-07
+- **Decision:** A **Contents** list (a `nav` named by `aria-label`, not a heading) right after
+  the page's `h1` links to each of the guide's `##` sections: the page renders the guide's `#`
+  line, then the list, then the rest. The links are hash links (`/docs#docs-<section>`), so a
+  section can be linked and Back works; opening `/docs` with a hash scrolls to that section and
+  focuses its heading instead of the `h1` (UI-SHL-9), with a test. `MarkdownView` gains heading ids that only a caller asking for them gets (the
+  Documentation page; user content never does, so it can't clobber the page's ids): each
+  `docs-` plus the heading's text as lowercase words joined by hyphens, a repeat given `-2`,
+  `-3`, …; DOMPurify keeps them, and the XSS corpus gains the heading-id cases. Selecting an
+  entry scrolls to its heading and moves focus there (`tabindex="-1"`).
+- **Source note:** the list's place, the hash links, and DL-310's title answer the re-cut's
+  docs-consistency review (DC-2026-11-07-s2-c21d-re-cut).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §11 ("Documentation"); ui-design-guide (UI-MD); build plan
+  (S2-C21d)
+- **Source:** owner, Nov 7, 2026 (chat session, S2-C21d re-cut)

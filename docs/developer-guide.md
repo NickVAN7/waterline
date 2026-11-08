@@ -933,7 +933,8 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   hides an action the user may never take; the server still checks.
 - **Markdown** (UI-MD-1, UI-MD-2): show stored markdown only with `<MarkdownView :source>`,
   the one place `v-html` is allowed (markdown-it with raw HTML off, then DOMPurify; links only
-  `http`, `https`, and `mailto`; images as links; headings one level down; `- [ ]` task lists as
+  `http`, `https`, and `mailto`; images as links; headings one level down, except `/docs`'s bundled
+  guide at level 0 with opt-in `docs-` heading ids, DL-310, DL-311; `- [ ]` task lists as
   marks drawn in tokens, named "Done" or "Not done"). Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
   and Preview tabs; `focus()` returns to Write). A new XSS vector goes in
   `MarkdownView.xss-corpus.ts`, which its spec runs through the renderer.
@@ -972,7 +973,8 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
 - **Adding a screen:** a view in `src/views/<area>/`, a route in `src/app/router.ts` (above the
   not-found route, which must stay last), and a `*.spec.ts` next to it that calls
   `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
-  page's primary actions (UI-SHL-8; the auth card's pages use a plain, smaller `h1`): navigation sets the title
+  page's primary actions (UI-SHL-8; the auth card's pages use a plain, smaller `h1`, and `/docs`
+  the guide's own): navigation sets the title
   to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
   `src/views/project/ProjectHomeView.vue`).
