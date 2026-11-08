@@ -2,7 +2,7 @@
 // The one markdown renderer (UI-MD-1, DL-140): markdown-it with raw HTML off, then DOMPurify on
 // its output. The CSP is the second layer behind it (design-doc §4, DL-142).
 import DOMPurify from 'dompurify'
-import MarkdownIt from 'markdown-it'
+import MarkdownIt, { type Token } from 'markdown-it'
 
 const SAFE_URL = /^(?:https?:|mailto:)/i
 
@@ -19,13 +19,39 @@ md.renderer.rules.image = (tokens, idx) => {
   return `<a href="${md.utils.escapeHtml(src)}">${md.utils.escapeHtml(token.content || src)}</a>`
 }
 
+type RenderEnv = {
+  level: number
+  // Heading ids, only for a caller that asks (the Documentation page), so stored content never
+  // sets an id that could clobber the page's (DL-311). Each repeat counted, for its `-2`.
+  ids?: Map<string, number>
+}
+
+/** A heading's plain text: its inline token's text and code spans. */
+function headingText(inline: Token | undefined): string {
+  return (inline?.children ?? [])
+    .filter((child) => child.type === 'text' || child.type === 'code_inline')
+    .map((child) => child.content)
+    .join('')
+}
+
+function headingId(text: string, ids: Map<string, number>): string {
+  const base = `docs-${(text.toLowerCase().match(/[a-z0-9]+/g) ?? []).join('-')}`
+  const seen = (ids.get(base) ?? 0) + 1
+  ids.set(base, seen)
+  return seen === 1 ? base : `${base}-${seen}`
+}
+
 md.core.ruler.push('waterline', (state) => {
   const tokens = state.tokens
+  const env = state.env as RenderEnv
   tokens.forEach((token, i) => {
+    if (token.type === 'heading_open' && env.ids) {
+      token.attrSet('id', headingId(headingText(tokens[i + 1]), env.ids))
+    }
     // Headings shift below the heading the content sits under (`level`, an h1 by default), so
     // content never adds a second h1 nor breaks the page's heading order (UI-SHL-8).
     if (token.type === 'heading_open' || token.type === 'heading_close') {
-      token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + (state.env as { level: number }).level)}`
+      token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + env.level)}`
     }
     // Task lists: "[ ]" or "[x]" opening a list item becomes a box drawn in our tokens, named
     // "Done" or "Not done": a disabled checkbox wears the browser's grey, under 3:1 (TD-88).
@@ -58,17 +84,33 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 })
 
 /** The markdown as sanitized HTML. */
-function renderMarkdown(source: string, level: number): string {
-  return DOMPurify.sanitize(md.render(source, { level }), sanitizeOptions)
+function renderMarkdown(source: string, level: number, anchors: boolean): string {
+  const env: RenderEnv = { level, ids: anchors ? new Map() : undefined }
+  return DOMPurify.sanitize(md.render(source, env), sanitizeOptions)
+}
+
+/** The `##` sections of markdown rendered with `anchors` at level 0: each one's text and the id
+ * its heading gets (the Documentation page's Contents, DL-311). */
+export function sections(source: string): { id: string; text: string }[] {
+  const tokens = md.parse(source, { level: 0, ids: new Map() } satisfies RenderEnv)
+  return tokens.flatMap((token, i) =>
+    token.type === 'heading_open' && token.markup === '##'
+      ? [{ id: String(token.attrGet('id')), text: headingText(tokens[i + 1]) }]
+      : [],
+  )
 }
 </script>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 
-// `level`: the heading level the content sits under.
-const props = withDefaults(defineProps<{ source: string; level?: number }>(), { level: 1 })
-const html = computed(() => renderMarkdown(props.source, props.level))
+// `level`: the heading level the content sits under. `anchors`: give headings ids (the bundled
+// user guide only, DL-311).
+const props = withDefaults(defineProps<{ source: string; level?: number; anchors?: boolean }>(), {
+  level: 1,
+  anchors: false,
+})
+const html = computed(() => renderMarkdown(props.source, props.level, props.anchors))
 </script>
 
 <template>
@@ -98,6 +140,13 @@ const html = computed(() => renderMarkdown(props.source, props.level))
 }
 .markdown :deep(ol) {
   list-style: decimal;
+}
+.markdown :deep(h1) {
+  /* Only at level 0 (the user guide, DL-310): PageHeader's h1. */
+  margin: 0;
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  font-weight: 600;
 }
 .markdown :deep(:where(h2, h3, h4, h5, h6)) {
   margin-block: calc(var(--spacing) * 4) calc(var(--spacing) * 2);

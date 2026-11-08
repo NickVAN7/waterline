@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { expectNoA11yViolations } from '@/test/a11y'
 
-import MarkdownView from './MarkdownView.vue'
+import MarkdownView, { sections } from './MarkdownView.vue'
 import { XSS_CORPUS } from './MarkdownView.xss-corpus'
 
 function render(source: string) {
@@ -144,6 +144,36 @@ describe('MarkdownView', () => {
     expect(view.text()).toBe('second')
   })
 
+  it('gives headings no id unless the caller asks, so stored content never sets one (DL-311)', () => {
+    const view = render('# One\n\n## Two')
+
+    expect(view.findAll('[id]')).toHaveLength(0)
+  })
+
+  it('with anchors, ids each heading docs- and its words, a repeat -2 and on (DL-311)', () => {
+    const view = mount(MarkdownView, {
+      props: {
+        source: '# User guide\n\n## My work\n\n### The `star`!\n\n## My work',
+        level: 0,
+        anchors: true,
+      },
+    })
+
+    expect(view.findAll('h1, h2, h3').map((h) => [h.element.tagName, h.attributes('id')])).toEqual([
+      ['H1', 'docs-user-guide'],
+      ['H2', 'docs-my-work'],
+      ['H3', 'docs-the-star'],
+      ['H2', 'docs-my-work-2'],
+    ])
+  })
+
+  it('lists the ## sections with the ids their headings get (the Contents, DL-311)', () => {
+    expect(sections('# Title\n\n## Signing in\n\n### Detail\n\n## Signing in')).toEqual([
+      { id: 'docs-signing-in', text: 'Signing in' },
+      { id: 'docs-signing-in-2', text: 'Signing in' },
+    ])
+  })
+
   it('has no accessibility violations', async () => {
     const view = render(
       '# Title\n\nText with [a link](https://example.com).\n\n- [ ] Task\n- [x] Done\n\n| H |\n|---|\n| d |\n\n```\ncode\n```',
@@ -166,6 +196,21 @@ describe('MarkdownView', () => {
       )
       expect(
         urls.filter((a) => !/^(?:https?:|mailto:)/i.test(a.value)).map((a) => a.value),
+      ).toEqual([])
+    })
+
+    // The Documentation page's heading ids keep every payload as harmless (DL-311).
+    it.each(XSS_CORPUS)('neutralizes %s with anchors', (payload) => {
+      const root = mount(MarkdownView, {
+        props: { source: payload, level: 0, anchors: true },
+        attachTo: document.body,
+      }).element as HTMLElement
+
+      expect(root.querySelectorAll(DANGEROUS)).toHaveLength(0)
+      const attributes = [...root.querySelectorAll('*')].flatMap((el) => [...el.attributes])
+      expect(attributes.filter((a) => /^on/i.test(a.name)).map((a) => a.name)).toEqual([])
+      expect(
+        attributes.filter((a) => a.name === 'id' && !/^docs-[a-z0-9-]*$/.test(a.value)),
       ).toEqual([])
     })
   })

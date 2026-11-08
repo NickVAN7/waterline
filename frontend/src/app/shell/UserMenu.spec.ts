@@ -60,7 +60,11 @@ describe('UserMenu', () => {
     expect(document.querySelector('#user-menu [role=menu]')?.getAttribute('aria-label')).toBe(
       'Account menu',
     )
-    expect(items().map((li) => li.textContent?.trim())).toEqual(['Account settings', 'Sign out'])
+    expect(items().map((li) => li.textContent?.trim())).toEqual([
+      'Account settings',
+      'Documentation',
+      'Sign out',
+    ])
     await expectNoA11yViolations(document.body)
   })
 
@@ -73,6 +77,17 @@ describe('UserMenu', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('account')
+  })
+
+  it('links to the user guide, as Documentation (DL-238)', async () => {
+    const { router } = await openMenu()
+    const link = item('Documentation').querySelector('a')!
+    expect(link.getAttribute('href')).toBe('/docs')
+
+    link.click()
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('docs')
   })
 
   it('links to the workspace pages, as Administration, for those who may see them (UI-SHL-10, DL-137)', async () => {
@@ -103,6 +118,7 @@ describe('UserMenu', () => {
     expect(items().map((li) => li.textContent?.trim())).toEqual([
       'Account settings',
       'Administration',
+      'Documentation',
       'Sign out',
     ])
   })

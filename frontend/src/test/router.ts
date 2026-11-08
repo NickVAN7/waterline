@@ -12,6 +12,7 @@ export async function testRouter(path = '/') {
       { path: '/sign-in', name: 'sign-in', component: Page },
       { path: '/account/change-password', name: 'change-password', component: Page },
       { path: '/status', name: 'status', component: Page },
+      { path: '/docs', name: 'docs', component: Page },
       { path: '/account', name: 'account', component: Page },
       { path: '/account/password', name: 'account-password', component: Page },
       { path: '/account/no-access', name: 'no-access', component: Page },

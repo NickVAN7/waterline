@@ -21,8 +21,9 @@ _SLUG_CHARACTERS = _LOWERCASE | frozenset(string.digits) | {"-"}
 # none may equal one of these; workspace slugs follow the same list (design-doc §3). Every
 # top-level route in the frontend's router must be listed here (a frontend test checks it,
 # from S1-C14). `api` is the backend's path behind the Vite proxy; `assets`, the built files.
+# An org or workspace that took a slug before it joined the list keeps it (`docs`, DL-309).
 RESERVED_SLUGS: frozenset[str] = frozenset(
-    {"account", "api", "assets", "sign-in", "status", "workspace"}
+    {"account", "api", "assets", "docs", "sign-in", "status", "workspace"}
 )
 
 

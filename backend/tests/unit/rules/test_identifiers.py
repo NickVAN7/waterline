@@ -108,7 +108,18 @@ def test_invalid_slugs(slug: str, problem: IdentifierProblem) -> None:
     assert slug_problem(slug) is problem
 
 
-@pytest.mark.parametrize("route", ["workspace", "account", "sign-in", "status", "api", "assets"])
+@pytest.mark.parametrize(
+    "route",
+    [
+        "workspace",
+        "account",
+        "sign-in",
+        "status",
+        "api",
+        "assets",
+        "docs",  # the Documentation page, from S2-C21d (DL-238, DL-309)
+    ],
+)
 def test_top_level_routes_are_reserved(route: str) -> None:
     assert route in RESERVED_SLUGS
     assert slug_problem(route) is IdentifierProblem.RESERVED

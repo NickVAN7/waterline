@@ -665,7 +665,8 @@ render inside the full shell when signed in.
   never valid and the reason is shown.
 - **UI-FRM-16** **Layout:** one column, label above control, control width suggests the expected
   input. No autofocus on page load; focus moves only in a dialog, on a failed submit, or on a
-  route change (UI-SHL-9).
+  route change (UI-SHL-9). The one load that moves focus is `/docs` with a section's hash, to
+  that section's heading (DL-311).
 - **UI-FRM-17** **Field hint** (for an optional nicety, and for naming an icon-only control such
   as the row-remove X): a short text that appears on pointer hover **and** on keyboard focus, stays
   visible while the pointer is over it, and is dismissed with Esc. A hint is never the only copy:

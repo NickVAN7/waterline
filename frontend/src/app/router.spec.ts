@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { flushPromises } from '@vue/test-utils'
 import type { App } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory } from 'vue-router'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
@@ -318,6 +318,17 @@ describe('reserved top-level routes', () => {
   it.each(routes.map((route) => route.path))('%s starts with a reserved slug', (path) => {
     const first = path.split('/')[1] ?? ''
     expect(OPEN.includes(first) || reserved.includes(first)).toBe(true)
+  })
+
+  // An org that took the slug `docs` before it was reserved keeps its pages (DL-309).
+  it.each([
+    ['/docs/overview', 'org-overview'],
+    ['/docs/projects', 'org-projects'],
+    ['/docs/projects/PORTAL', 'project-home'],
+  ])("%s is still the `docs` org's page, not the Documentation page", (path, name) => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+
+    expect(router.resolve(path).name).toBe(name)
   })
 })
 

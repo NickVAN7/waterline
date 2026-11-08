@@ -1,13 +1,7 @@
-# Waterline — User Guide
+# User guide
 
-How to use each feature, from an end user's point of view. Kept current at every checkpoint.
-
-> **Status:** Slice 1's features. You can sign in, change a temporary password, find your
-> projects from My work, the org menu, and the project selector, create projects, run a
-> project's members and settings and review who can reach it, edit your profile, change your
-> password, and choose a light or dark theme. Workspace owners and admins run the workspace from its
-> administration pages, and organization owners and admins run their organization's members and
-> settings from theirs. Requirements, tasks, and test cases come in later slices.
+How to use Waterline: signing in, finding your way around, your projects and their
+requirements, approvals, your account, and running a workspace or an organization.
 
 ## Signing in
 
@@ -324,6 +318,12 @@ Open the menu with your name and choose **Account settings**.
   using, when each signed in, and when it was last active (**Active now** for this one).
   **Sign out other sessions** signs out every one but this, and says "Your other sessions are
   signed out."; with no others, it says "You have no other sessions."
+
+## Documentation
+
+Open the menu with your name and choose **Documentation** to read this guide inside Waterline
+(`/docs`). The list of sections under its title links to each one; a section's address
+(`/docs#docs-account-settings`, say) opens the guide at that section, so you can share it.
 
 ## Choosing a password
 

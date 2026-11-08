@@ -3083,7 +3083,7 @@ export interface components {
          * @description Top-level browser routes: no workspace or org slug may be one.
          * @enum {string}
          */
-        ReservedSlug: "account" | "api" | "assets" | "sign-in" | "status" | "workspace";
+        ReservedSlug: "account" | "api" | "assets" | "docs" | "sign-in" | "status" | "workspace";
     };
     responses: never;
     parameters: never;

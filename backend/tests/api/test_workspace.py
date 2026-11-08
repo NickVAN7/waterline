@@ -179,6 +179,7 @@ async def test_the_openapi_schema_carries_the_reserved_slugs(client: AsyncClient
         "account",
         "api",
         "assets",
+        "docs",
         "sign-in",
         "status",
         "workspace",

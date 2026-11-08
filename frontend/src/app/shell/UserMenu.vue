@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The user menu (UI-SHL-8): account settings, where the theme is chosen (UI-TOK-2, DL-164), and
+// The user menu (UI-SHL-4): account settings, where the theme is chosen (UI-TOK-2, DL-164), and
 // sign out, with an icon in the danger tone. PrimeVue's Menu (UI-STY-3).
 // "Administration" leads to the workspace's admin pages for those who may see them
 // (`workspace.view`; UI-SHL-10, DL-104); an org's are in the org menu (UI-SHL-4, DL-137).
@@ -28,6 +28,8 @@ const items = computed<MenuItem[]>(() => [
   ...(allows(workspace.value, 'workspace.view')
     ? [{ label: 'Administration', route: { name: 'workspace-staff' } }]
     : []),
+  // The user guide, the help link (UI-SHL-8, DL-238).
+  { label: 'Documentation', route: { name: 'docs' } },
   { separator: true },
   // An icon and the danger tone set it apart (UI-SHL-4, DL-137).
   { label: 'Sign out', danger: true, command: () => emit('signOut') },

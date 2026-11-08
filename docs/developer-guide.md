@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C21c (Favorite projects) built; next is S2-C21d (Documentation page; `docs/reviews/`).
+> **Status:** S2-C21d (Documentation page) built; next is S2-C22 (Slice verification; `docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -476,7 +476,7 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 | `migrate` | `alembic upgrade head` once, then exits | — |
 | `api` | uvicorn with `--reload`, `backend/` mounted | `API_PORT` (8000) |
 | `worker` | the procrastinate worker, `backend/` mounted | — |
-| `web` | the Vite dev server, `frontend/` mounted; proxies `/api` to `api` | `WEB_PORT` (5173) |
+| `web` | the Vite dev server, `frontend/` mounted, and `docs/user-guide.md` read-only for the Documentation page (DL-308); proxies `/api` to `api` | `WEB_PORT` (5173) |
 
 - `api`, `worker`, and `migrate` share the backend image; `migrate` runs first, and `api` and
   `worker` start only once it has succeeded (the worker can't run without procrastinate's

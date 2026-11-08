@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
 import { expectFocusNotObscured, expectNoA11yViolations } from './support/a11y'
 import { signIn } from './support/demo'
@@ -95,6 +95,35 @@ test('the user menu works from the keyboard, with a visible focus ring', async (
   await page.keyboard.press('Escape')
   await expect(menu).toHaveCount(0)
   await expect(button).toBeFocused()
+})
+
+test('the user menu opens the user guide, and a section link opens its section (DL-308 to DL-311)', async ({
+  page,
+}) => {
+  await signIn(page, 'casey')
+
+  await page.getByRole('button', { name: /Account menu/ }).click()
+  await page.getByRole('menuitem', { name: 'Documentation' }).click()
+
+  // The guide reached the page through the Compose mount and Vite's allow list (DL-308).
+  await expect(page).toHaveURL('/docs')
+  await expect(page.getByRole('heading', { level: 1, name: 'User guide' })).toBeFocused()
+  await expect(page).toHaveTitle('User guide · Waterline')
+  const contents = page.getByRole('navigation', { name: 'Contents' })
+  await expect(contents.getByRole('link', { name: 'Signing in' })).toBeVisible()
+  await expectNoA11yViolations(page)
+
+  await contents.getByRole('link', { name: 'Account settings' }).click()
+  await expect(page).toHaveURL('/docs#docs-account-settings')
+  await expect(page.getByRole('heading', { level: 2, name: 'Account settings' })).toBeFocused()
+  await expectFocusedHeadingClear(page)
+
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1, name: 'User guide' })).toBeFocused()
+
+  await page.goto('/docs#docs-documentation')
+  await expect(page.getByRole('heading', { level: 2, name: 'Documentation' })).toBeFocused()
+  await expectFocusedHeadingClear(page)
 })
 
 test("a project's lowercase key is replaced with its own", async ({ page }) => {
@@ -209,3 +238,14 @@ test('focus is never under the sticky header on a page that scrolls', async ({ p
 
   await expectFocusNotObscured(page)
 })
+
+/** The focused element (a heading a hash scrolled to) is drawn clear of the sticky header. */
+async function expectFocusedHeadingClear(page: Page): Promise<void> {
+  const clear = await page.evaluate(() => {
+    const element = document.activeElement!
+    const box = element.getBoundingClientRect()
+    const hit = document.elementFromPoint(box.left + 1, box.top + 1)
+    return hit === element || element.contains(hit)
+  })
+  expect(clear, 'the focused heading is under the sticky header').toBe(true)
+}

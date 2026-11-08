@@ -149,6 +149,13 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/project/ProjectSettingsView.vue'),
     meta: { settlesItself: true },
   },
+  // The user guide (design-doc §11, DL-308); it settles its own focus for a section's hash.
+  {
+    path: '/docs',
+    name: 'docs',
+    component: () => import('@/views/docs/DocsView.vue'),
+    meta: { settlesItself: true },
+  },
   {
     path: '/status',
     name: 'status',

@@ -64,4 +64,10 @@ export const XSS_CORPUS: readonly string[] = [
   '```html\n<script>alert(1)</script>\n```',
   '| a |\n|---|\n| <img src=x onerror=alert(1)> |',
   '- [ ] <img src=x onerror=alert(1)>',
+  // Headings, for the ids the Documentation page gives them (DL-311)
+  '# x" onmouseover="alert(1)',
+  '## <img src=x onerror=alert(1)>',
+  '# location',
+  '# __proto__\n\n# constructor',
+  '# [x](javascript:alert(1))',
 ]

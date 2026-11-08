@@ -101,6 +101,8 @@ services:
       - "127.0.0.1:${WEB_PORT:-5173}:5173"
     volumes:
       - ./frontend:/app
+      # The user guide, which the Documentation page imports at its path beside `frontend/` (DL-308).
+      - ./docs/user-guide.md:/docs/user-guide.md:ro
       # node_modules from the image, not the host's; `wl up` renews it on every start.
       - /app/node_modules
     depends_on:
