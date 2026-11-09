@@ -845,10 +845,9 @@ describe('RequirementsTree', () => {
       expect(shown()).toEqual(['Invoicing', 'Payments', 'Card payments', 'Refunds', 'Reporting'])
       expect(expandButton().textContent!.trim()).toBe('Expand requirement')
       expect(expandButton().getAttribute('aria-disabled')).toBeNull()
-      expect(note()).toBe('')
     })
 
-    it('says nothing once it has opened the whole branch', async () => {
+    it('says how many rows it opened once it has opened the whole branch', async () => {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
       mountTree(DEEP)
       await flushPromises()
@@ -860,7 +859,18 @@ describe('RequirementsTree', () => {
       vi.advanceTimersByTime(ANNOUNCE_DELAY_MS)
       await flushPromises()
 
-      expect(note()).toBe('')
+      expect(note()).toBe('Opened all 2 rows under PMT-RQ-2.')
+    })
+
+    it('says "1 row" for a branch with one row under it', async () => {
+      mountTree(DEEP.slice(0, 1).concat(item(11, 'Invoice runs', 1)))
+      await flushPromises()
+      await select('Invoicing')
+
+      expandButton().click()
+      await vi.waitFor(() => expect(note()).not.toBe(''))
+
+      expect(note()).toBe('Opened 1 row under PMT-RQ-1.')
     })
 
     it('stays enabled on a branch already open, and changes nothing', async () => {

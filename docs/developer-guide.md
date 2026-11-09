@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C21d (Documentation page) built; next is S2-C22 (Slice verification; `docs/reviews/`).
+> **Status:** S2-C22 (Slice verification) built; next is Slice 2's retro, then Slice 3 (`docs/reviews/`).
 
 ## 1. Workstation setup
 
@@ -641,12 +641,12 @@ a filter on another table, written with `EXISTS`, never a join, so no item repea
 `search` columns for `?q=`, `archived_column` (archived rows hidden, with `?include_archived=true`
 or alone with `?archived_only=true`; both at once is a 422 `conflict`, DL-181, DL-182),
 `active_column` (a people list's `User.is_active`: deactivated people hidden, with
-`?include_deactivated=true`, DL-293), `soft_deleted`, and `paging="cursor"` for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
+`?include_deactivated=true`, DL-293), and `paging="cursor"` for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
 parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
 the service; the **repository** builds a statement already scoped to what the user may see and
 calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)` (newest first,
 `next_cursor`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
-some users may filter by), `include_deleted`, and `include_deactivated` (the list's admins only,
+some users may filter by) and `include_deactivated` (the list's admins only,
 DL-294; the roster's `manage` action) apply only when the endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
 `not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`;
 `page.with_items(rows)` turns a `PageResult` into the response with the rows built from it.
@@ -697,8 +697,13 @@ confirmation with `_confirmation(values, needed=..., members=...)`: the 422s
 `confirmation_required`, `members_changed`, and `confirmation_not_needed`, under the project's row
 lock, with the confirmation returned for the audit event (DL-81). `set_restriction` checks its
 rights after taking the project's lock, against the project and the caller's own project role
-read again under it (`_with_current_role`): a removal takes that lock first, so an explicit admin
-removed meanwhile can't lower (owner decision, S1-C13 review).
+read again under it (`with_current_role`): a removal takes that lock first, so an explicit admin
+removed meanwhile can't lower (owner decision, S1-C13 review). An approval decision loads the approver's whole
+authorization context again under its locks, and refuses a deactivated account (TD-82), so a
+removal, role change, revocation, or deactivation that committed while it waited is seen. Every requirement write checks its right
+again once it holds the project, whose row the hold or the tree lock (`lock_tree`) reads again:
+a create, edit, restriction change, move, delete, or restore sees an export-control change or archive that committed
+while it waited (TD-80).
 
 **Relationships** are always `lazy="raise"`: load what you use with `selectinload` /
 `joinedload` in the repository. Touching an unloaded relationship raises instead of emitting
@@ -908,7 +913,8 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   announcement; other failures get our own wording (`FORM_MESSAGES`: retry for a network error,
   reload for a 409). See `src/views/auth/SignInView.vue`.
 - **Styles:** Tailwind v4 utilities from the tokens (`src/app/styles/tokens.css`, a copy of
-  `docs/ui/tokens.css`; a new color pair goes in `docs/ui/check_contrast.py`, run as
+  `docs/ui/tokens.css`; a new color pair goes in `docs/ui/check_contrast.py`, which `wl check`
+  runs against it through a docs consistency test; by hand,
   `python3 docs/ui/check_contrast.py frontend/src/app/styles/tokens.css`). PrimeVue reads the
   same tokens through `src/app/theme/preset.ts`. Dark mode follows the system;
   `data-theme="light"`/`"dark"` on `<html>` overrides it: account settings' Appearance section
@@ -977,7 +983,9 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   the guide's own): navigation sets the title
   to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
-  `src/views/project/ProjectHomeView.vue`).
+  `src/views/project/ProjectHomeView.vue`); a reload after a user's action that replaces the page
+  (now the not-found or 403 page) calls `replacedPage()` instead, which focuses the new `h1` on a
+  visit's first page too.
 
 ## 8. Conventions
 
@@ -1196,6 +1204,7 @@ database. They check:
 | Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
 | § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` means a design-doc section, so refer to this guide's sections as "section N". The exceptions: `guide §N` (or `ui-design-guide §N`) names a section of `docs/ui-design-guide.md`; in that guide a bare `§N` is its own section; in `.claude/agents/ui-reviewer.md` a bare `§N` is its own section or the guide's; and in both, `design-doc §N` still means the design doc |
 | Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
+| Token contrast | `docs/ui/check_contrast.py` fails on `frontend/src/app/styles/tokens.css`: a pair below its §3.1 minimum in either theme (ui-design-guide UI-TOK-3, TD-61) |
 | Review records | from Slice 2 on (DL-138, DL-165): the latest `checkpoint(<ID>):` commit has no `docs/reviews/s<n>/<ID>.md`; a slice has an `S<n>-C1` record but no `S<n>-C0` or `S<n>-C0a` record; or the record of the slice's last row has no `## simplicity-auditor` heading |
 
 Fixing a failure: the message names both files and the mismatch. Update whichever side is

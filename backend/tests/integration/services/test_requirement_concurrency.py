@@ -156,7 +156,7 @@ async def test_a_move_in_progress_doesnt_block_a_create(concurrency: SessionMake
     ctx = AuthzContext(user_id=admin.id, is_system_admin=True)
 
     async with concurrency() as moving, concurrency() as creating:
-        await RequirementRepository(moving).lock_tree(project.id)
+        await RequirementRepository(moving).lock_tree(await moving.get_one(Project, project.id))
         await creating.execute(text("SET LOCAL lock_timeout = '2s'"))
         loaded = await creating.get_one(Project, project.id)
         created = await outcome(

@@ -6,6 +6,8 @@ structure changes fails with `DocsStructureError` instead of passing by finding 
 """
 
 import re
+import subprocess
+import sys
 from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
@@ -1015,3 +1017,40 @@ def test_the_latest_checkpoint_without_a_record_is_reported() -> None:
 
 def test_a_slice_1_checkpoint_needs_no_record_here() -> None:
     assert docs.review_record_problems({}, {}, docs.Checkpoint(1, 17)) == []
+
+
+# --- Token contrast (ui-design-guide UI-TOK-3, §9; TD-61) ------------------------------------
+
+_CONTRAST = docs.REPO_ROOT / "docs/ui/check_contrast.py"
+
+
+def _contrast(tokens: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(  # noqa: S603 -- fixed arguments: this interpreter running the repo's script
+        [sys.executable, "-I", str(_CONTRAST), str(tokens)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_every_token_pair_meets_its_contrast_minimum_in_both_themes() -> None:
+    result = _contrast(docs.REPO_ROOT / "frontend/src/app/styles/tokens.css")
+
+    assert result.returncode == 0, result.stdout
+
+
+def test_the_contrast_check_fails_a_pair_below_its_minimum(tmp_path: Path) -> None:
+    """Body text #777777 on #ffffff is 4.48:1, under 4.5:1: the check can fail."""
+    tokens = (docs.REPO_ROOT / "frontend/src/app/styles/tokens.css").read_text(encoding="utf-8")
+    weak = re.sub(
+        r"--color-text:\s*light-dark\(\s*#[0-9a-fA-F]{6}",
+        "--color-text: light-dark(#777777",
+        tokens,
+        count=1,
+    )
+    assert weak != tokens
+    (tmp_path / "tokens.css").write_text(weak, encoding="utf-8")
+
+    result = _contrast(tmp_path / "tokens.css")
+
+    assert (result.returncode, "color-text on color-bg" in result.stdout) == (1, True)

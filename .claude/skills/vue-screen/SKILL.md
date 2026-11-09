@@ -36,8 +36,9 @@ reference screen for your kind before writing anything, and copy its shape.
 ## 3. The page states, in this order in the template
 
 1. **Not allowed or not found:** `NotFoundView` or `ForbiddenView`, and the same 404 whether it's
-   missing or hidden (UI-FBK-14). A 404 after the page loaded (the thing deleted since) swaps in
-   the not-found page through `settlePage()`.
+   missing or hidden (UI-FBK-14). A 404 or 403 after the page loaded (the thing deleted since, a
+   refusal) swaps in that page through `replacedPage()`, which focuses its `h1` on a visit's
+   first page too; `settlePage()` is for the page's own first load.
 2. **Failed:** `ErrorState` keyed on `failures`, `live` after the first, with Retry.
 3. **Loading:** `Skeleton` in the region that holds `aria-busy` (UI-FBK-11).
 4. **Empty:** `EmptyState`, saying what would fill it.

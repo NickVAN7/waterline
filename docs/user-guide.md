@@ -77,7 +77,7 @@ loaded, it shows **Try again** and the others still show; if the whole page can'
 An organization's project list (`/<organization>/projects`) shows its projects that you can
 see, each with its key, type, and status, 25 to a page (archived projects are left out:
 organization owners and admins find them in the Overview's **Archived** list), with **Previous page** and **Next page** links when there are more. **Status**
-and **Type** narrow the list; **Clear filters** shows them all again. The page you're on and the
+and **Type** narrow the list; when no project matches, **Clear filters** shows them all again. The page you're on and the
 filters are in the address, so a link or a reload opens the same list.
 
 **New project**, in the project selector, is there if you may create projects in the organization
@@ -104,8 +104,8 @@ shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status. 
 requirements showing: open a branch with its arrow, or with the Right arrow key on its row
 (Left closes it). To open a requirement's whole branch at once, select its row and choose
 **Expand requirement**; the button says "Expanding…" until it's done. It opens up to 500 rows
-under the requirement, level by level; past that it says that deeper rows stay closed, and you
-open them with their arrows or the Right arrow key. A project with more than 2,000
+under the requirement, level by level, and says how many it opened; past that it says that
+deeper rows stay closed, and you open them with their arrows or the Right arrow key. A project with more than 2,000
 requirements shows the first 2,000, with a note saying so; there, a requirement you move to the
 bottom of its level can fall past the first 2,000 and leave the tree the next time it loads. Anyone who can read the project's
 content can open it; on an export-controlled project, that's only its members.
@@ -137,12 +137,13 @@ you make there shows in the tree. **Open full page** goes to the requirement's p
 (`…/requirements/<n>`), and **Copy link** copies that page's address, for sharing. The panel and
 the page show the same: its title, ID, status, restriction, priority, reporter (with
 "Deactivated" after a deactivated reporter's name), and its description. A status reads
-**Approved · modified** when the requirement was approved and has changed since. If the
+**Approved · modified** when the requirement is Approved and has changed since its approved revision. If the
 description has no "Acceptance Criteria" heading, a note says so. **Change status** (members and
 admins) sets any status but its own and Approved, which comes only from an approval. If someone
 changed the requirement since you opened it, the change is refused and the page shows the latest.
 **Change restriction** sets the requirement's restriction level and categories: members can raise
-it, only the project's admins can lower it, and it is never below the project's own. The badge
+it, only the project's admins can lower it (None and Internal count as the same level, so a member
+may switch between them), and it is never below the project's own. The badge
 shows the restriction that applies, the stricter of the requirement's and the project's levels
 with both sets of categories, so a requirement on a Confidential project reads Confidential
 without one of its own; **None** in Change restriction means "same as the project".
@@ -199,7 +200,8 @@ shows it for you to decide on:
   see it), then press **Approve** or **Reject**. A decision is final. Rejecting ends the whole
   request; with no comment, Waterline asks first: **Reject without a comment** goes ahead, and
   **Add a comment** takes you back to the comment.
-- Once everyone has approved, the requirement is approved at that revision. If the request was
+- Once everyone has approved, that revision is recorded as approved ("Last approved: revision
+  N"): a Draft requirement becomes Approved; one in any other status keeps its status. If the request was
   cancelled or decided meanwhile, the section says it isn't pending any more and shows where it
   stands.
 
@@ -223,7 +225,7 @@ requirement is "Approved · modified", on the approved revision against the curr
 revision's **Compare revision 3 with revision 2** picks it against the one before. The title
 shows on its own, and the description as its markdown text, inline: added words are underlined
 and removed ones struck through, and a screen reader says "Added:" or "Removed:" before each; a
-removed or added blank line shows as "(blank line)". Picking a From newer than To swaps the two,
+removed or added blank line shows as "(blank line)", and a line break as "(line break)". Picking a From newer than To swaps the two,
 and a screen reader says so.
 Runs of more than three unchanged lines fold away behind **Show 12 unchanged lines**. With only
 one revision there's nothing to compare yet.
@@ -241,7 +243,8 @@ Trash**. A link to a deleted requirement shows the page-not-found page.
 **Trash**, last in the sidebar under the project (`/<organization>/projects/<KEY>/trash`), lists
 the deleted requirements you may restore, newest first: each one's ID and title, who deleted it
 ("Deactivated" after someone since deactivated; **System** for an app command), and when.
-Project admins see everything; a member sees the never-approved requirements they reported.
+Project admins see everything; a member sees the never-approved requirements they reported. One
+that would bring back a child you couldn't restore yourself is listed without **Restore**.
 **Restore ERP-RQ-7** brings it back with the children deleted with it, which leave the list too;
 children deleted on their own stay in the Trash. A requirement whose parent is still in the
 Trash comes back at the bottom of the top level. The page then says "Restored ERP-RQ-7." with
@@ -254,7 +257,8 @@ project's admins (and organization owners and admins, workspace owners and admin
 admins) can also:
 
 - **Show deactivated**, above the list: deactivated members are listed too, each marked
-  **Deactivated**.
+  **Deactivated**. An archived project's list has no **Show deactivated**: it shows its active
+  members only.
 
 - **Add member**: the list of the organization's members and the workspace's staff opens as soon
   as you're in the field; type a name, email, or username to narrow it, choose one, and give them
@@ -290,7 +294,8 @@ admins) can also:
 - **Restriction** (project admins): the level and categories, then **Save restriction**. Export
   control isn't offered here; a project is made export-controlled only through the API, and
   saving keeps it. On an export-controlled project, system, workspace, and organization admins without a membership
-  can manage it but not see its content, and may only raise its restriction: lowering the level
+  can manage it but not see its content (Requirements and Trash leave their sidebar, and those
+pages say they can't open them), and may only raise its restriction: lowering the level
   or removing a category needs one of its explicit project admins.
 - **Danger zone** (organization owners and admins), set apart at the bottom: **Archive
   project**, once confirmed with the red **Archive project** button, makes it read-only for
@@ -358,8 +363,8 @@ deactivated**, above the list, to include deactivated people, each marked **Deac
 how you find someone to reactivate. A list with only deactivated people shows as empty ("No
 staff yet"), with a pointer to **Show deactivated**.
 
-- **Staff** lists the workspace's staff and their roles. **Add person** asks for the email first,
-  and, when you press **Continue**, tells you if it isn't an email address. If the email already has an account, you
+- **Staff** lists the workspace's staff and their roles. **Add person** asks for the email and
+  the role first, and, when you press **Continue**, tells you if it isn't an email address. If the email already has an account, you
   confirm adding that person (you're shown only the email). If not, you create the account: the
   email, which you can still correct there (a changed email is checked again, and if it turns out
   to have an account you're asked to confirm adding that person instead), name, username
@@ -412,8 +417,8 @@ is told to ask the organization's owners or admins.
   settings to unarchive it.
 
 - **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
-  as **Staff** does under workspace administration: **Add person** asks for the email first, then
-  either confirms an existing account or creates one with a temporary password, shown once; a
+  as **Staff** does under workspace administration: **Add person** asks for the email and the role first,
+  then either confirms an existing account or creates one with a temporary password, shown once; a
   row offers **Change role** and **Remove from organization**, which by default also removes the
   person from the organization's projects (a role change or removal that leaves someone unable
   to see a project's content hands their undecided approvals there to whoever requested each
@@ -423,7 +428,8 @@ is told to ask the organization's owners or admins.
   access review your role covers (see "Account actions" and "Access review" above).
 - **Settings** renames the organization and changes its slug, which is in its web addresses
   (organization owners and workspace admins; organization admins see the values). After a slug
-  change the page moves to its new address; links with the old slug no longer open it.
+  change the page moves to its new address; links to the organization's own pages with the old
+  slug no longer open, while links to its projects still go to the project.
 
 ## System status
 

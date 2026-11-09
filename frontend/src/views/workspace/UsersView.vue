@@ -9,7 +9,7 @@ import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
 import { ACTIVE, DEACTIVATED, USER, workspaceRoleText } from '@/app/labels'
-import { focusHeading, settlePage } from '@/app/routeFocus'
+import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -62,6 +62,13 @@ watch(
   { immediate: true },
 )
 list.returnWhenEmpty(page.data)
+// The template's 403 condition (it repeats it there, which narrows `workspace`).
+const shut = computed(
+  () =>
+    !workspace.value ||
+    !allows(workspace.value, 'workspace.view') ||
+    page.error.value?.status === 404,
+)
 watch(
   () => page.error.value?.status === 404,
   (gone) => {
@@ -93,10 +100,11 @@ async function finished(message: string) {
   await refocus.settle(page.data.value?.items.map((u) => u.id) ?? [])
 }
 
-// A 403 in a dialog: what the user may do changed, on the rows and the page (UI-FRM-7).
-function refused() {
-  void page.run()
-  store.load().catch(() => {})
+// A 403 in a dialog: what the user may do changed, on the rows and the page (UI-FRM-7). If the
+// page is gone with it, the 403 page takes focus, on a visit's first page too (UI-SHL-9).
+async function refused() {
+  await Promise.all([page.run(), store.load().catch(() => {})])
+  if (shut.value) await replacedPage()
 }
 
 const announcement = computed(() => {

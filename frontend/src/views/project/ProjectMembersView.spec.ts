@@ -282,6 +282,29 @@ describe('ProjectMembersView', () => {
     expect(pageButton(wrapper, 'Add member')).toBeUndefined()
   })
 
+  it('moves focus to the not-found h1 when a refused action takes the project away, on the first page of a visit (TD-90)', async () => {
+    const { wrapper, get } = await mountAt(project({ allowed_actions: ADMIN }), [
+      member('Ann Lee', { allowed_actions: ['project_member.manage'] }),
+    ])
+    // The project read is now a 404; everything else answers as before.
+    const before = get.getMockImplementation() as (path: string, init?: unknown) => unknown
+    get.mockImplementation(((path: string, init?: unknown) =>
+      path === '/api/projects/{key}'
+        ? Promise.resolve(failed(404, { code: 'not_found', message: '', details: {} }))
+        : before(path, init)) as never)
+    vi.spyOn(client, 'DELETE').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+
+    await rowAction(wrapper, 0, 'Remove from project')
+    await openDialog(wrapper).get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe('Page not found')
+    expect(document.activeElement).toBe(wrapper.get('h1').element)
+    expect(document.title).toBe('Page not found · Waterline')
+  })
+
   it("is the not-found page for a project the user can't see (UI-FBK-14)", async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(
       failed(404, { code: 'not_found', message: '', details: {} }),

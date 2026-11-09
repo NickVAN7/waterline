@@ -456,6 +456,169 @@ async def test_an_approvers_removal_waiting_on_the_requesters_org_removal_reads_
 
 
 @pytest.mark.concurrency("membership", *APPROVAL_TABLES)
+async def test_a_decision_waiting_on_the_approvers_removal_is_a_404(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """TD-82: Rita, no longer an org admin, can't take Vera's place, so Vera's removal leaves
+    her row pending (§6.2). Her decision, waiting on the project the removal holds, reads her
+    role again under the locks and finds her gone: a 404, and nothing decided. Without the
+    re-read it passes on the membership the removal deleted, and approves."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    rita, rita_ctx = await an_org_member(concurrency, requirement, OrgRole.ADMIN, viewer=False)
+    request_id = await a_pending_request(concurrency, rita_ctx, requirement, vera)
+    async with concurrency() as session:
+        await remove_from_org(ctx, requirement, rita, projects=False)(session)
+        await session.commit()
+        vera_ctx = await UserRepository(session).authz_context(await session.get_one(User, vera.id))
+
+    async def remove_vera(session: AsyncSession) -> object:
+        project = await session.get_one(Project, requirement.project_id)
+        return await ProjectService(session).remove_member(ctx, project, vera.id)
+
+    async def decide(session: AsyncSession) -> object:
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        return await RequirementService(session).decide(vera_ctx, loaded, body)
+
+    refused = await race(concurrency, concurrency_engine, first=remove_vera, second=decide)
+
+    async with concurrency() as check:
+        decision = await check.scalar(select(Approval.decision))
+        status = await check.scalar(select(ApprovalRequest.status))
+    assert (refused, decision, status) == (
+        ["NotFoundError"],
+        ApprovalDecision.PENDING,
+        ApprovalRequestStatus.PENDING,
+    )
+
+
+@pytest.mark.concurrency("membership", *APPROVAL_TABLES)
+async def test_a_decision_waiting_on_the_approvers_org_role_change_is_a_404(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """TD-82, an inherited approver: Olga decides as an org admin with no project membership.
+    Lowered to member, she loses project access, and her row stays pending, since Rita, the
+    requester, no longer holds admin (§6.2). The decision, waiting on the project the change
+    holds, loads her context again under the locks: a 404, and nothing decided. Re-reading only
+    her project membership keeps the org admin role loaded before the wait, and approves."""
+    ctx, requirement = await a_requirement(concurrency)
+    olga, olga_ctx = await an_org_member(concurrency, requirement, OrgRole.ADMIN, viewer=False)
+    rita, rita_ctx = await an_org_member(concurrency, requirement, OrgRole.ADMIN, viewer=False)
+    request_id = await a_pending_request(concurrency, rita_ctx, requirement, olga)
+    async with concurrency() as session:
+        await remove_from_org(ctx, requirement, rita, projects=False)(session)
+        await session.commit()
+
+    async def lower_olga(session: AsyncSession) -> object:
+        project = await session.get_one(Project, requirement.project_id)
+        org = await session.get_one(Organization, project.organization_id)
+        body = MemberRoleUpdate(role=OrgRole.MEMBER)
+        return await OrgService(session).change_member_role(ctx, org, olga.id, body)
+
+    async def decide(session: AsyncSession) -> object:
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        return await RequirementService(session).decide(olga_ctx, loaded, body)
+
+    refused = await race(concurrency, concurrency_engine, first=lower_olga, second=decide)
+
+    async with concurrency() as check:
+        decision = await check.scalar(select(Approval.decision))
+        status = await check.scalar(select(ApprovalRequest.status))
+    assert (refused, decision, status) == (
+        ["NotFoundError"],
+        ApprovalDecision.PENDING,
+        ApprovalRequestStatus.PENDING,
+    )
+
+
+async def a_request_no_one_takes_over(
+    concurrency: SessionMaker, ctx: AuthzContext, requirement: Requirement, approver: User
+) -> uuid.UUID:
+    """A pending request naming `approver`, by Rita, an org admin since removed from the org: no
+    longer holding project admin, she takes no one's place (§6.2), so a row of someone who loses
+    access stays pending."""
+    rita, rita_ctx = await an_org_member(concurrency, requirement, OrgRole.ADMIN, viewer=False)
+    request_id = await a_pending_request(concurrency, rita_ctx, requirement, approver)
+    async with concurrency() as session:
+        await remove_from_org(ctx, requirement, rita, projects=False)(session)
+        await session.commit()
+    return request_id
+
+
+async def stored_outcome(
+    concurrency: SessionMaker,
+) -> tuple[ApprovalDecision, ApprovalRequestStatus]:
+    async with concurrency() as check:
+        decision = await check.scalar(select(Approval.decision))
+        status = await check.scalar(select(ApprovalRequest.status))
+    return ApprovalDecision(decision), ApprovalRequestStatus(status)
+
+
+@pytest.mark.concurrency("membership", "session", *APPROVAL_TABLES)
+async def test_a_decision_waiting_on_the_approvers_deactivation_is_a_404(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine, settings: Settings
+) -> None:
+    """TD-82: a deactivation keeps the memberships, so the decision's reloaded context checks
+    `is_active`, as `ApprovalService` does: a 404, and nothing decided. Without it Vera's
+    project role still passes, and her approval lands after her deactivation committed."""
+    ctx, requirement = await a_requirement(concurrency)
+    vera = await an_approver(concurrency, requirement)
+    request_id = await a_request_no_one_takes_over(concurrency, ctx, requirement, vera)
+    async with concurrency() as session:
+        vera_ctx = await UserRepository(session).authz_context(await session.get_one(User, vera.id))
+
+    async def deactivate(session: AsyncSession) -> object:
+        return await AuthService(session, settings).deactivate(
+            ctx, await subject_of(session, vera.id)
+        )
+
+    async def decide(session: AsyncSession) -> object:
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        return await RequirementService(session).decide(vera_ctx, loaded, body)
+
+    refused = await race(concurrency, concurrency_engine, first=deactivate, second=decide)
+
+    assert (refused, await stored_outcome(concurrency)) == (
+        ["NotFoundError"],
+        (ApprovalDecision.PENDING, ApprovalRequestStatus.PENDING),
+    )
+
+
+@pytest.mark.concurrency("membership", *APPROVAL_TABLES)
+async def test_a_decision_waiting_on_revoking_the_approvers_system_admin_is_a_404(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine, settings: Settings
+) -> None:
+    """TD-82: Sam decides as a system admin with no membership. The decision's session already
+    holds his user row, as a request's does from signing in, so the reload reads the row again
+    (`populate_existing`) and sees the flag gone: a 404. Without the re-read the stale flag
+    passes."""
+    ctx, requirement = await a_requirement(concurrency)
+    async with committing_factories(concurrency):
+        sam = await UserFactory.create_async(is_system_admin=True, is_active=True)
+    request_id = await a_request_no_one_takes_over(concurrency, ctx, requirement, sam)
+    sam_ctx = AuthzContext(user_id=sam.id, is_system_admin=True)
+
+    async def revoke(session: AsyncSession) -> object:
+        return await AuthService(session, settings).revoke_system_admin(sam.email)
+
+    async def decide(session: AsyncSession) -> object:
+        await session.get_one(User, sam.id)  # loaded before the wait, as at sign-in
+        loaded = await session.get_one(ApprovalRequest, request_id)
+        body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
+        return await RequirementService(session).decide(sam_ctx, loaded, body)
+
+    refused = await race(concurrency, concurrency_engine, first=revoke, second=decide)
+
+    assert (refused, await stored_outcome(concurrency)) == (
+        ["NotFoundError"],
+        (ApprovalDecision.PENDING, ApprovalRequestStatus.PENDING),
+    )
+
+
+@pytest.mark.concurrency("membership", *APPROVAL_TABLES)
 async def test_a_request_naming_someone_and_their_org_removal_never_deadlock(
     concurrency: SessionMaker, concurrency_engine: AsyncEngine
 ) -> None:

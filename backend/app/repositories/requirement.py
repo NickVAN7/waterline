@@ -274,10 +274,9 @@ class RequirementRepository:
         )
         return bool(await self.session.scalar(select(exists().where(chain.c.id == requirement_id))))
 
-    async def lock_tree(self, project_id: uuid.UUID) -> None:
+    async def lock_tree(self, project: Project) -> None:
         """Hold the project's requirement tree until the transaction ends, so moves in it run one
         at a time. `FOR NO KEY UPDATE` on the project row: creates' foreign-key checks
-        (`FOR KEY SHARE`) still pass."""
-        await self.session.execute(
-            select(Project.id).where(Project.id == project_id).with_for_update(key_share=True)
-        )
+        (`FOR KEY SHARE`) still pass. The row is read again, so a check made under the lock sees
+        an export-control change or archive that committed while this waited (TD-80)."""
+        await self.session.refresh(project, with_for_update={"key_share": True})

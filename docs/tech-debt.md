@@ -276,8 +276,7 @@ Entry format:
   latest. npm's only "fix" downgrades `@vue/eslint-config-typescript` from 14.9.0 to 14.0.1.
   The vulnerable code only expands glob patterns from the repository's own ESLint
   configuration, never untrusted input, and never ships in the app.
-- **Fix by:** S2-C22 (Slice 2's tech-debt review; owner, S1-C17; still no fixed `braces` on Oct 21, 2026, and no
-  Slice 2 feature needs it: it only expands the linter's own globs)
+- **Fix by:** Slice 3 (its tech-debt review): still no fixed `braces` (3.0.3 is the latest) (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-20: What the git guard can't see
@@ -451,7 +450,7 @@ Entry format:
 ### TD-31: Other locked mutations check rights against the role loaded before the lock
 - **Added:** S1-C13
 - **What:** the `AuthzContext` is loaded at the start of a request. The restriction change
-  re-reads the caller's own project role after taking the project's lock (`_with_current_role`,
+  re-reads the caller's own project role after taking the project's lock (`with_current_role`,
   owner decision in the S1-C13 security review), so a role removed while it waits is seen. The
   other mutations that wait on a lock (project update, archive, member adds, role changes and
   removals, and the workspace and org rosters) still check rights against the context as loaded:
@@ -459,9 +458,7 @@ Entry format:
   milliseconds and needs a request already in flight.
 - **Why:** the owner decided the restriction change in S1-C13 and chose to revisit the rest
   later.
-- **Fix by:** S2-C22 (Slice 2's tech-debt review re-checks it): the owner accepted the gap at S1-C17, since
-  the window is milliseconds and needs a request already in flight; fix it when a checkpoint
-  adds a locked mutation where the race would matter
+- **Fix by:** Slice 3 (its tech-debt review re-checks it); accepted again (owner, S2-C22 tech-debt review, Nov 8, 2026); fix it when a checkpoint adds a locked mutation where the race would matter
 - **Status:** open
 
 ### TD-32: No page handles a 404 yet
@@ -589,9 +586,7 @@ Entry format:
 - **Why:** removing it needs a separate authorization action for the reset, which `allowed_actions`
   leaves out on one's own row: a design change in `app/authz/` with spec tests, outside S1-C15
   (owner decision, S1-C15 review).
-- **Fix by:** S2-C22 (Slice 2's tech-debt review re-checks it): the owner re-targeted it at S1-C17 until an
-  account action needs its own authorization action; the split was dropped once already
-  (DL-73), so it comes back only as a design change
+- **Fix by:** Slice 3 (its tech-debt review re-checks it) (owner, S2-C22 tech-debt review, Nov 8, 2026); the split comes back only as a design change (DL-73)
 - **Status:** open
 
 ### TD-43: The two settings forms repeat their save handling
@@ -789,7 +784,7 @@ Entry format:
   come. The owner revisits whether to port it at Slice 2's end.
 - **Fix by:** S2-C22 (Slice 2's slice-end tech-debt review decides: port it into `wl check`, or
   re-target)
-- **Status:** open
+- **Status:** resolved in S2-C22 (a docs consistency test runs `check_contrast.py` on the app's `tokens.css` in `wl check`)
 
 ### TD-62: The completed screen inventory isn't checked against the docs and built screens
 - **Added:** S1-C17 (docs-consistency)
@@ -810,8 +805,7 @@ Entry format:
   the same field, the later save wins without either seeing the conflict. (TD-56 covers fields
   the saver didn't change.)
 - **Why:** the owner judged it not an issue at Slice 1's scale.
-- **Fix by:** S2-C22 (Slice 2's slice-end tech-debt review revisits it: an optimistic lock, or
-  re-target)
+- **Fix by:** Slice 7 (before the first non-local deployment) (owner, S2-C22 tech-debt review, Nov 8, 2026): still no issue at v1's scale
 - **Status:** open
 
 ### TD-64: One action registry for every area
@@ -820,8 +814,7 @@ Entry format:
   Slice 1's actions), rather than per-area policy files; it grows with every area.
 - **Why:** the owner kept the one registry Slice 1 built (DL-151), and expects it will likely
   need splitting as the app grows.
-- **Fix by:** Slice 2 (its slice-end tech-debt review, and each one after: split it into per-area
-  files once it passes about 600 lines or a slice-end audit recommends it)
+- **Fix by:** Slice 3 (its slice-end tech-debt review, and each one after: split it into per-area files once it passes about 600 lines, 387 at S2-C22, or a slice-end audit recommends it)
 - **Status:** open
 
 ### TD-65: A project update locks its row twice
@@ -833,7 +826,7 @@ Entry format:
   query costs at v1's load.
 - **Fix by:** Slice 2 retro (keep, or split `apply_changes` if another caller needs the
   non-locking half)
-- **Status:** open
+- **Status:** resolved in S2-C22: kept as is, accepted (owner, S2-C22 tech-debt review, Nov 8, 2026); no other caller needs a non-locking `apply_changes`
 
 ### TD-66: "None" for a missing role is written in two views
 - **Added:** S2-C0g (ui-reviewer finding 3's siblings)
@@ -843,7 +836,7 @@ Entry format:
 - **Why:** both are S1-C15 and S1-C12 code that S2-C0g didn't need to change (DL-106); S2-C0g's
   own Role and Status values are in `labels.ts`.
 - **Fix by:** S2-C22 (the tech-debt review)
-- **Status:** open
+- **Status:** resolved in S2-C22 (`NO_ROLE` from `labels.ts` in the per-project access review)
 
 ### TD-67: A drop between two tied ranks has no rank to take
 - **Added:** S2-C2 (spec-test-writer question)
@@ -879,12 +872,7 @@ Entry format:
   before any child is forked.
 - **Why:** not worth chasing inside a checkpoint; the gate passes on the committed code. The
   owner chose to leave mutmut as configured until it crashes again (after S2-C12).
-- **Fix by:** S2-C22 (the tech-debt review), or sooner at the next crash: reproduce it under
-  the gate's real conditions (`wl backend mutate` and `wl check` about 10 times each in the
-  repository), then compare `use_setproctitle = false` (the most direct candidate: on Linux,
-  `setproctitle` overwrites the environment's memory, and the crash is reading `os.environ`)
-  and `process_isolation = "forkserver"` there, about 10 runs each; also retry on the
-  then-current mutmut, and report it upstream if it still crashes
+- **Fix by:** Slice 3 (its tech-debt review), or sooner at the next crash: then the reproduction plan below (owner, S2-C22 tech-debt review, Nov 8, 2026); no crash recorded since S2-C12
 - **Status:** open
 
 ### TD-69: Ranks have no maximum length
@@ -909,8 +897,7 @@ Entry format:
 - **Why:** the tree is a ranked view, returned whole for drag-and-drop (build plan, "API
   conventions"); the owner judged 2,000 more than enough for v1 (DL-159), and accepted the moved
   row's case (DL-256).
-- **Fix by:** S2-C22 (the tech-debt review): reviewed there, then paged when a project nears
-  2,000 requirements (DL-159)
+- **Fix by:** Slice 7 (the end of v1), or sooner when a project nears 2,000 requirements: then paged (DL-159); reviewed (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-71: Creating a child doesn't hold its parent
@@ -952,7 +939,7 @@ Entry format:
 - **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
   statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
   helper that does it now.
-- **Fix by:** S2-C22 (Slice 2's tech-debt review): one statement, if the timing matters
+- **Fix by:** Slice 7 (the end of v1), or sooner if a rewrite's timing is noticed: one statement (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-74: A new reporter's inherited admin isn't held against marking the project export-controlled
@@ -976,7 +963,7 @@ Entry format:
 - **Why:** the code is from an earlier checkpoint (S0/S1 lists), fixed only when needed; tasks'
   and test cases' trash (Slices 3 and 5) may still want it.
 - **Fix by:** S2-C22 (the tech-debt review): removed, with its tests, if nothing uses it
-- **Status:** open
+- **Status:** resolved in S2-C22 (`soft_deleted` and `?include_deleted` removed with their tests; the trash keeps its own query)
 
 ### TD-76: The revision feed has no `(requirement_id, id)` index
 - **Added:** S2-C9
@@ -985,8 +972,7 @@ Entry format:
   `UNIQUE(requirement_id, revision_number)` index and sorts the requirement's revisions by `id`.
 - **Why:** a requirement has tens of revisions, not thousands, so the sort is cheap; an index is
   a migration for no measured gain.
-- **Fix by:** S2-C22 (the tech-debt review): add the index if a requirement's revisions number in
-  the thousands
+- **Fix by:** Slice 7 (the end of v1), or sooner if a requirement's revisions number in the thousands: the index (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-77: The reporter and the trash's deleter carry no "deactivated" flag
@@ -1029,8 +1015,7 @@ Entry format:
 - **Why:** bounded by the 50-approver cap (DL-226), and a request names a handful in practice; a
   batched version needs `hold_access` and `authz_context` for many users at once, which nothing
   else needs yet.
-- **Fix by:** S2-C22 (the tech-debt review): batch the holds and the contexts (one query each
-  for every approver) if requests name many approvers
+- **Fix by:** Slice 7 (the end of v1), or sooner if requests name many approvers: batch the holds and the contexts (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-80: Deleting re-checks the rule against the project as first loaded
@@ -1045,7 +1030,7 @@ Entry format:
 - **Fix by:** S2-C22 (the tech-debt review): read the project again under the tree lock (or hold
   it as the request create does) before the re-check, with a race test against marking the
   project export-controlled
-- **Status:** open
+- **Status:** resolved in S2-C22 (`lock_tree` reads the project row again, and create, edit, a restriction change, and move check their right again after the hold or the tree lock, as delete and restore do; a race test of each against marking the project export-controlled)
 
 ### TD-81: The replacement reads the requester's and approvers' access without holding it
 - **Added:** S2-C12
@@ -1077,9 +1062,9 @@ Entry format:
 - **Why:** from S2-C11, fixed only when needed (DL-106). The window is the request's own, and
   the approver had access a moment before, as for TD-80.
 - **Fix by:** S2-C22 (the tech-debt review): re-read the caller's project membership under the
-  locks before the check (as `ProjectService._with_current_role` does), with a race test of a
+  locks before the check (as `ProjectService.with_current_role` does), with a race test of a
   removal first and the decision second
-- **Status:** open
+- **Status:** resolved in S2-C22 (`decide` loads the approver's whole authorization context again under its locks and refuses a deactivated account; race tests of a project removal, an org role change, a deactivation, and revoking system admin first)
 
 ### TD-83: A request created while someone loses access can deadlock with the change
 - **Added:** S2-C13 (owner decision, DL-235)
@@ -1093,8 +1078,7 @@ Entry format:
   one of the two: a 500, and nothing it did is kept.
 - **Why:** the window is a request created in the same moments as the person's removal,
   deactivation, or role change; the owner accepted it rather than a retry (DL-235).
-- **Fix by:** S2-C22 (the tech-debt review): retry the transaction once on a deadlock, or
-  confirm the window is still rare enough to keep
+- **Fix by:** Slice 7 (before the first non-local deployment): retry once on a deadlock, or confirm the window is still rare (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-84: Finding a requester's pending requests has no index
@@ -1105,8 +1089,7 @@ Entry format:
   table only grows: requests are cancelled, never deleted.
 - **Why:** negligible at the expected volumes (one firm's requests); an index is a schema change,
   which goes through a design change (schema-doc).
-- **Fix by:** S2-C22 (the tech-debt review): an index on `(requested_by, status)`, or a partial
-  one on pending requests
+- **Fix by:** Slice 7 (the end of v1), or sooner if `approval_request` grows large: an index on `(requested_by, status)`, through a design change (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-85: A refused move can't tell the page to reload
@@ -1129,9 +1112,7 @@ Entry format:
   (GHSA-g3hv-75wg-m249, GHSA-3g3m-2fjr-6pw4).
 - **Why:** the parents hadn't released versions that pull the fixed ones; an override silently
   outlives its need, so it's logged here.
-- **Fix by:** S2-C22 (the tech-debt review), and at any dependency bump before it: remove the
-  `overrides`, reinstall, and rerun `uv run wl audit`; if green, drop them in a `chore(deps):`
-  commit, otherwise keep this open
+- **Fix by:** Slice 3 (its tech-debt review), and at any dependency bump before it: remove the `overrides`, reinstall, and rerun `uv run wl audit`; still needed at S2-C22 (removing them brings back the `minimatch` advisories) (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-87: The CSP allows inline styles
@@ -1187,7 +1168,7 @@ Entry format:
   and a refusal that changes the page.
 - **Fix by:** S2-C22 (the tech-debt review): the same direct `syncTitle()` and `focusHeading()`,
   with a first-visit spec
-- **Status:** open
+- **Status:** resolved in S2-C22 (`replacedPage()` in `routeFocus.ts`, used by the members page, `RosterPage`'s refusal, `UsersView`'s refusal, and `RequirementDetail`'s `editGone`, with first-visit specs; UI-SHL-9 and `frontend/CLAUDE.md` say when)
 
 ### TD-91: A description's headings sit one level below the page's h1, not below its section
 - **Added:** S2-C18 (ui-reviewer note)
@@ -1198,7 +1179,9 @@ Entry format:
   a change to S2-C16's component for one page, and the manual screen-reader pass judges it.
 - **Fix by:** S2-C22 (the manual keyboard and screen-reader pass): a base level on
   `MarkdownView`, if the pass finds the outline confusing
-- **Status:** open
+- **Status:** resolved in S2-C20a (`MarkdownView`'s `level`; the requirement page passes
+  `:level="2"`, so a description's `#` is an `h3` under "Description"); closed in S2-C22 by the
+  owner
 
 ### TD-92: Closing the side panel drops an open edit
 - **Added:** S2-C18b
@@ -1229,7 +1212,8 @@ Entry format:
   DL-272 don't specify; whether it's needed is best judged with a screen reader.
 - **Fix by:** S2-C22 (the manual keyboard and screen-reader pass): decide with the owner whether
   to announce the outcome, and build it if so
-- **Status:** open
+- **Status:** resolved in S2-C22 (the owner: build it; the note says "Opened all 12 rows under
+  PMT-RQ-1.", or "Opened 1 row under …")
 
 ### TD-95: Revisions' default From misses an approved revision past the first page
 - **Added:** S2-C19a
@@ -1253,9 +1237,7 @@ Entry format:
   be picked in the UI; the API accepts them.
 - **Why:** the members list already exists; a candidates endpoint for everyone §6.2 allows is a
   new endpoint the owner chose not to build in S2-C20 (DL-278).
-- **Fix by:** S2-C22 (the tech-debt review): decide with the owner whether to add an approver
-  candidates endpoint. The owner's direction (S2-C20 review): the picker becomes a searchable
-  dropdown list in time, in place of the flat checkbox list
+- **Fix by:** Slice 3 (the filter bar's text search, with TD-41): the approver picker becomes a searchable dropdown, with a candidates endpoint for everyone §6.2 allows (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
@@ -1287,6 +1269,31 @@ Entry format:
 - **Why:** each control stays in place beside the alert, so pressing it again is the retry;
   a Retry that focuses the control and repeats it is the same code in three places, better built
   once.
-- **Fix by:** S2-C22 (the slice's tech-debt review): one shared retry for a row action's alert,
-  or UI-FRM-7 reworded for row actions
+- **Fix by:** Slice 3 (applied by Slice 2's retro design change, before the merge): UI-FRM-7 reworded for row actions, whose control stays beside the alert and is the retry (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Status:** open
+
+### TD-100: The approval-request list builds its page by hand
+- **Added:** S2-C22 (repo-auditor finding 2)
+- **What:** `RequirementService.approval_requests` builds `Page[ApprovalRequestItem](items=…,
+  total=…, limit=…, offset=…)` itself rather than `page.with_items(rows)`, the helper TD-54
+  added for every list.
+- **Why:** S2-C20 code, fixed only when needed (DL-106); it behaves the same.
+- **Fix by:** Slice 3 (the next checkpoint that touches approval reads, or its tech-debt review)
+- **Status:** open
+
+### TD-101: The reporter and approver checks are near-copies
+- **Added:** S2-C22 (repo-auditor finding 3)
+- **What:** `RequirementService._check_reporter` and `_check_approver` take the same four steps
+  (hold the access, get the user, load their context and authorize, check `is_active`); only the
+  action and the error differ, so a change to one (TD-79's batching) has to be made in both.
+- **Why:** S2-C11 and S2-C10 code, fixed only when needed (DL-106).
+- **Fix by:** Slice 3 (with TD-79, or the next change to either check)
+- **Status:** open
+
+### TD-102: A members list with no row actions still shows an Actions column
+- **Added:** S2-C22 (user-guide-verifier finding 9)
+- **What:** for someone who may change nobody (a project member), the roster's table keeps its
+  "Actions" header over empty cells.
+- **Why:** Slice 1 and S2-C17 roster code, fixed only when needed (DL-106); it's cosmetic.
+- **Fix by:** Slice 3 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
 - **Status:** open

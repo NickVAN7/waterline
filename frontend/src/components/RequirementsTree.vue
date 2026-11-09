@@ -369,10 +369,16 @@ async function expandRequirement() {
   expanding.value = false
   // Set after a pause, so the same note again is announced again (UI-FBK-2); not if another
   // selection, or a reload, came while it ran: the note would be about a row no longer selected.
-  if (stopped && selected.value?.[0][selected.value[1]] === node) {
-    const text = `Deeper rows under ${displayId(node.data)} stay closed: open them with their arrows or the Right arrow key.`
-    announcing = setTimeout(() => (expandNote.value = text), ANNOUNCE_DELAY_MS)
-  }
+  if (selected.value?.[0][selected.value[1]] !== node) return
+  const id = displayId(node.data)
+  const count = shownUnder(node, expandedKeys.value)
+  // Focus stays on the button, so the outcome is said either way (TD-94).
+  const text = stopped
+    ? `Deeper rows under ${id} stay closed: open them with their arrows or the Right arrow key.`
+    : count === 1
+      ? `Opened 1 row under ${id}.`
+      : `Opened all ${count} rows under ${id}.`
+  announcing = setTimeout(() => (expandNote.value = text), ANNOUNCE_DELAY_MS)
 }
 
 // Right on a closed row only opens it (WAI treegrid): TreeTable also moves focus to the next row.

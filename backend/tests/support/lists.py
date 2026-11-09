@@ -59,7 +59,6 @@ RECORDS = ListSpec(
     ),
     search=(Record.name, Record.notes),
     archived_column=Record.archived_at,
-    soft_deleted=True,
 )
 
 RECORD_FEED = ListSpec(

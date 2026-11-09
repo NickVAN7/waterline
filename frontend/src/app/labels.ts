@@ -192,7 +192,7 @@ export const ACCESS_KIND: Record<AccessKind, string> = {
 }
 
 /** An active account's status, and someone with no workspace role, in the users list's Status
- * and Role columns (DL-137, DL-183); the access review's no-role text. */
+ * and Role columns (DL-137, DL-183); both access reviews' no-role text. */
 export const ACTIVE = 'Active'
 export const USER = 'User'
 export const NO_ROLE = 'None'

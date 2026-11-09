@@ -30,7 +30,7 @@ import {
   REQUIREMENT_STATUS,
   requirementStatusBadge,
 } from '@/app/labels'
-import { settlePage, syncTitle } from '@/app/routeFocus'
+import { replacedPage, settlePage, syncTitle } from '@/app/routeFocus'
 import Alert from '@/components/Alert.vue'
 import Badge from '@/components/Badge.vue'
 import Button from '@/components/Button.vue'
@@ -236,12 +236,13 @@ async function editRefused() {
   if (document.activeElement === document.body) failureAlert.value?.focus()
 }
 // Gone since it loaded (an edit's save or a delete found it gone): the reload brings the
-// not-found page, which settles (UI-SHL-9), or the panel's note, after its title.
+// not-found page, whose h1 takes focus on a visit's first page too (UI-SHL-9, TD-90), or the
+// panel's note, after its title.
 async function editGone() {
   editing.value = false
   await item.run()
   if (props.inPanel) await props.focusHeading()
-  else await settlePage()
+  else await replacedPage()
 }
 
 function approvalChanged(saved: Requirement) {

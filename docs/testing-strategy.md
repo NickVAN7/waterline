@@ -121,7 +121,7 @@ tested, what each kind of test is for, and the gates every change passes.
   each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map owner
   per table; the tech-debt log's format, references, and deadlines; the decision log's format and
   references; every `audit-allowlist.toml` entry names an open tech-debt entry; the developer
-  guide's status line vs. `git log`; design-doc § references; the agents and skills listed vs. those
+  guide's status line vs. `git log`; design-doc § references; token contrast (UI-TOK-3, TD-61); the agents and skills listed vs. those
   in `.claude/`; from Slice 2 on, the review records (the latest checkpoint's record exists, a C0
   or C0a record before C1, and a `## simplicity-auditor` heading in the slice's last record;
   DL-138, DL-165). Parsers are strict: a doc that loses the structure they expect fails the test

@@ -8,7 +8,7 @@
 import { computed, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { ACCESS_KIND, ACCESS_REASON, DEACTIVATED, PROJECT_ROLE } from '@/app/labels'
+import { ACCESS_KIND, ACCESS_REASON, DEACTIVATED, NO_ROLE, PROJECT_ROLE } from '@/app/labels'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import Skeleton from '@/components/Skeleton.vue'
@@ -123,7 +123,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
                   </span>
                 </td>
                 <td class="p-2">{{ entry.user.email }}</td>
-                <td class="p-2">{{ entry.role ? PROJECT_ROLE[entry.role] : 'None' }}</td>
+                <td class="p-2">{{ entry.role ? PROJECT_ROLE[entry.role] : NO_ROLE }}</td>
                 <td class="p-2">{{ reasons(entry.reasons) }}</td>
                 <td v-if="exportControlled" class="p-2">{{ ACCESS_KIND[entry.access] }}</td>
               </tr>

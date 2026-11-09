@@ -41,6 +41,8 @@ async function mountAt(
   projects: Project[],
   items: unknown[],
   path = '/acme/projects/ERP/requirements/7',
+  // The visit's first page, opened from a link: focus moves only when the page says so.
+  { direct = false } = {},
 ) {
   useCurrentUserStore().me = me()
   const answers = { project: projects.map((p) => ok(p)), item: [...items] }
@@ -77,7 +79,7 @@ async function mountAt(
     ],
   })
   installRouteFocus(router)
-  await router.push('/')
+  await router.push(direct ? path : '/')
   const wrapper = mount(
     { template: '<main><RouterView /></main>' },
     { global: { plugins: [router, PrimeVue] }, attachTo: document.body },
@@ -891,6 +893,26 @@ describe('RequirementView', () => {
       expect(document.querySelector('#edit-requirement-title')).toBeNull()
       expect(wrapper.get('h1').text()).not.toBe('Refunds')
       expect(document.activeElement).toBe(wrapper.get('h1').element)
+    })
+
+    it("a 404 on a visit's first page moves focus to the not-found h1 too (TD-90's sibling)", async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        failed(404, { code: 'not_found', message: '', details: {} }),
+      )
+      const { wrapper } = await mountAt(
+        [READER],
+        [ok(EDITOR), failed(404, { code: 'not_found', message: '', details: {} })],
+        undefined,
+        { direct: true },
+      )
+      await edit()
+      await type(title(), 'Refunds and returns')
+
+      await save()
+
+      expect(wrapper.get('h1').text()).toBe('Page not found')
+      expect(document.activeElement).toBe(wrapper.get('h1').element)
+      expect(document.title).toBe('Page not found · Waterline')
     })
   })
 

@@ -160,6 +160,15 @@ class RequirementService:
         # A foreign key, so never None; the loader's project, an identity-map hit.
         return cast(Project, await self.session.get(Project, requirement.project_id))
 
+    async def _current_context(self, ctx: AuthzContext) -> AuthzContext:
+        """The caller's authorization context loaded again, for a check made under locks a
+        change to their access takes first."""
+        user = await self.session.get_one(User, ctx.user_id, populate_existing=True)
+        if not user.is_active:
+            # Deactivated meanwhile: no access at all, as `ApprovalService` counts it.
+            raise NotFoundError
+        return await UserRepository(self.session).authz_context(user)
+
     async def _lock_live(self, requirement: Requirement) -> None:
         """Lock the row and read it again; one deleted meanwhile is a 404."""
         await self.repository.lock(requirement)
@@ -200,6 +209,9 @@ class RequirementService:
         categories = frozenset(values.restriction_categories)
         # Held, so a raise committing meanwhile can't leave the item below the level (TD-72).
         await ProjectRepository(self.session).hold(project)
+        # Checked again on the held row: an archive or export-control change that committed
+        # while this waited takes the right away.
+        ensure(ctx, Action.REQUIREMENT_CREATE, project_target(project))
         _check_restriction(
             project,
             values.restriction_level,
@@ -270,6 +282,8 @@ class RequirementService:
         # first.
         await ProjectRepository(self.session).hold(project)
         target = project_target(project, requirement)
+        # Checked again on the held row, as a create is.
+        ensure(ctx, Action.REQUIREMENT_UPDATE, target)
         if values.status is RequirementStatus.APPROVED:
             ensure(ctx, Action.REQUIREMENT_APPROVE_MANUALLY, target)
             raise ValidationFailedError.on(
@@ -350,11 +364,12 @@ class RequirementService:
         that does neither either one. 422 on `level` (`below_project`) and `categories`
         (`project_only`). Logs each field that changed."""
         project = await self._project(requirement)
-        target = project_target(project, requirement)
         # The project first, as a raise does, so the level checked stays true until commit
         # (TD-72); then the row, so the rights and the old values logged see a concurrent change.
         await ProjectRepository(self.session).hold(project)
         await self._lock_live(requirement)
+        # Built on the held rows: an archive or export-control change meanwhile is seen (TD-80).
+        target = project_target(project, requirement)
         old = Restriction(requirement.restriction_level, frozenset(_categories(requirement)))
         new = Restriction(values.level, frozenset(values.categories))
         kind = change(old, new)
@@ -405,8 +420,10 @@ class RequirementService:
         # Moves in a project run one at a time, so two at once can't make a cycle neither saw.
         # The tree first, then the row: a new parent's foreign-key check waits on that parent's
         # row, which another move may hold.
-        await self.repository.lock_tree(project.id)
+        await self.repository.lock_tree(project)
         await self._lock_live(requirement)
+        # Checked again under the tree lock, which reads the project again (TD-80).
+        ensure(ctx, Action.REQUIREMENT_UPDATE, project_target(project, requirement))
         parent_id, old_parent_id = values.parent_id, requirement.parent_requirement_id
         reparented = parent_id != old_parent_id
         if parent_id is not None:
@@ -512,7 +529,7 @@ class RequirementService:
         may not delete each one (DL-221). Every deleted one's pending approval request is
         cancelled (DL-224). One `deleted_at` for all, each logged."""
         project = await self._project(requirement)
-        await self.repository.lock_tree(project.id)
+        await self.repository.lock_tree(project)
         await self._lock_live(requirement)
         # Checked again on the locked row: a reporter change or an approval that committed while
         # this waited can take the right away.
@@ -559,7 +576,7 @@ class RequirementService:
         if its parent is still in the trash (DL-217). One stored below the project's level is
         raised to it (DL-209). Each logged."""
         project = await self._project(requirement)
-        await self.repository.lock_tree(project.id)
+        await self.repository.lock_tree(project)
         await self.repository.lock(requirement)
         deleted_at = requirement.deleted_at
         if deleted_at is None:
@@ -851,6 +868,10 @@ class RequirementService:
         await self._lock_live(requirement)
         approvals = ApprovalService(self.session)
         request = await approvals.lock(request)
+        # The caller's access read again, whole: a removal, role change, revocation, or
+        # deactivation takes the project's lock first, so one that committed while this waited,
+        # leaving their row pending, is seen (TD-82).
+        ctx = await self._current_context(ctx)
         ensure(ctx, Action.APPROVAL_DECIDE, project_target(project, request))
         await approvals.decide(request, ctx.user_id, body.decision, body.comment)
         return await self._read_approval_request(
@@ -1031,7 +1052,8 @@ class RequirementService:
     ) -> ApprovalRequestRead:
         # A foreign key's row the caller just loaded or wrote, so never None.
         request = cast(ApprovalRequest, await ApprovalRepository(self.session).get(request_id))
-        actions = allowed_actions(ctx, target)
+        # The request's own actions only: the requirement's are on the requirement (S2-C22).
+        actions = [a for a in allowed_actions(ctx, target) if a is Action.APPROVAL_REQUEST_CANCEL]
         if request.status is ApprovalRequestStatus.PENDING:
             # Decide's relationship needs the request (its rows), not the requirement (DL-233).
             if authorize(ctx, Action.APPROVAL_DECIDE, dataclasses.replace(target, entity=request)):

@@ -297,7 +297,7 @@ only focus or boundary indicator.
   `@axe-core/playwright`? Is `expectFocusNotObscured()` used on the shell, on a page with a
   toast, and on a table with rows selected (sticky toolbar)?
 - Is there a toast-timing test (8 s, pause on hover and focus, flip-on-overlap) with a fake clock,
-  and does `check_contrast.py` (or its Vitest port) still pass after any token change?
+  and does `check_contrast.py` (run in `wl check` by a docs consistency test, TD-61) still pass after any token change?
 - Do specs mock only the API client with results typed from the generated schema, and assert
   what the user sees, not component internals? Is there a component with no spec?
 - Could any test pass with the behavior broken? (Name the mutation that would survive.)

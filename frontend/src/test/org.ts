@@ -33,6 +33,9 @@ export async function mountOrgPages(path: string, allowed: Action[]) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
+      // The 404 and 403 pages link to these.
+      { path: '/', name: 'my-work', component: { template: '<p />' } },
+      { path: '/status', name: 'status', component: { template: '<p />' } },
       { path: '/:orgSlug/members', name: 'org-members', component: OrgMembersView },
       { path: '/:orgSlug/settings', name: 'org-settings', component: OrgSettingsView },
     ],

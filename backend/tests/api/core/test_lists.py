@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import SessionMaker
@@ -388,32 +387,13 @@ async def test_archived_only_with_include_archived_is_a_conflict(client: AsyncCl
     )
 
 
-async def test_soft_deleted_rows_show_only_on_request(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    _, gone = await add(session, record("live"), record("deleted"))
-    await session.execute(
-        text("UPDATE support_record SET deleted_at = now() WHERE id = :id"), {"id": gone.id}
-    )
-    allowed = {**MINE, "X-Permitted": "include_deleted"}
-
-    hidden = (await client.get("/records", headers=MINE)).json()
-    shown = (await client.get("/records?include_deleted=true", headers=allowed)).json()
-
-    assert ([item["name"] for item in hidden["items"]], hidden["total"]) == (["live"], 1)
-    assert ([item["name"] for item in shown["items"]], shown["total"]) == (["deleted", "live"], 2)
-
-
 @pytest.mark.security
 @pytest.mark.parametrize(
     ("query", "permitted", "refused"),
     [
-        ("include_deleted=true", "", ["include_deleted"]),
         ("name_starts_with=a", "", ["name_starts_with"]),  # a restricted custom filter
         ("flagged=false", "", ["flagged"]),  # a falsy value is still a use of the filter
-        ("include_deleted=true", "flagged", ["include_deleted"]),
         ("flagged=true", "", ["flagged"]),
-        ("flagged=true&include_deleted=true", "", ["flagged", "include_deleted"]),
     ],
 )
 async def test_a_restricted_filter_the_caller_wasnt_permitted_is_a_422(
@@ -428,14 +408,6 @@ async def test_a_restricted_filter_the_caller_wasnt_permitted_is_a_422(
     assert [(field["loc"], field["type"]) for field in fields] == [
         (["query", name], "not_permitted") for name in refused
     ]
-
-
-async def test_include_deleted_false_needs_no_permission(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    await add(session, record("live"))
-
-    assert await names(client, "include_deleted=false") == ["live"]
 
 
 # --- Scope (testing-strategy.md, Security: list endpoints return only accessible rows) --------
@@ -453,25 +425,19 @@ async def test_include_deleted_false_needs_no_permission(
         "name__contains=secret",
         "include_archived=true",
         "archived_only=true",
-        "include_deleted=true",
-        "include_archived=true&include_deleted=true&status__not=in_review&owner__is_null=true",
+        "include_archived=true&status__not=in_review&owner__is_null=true",
     ],
 )
 async def test_no_filter_widens_the_scope(
     client: AsyncClient, session: AsyncSession, query: str
 ) -> None:
     # Another tenant's rows, each matching one of the filters above.
-    _, theirs_deleted, _ = await add(
+    await add(
         session,
         record("secret", tenant="theirs", status=None, owner_id=None),
-        record("secret deleted", tenant="theirs"),
         record("secret archived", tenant="theirs", archived_at=datetime.now(UTC)),
     )
-    await session.execute(
-        text("UPDATE support_record SET deleted_at = now() WHERE id = :id"),
-        {"id": theirs_deleted.id},
-    )
-    headers = {**MINE, "X-User": str(ANN), "X-Permitted": "include_deleted"}
+    headers = {**MINE, "X-User": str(ANN)}
 
     body = (await client.get(f"/records?{query}", headers=headers)).json()
 
@@ -551,7 +517,6 @@ async def test_the_filters_are_in_the_openapi_schema(
         "q",
         "include_archived",
         "archived_only",
-        "include_deleted",
         "status",
         "status__not",
         "status__is_null",

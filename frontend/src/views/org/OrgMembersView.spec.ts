@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { ACME, failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
-import { mountOrgView } from '@/test/org'
+import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
+import { acme, mountOrgPages, mountOrgView } from '@/test/org'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { cleanUpAfterEach, listPage } from '@/test/workspace'
 
@@ -284,6 +284,33 @@ describe('OrgMembersView', () => {
       params: { path: { org_id: ACME.id, user_id: ANN.user_id }, query: { with_projects: true } },
     })
     expect(wrapper.text()).toContain('Ann Admin removed from Acme Manufacturing.')
+  })
+
+  it("moves focus to the 403 page's h1 when a refused removal's reload is refused, on the first page of a visit (TD-90)", async () => {
+    const get = answers()
+    vi.spyOn(client, 'DELETE').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    const { wrapper } = await mountOrgPages('/acme/members', [...ADMIN])
+    await wrapper.get('button[aria-label="Actions for Ann Admin"]').trigger('click')
+    await flushPromises()
+    await chooseFromMenu('Remove from organization')
+    // The list's reload is refused too; everything else answers as before.
+    const before = get.getMockImplementation() as (path: string) => unknown
+    get.mockImplementation(((path: string) =>
+      path === '/api/orgs/{org_id}/members'
+        ? Promise.resolve(failed(403, { code: 'forbidden', message: '', details: {} }))
+        : path === '/api/auth/me'
+          ? Promise.resolve(ok(me({ orgs: [acme([...ADMIN])] })))
+          : before(path)) as never)
+
+    const dialog = wrapper.findAll('dialog').find((d) => d.text().includes('Remove Ann Admin'))!
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe("You can't open this page")
+    expect(document.activeElement).toBe(wrapper.get('h1').element)
+    expect(document.title).toBe("You can't open this page · Waterline")
   })
 
   it('is the 403 page, without asking the API, for an org member who may not manage it', async () => {

@@ -170,6 +170,32 @@ describe('UsersView', () => {
     expect(wrapper.text()).toContain('Ask one of them if you need it.')
   })
 
+  it("moves focus to the 403 page's h1 when a refused action's /me reload takes the page away (UI-SHL-9)", async () => {
+    vi.spyOn(client, 'GET').mockImplementation(((path: string) =>
+      Promise.resolve(path === '/api/auth/me' ? ok(me()) : ok(listPage(USERS)))) as never)
+    vi.spyOn(client, 'POST').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
+    await wrapper.findAll('tbody tr')[1]!.get('button[aria-haspopup=menu]').trigger('click')
+    await flushPromises()
+    ;[...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((e) => e.textContent?.trim() === 'Reactivate')!
+      .click()
+    await flushPromises()
+
+    await wrapper
+      .findAll('dialog')
+      .find((d) => d.attributes('open') !== undefined)!
+      .get('form')
+      .trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe("You can't open this page")
+    expect(document.activeElement).toBe(wrapper.get('h1').element)
+    expect(document.title).toBe("You can't open this page · Waterline")
+  })
+
   it('reloads the rows and /me after a 403 in an account dialog, as what the user may do changed (UI-FRM-7)', async () => {
     const get = vi
       .spyOn(client, 'GET')

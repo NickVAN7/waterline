@@ -134,9 +134,11 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A form alert's dismiss returns focus to the form's submit button (`dismissToSubmit`, or
   `useSettingsSave`'s `dismissed`), never `dismissAlert()` alone: the alert held focus (UI-FBK-13;
   S1-C16a review).
-- A reload after a 403 that leaves the page without the form (now a 403 or 404 page, or an
-  error state) settles it as a navigation does, `settlePage()`: the alert that held focus is gone
-  (UI-FRM-7, UI-SHL-9; S1-C16a review).
+- A reload after a user's action that replaces the page (a 403 that leaves a 403 or 404 page, a
+  save that finds the item gone) calls `replacedPage()`, which sets the title and focuses the new
+  `h1` on a visit's first page too; never `settlePage()`, which skips focus on a first page
+  because that page came from a load. Its spec mounts directly on the URL (UI-FRM-7, UI-SHL-9;
+  S1-C16a review, S2-C22 review).
 - A confirmation that names people shows each with their email and their "Deactivated" badge,
   keyed by id: names aren't unique (UI-FBK-6; S1-C16a review).
 - A dialog component is mounted once per page: two copies share their fields' ids, so each label
@@ -144,8 +146,8 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A page with more than one paged list names each `Pagination` after its list (`label`,
   "Archived pagination"): two landmarks never share a name (UI-TBL-3; S2-C0g review).
 - A dialog's 404 (the item gone since the page loaded) goes through the page's own gone handler,
-  which settles the not-found page or focuses the panel's title (`RequirementDetail`'s
-  `editGone`), never a bare reload: focus comes back to the opener a task later, and the reload
+  which brings the not-found page (`replacedPage()`) or focuses the panel's title
+  (`RequirementDetail`'s `editGone`), never a bare reload: focus comes back to the opener a task later, and the reload
   then removes it (UI-SHL-9; S2-C21 review).
 - A reload after a 403 that removes the control holding focus, while the page stays, moves focus
   to the failure alert when focus is left on `<body>` (`RequirementsTree`'s `movable` watch,

@@ -11,7 +11,7 @@ import { computed, ref } from 'vue'
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { PROJECT_ROLE } from '@/app/labels'
-import { focusHeading, settlePage } from '@/app/routeFocus'
+import { focusHeading, replacedPage } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import Skeleton from '@/components/Skeleton.vue'
@@ -107,11 +107,12 @@ async function list(query: { limit: number; offset: number; include_deactivated?
 }
 
 // A 403 in a dialog: the project's actions changed too (its buttons, the export-control flag). If
-// the project is gone with them, the page settles as a navigation does (UI-SHL-9).
+// the project is gone with them, focus moves to the new page's h1, on a visit's first page too
+// (UI-SHL-9, TD-90).
 async function refused() {
   await project.run()
   if (project.data.value) nav.select(project.data.value)
-  if (notFound.value) await settlePage()
+  if (notFound.value) await replacedPage()
 }
 </script>
 

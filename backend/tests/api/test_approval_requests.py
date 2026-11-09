@@ -421,6 +421,19 @@ async def test_a_request_offers_cancel_only_while_it_is_pending(
     assert ("approval_request.cancel" in response.json()["allowed_actions"]) is offered
 
 
+async def test_a_requests_actions_leave_out_its_requirements(
+    client: AsyncClient, t: Tenancy, admin: User
+) -> None:
+    """S2-C22 (repo-auditor). Bug: the requirement's actions (`requirement.update`, …) copied onto
+    the request's read."""
+    item = await requirement(t)
+    request = await request_on(t, item, admin)
+
+    response = await client.get(f"/api/approval-requests/{request.id}")
+
+    assert response.json()["allowed_actions"] == ["approval_request.cancel"]
+
+
 # --- The list (DL-227) --------------------------------------------------------------------------
 
 

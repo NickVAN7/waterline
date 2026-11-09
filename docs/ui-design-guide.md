@@ -331,7 +331,7 @@ html {
   bold); component boundaries, icons that carry meaning, and the focus ring 3:1 against the
   colors next to them. A new token pair meets these in both themes before it is added, and is
   added to `check_contrast.py` (§9) in the same change. When `tokens.css` exists, a test enforces
-  this for every pair (open item 3).
+  this for every pair (open item 3, done).
 - **UI-TOK-4** Font sizes are in `rem`, so text follows the user's settings. Body text is
   16 px, nothing is smaller than `--text-xs`, body line height is at least 1.5, and containers
   that hold text have no fixed height, so user text-spacing overrides do not clip.
@@ -497,7 +497,10 @@ render inside the full shell when signed in.
   `<h1 text> · Waterline` and move focus to the new `h1` (`tabindex="-1"`) once the view has
   rendered. A change that only alters list state through `useListQuery` (sort, filter, page)
   does not move focus; it updates a polite live region instead ("12 projects"). On `/docs`, a
-  hash (`#docs-<section>`) moves focus to that section's heading instead (DL-311).
+  hash (`#docs-<section>`) moves focus to that section's heading instead (DL-311). A user's action
+  whose reload replaces the page (a refusal that leaves the not-found or 403 page, a save that
+  finds the item gone) does the same, on a visit's first page too (`replacedPage()`; S2-C22
+  review).
 - **UI-SHL-10** **Admin pages.** Organization administration (overview, members, settings) and
   workspace administration (staff, orgs, users, settings) are separate pages. The entry points
   (DL-137): the org menu in the header (UI-SHL-4) for the current org's pages, and the user
@@ -1085,7 +1088,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 
 | Check | When | How |
 |---|---|---|
-| Token contrast | Whenever `tokens.css` changes, and in `wl check` once ported | `check_contrast.py` reads every `light-dark()` pair and checks it against §3.1's minimums in both themes (140 checks today); a new token pair is added to its list in the same change (UI-TOK-3) |
+| Token contrast | In `wl check` (a docs consistency test, TD-61) | `check_contrast.py` reads every `light-dark()` pair and checks it against §3.1's minimums in both themes (140 checks today); a new token pair is added to its list in the same change (UI-TOK-3) |
 | axe in component tests | Every view and shared component spec | `vitest-axe` through one shared `expectNoA11yViolations()`. Use the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`. axe-core's only WCAG 2.2 rule, `target-size` (tag `wcag22aa`), is **disabled by default** and must be opted into, so the shared setup proves it is running with a deliberately undersized-target fixture that must fail. axe does not automate Focus Not Obscured (2.4.11), which is why `expectFocusNotObscured()` below exists. jsdom has no layout, so contrast and target size are not really checked here: axe reports contrast as "incomplete" there, so treat `incomplete` as unchecked, not as a pass |
 | axe in end-to-end tests | Every screen each flow visits, **once in light and once in dark** (`colorScheme` emulation) | `@axe-core/playwright` with the same tags. This is where contrast and target size are actually checked |
 | Focus not obscured | A sticky-header fixture (S1-C14), then the shell pages (from S1-C14a), a page with a toast showing, and a table with rows selected | End-to-end helper `expectFocusNotObscured()`: press Tab through the page; after each press, `document.elementFromPoint` at the centre of the focused element's box must return that element or a descendant. With a sticky selection toolbar showing, scroll so a row sits at the top edge and Tab to it; it must not be under the toolbar. Proven able to fail on a test fixture with a sticky header (S1-C14, DL-89) |
@@ -1110,8 +1113,9 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    UI-TBL-1 to 8 or the table stays native; (e) whether PrimeVue's Toast could replace ours; (f)
    that a password manager's icon doesn't collide with the in-field toggle on the real sign-in
    page; (g) that no PrimeIcons font is pulled in (UI-STY-4).
-3. **Contrast test:** port the pair check to a Vitest test that reads `tokens.css` and runs in
-   `wl check`, so UI-TOK-3 is enforced, not just checked once.
+3. **Contrast test:** done in S2-C22 (TD-61): a docs consistency test runs `check_contrast.py`
+   against the app's `tokens.css` in `wl check`, so UI-TOK-3 is enforced, not just checked once
+   (one list of pairs, the script's, rather than a Vitest copy of it).
 4. **Text darkness:** body text is a very dark `#0a1018` (light) and near-white `#f6f9fc` (dark),
    chosen to widen the gap to placeholders. If it looks too heavy across the full app once
    pages are populated, adjust `--color-text`.

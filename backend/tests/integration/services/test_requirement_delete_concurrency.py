@@ -4,8 +4,10 @@ raise and a new reporter's membership against a removal (TD-72), two deletes at 
 edit waiting on a delete (design-doc §9; backend/CLAUDE.md, "A check that *another* row exists
 before a write…"). Each sabotage-checked against the code without the hold."""
 
+from datetime import UTC, datetime
+
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.authz.context import AuthzContext, ProjectAccess
@@ -27,6 +29,7 @@ from app.repositories.user import UserRepository
 from app.schemas.project import RestrictionUpdate
 from app.schemas.requirement import (
     RequirementCreate,
+    RequirementMove,
     RequirementRestrictionUpdate,
     RequirementUpdate,
 )
@@ -214,6 +217,106 @@ async def test_a_reporter_change_waiting_on_marking_export_controlled_refuses_an
     refused = await race(concurrency, concurrency_engine, first=mark, second=reassign)
 
     assert refused == ["not_member"]
+
+
+def write(name: str, ctx: AuthzContext, project: Project, requirement: Requirement) -> Change:
+    """One requirement write by `ctx`: each checks its right again once it holds the project."""
+
+    async def change(session: AsyncSession) -> object:
+        service = RequirementService(session)
+        loaded = await session.get_one(
+            Requirement, requirement.id, execution_options={"include_deleted": True}
+        )
+        match name:
+            case "create":
+                body = RequirementCreate(title="New")
+                return await service.create(ctx, await session.get_one(Project, project.id), body)
+            case "update":
+                return await service.update(
+                    ctx, loaded, RequirementUpdate(version=1, title="Edited")
+                )
+            case "move":
+                return await service.move(ctx, loaded, RequirementMove(parent_id=None))
+            case "delete":
+                return await service.delete(ctx, loaded, DeletedChildren.DELETE)
+            case "restriction":
+                body = RequirementRestrictionUpdate(
+                    level=RestrictionLevel.CONFIDENTIAL, categories=[]
+                )
+                return await service.set_restriction(ctx, loaded, body)
+            case _:
+                return await service.restore(ctx, loaded)
+
+    return change
+
+
+IN_TRASH = datetime(2026, 11, 1, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("name", "deleted_at"),
+    [
+        ("create", None),
+        ("update", None),
+        ("restriction", None),
+        ("move", None),
+        ("delete", None),
+        ("restore", IN_TRASH),
+    ],
+)
+@pytest.mark.concurrency(*TABLES)
+async def test_a_write_waiting_on_marking_export_controlled_is_a_404_to_an_inherited_admin(
+    concurrency: SessionMaker,
+    concurrency_engine: AsyncEngine,
+    name: str,
+    deleted_at: datetime | None,
+) -> None:
+    """TD-80: each write holds the project, which reads it again, and checks its right again
+    under it, so a system admin with no explicit membership, who loses content access once the
+    project is marked export-controlled (§3.1), is refused once the change commits. Without the
+    re-check the write runs on the project as it was first loaded."""
+    ctx, project, requirement = await a_project(concurrency)
+    async with committing_factories(concurrency) as session:
+        ada = await UserFactory.create_async(is_system_admin=False, is_active=True)
+        await ProjectMembershipFactory.create_async(
+            project=await session.get_one(Project, project.id), user=ada, role=ProjectRole.ADMIN
+        )
+    async with concurrency() as session:
+        # A restore's requirement is in the trash first.
+        await session.execute(
+            update(Requirement)
+            .where(Requirement.id == requirement.id)
+            .values(deleted_at=deleted_at)
+        )
+        await session.commit()
+    mark_ec = RestrictionUpdate(
+        level=None,
+        categories=[RestrictionCategory.EXPORT_CONTROLLED],
+        export_control_confirmed=True,
+        confirmed_member_ids=[ada.id],
+    )
+
+    async def mark(session: AsyncSession) -> object:
+        loaded = await session.get_one(Project, project.id)
+        return await ProjectService(session).set_restriction(ctx, loaded, mark_ec)
+
+    async def requirement_state(session: AsyncSession) -> list[tuple[object, ...]]:
+        rows = await session.execute(
+            select(Requirement.id, Requirement.title, Requirement.rank, Requirement.deleted_at)
+            .order_by(Requirement.id)
+            .execution_options(include_deleted=True)
+        )
+        return [tuple(row) for row in rows.all()]
+
+    async with concurrency() as before:
+        state = await requirement_state(before)
+
+    refused = await race(
+        concurrency, concurrency_engine, first=mark, second=write(name, ctx, project, requirement)
+    )
+
+    async with concurrency() as check:
+        assert (refused, await requirement_state(check)) == (["NotFoundError"], state)
 
 
 @pytest.mark.concurrency(*TABLES)

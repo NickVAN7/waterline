@@ -11,7 +11,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { DEACTIVATED } from '@/app/labels'
-import { focusHeading, settlePage } from '@/app/routeFocus'
+import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -160,10 +160,12 @@ function finished(message: string) {
   void page.run()
 }
 
-function forbidden() {
-  void page.run()
-  store.load().catch(() => {})
+// A 403 in a dialog: the reload may bring the not-found or 403 page, which takes focus on a
+// visit's first page too, since an action replaced it (UI-SHL-9).
+async function forbidden() {
   emit('refused')
+  await Promise.all([page.run(), store.load().catch(() => {})])
+  if (notFound.value || refused.value) await replacedPage()
 }
 
 const announcement = computed(() => {

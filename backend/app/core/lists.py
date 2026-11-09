@@ -26,7 +26,6 @@ from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute
 
-from app.core.base_model import INCLUDE_DELETED as INCLUDE_DELETED_OPTION
 from app.core.errors import FieldError, ValidationFailedError
 
 DEFAULT_LIMIT = 50
@@ -47,7 +46,6 @@ _BUILT_IN = frozenset(
         "q",
         "include_archived",
         "archived_only",
-        "include_deleted",
         "include_deactivated",
     }
 )
@@ -100,10 +98,6 @@ class CustomFilter:
 # Showing deactivated people is restricted too: only the list's admins may (DL-294).
 INCLUDE_DEACTIVATED = "include_deactivated"
 
-# Showing soft-deleted rows is always restricted: the trash view shows each user only what they
-# may restore (design-doc §9), so the endpoint decides who may ask for it.
-INCLUDE_DELETED = "include_deleted"
-
 
 @dataclass(frozen=True)
 class ListSpec:
@@ -126,7 +120,6 @@ class ListSpec:
     search: tuple[Column, ...] = ()
     archived_column: Column | None = None
     active_column: Column | None = None
-    soft_deleted: bool = False
     paging: Literal["offset", "cursor"] = "offset"
 
     def __post_init__(self) -> None:
@@ -177,8 +170,6 @@ class ListSpec:
             fields["archived_only"] = (bool, False)
         if self.active_column is not None:
             fields[INCLUDE_DEACTIVATED] = (bool, False)
-        if self.soft_deleted:
-            fields[INCLUDE_DELETED] = (bool, False)
         for declared in self.filters:
             fields.update(_parameters(declared))
         return create_model(
@@ -325,8 +316,8 @@ def apply_filters(
     permitted: Collection[str] = frozenset(),
 ) -> Select[Any]:
     """`statement` narrowed by everything in `query` except paging and sorting: filters (AND
-    across fields, OR within one), search, and hidden rows. Restricted filters,
-    `include_deleted`, and `include_deactivated` apply only if `permitted` names them
+    across fields, OR within one), search, and hidden rows. Restricted filters
+    and `include_deactivated` apply only if `permitted` names them
     (`check_permitted`)."""
     check_permitted(spec, query, permitted)
     for declared in spec.filters:
@@ -338,8 +329,6 @@ def apply_filters(
         statement = _apply_archived(statement, spec.archived_column, query)
     if spec.active_column is not None and not _value(query, INCLUDE_DEACTIVATED):
         statement = statement.where(spec.active_column)
-    if spec.soft_deleted and _value(query, INCLUDE_DELETED):
-        statement = statement.execution_options(**{INCLUDE_DELETED_OPTION: True})
     return statement
 
 
@@ -363,18 +352,15 @@ def _used_parameters(declared: Filter | CustomFilter, query: BaseModel) -> list[
 
 
 def check_permitted(spec: ListSpec, query: BaseModel, permitted: Collection[str]) -> None:
-    """Refuse a restricted filter (or `include_deleted`, `include_deactivated`) the caller
-    wasn't permitted: a 422 on the parameter, so the list never hints at what it would have
-    matched. `permitted` holds filter names (and those two), decided by the endpoint (through
-    `authorize()`)."""
+    """Refuse a restricted filter (or `include_deactivated`) the caller wasn't permitted: a 422
+    on the parameter, so the list never hints at what it would have matched. `permitted` holds
+    filter names (and `include_deactivated`), decided by the endpoint (through `authorize()`)."""
     refused = [
         parameter
         for declared in spec.filters
         if declared.restricted and declared.name not in permitted
         for parameter in _used_parameters(declared, query)
     ]
-    if spec.soft_deleted and _value(query, INCLUDE_DELETED) and INCLUDE_DELETED not in permitted:
-        refused.append(INCLUDE_DELETED)
     if (
         spec.active_column is not None
         and _value(query, INCLUDE_DEACTIVATED)
@@ -443,8 +429,8 @@ async def fetch_page(
     filtered = apply_filters(
         statement, spec, query, current_user_id=current_user_id, permitted=permitted
     )
-    # The count carries the same options as the list (e.g. the include_deleted opt-in), or the
-    # soft-delete filter would apply to the count alone and `total` disagree with `items`.
+    # The count carries the same options as the list (e.g. the trash's include_deleted opt-in),
+    # or the soft-delete filter would apply to the count alone and `total` disagree with `items`.
     total_statement = (
         select(func.count())
         .select_from(filtered.order_by(None).subquery())
