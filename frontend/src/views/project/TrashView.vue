@@ -28,26 +28,20 @@ import { allows } from '@/composables/allowedActions'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useListQuery } from '@/composables/useListQuery'
 import { useLoad } from '@/composables/useLoad'
-import { useCurrentOrgStore } from '@/stores/currentOrg'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
 import ProjectHeader from './ProjectHeader.vue'
+import ProjectPageLoading from './ProjectPageLoading.vue'
 import { useProjectPage } from './useProjectPage'
 
 type Item = components['schemas']['TrashItem']
 
-const WHO_TO_ASK_EXPORT =
-  "This project's content is export-controlled: only its members can read it. Ask one of its admins to add you."
 const WHO_TO_ASK = "Ask one of the project's admins if you need its requirements."
 
-const { key, project, notFound, retry } = useProjectPage('project-trash')
-const nav = useCurrentOrgStore()
+const { key, project, notFound, retry, reload, whoToAsk } = useProjectPage('project-trash')
 const loaded = computed(() => project.data.value)
 const allowed = computed(() => allows(loaded.value, 'requirement.view'))
-const exportControlled = computed(
-  () => !!loaded.value?.restriction_categories.includes('export_controlled'),
-)
 const list = useListQuery({ limit: 25 })
 
 const page = useLoad(() =>
@@ -117,10 +111,8 @@ async function restore(row: Item, index: number) {
         : error.status === 404
           ? `${id} isn't in the Trash any more.`
           : `Couldn't restore ${id}. Try again in a moment.`
-    if (error.status === 403) {
-      await project.run()
-      if (project.data.value) nav.select(project.data.value)
-    }
+    // The content closed to the user: the 403 page has replaced this one, so no list to read.
+    if (error.status === 403 && !(await reload(() => allowed.value))) return
     if (error.status === 403 || error.status === 404) await page.run()
     // Its button may be gone with the row or the permission: then the alert takes focus.
     await nextTick()
@@ -150,28 +142,15 @@ const announcement = computed(() => {
 
 <template>
   <NotFoundView v-if="notFound || page.error.value?.status === 404" />
-  <ForbiddenView
-    v-else-if="loaded && !allowed"
-    :who-to-ask="exportControlled ? WHO_TO_ASK_EXPORT : WHO_TO_ASK"
-  />
+  <ForbiddenView v-else-if="loaded && !allowed" :who-to-ask="whoToAsk(WHO_TO_ASK)" />
   <div v-else class="flex flex-col gap-6">
-    <div
+    <ProjectPageLoading
       v-if="!loaded"
-      class="flex flex-col gap-6"
-      :aria-busy="project.loading.value ? 'true' : 'false'"
-    >
-      <template v-if="project.error.value">
-        <h1 class="m-0 text-2xl leading-tight font-semibold font-mono">{{ key.toUpperCase() }}</h1>
-        <ErrorState
-          :key="project.failures.value"
-          :live="project.failures.value > 1"
-          thing="this project"
-          :pending="project.loading.value"
-          @retry="retry"
-        />
-      </template>
-      <Skeleton v-else :rows="4" />
-    </div>
+      :project="project"
+      :title="key.toUpperCase()"
+      :rows="4"
+      @retry="retry"
+    />
     <template v-else>
       <ProjectHeader :project="loaded" :title="`${loaded.name} trash`" />
       <p class="m-0 text-text-muted">

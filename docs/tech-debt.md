@@ -414,15 +414,6 @@ Entry format:
 - **Fix by:** S3-C16 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
 - **Status:** open
 
-### TD-103: TextField's slot shadows its `describedBy` prop
-- **Added:** S2-C22 (CI lint warning, Slice 2 retro)
-- **What:** `frontend/src/components/TextField.vue`'s `FormField` slot names its merged IDs
-  `describedBy`, the prop's name, so ESLint warns "already declared in the upper scope".
-  Behavior is correct: the input should use the slot's merged value.
-- **Why:** app code, which waits for Slice 3 (the owner, Slice 2 retro).
-- **Fix by:** S3-C0a (rename it in the slot, as `PasswordField.vue` does: `describedBy: ids`)
-- **Status:** open
-
 ### TD-104: The documentation has no search of its own
 - **Added:** DC-2026-11-09-s2-retro-and-ui-polish (DL-342)
 - **What:** the reader's guide (from S3-C0g) has no docs-only search.
@@ -788,3 +779,7 @@ Entry format:
 - **Added:** S2-C21c
 - **Status:** resolved in DC-2026-11-09-s2-retro-and-ui-polish (UI-FRM-7: a row or inline
   action's control is its own retry, DL-319)
+
+### TD-103: TextField's slot shadows its `describedBy` prop
+- **Added:** S2-C22 (CI lint warning, Slice 2 retro)
+- **Status:** resolved in S3-C0a (the slot's IDs are `ids`, as in `PasswordField.vue`)

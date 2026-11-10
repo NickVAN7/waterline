@@ -12,7 +12,7 @@ reference screen for your kind before writing anything, and copy its shape.
 | Kind | Reference | Its pieces |
 |---|---|---|
 | A paged list | `views/workspace/UsersView.vue` | `useLoad` + `useListQuery` (`returnWhenEmpty`), `Pagination`, `RowActions`, `SuccessStatus` |
-| A project page | `views/project/ProjectAccessView.vue` | `useProjectPage` (loading, not found, the redirect), `ProjectHeader` |
+| A project page | `views/project/ProjectAccessView.vue` | `useProjectPage` (loading, not found, the redirect; `reload` after a refusal, `exportControlled`, a content page's `whoToAsk`), `ProjectPageLoading`, `ProjectHeader` |
 | A settings form | `views/project/ProjectSettingsView.vue`, `components/NameSlugSettings.vue` | `useSettingsSave`, `useFormErrors`, only changed fields sent (TD-56) |
 | A dialog | `views/roster/ChangeRoleDialog.vue`; multi-step: `views/roster/AddPersonDialog.vue` | `ModalDialog`, `useFormErrors`, `retryFromSubmit`, `fallbackFocus` |
 | An admin page | any view under `views/workspace/` or `views/org/` | `meta.adminArea`, `ForbiddenView` with `WHO_TO_ASK` |

@@ -10,15 +10,14 @@ import { useRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
-import { focusHeading, syncTitle } from '@/app/routeFocus'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
 import { useLoad } from '@/composables/useLoad'
-import { useCurrentOrgStore } from '@/stores/currentOrg'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
+import ProjectPageLoading from '@/views/project/ProjectPageLoading.vue'
 import { useProjectPage } from '@/views/project/useProjectPage'
 
 import CreateRequirementForm from './CreateRequirementForm.vue'
@@ -26,8 +25,13 @@ import { readDraft } from './templates'
 
 const WHO_TO_ASK = "Ask one of the project's admins if you need to add requirements to it."
 
-const { key, project, notFound, retry } = useProjectPage('project-requirement-new')
-const nav = useCurrentOrgStore()
+const {
+  key,
+  project,
+  notFound,
+  retry,
+  reload: reloadPage,
+} = useProjectPage('project-requirement-new')
 const router = useRouter()
 const loaded = computed(() => project.data.value)
 const allowed = computed(() => allows(loaded.value, 'requirement.create'))
@@ -51,14 +55,7 @@ watch(
 
 // A refused create: what the user may do, again; a page that turns into another settles
 // (UI-FRM-7, UI-SHL-9).
-async function reload() {
-  await project.run()
-  if (project.data.value) nav.select(project.data.value)
-  if (notFound.value || !allowed.value) {
-    await syncTitle()
-    await focusHeading()
-  }
-}
+const reload = () => reloadPage(() => allowed.value)
 
 async function created(requirement: components['schemas']['RequirementRead']) {
   await router.replace({
@@ -72,23 +69,13 @@ async function created(requirement: components['schemas']['RequirementRead']) {
   <NotFoundView v-if="notFound || (tree.error.value?.status === 404 && allowed)" />
   <ForbiddenView v-else-if="loaded && !allowed" :who-to-ask="WHO_TO_ASK" />
   <div v-else class="flex flex-col gap-6">
-    <div
+    <ProjectPageLoading
       v-if="!loaded"
-      class="flex flex-col gap-6"
-      :aria-busy="project.loading.value ? 'true' : 'false'"
-    >
-      <template v-if="project.error.value">
-        <h1 class="m-0 text-2xl leading-tight font-semibold font-mono">{{ key.toUpperCase() }}</h1>
-        <ErrorState
-          :key="project.failures.value"
-          :live="project.failures.value > 1"
-          thing="this project"
-          :pending="project.loading.value"
-          @retry="retry"
-        />
-      </template>
-      <Skeleton v-else :rows="6" />
-    </div>
+      :project="project"
+      :title="key.toUpperCase()"
+      :rows="6"
+      @retry="retry"
+    />
     <template v-else>
       <RouterLink
         :to="{ name: 'project-requirements', params: { key: loaded.key } }"

@@ -19,16 +19,14 @@ import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
 import ProjectHeader from './ProjectHeader.vue'
+import ProjectPageLoading from './ProjectPageLoading.vue'
 import { useProjectPage } from './useProjectPage'
 
 const WHO_TO_ASK = "The access review is for the project's admins. Ask one of them if you need it."
 
-const { key, project, notFound, retry } = useProjectPage('project-access')
+const { key, project, notFound, retry, exportControlled } = useProjectPage('project-access')
 const loaded = computed(() => project.data.value)
 const allowed = computed(() => allows(loaded.value, 'project.view_access'))
-const exportControlled = computed(
-  () => !!loaded.value?.restriction_categories.includes('export_controlled'),
-)
 
 const review = useLoad(() =>
   api(client.GET('/api/projects/{key}/access', { params: { path: { key: loaded.value!.key } } })),
@@ -50,23 +48,13 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
   <NotFoundView v-if="notFound || review.error.value?.status === 404" />
   <ForbiddenView v-else-if="loaded && !allowed" :who-to-ask="WHO_TO_ASK" />
   <div v-else class="flex flex-col gap-6">
-    <div
+    <ProjectPageLoading
       v-if="!loaded"
-      class="flex flex-col gap-6"
-      :aria-busy="project.loading.value ? 'true' : 'false'"
-    >
-      <template v-if="project.error.value">
-        <h1 class="m-0 text-2xl leading-tight font-semibold font-mono">{{ key.toUpperCase() }}</h1>
-        <ErrorState
-          :key="project.failures.value"
-          :live="project.failures.value > 1"
-          thing="this project"
-          :pending="project.loading.value"
-          @retry="retry"
-        />
-      </template>
-      <Skeleton v-else :rows="4" />
-    </div>
+      :project="project"
+      :title="key.toUpperCase()"
+      :rows="4"
+      @retry="retry"
+    />
     <template v-else>
       <ProjectHeader :project="loaded" :title="`${loaded.name} project access review`" />
       <p class="m-0 text-text-muted">

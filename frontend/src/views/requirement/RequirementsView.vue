@@ -18,7 +18,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
-import { focusHeading, syncTitle } from '@/app/routeFocus'
+import { focusHeading } from '@/app/routeFocus'
 import Alert from '@/components/Alert.vue'
 import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -30,10 +30,10 @@ import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows } from '@/composables/allowedActions'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
-import { useCurrentOrgStore } from '@/stores/currentOrg'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import ProjectHeader from '@/views/project/ProjectHeader.vue'
+import ProjectPageLoading from '@/views/project/ProjectPageLoading.vue'
 import { useProjectPage } from '@/views/project/useProjectPage'
 
 import CreateRequirementDialog from './CreateRequirementDialog.vue'
@@ -41,17 +41,11 @@ import RequirementDetail from './RequirementDetail.vue'
 
 type Requirement = components['schemas']['RequirementRead']
 
-const WHO_TO_ASK_EXPORT =
-  "This project's content is export-controlled: only its members can read it. Ask one of its admins to add you."
 const WHO_TO_ASK = "Ask one of the project's admins if you need its requirements."
 
-const { key, project, notFound, retry } = useProjectPage('project-requirements')
+const { key, project, notFound, retry, reload, whoToAsk } = useProjectPage('project-requirements')
 const loaded = computed(() => project.data.value)
 const allowed = computed(() => allows(loaded.value, 'requirement.view'))
-const exportControlled = computed(
-  () => !!loaded.value?.restriction_categories.includes('export_controlled'),
-)
-const nav = useCurrentOrgStore()
 
 const tree = useLoad(() =>
   api(
@@ -67,14 +61,7 @@ watch(allowed, (may) => may && void tree.run(), { immediate: true })
 // focus goes to the new page's h1 even on the visit's first page, where a navigation's settling
 // leaves it (UI-SHL-9, UI-FRM-7). A failed tree reload is a live error whose Try again takes
 // focus (UI-FBK-15).
-async function reloadProject() {
-  await project.run()
-  if (project.data.value) nav.select(project.data.value)
-  if (notFound.value || !allowed.value || tree.error.value?.status === 404) {
-    await syncTitle()
-    await focusHeading()
-  }
-}
+const reloadProject = () => reload(() => allowed.value && tree.error.value?.status !== 404)
 
 // A 404 on the tree: the project's own answer says whether it's gone or closed to the user.
 watch(
@@ -159,38 +146,19 @@ async function panelDeleted(id: string) {
   await tree.run()
   await focusHeading()
 }
-
-// False: the requirement has gone with the permission, and this page with it.
-async function panelReload(): Promise<boolean> {
-  await reloadProject()
-  return !notFound.value && allowed.value
-}
 </script>
 
 <template>
   <NotFoundView v-if="notFound || (tree.error.value?.status === 404 && allowed)" />
-  <ForbiddenView
-    v-else-if="loaded && !allowed"
-    :who-to-ask="exportControlled ? WHO_TO_ASK_EXPORT : WHO_TO_ASK"
-  />
+  <ForbiddenView v-else-if="loaded && !allowed" :who-to-ask="whoToAsk(WHO_TO_ASK)" />
   <div v-else class="flex flex-col gap-6">
-    <div
+    <ProjectPageLoading
       v-if="!loaded"
-      class="flex flex-col gap-6"
-      :aria-busy="project.loading.value ? 'true' : 'false'"
-    >
-      <template v-if="project.error.value">
-        <h1 class="m-0 text-2xl leading-tight font-semibold font-mono">{{ key.toUpperCase() }}</h1>
-        <ErrorState
-          :key="project.failures.value"
-          :live="project.failures.value > 1"
-          thing="this project"
-          :pending="project.loading.value"
-          @retry="retry"
-        />
-      </template>
-      <Skeleton v-else :rows="4" />
-    </div>
+      :project="project"
+      :title="key.toUpperCase()"
+      :rows="4"
+      @retry="retry"
+    />
     <template v-else>
       <ProjectHeader :project="loaded" :title="`${loaded.name} requirements`">
         <Button v-if="allows(loaded, 'requirement.create')" @click="creating?.open()"
@@ -260,7 +228,7 @@ async function panelReload(): Promise<boolean> {
           in-panel
           :project="loaded"
           :number="panelNumber"
-          :reload-project="panelReload"
+          :reload-project="reloadProject"
           :focus-heading="() => panel?.focusTitle()"
           @changed="shownChanged"
           @gone="tree.run"

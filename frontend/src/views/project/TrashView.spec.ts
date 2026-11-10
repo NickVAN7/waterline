@@ -282,6 +282,24 @@ describe('TrashView', () => {
       expect(alert.contains(document.activeElement)).toBe(true)
     })
 
+    it("a 403 that closes the project's content to the user settles on the 403 page (UI-SHL-9)", async () => {
+      vi.spyOn(client, 'POST').mockResolvedValue(FORBIDDEN)
+      const { get } = await mountAt(
+        [READER, project({ allowed_actions: ['project.view'] })],
+        [page([row(3, 'Refunds')])],
+      )
+
+      restoreButton('ERP-RQ-3')!.click()
+      await flushPromises()
+
+      const h1 = document.querySelector('main h1')!
+      expect(h1.textContent).toBe("You can't open this page")
+      expect(document.activeElement).toBe(h1)
+      expect(document.title).toBe("You can't open this page · Waterline")
+      // No read of a trash the user may no longer open.
+      expect(trashCalls(get)).toHaveLength(1)
+    })
+
     it('a 404 says it has left the trash, and reloads the list', async () => {
       vi.spyOn(client, 'POST').mockResolvedValue(NOT_FOUND)
       const { get } = await mountAt([READER], [page([row(3, 'Refunds')]), page([])])

@@ -7,8 +7,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-Slice 2 merged (PR #11); Slice 3 planned (`docs/reviews/s3/S3-plan.md`, DL-344 to DL-354), on
-branch `s3`; next: S3-C0a (Project pages share their setup).
+S3-C0a (Project pages share their setup) done; next: S3-C0b (The git guard's trial).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
