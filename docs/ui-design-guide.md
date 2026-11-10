@@ -42,7 +42,8 @@ layout and utilities, both fed by one set of design tokens.**
 - **Native elements first** still holds (UI-STY-3): `<dialog>`, `<fieldset>`, `<table>`, and
   plain `<button>` and `<a>` are used where they do the job.
 - **SVAR for what PrimeVue does not have.** PrimeVue has no kanban board and no Gantt chart. The
-  task board and the editable or orderable lists use SVAR Vue **Kanban** and **DataGrid** (V1);
+  task board uses SVAR Vue **Kanban** and the editable grids **DataGrid** (V1); an orderable list's
+  widget is decided per list (UI-SVR-2; the backlog's by S3-C0i's spike, DL-344);
   the schedule chart uses SVAR **Gantt** (V2). SVAR is themed by one mapping file onto the same
   tokens (UI-SVR-3), so there is still one palette. Rules and known defects are in §7.1.
 
@@ -470,7 +471,9 @@ render inside the full shell when signed in.
   about eight projects, and "All projects" (styled apart from the project links) and "New
   project" (only when allowed; not indented) (DL-137). Below it, the selected project's pages
   are links, flat, in this order (DL-202): Home, Requirements, Tasks (Board and Backlog as tabs),
-  Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash last. Each
+  Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings,
+  and Trash last; from S3-C0l, Trash leaves the list for a link in each list page's header
+  (DL-350). Each
   appears once its feature is built, and a turned-off or unshipped module's page is left out. A module that isn't
   shipped can't be enabled (DL-136), so a module page appears only once its module has shipped
   and is enabled. **Only the page you are on has `aria-current="page"`**: "All projects" is
@@ -941,7 +944,9 @@ alternative.**
   SVAR DataGrid is for lists where **inline cell editing or manual row order is the point**,
   except the requirement tree, which is PrimeVue's TreeTable: SVAR's free tree mode has no drag
   and no move of its own (DL-174). The tree still follows UI-SVR-5 (the server decides each move)
-  and UI-SVR-6 (the move menu sits outside the widget). The task board is SVAR Kanban. The choice for each Task and Requirements list is written in
+  and UI-SVR-6 (the move menu sits outside the widget). The task board is SVAR Kanban. The
+  backlog's component, SVAR DataGrid or PrimeVue DataTable's row reorder, is decided by S3-C0i's
+  spike (DL-344). The choice for each Task and Requirements list is written in
   `screen-inventory.md` when that screen is specified, and **one list never ships with two
   implementations**. (The spike did not decide the per-list split; that is the owner's call
   per list.)
@@ -1129,12 +1134,13 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 4. **Text darkness:** body text is a very dark `#0a1018` (light) and near-white `#f6f9fc` (dark),
    chosen to widen the gap to placeholders. If it looks too heavy across the full app once
    pages are populated, adjust `--color-text`.
-5. **SVAR items.** (a) Decide the per-list split between DataTable and DataGrid (UI-SVR-2) as
-   each Task and Requirements screen is specified. (b) Wrapper work found by the spike and not
+5. **SVAR items.** (a) The per-list split between DataTable and DataGrid (UI-SVR-2): the
+   backlog's is decided by S3-C0i's spike (DL-344); any other Task or Requirements list's as its
+   screen is specified. (b) Wrapper work found by the spike and not
    yet built or tested: a visible and announced selected state for the board, focus return after
    a grid editor closes, names for the grid editors, and the `aria-rowindex="0"` and `treegrid`
    defects (patch in the wrapper or report upstream, UI-SVR-7). (c) Grid row drag with a
-   pointer was not exercised. (d) The Gantt baseline decision and the Gantt performance test
+   pointer was not exercised (S3-C0i exercises it, DL-344). (d) The Gantt baseline decision and the Gantt performance test
    (§7.2). (e) Whether to report the Gantt 2.8.0 mount crash upstream, and re-check it at V2.
    (f) The Kanban card shows no visible change when selected, so the wrapper needs its own
    selected style (UI-TOK-9). (g) **Tree rows:** the spike used a flat grid. Whether the

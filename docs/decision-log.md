@@ -817,7 +817,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   server. The packages are pinned exactly and arrive in the first checkpoint that ships a board or
   an editable grid (placed when Slices 2 and 3 are planned), not in S1-C14.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-344 (in part: the backlog's component, decided by the S3-C0i spike)
 - **Applies to:** ui-design-guide §7; build plan (Slice overview, Slice 2 notes);
   testing-strategy ("Accessibility"); `frontend/CLAUDE.md`
 - **Source:** chat session (owner's design walkthrough and the SVAR spike, Oct 10, 2026)
@@ -2564,7 +2564,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   all three are ticked, and a project admin can hide it sooner, through a per-project flag
   designed with its slice (the owner's to place). GitHub isn't part of it.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-354 (in part: Compile your plan is live from Slice 3)
 - **Applies to:** design-doc §11; screen-inventory step 5, step 6
 - **Source:** owner, Oct 27, 2026 (handoff decision 27; who sees it and the loose ticks answered
   in chat, Oct 27, 2026)
@@ -2578,7 +2578,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   Backlog tabs), Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash
   last, leaving out turned-off and unshipped modules.
 - **Supersedes:** DL-146 (in part: Trash linked from the requirements page's header)
-- **Superseded by:** DL-321 (in part: a split pane at wide widths)
+- **Superseded by:** DL-321 (in part: a split pane at wide widths); DL-348 (in part:
+  Workstreams after Timeline); DL-350 (in part: Trash leaves the navigation)
 - **Applies to:** design-doc §9; ui-design-guide UI-SHL-6, UI-SHL-11, UI-SHL-12; build plan
   (S2-C17, S2-C21); screen-inventory step 6
 - **Source:** owner, Oct 27, 2026 (handoff decisions 28 to 30; test runs opening like the other
@@ -2752,7 +2753,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   project's whole task order) and whether task moves run one at a time are decided in Slice 3
   planning.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-345
 - **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering"; build plan ("Later
   slices")
 - **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C7.md`, open question 2)
@@ -3654,7 +3655,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the trash endpoint's check, as Requirements' link does; each user's Trash lists what they may
   restore, project admins everything (design-doc §9).
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-350 (in part: the link in the project navigation)
 - **Applies to:** design-doc §9; build plan (S2-C21)
 - **Source:** owner, Nov 5, 2026 (chat session, S2-C21 re-cut)
 
@@ -4141,7 +4142,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   safety cap (about 500) and a note if it's reached, as the list conventions do, and per-org
   totals. "Showing 10 of N; each organization's list has the rest" goes.
 - **Supersedes:** design-doc §11's first-10 Projects section
-- **Superseded by:** none
+- **Superseded by:** DL-349
 - **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 11)
 
@@ -4162,7 +4163,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   decisions** is removed from My work, with its API section and endpoint (the owner's amendment to
   the handoff, which kept it as a link at the bottom).
 - **Supersedes:** DL-286; DL-302 in part (Favorites first)
-- **Superseded by:** none
+- **Superseded by:** DL-349 (in part: approvals below the projects)
 - **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 13, amended in the
   Claude Code session the same day)
@@ -4286,3 +4287,145 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S3-C0h; slice verification from Slice 3); testing strategy
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 23)
+
+### DL-344: The backlog's widget is decided by a spike, S3-C0i
+- **Date:** 2026-11-10
+- **Decision:** Whether the backlog is SVAR DataGrid or PrimeVue DataTable with row reorder is
+  decided by a spike, S3-C0i (one checklist: pointer drag, the move menu outside the widget, a
+  server-denied move snapping back, keyboard, axe, the token theme audit, about 2,000 rows), with
+  a working example of each option shown to the owner before the choice; its decision-log entry
+  decides S3-C19 and UI-SVR-2's backlog line.
+- **Supersedes:** DL-64 in part (the DataGrid for lists where manual order is the point, for the
+  backlog, until the spike decides)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SVR-2 and §10 item 5; build plan (S3-C0i, S3-C19)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q1)
+
+### DL-345: Task rank rewrites cover the project's task order; task moves share the tree lock
+- **Date:** 2026-11-10
+- **Decision:** A task drop between tied neighbors or past the 255-character cap rewrites the
+  project's whole task order, in one statement; task moves run one at a time per project under
+  the requirement tree's project-row lock (DL-214). The tree's rewrite becomes the same one
+  statement (TD-73, in S3-C7).
+- **Supersedes:** DL-216
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering"; build plan (S3-C7,
+  "Later slices"); tech debt TD-73
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q3)
+
+### DL-346: The backlog and board before sprints
+- **Date:** 2026-11-10
+- **Decision:** Until sprints ship, the backlog lists every task not `done` or `cancelled` (the
+  filter bar shows the rest), in rank order; the board has five columns, To do, In progress,
+  Blocked, In review, and Done, with Cancelled left off. Slice 4 narrows the backlog to tasks
+  without a sprint.
+- **Supersedes:** the screen inventory's "Backlog: ranked tasks not in a sprint" (Step 4), until
+  Slice 4
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; screen inventory (Step 4); build plan (S3-C20,
+  S3-C21, "Later slices")
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q4)
+
+### DL-347: Who may be a task's assignee or reviewer
+- **Date:** 2026-11-10
+- **Decision:** A task's assignee or reviewer is an active user who may update tasks in the
+  project (members and up with content access, and inherited admins on a project that isn't
+  export-controlled), checked by the one person check that reporter and approver share; a
+  deactivated assignee or reviewer stays on existing tasks, with the "Deactivated" badge.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Other targeted rules", §6 "Task"; build plan (S3-C6, S3-C13)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q5)
+
+### DL-348: Workstreams have their own page
+- **Date:** 2026-11-10
+- **Decision:** Workstreams are managed on their own page, `…/:key/workstreams`, after Timeline
+  in the project navigation, since members manage them and Settings is a project admins' page.
+- **Supersedes:** the screen inventory's "Workstreams: a section of Settings (or its own tab)";
+  DL-202 in part (the navigation's order gains Workstreams)
+- **Superseded by:** none
+- **Applies to:** screen inventory (Step 6, "Project"; layout patterns); ui-design-guide UI-SHL-6;
+  build plan (S3-C27)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q7)
+
+### DL-349: My work: summary tiles, projects first, ten per organization
+- **Date:** 2026-11-10
+- **Decision:** My work opens with summary tiles (Approvals waiting, Assigned to you, Waiting for
+  your review, Overdue or due this week), then Favorites, then each organization with its first
+  10 projects ("Showing 10 of N", its count, and **All N projects**), then Approvals waiting for
+  you, Assigned to you, and Waiting for your review. `GET /api/me/work` returns each org's first
+  10 projects and its total, which settles S3-C0f's open question (DC-2026-11-09, decision B). A
+  fuller dashboard is v1.5 or v2.
+- **Supersedes:** DL-331 (every project); DL-333 in part (approvals first, above Favorites)
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "My work", §16; screen inventory (My work); build plan (S3-C0f,
+  S3-C11, S3-C29)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q9)
+
+### DL-350: Trash is reached from each list page, not the navigation
+- **Date:** 2026-11-10
+- **Decision:** Trash leaves the project navigation. Every list page whose items can be deleted
+  has a **Trash** link in its header (Requirements from S3-C0l, Tasks from S3-C20, Test cases in
+  Slice 5), shown under the nav link's check (`requirement.view`, DL-291), opening the one Trash
+  page filtered to that page's type (`?type=task`), the filter removable; the route
+  `…/:key/trash` stays, and its breadcrumb leads back to the list. The delete status's Trash link
+  (DL-287) stays.
+- **Supersedes:** DL-291 in part (the link in the project navigation); DL-202 in part (Trash last
+  in the navigation)
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Trash"; screen inventory (layout patterns; Step 6, "Project");
+  ui-design-guide UI-SHL-6; build plan (S3-C0l, S3-C20, "Later slices")
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`,
+  Q12a)
+
+### DL-351: Ranked views take declared filters; a filtered tree shows ancestors
+- **Date:** 2026-11-10
+- **Decision:** A ranked view may take declared filters and returns the matches, complete up to
+  the cap; the requirement tree returns each match's ancestors too, marked as context. While the
+  tree is filtered, its move menu is off, with a polite note saying so (a match's siblings may be
+  hidden); a filtered task view keeps drag and the move menu, since a task's rank is one order
+  for the project and a move names its neighbors. A CSV export of a filtered tree holds the
+  matches only.
+- **Supersedes:** build plan, API conventions, "Ranked views" in part (ranked views returned the
+  complete list, with no filters)
+- **Superseded by:** none
+- **Applies to:** build plan (API conventions; S3-C10, S3-C14, S3-C26); design-doc §6
+  "Requirement tree"; screen inventory (Requirements)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`,
+  Q13)
+
+### DL-352: Task types per project type
+- **Date:** 2026-11-10
+- **Decision:** Software projects offer the task types feature, bug, chore, and spike; ERP and
+  general projects offer all seven (config, data, and training too). The rule lives in `rules/`
+  and the API exposes a project's allowed types; the display labels stay a frontend constant
+  (design-doc §1.1), as the acceptance-criteria templates do (DL-149). An existing task's type is
+  always shown, even after its project's type changes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Task"; build plan (S3-C2, S3-C5, S3-C22)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`,
+  Q14)
+
+### DL-353: The plan's readiness review is an independent agent's
+- **Date:** 2026-11-10
+- **Decision:** A slice plan's readiness review (build plan, "Planning a slice") is run by an
+  independent read-only agent on the same snapshot as the plan's design change's
+  `docs-consistency` pass. It returns a finding per row and rule, and the findings and their
+  fixes are recorded in that design change's record.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Planning a slice")
+- **Source:** owner, Nov 10, 2026 (Claude Code session, Slice 3 plan's design change)
+
+### DL-354: "Compile your plan" is live from Slice 3, ticked by a dated phase
+- **Date:** 2026-11-10
+- **Decision:** The Get started checklist's **Compile your plan** item shows from S3-C27, when
+  phases ship, ticked once the project has a phase with a date; a dated milestone ticks it too
+  from Slice 4.
+- **Supersedes:** DL-201 in part ("hidden until phases and milestones ship")
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "Project home: Get started checklist"; screen inventory (Step 5);
+  build plan (S3-C15, S3-C27)
+- **Source:** owner, Nov 10, 2026 (Claude Code session, Slice 3 plan's design change;
+  `docs-consistency` decision 1)

@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S2-C22 (Slice verification) done, and the Slice 2 retro and the UI polish handoff decided
-(DL-312 to DL-343); next: Slice 3's planning, whose first rows are S3-C0a to S3-C0h.
+Slice 2 merged (PR #11); Slice 3 planned (`docs/reviews/s3/S3-plan.md`, DL-344 to DL-354), on
+branch `s3`; next: S3-C0a (Project pages share their setup).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

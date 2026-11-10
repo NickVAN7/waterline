@@ -160,7 +160,7 @@ Entry format:
   says how many there are; an approval past the first 10 shows once an older one is decided.
 - **Why:** smallest complete change: no demo user is on more than two projects, and the org list
   already shows them all; no demo user has more than a few approvals. The "see all" list belongs with the sections that need one most.
-- **Fix by:** Slice 3 (with My work's tasks section, whose lists are long)
+- **Fix by:** S3-C29 (My work's "see all" for every section; the per-section routes exist, so frontend only)
 - **Status:** open
 
 ### TD-38: The project selector lists an org's first 200 projects
@@ -170,7 +170,7 @@ Entry format:
   shows only the first 200 there (all of them are on its project list).
 - **Why:** smallest complete change: v1's orgs have tens of projects. A server-side search
   parameter would be new API.
-- **Fix by:** Slice 3 (the filter bar's text search, which the selector can call)
+- **Fix by:** S3-C17 (the selector's search, on S3-C13's server-side `?q=`)
 - **Status:** open
 
 ### TD-41: Pickers of people load the first 200
@@ -181,7 +181,7 @@ Entry format:
   offer those; a roster, workspace, or org with more people shows only the first 200 by name.
 - **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
   would be new API (the lists have no text filter yet).
-- **Fix by:** Slice 3 (the filter bar's text search, which the pickers can call)
+- **Fix by:** S3-C17 (one searchable person picker, on S3-C13's server-side `?q=`)
 - **Status:** open
 
 ### TD-42: The own-row reset is hidden by a client-side check
@@ -261,7 +261,7 @@ Entry format:
 - **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
   statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
   helper that does it now.
-- **Fix by:** Slice 7 (the end of v1), or sooner if a rewrite's timing is noticed: one statement (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** S3-C7 (one statement, shared with the task order's rewrite, DL-345)
 - **Status:** open
 
 ### TD-76: The revision feed has no `(requirement_id, id)` index
@@ -365,7 +365,7 @@ Entry format:
   be picked in the UI; the API accepts them.
 - **Why:** the members list already exists; a candidates endpoint for everyone §6.2 allows is a
   new endpoint the owner chose not to build in S2-C20 (DL-278).
-- **Fix by:** Slice 3 (the filter bar's text search, with TD-41): the approver picker becomes a searchable dropdown, with a candidates endpoint for everyone §6.2 allows (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** S3-C17 (the approver picker becomes the searchable person picker, on S3-C13's candidates endpoint for everyone §6.2 allows)
 - **Status:** open
 
 ### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
@@ -374,8 +374,7 @@ Entry format:
   their "Show deactivated" checkbox above the list, not in a filter bar.
 - **Why:** the filter bar is built in Slice 3 (build plan, API conventions, "Frontend"); S2-C21a
   needs only the one checkbox.
-- **Fix by:** Slice 3, the checkpoint that builds the filter bar: the checkbox moves into it on
-  the four lists
+- **Fix by:** S3-C16 (the filter bar: the checkbox moves into it on the four lists)
 - **Status:** open
 
 ### TD-98: The session list shows the 200 most recently active sessions only
@@ -395,7 +394,7 @@ Entry format:
   total=…, limit=…, offset=…)` itself rather than `page.with_items(rows)`, the helper TD-54
   added for every list.
 - **Why:** S2-C20 code, fixed only when needed (DL-106); it behaves the same.
-- **Fix by:** Slice 3 (the next checkpoint that touches approval reads, or its tech-debt review)
+- **Fix by:** Slice 3 (its tech-debt review, S3-C33: no Slice 3 row touches approval reads)
 - **Status:** open
 
 ### TD-101: The reporter and approver checks are near-copies
@@ -404,7 +403,7 @@ Entry format:
   (hold the access, get the user, load their context and authorize, check `is_active`); only the
   action and the error differ, so a change to one (TD-79's batching) has to be made in both.
 - **Why:** S2-C11 and S2-C10 code, fixed only when needed (DL-106).
-- **Fix by:** Slice 3 (with TD-79, or the next change to either check)
+- **Fix by:** S3-C6 (one shared person check for reporter, approver, assignee, and reviewer)
 - **Status:** open
 
 ### TD-102: A members list with no row actions still shows an Actions column
@@ -412,7 +411,7 @@ Entry format:
 - **What:** for someone who may change nobody (a project member), the roster's table keeps its
   "Actions" header over empty cells.
 - **Why:** Slice 1 and S2-C17 roster code, fixed only when needed (DL-106); it's cosmetic.
-- **Fix by:** Slice 3 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
+- **Fix by:** S3-C16 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
 - **Status:** open
 
 ### TD-103: TextField's slot shadows its `describedBy` prop
