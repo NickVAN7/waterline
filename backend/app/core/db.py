@@ -1,5 +1,7 @@
-"""Async engine, session factory, and the one-transaction-per-request dependency."""
+"""Async engine, session factory, and the one-transaction-per-request dependency, which also
+decides whether a stale row is a 409 or a 404."""
 
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Annotated, Any
@@ -17,7 +19,7 @@ from sqlalchemy.orm.attributes import instance_state
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.base_model import INCLUDE_DELETED, StaleVersionError, VersionMixin
-from app.core.errors import NotFoundError, stale_table, versioned_class_for
+from app.core.errors import AppError, NotFoundError, StaleRowError
 
 type SessionMaker = async_sessionmaker[AsyncSession]
 
@@ -51,11 +53,46 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
         except BaseException as exc:
             written = _versioned_rows_written(session, exc)
             await session.rollback()
-            if written and await _any_gone(session, written):
-                # The "stale version" was a row deleted, or soft-deleted, since this request
-                # loaded it: it's gone, not changed.
-                raise NotFoundError from exc
+            if isinstance(exc, StaleDataError):
+                gone = bool(written) and await _any_gone(session, written)
+                raise stale_row_error(exc, gone=gone) from exc
             raise
+
+
+def stale_row_error(exc: StaleDataError, *, gone: bool) -> AppError:
+    """A stale row is a 404 when it's gone (deleted, or soft-deleted since this request loaded
+    it, or a non-versioned row that matched nothing), else a 409: someone else saved it. An
+    error whose table can't be read is treated as a version conflict."""
+    if gone:
+        return NotFoundError()
+    if isinstance(exc, StaleVersionError):
+        return StaleRowError()
+    table = stale_table(exc)
+    if table is None or versioned_class_for(table) is not None:
+        return StaleRowError()
+    return NotFoundError()
+
+
+# SQLAlchemy's wording when an UPDATE or DELETE by primary key matches fewer rows than expected.
+_STALE_TABLE = re.compile(r"^(?:UPDATE|DELETE) statement on table '([^']+)' expected to")
+
+
+def stale_table(exc: StaleDataError) -> str | None:
+    """The table named in SQLAlchemy's stale-row error, or None if the wording can't be read."""
+    match = _STALE_TABLE.match(str(exc))
+    return match.group(1) if match else None
+
+
+def versioned_class_for(table: str) -> type[VersionMixin] | None:
+    """The `VersionMixin` model mapped to `table`, if any."""
+    pending: list[type] = [VersionMixin]
+    while pending:
+        cls = pending.pop()
+        pending.extend(cls.__subclasses__())
+        mapped = getattr(cls, "__table__", None)
+        if mapped is not None and mapped.name == table:
+            return cls
+    return None
 
 
 _VERSIONED_WRITES = "versioned_writes"

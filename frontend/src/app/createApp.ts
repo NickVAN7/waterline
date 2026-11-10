@@ -21,7 +21,9 @@ export function createWaterlineApp(history?: RouterHistory) {
   app.use(pinia)
   const router = createAppRouter(history)
   app.use(router)
-  app.use(PrimeVue, { theme })
+  // The owner's PrimeUI Community License key (DL-135): a build-time setting, never committed.
+  // Without it PrimeVue shows an "Invalid PrimeUI License" notice, which the e2e tests fail on.
+  app.use(PrimeVue, { theme, license: import.meta.env.VITE_PRIMEUI_LICENSE })
   onSessionProblem(sessionProblemHandler(router))
   return { app, pinia, router }
 }

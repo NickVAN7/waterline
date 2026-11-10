@@ -64,7 +64,7 @@ describe('CreateOrgDialog', () => {
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: 'ws' },
-        query: { limit: 200, is_active: true, sort: 'name' },
+        query: { limit: 200, sort: 'name' },
       },
     })
     expect(wrapper.findAll('#org-owner-id option').map((o) => o.text())).toEqual([
@@ -188,6 +188,35 @@ describe('CreateOrgDialog', () => {
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(document.activeElement?.textContent?.trim()).toBe('Create organization')
+  })
+
+  it("keeps the admin's own username across the owner switch, and follows the name again once reopened", async () => {
+    const { wrapper, get } = await openDialog()
+    const answer = get.getMockImplementation() as unknown as (...args: unknown[]) => unknown
+    get.mockImplementation(((path: string, init?: { params?: { query?: { name?: string } } }) =>
+      init?.params?.query?.name
+        ? Promise.resolve(ok({ suggestion: 'ben-q-ito' }))
+        : answer(path, init)) as never)
+    await wrapper.get('input[value=new]').setValue(true)
+    await wrapper.get('#org-owner-username').setValue('bito')
+    await wrapper.get('input[value=existing]').setValue(true)
+    await wrapper.get('input[value=new]').setValue(true)
+    vi.useFakeTimers()
+
+    await wrapper.get('#org-owner-name').setValue('Ben Q Ito')
+    await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
+    expect(wrapper.get<HTMLInputElement>('#org-owner-username').element.value).toBe('bito')
+
+    vi.useRealTimers()
+    await wrapper.vm.open()
+    await flushPromises()
+    await wrapper.get('input[value=new]').setValue(true)
+    vi.useFakeTimers()
+    await wrapper.get('#org-owner-name').setValue('Ben Q Ito')
+    await vi.advanceTimersByTimeAsync(AVAILABILITY_DELAY_MS)
+    vi.useRealTimers()
+    await flushPromises()
+    expect(wrapper.get<HTMLInputElement>('#org-owner-username').element.value).toBe('ben-q-ito')
   })
 
   it('asks for no username suggestion once the dialog is gone', async () => {

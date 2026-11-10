@@ -56,6 +56,8 @@ function onClick(event: MouseEvent) {
   }
   emit('click', event)
 }
+
+defineExpose({ focus: () => button.value?.focus() })
 </script>
 
 <template>

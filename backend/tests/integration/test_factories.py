@@ -9,19 +9,25 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.approval import Approval, ApprovalRequest
+from app.models.audit import ActivityLog
 from app.models.audit_event import AuditEvent
 from app.models.auth import UserSession
 from app.models.numbering import ProjectCounter
 from app.models.org import Membership, Organization
 from app.models.project import Project, ProjectMembership
+from app.models.requirement import Requirement, RequirementRevision
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMembership
-from tests.factories import BaseFactory, fake_slug
+from tests.factories import BaseFactory, fake_slug, reset_factories
+from tests.factories.approval import ApprovalFactory, ApprovalRequestFactory
+from tests.factories.audit import ActivityLogFactory
 from tests.factories.audit_event import AuditEventFactory
 from tests.factories.auth import UserSessionFactory
 from tests.factories.numbering import ProjectCounterFactory
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
+from tests.factories.requirement import RequirementFactory, RequirementRevisionFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
 
@@ -41,6 +47,11 @@ pytestmark = pytest.mark.anyio
         (ProjectMembershipFactory, ProjectMembership),
         (ProjectCounterFactory, ProjectCounter),
         (AuditEventFactory, AuditEvent),
+        (RequirementFactory, Requirement),
+        (RequirementRevisionFactory, RequirementRevision),
+        (ApprovalRequestFactory, ApprovalRequest),
+        (ApprovalFactory, Approval),
+        (ActivityLogFactory, ActivityLog),
     ],
 )
 async def test_factory_persists_a_valid_row(
@@ -84,3 +95,12 @@ def test_fake_slug_stays_within_the_slug_format_for_long_names() -> None:
     slug = fake_slug("The Extremely Long Consolidated Holdings Company of Greater Springfield")
 
     assert SLUG.fullmatch(slug)
+
+
+def test_unique_values_repeat_after_each_reset() -> None:
+    """Each test starts from the same values: `unique` doesn't skip what earlier tests drew."""
+    reset_factories()
+    first = RequirementFactory.build().number
+    reset_factories()
+
+    assert RequirementFactory.build().number == first

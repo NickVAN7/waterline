@@ -112,8 +112,8 @@ don't reopen a resolution the owner decided.
      workspace;
    - only project admins move a gate into or out of `approved`, or a requirement into
      `approved`, by hand;
-   - classification (design-doc §3.1, from S1-C13): every action is marked content or
-     management; the export-control confirmation is required on every member-add path, when
+   - restriction (design-doc §3.1, from S1-C13; "classification" until S2-C0d, DL-134): every
+     action is marked content or management; the export-control confirmation is required on every member-add path, when
      marking a project export-controlled, and when creating one; only an explicit project admin
      can remove `export_controlled`, or lower the level or remove a category on an
      export-controlled project;

@@ -16,8 +16,12 @@ export type IconName =
   | 'menu'
   | 'home'
   | 'more'
+  | 'sign-out'
+  | 'pause'
+  | 'star'
 
-const props = defineProps<{ name: IconName; label?: string }>()
+// `filled`: drawn solid, for a control's on state (a starred project, DL-305).
+const props = defineProps<{ name: IconName; label?: string; filled?: boolean }>()
 
 const PATHS: Record<IconName, string[]> = {
   alert: ['M12 8v5', 'M12 16.5v.01', 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0'],
@@ -37,11 +41,18 @@ const PATHS: Record<IconName, string[]> = {
     'M9.9 9.9a3 3 0 0 0 4.2 4.2',
   ],
   x: ['M6 6l12 12', 'M18 6 6 18'],
+  pause: ['M9 6v12', 'M15 6v12'],
+  star: ['M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z'],
   spinner: ['M12 3a9 9 0 1 0 9 9'],
   'chevron-down': ['M6 9l6 6 6-6'],
   menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
   home: ['M4 11l8-7 8 7', 'M6 9.5V20h12V9.5'],
   more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
+  'sign-out': [
+    'M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2',
+    'M9 12h12',
+    'M18 9l3 3-3 3',
+  ],
 }
 
 const paths = computed(() => PATHS[props.name])
@@ -52,7 +63,7 @@ const paths = computed(() => PATHS[props.name])
     viewBox="0 0 24 24"
     width="1.25em"
     height="1.25em"
-    fill="none"
+    :fill="filled ? 'currentColor' : 'none'"
     stroke="currentColor"
     stroke-width="2"
     stroke-linecap="round"

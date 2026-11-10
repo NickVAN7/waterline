@@ -1,29 +1,30 @@
 <script setup lang="ts">
 // Adding a person to a roster, email first (design-doc §4; UI-FRM-13, DL-66). Step 1 asks for the
-// email and role and checks the email (the user check). An account that exists is added after a
-// confirm step naming only the email; otherwise step 2 keeps the email (read-only) and asks for
-// the name, the username (suggested from the name until the admin edits it, and checked live,
-// UI-FRM-9), and a temporary password, then shows that password once (UI-FRM-11). A 422 on the
-// email (already a member, deactivated) or the role takes the admin back to step 1, under the field.
+// email and role, checks the email's format, then the email itself (the user check). An account
+// that exists is added after a confirm step naming only the email; otherwise step 2 keeps the
+// email, editable, and asks for the new account's name, username, and temporary password
+// (`NewAccountFields`), then shows that password once (UI-FRM-11). An email changed on step 2 is
+// checked again before the account is created, and an existing account's goes to the confirm step;
+// a 422 on it stays on step 2, under the field (UI-FRM-13, DL-137). A 422 on the role, or on the
+// email at a confirm step, takes the admin back to step 1, under the field.
 // On a project (S1-C16b): an account from outside the org (`outside_org`) is added only after a
 // second confirm that adds them to the org too (`join_org`, DL-78); on an export-controlled project,
 // each add first confirms the person is authorized (design-doc §3.1), its button blocked until then
 // (UI-FRM-15). A confirmation step starts on Back (DL-117), and each step's text is read with the
 // control that gets focus (DL-118). A 403, or a refusal for a project's changed export control,
 // tells the page (`refused`), so it reloads what the user may do (UI-FRM-7, DL-116).
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
-import { api, ApiError, client } from '@/api/client'
+import { api, client } from '@/api/client'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
 import SelectField from '@/components/SelectField.vue'
-import TemporaryPasswordField from '@/components/TemporaryPasswordField.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
 import TextField from '@/components/TextField.vue'
-import { AVAILABILITY_DELAY_MS, useAvailability } from '@/composables/useAvailability'
 import { dismissToSubmit, refetchNeeded, useFormErrors } from '@/composables/useFormErrors'
 
+import NewAccountFields, { type NewAccount, type NewAccountField } from './NewAccountFields.vue'
 import type { Roster } from './roster'
 
 // `fallbackFocus`: where focus goes on close when the opener is gone (a 403 reload hid it).
@@ -34,7 +35,10 @@ type Step = 'email' | 'confirm' | 'join' | 'create' | 'created'
 const step = ref<Step>('email')
 const pending = ref(false)
 const status = ref('')
-const values = ref({ email: '', role: '', name: '', username: '', password: '' })
+const role = ref('')
+const account = ref<NewAccount>({ email: '', name: '', username: '', password: '' })
+// The email the user check last found no account for: one changed since is checked again.
+let checkedEmail = ''
 const usernameEdited = ref(false)
 const authorized = ref(false)
 // The server's reason the account needs adding to the org too (`outside_org`).
@@ -55,22 +59,12 @@ const dialog = ref<InstanceType<typeof ModalDialog>>()
 const alertBox = ref<InstanceType<typeof FormAlert>>()
 const emailField = ref<InstanceType<typeof TextField>>()
 const roleField = ref<InstanceType<typeof SelectField>>()
-const nameField = ref<InstanceType<typeof TextField>>()
-const usernameField = ref<InstanceType<typeof TextField>>()
-const passwordField = ref<InstanceType<typeof TemporaryPasswordField>>()
+const accountFields = ref<InstanceType<typeof NewAccountFields>>()
 const confirmButton = ref<InstanceType<typeof Button>>()
 const joinButton = ref<InstanceType<typeof Button>>()
 const backButton = ref<InstanceType<typeof Button>>()
 const doneButton = ref<InstanceType<typeof Button>>()
-const fields = {
-  email: emailField,
-  role: roleField,
-  name: nameField,
-  username: usernameField,
-  password: passwordField,
-}
-
-function userCheck(query: { email: string } | { username: string } | { name: string }) {
+function userCheck(query: { email: string }) {
   return api(
     client.GET('/api/workspaces/{workspace_id}/user-check', {
       params: { path: { workspace_id: props.roster.workspaceId }, query },
@@ -78,52 +72,16 @@ function userCheck(query: { email: string } | { username: string } | { name: str
   )
 }
 
-const username = computed(() => values.value.username)
-const { message: availability } = useAvailability(
-  username,
-  'Username',
-  (value) =>
-    userCheck({ username: value }) as Promise<{ available: boolean; problem: string | null }>,
-  (value) => value === '' || step.value !== 'create',
-)
-
-// The username follows the server's suggestion for the name until the admin edits it (DL-66).
-let suggesting: ReturnType<typeof setTimeout> | undefined
-// A suggestion still pending when the dialog goes would ask the API for nothing.
-onBeforeUnmount(() => clearTimeout(suggesting))
-watch(
-  () => values.value.name,
-  (name) => {
-    clearTimeout(suggesting)
-    if (usernameEdited.value || step.value !== 'create' || name.trim() === '') return
-    suggesting = setTimeout(async () => {
-      try {
-        const { suggestion } = (await userCheck({ name })) as { suggestion: string | null }
-        if (!usernameEdited.value && values.value.name === name && suggestion) {
-          values.value.username = suggestion
-        }
-      } catch (error) {
-        // No suggestion: the admin types a username, and the server checks it on submit.
-        if (!(error instanceof ApiError)) throw error
-      }
-    }, AVAILABILITY_DELAY_MS)
-  },
-)
-
-function editUsername() {
-  usernameEdited.value = true
-  createErrors.clearField('username')
-}
+// The client's one check besides required fields (UI-FRM-13): an email's shape, before the user
+// check; the server still decides.
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const BAD_EMAIL = 'Enter an email address like name@example.com.'
 
 async function open(): Promise<void> {
   step.value = 'email'
-  values.value = {
-    email: '',
-    role: props.roster.roles.at(-1)!.value,
-    name: '',
-    username: '',
-    password: '',
-  }
+  role.value = props.roster.roles.at(-1)!.value
+  account.value = { email: '', name: '', username: '', password: '' }
+  checkedEmail = ''
   usernameEdited.value = false
   authorized.value = false
   joining.value = ''
@@ -133,10 +91,12 @@ async function open(): Promise<void> {
   await dialog.value?.open()
 }
 
-async function focus(target: keyof typeof fields | 'alert') {
+async function focus(target: NewAccountField | 'role' | 'alert') {
   await nextTick()
   if (target === 'alert') alertBox.value?.focus()
-  else fields[target].value?.focus()
+  else if (target === 'role') roleField.value?.focus()
+  else if (step.value === 'create') accountFields.value?.focus(target)
+  else emailField.value?.focus()
 }
 
 async function run(work: () => Promise<void>, saying: string): Promise<void> {
@@ -158,8 +118,9 @@ async function run(work: () => Promise<void>, saying: string): Promise<void> {
       await nextTick()
       return focusBack()
     }
-    // An email problem belongs to step 1, where the email can be changed.
-    if ((target === 'email' || target === 'role') && step.value !== 'email') {
+    // The role is on step 1, and a confirm step's email is changed there; step 2's email is its own.
+    const elsewhere = target === 'role' || (target === 'email' && step.value !== 'create')
+    if (elsewhere && step.value !== 'email') {
       emailErrors.fieldErrors.value = { [target]: errors.value.fieldErrors.value[target] }
       step.value = 'email'
     }
@@ -170,14 +131,18 @@ async function run(work: () => Promise<void>, saying: string): Promise<void> {
 }
 
 async function checkEmail(): Promise<void> {
-  const empty = emailErrors.requireFilled({ email: values.value.email, role: values.value.role })
+  const empty = emailErrors.requireFilled({ email: account.value.email, role: role.value })
   if (empty) return focus(empty)
+  if (!EMAIL.test(account.value.email.trim()))
+    return focus(emailErrors.invalidate('email', BAD_EMAIL))
   await run(async () => {
-    const { exists } = (await userCheck({ email: values.value.email })) as { exists: boolean }
+    const email = account.value.email
+    const { exists } = (await userCheck({ email })) as { exists: boolean }
+    if (!exists) checkedEmail = email
     step.value = exists ? 'confirm' : 'create'
     await nextTick()
     if (exists) focusBack()
-    else nameField.value?.focus()
+    else accountFields.value?.focus('name')
   }, 'Checking the email…')
 }
 
@@ -191,23 +156,44 @@ async function addExisting(): Promise<void> {
   // Retry calls this directly, past the blocked button (UI-FRM-15).
   if (blocked.value) return
   await run(async () => {
-    await props.roster.add(values.value.email, values.value.role, options())
+    await props.roster.add(account.value.email, role.value, options())
     dialog.value?.close()
-    emit('done', `${values.value.email} added to ${props.roster.scope}.`)
+    emit('done', `${account.value.email} added to ${props.roster.scope}.`)
   }, 'Adding…')
 }
 
 async function create(): Promise<void> {
   if (blocked.value) return
-  const empty = createErrors.requireFilled(values.value)
+  const empty = createErrors.requireFilled(account.value)
   if (empty) return focus(empty)
+  if (!EMAIL.test(account.value.email.trim()))
+    return focus(createErrors.invalidate('email', BAD_EMAIL))
   await run(async () => {
-    await props.roster.create(values.value, options())
+    // An email changed on this step is checked again: it may be someone's account (UI-FRM-13).
+    if (account.value.email !== checkedEmail) {
+      const email = account.value.email
+      const { exists } = (await userCheck({ email })) as { exists: boolean }
+      if (exists) {
+        // The confirmation was for the account being created; this is another person (§3.1).
+        authorized.value = false
+        step.value = 'confirm'
+        await nextTick()
+        return focusBack()
+      }
+      checkedEmail = email
+    }
+    await props.roster.create({ ...account.value, role: role.value }, options())
     step.value = 'created'
-    emit('done', `${values.value.name} added to ${props.roster.scope}.`)
+    emit('done', `${account.value.name} added to ${props.roster.scope}.`)
     await nextTick()
     ;(doneButton.value?.$el as HTMLElement | undefined)?.focus()
   }, 'Creating the account…')
+}
+
+function accountEdited(field: NewAccountField) {
+  createErrors.clearField(field)
+  // Another email is another person: their confirmation is asked again (§3.1), as on Back.
+  if (field === 'email') authorized.value = false
 }
 
 async function back(): Promise<void> {
@@ -220,8 +206,7 @@ async function back(): Promise<void> {
 /** The step's form (step 1 or 2); the confirm steps have none. */
 function stepForm(): HTMLFormElement | undefined {
   if (step.value !== 'email' && step.value !== 'create') return undefined
-  const first = step.value === 'create' ? 'name' : 'email'
-  return document.querySelector<HTMLInputElement>(`#add-${first}`)?.form ?? undefined
+  return document.querySelector<HTMLInputElement>('#add-email')?.form ?? undefined
 }
 
 /** A confirmation step's Back, where it starts (DL-117). */
@@ -277,7 +262,7 @@ defineExpose({ open })
       <TextField
         id="add-email"
         ref="emailField"
-        v-model="values.email"
+        v-model="account.email"
         label="Email"
         type="email"
         autocomplete="off"
@@ -288,7 +273,7 @@ defineExpose({ open })
       <SelectField
         id="add-role"
         ref="roleField"
-        v-model="values.role"
+        v-model="role"
         label="Role"
         :options="roster.roles"
         required
@@ -302,7 +287,7 @@ defineExpose({ open })
     </form>
     <div v-else-if="step === 'confirm'" class="flex flex-col gap-4">
       <p id="add-confirm-what" class="m-0">
-        An account already exists for {{ values.email }}. Add them?
+        An account already exists for {{ account.email }}. Add them?
       </p>
       <label v-if="roster.exportControlled" class="flex items-start gap-2">
         <input v-model="authorized" type="checkbox" class="size-(--target-min) shrink-0" />
@@ -334,7 +319,7 @@ defineExpose({ open })
       <!-- Read with Back, which gets focus, and with the action: nothing else announces it. -->
       <p id="add-join-reason" class="m-0">{{ joining }}</p>
       <p id="add-join-what" class="m-0">
-        Add {{ values.email }} to the organization as a member, and to {{ roster.scope }}?
+        Add {{ account.email }} to the organization as a member, and to {{ roster.scope }}?
       </p>
       <div class="flex flex-wrap gap-3">
         <Button
@@ -361,42 +346,18 @@ defineExpose({ open })
       @submit.prevent="create"
     >
       <p id="add-create-what" class="m-0">No account has this email yet. Create one:</p>
-      <dl class="m-0 flex flex-col gap-1">
-        <dt class="font-medium">Email</dt>
-        <dd class="m-0">{{ values.email }}</dd>
-      </dl>
       <p class="m-0 text-sm text-text-muted">
         <span aria-hidden="true" class="font-bold text-danger">*</span> Required field
       </p>
-      <TextField
-        id="add-name"
-        ref="nameField"
-        v-model="values.name"
-        label="Name"
-        described-by="add-create-what"
-        autocomplete="off"
-        required
-        :error="createErrors.fieldErrors.value.name"
-        @update:model-value="createErrors.clearField('name')"
-      />
-      <TextField
-        id="add-username"
-        ref="usernameField"
-        v-model="values.username"
-        label="Username"
-        autocomplete="off"
-        required
-        help="Suggested from the name. Lowercase letters, digits, and hyphens, starting with a letter."
-        :error="createErrors.fieldErrors.value.username"
-        @update:model-value="editUsername"
-      />
-      <p class="m-0 text-sm" aria-live="polite">{{ availability }}</p>
-      <TemporaryPasswordField
-        id="add-password"
-        ref="passwordField"
-        v-model="values.password"
-        :error="createErrors.fieldErrors.value.password"
-        @update:model-value="createErrors.clearField('password')"
+      <NewAccountFields
+        ref="accountFields"
+        v-model="account"
+        v-model:username-edited="usernameEdited"
+        :workspace-id="roster.workspaceId"
+        prefix="add"
+        name-described-by="add-create-what"
+        :errors="createErrors.fieldErrors.value"
+        @edit="accountEdited"
       />
       <label v-if="roster.exportControlled" class="flex items-start gap-2">
         <input v-model="authorized" type="checkbox" class="size-(--target-min) shrink-0" />
@@ -418,8 +379,8 @@ defineExpose({ open })
       </div>
     </form>
     <template v-else>
-      <p id="add-created-what" class="m-0">{{ values.name }} is added to {{ roster.scope }}.</p>
-      <TemporaryPasswordNotice :password="values.password" warning-id="add-created-warning" />
+      <p id="add-created-what" class="m-0">{{ account.name }} is added to {{ roster.scope }}.</p>
+      <TemporaryPasswordNotice :password="account.password" warning-id="add-created-warning" />
       <div>
         <Button
           ref="doneButton"

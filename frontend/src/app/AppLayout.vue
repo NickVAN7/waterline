@@ -1,9 +1,11 @@
 <script setup lang="ts">
-// The app shell (docs/ui-design-guide.md §4): the skip link, a sticky header with the org switcher
-// and user menu, the sidebar (My work, the project selector, the selected project's pages), and
-// `main`. Below 40rem the header wraps and scrolls with the page (DL-98); below 48rem the sidebar
-// is behind a "Menu" disclosure in the header. Signed out (the status and not-found pages), the
-// header has only the app name and Sign in.
+// The app shell (docs/ui-design-guide.md §4): the skip link, a sticky header ("Waterline", then
+// the current org's name, which is the org menu, UI-SHL-4, DL-137; the user menu at the end),
+// the sidebar (My work, then the project selector and the selected project's pages, or on an admin
+// page that area's pages, UI-SHL-5, DL-137), and `main`. Below
+// 40rem the header wraps and scrolls with the page (DL-98); below 48rem the sidebar is behind a
+// "Menu" disclosure in the header. Signed out (the status and not-found pages), the header has
+// only the app name and Sign in.
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -13,11 +15,13 @@ import { useSignOut } from '@/composables/useSignOut'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 
-import OrgSwitcher from './shell/OrgSwitcher.vue'
+import OrgMenu from './shell/OrgMenu.vue'
 import ProjectPages from './shell/ProjectPages.vue'
 import ProjectSelector from './shell/ProjectSelector.vue'
 import SidebarLink from './shell/SidebarLink.vue'
 import UserMenu from './shell/UserMenu.vue'
+import OrgNav from '@/views/org/OrgNav.vue'
+import WorkspaceNav from '@/views/workspace/WorkspaceNav.vue'
 
 const store = useCurrentUserStore()
 const nav = useCurrentOrgStore()
@@ -57,11 +61,9 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
         <Icon name="menu" />Menu
       </button>
       <RouterLink to="/" class="text-lg font-semibold text-text no-underline">Waterline</RouterLink>
+      <OrgMenu v-if="store.me" />
       <div class="flex-1" />
-      <template v-if="store.me">
-        <OrgSwitcher />
-        <UserMenu ref="userMenu" @sign-out="signOut" />
-      </template>
+      <UserMenu v-if="store.me" ref="userMenu" @sign-out="signOut" />
       <RouterLink v-else :to="{ name: 'sign-in' }">Sign in</RouterLink>
     </header>
     <div class="flex flex-1 flex-col md:flex-row">
@@ -77,10 +79,18 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
           <div class="border-b border-border-subtle pb-4 font-semibold">
             <SidebarLink to="/"><Icon name="home" />My work</SidebarLink>
           </div>
-          <ProjectSelector />
+          <ProjectSelector v-if="!route.meta.adminArea" />
         </nav>
+        <WorkspaceNav v-if="route.meta.adminArea === 'workspace'" />
+        <!-- The URL's org only: on a slug the user doesn't see (the not-found page), none. -->
+        <OrgNav
+          v-else-if="
+            route.meta.adminArea === 'org' && nav.org && nav.org.slug === route.params.orgSlug
+          "
+          :org="nav.org"
+        />
         <ProjectPages
-          v-if="nav.project"
+          v-else-if="!route.meta.adminArea && nav.project"
           :key="nav.project.id"
           :project="nav.project"
           :org-slug="nav.org?.slug"

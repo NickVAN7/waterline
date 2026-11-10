@@ -18,10 +18,12 @@ import CreateProjectDialog from './CreateProjectDialog.vue'
 type Action = components['schemas']['Action']
 
 const ME = me().user
+// `github` as though its slice had shipped, so a recommended module that has and one that hasn't
+// can be told apart (DL-136).
 const GUIDANCE: components['schemas']['ModuleGuidance'] = {
   modules: [
     { module: 'sprints', note: 'Plan work in sprints.', available: false },
-    { module: 'github', note: 'Link pull requests.', available: false },
+    { module: 'github', note: 'Link pull requests.', available: true },
     { module: 'raid', note: 'Track risks and issues.', available: false },
   ],
   types: [
@@ -31,16 +33,16 @@ const GUIDANCE: components['schemas']['ModuleGuidance'] = {
   ],
 }
 
-function member(name: string, overrides: Partial<components['schemas']['MemberRead']> = {}) {
+function candidate(
+  name: string,
+  overrides: Partial<components['schemas']['MemberCandidate']> = {},
+): components['schemas']['MemberCandidate'] {
   const handle = name.toLowerCase().split(' ')[0]!
   return {
     user_id: `u-${handle}`,
     email: `${handle}@acme.example`,
     username: handle,
     name,
-    role: 'member' as const,
-    is_active: true,
-    allowed_actions: [],
     ...overrides,
   }
 }
@@ -49,13 +51,14 @@ async function openDialog(allowed: Action[] = ['project.create']) {
   useCurrentUserStore().me = me()
   const get = vi.spyOn(client, 'GET').mockImplementation(((path: string) => {
     if (path === '/api/module-guidance') return Promise.resolve(ok(GUIDANCE))
-    if (path === '/api/orgs/{org_id}/members')
+    // The org's active members and the workspace's active staff (DL-152): the server filters.
+    if (path === '/api/orgs/{org_id}/first-admin-candidates')
       return Promise.resolve(
         ok(
           listPage([
-            member('Ann Lee'),
-            member('Dee Gone', { is_active: false }),
-            member('Casey Cole', { user_id: ME.id }),
+            candidate('Ann Lee'),
+            candidate('Casey Cole', { user_id: ME.id }),
+            candidate('Sam Staff'),
           ]),
         ),
       )
@@ -89,12 +92,6 @@ async function submit(wrapper: Wrapper) {
   await flushPromises()
 }
 
-/** The export-control confirmation, the dialog inside the create dialog. */
-const confirmation = (wrapper: Wrapper) => wrapper.findAll('dialog')[1]!
-
-const buttonNamed = (scope: ReturnType<Wrapper['get']>, text: string) =>
-  scope.findAll('button').find((b) => b.text() === text)!
-
 const categoryBox = (wrapper: Wrapper, value: string) =>
   wrapper.get<HTMLInputElement>(`input[type=checkbox][value=${value}]`)
 
@@ -110,7 +107,7 @@ afterEach(() => {
 })
 
 describe('CreateProjectDialog', () => {
-  it("creates the project with the type's recommended modules and opens it", async () => {
+  it("creates the project with the type's recommended modules that have shipped, and opens it", async () => {
     const { wrapper, post, router } = await openDialog()
     await fill(wrapper)
 
@@ -122,24 +119,32 @@ describe('CreateProjectDialog', () => {
         name: 'Invoicing',
         key: 'inv',
         type: 'software',
-        enabled_modules: ['sprints', 'github'],
-        classification_level: null,
-        classification_categories: [],
+        enabled_modules: ['github'],
+        restriction_level: null,
+        restriction_categories: [],
       },
     })
     expect(router.currentRoute.value.fullPath).toBe('/acme/projects/INV')
   })
 
-  it('lists the modules with their notes; a v2 module only as text, not available yet', async () => {
+  it("lists the modules with their notes; one that hasn't shipped is a disabled checkbox, not available yet (DL-136)", async () => {
     const { wrapper } = await openDialog()
 
     const legend = wrapper.findAll('legend').find((l) => l.text() === 'Modules')!
     const modules = legend.element.parentElement!
-    expect(modules.querySelectorAll('input[type=checkbox]')).toHaveLength(2)
+    expect(modules.querySelectorAll('input[type=checkbox]')).toHaveLength(3)
     const text = modules.textContent!.replace(/\s+/g, ' ')
     expect(text).toContain('Sprints · Recommended for Software · Not available yet')
     expect(text).toContain('Plan work in sprints.')
     expect(text).toContain('RAID log · Not available yet')
+    expect(categoryBox(wrapper, 'sprints').element.disabled).toBe(true)
+    expect(categoryBox(wrapper, 'raid').element.disabled).toBe(true)
+    expect(categoryBox(wrapper, 'github').element.disabled).toBe(false)
+    // The reason is in the box's own label, so its name: no description repeats it.
+    expect(categoryBox(wrapper, 'sprints').element.labels![0]!.textContent).toContain(
+      'Not available yet',
+    )
+    expect(categoryBox(wrapper, 'sprints').attributes('aria-describedby')).toBeUndefined()
     await expectNoA11yViolations(wrapper)
   })
 
@@ -148,15 +153,15 @@ describe('CreateProjectDialog', () => {
     await fill(wrapper)
 
     await wrapper.get('#create-project-type').setValue('general')
-    expect(categoryBox(wrapper, 'sprints').element.checked).toBe(false)
-    await categoryBox(wrapper, 'github').setValue(true)
+    expect(categoryBox(wrapper, 'github').element.checked).toBe(false)
+    await wrapper.get('#create-project-type').setValue('software')
+    expect(categoryBox(wrapper, 'github').element.checked).toBe(true)
+    await categoryBox(wrapper, 'github').setValue(false)
+    await wrapper.get('#create-project-type').setValue('general')
     await wrapper.get('#create-project-type').setValue('software')
     await submit(wrapper)
 
-    expect(sent(post)).toMatchObject({
-      type: 'software',
-      enabled_modules: ['github'],
-    })
+    expect(sent(post)).toMatchObject({ type: 'software', enabled_modules: [] })
   })
 
   it("checks the key live against the org's endpoint, in the key's words", async () => {
@@ -199,16 +204,26 @@ describe('CreateProjectDialog', () => {
     const { wrapper, get } = await openDialog(['project.create'])
 
     expect(wrapper.find('#create-project-first-admin-id').exists()).toBe(false)
-    expect(get).not.toHaveBeenCalledWith('/api/orgs/{org_id}/members', expect.anything())
+    expect(get).not.toHaveBeenCalledWith(
+      '/api/orgs/{org_id}/first-admin-candidates',
+      expect.anything(),
+    )
   })
 
-  it("offers the org's other active members as first admin, and names the one chosen", async () => {
-    const { wrapper, post } = await openDialog(['project.create', 'project.assign_first_admin'])
+  it('offers the first-admin candidates other than you, and names the one chosen', async () => {
+    const { wrapper, get, post } = await openDialog([
+      'project.create',
+      'project.assign_first_admin',
+    ])
     await fill(wrapper)
 
+    expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/first-admin-candidates', {
+      params: { path: { org_id: ACME.id }, query: { limit: 200 } },
+    })
     expect(wrapper.findAll('#create-project-first-admin-id option').map((o) => o.text())).toEqual([
       'Me (Casey Cole)',
       'Ann Lee (ann@acme.example)',
+      'Sam Staff (sam@acme.example)',
     ])
     await wrapper.get('#create-project-first-admin-id').setValue('u-ann')
     await submit(wrapper)
@@ -216,59 +231,11 @@ describe('CreateProjectDialog', () => {
     expect(sent(post)).toMatchObject({ first_admin_id: 'u-ann' })
   })
 
-  it('asks for the confirmation in its own dialog before creating an export-controlled project (DL-114)', async () => {
-    const { wrapper, post } = await openDialog()
-    await fill(wrapper)
-    await categoryBox(wrapper, 'export_controlled').setValue(true)
+  it("doesn't offer export control (DL-133)", async () => {
+    const { wrapper } = await openDialog()
 
-    await submit(wrapper)
-    expect(post).not.toHaveBeenCalled()
-    const confirm = confirmation(wrapper)
-    expect(confirm.attributes('open')).toBeDefined()
-    expect(confirm.text()).toContain('Casey Cole (casey@harbor.example) (you)')
-    expect(confirm.text()).toContain('I confirm I am authorized for export-controlled data.')
-    await expectNoA11yViolations(wrapper)
-
-    await confirm.get('input[type=checkbox]').setValue(true)
-    await confirm.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(confirm.attributes('open')).toBeUndefined()
-    expect(sent(post)).toMatchObject({
-      classification_categories: ['export_controlled'],
-      export_control_confirmed: true,
-      confirmed_member_ids: [ME.id],
-    })
-  })
-
-  it('creates nothing when the export-control confirmation is cancelled', async () => {
-    const { wrapper, post } = await openDialog()
-    await fill(wrapper)
-    await categoryBox(wrapper, 'export_controlled').setValue(true)
-    await submit(wrapper)
-
-    await buttonNamed(confirmation(wrapper), 'Cancel').trigger('click')
-    await flushPromises()
-
-    expect(post).not.toHaveBeenCalled()
-    expect(wrapper.get('dialog').attributes('open')).toBeDefined()
-  })
-
-  it('confirms the named first admin as the only explicit member', async () => {
-    const { wrapper, post } = await openDialog(['project.create', 'project.assign_first_admin'])
-    await fill(wrapper)
-    await categoryBox(wrapper, 'export_controlled').setValue(true)
-    await wrapper.get('#create-project-first-admin-id').setValue('u-ann')
-    await submit(wrapper)
-
-    const confirm = confirmation(wrapper)
-    expect(confirm.text()).toContain('I confirm Ann Lee is authorized for export-controlled data.')
-    expect(confirm.text()).not.toContain('(you)')
-    await confirm.get('input[type=checkbox]').setValue(true)
-    await confirm.get('form').trigger('submit')
-    await flushPromises()
-
-    expect(sent(post)).toMatchObject({ confirmed_member_ids: ['u-ann'] })
+    expect(wrapper.find('input[type=checkbox][value=export_controlled]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Export-controlled')
   })
 
   it('sends a level and categories without any confirmation when not export-controlled', async () => {
@@ -281,8 +248,8 @@ describe('CreateProjectDialog', () => {
 
     const body = sent(post)
     expect(body).toMatchObject({
-      classification_level: 'confidential',
-      classification_categories: ['financial'],
+      restriction_level: 'confidential',
+      restriction_categories: ['financial'],
     })
     expect('export_control_confirmed' in body).toBe(false)
     expect('confirmed_member_ids' in body).toBe(false)
@@ -291,32 +258,35 @@ describe('CreateProjectDialog', () => {
   it("shows each level's description beside it (design-doc §3.1)", async () => {
     const { wrapper } = await openDialog()
 
-    const legend = wrapper.findAll('legend').find((l) => l.text() === 'Classification')!
+    const legend = wrapper.findAll('legend').find((l) => l.text() === 'Restriction')!
     const text = legend.element.parentElement!.textContent
-    expect(text).toContain('Not classified')
-    expect(text).toContain('Not yet classified; treated like Internal for every rule.')
-    expect(text).toContain('Restricted')
-    expect(text).toContain(
-      'Disclosure would cause serious harm or breach a legal or regulatory duty; need-to-know.',
-    )
+    expect(text).toContain('None')
+    expect(text).toContain('Not yet restricted; treated like Internal for every rule.')
+    expect(text).toContain('Confidential')
+    // DL-134 removed Restricted.
+    expect(wrapper.findAll('input[type=radio]').map((r) => r.attributes('value'))).toEqual([
+      '',
+      'internal',
+      'confidential',
+    ])
   })
 
   it('shows a categories 422 under the categories, tied to the group (UI-FRM-5)', async () => {
     const { wrapper, post } = await openDialog()
     post.mockResolvedValue(
       validationFailed([
-        { loc: ['body', 'classification_categories'], message: 'Not a category.', type: 'enum' },
+        { loc: ['body', 'restriction_categories'], message: 'Not a category.', type: 'enum' },
       ]),
     )
     await fill(wrapper)
 
     await submit(wrapper)
 
-    const group = wrapper.get('#create-project-classification-categories')
+    const group = wrapper.get('#create-project-restriction-categories')
     expect(group.attributes('aria-invalid')).toBe('true')
     expect(group.attributes('aria-describedby')).toBe('create-project-categories-error')
     expect(wrapper.get('#create-project-categories-error').text()).toBe('Not a category.')
-    expect(document.activeElement?.id).toBe('create-project-classification-categories')
+    expect(document.activeElement?.id).toBe('create-project-restriction-categories')
   })
 
   it('on a 403, says so and reloads /me, so New project goes if it must (UI-FRM-7)', async () => {

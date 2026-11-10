@@ -115,6 +115,15 @@ export function useFormErrors<F extends string>(
     return empty[0] ?? null
   }
 
+  /** A field the client found wrong before sending (an email's shape, UI-FRM-13), shown and
+   * announced as a server's 422 would be. Returns the field, to focus. */
+  function invalidate(field: F, message: string): F {
+    reset()
+    fieldErrors.value = { [field]: message } as Partial<Record<F, string>>
+    announce([field])
+    return field
+  }
+
   function apply(error: unknown): F | 'alert' {
     if (!(error instanceof ApiError)) throw error
     reset()
@@ -152,6 +161,7 @@ export function useFormErrors<F extends string>(
     reset,
     clearField,
     requireFilled,
+    invalidate,
     apply,
     dismissAlert,
   }

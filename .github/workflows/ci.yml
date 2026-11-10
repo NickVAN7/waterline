@@ -93,3 +93,6 @@ jobs:
       # .pre-commit-config.yaml; it needs the network), and `wl e2e`.
       - name: wl check
         run: uv run wl check --full
+        # The end-to-end stack's web app builds the PrimeUI license key in (DL-135).
+        env:
+          VITE_PRIMEUI_LICENSE: ${{ secrets.VITE_PRIMEUI_LICENSE }}

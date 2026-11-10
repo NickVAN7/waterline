@@ -16,10 +16,15 @@ declare module 'vue-router' {
     layout?: 'auth'
     /** The page sets its title and focus once its data loads (`settlePage()`). */
     settlesItself?: boolean
+    /** An admin page: the sidebar shows this area's pages in place of the project selector
+     * (UI-SHL-5, UI-SHL-10). */
+    adminArea?: 'workspace' | 'org'
   }
 }
 
 const HOME = '/'
+// What a signed-in user with no org or project can still open: their own account.
+const NO_ACCESS_PAGES = new Set<unknown>(['no-access', 'account', 'account-password'])
 
 /** Whether the user can open anything: a system admin, or staff, or in an org or project. */
 export function hasAccess(me: Me): boolean {
@@ -53,8 +58,7 @@ export const authGuard: NavigationGuardWithThis<undefined> = async (to) => {
     return to.name === 'change-password' ? true : ({ name: 'change-password' } as RouteLocationRaw)
   }
   if (to.meta.guest || to.name === 'change-password') return safeNext(to.query.next)
-  if (!hasAccess(me))
-    return to.name === 'no-access' || to.name === 'account' || { name: 'no-access' }
+  if (!hasAccess(me)) return NO_ACCESS_PAGES.has(to.name) || { name: 'no-access' }
   if (to.name === 'no-access') return HOME
   return true
 }

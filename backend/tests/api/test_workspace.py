@@ -179,6 +179,7 @@ async def test_the_openapi_schema_carries_the_reserved_slugs(client: AsyncClient
         "account",
         "api",
         "assets",
+        "docs",
         "sign-in",
         "status",
         "workspace",
@@ -205,18 +206,22 @@ async def test_the_staff_list_is_sorted_by_name_and_filters_by_role(
     assert ([row["name"] for row in body["items"]], body["total"]) == (["Abe", "Cleo"], 2)
 
 
-async def test_each_staff_row_says_whether_the_person_is_active(
+async def test_the_staff_list_leaves_out_deactivated_people_unless_asked(
     client: AsyncClient, workspace: Workspace
 ) -> None:
-    """DL-102: the page marks a deactivated staff member."""
+    """DL-293: active staff only; `include_deactivated` adds a deactivated one, marked (DL-102)."""
     await owner_of(client, workspace)
     for name, is_active in (("On", True), ("Off", False)):
         user = await UserFactory.create_async(name=name, is_active=is_active)
         await WorkspaceMembershipFactory.create_async(workspace=workspace, user=user)
 
-    response = await client.get(f"/api/workspaces/{workspace.id}/staff")
+    staff = f"/api/workspaces/{workspace.id}/staff"
+    default = (await client.get(staff)).json()
+    everyone = (await client.get(staff, params={"include_deactivated": "true"})).json()
 
-    active = {row["name"]: row["is_active"] for row in response.json()["items"]}
+    assert "Off" not in {row["name"] for row in default["items"]}
+    assert default["total"] == len(default["items"])
+    active = {row["name"]: row["is_active"] for row in everyone["items"]}
     assert (active["On"], active["Off"]) == (True, False)
 
 

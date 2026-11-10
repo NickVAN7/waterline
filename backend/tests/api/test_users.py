@@ -112,26 +112,99 @@ async def test_the_users_list_holds_the_workspaces_people_and_accounts_with_no_m
     ]
 
 
-async def test_the_users_list_shows_who_holds_system_admin_and_filters_by_active(
+async def test_the_users_list_shows_who_holds_system_admin_and_hides_deactivated_unless_asked(
     client: AsyncClient, t: Tenancy
 ) -> None:
+    """DL-293: active accounts only; `include_deactivated` adds a deactivated one, marked."""
     await signed_in(client, await staff(t, WorkspaceRole.OWNER, name="Ada Owner"))
     await staff(t, name="Sam System", is_system_admin=True)
     await staff(t, name="Dee Gone", is_active=False)
 
-    everyone = await client.get(f"/api/workspaces/{t.workspace.id}/users")
-    inactive = await client.get(
+    users = f"/api/workspaces/{t.workspace.id}/users"
+    default = (await client.get(users)).json()
+    everyone = (await client.get(users, params={"include_deactivated": "true"})).json()
+
+    assert [(r["name"], r["is_system_admin"]) for r in default["items"]] == [
+        ("Ada Owner", False),
+        ("Sam System", True),
+    ]
+    assert default["total"] == 2
+    assert [(r["name"], r["is_active"]) for r in everyone["items"]] == [
+        ("Ada Owner", True),
+        ("Dee Gone", False),
+        ("Sam System", True),
+    ]
+
+
+async def test_the_users_list_has_no_is_active_filter_any_more(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-293: `include_deactivated` replaces it, so the old parameter is an unknown one."""
+    await signed_in(client, await staff(t, WorkspaceRole.OWNER))
+
+    response = await client.get(
         f"/api/workspaces/{t.workspace.id}/users", params={"is_active": "false"}
     )
 
-    assert [
-        (r["name"], r["is_system_admin"], r["is_active"]) for r in everyone.json()["items"]
-    ] == [
-        ("Ada Owner", False, True),
-        ("Dee Gone", False, False),
-        ("Sam System", True, True),
+    assert response.status_code == 422
+
+
+async def test_each_listed_user_carries_their_workspace_role_or_none(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-183: the staff role for the Role column; null for anyone who isn't staff."""
+    await signed_in(client, await staff(t, WorkspaceRole.OWNER, name="Ada Owner"))
+    await staff(t, WorkspaceRole.MEMBER, name="Mo Member")
+    await org_member(t, OrgRole.ADMIN, name="Olga Orgadmin")
+
+    response = await client.get(f"/api/workspaces/{t.workspace.id}/users")
+
+    assert [(r["name"], r["workspace_role"]) for r in response.json()["items"]] == [
+        ("Ada Owner", "owner"),
+        ("Mo Member", "member"),
+        ("Olga Orgadmin", None),
     ]
-    assert [r["name"] for r in inactive.json()["items"]] == ["Dee Gone"]
+
+
+@pytest.mark.parametrize(
+    ("sort", "expected"),
+    [
+        ("name", ["Bo Both", "Cy Plain", "Al Root", "Zed Root"]),
+        ("-name", ["Cy Plain", "Bo Both", "Zed Root", "Al Root"]),
+    ],
+)
+async def test_system_admins_with_no_workspace_role_are_listed_last(
+    client: AsyncClient, t: Tenancy, sort: str, expected: list[str]
+) -> None:
+    """DL-188: after everyone else, in the chosen sort's order; a system admin who is staff
+    stays in place."""
+    await signed_in(
+        client, await staff(t, WorkspaceRole.OWNER, name="Bo Both", is_system_admin=True)
+    )
+    await org_member(t, name="Cy Plain")
+    await UserFactory.create_async(name="Al Root", is_system_admin=True)
+    await org_member(t, name="Zed Root", is_system_admin=True)
+
+    response = await client.get(f"/api/workspaces/{t.workspace.id}/users", params={"sort": sort})
+
+    assert [r["name"] for r in response.json()["items"]] == expected
+
+
+async def test_system_admins_with_no_workspace_role_stay_last_across_pages(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-188: the order is the server's, so page 1 holds no one the last page sorts before."""
+    await signed_in(client, await staff(t, WorkspaceRole.ADMIN, name="Bo Both"))
+    await UserFactory.create_async(name="Al Root", is_system_admin=True)
+    await org_member(t, name="Cy Plain")
+
+    first = await client.get(f"/api/workspaces/{t.workspace.id}/users", params={"limit": 2})
+    second = await client.get(
+        f"/api/workspaces/{t.workspace.id}/users", params={"limit": 2, "offset": 2}
+    )
+
+    assert [r["name"] for r in first.json()["items"]] == ["Bo Both", "Cy Plain"]
+    assert [r["name"] for r in second.json()["items"]] == ["Al Root"]
 
 
 @pytest.mark.security

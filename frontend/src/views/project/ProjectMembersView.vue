@@ -11,7 +11,7 @@ import { computed, ref } from 'vue'
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { PROJECT_ROLE } from '@/app/labels'
-import { focusHeading, settlePage } from '@/app/routeFocus'
+import { focusHeading, replacedPage } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import Skeleton from '@/components/Skeleton.vue'
@@ -52,7 +52,7 @@ const roster = computed<Roster>(() => ({
     value,
     label: PROJECT_ROLE[value],
   })),
-  exportControlled: !!loaded.value?.classification_categories.includes('export_controlled'),
+  exportControlled: !!loaded.value?.restriction_categories.includes('export_controlled'),
   workspaceId: workspaceId.value,
   add: (email, role, options) =>
     api(
@@ -93,7 +93,7 @@ const roster = computed<Roster>(() => ({
 
 // For its admins, the workspace comes first, so Add by email (and its dialog) appears only once
 // the user check can run; a failure of either is the list's error, with Try again.
-async function list(query: { limit: number; offset: number }) {
+async function list(query: { limit: number; offset: number; include_deactivated?: boolean }) {
   if (canManage.value && !workspaceId.value) {
     workspaceId.value = (
       await api(
@@ -107,11 +107,12 @@ async function list(query: { limit: number; offset: number }) {
 }
 
 // A 403 in a dialog: the project's actions changed too (its buttons, the export-control flag). If
-// the project is gone with them, the page settles as a navigation does (UI-SHL-9).
+// the project is gone with them, focus moves to the new page's h1, on a visit's first page too
+// (UI-SHL-9, TD-90).
 async function refused() {
   await project.run()
   if (project.data.value) nav.select(project.data.value)
-  if (notFound.value) await settlePage()
+  if (notFound.value) await replacedPage()
 }
 </script>
 
@@ -145,6 +146,7 @@ async function refused() {
       :list="list"
       manage="project_member.manage"
       remove-label="Remove from project"
+      :can-show-deactivated="canManage"
       :role-labels="PROJECT_ROLE"
       allowed
       :who-to-ask="WHO_TO_ASK"
@@ -152,11 +154,7 @@ async function refused() {
       @refused="refused"
     >
       <template #header="{ add }">
-        <ProjectHeader :project="loaded" :title="`${loaded.name} members`" />
-        <div
-          v-if="canManage || allows(loaded, 'project.view_access')"
-          class="flex flex-wrap items-center gap-3"
-        >
+        <ProjectHeader :project="loaded" :title="`${loaded.name} members`">
           <Button v-if="canManage" @click="picker?.open()">Add member</Button>
           <Button v-if="canManage && workspaceId" variant="secondary" @click="add()"
             >Add by email</Button
@@ -169,7 +167,7 @@ async function refused() {
             }"
             >Access review</RouterLink
           >
-        </div>
+        </ProjectHeader>
       </template>
       <template #dialogs="{ done, refused: reload }">
         <!-- Mounted whatever the actions: a 403 reload mustn't take it away while it's open. -->

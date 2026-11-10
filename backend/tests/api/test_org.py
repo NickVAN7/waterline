@@ -321,6 +321,23 @@ async def test_renaming_an_org_records_old_and_new_values(
     ]
 
 
+async def test_an_org_name_over_100_characters_is_a_422_and_changes_nothing(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """The request schemas' length limit (DL-143) reaches the client as a field error."""
+    await admin_of(client, workspace)
+    org = await OrganizationFactory.create_async(workspace=workspace, name="Bolt", slug="bolt")
+
+    response = await client.patch(f"/api/orgs/{org.id}", json={"name": "x" * 101})
+
+    assert (response.status_code, response.json()["code"]) == (422, "validation_error")
+    assert [(f["loc"], f["type"]) for f in response.json()["details"]["fields"]] == [
+        (["body", "name"], "string_too_long")
+    ]
+    assert await session.scalar(select(Organization.name)) == "Bolt"
+    assert await events(session) == []
+
+
 async def test_an_org_slug_another_org_in_the_workspace_has_is_a_422(
     client: AsyncClient, workspace: Workspace
 ) -> None:
@@ -331,6 +348,38 @@ async def test_an_org_slug_another_org_in_the_workspace_has_is_a_422(
     response = await client.patch(f"/api/orgs/{org.id}", json={"slug": "cove"})
 
     assert (response.status_code, fields(response.json())) == (422, [(["body", "slug"], "taken")])
+
+
+async def test_an_org_that_had_the_slug_docs_before_it_was_reserved_keeps_it(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    """`docs` joined the reserved slugs after orgs could take it; one that did still saves its
+    settings, which send only the changed fields (DL-309)."""
+    await admin_of(client, workspace)
+    org = await OrganizationFactory.create_async(workspace=workspace, name="Docs", slug="docs")
+
+    response = await client.patch(f"/api/orgs/{org.id}", json={"name": "Docs Team"})
+
+    assert (response.status_code, response.json()["slug"]) == (200, "docs")
+    assert (await session.execute(select(Organization.name, Organization.slug))).one() == (
+        "Docs Team",
+        "docs",
+    )
+
+
+async def test_an_org_cant_change_its_slug_to_docs(
+    client: AsyncClient, session: AsyncSession, workspace: Workspace
+) -> None:
+    await admin_of(client, workspace)
+    org = await OrganizationFactory.create_async(workspace=workspace, slug="bolt")
+
+    response = await client.patch(f"/api/orgs/{org.id}", json={"slug": "docs"})
+
+    assert (response.status_code, fields(response.json())) == (
+        422,
+        [(["body", "slug"], "reserved")],
+    )
+    assert await session.scalar(select(Organization.slug)) == "bolt"
 
 
 @pytest.mark.parametrize(

@@ -1,5 +1,5 @@
 /**
- * Which org the shell is in (the org switcher, UI-SHL-4) and the selected project (the project
+ * Which org the shell is in (the org menu, UI-SHL-4) and the selected project (the project
  * selector, UI-SHL-6). An org page sets the org from its URL; elsewhere the last one stays, or the
  * user's first org. A project page sets the project.
  */

@@ -79,7 +79,7 @@ test("a project's members are added by email and from the picker, changed, remov
   // The access review: them by their role, and olivia through the org.
   await page.getByRole('link', { name: 'Access review' }).click()
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Customer Portal access review' }),
+    page.getByRole('heading', { level: 1, name: 'Customer Portal project access review' }),
   ).toBeFocused()
   const review = page.getByRole('table', { name: 'Who reaches the project' })
   await expect(review.getByRole('row', { name: new RegExp(name) })).toContainText('Project viewer')

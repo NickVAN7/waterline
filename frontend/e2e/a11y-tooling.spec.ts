@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test'
 
 import { expectFocusNotObscured, expectNoA11yViolations } from './support/a11y'
+import { expectOnlyTokenColors } from './support/theme'
 
 const page = (body: string, style = '') =>
   `<!doctype html><html lang="en"><head><title>Fixture</title><style>${style}</style></head>
@@ -61,4 +62,22 @@ test('the focus helper keeps going past identical elements', async ({ page: brow
   )
 
   await expect(expectFocusNotObscured(browser)).rejects.toThrow(/drawn under something else/)
+})
+
+const tokens = ':root { --color-text: rgb(10, 16, 24); --color-bg: rgb(255, 255, 255); }'
+
+test('the theme audit passes colors that are tokens', async ({ page: browser }) => {
+  await browser.setContent(
+    page('<div class="w">x</div>', `${tokens} .w { color: var(--color-text); }`),
+  )
+
+  await expectOnlyTokenColors(browser, '.w')
+})
+
+test('the theme audit rejects a color that is not a token', async ({ page: browser }) => {
+  await browser.setContent(
+    page('<div class="w">x</div>', `${tokens} .w { color: rgb(255, 0, 0); }`),
+  )
+
+  await expect(expectOnlyTokenColors(browser, '.w')).rejects.toThrow(/color: rgb\(255, 0, 0\)/)
 })

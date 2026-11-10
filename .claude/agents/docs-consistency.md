@@ -43,7 +43,8 @@ first so you don't duplicate them.
 2. **Superseded rules:** a rule that a later recorded decision replaced but still appears
    elsewhere (e.g. a CLAUDE.md rule the build plan has since changed).
 3. **Stale status and time words:** "not yet", "(later)", "from S0-Cn", "until …", "will be",
-   status lines, and "Fix by" targets that the current checkpoint (latest `checkpoint(...)`
+   status lines (the root `CLAUDE.md`'s **Status** names the latest checkpoint and what's next,
+   DL-315), and "Fix by" targets that the current checkpoint (latest `checkpoint(...)`
    commit) has already passed.
 4. **Internal contradictions** within one doc (e.g. a layout section that disagrees with a later
    section of the same doc).

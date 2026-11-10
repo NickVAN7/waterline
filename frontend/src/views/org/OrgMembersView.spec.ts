@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
-import { ACME, failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
-import { mountOrgView } from '@/test/org'
+import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
+import { acme, mountOrgPages, mountOrgView } from '@/test/org'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { cleanUpAfterEach, listPage } from '@/test/workspace'
 
@@ -75,7 +75,7 @@ beforeEach(() => {
 cleanUpAfterEach()
 
 describe('OrgMembersView', () => {
-  it("lists the org's members with their org roles, under the org's section nav", async () => {
+  it("lists the org's members with their org roles", async () => {
     const get = answers()
 
     const { wrapper } = await mountOrgView(OrgMembersView, '/acme/members', [...ADMIN])
@@ -84,7 +84,8 @@ describe('OrgMembersView', () => {
       params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing members')
-    expect(wrapper.get('nav').attributes('aria-label')).toBe('Organization administration')
+    // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
+    expect(wrapper.find('nav').exists()).toBe(false)
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr
@@ -97,6 +98,14 @@ describe('OrgMembersView', () => {
       ['Ann Admin', 'ann-admin@acme.example', 'Admin'],
     ])
     await expectNoA11yViolations(wrapper)
+  })
+
+  it('offers its admins Show deactivated (DL-295)', async () => {
+    answers()
+
+    const { wrapper } = await mountOrgView(OrgMembersView, '/acme/members', [...ADMIN])
+
+    expect(wrapper.get('label:has(#show-deactivated)').text()).toBe('Show deactivated')
   })
 
   it('offers each row only the roster actions its allowed_actions carry', async () => {
@@ -275,6 +284,33 @@ describe('OrgMembersView', () => {
       params: { path: { org_id: ACME.id, user_id: ANN.user_id }, query: { with_projects: true } },
     })
     expect(wrapper.text()).toContain('Ann Admin removed from Acme Manufacturing.')
+  })
+
+  it("moves focus to the 403 page's h1 when a refused removal's reload is refused, on the first page of a visit (TD-90)", async () => {
+    const get = answers()
+    vi.spyOn(client, 'DELETE').mockResolvedValue(
+      failed(403, { code: 'forbidden', message: '', details: {} }),
+    )
+    const { wrapper } = await mountOrgPages('/acme/members', [...ADMIN])
+    await wrapper.get('button[aria-label="Actions for Ann Admin"]').trigger('click')
+    await flushPromises()
+    await chooseFromMenu('Remove from organization')
+    // The list's reload is refused too; everything else answers as before.
+    const before = get.getMockImplementation() as (path: string) => unknown
+    get.mockImplementation(((path: string) =>
+      path === '/api/orgs/{org_id}/members'
+        ? Promise.resolve(failed(403, { code: 'forbidden', message: '', details: {} }))
+        : path === '/api/auth/me'
+          ? Promise.resolve(ok(me({ orgs: [acme([...ADMIN])] })))
+          : before(path)) as never)
+
+    const dialog = wrapper.findAll('dialog').find((d) => d.text().includes('Remove Ann Admin'))!
+    await dialog.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe("You can't open this page")
+    expect(document.activeElement).toBe(wrapper.get('h1').element)
+    expect(document.title).toBe("You can't open this page · Waterline")
   })
 
   it('is the 403 page, without asking the API, for an org member who may not manage it', async () => {

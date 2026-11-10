@@ -9,6 +9,9 @@
   owners/admins, system admins; `project.unarchive` is archive-exempt). An archived project
   denies every other mutation (design-doc §5, step 1), archiving it again included.
 
+S2-C21c adds `project.favorite` (DL-303): a visible project-level management mutation, for
+whoever sees the project, denied on an archived one, past the export-control gate.
+
 Personas are those of tests/support/authz.py, relative to workspace WS, org ORG, and project
 PROJ (in ORG).
 """
@@ -17,11 +20,12 @@ import uuid
 
 import pytest
 
+from app.authz.actions import REGISTRY, Action, Level
 from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext, ProjectAccess
 from app.authz.target import Target
 from app.core.errors import ForbiddenError, NotFoundError
-from app.enums import OrgRole, ProjectRole, WorkspaceRole
+from app.enums import AccessKind, OrgRole, ProjectRole, WorkspaceRole
 from tests.support.authz import (
     ARCHIVED_PROJECT_TARGET,
     ORG,
@@ -32,6 +36,7 @@ from tests.support.authz import (
     PROJ2,
     PROJECT_TARGET,
     WS,
+    project_actions,
     rows,
 )
 
@@ -230,39 +235,18 @@ def test_a_project_action_is_404_to_who_cannot_see_the_project(persona: str, act
 
 # --- allowed_actions on a project (the project read, DL-76) -------------------------------------
 
-INHERITED_ON_A_LIVE_PROJECT = [
-    "project.archive",
-    "project.lower_classification",
-    "project.raise_classification",
-    "project.unarchive",
-    "project.update",
-    "project.view",
-    "project.view_access",
-    "project_member.manage",
-]
-
 
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("workspace_admin", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_owner", INHERITED_ON_A_LIVE_PROJECT),
-        ("org_admin", INHERITED_ON_A_LIVE_PROJECT),
-        (
-            "project_admin",
-            [
-                "project.lower_classification",
-                "project.raise_classification",
-                "project.update",
-                "project.view",
-                "project.view_access",
-                "project_member.manage",
-            ],
-        ),
-        ("project_member", ["project.view"]),
-        ("project_viewer", ["project.view"]),
+        ("system_admin", project_actions(inherited=True)),
+        ("workspace_owner", project_actions(inherited=True)),
+        ("workspace_admin", project_actions(inherited=True)),
+        ("org_owner", project_actions(inherited=True)),
+        ("org_admin", project_actions(inherited=True)),
+        ("project_admin", project_actions(ProjectRole.ADMIN)),
+        ("project_member", project_actions(ProjectRole.MEMBER)),
+        ("project_viewer", project_actions(ProjectRole.VIEWER)),
         ("org_member", []),
         ("other_project_admin", []),
         ("nobody", []),
@@ -275,11 +259,20 @@ def test_allowed_actions_on_a_project(persona: str, expected: list[str]) -> None
 @pytest.mark.parametrize(
     ("persona", "expected"),
     [
-        ("system_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("workspace_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("org_admin", ["project.unarchive", "project.view", "project.view_access"]),
-        ("project_admin", ["project.view", "project.view_access"]),
-        ("project_viewer", ["project.view"]),
+        (
+            "system_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "workspace_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        (
+            "org_admin",
+            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+        ),
+        ("project_admin", ["project.view", "project.view_access", "requirement.view"]),
+        ("project_viewer", ["project.view", "requirement.view"]),
         ("org_member", []),
     ],
 )
@@ -323,3 +316,97 @@ def test_allowed_actions_on_an_org_carry_the_project_actions(
     persona: str, expected: list[str]
 ) -> None:
     assert allowed_actions(PERSONAS[persona], ORG_TARGET) == expected
+
+
+# --- project.favorite (S2-C21c; DL-303) ----------------------------------------------------------
+# A visible management action: anyone who can see the project (design-doc §4, "Visibility": a
+# project membership, or inherited admin) may star or unstar it; it's a mutation, so an archived
+# project denies it to everyone (§5, step 1); management, so the export-control gate lets
+# inherited admins through (§3.1; §5, step 2).
+
+FAVORITE = "project.favorite"
+EC_PROJECT_TARGET = Target(WS, ORG, PROJ, export_controlled=True)
+ARCHIVED_EC_PROJECT_TARGET = Target(WS, ORG, PROJ, archived=True, export_controlled=True)
+PROJECT_UNSEEN = [
+    "org_member",
+    "other_project_admin",
+    "workspace_member",
+    "other_org_owner",
+    "other_workspace_owner",
+    "nobody",
+]
+
+
+def test_project_favorite_is_a_visible_project_level_management_mutation() -> None:
+    """DL-303: registered in `authz/actions.py` as a visible management action, a mutation that
+    an archived project doesn't exempt, and not personal."""
+    spec = REGISTRY[Action.PROJECT_FAVORITE]
+    assert (
+        spec.level,
+        spec.access,
+        spec.visible,
+        spec.mutation,
+        spec.archive_exempt,
+        spec.relationship,
+        spec.explicit_when_export_controlled,
+    ) == (Level.PROJECT, AccessKind.MANAGEMENT, True, True, False, None, False)
+
+
+@pytest.mark.parametrize(("persona", "allowed"), rows(SEES_THE_PROJECT))
+def test_project_favorite_is_for_whoever_sees_the_project(persona: str, allowed: bool) -> None:
+    """Every project role, viewer included, and every inherited admin; an org membership alone,
+    another project in the org, staff membership alone, or roles elsewhere don't show it."""
+    assert authorize(PERSONAS[persona], FAVORITE, PROJECT_TARGET) is allowed
+
+
+@pytest.mark.parametrize(("persona", "allowed"), rows(SEES_THE_PROJECT))
+def test_project_favorite_passes_the_export_control_gate(persona: str, allowed: bool) -> None:
+    """A management action (DL-303; §3.1): inherited admins without an explicit membership keep
+    it on an export-controlled project."""
+    assert authorize(PERSONAS[persona], FAVORITE, EC_PROJECT_TARGET) is allowed
+
+
+@pytest.mark.parametrize("target", [ARCHIVED_PROJECT_TARGET, ARCHIVED_EC_PROJECT_TARGET])
+@pytest.mark.parametrize("persona", list(PERSONAS))
+def test_project_favorite_is_denied_to_everyone_on_an_archived_project(
+    persona: str, target: Target
+) -> None:
+    """DL-303: a mutation, so an archived project denies it, system admins included."""
+    assert authorize(PERSONAS[persona], FAVORITE, target) is False
+
+
+@pytest.mark.parametrize("target", [PROJECT_TARGET, ARCHIVED_PROJECT_TARGET, EC_PROJECT_TARGET])
+@pytest.mark.parametrize("persona", PROJECT_UNSEEN)
+def test_project_favorite_is_404_to_whoever_cannot_see_the_project(
+    persona: str, target: Target
+) -> None:
+    with pytest.raises(NotFoundError):
+        ensure(PERSONAS[persona], FAVORITE, target)
+
+
+@pytest.mark.parametrize("persona", sorted(SEES_THE_PROJECT))
+def test_project_favorite_on_an_archived_project_is_403_to_whoever_sees_it(persona: str) -> None:
+    with pytest.raises(ForbiddenError):
+        ensure(PERSONAS[persona], FAVORITE, ARCHIVED_PROJECT_TARGET)
+
+
+def test_project_favorite_counts_a_project_role_only_on_its_own_project() -> None:
+    """An admin of PROJ2 (same org) stars PROJ2, not PROJ."""
+    other = PERSONAS["other_project_admin"]
+    assert authorize(other, FAVORITE, Target(WS, ORG, PROJ2)) is True
+    assert authorize(other, FAVORITE, PROJECT_TARGET) is False
+
+
+@pytest.mark.parametrize(
+    ("target", "persona", "carried"),
+    [
+        *((PROJECT_TARGET, persona, allowed) for persona, allowed in rows(SEES_THE_PROJECT)),
+        *((ARCHIVED_PROJECT_TARGET, persona, False) for persona in PERSONAS),
+    ],
+)
+def test_allowed_actions_carry_project_favorite_where_it_is_granted(
+    target: Target, persona: str, carried: bool
+) -> None:
+    """DL-306: My work's project items carry `allowed_actions`, so the star shows only where it
+    works: on a project the user sees, and never on an archived one."""
+    assert (FAVORITE in allowed_actions(PERSONAS[persona], target)) is carried

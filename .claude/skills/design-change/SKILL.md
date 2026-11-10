@@ -53,8 +53,11 @@ stays valid.
 
 ## 5. Record each decision
 
-Add one `DL-<n>` entry per decision to `docs/decision-log.md` (format at the top of that file).
-When it supersedes an earlier entry, fill in that entry's "Superseded by".
+Add a `DL-<n>` entry to `docs/decision-log.md` (format at the top of that file) for each
+decision that changes or supersedes a written rule, or sets a process (DL-7). A decision that
+only adds detail to an unbuilt checkpoint goes into that doc directly; the design change's
+review record names it, with its source and reasons (DL-312). When an entry supersedes an
+earlier one, fill in that entry's "Superseded by".
 
 ## 6. Update every affected doc
 
@@ -67,7 +70,8 @@ Work through this list for each decision, and change everything that states the 
 - `docs/testing-strategy.md`, `docs/screen-inventory.md`.
 - `docs/developer-guide.md` and `docs/user-guide.md`.
 - `docs/tech-debt.md`: resolve or re-target entries the decision affects.
-- The `CLAUDE.md` files, and `.claude/` skills and agents (e.g. a reviewer's checklist).
+- The `CLAUDE.md` files, and `.claude/` skills and agents (e.g. a reviewer's checklist); the
+  root `CLAUDE.md`'s **Status** when the change alters what's next (DL-315).
 
 Replace the superseded text with the current rule and a `DL-<n>` reference. Don't narrate the
 history in the docs; the log holds it.

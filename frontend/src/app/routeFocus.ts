@@ -44,6 +44,14 @@ export async function syncTitle(): Promise<void> {
   document.title = h1?.textContent ? `${h1.textContent.trim()} · ${APP_NAME}` : APP_NAME
 }
 
+/** A page a user's action replaced (a reload after a refusal, or a save that found the item
+ * gone): the title, and focus on the new `h1`, on a visit's first page too (UI-SHL-9). Not
+ * `settlePage()`, which leaves a first page's focus alone because that page came from a load. */
+export async function replacedPage(): Promise<void> {
+  await syncTitle()
+  await focusHeading()
+}
+
 /** Set the title from the `h1` and, after the first page, focus it. */
 export async function settlePage(): Promise<void> {
   await syncTitle()

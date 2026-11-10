@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// Changing your own password (design-doc §4): the forced change and account settings both use it.
+// Changing your own password (design-doc §4): the forced change and the change-password page
+// (`/account/password`) both use it.
 // The new password has the requirements list under it (UI-FRM-10); a 422 on a listed requirement
 // marks that line instead of a message under the field (DL-94). `withSignOut` adds the forced
 // change's Sign out, whose failure shows in this form's alert.
@@ -15,11 +16,7 @@ import { useFormErrors } from '@/composables/useFormErrors'
 import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 import { useCurrentUserStore } from '@/stores/currentUser'
 
-// `secondary` for a page whose primary action is another form's (account settings, UI-FRM-15).
-withDefaults(defineProps<{ withSignOut?: boolean; secondary?: boolean }>(), {
-  withSignOut: false,
-  secondary: false,
-})
+withDefaults(defineProps<{ withSignOut?: boolean }>(), { withSignOut: false })
 const emit = defineEmits<{ changed: [] }>()
 
 const store = useCurrentUserStore()
@@ -166,13 +163,7 @@ async function signOut() {
       />
     </div>
     <div class="flex flex-wrap gap-3">
-      <Button
-        ref="submitButton"
-        type="submit"
-        :variant="secondary ? 'secondary' : 'primary'"
-        :pending="pending"
-        pending-label="Changing…"
-      >
+      <Button ref="submitButton" type="submit" :pending="pending" pending-label="Changing…">
         Change password
       </Button>
       <Button

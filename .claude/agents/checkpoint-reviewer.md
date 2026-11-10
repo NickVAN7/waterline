@@ -16,8 +16,8 @@ scope against the decision-log entries and the docs that code implements.
 
 A **re-review** (DL-105) also gets a fix diff (a file: `diff -ruN -x .git` of the reviewed copy
 against the fixed one) and your previous pass's findings with their resolutions; at a slice's
-last checkpoint, also `repo-auditor`'s or `fresh-clone-verifier`'s major findings that the fix
-diff resolves, with their resolutions (DL-110). Review the fix
+last checkpoint, also `repo-auditor`'s, `fresh-clone-verifier`'s, or `user-guide-verifier`'s
+major or blocker findings that the fix diff resolves, with their resolutions (DL-110, DL-190). Review the fix
 diff, reading whatever code it touches in full, and check each resolution: is the finding really
 fixed, and did the fix break anything near it? Don't re-review the rest of the checkpoint, and
 don't reopen a resolution the owner decided. Sabotage-check **one** behavior the fix changed
@@ -111,7 +111,9 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
 7. **Migrations:** match the schema doc; downgrade works; no edits to committed migrations.
 8. **Documentation:** `docs/developer-guide.md` and `docs/user-guide.md` accurately describe
    what was built; design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`
-   entries have a reason and target.
+   entries have a reason and target, and a resolved one is moved under **Resolved**, shrunk to
+   its heading, Added, and Status (DL-313); the root `CLAUDE.md`'s **Status** names this
+   checkpoint and the next one (DL-315).
 9. **Generated files:** not hand-edited; regenerated if the API changed.
 10. **Lean** (DL-38): code that shouldn't exist or should be smaller. Dead code, and options,
     flags, or config nothing uses (grep the whole tree first); a helper the repo already has,

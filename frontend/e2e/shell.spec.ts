@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
 import { expectFocusNotObscured, expectNoA11yViolations } from './support/a11y'
 import { signIn } from './support/demo'
 
-// `casey` is in both demo orgs, on PORTAL (acme) and INV (globex): the org switcher's user.
+// `casey` is in both demo orgs, on PORTAL (acme) and INV (globex): the org menu's user.
 
 test('My work lists the projects the user can open, in the shell', async ({ page }) => {
   await signIn(page, 'casey')
@@ -16,7 +16,7 @@ test('My work lists the projects the user can open, in the shell', async ({ page
   await expectFocusNotObscured(page)
 })
 
-test('the org switcher opens an org, and the project selector one of its projects', async ({
+test('the org menu opens an org, and the project selector one of its projects', async ({
   page,
 }) => {
   await signIn(page, 'casey')
@@ -54,7 +54,7 @@ test('the org switcher opens an org, and the project selector one of its project
   await expectFocusNotObscured(page)
 })
 
-test('the org switcher and project selector work from the keyboard', async ({ page }) => {
+test('the org menu and project selector work from the keyboard', async ({ page }) => {
   await signIn(page, 'casey')
 
   const switcher = page.getByRole('button', { name: /Organization:/ })
@@ -97,6 +97,35 @@ test('the user menu works from the keyboard, with a visible focus ring', async (
   await expect(button).toBeFocused()
 })
 
+test('the user menu opens the user guide, and a section link opens its section (DL-308 to DL-311)', async ({
+  page,
+}) => {
+  await signIn(page, 'casey')
+
+  await page.getByRole('button', { name: /Account menu/ }).click()
+  await page.getByRole('menuitem', { name: 'Documentation' }).click()
+
+  // The guide reached the page through the Compose mount and Vite's allow list (DL-308).
+  await expect(page).toHaveURL('/docs')
+  await expect(page.getByRole('heading', { level: 1, name: 'User guide' })).toBeFocused()
+  await expect(page).toHaveTitle('User guide · Waterline')
+  const contents = page.getByRole('navigation', { name: 'Contents' })
+  await expect(contents.getByRole('link', { name: 'Signing in' })).toBeVisible()
+  await expectNoA11yViolations(page)
+
+  await contents.getByRole('link', { name: 'Account settings' }).click()
+  await expect(page).toHaveURL('/docs#docs-account-settings')
+  await expect(page.getByRole('heading', { level: 2, name: 'Account settings' })).toBeFocused()
+  await expectFocusedHeadingClear(page)
+
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1, name: 'User guide' })).toBeFocused()
+
+  await page.goto('/docs#docs-documentation')
+  await expect(page.getByRole('heading', { level: 2, name: 'Documentation' })).toBeFocused()
+  await expectFocusedHeadingClear(page)
+})
+
 test("a project's lowercase key is replaced with its own", async ({ page }) => {
   await signIn(page, 'casey')
 
@@ -123,27 +152,26 @@ test("a project the user isn't on is not found, the same as one that doesn't exi
   await expectNoA11yViolations(page)
 })
 
-test('the theme chosen in the user menu applies and stays after a reload', async ({ page }) => {
+test('the theme chosen in account settings applies and stays after a reload (DL-164)', async ({
+  page,
+}) => {
   await signIn(page, 'casey')
+  await page.goto('/account')
 
-  await page.getByRole('button', { name: /Account menu/ }).click()
-  await expectNoA11yViolations(page)
-  await page.getByRole('menuitemradio', { name: 'Dark theme' }).click()
+  await page.getByRole('radio', { name: 'Dark' }).check()
 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(15, 20, 26)')
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(page.getByRole('radio', { name: 'Dark' })).toBeChecked()
+  await expectNoA11yViolations(page)
+  // The user menu no longer holds it.
   await page.getByRole('button', { name: /Account menu/ }).click()
-  await expect(page.getByRole('menuitemradio', { name: 'Dark theme' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  )
+  await expect(page.getByRole('menuitemradio')).toHaveCount(0)
 })
 
-test('account settings save the profile and check a new password as it is typed', async ({
-  page,
-}) => {
+test('account settings save the profile, and change password is its own page', async ({ page }) => {
   await signIn(page, 'casey')
   await page.getByRole('button', { name: /Account menu/ }).click()
   await page.getByRole('menuitem', { name: 'Account settings' }).click()
@@ -154,7 +182,11 @@ test('account settings save the profile and check a new password as it is typed'
   // Saved unchanged, so the shared demo account stays as other tests expect it.
   await page.getByRole('button', { name: 'Save profile' }).click()
   await expect(page.getByText('Profile saved.')).toBeVisible()
+  await expectNoA11yViolations(page)
 
+  await page.getByRole('link', { name: 'Change password' }).click()
+  await expect(page).toHaveURL('/account/password')
+  await expect(page.getByRole('heading', { level: 1, name: 'Change password' })).toBeFocused()
   const requirements = page.locator('#new_password-requirements li')
   await expect(requirements.first()).toHaveText(/Not met:\s*At least 8 characters/)
   await page.getByRole('textbox', { name: 'New password', exact: true }).fill('a long passphrase')
@@ -206,3 +238,14 @@ test('focus is never under the sticky header on a page that scrolls', async ({ p
 
   await expectFocusNotObscured(page)
 })
+
+/** The focused element (a heading a hash scrolled to) is drawn clear of the sticky header. */
+async function expectFocusedHeadingClear(page: Page): Promise<void> {
+  const clear = await page.evaluate(() => {
+    const element = document.activeElement!
+    const box = element.getBoundingClientRect()
+    const hit = document.elementFromPoint(box.left + 1, box.top + 1)
+    return hit === element || element.contains(hit)
+  })
+  expect(clear, 'the focused heading is under the sticky header').toBe(true)
+}

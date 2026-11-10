@@ -99,8 +99,17 @@ function onHide() {
     <span class="break-words"><slot name="button" /></span>
     <Icon name="chevron-down" />
   </button>
-  <Popover :id="popoverId" ref="popover" :aria-label="name" @show="onShow" @hide="onHide">
+  <Popover
+    :id="popoverId"
+    ref="popover"
+    :aria-label="name"
+    :aria-describedby="$slots.header ? `${popoverId}-header` : undefined"
+    @show="onShow"
+    @hide="onHide"
+  >
     <div class="flex w-72 max-w-full flex-col gap-2">
+      <!-- The popover's description, read with its name: focus goes straight to a link. -->
+      <div v-if="$slots.header" :id="`${popoverId}-header`"><slot name="header" /></div>
       <div v-if="links.length > FILTER_AFTER" class="flex flex-col gap-1">
         <label :for="`${popoverId}-filter`" class="text-sm font-medium"
           >Filter {{ name.toLowerCase() }}</label

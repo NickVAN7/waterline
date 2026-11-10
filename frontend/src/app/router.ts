@@ -33,6 +33,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/user/AccountView.vue'),
   },
   {
+    path: '/account/password',
+    name: 'account-password',
+    component: () => import('@/views/user/AccountPasswordView.vue'),
+  },
+  {
     path: '/account/no-access',
     name: 'no-access',
     component: () => import('@/views/errors/NoAccessView.vue'),
@@ -44,37 +49,51 @@ export const routes: RouteRecordRaw[] = [
   {
     path: '/workspace/staff',
     name: 'workspace-staff',
+    meta: { adminArea: 'workspace' },
     component: () => import('@/views/workspace/StaffView.vue'),
   },
   {
     path: '/workspace/orgs',
     name: 'workspace-orgs',
+    meta: { adminArea: 'workspace' },
     component: () => import('@/views/workspace/OrgsView.vue'),
   },
   {
     path: '/workspace/users',
     name: 'workspace-users',
+    meta: { adminArea: 'workspace' },
     component: () => import('@/views/workspace/UsersView.vue'),
   },
   {
     path: '/workspace/users/:userId/access',
     name: 'user-access',
+    meta: { adminArea: 'workspace' },
     component: () => import('@/views/user/AccessReviewView.vue'),
   },
   {
     path: '/workspace/settings',
     name: 'workspace-settings',
+    meta: { adminArea: 'workspace' },
     component: () => import('@/views/workspace/WorkspaceSettingsView.vue'),
   },
-  // Org administration (UI-SHL-10, DL-104): for its owners and admins, and workspace admins.
+  // Org administration (UI-SHL-10, DL-104): for its owners and admins, and workspace admins. The
+  // overview is its landing page (DL-137, DL-163).
+  {
+    path: '/:orgSlug/overview',
+    name: 'org-overview',
+    meta: { adminArea: 'org' },
+    component: () => import('@/views/org/OrgOverviewView.vue'),
+  },
   {
     path: '/:orgSlug/members',
     name: 'org-members',
+    meta: { adminArea: 'org' },
     component: () => import('@/views/org/OrgMembersView.vue'),
   },
   {
     path: '/:orgSlug/settings',
     name: 'org-settings',
+    meta: { adminArea: 'org' },
     component: () => import('@/views/org/OrgSettingsView.vue'),
   },
   {
@@ -86,6 +105,30 @@ export const routes: RouteRecordRaw[] = [
     path: '/:orgSlug/projects/:key',
     name: 'project-home',
     component: () => import('@/views/project/ProjectHomeView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
+    path: '/:orgSlug/projects/:key/requirements',
+    name: 'project-requirements',
+    component: () => import('@/views/requirement/RequirementsView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
+    path: '/:orgSlug/projects/:key/requirements/new',
+    name: 'project-requirement-new',
+    component: () => import('@/views/requirement/NewRequirementView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
+    path: '/:orgSlug/projects/:key/requirements/:number(\\d+)',
+    name: 'project-requirement',
+    component: () => import('@/views/requirement/RequirementView.vue'),
+    meta: { settlesItself: true },
+  },
+  {
+    path: '/:orgSlug/projects/:key/trash',
+    name: 'project-trash',
+    component: () => import('@/views/project/TrashView.vue'),
     meta: { settlesItself: true },
   },
   {
@@ -104,6 +147,13 @@ export const routes: RouteRecordRaw[] = [
     path: '/:orgSlug/projects/:key/settings',
     name: 'project-settings',
     component: () => import('@/views/project/ProjectSettingsView.vue'),
+    meta: { settlesItself: true },
+  },
+  // The user guide (design-doc §11, DL-308); it settles its own focus for a section's hash.
+  {
+    path: '/docs',
+    name: 'docs',
+    component: () => import('@/views/docs/DocsView.vue'),
     meta: { settlesItself: true },
   },
   {

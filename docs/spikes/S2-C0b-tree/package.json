@@ -1,0 +1,25 @@
+{
+  "name": "s2-c0b-tree-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5199 --strictPort",
+    "measure": "node measure.mjs"
+  },
+  "dependencies": {
+    "@svar-ui/vue-grid": "2.7.5",
+    "@svar-ui/vue-core": "2.6.1",
+    "primevue": "5.0.2",
+    "@primeuix/themes": "3.0.1",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.64.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@vitejs/plugin-vue": "6.0.9",
+    "tailwindcss": "4.3.3",
+    "tailwindcss-primeui": "0.6.1",
+    "vite": "8.3.4"
+  }
+}

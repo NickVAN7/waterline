@@ -2,15 +2,14 @@
 and org API", DL-55)."""
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
 from app.authz.actions import Action
 from app.core.db import SessionDep
-from app.core.errors import ErrorBody
 from app.core.lists import Page
-from app.routers.deps import AuthzContextDep, authorized, load_org, load_workspace
+from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_org, load_workspace
 from app.schemas.org import (
     MemberAdd,
     MemberCreate,
@@ -26,16 +25,6 @@ from app.services.workspace import WorkspaceEntity
 
 router = APIRouter(tags=["org"])
 
-_ERRORS: dict[int | str, dict[str, Any]] = {
-    code: {"model": ErrorBody}
-    for code in (
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN,
-        status.HTTP_404_NOT_FOUND,
-        status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
-}
-
 OrgCreatable = Annotated[WorkspaceEntity, Depends(authorized(load_workspace, Action.ORG_CREATE))]
 Viewed = Annotated[OrgEntity, Depends(authorized(load_org, Action.ORG_VIEW))]
 Updated = Annotated[OrgEntity, Depends(authorized(load_org, Action.ORG_UPDATE))]
@@ -44,7 +33,7 @@ MemberQuery = Annotated[MEMBERS.query_model, Query()]  # pyright: ignore[reportI
 
 
 @router.post(
-    "/workspaces/{workspace_id}/orgs", status_code=status.HTTP_201_CREATED, responses=_ERRORS
+    "/workspaces/{workspace_id}/orgs", status_code=status.HTTP_201_CREATED, responses=ERRORS
 )
 async def create_org(
     workspace: OrgCreatable, body: OrgCreate, ctx: AuthzContextDep, session: SessionDep
@@ -54,7 +43,7 @@ async def create_org(
     return await OrgService(session).create(ctx, workspace, body)
 
 
-@router.get("/workspaces/{workspace_id}/org-slug-availability", responses=_ERRORS)
+@router.get("/workspaces/{workspace_id}/org-slug-availability", responses=ERRORS)
 async def new_org_slug_availability(
     workspace: OrgCreatable, slug: str, session: SessionDep
 ) -> SlugAvailability:
@@ -62,13 +51,13 @@ async def new_org_slug_availability(
     return await OrgService(session).slug_availability(workspace.id, slug)
 
 
-@router.get("/orgs/{org_id}", responses=_ERRORS)
+@router.get("/orgs/{org_id}", responses=ERRORS)
 async def get_org(org: Viewed, ctx: AuthzContextDep, session: SessionDep) -> OrgRead:
     """The org, with the actions the caller may take on it."""
     return OrgService(session).read(ctx, org)
 
 
-@router.patch("/orgs/{org_id}", responses=_ERRORS)
+@router.patch("/orgs/{org_id}", responses=ERRORS)
 async def update_org(
     org: Updated, body: OrgUpdate, ctx: AuthzContextDep, session: SessionDep
 ) -> OrgRead:
@@ -76,13 +65,13 @@ async def update_org(
     return await OrgService(session).update(ctx, org, body)
 
 
-@router.get("/orgs/{org_id}/slug-availability", responses=_ERRORS)
+@router.get("/orgs/{org_id}/slug-availability", responses=ERRORS)
 async def org_slug_availability(org: Updated, slug: str, session: SessionDep) -> SlugAvailability:
     """Whether `slug` could be this org's (its own counts as available)."""
     return await OrgService(session).slug_availability(org.workspace_id, slug, org=org)
 
 
-@router.get("/orgs/{org_id}/members", responses=_ERRORS)
+@router.get("/orgs/{org_id}/members", responses=ERRORS)
 async def list_members(
     org: MembersManaged, query: MemberQuery, ctx: AuthzContextDep, session: SessionDep
 ) -> Page[MemberRead]:
@@ -90,7 +79,7 @@ async def list_members(
     return await OrgService(session).list_members(ctx, org, query)
 
 
-@router.post("/orgs/{org_id}/members", status_code=status.HTTP_201_CREATED, responses=_ERRORS)
+@router.post("/orgs/{org_id}/members", status_code=status.HTTP_201_CREATED, responses=ERRORS)
 async def add_member(
     org: MembersManaged, body: MemberAdd, ctx: AuthzContextDep, session: SessionDep
 ) -> MemberRead:
@@ -99,7 +88,7 @@ async def add_member(
     return await OrgService(session).add_member(ctx, org, body.email, body.role)
 
 
-@router.post("/orgs/{org_id}/members/new", status_code=status.HTTP_201_CREATED, responses=_ERRORS)
+@router.post("/orgs/{org_id}/members/new", status_code=status.HTTP_201_CREATED, responses=ERRORS)
 async def create_member(
     org: MembersManaged, body: MemberCreate, ctx: AuthzContextDep, session: SessionDep
 ) -> MemberRead:
@@ -108,7 +97,7 @@ async def create_member(
     return await OrgService(session).create_member(ctx, org, body)
 
 
-@router.patch("/orgs/{org_id}/members/{user_id}", responses=_ERRORS)
+@router.patch("/orgs/{org_id}/members/{user_id}", responses=ERRORS)
 async def change_member_role(
     org: MembersManaged,
     user_id: uuid.UUID,
@@ -123,7 +112,7 @@ async def change_member_role(
 
 
 @router.delete(
-    "/orgs/{org_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=_ERRORS
+    "/orgs/{org_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=ERRORS
 )
 async def remove_member(
     org: MembersManaged,

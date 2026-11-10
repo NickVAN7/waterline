@@ -1,9 +1,10 @@
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
 from app.enums import OrgRole
+from app.schemas.limits import NAME_MAX
 from app.schemas.workspace import NewUser
 
 
@@ -25,7 +26,7 @@ class OrgCreate(BaseModel):
     """An org and its first owner: exactly one of `owner_id` (an existing active user) and
     `new_owner` (a new account)."""
 
-    name: str
+    name: str = Field(max_length=NAME_MAX)
     slug: str
     owner_id: uuid.UUID | None = None
     new_owner: NewUser | None = None
@@ -34,7 +35,7 @@ class OrgCreate(BaseModel):
 class OrgUpdate(BaseModel):
     """Only the fields sent change."""
 
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=NAME_MAX)
     slug: str | None = None
 
 
