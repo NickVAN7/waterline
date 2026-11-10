@@ -1529,6 +1529,10 @@ cancels their approval requests, §6.2; DL-200), which stay visible inside the p
 notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
 projects** (DL-197): a star on a My work project row keeps it at the top, per user: a Favorite
 projects section first, by name, archived ones left out (S2-C21c, DL-238, DL-302 to DL-305); favoriting items is v1.5 or later, and there's no "recently viewed".
+From S3-C0f (DL-329 to DL-334), My work opens with the approvals waiting for you, then
+Favorites, then a section per organization listing every project you can open (active first;
+completed, cancelled, and archived behind a toggle), in compact rows; the past-decisions
+section is removed (DL-333). This section is rewritten then.
 My work is the cross-project view in v1; a portfolio view comes when it outgrows the page
 (§16). It lives at the root route (`/`), so it adds nothing to the reserved-slug
 list (§3); a top-level route of its own would have to join it. Each section arrives with its
@@ -1562,6 +1566,10 @@ The user menu's **Documentation** item renders the user guide inside the app (DL
 `/docs` (S2-C21d, DL-238; `docs` joins the reserved slugs there, §3). The guide is bundled into
 the web app at build time, the same for every signed-in user, with no endpoint (DL-308); its own
 heading (**User guide**) is the page's, and a Contents list after it links to each section (DL-310, DL-311).
+From S3-C0g (DL-335 to DL-342), the guide is one page per topic under `docs/user-guide/`, with
+a landing page and article pages in its own sidebar nav, and today's file becomes
+`docs/behavior-reference.md`, which the app never shows; from S3-C0h its screenshots are
+generated (DL-343).
 
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).

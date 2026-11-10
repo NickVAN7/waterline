@@ -5,6 +5,12 @@ ERP implementations: requirements, tasks, phases, test cycles, sign-offs, and st
 with traceability from requirement to sign-off. Monorepo: FastAPI backend (`backend/`), Vue 3 +
 TypeScript frontend (`frontend/`), docs (`docs/`).
 
+## Status
+
+S2-C22 (Slice verification) done, and the Slice 2 retro and the UI polish handoff decided
+(DL-312 to DL-343); next: Slice 3's planning, whose first rows are S3-C0a to S3-C0h.
+Updated at every checkpoint, and by a design change that changes what's next (DL-315).
+
 ## Docs (source of truth)
 
 | Doc | Holds |

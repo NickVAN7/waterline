@@ -527,7 +527,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   runs no tests. Its findings are resolved like any reviewer's (fixed within the slice's scope,
   otherwise logged as tech debt or raised as a design change) and feed the slice retro.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-318 (in part: the lean category)
 - **Applies to:** new `repo-auditor` agent; `checkpoint` skill; root `CLAUDE.md`; build plan
   ("Verification", "Claude configuration", the layout, Checkpoint 17); developer guide sections
   2 and 11
@@ -2134,7 +2134,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   whether either reported lean findings and how useful they were, and the owner decides whether
   to keep, drop, or narrow it.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-318
 - **Applies to:** build plan (S2-C22)
 - **Source:** owner, Oct 22, 2026 (answers to the Slice 2 plan's open questions and the
   design change's decisions, `DC-2026-10-22-slice-2-plan.md`)
@@ -2183,7 +2183,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   to S2-C1, the first row where a versioned model's test can exercise it.
 - **Supersedes:** none (an exception to DL-138's "the next slice's C0 applies the ones the
   owner accepts", and the S2-C0a row, for finding 7 only)
-- **Superseded by:** none
+- **Superseded by:** DL-315 (in part: the developer guide's Status line and its test)
 - **Applies to:** build plan (S2-C0c, S2-C0g, S2-C0h, S2-C0i, S2-C1);
   `docs/reviews/s2/S2-C0a.md`
 - **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
@@ -2195,7 +2195,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   session; finding 3 (one list of agents, skills, and hooks, in developer guide section 11) is
   decided there too. Until then the guard and the three lists stay as they are.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-316 (finding 1's trial, S3-C0b); DL-317 (finding 3)
 - **Applies to:** build plan (S2-C22); `docs/reviews/s2/S2-C0a.md`
 - **Source:** owner, Oct 22, 2026 (chat session, the S2-C0a findings one by one)
 
@@ -2578,7 +2578,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   Backlog tabs), Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash
   last, leaving out turned-off and unshipped modules.
 - **Supersedes:** DL-146 (in part: Trash linked from the requirements page's header)
-- **Superseded by:** none
+- **Superseded by:** DL-321 (in part: a split pane at wide widths)
 - **Applies to:** design-doc §9; ui-design-guide UI-SHL-6, UI-SHL-11, UI-SHL-12; build plan
   (S2-C17, S2-C21); screen-inventory step 6
 - **Source:** owner, Oct 27, 2026 (handoff decisions 28 to 30; test runs opening like the other
@@ -3301,7 +3301,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   reuse in Slice 3: a shared piece used for the first time gets its own row (DL-139). Until then
   a requirement opens as its full page.
 - **Supersedes:** none (places UI-SHL-11 in Slice 2)
-- **Superseded by:** none
+- **Superseded by:** DL-321 (in part: a split pane at wide widths)
 - **Applies to:** build plan (S2-C18b; "Later slices", Slice 3); ui-design-guide (UI-SHL-11)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C18 re-cut)
 
@@ -3600,7 +3600,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   whose content the caller can't see (§5, §3.1). Shown on My work as "My past decisions", under
   the approvals the user owes.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-333 (past decisions removed from My work)
 - **Applies to:** design-doc §11; build plan ("API conventions" My work row, S2-C20b); screen
   inventory Piece 6
 - **Source:** owner, Nov 5, 2026 (chat session, S2-C20a re-cut)
@@ -3790,7 +3790,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   project still lists in Projects, with its star filled when it's a favorite. This is how the
   star "keeps it at the top" (design-doc §11).
 - **Supersedes:** none (specifies DL-197's favorites, placed in S2-C21c by DL-238)
-- **Superseded by:** none
+- **Superseded by:** DL-329 (in part: a section per org); DL-333 (in part: approvals first)
 - **Applies to:** design-doc §11; screen inventory (My work); build plan (S2-C21c)
 - **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut)
 
@@ -3858,7 +3858,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the same for everyone. (`wl gen-client` still runs, for the `ReservedSlug` enum gaining
   `docs`, DL-309.)
 - **Supersedes:** none (specifies DL-197's Documentation, placed in S2-C21d by DL-238)
-- **Superseded by:** none
+- **Superseded by:** DL-335 (in part: a guide per page and a behavior reference)
 - **Applies to:** design-doc §11 ("Documentation"); build plan (S2-C21d)
 - **Source:** owner, Nov 7, 2026 (chat session, S2-C21d re-cut)
 
@@ -3883,7 +3883,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   one short line on what the app covers. It's the one page whose `h1` isn't in a `PageHeader`
   (UI-SHL-8), and the one `MarkdownView` at level 0: stored content never is.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-339 (in part: the landing page's h1)
 - **Applies to:** user guide (its opening); build plan (S2-C21d)
 - **Source:** owner, Nov 7, 2026 (chat session, S2-C21d re-cut)
 
@@ -3901,7 +3901,388 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Source note:** the list's place, the hash links, and DL-310's title answer the re-cut's
   docs-consistency review (DC-2026-11-07-s2-c21d-re-cut).
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-338 (in part: the anchors); DL-340 (in part: On this page)
 - **Applies to:** design-doc §11 ("Documentation"); ui-design-guide (UI-MD); build plan
   (S2-C21d)
 - **Source:** owner, Nov 7, 2026 (chat session, S2-C21d re-cut)
+
+### DL-312: The log records rule changes only; added detail goes into its doc
+- **Date:** 2026-11-09
+- **Decision:** From the next design change, a `DL-<n>` entry is added only for a decision that changes or
+  supersedes a written rule, or sets a process (DL-7). A decision that only adds detail to an
+  unbuilt checkpoint goes into that doc directly, and the design change's review record names it,
+  with its source and reasons. Existing entries stay as they are, and so do this change's
+  (DL-321 to DL-343: the handoff asked for one entry per decision, and they hold its detail).
+- **Supersedes:** the `design-change` skill's "one entry per decision" (step 5)
+- **Superseded by:** none
+- **Applies to:** `design-change` skill (step 5); this log's header
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro, simplicity finding Y1)
+
+### DL-313: Resolved tech-debt entries move to a Resolved section, shrunk
+- **Date:** 2026-11-09
+- **Decision:** `docs/tech-debt.md` lists its open entries first, then a **Resolved** section.
+  Resolving an entry moves it there, shrunk to its heading, Added, and Status; its full text stays
+  in git history and in the review record that resolved it. The docs consistency test checks the
+  sections, the fields, and that the numbers are 1..n, each once, ascending in each section.
+- **Supersedes:** the log's "Resolved entries are marked, not deleted" (its header and the
+  `checkpoint` skill, step 3)
+- **Superseded by:** none
+- **Applies to:** `docs/tech-debt.md`; `checkpoint` skill (step 3); developer guide section 9;
+  `tests/support/docs.py`, `test_docs_consistency.py`
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro, simplicity finding Y2, with the owner's Resolved
+  section)
+
+### DL-314: `ui-reviewer` walks the UI guide's R rules instead of restating them
+- **Date:** 2026-11-09
+- **Decision:** `ui-reviewer`'s checklist keeps only what `docs/ui-design-guide.md` doesn't say
+  (code-level habits, traps from past reviews); for the rest it walks every guide rule marked R
+  (the guide's check legend) against the diff. Adopted after a trial on S2-C21d's committed diff,
+  recorded in this change's review record.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** `.claude/agents/ui-reviewer.md`
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro, simplicity finding Y3, with a trial first)
+
+### DL-315: The project's Status line is in the root CLAUDE.md, without a test
+- **Date:** 2026-11-09
+- **Decision:** The one-line Status (the latest checkpoint and what's next) moves from the
+  developer guide to a `## Status` section of the root `CLAUDE.md`, which every session loads.
+  The `checkpoint` skill updates it at every checkpoint and the `design-change` skill when what's
+  next changes; `docs-consistency` and `checkpoint-reviewer` check it. Its docs consistency test
+  and helpers are removed.
+- **Supersedes:** DL-170 in part (the developer guide's one-line Status and its test)
+- **Superseded by:** none
+- **Applies to:** root `CLAUDE.md`; developer guide (top, section 9); `checkpoint` skill (step 3);
+  `design-change` skill; `tests/support/docs.py`, `test_docs_consistency.py`
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro, simplicity finding Y5, owner's version)
+
+### DL-316: The git guard's trial moves to Slice 3's polish group
+- **Date:** 2026-11-09
+- **Decision:** S2-C0a's finding 1 (replace the git guard with Claude Code permission rules and a
+  hook refusing commits on `main`) is decided after its trial, run as S3-C0b. The trial covers a
+  forbidden command inside a compound one and redirects into `.git/` or git config (DL-24). The
+  guard stays as it is until then.
+- **Supersedes:** DL-171 in part (finding 1 decided at Slice 2's retro)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0b)
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro)
+
+### DL-317: One list of agents, skills, and hooks
+- **Date:** 2026-11-09
+- **Decision:** Developer guide section 11 is the one full list of agents, skills, and hooks, with
+  its docs consistency test. The build plan's "Claude configuration" points to it and keeps only
+  the order the reviewers run in; its test is removed. The root `CLAUDE.md` keeps its
+  when-to-use rules, not a catalogue. `frontend/CLAUDE.md`'s layout names folder purposes, not
+  file names.
+- **Supersedes:** DL-171 in part (finding 3 decided at Slice 2's retro)
+- **Superseded by:** none
+- **Applies to:** build plan ("Claude configuration"); developer guide section 11; root and
+  `frontend/CLAUDE.md`; `test_docs_consistency.py`
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro, S2-C0a finding 3, with the `CLAUDE.md`
+  adjustment)
+
+### DL-318: `repo-auditor` drops its lean category
+- **Date:** 2026-11-09
+- **Decision:** `repo-auditor` no longer reports lean findings; dead code, duplicates, and
+  unneeded config are `simplicity-auditor`'s alone, and the overlap rule goes. In Slice 2 its two
+  lean findings (A2, A3) were the kind `simplicity-auditor` reports.
+- **Supersedes:** DL-41 in part (the lean category); DL-166
+- **Superseded by:** none
+- **Applies to:** `.claude/agents/repo-auditor.md`, `.claude/agents/simplicity-auditor.md`;
+  build plan ("Verification")
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro, DL-166's re-evaluation)
+
+### DL-319: A row or inline action's control is its own retry
+- **Date:** 2026-11-09
+- **Decision:** A row or inline action whose control stays in place beside its alert (a favorite
+  star, Restore, Sign out other sessions) shows UI-FRM-7's network alert without Retry: pressing
+  the control again is the retry. A control that leaves or changes when its action fails keeps
+  Retry.
+- **Supersedes:** UI-FRM-7 in part (Retry on every network failure)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-7; tech debt (TD-99)
+- **Source:** owner, Nov 8–9, 2026 (S2-C22 tech-debt review; wording at the Slice 2 retro)
+
+### DL-320: The manual pass's sheet is set up by one command and written as actions
+- **Date:** 2026-11-09
+- **Decision:** From Slice 3, the owner's manual pass needs one setup command (a demo seed that
+  creates every state the pass needs, built in S3-C0c), lists each screen's checks as concrete
+  actions with what should happen, states the general checks once for the whole pass, and uses
+  plain language, with no checkpoint IDs or rule numbers.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** ui-design-guide Appendix A; testing strategy ("Accessibility"); build plan
+  (S3-C0c)
+- **Source:** owner, Nov 9, 2026 (Slice 2 retro; the S2-C22 sheet's setup, grid, and wording)
+
+### DL-321: The item side panel is a split pane at wide widths
+- **Date:** 2026-11-09
+- **Decision:** At 64rem and wider, an item opened from a list opens in a panel region beside the
+  list, which stays fully usable (scroll, select, expand, open another item); `ItemPanel` stops
+  being a `showModal()` dialog there. Below 64rem it keeps today's modal overlay (inert page,
+  focus kept in the panel, Esc closes). Shared, so tasks inherit it. Built in S3-C0d.
+- **Supersedes:** DL-202 and DL-262 in part (the panel over the list)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0d); ui-design-guide UI-SHL-11 (from S3-C0d)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 1)
+
+### DL-322: The split pane is resizable
+- **Date:** 2026-11-09
+- **Decision:** The panel is 560px wide by default, 400 to 800px. A vertical separator between the
+  list and the panel drags to resize and is keyboard operable (`role="separator"`,
+  `aria-orientation="vertical"`, `aria-valuenow/min/max`, an accessible name, arrow keys). The
+  width is remembered per viewer in `localStorage`, in try/catch, falling back to the default.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0d)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 2)
+
+### DL-323: Swapping items in the panel, and unsaved edits
+- **Date:** 2026-11-09
+- **Decision:** Selecting another item's ID while the panel is open swaps its content and updates
+  `?open=`. With unsaved edits, swapping, Close, Back, or Open full page first asks **Discard your
+  changes?**, the body naming the item being left and what's about to happen, with **Keep
+  editing** (initial focus) and **Discard changes** (danger). Esc still doesn't close the panel
+  while editing.
+- **Supersedes:** S2-C18b's "closes it and drops what you typed" (TD-92)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0d); tech debt (TD-92)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 3)
+
+### DL-324: The split pane's focus and landmarks
+- **Date:** 2026-11-09
+- **Decision:** Opening the panel moves focus to its title; focus isn't trapped at wide widths.
+  Esc closes it when focus is inside and it isn't editing; Close returns focus to the ID that
+  opened it, falling back as today. The panel is a labelled complementary region ("Requirement
+  PORTAL-RQ-3"). The open item's row is marked by more than color: the selected background, a bold
+  title, and an "Open" label with a panel icon.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0d)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 4)
+
+### DL-325: The panel's header
+- **Date:** 2026-11-09
+- **Decision:** A top row with the item's ID (mono) and status badge on the left and three icon
+  buttons on the right (**Open full page**, **Copy link**, **Close**, each with an accessible name
+  and a tooltip); then the title, the panel's heading; then the actions: **Edit**, **Change
+  status** (menu), and a **⋯ More actions** menu holding **Change restriction…** and, after a
+  separator, **Delete…** in the danger color, hidden (not disabled) when empty. Copy link keeps
+  its live-region message. Below, Priority, Reporter, Parent (its ID linked, then its title), and
+  Restriction as a two-column definition list. The actions stay in the header, not at the bottom
+  (the owner, over `S2-ui-feedback.md`).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0d)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 5)
+
+### DL-326: The requirement's full page matches the panel's header
+- **Date:** 2026-11-09
+- **Decision:** The full page uses the same action set beside its `h1` (Edit, Change status, ⋯),
+  with the ID and status badge under the `h1`, and the same definition list.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0d)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 6)
+
+### DL-327: A breadcrumb trail on every page but the top-level ones
+- **Date:** 2026-11-09
+- **Decision:** PrimeVue's `Breadcrumb`, themed through the preset, in one component above the
+  page's `h1`. Inside an org the trail starts at the org (Org › Project › Section › Item); outside
+  one, at its area (`Workspace › Users`, `Documentation › Requirements`). My work, Account
+  settings, and any page with nothing above it show none. Items appear by ID (mono), with a
+  nested requirement's ancestors. Every crumb but the last is a link; the last is plain text with
+  `aria-current="page"`. In `nav aria-label="Breadcrumb"` with an `ol` and decorative chevrons;
+  the org crumb has a building icon. Under 40rem the middle crumbs fold into a "…" menu button
+  ("Show N more levels"), keeping the first and last. 14px (`--text-xs`): links in
+  `--color-text-muted`, `--color-text` and underlined on hover and focus; the current crumb in
+  `--color-text`. Replaces the single "Requirements" back links.
+- **Supersedes:** the requirement pages' single back links
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0e); ui-design-guide (a new UI-SHL rule, from S3-C0e)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 7)
+
+### DL-328: The requirement read carries its ancestors
+- **Date:** 2026-11-09
+- **Decision:** The requirement read gains `ancestors` (root first, each with `number`), so the
+  trail doesn't walk the tree client-side, unless something existing already serves it (checked
+  in S3-C0e). If a live requirement can have a parent in the Trash, that ancestor's ID shows
+  unlinked.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0e)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 8)
+
+### DL-329: My work groups projects by organization
+- **Date:** 2026-11-09
+- **Decision:** Below Favorites, each org the user can see projects in gets its own full-width
+  section, stacked: its name as an `h2`, its project count ("9 projects"), and an **All projects**
+  link to its project list. Someone with projects in one org only sees no org headers.
+- **Supersedes:** DL-302 in part (one Projects section)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 9)
+
+### DL-330: My work's project order, and hidden projects
+- **Date:** 2026-11-09
+- **Decision:** Within each org: Active, Planning, On hold, then by name. Completed, Cancelled,
+  and Archived projects sit behind a per-org **Show N hidden projects** / **Hide N hidden
+  projects** toggle (`aria-expanded`), in the same order. Archived projects come onto My work's
+  project list; their items stay off My work. Archived rows have no star; completed and cancelled
+  rows keep theirs.
+- **Supersedes:** "archived projects are left out" of My work's projects (design-doc §11)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 10)
+
+### DL-331: My work lists every project
+- **Date:** 2026-11-09
+- **Decision:** No 10-project cap: My work lists every project the user can open, with a high
+  safety cap (about 500) and a note if it's reached, as the list conventions do, and per-org
+  totals. "Showing 10 of N; each organization's list has the rest" goes.
+- **Supersedes:** design-doc §11's first-10 Projects section
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 11)
+
+### DL-332: Favorites stay one cross-org section
+- **Date:** 2026-11-09
+- **Decision:** Favorites stay a flat, cross-org section at the top of the project lists, by name:
+  the only list that shows each row's org. Favorites also appear in their org's section; archived
+  projects stay out of Favorites.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0f)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 12)
+
+### DL-333: Approvals first on My work; past decisions removed
+- **Date:** 2026-11-09
+- **Decision:** **Approvals waiting for you** moves to the top of My work, above Favorites; with
+  none, one line: "Nothing to decide. Approval requests that name you will appear here." **My past
+  decisions** is removed from My work, with its API section and endpoint (the owner's amendment to
+  the handoff, which kept it as a link at the bottom).
+- **Supersedes:** DL-286; DL-302 in part (Favorites first)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 13, amended in the
+  Claude Code session the same day)
+
+### DL-334: My work's rows are compact
+- **Date:** 2026-11-09
+- **Decision:** About 44px rows replace the bordered cards: star, name (link) with key (mono,
+  muted), your access (muted; "Admin (inherited)" as today), and the status badge; Favorites adds
+  an org column. One bordered list per section, with row hover. The star's focus after a change
+  stays as it is.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0f)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 14)
+
+### DL-335: A reader's guide and a behavior reference
+- **Date:** 2026-11-09
+- **Decision:** `docs/user-guide.md` becomes `docs/behavior-reference.md` (moved with history,
+  still exhaustive, never shown in the app); the reader's guide is one markdown file per page under
+  `docs/user-guide/`. The reference is updated whenever behavior changes; the guide only when
+  something a user does or sees changes or is added. The rule goes into the `checkpoint` and
+  `design-change` skills, the `CLAUDE.md` files, and `docs-consistency` in S3-C0g, with every
+  pointer to `docs/user-guide.md`.
+- **Supersedes:** DL-308 in part (the one bundled file)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 15)
+
+### DL-336: `user-guide-verifier` checks the reference and the guide
+- **Date:** 2026-11-09
+- **Decision:** It follows `docs/behavior-reference.md` literally in the browser, as today, and
+  checks the guide at a higher level: every statement true and consistent with the reference;
+  each page's tasks mapped to reference sections; no route paths, exact error strings, or numeric
+  limits; every image present, with meaningful alt text.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g, slice verification from Slice 3); testing strategy
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 16)
+
+### DL-337: The guide's pages and groups
+- **Date:** 2026-11-09
+- **Decision:** Each page has front matter (`title`, `group`, `order`, `description`). Groups:
+  **Get started** (Welcome to Waterline); **Using Waterline** (My work, Projects, Requirements,
+  Approvals, Members and roles, Trash, Your account); **Administration** (Workspace,
+  Organizations, System status; visible to everyone, "For workspace and organization owners and
+  admins."); **Reference** (Keyboard and accessibility, where shortcuts and focus details move).
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 17)
+
+### DL-338: Documentation's routes and sidebar
+- **Date:** 2026-11-09
+- **Decision:** `/docs` is the landing page and `/docs/:slug` an article, anchors as
+  `/docs/requirements#create`. On a docs route the sidebar shows My work, then Documentation (the
+  landing page), then the groups and pages, the current one marked, as admin pages do (UI-SHL-5).
+  `docs` stays reserved (DL-309); old `/docs#docs-…` links may land on the landing page.
+- **Supersedes:** DL-311 in part (the hash anchors)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g); ui-design-guide UI-SHL-5, UI-SHL-6 (from S3-C0g)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 18)
+
+### DL-339: Documentation's landing page
+- **Date:** 2026-11-09
+- **Decision:** An `h1` "Documentation" with a one-line intro ("How to plan, track, and sign off
+  on your projects in Waterline."); a **Start here** row of three larger cards with icons (Welcome
+  to Waterline, Set up a project, Review and approve); then a card grid per group (title and the
+  front matter's description, the whole card a link; `auto-fill`, `minmax(260px, 1fr)`).
+- **Supersedes:** DL-310 in part (the guide's own `#` as the page's `h1`)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 19)
+
+### DL-340: Documentation's article page
+- **Date:** 2026-11-09
+- **Decision:** At the top, the breadcrumb (`Documentation › <page>`), a small group label above
+  the `h1`, the `h1`, and a lead paragraph in larger muted text. The body has task-named `##`
+  sections, prose up to about 68ch, a "Who can do this" table where permissions matter, and
+  Previous / Next links in nav order. An **On this page** nav (`aria-label="On this page"`) lists
+  the `##` sections and marks the one being read (`aria-current="location"`, on scroll), sticky on
+  wide screens and below the content on narrow ones; hash links still move focus (UI-SHL-9).
+- **Supersedes:** DL-311 in part (the Contents list)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 20)
+
+### DL-341: A docs mode for MarkdownView
+- **Date:** 2026-11-09
+- **Decision:** A docs mode on `MarkdownView` (or a thin docs wrapper); user content renders as
+  today and raw HTML stays off. Docs mode adds callouts (`> [!TIP]`, `> [!NOTE]`, `> [!WARNING]`,
+  as info, warning, and danger tone boxes with an icon and a bold label), keys (`++Right arrow++`
+  as `<kbd>`), heading anchors, and local images bundled through Vite from
+  `docs/user-guide/images/`. Remote images stay links everywhere, and user content never renders
+  an image; the CSP's `img-src` is checked for bundled images.
+- **Supersedes:** UI-MD-1 in part (no images), for the bundled guide only
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g); ui-design-guide UI-MD (from S3-C0g)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 21)
+
+### DL-342: The guide is rewritten for readers
+- **Date:** 2026-11-09
+- **Decision:** Task-oriented, about 300 to 600 words a page and 2,000 to 2,500 in all, leaving
+  out what the screen already says (route paths, exact messages, edge limits, focus mechanics; the
+  reference keeps them), callouts used sparingly, in the handoff's Requirements sample's tone.
+  Docs-only search is deferred (TD-104); Slice 6's site-wide search covers the docs.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0g); tech debt (TD-104)
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 22)
+
+### DL-343: The guide's screenshots are generated
+- **Date:** 2026-11-09
+- **Decision:** A `wl docs-screenshots` command starts the e2e stack, runs `seed --demo`, and
+  drives Playwright through a short list of named shots, saved in light and dark as WebP in
+  `docs/user-guide/images/` (`requirement-panel.webp`, `requirement-panel-dark.webp`). The guide
+  references the light file; docs mode shows the `-dark` sibling in the dark theme. Every image
+  has alt text saying what it shows; nothing outside the demo data appears. Regenerated at slice
+  verification and when a UI change affects a shot; about one per page. Built in S3-C0h, after
+  S3-C0g, whose docs mode and images folder it needs.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0h; slice verification from Slice 3); testing strategy
+- **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 23)

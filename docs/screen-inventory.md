@@ -604,8 +604,8 @@ and fills the gaps.
 
 ## Step 6 — Consolidated inventory (done Oct 27, 2026)
 
-Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch as of Oct 26,
-2026. Routes for screens not yet built are proposals that each slice's planning confirms.
+Every v1 screen, with its type, route, and slice. **Built** = committed on its slice's branch; the column is kept current with each
+checkpoint. Routes for screens not yet built are proposals that each slice's planning confirms.
 `…/:key` below stands for `/:orgSlug/projects/:key`.
 
 ### Layout patterns (decided Oct 27, 2026)
@@ -614,7 +614,8 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
   a **side panel** over the list, so the list keeps its place, with **Open full page**. The
   panel has its own URL (the list's route with the item open, e.g. `?open=TA-45`), so Back
   closes it and the address can be shared. A direct link to an item, and **Copy link**, use
-  the **full-page** route.
+  the **full-page** route. From S3-C0d, a split pane beside the list at wide widths
+  (DL-321 to DL-326).
 - **Creating an item:** a **dialog** with the essential fields, which the user can **expand
   into a full page** (typed values kept). After creating, the user lands on the new item to
   fill in the rest.
@@ -633,13 +634,13 @@ Every v1 screen, with its type, route, and slice. **Built** = on the `s2` branch
 | Change temporary password | page (auth layout) | `/account/change-password` | 1 | Built |
 | Account settings (profile, appearance) | page | `/account` | 1 | Built |
 | Change password | page | `/account/password` | 1 | Built |
-| Active sessions, sign out others | section of Account settings | `/account` | 2 (S2-C21b, DL-238) | — |
+| Active sessions, sign out others | section of Account settings | `/account` | 2 (S2-C21b, DL-238) | Built |
 | GitHub account link / unlink | section of Account settings | `/account` | 7 | — |
 | Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (DL-239) | — |
 | No access | page | `/account/no-access` | 1 | Built |
-| My work | page | `/` | 1, sections in 2, 3, 5 | Projects, approvals, past decisions built |
-| Favorite projects | section of My work, first; star on My work's project rows (DL-302, DL-305) | `/` | 2 (S2-C21c, DL-238) | — |
-| Documentation (user guide) | page, from the user menu; the guide's title, a Contents list, then the guide (DL-310, DL-311) | `/docs` | 2 (S2-C21d, DL-238) | — |
+| My work | page | `/` | 1, sections in 2, 3, 5 | Projects, approvals, past decisions built; grouped by organization, past decisions removed, in S3-C0f (DL-329 to DL-334) |
+| Favorite projects | section of My work, first; star on My work's project rows (DL-302, DL-305) | `/` | 2 (S2-C21c, DL-238) | Built |
+| Documentation (user guide) | page, from the user menu; the guide's title, a Contents list, then the guide (DL-310, DL-311); a landing page and articles from S3-C0g (DL-335 to DL-342) | `/docs` | 2 (S2-C21d, DL-238) | Built |
 | Search results | page, from the header search bar | `/search` | 6 | — |
 | System status | page, no sign-in | `/status` | 0 | Built |
 | Page not found (404) / Forbidden (403) | page in the shell | any | 1 | Built |

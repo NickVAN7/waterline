@@ -5,23 +5,19 @@ Pinia, Vitest + Vue Test Utils, Playwright (from Slice 1).
 
 ## Layout
 
-- `src/api/` — `schema.d.ts` (generated) and `client.ts`: the configured `openapi-fetch`
-  `client`, `api()`, and `ApiError`
-- `src/app/` — `createApp.ts` (the app the tests and `main.ts` both build), layouts (`AppLayout`
-  is the shell), router, route focus, the session hook, `labels.ts` (display labels); the shell's
-  parts in `src/app/shell/`; route guards in `src/app/guards/`
-- `src/app/styles/` (`tokens.css`, `base.css`), `src/app/theme/` (`preset.ts`, and, once a board
-  or grid ships, `svar-theme.css`)
+Folder purposes only; each file says what it holds (DL-317).
+
+- `src/api/` — the generated schema and the configured API client (`api()`, `ApiError`)
+- `src/app/` — the app's setup, the shell, the router and its guards, route focus, the session
+  hook, and display labels; styles and tokens in `src/app/styles/`, the PrimeVue preset (and,
+  once a board or grid ships, the SVAR theme) in `src/app/theme/`
 - `src/components/` — shared UI components
 - `src/composables/` — shared logic (auth state, permissions, forms)
 - `src/stores/` — Pinia stores (current user, current org)
 - `src/views/<area>/` — screens, grouped by the same area names as the backend, singular
   (`project/`, `task/`, …); `status/` and `errors/` aren't backend areas
-- `src/test/` — shared test helpers: `a11y.ts` (`expectNoA11yViolations`), `api.ts` (typed
-  responses), `projects.ts`, `overlay.ts` (`stubResizeObserver`, `stubDialog`), `router.ts`,
-  `workspace.ts` (`mountWorkspaceView`, `mountSignedIn`), `org.ts` (`mountOrgView`, `mountOrgPages`)
-- `e2e/` — Playwright tests; `e2e/support/` holds their helpers (`a11y.ts`: axe and
-  `expectFocusNotObscured`; `demo.ts`: the demo users)
+- `src/test/` — shared test helpers (axe, typed responses, mounting, overlay stubs)
+- `e2e/` — Playwright tests; `e2e/support/` holds their helpers
 
 ## Rules
 

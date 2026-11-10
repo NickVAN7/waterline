@@ -4,7 +4,7 @@ How to set up a workstation, run the project, and add to it. Kept current at eve
 if a step here is wrong, fixing it is part of the work. The *why* behind the rules lives in
 `design-doc.md` and `build-plan.md`; this guide is the *how*.
 
-> **Status:** S2-C22 (Slice verification) built; next is Slice 2's retro, then Slice 3 (`docs/reviews/`).
+Where the project stands is the root `CLAUDE.md`'s **Status** (DL-315).
 
 ## 1. Workstation setup
 
@@ -1198,12 +1198,11 @@ database. They check:
 | Model tables documented | a model table has no ``### `<table>` `` section in `schema-doc.md`, or is listed under "Deferred tables" |
 | Columns and enum values | a model's columns, or an enum column's values, differ from its schema-doc field table. The column check runs per column (`table.column`). A documented column whose Notes cell starts with `Added in Slice <n>.` is **skipped** (`added in Slice <n> (schema-doc)`) until slice `<n>` is finished (its last checkpoint, or a later slice's, has a `checkpoint(<ID>):` commit), and required from then on; a malformed marker is a `DocsStructureError`. A model column with no documented row always fails |
 | One owner per table | a schema-doc table isn't in exactly one "Owns (tables)" cell of the build plan's feature map, or the map names a table schema-doc lacks |
-| Tech-debt log | an entry lacks Added/What/Why/Fix by/Status, numbers aren't 1..n, a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
+| Tech-debt log | an open entry lacks Added/What/Why/Fix by/Status; a resolved entry isn't under **Resolved**, or has more than Added and Status (DL-313); the numbers aren't 1..n, each once, ascending in each section; a `TD-<n>` reference (in `docs/` outside `docs/reviews/`, the `CLAUDE.md` files, or `.claude/`) has no entry, or an open entry's Fix by is already past |
 | Decision log | an entry lacks Date/Decision/Supersedes/Superseded by/Applies to/Source, numbers aren't 1..n, a Superseded by is neither `none` nor another entry (`DL-<n>`), or a `DL-<n>` reference (same files as TD references) has no entry |
 | Audit allowlist | an `audit-allowlist.toml` entry names a tech-debt entry that doesn't exist or is resolved |
-| Status line | this guide's Status line names neither the latest `checkpoint(<ID>):` commit nor the one after it. "After" is the next row of the slice's build-plan "### Checkpoints" table, whose `#` column may hold an inserted checkpoint (`13a`, ID `S1-C13a`); a malformed ID or `#` cell, or rows out of order, is a `DocsStructureError` |
 | § references | a `§N` / `§N.M` (same files as TD references) isn't a numbered heading in `design-doc.md`; `§` means a design-doc section, so refer to this guide's sections as "section N". The exceptions: `guide §N` (or `ui-design-guide §N`) names a section of `docs/ui-design-guide.md`; in that guide a bare `§N` is its own section; in `.claude/agents/ui-reviewer.md` a bare `§N` is its own section or the guide's; and in both, `design-doc §N` still means the design doc |
-| Claude configuration | the agents and skills in `.claude/` differ from those listed in the build plan's "Claude configuration" or section 11 below |
+| Claude configuration | the agents and skills in `.claude/` differ from those listed in section 11 below, the one list (DL-317) |
 | Token contrast | `docs/ui/check_contrast.py` fails on `frontend/src/app/styles/tokens.css`: a pair below its §3.1 minimum in either theme (ui-design-guide UI-TOK-3, TD-61) |
 | Review records | from Slice 2 on (DL-138, DL-165): the latest `checkpoint(<ID>):` commit has no `docs/reviews/s<n>/<ID>.md`; a slice has an `S<n>-C1` record but no `S<n>-C0` or `S<n>-C0a` record; or the record of the slice's last row has no `## simplicity-auditor` heading |
 
@@ -1211,8 +1210,9 @@ Fixing a failure: the message names both files and the mismatch. Update whicheve
 wrong (usually the doc); when the right answer is a design question, ask the owner. A
 `DocsStructureError` means a doc no longer has the structure the parser expects (a heading,
 table header, or field line); restore the structure, or update the parser in the same commit.
-Never skip or weaken a check to get green. The status and overdue checks need full git history
-(a shallow clone fails with a message saying so).
+Never skip or weaken a check to get green. The overdue Fix-by check, the `Added in Slice <n>.`
+column check, and the review-records check need full git history (a shallow clone fails with a
+message saying so).
 
 ## 10. Git workflow
 
@@ -1258,7 +1258,8 @@ Never skip or weaken a check to get green. The status and overdue checks need fu
 
 ## 11. Claude Code configuration
 
-The repository's Claude Code setup lives in `.claude/` and is version-controlled.
+The repository's Claude Code setup lives in `.claude/` and is version-controlled. This section is
+its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when to use each.
 
 - **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
   `design-change`, `vue-screen` (the recipe for a screen or dialog).
@@ -1274,7 +1275,8 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   `frontend/e2e/` (read-only: accessibility and frontend conventions against
   `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`,
   `user-guide-verifier` (the user guide followed in a browser, DL-124), `docs-consistency`, and
-  `repo-auditor` (a whole-repository audit that runs no tests, DL-41), then
+  `repo-auditor` (a whole-repository audit for bugs, security, scale, untested risk, and
+  slowness, which runs no tests, DL-41; waste is `simplicity-auditor`'s alone, DL-318), then
   `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored
   in `.claude/audit/`, whose findings go to the owner, DL-138) at the last checkpoint of a
   slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
@@ -1283,8 +1285,10 @@ The repository's Claude Code setup lives in `.claude/` and is version-controlled
   committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
   decisions for the owner, which are never decided for them.
 - **Design changes** outside a checkpoint's scope (decisions from a chat session, or code that
-  must differ from the docs) use the `design-change` skill: one decision-log entry per decision
-  (`docs/decision-log.md`), every affected doc updated, `docs-consistency`, then a `docs:`
+  must differ from the docs) use the `design-change` skill: a decision-log entry (`docs/decision-log.md`) for each
+  decision that changes or supersedes a written rule or sets a process, while one that only adds
+  detail to an unbuilt checkpoint goes into that doc and is named in the change's review record
+  (DL-312); every affected doc updated, `docs-consistency`, then a `docs:`
   commit. A change to code already built becomes a new checkpoint with a letter suffix
   (`S1-C13a`); checkpoints are never renumbered. Review answers that change built code are
   bundled into the next planned checkpoint, or one follow-up per group (DL-131). Developer-tooling and process code (hooks, the

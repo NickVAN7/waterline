@@ -111,7 +111,9 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
 7. **Migrations:** match the schema doc; downgrade works; no edits to committed migrations.
 8. **Documentation:** `docs/developer-guide.md` and `docs/user-guide.md` accurately describe
    what was built; design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`
-   entries have a reason and target.
+   entries have a reason and target, and a resolved one is moved under **Resolved**, shrunk to
+   its heading, Added, and Status (DL-313); the root `CLAUDE.md`'s **Status** names this
+   checkpoint and the next one (DL-315).
 9. **Generated files:** not hand-edited; regenerated if the API changed.
 10. **Lean** (DL-38): code that shouldn't exist or should be smaller. Dead code, and options,
     flags, or config nothing uses (grep the whole tree first); a helper the repo already has,

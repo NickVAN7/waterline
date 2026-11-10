@@ -120,9 +120,9 @@ tested, what each kind of test is for, and the gates every change passes.
 - **Docs consistency** (`backend/tests/unit/docs/`, no database): the docs agree with the code and
   each other. Models vs. schema doc (tables, columns, enum values); exactly one feature-map owner
   per table; the tech-debt log's format, references, and deadlines; the decision log's format and
-  references; every `audit-allowlist.toml` entry names an open tech-debt entry; the developer
-  guide's status line vs. `git log`; design-doc § references; token contrast (UI-TOK-3, TD-61); the agents and skills listed vs. those
-  in `.claude/`; from Slice 2 on, the review records (the latest checkpoint's record exists, a C0
+  references; every `audit-allowlist.toml` entry names an open tech-debt entry; design-doc §
+  references; token contrast (UI-TOK-3, TD-61); the agents and skills the developer guide lists
+  vs. those in `.claude/`; from Slice 2 on, the review records (the latest checkpoint's record exists, a C0
   or C0a record before C1, and a `## simplicity-auditor` heading in the slice's last record;
   DL-138, DL-165). Parsers are strict: a doc that loses the structure they expect fails the test
   instead of passing by finding nothing. The column check runs per column: a documented column whose
@@ -150,7 +150,9 @@ tested, what each kind of test is for, and the gates every change passes.
     `RequirementsTree`'s keyboard and move specs are component specs, and its theme audit runs
     end to end with the requirements page from S2-C17, DL-243);
   - a manual keyboard and screen-reader pass on each slice's new screens at slice
-    verification, since automated checks find only part of the problems.
+    verification, since automated checks find only part of the problems; from Slice 3 its
+    sheet is set up by one command and written as concrete actions in plain language
+    (ui-design-guide Appendix A, DL-320).
 - **Migrations** (`tests/integration/test_migrations.py`, each on a scratch database):
   - Every migration upgrades from an empty database to head.
   - Every migration downgrades one step and upgrades again (round-trip).
@@ -318,6 +320,10 @@ saying why.
   git history. Any known vulnerability fails; an advisory is ignored only through an
   `audit-allowlist.toml` entry with a reason and an open tech-debt entry whose Fix by is the
   deadline. A red audit is fixed before any checkpoint starts (`chore(deps):` commit).
+- **Slice verification, from Slice 3:** `wl docs-screenshots` regenerates the guide's
+  screenshots, in light and dark (also whenever a UI change affects one; DL-343), and
+  `user-guide-verifier` checks in two parts: the behavior reference followed literally in a
+  browser, and the reader's guide checked against it (DL-336). Both arrive in S3-C0g and S3-C0h.
 - **Pull requests:** each slice works on one branch with one draft PR, and CI runs on every
   push; a checkpoint goes to the owner only with green CI, and the slice's PR merges to `main`
   (a merge commit) only with green CI (build-plan, "Pull requests"). GitHub enforces it: the

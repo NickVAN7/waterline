@@ -35,8 +35,7 @@ The review ID (e.g. `S2-C22`), the commit or snapshot directory to audit, and, a
   (router, service, repository; the import-linter contracts), even where a layer only passes a
   call through; an open tech-debt entry; a rule in the design docs. If you think a recorded
   decision is wrong, report it in the **conflicts with DL-n** category, for the owner.
-- **Bugs, security, and scale are `repo-auditor`'s.** A finding both of you would report is
-  reported once, by `repo-auditor`: leave it out.
+- **Bugs, security, and scale are `repo-auditor`'s**; waste is yours alone (DL-318).
 - **Every finding has evidence:** the paths and lines, what a reader or maintainer pays for it
   now, and a concrete smaller version. Before calling anything unused, grep the whole tree:
   tests, fixtures, config, docs, and string or dynamic references. No evidence, no finding. No

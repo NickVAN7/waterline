@@ -29,9 +29,10 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
 
 ## 3. Update the docs
 
+- The root `CLAUDE.md`'s **Status**: one line, this checkpoint and the next one; what was built
+  goes in the commit and the review record, not there (DL-315).
 - `docs/developer-guide.md`: anything a developer now needs (setup steps, commands, conventions,
-  how-tos, troubleshooting). Its Status stays one line, the checkpoint and the next one; what was
-  built goes in the commit and the review record, not there (DL-170).
+  how-tos, troubleshooting).
 - `docs/user-guide.md`: any user-visible behavior.
 - `docs/design-doc.md`, `docs/schema-doc.md`, `docs/build-plan.md`: any drift between the docs
   and what was built (approved changes only; unapproved divergence goes back to the owner).
@@ -46,7 +47,10 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   - **Status:** open | resolved in <checkpoint ID>
   ```
 
-  Mark resolved entries as resolved rather than deleting them.
+  New entries go at the end of the open entries, before **Resolved**. A resolved entry moves
+  under **Resolved**, in number order, shrunk to its heading, Added, and Status (`resolved in
+  <checkpoint ID>` and how); its full text stays in git history and this review record
+  (DL-313).
 
 ## 4. Independent review
 
@@ -259,8 +263,9 @@ Send the owner:
   the owner, which skills and agents never triggered, the verdict of any process trial, and the
   `repo-auditor` findings left for the owner (with the design changes they propose), and every
   `simplicity-auditor` finding for the owner to decide.
-  The owner decides what changes; each change gets a decision-log entry and is applied on the
-  slice branch before the merge (DL-19);
+  The owner decides what changes; each change that changes or supersedes a written rule, or
+  sets a process, gets a decision-log entry (DL-312), and each is applied on the slice branch
+  before the merge (DL-19);
 - what the next checkpoint will cover.
 
 Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.

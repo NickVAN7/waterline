@@ -462,7 +462,8 @@ render inside the full shell when signed in.
   the project selector and project pages (DL-137; from S2-C0f). An item shows only when
   `allowed_actions` allows it. Text is always visible; icons only supplement it. Below 48 rem
   the sidebar becomes a "Menu" disclosure button in the header (`aria-expanded`,
-  `aria-controls`); nothing depends on hover.
+  `aria-controls`); nothing depends on hover. From S3-C0g, a docs route's sidebar shows My work,
+  Documentation, and the guide's groups and pages, the current one marked (DL-338).
 - **UI-SHL-6** **Project selector and project pages.** The selector is a menu button showing the
   current project that opens a disclosure popover of **links** (not a Select or listbox),
   headed by the current org's name (it lists that org's projects only), with a filter field past
@@ -520,7 +521,9 @@ render inside the full shell when signed in.
   page** (DL-202). The panel has its own URL, the list's route with the item open (e.g.
   `?open=TA-45`), so Back closes it and the address can be shared. A direct link to an item, and
   **Copy link**, use the full-page route. For requirements, the tree's ID opens it at
-  `…/requirements?open=RQ-<n>` (DL-262).
+  `…/requirements?open=RQ-<n>` (DL-262). From S3-C0d, at 64rem and wider the panel is a
+  resizable split pane beside a list that stays usable, and below it this overlay; its header,
+  swapping, unsaved edits, and focus are DL-321 to DL-326, and this rule is rewritten then.
 - **UI-SHL-12** **Creating an item** is a dialog with the essential fields that the user can
   **expand into a full page**, keeping what they typed; after creating, they land on the new
   item to fill in the rest (DL-202). For requirements, **Open as a full page** carries what was
@@ -530,6 +533,8 @@ render inside the full shell when signed in.
   off) is an explanatory page inside the project, not a 404: "The Sprints module is turned off
   for this project. Contact your administrator for questions.", with the module's name. A module
   that hasn't shipped has no page at all (DL-200).
+- **Breadcrumbs** (from S3-C0e, DL-327, DL-328): a trail above the `h1` on every page but the
+  top-level ones, replacing the single back links; it becomes a numbered UI-SHL rule then.
 
 ---
 
@@ -585,7 +590,10 @@ render inside the full shell when signed in.
   a Retry button; anything else, a generic message with no codes or stack details. The alert has
   a dismiss X; the form stays usable. Retry first moves focus to the control whose action failed,
   which shows its pending state, then repeats the action, so focus never falls to the page while
-  the alert is replaced; dismissing returns focus as UI-FBK-13 says (DL-93).
+  the alert is replaced; dismissing returns focus as UI-FBK-13 says (DL-93). A **row or inline
+  action** whose control stays in place beside its alert (a favorite star, Restore, Sign out
+  other sessions) shows the same alert without Retry: pressing the control again is the retry.
+  A control that leaves or changes when its action fails keeps Retry (DL-319).
 - **UI-FRM-8** **Pending state:** the submit button stays enabled in the DOM with
   `aria-disabled="true"` (a real `disabled` would drop focus), keeps its normal colors (UI-TOK-10),
   its label changes to "Saving…" with a small inline spinner, its width is fixed so nothing
@@ -1045,6 +1053,8 @@ the revision compare in S2-C19a (DL-267).
   look the tokens can't reach (DL-258). A component test runs a corpus of known XSS
   payloads (the OWASP cheat sheet's) through it, and an end-to-end test (S2-C18, DL-245) proves a
   stored payload doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
+  From S3-C0g, a docs mode for the bundled guide only adds callouts, keys, and local images
+  (DL-341); user content renders as now.
 - **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
   **Preview** tabs (a tablist), previewing with `MarkdownView` (DL-141). No WYSIWYG editor; a
   toolbar may come later if usability calls for it. Hints (such as a template's) sit beside the
@@ -1147,6 +1157,12 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 ---
 
 ## Appendix A — Manual keyboard and screen-reader pass
+
+**The owner's sheet** (from Slice 3, DL-320): one setup command creates every state the pass
+needs (the demo seed, S3-C0c); the checks below are stated once, for the whole pass; each
+screen's own checks are concrete actions with what should happen ("On My work, press Tab from
+the header: focus goes to the first project's star, then its name"); and it's in plain
+language, with no checkpoint IDs or rule numbers.
 
 For each new screen at slice verification, in light and dark:
 
