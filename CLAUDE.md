@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0b (The git guard's trial) set up, the owner's run and its `design-change` to follow; next:
-S3-C0c (The manual pass's setup command).
+S3-C0b (The git guard's trial) run; its decision held to the end of S3-C0x; next: S3-C0c (The
+manual pass's setup command).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
@@ -136,7 +136,9 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   variables, or `$(...)`); use `git -C <path>` for another directory and
   `git commit -F - <<'EOF'` for a commit message. Commits and pushes to `main`, history
   rewrites, and skipped hooks are blocked; merging a PR asks the owner. Anything the allow-list
-  doesn't cover, ask the owner to run. When a hook blocks you, do what its message says. Never
+  doesn't cover, ask the owner to run. When a hook blocks you, do what its message says. Until
+the guard's decision at the end of S3-C0x, log every block or workaround in
+`docs/spikes/S3-C0b-guard-trial/friction-log.md`, committed with the work it happened in. Never
   work around a hook with shell commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
 
 See `backend/CLAUDE.md` and `frontend/CLAUDE.md` for the rules specific to each half.

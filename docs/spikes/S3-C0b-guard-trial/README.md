@@ -68,35 +68,35 @@ row because of it, tell it the guard is off for this trial.
 
 ## Results (the owner fills these in)
 
-Claude Code version: … · permission mode: … · date: …
+Claude Code version: 2.1.322 · permission mode: auto · date: 2026-11-10
 
 | # | Result (ran / prompted / denied / refused by the hook) | Matches expected? | Notes |
 |---|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 3a | | | |
-| 4 | | | |
-| 5 | | | |
-| 6 | | | |
-| 7 | | | |
-| 8 | | | |
-| 9 | | | |
-| 10 | | | |
-| 11 | | | |
-| 12 | | | |
-| 13 | | | |
-| 14 | | | |
-| 15 | | | |
-| 16 | | | |
-| 17 | | | |
-| 18 | | | |
-| 19 | | | |
-| 20 | | | |
-| 21 | | | |
-| 22 | | | |
-| 23 | | | |
-| 24 | | | |
+| 1 | ran | yes | |
+| 2 | refused by hook | yes | |
+| 3 | ran | no? |  was not prompted - got a message "Commits shouldn't be refused here, since that hook only blocks commit on main |
+| 3a | ran | yes? | was not prompted for anything, but it ran |
+| 4 | denied | yes | |
+| 5 | denied | yes | |
+| 6 | denied | yes | |
+| 7 | denied | yes | |
+| 8 | denied | yes | |
+| 9 | denied | yes| |
+| 10 | denied | yes | |
+| 11 | denied | yes | |
+| 12 | denied | yes | |
+| 13 | denied | yes | |
+| 14 | denied | yes | |
+| 15 | denied | yes | |
+| 16 | denied | yes | |
+| 17 | runs | yes | was prompted, chose no |
+| 18 | runs | yes | was prompted, chose no |
+| 19 | denied | ? | was denied, reason is Auto-mode classifier |
+| 20 | runs | yes? | was not prompted |
+| 21 | runs | yes? | was not prompted, but the guard didn't refuse it. |
+| 22 | runs | yes? | |
+| 23 | runs | yes | was not prompted, guard did not refuse it |
+| 24 | denied | yes | blocked by git guard hook. |
 
 **For the decision:** a row that ran where it should have been denied is a gap the replacement
 would leave. Rows 19 and 21 to 24 are expected gaps: `bash -c`, and every way to move `main` other
@@ -105,3 +105,21 @@ still refuses on the real repository). In auto mode, note whether the classifier
 `main` moved (`git log -1 --oneline main` shows "trial commit").
 Weigh those against the guard's cost: one git command per Bash call, no `cd` or `&&`, and
 `git -C` in every session.
+
+## What the clone's logs add (read by Claude after the run, 2026-11-10)
+
+- **Row 21 moved `main`:** the clone's branch log shows `main` reset onto "trial commit" by
+  `git branch -f main trial`. Rows 22 and 23 then had nothing left to move. The bare remote's
+  `main` never moved.
+- **Row 24 didn't test the trial's settings:** row 23's `git reset --hard` restored the committed
+  `.claude/settings.json`, turning the real guard back on, so the guard blocked it. Under the
+  trial's settings it would have pushed `main` to the local remote; on GitHub the ruleset refuses
+  it (DL-27). A restore of tracked files can rewrite Claude's own settings, and no `Edit` rule
+  sees it: a further gap.
+- **Rows 17 and 18 prompted** (answered No). **Rows 3, 3a, and 20 to 23 ran without a prompt**
+  in auto mode. **Row 19** was stopped only by the auto-mode classifier, not a rule.
+
+## Outcome: held (owner, 2026-11-10)
+
+The decision waits for the end of Slice 3's pre-work checkpoints (S3-C0x). Until then, every
+time the guard gets in the way of work is recorded in `friction-log.md`, as evidence for it.
