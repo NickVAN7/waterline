@@ -7,7 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0a (Project pages share their setup) done; next: S3-C0b (The git guard's trial).
+S3-C0b (The git guard's trial) set up, the owner's run and its `design-change` to follow; next:
+S3-C0c (The manual pass's setup command).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
