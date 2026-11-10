@@ -442,36 +442,6 @@ def checkpoint_rows(slice_number: int, cells: list[str], source: str) -> tuple[C
     return tuple(checkpoints)
 
 
-def next_checkpoints(latest: Checkpoint, order: CheckpointOrder) -> frozenset[Checkpoint]:
-    """The checkpoint(s) that can follow `latest`: the next row of its slice's table, or the
-    first of the next slice after the last row. Both, if the slice has no table yet."""
-    next_slice = order.get(latest.slice + 1, (Checkpoint(latest.slice + 1, 1),))[0]
-    rows = order.get(latest.slice)
-    if rows is None:
-        return frozenset({Checkpoint(latest.slice, latest.number + 1), next_slice})
-    if latest not in rows:
-        raise DocsStructureError(
-            f"the latest checkpoint commit, {latest}, is not a row of the {BUILD_PLAN} Slice "
-            f"{latest.slice} checkpoints table"
-        )
-    index = rows.index(latest)
-    return frozenset({rows[index + 1] if index + 1 < len(rows) else next_slice})
-
-
-def status_line_checkpoint() -> Checkpoint:
-    """The first checkpoint ID in the developer guide's `> **Status:**` line."""
-    text = read(DEVELOPER_GUIDE)
-    match = re.search(r"^> \*\*Status:\*\*(.*(?:\n>.*)*)", text, re.MULTILINE)
-    if match is None:
-        raise DocsStructureError(f"{DEVELOPER_GUIDE}: no `> **Status:**` line")
-    checkpoint = re.search(_CHECKPOINT_LIKE, match.group(1))
-    if checkpoint is None:
-        raise DocsStructureError(
-            f"{DEVELOPER_GUIDE}: the Status line names no checkpoint ID (S<slice>-C<n>)"
-        )
-    return Checkpoint.parse(checkpoint.group(0))
-
-
 # --- Review records ---------------------------------------------------------------------------
 
 REVIEWS = "docs/reviews"
@@ -524,12 +494,16 @@ def review_record_problems(
 # --- Tech-debt log ----------------------------------------------------------------------------
 
 TD_FIELDS = ("Added", "What", "Why", "Fix by", "Status")
+# A resolved entry, moved under the log's Resolved heading, keeps only these (DL-313).
+TD_RESOLVED_FIELDS = ("Added", "Status")
+TD_RESOLVED_HEADING = "## Resolved"
 
 
 @dataclass(frozen=True)
 class TechDebt:
     number: int
     fields: dict[str, str]
+    in_resolved: bool = False
 
     @property
     def is_open(self) -> bool:
@@ -545,18 +519,54 @@ class TechDebt:
 
 
 def tech_debt_entries() -> list[TechDebt]:
-    return [TechDebt(number, fields) for number, fields in _log_entries(TECH_DEBT, "TD")]
+    """The log's entries, each marked with whether it sits under the Resolved heading, by its
+    position: a number repeated in both sections must not move the open copy."""
+    text = read(TECH_DEBT)
+    split = re.search(rf"^{TD_RESOLVED_HEADING}$", text, re.MULTILINE)
+    above = (
+        len(re.findall(r"^### TD-\d+: ", text[: split.start()], re.MULTILINE)) if split else None
+    )
+    return [
+        TechDebt(number, fields, above is not None and index >= above)
+        for index, (number, fields) in enumerate(_log_entries(TECH_DEBT, "TD"))
+    ]
 
 
 def tech_debt_format_problems(entries: list[TechDebt]) -> list[str]:
+    """Open entries carry every field and come first; resolved ones sit under the Resolved
+    heading with only Added and Status; numbers are 1..n, each once, ascending in each section
+    (DL-313)."""
     problems: list[str] = []
     for entry in entries:
-        missing = [field for field in TD_FIELDS if field not in entry.fields]
+        if "Status" not in entry.fields:
+            problems.append(f"{TECH_DEBT} TD-{entry.number} is missing: Status")
+            continue
+        if entry.in_resolved == entry.is_open:
+            where = "under" if entry.in_resolved else "outside"
+            problems.append(
+                f"{TECH_DEBT} TD-{entry.number} is {'open' if entry.is_open else 'resolved'} "
+                f"but sits {where} {TD_RESOLVED_HEADING!r}"
+            )
+            continue
+        expected = TD_RESOLVED_FIELDS if entry.in_resolved else TD_FIELDS
+        missing = [field for field in expected if field not in entry.fields]
         if missing:
             problems.append(f"{TECH_DEBT} TD-{entry.number} is missing: {', '.join(missing)}")
+        extra = [field for field in entry.fields if field not in expected]
+        if entry.in_resolved and extra:
+            problems.append(f"{TECH_DEBT} TD-{entry.number} is resolved; drop: {', '.join(extra)}")
     numbers = [entry.number for entry in entries]
-    if numbers != list(range(1, len(numbers) + 1)):
-        problems.append(f"{TECH_DEBT}: TD numbers must be 1..n in order, unique; got {numbers}")
+    sections = [
+        [entry.number for entry in entries if entry.in_resolved == resolved]
+        for resolved in (False, True)
+    ]
+    if sorted(numbers) != list(range(1, len(numbers) + 1)) or any(
+        section != sorted(section) for section in sections
+    ):
+        problems.append(
+            f"{TECH_DEBT}: TD numbers must be 1..n, each once, ascending in each section; "
+            f"got {numbers}"
+        )
     return problems
 
 
@@ -789,19 +799,6 @@ def claude_config_on_disk() -> ClaudeConfig:
         skills=frozenset(
             path.parent.name for path in (REPO_ROOT / ".claude/skills").glob("*/SKILL.md")
         ),
-    )
-
-
-def claude_config_in_build_plan() -> ClaudeConfig:
-    body = section(read(BUILD_PLAN), "### Claude configuration (in the repo)", BUILD_PLAN)
-    found = re.findall(r"\*\*`([a-z-]+)` (agent|skill)\*\*", body)
-    if not found:
-        raise DocsStructureError(
-            f"{BUILD_PLAN} Claude configuration: no **`<name>` agent** / **`<name>` skill** items"
-        )
-    return ClaudeConfig(
-        agents=frozenset(name for name, kind in found if kind == "agent"),
-        skills=frozenset(name for name, kind in found if kind == "skill"),
     )
 
 

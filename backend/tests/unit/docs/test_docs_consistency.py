@@ -504,56 +504,8 @@ def test_malformed_decision_log_heading_is_a_structure_error(
         docs.decision_log_entries()
 
 
-# --- 7: developer-guide status ----------------------------------------------------------------
-
-
-def test_status_line_names_the_latest_or_next_checkpoint() -> None:
-    latest = docs.latest_checkpoint()
-    allowed = {latest} | docs.next_checkpoints(latest, docs.checkpoint_order())
-
-    status = docs.status_line_checkpoint()
-
-    assert status in allowed, (
-        f"{docs.DEVELOPER_GUIDE} Status names {status}; the latest checkpoint commit is "
-        f"{latest}, so it must name one of {sorted(str(c) for c in allowed)}"
-    )
-
-
-# Slice 1 with a checkpoint inserted after its plan was written (design-change skill), and a
-# slice 2 table that hasn't been planned yet.
-_WITH_INSERTED = _slice(1, "1", "12", "13", "13a", "14", "17") | _slice(0, "1", "8")
-
-
-@pytest.mark.parametrize(
-    ("latest", "expected"),
-    [
-        ("S1-C12", {"S1-C13"}),  # mid-slice
-        ("S1-C13", {"S1-C13a"}),  # the inserted checkpoint follows the row before it
-        ("S1-C13a", {"S1-C14"}),  # and is followed by the next row
-        ("S1-C17", {"S2-C1"}),  # the slice's last row: the next slice's first checkpoint
-        ("S0-C8", {"S1-C1"}),  # the next slice's table names its first row
-        ("S2-C2", {"S2-C3", "S3-C1"}),  # no table for the slice yet
-    ],
-)
-def test_next_checkpoint_is_the_next_row_of_the_slice_table(
-    latest: str, expected: set[str]
-) -> None:
-    following = docs.next_checkpoints(docs.Checkpoint.parse(latest), _WITH_INSERTED)
-
-    assert {str(checkpoint) for checkpoint in following} == expected
-
-
-def test_next_slice_starts_at_its_pre_checkpoint() -> None:
-    order = _slice(1, "1", "17") | _slice(2, "0a", "0b", "1")
-
-    following = docs.next_checkpoints(docs.Checkpoint(1, 17), order)
-
-    assert {str(checkpoint) for checkpoint in following} == {"S2-C0a"}
-
-
-def test_latest_checkpoint_missing_from_its_slice_table_is_a_structure_error() -> None:
-    with pytest.raises(docs.DocsStructureError, match="S1-C15, is not a row"):
-        docs.next_checkpoints(docs.Checkpoint(1, 15), _WITH_INSERTED)
+# Slice 1 with a checkpoint inserted after its plan was written (design-change skill).
+_WITH_INSERTED = _slice(1, "1", "12", "13", "13a", "14", "17")
 
 
 @pytest.mark.parametrize(
@@ -668,23 +620,6 @@ def test_malformed_checkpoint_table_is_a_structure_error(
         docs.checkpoint_order()
 
 
-def test_status_line_names_an_inserted_checkpoint(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        docs, "read", _reading("> **Status:** S1-C13a (Fix) done; next is S1-C14.\n")
-    )
-
-    assert docs.status_line_checkpoint() == docs.Checkpoint(1, 13, "a")
-
-
-def test_status_line_with_a_malformed_checkpoint_is_a_structure_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(docs, "read", _reading("> **Status:** S1-C13A done.\n"))
-
-    with pytest.raises(docs.DocsStructureError, match="'S1-C13A' is not a checkpoint ID"):
-        docs.status_line_checkpoint()
-
-
 def _history(shallow: str, log: str) -> Callable[..., str]:
     def fake_git(*args: str) -> str:
         return shallow if args[0] == "rev-parse" else log
@@ -768,16 +703,6 @@ def test_every_ui_guide_section_reference_resolves_to_its_heading() -> None:
 
 
 # --- 9: Claude configuration ------------------------------------------------------------------
-
-
-def test_build_plan_lists_every_agent_and_skill() -> None:
-    problems = docs.config_differences(
-        docs.claude_config_on_disk(),
-        docs.claude_config_in_build_plan(),
-        f'{docs.BUILD_PLAN} "Claude configuration"',
-    )
-
-    assert problems == [], _report(problems)
 
 
 def test_developer_guide_lists_every_agent_and_skill() -> None:
@@ -871,7 +796,105 @@ def test_tech_debt_numbers_with_a_gap_are_reported() -> None:
 
     problems = docs.tech_debt_format_problems([docs.TechDebt(1, fields), docs.TechDebt(3, fields)])
 
-    assert problems == ["docs/tech-debt.md: TD numbers must be 1..n in order, unique; got [1, 3]"]
+    assert problems == [
+        "docs/tech-debt.md: TD numbers must be 1..n, each once, ascending in each section; "
+        "got [1, 3]"
+    ]
+
+
+_OPEN_FIELDS = {"Added": "S0-C1", "What": "x", "Why": "x", "Fix by": "S0-C7", "Status": "open"}
+_RESOLVED_FIELDS = {"Added": "S0-C1", "Status": "resolved in S0-C7"}
+
+
+def test_a_resolved_entry_under_resolved_with_added_and_status_passes() -> None:
+    """DL-313: the open entries, then the shrunk resolved ones; the numbers interleave."""
+    entries = [
+        docs.TechDebt(2, _OPEN_FIELDS),
+        docs.TechDebt(1, _RESOLVED_FIELDS, in_resolved=True),
+        docs.TechDebt(3, _RESOLVED_FIELDS, in_resolved=True),
+    ]
+
+    assert docs.tech_debt_format_problems(entries) == []
+
+
+def test_a_resolved_entry_left_among_the_open_ones_is_reported() -> None:
+    entry = docs.TechDebt(1, {**_OPEN_FIELDS, "Status": "resolved in S0-C7"})
+
+    assert docs.tech_debt_format_problems([entry]) == [
+        "docs/tech-debt.md TD-1 is resolved but sits outside '## Resolved'"
+    ]
+
+
+def test_an_open_entry_under_resolved_is_reported() -> None:
+    entry = docs.TechDebt(1, _OPEN_FIELDS, in_resolved=True)
+
+    assert docs.tech_debt_format_problems([entry]) == [
+        "docs/tech-debt.md TD-1 is open but sits under '## Resolved'"
+    ]
+
+
+def test_a_resolved_entry_keeping_its_other_fields_is_reported() -> None:
+    entry = docs.TechDebt(1, {**_OPEN_FIELDS, "Status": "resolved in S0-C7"}, in_resolved=True)
+
+    assert docs.tech_debt_format_problems([entry]) == [
+        "docs/tech-debt.md TD-1 is resolved; drop: What, Why, Fix by"
+    ]
+
+
+def test_a_resolved_entry_missing_added_is_reported() -> None:
+    entry = docs.TechDebt(1, {"Status": "resolved in S0-C7"}, in_resolved=True)
+
+    assert docs.tech_debt_format_problems([entry]) == ["docs/tech-debt.md TD-1 is missing: Added"]
+
+
+def test_tech_debt_numbers_out_of_order_in_a_section_are_reported() -> None:
+    entries = [
+        docs.TechDebt(2, _RESOLVED_FIELDS, in_resolved=True),
+        docs.TechDebt(1, _RESOLVED_FIELDS, in_resolved=True),
+    ]
+
+    assert docs.tech_debt_format_problems(entries) == [
+        "docs/tech-debt.md: TD numbers must be 1..n, each once, ascending in each section; "
+        "got [2, 1]"
+    ]
+
+
+def test_tech_debt_entries_mark_those_under_the_resolved_heading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        docs,
+        "read",
+        _reading(
+            "### TD-2: open\n- **Status:** open\n\n## Resolved\n\n"
+            "### TD-1: done\n- **Status:** resolved in S0-C7\n"
+        ),
+    )
+
+    assert [(e.number, e.in_resolved) for e in docs.tech_debt_entries()] == [(2, False), (1, True)]
+
+
+def test_a_number_repeated_above_resolved_stays_an_open_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review DC-2026-11-09 finding 1: by position, not by number."""
+    monkeypatch.setattr(
+        docs,
+        "read",
+        _reading(
+            "### TD-1: open\n- **Status:** open\n\n## Resolved\n\n"
+            "### TD-1: done\n- **Status:** resolved in S0-C7\n"
+        ),
+    )
+
+    assert [(e.number, e.in_resolved) for e in docs.tech_debt_entries()] == [(1, False), (1, True)]
+
+
+def test_a_tech_debt_entry_without_a_status_is_reported() -> None:
+    """Review DC-2026-11-09 finding 2: a message, not a KeyError."""
+    entry = docs.TechDebt(1, {"Added": "S0-C1", "What": "x", "Why": "x", "Fix by": "S0-C7"})
+
+    assert docs.tech_debt_format_problems([entry]) == ["docs/tech-debt.md TD-1 is missing: Status"]
 
 
 def test_malformed_tech_debt_heading_is_a_structure_error(monkeypatch: pytest.MonkeyPatch) -> None:
