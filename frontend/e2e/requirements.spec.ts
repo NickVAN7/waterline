@@ -325,20 +325,25 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
   await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
   await expect(panel.locator('.markdown')).toContainText('Works')
-  // On a screen wider than the sidebar and `--content-wide`, the split pane still reaches the
-  // window's right edge, less `main`'s padding: the page takes the whole width (UI-SHL-7).
+  // On a screen wider than the sidebar and `--content-wide`, the split pane is the layout's right
+  // column: from under the header to the window's foot, at its right edge; the page, its header
+  // and New requirement included, narrows beside it (UI-SHL-7, DL-356).
   await page.setViewportSize({ width: 1920, height: 720 })
-  const panelRight = await panel.evaluate((el) => {
-    const main = document.getElementById('main')!
+  const placed = await panel.evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    const main = document.getElementById('main')!.getBoundingClientRect()
+    const header = document.querySelector('header')!.getBoundingClientRect()
     return {
-      gap: main.getBoundingClientRect().right - el.getBoundingClientRect().right,
-      padding: parseFloat(getComputedStyle(main).paddingRight),
-      mainRight: main.getBoundingClientRect().right,
-      viewport: document.documentElement.clientWidth,
+      top: box.top - header.bottom,
+      bottom: document.documentElement.clientHeight - box.bottom,
+      right: document.documentElement.clientWidth - box.right,
+      mainEnd: box.left - main.right,
     }
   })
-  expect(panelRight.gap).toBeCloseTo(panelRight.padding, 0)
-  expect(panelRight.mainRight).toBeCloseTo(panelRight.viewport, 0)
+  expect(placed).toEqual({ top: 0, bottom: 0, right: 0, mainEnd: 0 })
+  const create = (await page.getByRole('button', { name: 'New requirement' }).boundingBox())!
+  const panelBox = (await panel.boundingBox())!
+  expect(create.x + create.width).toBeLessThan(panelBox.x)
   await page.setViewportSize({ width: 1280, height: 720 })
   expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
   // Its row is marked by more than color (DL-324).

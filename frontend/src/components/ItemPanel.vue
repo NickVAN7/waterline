@@ -13,7 +13,7 @@
 // the page then calls `close()`, which returns focus to the ID that opened the panel, or to
 // `fallbackFocus`. Esc that something inside has cancelled (an edit form, a menu) doesn't close
 // it. Shared by every item that opens this way (requirements; tasks in Slice 3).
-import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { inject, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { type RouteLocationRaw, useRouter } from 'vue-router'
 
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
@@ -29,6 +29,10 @@ const props = defineProps<{
 const emit = defineEmits<{ dismiss: []; closed: [] }>()
 
 const router = useRouter()
+// The layout's column right of `main` (`AppLayout`, DL-356): the split pane goes there, from
+// under the header to the window's foot, so the page beside it (its header too) narrows. Mounted
+// without the layout (a spec), it stays in place.
+const sidePane = inject<string | null>('sidePane', null)
 
 // The split pane's width: 64rem, the layout's wide breakpoint (DL-321).
 const query = window.matchMedia('(min-width: 64rem)')
@@ -200,34 +204,36 @@ defineExpose({ open, close, swapped, focusTitle: () => heading.value?.focus() })
 </script>
 
 <template>
-  <!-- The split pane: beside the list, sticky under the header, at full height. -->
-  <aside
-    v-show="isOpen && wide"
-    :aria-label="label"
-    class="sticky top-(--header-height) flex max-h-(--split-pane-height) shrink-0 self-start"
-    :style="{ width: `${width / 16}rem` }"
-    @keydown.esc="escape"
-  >
-    <div
-      role="separator"
-      tabindex="0"
-      aria-orientation="vertical"
-      aria-label="Resize the panel"
-      :aria-valuenow="width"
-      :aria-valuetext="`${width} pixels wide`"
-      :aria-valuemin="WIDTH.min"
-      :aria-valuemax="WIDTH.max"
-      class="group flex w-(--target-min) shrink-0 cursor-col-resize touch-none justify-center"
-      @keydown="resizeKey"
-      @pointerdown="dragStart"
-      @pointermove="dragMove"
-      @pointerup="dragEnd"
-      @pointercancel="dragCancel"
+  <!-- The split pane: right of the page, sticky under the header, at full height. -->
+  <Teleport defer :to="`#${sidePane}`" :disabled="!sidePane">
+    <aside
+      v-show="isOpen && wide"
+      :aria-label="label"
+      class="sticky top-(--header-height) flex h-(--split-pane-height) shrink-0 self-start"
+      :style="{ width: `${width / 16}rem` }"
+      @keydown.esc="escape"
     >
-      <span class="w-px bg-border group-hover:bg-accent group-focus-visible:bg-accent" />
-    </div>
-    <div :id="wideId" class="min-w-0 flex-1 overflow-y-auto border-l border-border bg-surface" />
-  </aside>
+      <div
+        role="separator"
+        tabindex="0"
+        aria-orientation="vertical"
+        aria-label="Resize the panel"
+        :aria-valuenow="width"
+        :aria-valuetext="`${width} pixels wide`"
+        :aria-valuemin="WIDTH.min"
+        :aria-valuemax="WIDTH.max"
+        class="group flex w-(--target-min) shrink-0 cursor-col-resize touch-none justify-end"
+        @keydown="resizeKey"
+        @pointerdown="dragStart"
+        @pointermove="dragMove"
+        @pointerup="dragEnd"
+        @pointercancel="dragCancel"
+      >
+        <span class="w-px bg-border group-hover:bg-accent group-focus-visible:bg-accent" />
+      </div>
+      <div :id="wideId" class="min-w-0 flex-1 overflow-y-auto bg-surface" />
+    </aside>
+  </Teleport>
   <!-- The overlay below 64rem, docked at the right at full height. -->
   <dialog
     ref="dialog"

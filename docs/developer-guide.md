@@ -992,9 +992,11 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `RequirementFields`), and tells the list what it shows (`changed`), so the list updates its row
   in place (`RequirementsTree`'s `update()`; the tree's data is a shallow ref) and marks the open
   row (`openNumber`). Specs set the width with `stubWidth(wide)` (`@/test/overlay`; jsdom has no
-  `matchMedia`), whose `resize()` crosses the breakpoint. Its route sets `meta.fullWidth`, so
-  `AppLayout`'s `main` drops the `--content-wide` cap and the panel reaches the window's right
-  edge (DL-356).
+  `matchMedia`), whose `resize()` crosses the breakpoint. The `<aside>` is teleported to
+  `AppLayout`'s column after `main` (`#side-pane`, provided as `sidePane`; in place when mounted
+  without the layout), so it runs from under the header to the window's foot and the whole page
+  narrows beside it; the list's route sets `meta.fullWidth`, so `main` drops the
+  `--content-wide` cap (DL-356).
 - **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
   only the latest answer, and gives the message for a polite live region under the field; `skip`
   leaves out a value that needs no check (the person's own username).

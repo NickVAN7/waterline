@@ -487,8 +487,7 @@ render inside the full shell when signed in.
   picker, primary) and Add by email (secondary) (DL-119).
 - **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
   up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. A list
-  that opens items in the split pane (UI-SHL-11) takes the whole width instead, so the panel
-  reaches the window's right edge (route meta `fullWidth`; DL-356). Pages
+  that opens items in the split pane (UI-SHL-11) takes the whole width instead (route meta `fullWidth`; DL-356). Pages
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
@@ -524,8 +523,9 @@ render inside the full shell when signed in.
   `/{org_slug}/settings`.
 - **UI-SHL-11** **Opening an item** (a requirement, task, test case, or test run) from a list or
   the board opens it in the shared **side panel** (`ItemPanel`; DL-202, DL-321 to DL-326):
-  - **Where:** at 64rem and wider, a split pane beside the list, which stays usable (scroll,
-    select, expand, open another item); below 64rem, a modal overlay (the page inert, focus kept
+  - **Where:** at 64rem and wider, a split pane right of the page, from under the app header to
+    the window's foot, the page (its header too) narrowing beside it (DL-356); the list stays
+    usable (scroll, select, expand, open another item); below 64rem, a modal overlay (the page inert, focus kept
     in it, Esc closes). Crossing the width keeps what the panel holds, and the focus in it.
   - **Size:** 560px by default, 400 to 800px, by a vertical separator that drags, steps through
     400, 560, and 800 on a click without a drag (WCAG 2.5.7, DL-355), and works from the keyboard

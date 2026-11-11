@@ -6,7 +6,7 @@
 // 40rem the header wraps and scrolls with the page (DL-98); below 48rem the sidebar is behind a
 // "Menu" disclosure in the header. Signed out (the status and not-found pages), the header has
 // only the app name and Sign in.
-import { ref, watch } from 'vue'
+import { provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import Alert from '@/components/Alert.vue'
@@ -27,6 +27,9 @@ const store = useCurrentUserStore()
 const nav = useCurrentOrgStore()
 const route = useRoute()
 const { signOut, failed, failures, status, dismiss: dismissAlert } = useSignOut()
+
+// Where a list's split pane goes: the column after `main` (ItemPanel, DL-356).
+provide('sidePane', 'side-pane')
 
 const menuOpen = ref(false)
 const userMenu = ref<InstanceType<typeof UserMenu>>()
@@ -108,6 +111,7 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
         <slot />
         <p class="sr-only" aria-live="polite">{{ status }}</p>
       </main>
+      <div id="side-pane" class="contents" />
     </div>
   </div>
 </template>

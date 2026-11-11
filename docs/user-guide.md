@@ -131,8 +131,9 @@ If a requirement's place changed since you opened the page, the move is refused 
 reloads to show where things are now.
 
 A requirement's ID in the tree opens it in a side panel (clicking elsewhere on the row only
-selects it). On a wide window the panel sits beside the tree, which you can still scroll, select
-in, and open other requirements from; on a narrower one it covers the tree. Its row is marked
+selects it). On a wide window the panel runs down the right side of the window, and the page beside
+it narrows; you can still scroll the tree, select in it, and open other requirements from it. On
+a narrower window the panel covers the tree. Its row is marked
 **Open**, in bold. To make the panel wider or narrower, drag the bar between the tree and the
 panel, click the bar to step between narrow, medium, and wide, or focus it and press the Left or
 Right arrow; the width is kept for next time. Another
