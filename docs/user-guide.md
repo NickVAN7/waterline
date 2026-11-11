@@ -130,18 +130,26 @@ children move with it. A move that doesn't apply says why in the menu ("already 
 If a requirement's place changed since you opened the page, the move is refused and the tree
 reloads to show where things are now.
 
-A requirement's ID in the tree opens it in a side panel over the tree, which keeps its place
-(clicking elsewhere on the row only selects it). The panel has its own address
-(`…/requirements?open=RQ-<n>`), so the browser's Back closes it, as do **Close** and Esc; a change
-you make there shows in the tree. **Open full page** goes to the requirement's page
-(`…/requirements/<n>`), and **Copy link** copies that page's address, for sharing. The panel and
-the page show the same: its title, ID, status, restriction, priority, reporter (with
-"Deactivated" after a deactivated reporter's name), and its description. A status reads
+A requirement's ID in the tree opens it in a side panel (clicking elsewhere on the row only
+selects it). On a wide window the panel sits beside the tree, which you can still scroll, select
+in, and open other requirements from; on a narrower one it covers the tree. Its row is marked
+**Open**, in bold. To make the panel wider or narrower, drag the bar between the tree and the
+panel, click the bar to step between narrow, medium, and wide, or focus it and press the Left or
+Right arrow; the width is kept for next time. Another
+requirement's ID shows that one in the panel instead. The panel has its own address
+(`…/requirements?open=RQ-<n>`), so the browser's Back closes it, as do **Close** (the ✕ at its top)
+and Esc; a change you make there shows in the tree. At the top of the panel, beside the ID and
+status, **Open full page** goes to the requirement's page (`…/requirements/<n>`) and **Copy link**
+copies that page's address, for sharing. Under the title are **Edit**, **Change status**, and
+**⋯ More actions**, which holds **Change restriction…** and **Delete…**, as far as you may use them;
+then the requirement's priority, reporter (with "Deactivated" after a deactivated reporter's name),
+and restriction, and its description. The page shows the same, with the actions beside its title
+and the ID and status under it. A status reads
 **Approved · modified** when the requirement is Approved and has changed since its approved revision. If the
 description has no "Acceptance Criteria" heading, a note says so. **Change status** (members and
 admins) sets any status but its own and Approved, which comes only from an approval. If someone
 changed the requirement since you opened it, the change is refused and the page shows the latest.
-**Change restriction** sets the requirement's restriction level and categories: members can raise
+**Change restriction…** sets the requirement's restriction level and categories: members can raise
 it, only the project's admins can lower it (None and Internal count as the same level, so a member
 may switch between them), and it is never below the project's own. The badge
 shows the restriction that applies, the stricter of the requirement's and the project's levels
@@ -154,8 +162,10 @@ description is saved as a new version, with the note, while a priority change al
 keeps no note). **Cancel** drops them. If someone else saved the requirement while you were
 editing, Save is refused: **Reload** shows the latest, and your changes are lost once you press
 it, so copy anything you need first. While you edit, Change status waits until you save or
-cancel. In the side panel, Esc doesn't close the panel while you edit; **Close**, Back, or
-**Open full page** closes it and drops what you typed.
+cancel. In the side panel, Esc doesn't close the panel while you edit. If you've changed
+anything, **Close**, Back, another requirement's ID, or **Open full page** first asks **Discard
+your changes?**: **Keep editing** returns you to the form with what you typed, and **Discard
+changes** drops it and goes on.
 
 Below the description, the **Approval** section shows the revision last approved ("Last approved:
 revision 3") and the latest approval request: its status (Pending, Approved, Rejected, or
@@ -230,8 +240,8 @@ and a screen reader says so.
 Runs of more than three unchanged lines fold away behind **Show 12 unchanged lines**. With only
 one revision there's nothing to compare yet.
 
-**Delete** (the requirement's reporter, while it has never been approved, and project admins), at
-the top of the requirement, on its page and in the side panel, asks first: **Delete ERP-RQ-7?**
+**Delete…** (the requirement's reporter, while it has never been approved, and project admins), in
+**⋯ More actions** on its page and in the side panel, asks first: **Delete ERP-RQ-7?**
 says it moves to the project's Trash, where it can be restored. If it has children, choose what
 happens to them: **Move them up to its parent** (the default; they take its place) or **Delete
 them too**, with their own children. When you can't delete one of them yourself, only moving them

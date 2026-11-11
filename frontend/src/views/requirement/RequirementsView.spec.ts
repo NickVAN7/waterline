@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -11,7 +11,7 @@ import { useCurrentOrgStore } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok } from '@/test/api'
-import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { stubDialog, stubResizeObserver, stubWidth } from '@/test/overlay'
 import { requirementRead } from '@/test/requirements'
 import { project } from '@/test/projects'
 
@@ -136,6 +136,8 @@ beforeEach(() => {
   setActivePinia(createPinia())
   stubResizeObserver()
   stubDialog()
+  // The overlay, below 64rem, unless a test widens it (DL-321).
+  stubWidth(false)
 })
 afterEach(() => {
   document.body.innerHTML = ''
@@ -436,7 +438,7 @@ describe('RequirementsView', () => {
       )!
     const inPanel = (label: string) =>
       [...panel()!.querySelectorAll<HTMLElement>('button, a')].find(
-        (b) => b.textContent!.trim() === label,
+        (b) => b.textContent!.trim() === label || b.getAttribute('aria-label') === label,
       )
     const requirementCalls = (get: Spy) =>
       get.mock.calls.filter((call) => call[0] === '/api/projects/{key}/requirements/{number}')
@@ -500,7 +502,8 @@ describe('RequirementsView', () => {
       const back = vi.spyOn(router, 'back')
       const replace = vi.spyOn(router, 'replace')
 
-      panel()!.close()
+      // Esc: the native cancel, which the panel turns into a request to its page.
+      panel()!.dispatchEvent(new Event('cancel', { cancelable: true }))
       await flushPromises()
 
       expect(back).toHaveBeenCalledOnce()
@@ -665,7 +668,12 @@ describe('RequirementsView', () => {
       )
       await openFromTree(2)
 
-      inPanel('Delete')!.click()
+      inPanel('More actions for ERP-RQ-2')!.click()
+      await flushPromises()
+      ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
+        .find((li) => li.textContent!.trim() === 'Delete…')!
+        .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+        .click()
       await flushPromises()
       // The delete dialog, over the panel.
       const confirm = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)!
@@ -687,5 +695,222 @@ describe('RequirementsView', () => {
       )
       expect(document.activeElement).toBe(document.querySelector('main h1'))
     })
+  })
+})
+
+describe('RequirementsView: the split pane, swapping, and unsaved edits (DL-321 to DL-324)', () => {
+  const PAYMENTS = { ...requirementRead(2, 'Payments'), allowed_actions: ['requirement.update'] }
+  const INVOICING = { ...requirementRead(1, 'Invoicing'), allowed_actions: ['requirement.update'] }
+  const region = () => document.querySelector<HTMLElement>('aside[aria-label^="Requirement "]')
+  const idLink = (number: number) =>
+    [...document.querySelectorAll<HTMLAnchorElement>('tbody a')].find(
+      (a) => a.textContent === `ERP-RQ-${number}`,
+    )!
+  const row = (number: number) => idLink(number).closest('tr')!
+  const title = () => document.querySelector<HTMLElement>('main h2[tabindex="-1"]')
+  const named = (label: string) =>
+    [...document.querySelectorAll<HTMLElement>('button, a')].find(
+      (b) => b.textContent!.trim() === label || b.getAttribute('aria-label') === label,
+    )!
+  const confirmation = () =>
+    [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].find((d) =>
+      d.textContent!.includes('Discard your changes?'),
+    )
+  async function openFromTree(number: number) {
+    idLink(number).focus()
+    idLink(number).click()
+    await flushPromises()
+  }
+  async function typeInto(selector: string, text: string) {
+    const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!
+    field.value = text
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+  }
+  async function pick(selector: string) {
+    document.querySelector<HTMLInputElement>(selector)!.click()
+    await flushPromises()
+  }
+  async function editTitle(text: string) {
+    named('Edit').click()
+    await flushPromises()
+    const field = document.querySelector<HTMLInputElement>('#edit-requirement-title')!
+    field.value = text
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+  }
+
+  it('opens beside the tree at 64rem and wider: a named region, the tree still usable', async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+
+    await openFromTree(2)
+
+    expect(region()!.getAttribute('aria-label')).toBe('Requirement ERP-RQ-2')
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(document.activeElement).toBe(title())
+    expect(title()!.textContent!.trim()).toBe('Payments')
+    expect(region()!.textContent).toContain('ERP-RQ-2')
+    // Not a modal: the tree's controls aren't inert behind it.
+    expect(document.querySelector('main [inert]')).toBeNull()
+    await expectNoA11yViolations(document.body)
+  })
+
+  it("marks the open requirement's row by more than color: bold, and an Open label", async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+
+    await openFromTree(2)
+
+    expect(row(2).classList).toContain('bg-selected')
+    expect(row(2).querySelector('.font-semibold')!.textContent).toBe('Payments')
+    expect(row(2).textContent).toContain('Open')
+    expect(idLink(2).getAttribute('aria-current')).toBe('true')
+    expect(idLink(1).hasAttribute('aria-current')).toBe(false)
+    expect(row(1).classList).not.toContain('bg-selected')
+    expect(row(1).textContent).not.toContain('Open')
+  })
+
+  it('another ID swaps what it shows and the URL, focus on the new title', async () => {
+    stubWidth(true)
+    const { router } = await mountAt([READER], [ok(TREE)], {
+      requirements: [ok(PAYMENTS), ok(INVOICING)],
+    })
+    await openFromTree(2)
+
+    await openFromTree(1)
+
+    expect(router.currentRoute.value.query.open).toBe('RQ-1')
+    expect(region()!.getAttribute('aria-label')).toBe('Requirement ERP-RQ-1')
+    expect(title()!.textContent!.trim()).toBe('Invoicing')
+    expect(document.activeElement).toBe(title())
+    expect(row(1).textContent).toContain('Open')
+    expect(row(2).textContent).not.toContain('Open')
+  })
+
+  it('Close after a swap returns focus to the ID that opened what it shows', async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS), ok(INVOICING)] })
+    await openFromTree(2)
+    await openFromTree(1)
+
+    named('Close').click()
+    await flushPromises()
+
+    expect(region()).toBeNull()
+    expect(document.activeElement).toBe(idLink(1))
+  })
+
+  it('Esc from inside closes it, back on the ID', async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+
+    title()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+
+    expect(region()).toBeNull()
+    expect(document.activeElement).toBe(idLink(2))
+  })
+
+  it('an edit with nothing changed closes without asking', async () => {
+    await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    named('Edit').click()
+    await flushPromises()
+
+    named('Close').click()
+    await flushPromises()
+
+    expect(confirmation()).toBeUndefined()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+  })
+
+  it('Close with unsaved edits asks first, on Keep editing, naming the item and what happens', async () => {
+    const { router } = await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    await editTitle('Card payments')
+
+    named('Close').click()
+    await flushPromises()
+
+    const asked = confirmation()!
+    expect(asked.textContent).toContain(
+      "Your edits to ERP-RQ-2 aren't saved. Closing the panel discards them.",
+    )
+    expect(document.activeElement!.textContent!.trim()).toBe('Keep editing')
+    expect(named('Discard changes').className).toContain('danger')
+    await expectNoA11yViolations(asked)
+    expect(router.currentRoute.value.query.open).toBe('RQ-2')
+  })
+
+  // Each field the form keeps counts: a change to any one alone asks (DL-323).
+  it.each([
+    ['the title', () => typeInto('#edit-requirement-title', 'Card payments')],
+    ['the description', () => typeInto('#edit-requirement-description', 'Pays by card.')],
+    ['the priority', () => pick('input[name=edit-requirement-priority][value=high]')],
+    ['the change note', () => typeInto('#edit-requirement-change-note', 'Why')],
+  ])('a change to %s alone asks before Close', async (_, change) => {
+    await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    named('Edit').click()
+    await flushPromises()
+    await change()
+
+    named('Close').click()
+    await flushPromises()
+
+    expect(confirmation()).toBeDefined()
+  })
+
+  it('Keep editing keeps the panel and what was typed', async () => {
+    const { router } = await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    await editTitle('Card payments')
+    named('Close').click()
+    await flushPromises()
+
+    named('Keep editing').click()
+    await flushPromises()
+
+    expect(confirmation()).toBeUndefined()
+    expect(router.currentRoute.value.query.open).toBe('RQ-2')
+    expect(document.querySelector<HTMLInputElement>('#edit-requirement-title')!.value).toBe(
+      'Card payments',
+    )
+  })
+
+  it('Discard changes closes it, and saves nothing', async () => {
+    const patch = vi.spyOn(client, 'PATCH')
+    const { router } = await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    await editTitle('Card payments')
+    named('Close').click()
+    await flushPromises()
+
+    named('Discard changes').click()
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.open).toBeUndefined()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(patch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['another ID', () => openFromTree(1), 'Opening ERP-RQ-1 discards them.'],
+    ['Open full page', () => named('Open full page').click(), 'Leaving this page discards them.'],
+    ['Back', (router: Router) => router.back(), 'Closing the panel discards them.'],
+  ])('%s with unsaved edits asks first, saying what happens', async (_, act, happens) => {
+    const { router } = await mountAt([MOVER], [ok(TREE)], {
+      requirements: [ok(PAYMENTS), ok(INVOICING)],
+    })
+    await openFromTree(2)
+    await editTitle('Card payments')
+
+    await act(router)
+    await flushPromises()
+
+    expect(confirmation()!.textContent).toContain(happens)
+    expect(router.currentRoute.value.query.open).toBe('RQ-2')
   })
 })

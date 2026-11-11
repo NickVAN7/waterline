@@ -98,6 +98,37 @@ const button = (name: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('main button')].find(
     (b) => b.textContent!.trim() === name,
   )
+// A term's value in the definition list (DL-325, DL-326).
+const definition = (term: string) =>
+  [...document.querySelectorAll('main dt')]
+    .find((dt) => dt.textContent!.trim() === term)!
+    .nextElementSibling!.textContent!.replace(/\s+/g, ' ')
+    .trim()
+// ⋯ More actions (DL-325): absent when it would be empty, else its items' labels.
+const moreButton = () =>
+  document.querySelector<HTMLButtonElement>('button[aria-label="More actions for ERP-RQ-7"]')
+const moreItems = () =>
+  [...document.querySelectorAll<HTMLElement>('[role=menuitem]')].filter((li) =>
+    li.closest('[aria-label="More actions for ERP-RQ-7"]'),
+  )
+async function moreLabels(): Promise<string[]> {
+  if (!moreButton()) return []
+  moreButton()!.click()
+  await flushPromises()
+  const labels = moreItems().map((li) => li.textContent!.trim())
+  moreButton()!.click()
+  await flushPromises()
+  return labels
+}
+async function more(label: string) {
+  moreButton()!.click()
+  await flushPromises()
+  moreItems()
+    .find((li) => li.textContent!.trim() === label)!
+    .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+    .click()
+  await flushPromises()
+}
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -119,8 +150,9 @@ describe('RequirementView', () => {
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(wrapper.text()).toContain('ERP-RQ-7')
     expect(wrapper.text()).toContain('Status: Draft')
-    expect(wrapper.text()).toContain('Priority:High')
-    expect(wrapper.text()).toContain('Reporter:Ben Ortiz')
+    expect(definition('Priority')).toBe('High')
+    expect(definition('Reporter')).toBe('Ben Ortiz')
+    expect(definition('Restriction')).toBe('None')
     // Under the Description h2, the description's ## is an h4 (UI-MD-1, UI-SHL-8).
     expect(wrapper.find('.markdown h4').text()).toBe('Context')
     expect(wrapper.findAll('.markdown h2, .markdown h3')).toHaveLength(0)
@@ -233,9 +265,9 @@ describe('RequirementView', () => {
   )
 
   it('marks a deactivated reporter (TD-77)', async () => {
-    const { wrapper } = await mountAt([READER], [ok({ ...REFUNDS, reporter_is_active: false })])
+    await mountAt([READER], [ok({ ...REFUNDS, reporter_is_active: false })])
 
-    expect(wrapper.text()).toContain('Reporter:Ben Ortiz Deactivated')
+    expect(definition('Reporter')).toBe('Ben Ortiz Deactivated')
   })
 
   it.each([
@@ -435,8 +467,7 @@ describe('RequirementView', () => {
         )
       expect(historyCalls()).toHaveLength(1)
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       const dialog = document.querySelector('dialog[open]')!
       dialog.querySelector<HTMLInputElement>('input[type=radio][value=confidential]')!.click()
       dialog.querySelector('form')!.requestSubmit()
@@ -509,7 +540,7 @@ describe('RequirementView', () => {
       async (...actions) => {
         await mountAt([READER], [ok(withActions(...actions))])
 
-        expect(Boolean(button('Change restriction'))).toBe(actions.length > 0)
+        expect((await moreLabels()).includes('Change restriction…')).toBe(actions.length > 0)
       },
     )
 
@@ -537,8 +568,7 @@ describe('RequirementView', () => {
         [ok(withActions('requirement.raise_restriction'))],
       )
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
 
       expect(document.querySelector('dialog[open] fieldset')!.textContent).toContain(words)
     })
@@ -565,8 +595,7 @@ describe('RequirementView', () => {
       )
       expect(wrapper.text()).toContain('Restriction: Internal')
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       const dialog = document.querySelector('dialog[open]')!
       expect(dialog.querySelector('h2')!.textContent).toBe('Restriction of ERP-RQ-7')
       await expectNoA11yViolations(dialog as HTMLElement)
@@ -593,14 +622,13 @@ describe('RequirementView', () => {
         [ok(withActions('requirement.raise_restriction')), ok(REFUNDS)],
       )
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit()
       await flushPromises()
 
       expect(get.mock.calls.filter((c) => c[0] === '/api/projects/{key}')).toHaveLength(2)
       expect(itemCalls(get)).toHaveLength(2)
-      expect(button('Change restriction')).toBeUndefined()
+      expect(await moreLabels()).not.toContain('Change restriction…')
     })
 
     it("shows the server's 422 on the level, with focus there", async () => {
@@ -621,8 +649,7 @@ describe('RequirementView', () => {
       )
       await mountAt([READER], [ok(withActions('requirement.lower_restriction'))])
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit()
       await flushPromises()
 
@@ -929,7 +956,7 @@ describe('RequirementView', () => {
       async (...actions) => {
         await mountAt([READER], [ok(withActions(...actions))])
 
-        expect(Boolean(button('Delete'))).toBe(actions.length > 0)
+        expect((await moreLabels()).includes('Delete…')).toBe(actions.length > 0)
       },
     )
 
@@ -937,8 +964,7 @@ describe('RequirementView', () => {
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
       const { router } = await mountAt([READER], [ok(deletable())])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       expect(dialog().querySelector('h2')!.textContent).toBe('Delete ERP-RQ-7?')
       expect(document.activeElement!.textContent!.trim()).toBe('Cancel')
       // No children: nothing to ask about them.
@@ -961,8 +987,7 @@ describe('RequirementView', () => {
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
       await mountAt([READER], [ok(deletable({ has_children: true, can_delete_children: true }))])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       const promote = dialog().querySelector<HTMLInputElement>('input[value=promote]')!
       expect(promote.checked).toBe(true)
       expect(dialog().querySelector('legend')!.textContent).toBe('Its children')
@@ -984,8 +1009,7 @@ describe('RequirementView', () => {
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
       await mountAt([READER], [ok(deletable({ has_children: true, can_delete_children: false }))])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       expect(dialog().querySelector('input[type=radio]')).toBeNull()
       expect(dialog().textContent).toContain(
         "Its children move up to its parent. They can't be deleted with it",
@@ -998,19 +1022,17 @@ describe('RequirementView', () => {
       })
     })
 
-    it('Cancel deletes nothing and returns focus to Delete', async () => {
+    it('Cancel deletes nothing and returns focus to More actions', async () => {
       const del = vi.spyOn(client, 'DELETE')
       await mountAt([READER], [ok(deletable())])
 
-      button('Delete')!.focus()
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       ;(document.activeElement as HTMLButtonElement).click()
       await flushPromises()
 
       expect(del).not.toHaveBeenCalled()
       expect(document.querySelector('dialog[open]')).toBeNull()
-      expect(document.activeElement).toBe(button('Delete'))
+      expect(document.activeElement).toBe(moreButton())
     })
 
     it('a 403 says so in the dialog and reloads what the user may do (UI-FRM-7)', async () => {
@@ -1019,8 +1041,7 @@ describe('RequirementView', () => {
       )
       const { get, router } = await mountAt([READER], [ok(deletable()), ok(REFUNDS)])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       dialog().querySelector('form')!.requestSubmit()
       await flushPromises()
 
@@ -1029,7 +1050,7 @@ describe('RequirementView', () => {
       )
       expect(get.mock.calls.filter((c) => c[0] === '/api/projects/{key}')).toHaveLength(2)
       expect(itemCalls(get)).toHaveLength(2)
-      expect(button('Delete')).toBeUndefined()
+      expect(await moreLabels()).not.toContain('Delete…')
       expect(router.currentRoute.value.name).toBe('project-requirement')
     })
 
@@ -1042,8 +1063,7 @@ describe('RequirementView', () => {
         [ok(deletable()), failed(404, { code: 'not_found', message: '', details: {} })],
       )
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       dialog().querySelector('form')!.requestSubmit()
       await flushPromises()
 

@@ -191,6 +191,13 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   layer, `@keydown.esc.prevent`), and so is an in-place edit form's (`RequirementDetail`):
   PrimeVue doesn't cancel it, and an uncancelled Escape also closes the dialog. The e2e presses
   Esc in the open popup and expects the dialog to stay (S2-C18b review).
+- A container that handles Esc for itself (the split pane, `ItemPanel`) ignores an Esc from a
+  `<dialog>` inside it: a modal's keydown still bubbles through its DOM ancestors, and its own
+  cancel comes after, so the container would close too. The e2e presses Esc in a dialog opened
+  from the panel and expects the panel to stay (S3-C0d review).
+- Content moved between containers (a teleport's target changing at a breakpoint) puts focus
+  back where it was: moving a node that holds focus blurs it, and a dialog's open or close moves
+  it again (S3-C0d review).
 - A status note that reports an action's result (not a form alert) is cleared when what it
   describes changes: a new selection, a reload, or the next run of the action
   (`RequirementsTree`'s expand note; S2-C18c review).

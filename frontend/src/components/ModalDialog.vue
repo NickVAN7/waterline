@@ -5,28 +5,25 @@
 // close, focus returns to the control that opened it, or, when that's gone (a removed row), to
 // `fallbackFocus()`; an action that navigates away closes with `close({ returnFocus: false })`,
 // so the new page's `h1` keeps focus (the close event comes later, in its own task). `m-auto`
-// centers it in the viewport: the base styles' reset drops the browser's own (DL-137). `panel`: an
-// item's side panel (UI-SHL-11), docked at the right at full height, opening on its title, as a
-// page opens on its `h1`.
+// centers it in the viewport: the base styles' reset drops the browser's own (DL-137). An item's
+// side panel is `ItemPanel`'s own (UI-SHL-11).
 import { nextTick, ref, useId } from 'vue'
 
-const props = defineProps<{ title: string; fallbackFocus?: () => void; panel?: boolean }>()
+const props = defineProps<{ title: string; fallbackFocus?: () => void }>()
 const emit = defineEmits<{ close: [] }>()
 
 const dialog = ref<HTMLDialogElement>()
-const heading = ref<HTMLElement>()
 const titleId = useId()
 let opener: HTMLElement | null = null
 let returnFocus = true
 
 async function open(): Promise<void> {
-  // The body is no opener: nothing had focus (a panel opened by its URL), so the fallback takes it.
+  // The body is no opener: nothing had focus, so the fallback takes it.
   const active = document.activeElement
   opener = active instanceof HTMLElement && active !== document.body ? active : null
   dialog.value?.showModal()
   await nextTick()
-  if (props.panel) heading.value?.focus()
-  else (own('[data-autofocus]') ?? own('input, select, textarea, button'))?.focus()
+  ;(own('[data-autofocus]') ?? own('input, select, textarea, button'))?.focus()
 }
 
 /** The first match that is this dialog's own, not inside a dialog nested in it. */
@@ -54,30 +51,18 @@ function closed(): void {
   returnFocus = true
 }
 
-defineExpose({ open, close, focusTitle: () => heading.value?.focus() })
+defineExpose({ open, close })
 </script>
 
 <template>
   <dialog
     ref="dialog"
     :aria-labelledby="titleId"
-    :class="[
-      'w-full border border-border bg-surface p-0 text-text shadow-dialog',
-      panel
-        ? 'my-0 mr-0 ml-auto h-dvh max-h-none max-w-(--content-narrow) overflow-y-auto'
-        : 'm-auto max-w-(--content-narrow) rounded-lg',
-    ]"
+    class="m-auto w-full max-w-(--content-narrow) rounded-lg border border-border bg-surface p-0 text-text shadow-dialog"
     @close="closed"
   >
     <div class="flex flex-col gap-4 p-6">
-      <h2
-        :id="titleId"
-        ref="heading"
-        :tabindex="panel ? -1 : undefined"
-        class="m-0 text-xl font-semibold"
-      >
-        {{ title }}
-      </h2>
+      <h2 :id="titleId" class="m-0 text-xl font-semibold">{{ title }}</h2>
       <slot />
     </div>
   </dialog>

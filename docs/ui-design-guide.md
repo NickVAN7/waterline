@@ -441,8 +441,9 @@ render inside the full shell when signed in.
   Main nav while signed out) is left out, not left empty (DL-93).
 - **UI-SHL-3** The header is sticky at `--header-height`. Below 40 rem it wraps onto as many
   rows as its contents need and is not sticky, so the page reflows to 320 CSS px with no
-  horizontal scroll and a taller header never covers focus (DL-98). The only other sticky layer in v1 is a
-  table's selection toolbar, and only while rows are selected (UI-TBL-8). Any later sticky
+  horizontal scroll and a taller header never covers focus (DL-98). The other sticky layers in v1
+  are a table's selection toolbar, only while rows are selected (UI-TBL-8), and the item side
+  panel's split pane, under the header at `--header-height` (UI-SHL-11). Any later sticky
   element needs the same `scroll-padding` treatment and an end-to-end focus check
   (UI-FBK-10).
 - **UI-SHL-4** **Org menu** (DL-137; from S2-C0e and S2-C0f): the header reads "Waterline"
@@ -520,13 +521,34 @@ render inside the full shell when signed in.
   project admin, design-doc §5), `/{org_slug}/members`, and
   `/{org_slug}/settings`.
 - **UI-SHL-11** **Opening an item** (a requirement, task, test case, or test run) from a list or
-  the board opens a **side panel** over the list, so the list keeps its place, with **Open full
-  page** (DL-202). The panel has its own URL, the list's route with the item open (e.g.
-  `?open=TA-45`), so Back closes it and the address can be shared. A direct link to an item, and
-  **Copy link**, use the full-page route. For requirements, the tree's ID opens it at
-  `…/requirements?open=RQ-<n>` (DL-262). From S3-C0d, at 64rem and wider the panel is a
-  resizable split pane beside a list that stays usable, and below it this overlay; its header,
-  swapping, unsaved edits, and focus are DL-321 to DL-326, and this rule is rewritten then.
+  the board opens it in the shared **side panel** (`ItemPanel`; DL-202, DL-321 to DL-326):
+  - **Where:** at 64rem and wider, a split pane beside the list, which stays usable (scroll,
+    select, expand, open another item); below 64rem, a modal overlay (the page inert, focus kept
+    in it, Esc closes). Crossing the width keeps what the panel holds, and the focus in it.
+  - **Size:** 560px by default, 400 to 800px, by a vertical separator that drags, steps through
+    400, 560, and 800 on a click without a drag (WCAG 2.5.7, DL-355), and works from the keyboard
+    (`role="separator"`, named, `aria-valuenow/min/max` and a value text, Left and Right
+    arrows); the width is kept per viewer in `localStorage`, in try/catch.
+  - **Address:** the list's route with the item open (e.g. `?open=TA-45`), so Back closes it and
+    the address can be shared; another item's ID swaps it and updates `?open`. A direct link to
+    an item, and **Copy link**, use the full-page route. For requirements, the tree's ID opens it
+    at `…/requirements?open=RQ-<n>` (DL-262).
+  - **Header:** the item's ID (mono) and status badge, with **Open full page**, **Copy link**,
+    and **Close** as icon buttons (each with an accessible name and a tooltip); the title, the
+    panel's heading; then **Edit**, **Change status**, and **⋯ More actions** (its danger items
+    after a separator, the menu hidden when empty), and the item's fields as a two-column
+    definition list. The item's full page has the same actions beside its `h1`, the ID and
+    status under it.
+  - **Focus and landmarks:** opening or swapping focuses the title; at wide widths focus isn't
+    trapped and the panel is a complementary region named for the item ("Requirement
+    PORTAL-RQ-3"); Esc closes it when focus is inside and nothing there used the key (an edit
+    form, a menu, a dialog opened from the panel); closing returns focus to the ID that opened
+    it, or the page's `h1`. The open item's row is marked by more than color: the selected
+    background, a bold title, and an "Open" label with a panel icon; its ID link has
+    `aria-current="true"`.
+  - **Unsaved edits:** Close, Esc from outside the edit form (in it, Esc does nothing), Back,
+    another item's ID, and Open full page first ask **Discard your changes?**, naming the item and
+    what happens, with **Keep editing** (initial focus) and **Discard changes** (danger).
 - **UI-SHL-12** **Creating an item** is a dialog with the essential fields that the user can
   **expand into a full page**, keeping what they typed; after creating, they land on the new
   item to fill in the rest (DL-202). For requirements, **Open as a full page** carries what was

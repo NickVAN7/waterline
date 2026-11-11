@@ -27,9 +27,14 @@ test('an admin deletes a requirement with its child, and restores both from Tras
   const child = await create(`Partial refunds ${stamp}`, parent.id)
   const parentId = `${KEY}-RQ-${parent.number}`
 
-  // Delete, from the keyboard: the dialog starts on Cancel, and asks about the child.
+  // Delete, from the keyboard through ⋯ More actions (DL-326): the dialog starts on Cancel, and
+  // asks about the child.
   await page.goto(`/globex/projects/${KEY}/requirements/${parent.number}`)
-  await page.getByRole('button', { name: 'Delete', exact: true }).focus()
+  await page.getByRole('button', { name: `More actions for ${parentId}` }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu')).toBeFocused()
+  // Delete… is the menu's last item, after a separator.
+  await page.keyboard.press('End')
   await page.keyboard.press('Enter')
   const dialog = page.getByRole('dialog', { name: `Delete ${parentId}?` })
   await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()

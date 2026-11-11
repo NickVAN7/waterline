@@ -19,6 +19,9 @@ export type IconName =
   | 'sign-out'
   | 'pause'
   | 'star'
+  | 'external'
+  | 'link'
+  | 'panel'
 
 // `filled`: drawn solid, for a control's on state (a starred project, DL-305).
 const props = defineProps<{ name: IconName; label?: string; filled?: boolean }>()
@@ -48,6 +51,12 @@ const PATHS: Record<IconName, string[]> = {
   menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
   home: ['M4 11l8-7 8 7', 'M6 9.5V20h12V9.5'],
   more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
+  external: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'],
+  link: [
+    'M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1',
+    'M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1',
+  ],
+  panel: ['M4 5h16v14H4z', 'M14 5v14'],
   'sign-out': [
     'M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2',
     'M9 12h12',

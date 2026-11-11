@@ -308,29 +308,36 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   })
   expect(patched.status()).toBe(200)
 
+  const other = await createRequirement(page, key, 'Another requirement')
+
   await page.goto(`/acme/projects/${key}/requirements`)
   const listUrl = page.url()
   const idLink = page.getByRole('link', { name: `${key}-RQ-${created.number}` })
+  const otherLink = page.getByRole('link', { name: `${key}-RQ-${other.number}` })
 
-  // The ID opens the side panel over the list (UI-SHL-11): its own URL, focus on its title.
+  // At 1280px the ID opens the split pane beside the list (UI-SHL-11, DL-321): its own URL, a
+  // named region, focus on its title, the list still usable.
   await idLink.focus()
   await page.keyboard.press('Enter')
-  const panel = page.getByRole('dialog', { name: 'Stored payload' })
+  const panel = page.getByRole('complementary', { name: `Requirement ${key}-RQ-${created.number}` })
   await expect(panel).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
   await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
   await expect(panel.locator('.markdown')).toContainText('Works')
   expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
+  // Its row is marked by more than color (DL-324).
+  const openRow = page.getByRole('row', { name: /Stored payload/ })
+  await expect(openRow).toContainText('Open')
   await expectNoA11yViolations(page)
-  await expectOnlyTokenColors(page, 'dialog[open]')
+  await expectOnlyTokenColors(page, 'aside')
 
-  // A change in the panel, from the keyboard: its menu works over the inert page, and the row
-  // under it follows.
+  // A change in the panel, from the keyboard; the row beside it follows.
   const change = panel.getByRole('button', { name: `Change status of ${key}-RQ-${created.number}` })
   await change.focus()
   await page.keyboard.press('Enter')
   await expect(panel.getByRole('menu')).toBeFocused()
-  // Under its button, not where PrimeVue's document coordinates would put it in a fixed panel.
+  // Under its button, not where PrimeVue's document coordinates would put it.
   const button = (await change.boundingBox())!
   const opened = (await panel.getByRole('menu').boundingBox())!
   expect(Math.abs(opened.y - (button.y + button.height))).toBeLessThan(12)
@@ -345,30 +352,103 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await panel.getByRole('menu').getByRole('menuitem', { name: 'Deferred' }).click()
   await expect(panel.getByText('Status: Deferred')).toBeVisible()
   await expect(change).toBeFocused()
-  await expect(page.getByRole('row', { name: /Stored payload/ })).toContainText('Deferred')
+  await expect(openRow).toContainText('Deferred')
   // History, open below the description, shows the change, read back from the server (DL-147).
   await expect(
     panel.getByRole('tabpanel', { name: 'History' }).getByRole('listitem').first(),
   ).toContainText('changed the status from Draft to Deferred')
   // Checked once History has rendered, not on its skeleton (ui-reviewer, S2-C19).
   await expectNoA11yViolations(page)
-  await expectOnlyTokenColors(page, 'dialog[open]')
+  await expectOnlyTokenColors(page, 'aside')
 
-  // Esc in the edit form keeps the panel and what was typed; Cancel ends the edit.
+  // ⋯ More actions from the keyboard (DL-325): its menu under its button, in our colors.
+  const more = panel.getByRole('button', { name: `More actions for ${key}-RQ-${created.number}` })
+  await more.focus()
+  await page.keyboard.press('Enter')
+  const moreMenu = page.getByRole('menu', { name: `More actions for ${key}-RQ-${created.number}` })
+  await expect(moreMenu).toBeFocused()
+  const moreBox = (await more.boundingBox())!
+  const moreOpened = (await moreMenu.boundingBox())!
+  expect(Math.abs(moreOpened.y - (moreBox.y + moreBox.height))).toBeLessThan(12)
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, '[role=menu]')
+  // Esc in a dialog opened from the panel closes that dialog alone (UI-SHL-11), focus back on ⋯.
+  await moreMenu.getByRole('menuitem', { name: 'Change restriction…' }).click()
+  const restriction = page.getByRole('dialog', {
+    name: `Restriction of ${key}-RQ-${created.number}`,
+  })
+  await expect(restriction).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(restriction).toBeHidden()
+  await expect(panel).toBeVisible()
+  await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
+  await expect(more).toBeFocused()
+
+  // Esc in the edit form keeps the panel and what was typed.
   await panel.getByRole('button', { name: 'Edit' }).click()
-  const title = panel.getByLabel('Title')
+  const title = panel.getByRole('textbox', { name: 'Title', exact: true })
   await title.fill('Stored payload, edited')
   await page.keyboard.press('Escape')
   await expect(panel).toBeVisible()
   await expect(title).toHaveValue('Stored payload, edited')
-  await panel.getByRole('button', { name: 'Cancel' }).click()
-  await expect(panel.getByRole('button', { name: 'Edit' })).toBeFocused()
+  // Another ID with unsaved edits asks first (DL-323), on Keep editing, which keeps them.
+  await otherLink.click()
+  const discard = page.getByRole('dialog', { name: 'Discard your changes?' })
+  await expect(discard).toContainText(
+    `Your edits to ${key}-RQ-${created.number} aren't saved. Opening ${key}-RQ-${other.number} discards them.`,
+  )
+  await expect(discard.getByRole('button', { name: 'Keep editing' })).toBeFocused()
+  await expectNoA11yViolations(page)
+  await page.keyboard.press('Enter')
+  await expect(discard).toBeHidden()
+  await expect(title).toHaveValue('Stored payload, edited')
+  await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
+  // Discard changes swaps to the other, focus on its title.
+  await otherLink.click()
+  await discard.getByRole('button', { name: 'Discard changes' }).click()
+  const swapped = page.getByRole('complementary', { name: `Requirement ${key}-RQ-${other.number}` })
+  await expect(swapped.getByRole('heading', { name: 'Another requirement' })).toBeFocused()
+  await expect(page).toHaveURL(`${listUrl}?open=RQ-${other.number}`)
+  await expect(page.getByRole('row', { name: /Another requirement/ })).toContainText('Open')
+  await expect(openRow).not.toContainText('Open')
 
-  // Esc closes it as Back would: focus back on the ID, and no history entry left behind.
+  // The separator resizes it from the keyboard (DL-322), and the width is kept.
+  const separator = page.getByRole('separator', { name: 'Resize the panel' })
+  await separator.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(separator).toHaveAttribute('aria-valuenow', '576')
+  await expectFocusNotObscured(page)
+
+  // Esc closes it as Back would: focus back on the ID that opened it, no history entry left.
+  await swapped.getByRole('heading', { name: 'Another requirement' }).focus()
   await page.keyboard.press('Escape')
-  await expect(panel).toBeHidden()
+  await expect(swapped).toBeHidden()
   await expect(page).toHaveURL(listUrl)
+  await expect(otherLink).toBeFocused()
+  // The split pane is a sticky layer (UI-SHL-3): a row's focus beside it isn't covered.
+  await expectFocusNotObscured(page)
+
+  // Narrowing the window with an edit open keeps the edit and the focus in it (UI-SHL-11).
+  await idLink.click()
+  await panel.getByRole('button', { name: 'Edit' }).click()
+  await title.fill('Typed before narrowing')
+  await title.focus()
+  await page.setViewportSize({ width: 900, height: 900 })
+  // Below 64rem it's a modal overlay: a dialog over an inert page, with no separator.
+  const overlay = page.getByRole('dialog', { name: 'Stored payload' })
+  await expect(overlay).toBeVisible()
+  const overlayTitle = overlay.getByRole('textbox', { name: 'Title', exact: true })
+  await expect(overlayTitle).toBeFocused()
+  await expect(overlayTitle).toHaveValue('Typed before narrowing')
+  await overlay.getByRole('button', { name: 'Cancel' }).click()
+  await overlay.getByRole('heading', { name: 'Stored payload' }).focus()
+  await expect(page.getByRole('separator')).toBeHidden()
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, 'dialog[open]')
+  await page.keyboard.press('Escape')
+  await expect(overlay).toBeHidden()
   await expect(idLink).toBeFocused()
+  await page.setViewportSize({ width: 1280, height: 720 })
   await page.goBack()
   await expect(page).not.toHaveURL(listUrl)
   await page.goForward()

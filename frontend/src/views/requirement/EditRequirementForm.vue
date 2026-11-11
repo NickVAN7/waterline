@@ -6,17 +6,16 @@
 // description makes the next revision, with the note. Nothing changed, Save closes the form as
 // Cancel does. A 403 tells the page (`refused`), which reloads what the user may do; a 404 means
 // the requirement is gone (`gone`).
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
-import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import TextField from '@/components/TextField.vue'
 import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 
-import PriorityField from './PriorityField.vue'
+import RequirementFields from './RequirementFields.vue'
 
 type Requirement = components['schemas']['RequirementRead']
 
@@ -48,19 +47,26 @@ const errors = useFormErrors({
 })
 
 const alertBox = ref<InstanceType<typeof FormAlert>>()
-const titleField = ref<InstanceType<typeof TextField>>()
-const descriptionField = ref<InstanceType<typeof MarkdownEditor>>()
+const fields = ref<InstanceType<typeof RequirementFields>>()
 const noteField = ref<InstanceType<typeof TextField>>()
 const formElement = ref<HTMLFormElement>()
 
 async function focus(target: string) {
   await nextTick()
   if (target === 'alert') alertBox.value?.focus()
-  else if (target === 'title') titleField.value?.focus()
-  else if (target === 'description_md') await descriptionField.value?.focus()
-  else if (target === 'priority') document.getElementById(`${PREFIX}-priority`)?.focus()
+  else if (target === 'title' || target === 'description_md' || target === 'priority')
+    await fields.value?.focus(target)
   else noteField.value?.focus()
 }
+
+// Typed but not saved: the side panel asks before it drops them (DL-323).
+const dirty = computed(
+  () =>
+    values.value.title !== base.title ||
+    values.value.description_md !== base.description_md ||
+    values.value.priority !== base.priority ||
+    values.value.change_note !== '',
+)
 
 async function submit(): Promise<void> {
   if (pending.value) return
@@ -100,7 +106,7 @@ async function submit(): Promise<void> {
 const retry = retryFromSubmit(formElement, submit)
 const dismissed = () => dismissToSubmit(errors, formElement)
 
-defineExpose({ focus: () => focus('title') })
+defineExpose({ focus: () => focus('title'), dirty })
 </script>
 
 <template>
@@ -122,30 +128,14 @@ defineExpose({ focus: () => focus('title') })
     <p class="m-0 text-sm text-text-muted">
       <span aria-hidden="true" class="font-bold text-danger">*</span> Required field
     </p>
-    <TextField
-      :id="`${PREFIX}-title`"
-      ref="titleField"
-      v-model="values.title"
-      label="Title"
-      autocomplete="off"
-      required
-      :error="errors.fieldErrors.value.title"
-      @update:model-value="errors.clearField('title')"
-    />
-    <MarkdownEditor
-      :id="`${PREFIX}-description`"
-      ref="descriptionField"
-      v-model="values.description_md"
-      label="Description"
-      help="Write the acceptance criteria as a numbered list under Acceptance Criteria. Markdown: see how it reads in Preview."
-      :error="errors.fieldErrors.value.description_md"
-      @update:model-value="errors.clearField('description_md')"
-    />
-    <PriorityField
-      v-model="values.priority"
+    <RequirementFields
+      ref="fields"
+      v-model:title="values.title"
+      v-model:description="values.description_md"
+      v-model:priority="values.priority"
       :prefix="PREFIX"
-      :error="errors.fieldErrors.value.priority"
-      @edit="errors.clearField('priority')"
+      :errors="errors.fieldErrors.value"
+      @edit="errors.clearField"
     />
     <TextField
       :id="`${PREFIX}-change-note`"

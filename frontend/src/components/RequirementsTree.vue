@@ -18,6 +18,7 @@ import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import Alert from './Alert.vue'
 import Badge from './Badge.vue'
 import Button from './Button.vue'
+import Icon from './Icon.vue'
 import MovePickerDialog from './MovePickerDialog.vue'
 import MoveToMenu, { type MoveAction } from './MoveToMenu.vue'
 
@@ -25,7 +26,13 @@ type Item = components['schemas']['RequirementItem']
 type Node = { key: string; data: Item; children: Node[] }
 type Placement = components['schemas']['RequirementMove']
 
-const props = defineProps<{ projectKey: string; items: Item[]; movable: boolean }>()
+// `openNumber`: the requirement open in the side panel, whose row is marked (DL-324).
+const props = defineProps<{
+  projectKey: string
+  items: Item[]
+  movable: boolean
+  openNumber?: number | null
+}>()
 const emit = defineEmits<{ stale: []; refused: [] }>()
 
 const displayId = (item: Item) => `${props.projectKey}-RQ-${item.number}`
@@ -396,10 +403,14 @@ const tablePt = { table: { 'aria-label': 'Requirements' } }
 const columnPt = { nodeToggleButton: { 'aria-hidden': 'true' } }
 // A selected row also gets the leading bar, not color alone (UI-TOK-9), on its first cell: the
 // table's borders are separate, where a `tr`'s border isn't drawn. Only the selected row has one,
-// since forced colors would draw a transparent border.
+// since forced colors would draw a transparent border. The row open in the side panel has the
+// selected background, its title bold and an "Open" label by its ID (DL-324), so not color alone.
 const rowPt = {
-  row: ({ context }: { context: { selected: boolean } }) => ({
-    class: context.selected ? ['*:first:border-l-3', '*:first:border-accent'] : undefined,
+  row: ({ context, props: row }: { context: { selected: boolean }; props: { node: Node } }) => ({
+    class: [
+      ...(context.selected ? ['*:first:border-l-3', '*:first:border-accent'] : []),
+      ...(row.node.data.number === props.openNumber ? ['bg-selected'] : []),
+    ],
   }),
 }
 const headerPt = { headerCell: { scope: 'col' } }
@@ -448,7 +459,15 @@ const headerPt = { headerCell: { scope: 'col' } }
       @keydown.capture="onKeydown"
       @focusin="onFocusin"
     >
-      <Column field="title" header="Title" expander :pt="{ ...columnPt, ...headerPt }" />
+      <Column field="title" header="Title" expander :pt="{ ...columnPt, ...headerPt }">
+        <template #body="{ node }">
+          <span
+            v-memo="[node.data.title, node.data.number === openNumber]"
+            :class="{ 'font-semibold': node.data.number === openNumber }"
+            >{{ node.data.title }}</span
+          >
+        </template>
+      </Column>
       <Column header="ID" :pt="headerPt">
         <template #body="{ node }">
           <!-- The ID opens the requirement, in the list's side panel (`?open=RQ-7`, UI-SHL-11); a
@@ -456,14 +475,24 @@ const headerPt = { headerCell: { scope: 'col' } }
                Tab stop (DL-266). The
                cells are memoized: TreeTable redraws every row on each expand frame, and a
                component with slot content would re-render each time (DL-253's pass mark). -->
-          <RouterLink
-            v-memo="[node.data.number, focusedKey === node.key]"
-            :to="{ query: { open: `RQ-${node.data.number}` } }"
-            :data-requirement-row="node.key"
-            :tabindex="focusedKey === node.key ? undefined : -1"
-            class="font-mono"
-            >{{ displayId(node.data) }}</RouterLink
+          <span
+            v-memo="[node.data.number, focusedKey === node.key, node.data.number === openNumber]"
+            class="inline-flex items-center gap-2"
           >
+            <RouterLink
+              :to="{ query: { open: `RQ-${node.data.number}` } }"
+              :data-requirement-row="node.key"
+              :aria-current="node.data.number === openNumber ? 'true' : undefined"
+              :tabindex="focusedKey === node.key ? undefined : -1"
+              class="font-mono"
+              >{{ displayId(node.data) }}</RouterLink
+            >
+            <span
+              v-if="node.data.number === openNumber"
+              class="inline-flex items-center gap-1 text-sm text-text-muted"
+              ><Icon name="panel" />Open</span
+            >
+          </span>
         </template>
       </Column>
       <Column header="Status" :pt="headerPt">

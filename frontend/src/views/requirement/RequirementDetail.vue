@@ -3,16 +3,19 @@
 // on its page or in the list's side panel (`inPanel`, UI-SHL-11, S2-C18b): its title, ID, status
 // (DL-148; "Approved · modified" when edited since its approval, design-doc §6.1), restriction,
 // priority, reporter, and its description through `MarkdownView` (the one sanitizing renderer,
-// UI-MD-1), with a note when it has no "Acceptance Criteria" heading (DL-149). The status menu
-// (`requirement.update`) and the restriction control (`requirement.raise_restriction` or
-// `.lower_restriction`, DL-251) act on it; the server decides each change. Edit
+// UI-MD-1), with a note when it has no "Acceptance Criteria" heading (DL-149). Its header (DL-325,
+// DL-326): Edit, the status menu (`requirement.update`), and ⋯ More actions (Change restriction…
+// for `requirement.raise_restriction` or `.lower_restriction`, DL-251; Delete…), then Priority,
+// Reporter, and Restriction as a definition list; on the page the ID and status go under the
+// `h1`, in the panel in its top row. The server decides each change. Edit
 // (`requirement.update`) turns the title, description, and priority into a form in place
 // (DL-263); the status menu waits while it's open, since its change would make the form's save a
 // 409. What it shows is told to its host (`changed`), so the list's row follows a change made in
 // the panel. A refused change asks the host to reload what the user may do (`reloadProject`,
 // false when the user may no longer read it); `focusHeading` is where focus goes when the control
 // that had it is gone (the page's `h1`, the panel's title). Delete (`requirement.delete`) opens
-// the delete dialog; once deleted, the host moves to the tree (`deleted`, DL-287).
+// the delete dialog; once deleted, the host moves to the tree (`deleted`, DL-287). `dirty`: an
+// edit with unsaved changes, for the panel's Discard your changes? (DL-323).
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -26,6 +29,7 @@ import {
   APPROVED_MODIFIED,
   ARCHIVED_BANNER,
   DEACTIVATED,
+  NO_RESTRICTION,
   PRIORITY,
   REQUIREMENT_STATUS,
   requirementStatusBadge,
@@ -36,6 +40,7 @@ import Badge from '@/components/Badge.vue'
 import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import MoreActionsMenu, { type MoreAction } from '@/components/MoreActionsMenu.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
@@ -251,6 +256,24 @@ function approvalChanged(saved: Requirement) {
 
 const restricting = ref<InstanceType<typeof RestrictionDialog>>()
 const deleting = ref<InstanceType<typeof DeleteRequirementDialog>>()
+const moreMenu = ref<InstanceType<typeof MoreActionsMenu>>()
+// ⋯ More actions (DL-325): Change restriction…, then Delete… after a separator; only those
+// `allowed_actions` allow, so an empty menu isn't shown.
+const moreActions = computed<MoreAction[]>(() => {
+  const shown = requirement.value
+  if (!shown) return []
+  return [
+    ...(canRestrict.value
+      ? [{ label: 'Change restriction…', run: () => restricting.value?.open(shown) }]
+      : []),
+    ...(!editing.value && allows(shown, 'requirement.delete')
+      ? [{ label: 'Delete…', danger: true, run: () => deleting.value?.open(shown) }]
+      : []),
+  ]
+})
+
+// Typed in the edit form and not saved: the side panel asks before it drops it (DL-323).
+defineExpose({ dirty: computed(() => editing.value && !!editForm.value?.dirty) })
 
 function restrictionSaved(saved: Requirement) {
   item.data.value = saved
@@ -293,11 +316,13 @@ function restrictionSaved(saved: Requirement) {
       <!-- In the panel too: the list's banner is behind it, inert. -->
       <Alert v-if="project.archived" tone="info">{{ ARCHIVED_BANNER }}</Alert>
       <header class="flex flex-col gap-2">
-        <!-- The page's h1 with its actions; in the panel, whose title is the requirement's, the
-             actions alone. -->
+        <!-- The page's h1 with its actions beside it (DL-326); in the panel, whose title is the
+             requirement's and whose top row holds its ID and status (DL-325), the actions alone. -->
         <component
           :is="inPanel ? 'div' : PageHeader"
-          v-bind="inPanel ? { class: 'flex flex-wrap gap-3' } : { title: requirement.title }"
+          v-bind="
+            inPanel ? { class: 'flex flex-wrap items-center gap-3' } : { title: requirement.title }
+          "
         >
           <Button
             v-if="!editing && allows(requirement, 'requirement.update')"
@@ -314,28 +339,13 @@ function restrictionSaved(saved: Requirement) {
             :pending="changing"
             @change="changeStatus"
           />
-          <Button v-if="canRestrict" variant="secondary" @click="restricting?.open(requirement)"
-            >Change restriction</Button
-          >
-          <Button
-            v-if="!editing && allows(requirement, 'requirement.delete')"
-            variant="danger"
-            @click="deleting?.open(requirement)"
-            >Delete</Button
-          >
+          <MoreActionsMenu ref="moreMenu" :name="id" :actions="moreActions" />
         </component>
-        <div class="flex flex-wrap items-center gap-3">
+        <div v-if="!inPanel" class="flex flex-wrap items-center gap-3">
           <span class="font-mono text-text-muted">{{ id }}</span>
           <Badge :tone="statusBadge.tone" :icon="statusBadge.icon"
             ><span class="sr-only">Status: </span>{{ statusBadge.label }}</Badge
           >
-          <!-- The restriction that applies, its own with the project's (DL-265). -->
-          <RestrictionBadge
-            :project="{
-              restriction_level: requirement.effective_restriction_level,
-              restriction_categories: requirement.effective_restriction_categories,
-            }"
-          />
         </div>
       </header>
       <Alert
@@ -360,13 +370,14 @@ function restrictionSaved(saved: Requirement) {
         @refused="editRefused"
         @gone="editGone"
       />
-      <dl class="m-0 flex flex-col gap-1">
-        <div v-if="!editing" class="flex flex-wrap gap-2">
-          <dt class="font-medium">Priority:</dt>
+      <!-- Two columns of term and value (DL-325, DL-326); the parent comes with S3-C0e (TD-106). -->
+      <dl class="m-0 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div v-if="!editing" class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Priority</dt>
           <dd class="m-0">{{ PRIORITY[requirement.priority] }}</dd>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <dt class="font-medium">Reporter:</dt>
+        <div class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Reporter</dt>
           <dd class="m-0 flex flex-wrap items-center gap-2">
             {{ requirement.reporter_name }}
             <Badge
@@ -375,6 +386,23 @@ function restrictionSaved(saved: Requirement) {
               :icon="DEACTIVATED.icon"
               >{{ DEACTIVATED.label }}</Badge
             >
+          </dd>
+        </div>
+        <div class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Restriction</dt>
+          <!-- The restriction that applies, its own with the project's (DL-265). -->
+          <dd class="m-0">
+            <RestrictionBadge
+              v-if="
+                requirement.effective_restriction_level ||
+                requirement.effective_restriction_categories.length
+              "
+              :project="{
+                restriction_level: requirement.effective_restriction_level,
+                restriction_categories: requirement.effective_restriction_categories,
+              }"
+            />
+            <template v-else>{{ NO_RESTRICTION.label }}</template>
           </dd>
         </div>
       </dl>

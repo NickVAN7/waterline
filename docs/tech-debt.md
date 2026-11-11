@@ -347,17 +347,6 @@ Entry format:
   nears the cap
 - **Status:** open
 
-### TD-92: Closing the side panel drops an open edit
-- **Added:** S2-C18b
-- **What:** while the requirement's edit form is open in the side panel, **Close**, the browser's
-  Back, and **Open full page** close the panel and drop what was typed, without asking. Esc in
-  the form is the form's (it does nothing, as on the page), so it no longer closes the panel.
-- **Why:** no rule says what an item's panel does with unsaved changes (keep them, or ask
-  first); that's the owner's to decide (S2-C18b review, `ui-reviewer`'s proposed UI-SHL-11
-  addition), and the panel is the shared one tasks reuse in Slice 3.
-- **Fix by:** S3-C0d (the split pane asks **Discard your changes?** first, DL-323)
-- **Status:** open
-
 ### TD-96: The approver picker can't name an inherited project admin
 - **Added:** DC-2026-11-05 (DL-278)
 - **What:** the request dialog's approver picker lists the project's explicit members only, so an
@@ -432,6 +421,50 @@ Entry format:
 - **Why:** earlier code outside S3-C0c's scope; the new-project form checks the key before it
   sends, so a user rarely sees the API's message.
 - **Fix by:** S3-C0l (project & requirements feedback), or sooner if the owner says so
+- **Status:** open
+
+### TD-106: The requirement's header has no Parent row yet
+- **Added:** S3-C0d
+- **What:** DL-325 and DL-326's definition list has Priority, Reporter, and Restriction, but not
+  Parent (its ID linked, then its title): the requirement read returns only `parent_id`.
+- **Why:** the owner's decision (2026-11-11, S3-C0d): the parent's number and title come with
+  the read's `ancestors` in S3-C0e, which has the security review for what a parent's title may
+  show, rather than a second field added here.
+- **Fix by:** S3-C0e (breadcrumbs, the read's `ancestors`)
+- **Status:** open
+
+### TD-107: An icon button's tooltip is its `title`, which keyboard focus never shows
+- **Added:** S3-C0d
+- **What:** the side panel's Open full page, Copy link, and Close, ⋯ More actions, and
+  `RowActions` before them, show their name on hover through the native `title` only: it doesn't
+  appear on keyboard focus and can't be dismissed with Esc (WCAG 1.4.13), so a sighted keyboard
+  user sees bare icons. Their accessible names are right.
+- **Why:** the repo's one pattern for a tooltip; a focus-showing hint (the guide's `FieldHint`)
+  isn't built yet, and building one is its own component (ui-reviewer, S3-C0d, finding 5).
+- **Fix by:** S3-C33 (the tech-debt review: build the hint then, or before the first new icon button)
+- **Status:** open
+
+### TD-108: Just above 64rem, the split pane leaves the list little room
+- **Added:** S3-C0d
+- **What:** the split pane starts at 64rem and is 400 to 800px wide (DL-321, DL-322), so at
+  1024px (or 1280px at 125% zoom), with the sidebar and padding, a 560px panel leaves the tree
+  about 150px, and a stored 800px leaves none, the row then scrolling sideways.
+- **Why:** kept as decided by the owner (2026-11-11, S3-C0d review, ui-reviewer finding 2):
+  judged at slice verification, where the manual pass checks the requirements page at 1024 to
+  1280px and zoomed, before a cap or a later breakpoint is chosen.
+- **Fix by:** S3-C33 (slice verification's manual pass)
+- **Status:** open
+
+### TD-109: A dialog opened from the panel may stop being modal when the window crosses 64rem
+- **Added:** S3-C0d
+- **What:** Change restriction…, Delete…, and Request approval are `<dialog>`s inside the side
+  panel's teleported content. If one is open when the window crosses 64rem, the move takes it
+  out of the top layer: by the HTML spec it stays open but isn't modal any more, so the page
+  behind isn't inert and its Esc may reach the panel instead (ui-reviewer, S3-C0d pass 2).
+- **Why:** unconfirmed: it needs a real browser to see what happens, and crossing the width with
+  a dialog open (a tablet turned, a zoom) is rare; the fix, if needed, is to close or reopen the
+  nested dialog on the breakpoint change.
+- **Fix by:** S3-C33 (the manual pass checks it at 1024px; fixed in the slice if it shows)
 - **Status:** open
 
 ---
@@ -772,6 +805,11 @@ Entry format:
 - **Status:** resolved in S2-C20a (`MarkdownView`'s `level`; the requirement page passes
   `:level="2"`, so a description's `#` is an `h3` under "Description"); closed in S2-C22 by the
   owner
+
+### TD-92: Closing the side panel drops an open edit
+- **Added:** S2-C18b
+- **Status:** resolved in S3-C0d: Close, Esc, Back, another item's ID, and Open full page ask
+  **Discard your changes?** first (DL-323)
 
 ### TD-93: Expand all may not be the right action for the tree
 - **Added:** DC-2026-11-04b (DL-270)

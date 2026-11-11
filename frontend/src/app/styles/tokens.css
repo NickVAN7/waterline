@@ -100,6 +100,7 @@
   --control-height-sm: 2rem; /* 32px: icon-only buttons, dense rows */
   --control-height: 2.25rem; /* 36px: buttons and inputs */
   --header-height: 3.5rem;
+  --split-pane-height: calc(100dvh - var(--header-height)); /* the side panel beside a list */
   --sidebar-width: 15rem;
   --content-narrow: 40rem; /* forms, settings */
   --content-wide: 80rem; /* lists, tables */

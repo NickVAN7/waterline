@@ -1325,7 +1325,7 @@ accurate PR status.
 **Deleting a test case:** its requirement links and recorded results remain for history; its
 `not_run` rows are removed from open runs.
 
-**Deleting a requirement** (the Delete button in its header, on the page and in the side panel,
+**Deleting a requirement** (Delete… in its header's ⋯ More actions, on the page and in the side panel,
 DL-287) opens a dialog listing what's affected, with a choice per category:
 - **Linked tasks and test cases:** *detach* them (they remain, now without a requirement, and
   are flagged in the UI) **or** soft-delete them too.

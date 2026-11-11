@@ -4429,3 +4429,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   build plan (S3-C15, S3-C27)
 - **Source:** owner, Nov 10, 2026 (Claude Code session, Slice 3 plan's design change;
   `docs-consistency` decision 1)
+
+### DL-355: A click on the split pane's separator steps its width
+- **Date:** 2026-11-11
+- **Decision:** Besides dragging and the arrow keys (DL-322), a click on the separator without a
+  drag (under 4px of movement) steps the panel's width through 400, 560, and 800px, then back to
+  400, and the width is kept as a drag's is. It's the single-pointer alternative WCAG 2.5.7 asks
+  for a drag; the separator says its width as "560 pixels wide".
+- **Supersedes:** none (adds to DL-322)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-11; build plan (S3-C0d)
+- **Source:** owner, Nov 11, 2026 (S3-C0d review, ui-reviewer finding 4)

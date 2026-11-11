@@ -835,7 +835,8 @@ frontend/src/
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
                      Pagination, SuccessStatus, PageHeader, ModalDialog, ItemPanel,
-                     ConfirmDialog, GroupError, RowActions, Icon, NameSlugSettings,
+                     ConfirmDialog, GroupError, RowActions, MoreActionsMenu, Icon,
+                     NameSlugSettings,
                      CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9)
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
                      useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
@@ -853,7 +854,8 @@ frontend/src/
                      person, change role, and remove dialogs); plus status/ and errors/ (404,
                      403, no access)
   test/              helpers for the specs: a11y.ts, api.ts (typed responses), projects.ts,
-                     overlay.ts (`stubResizeObserver`, `stubDialog`), router.ts, workspace.ts
+                     overlay.ts (`stubResizeObserver`, `stubDialog`, `stubWidth`), router.ts,
+                     workspace.ts
                      (`mountWorkspaceView`, `mountSignedIn`), org.ts (`mountOrgView`,
                      `mountOrgPages`)
 frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
@@ -971,16 +973,26 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   element marked `data-autofocus` (a confirmation's Cancel) or the first field, and closing
   returns focus to whatever had it, or to `fallbackFocus` when that's gone (a removed row).
   `RowActions` puts focus back on its own button before an action runs, so a dialog it opens
-  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A form
+  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A
+  confirmation whose action moves focus itself (a navigation) passes `navigates`, so it doesn't
+  return focus to its opener a task later (`ConfirmDialog`). A form
   alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
   before repeating the action (UI-FRM-7).
-- **Side panels** (UI-SHL-11): `ItemPanel` is `ModalDialog` with `panel` (docked at the right,
-  opening on its title), Open full page, Copy link, and Close. The list page owns it from its URL
-  (`?open=RQ-7`): it opens the panel when the query names an item and closes it when the query
-  goes; the panel's `close` (Esc, Close) goes Back when the entry before is the list without it,
-  else replaces the URL. The item's view is shared with its full page (`RequirementDetail`, with
-  `inPanel`), and tells the list what it shows (`changed`), so the list updates its row in place
-  (`RequirementsTree`'s `update()`; the tree's data is a shallow ref).
+- **Side panels** (UI-SHL-11, DL-321 to DL-326, DL-355): `ItemPanel` holds its own `<aside>` (the
+  split pane at 64rem and wider, named by `label`, with the resizing separator) and `<dialog>`
+  (the overlay below), and one teleport that moves the content, its `meta` slot (ID and status)
+  and default slot (the item) under its header, between them. The list page owns it from its URL
+  (`?open=RQ-7`): it calls `open()` when the query names an item, `swapped()` when it names
+  another, and `close()` when it goes. Close and Esc only emit `dismiss`, and the page changes
+  the URL (Back when the entry before is the list without it, else a replace); `closed` comes
+  once it has closed. So every way out goes through the page's `onBeforeRouteUpdate` and
+  `onBeforeRouteLeave`, which ask **Discard your changes?** (`ConfirmDialog` with `navigates`)
+  while the item's `dirty` is true. The item's view is shared with its full page
+  (`RequirementDetail`, with `inPanel`; its ⋯ menu is `MoreActionsMenu`, its fields in the forms
+  `RequirementFields`), and tells the list what it shows (`changed`), so the list updates its row
+  in place (`RequirementsTree`'s `update()`; the tree's data is a shallow ref) and marks the open
+  row (`openNumber`). Specs set the width with `stubWidth(wide)` (`@/test/overlay`; jsdom has no
+  `matchMedia`), whose `resize()` crosses the breakpoint.
 - **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
   only the latest answer, and gives the message for a polite live region under the field; `skip`
   leaves out a value that needs no check (the person's own username).
