@@ -978,7 +978,7 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   return focus to its opener a task later (`ConfirmDialog`). A form
   alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
   before repeating the action (UI-FRM-7).
-- **Side panels** (UI-SHL-11, DL-321 to DL-326, DL-355): `ItemPanel` holds its own `<aside>` (the
+- **Side panels** (UI-SHL-11, DL-321 to DL-326, DL-355, DL-356): `ItemPanel` holds its own `<aside>` (the
   split pane at 64rem and wider, named by `label`, with the resizing separator) and `<dialog>`
   (the overlay below), and one teleport that moves the content, its `meta` slot (ID and status)
   and default slot (the item) under its header, between them. The list page owns it from its URL
@@ -992,7 +992,9 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `RequirementFields`), and tells the list what it shows (`changed`), so the list updates its row
   in place (`RequirementsTree`'s `update()`; the tree's data is a shallow ref) and marks the open
   row (`openNumber`). Specs set the width with `stubWidth(wide)` (`@/test/overlay`; jsdom has no
-  `matchMedia`), whose `resize()` crosses the breakpoint.
+  `matchMedia`), whose `resize()` crosses the breakpoint. Its route sets `meta.fullWidth`, so
+  `AppLayout`'s `main` drops the `--content-wide` cap and the panel reaches the window's right
+  edge (DL-356).
 - **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
   only the latest answer, and gives the message for a polite live region under the field; `skip`
   leaves out a value that needs no check (the person's own username).

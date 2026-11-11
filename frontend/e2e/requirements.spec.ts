@@ -325,6 +325,21 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
   await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
   await expect(panel.locator('.markdown')).toContainText('Works')
+  // On a screen wider than the sidebar and `--content-wide`, the split pane still reaches the
+  // window's right edge, less `main`'s padding: the page takes the whole width (UI-SHL-7).
+  await page.setViewportSize({ width: 1920, height: 720 })
+  const panelRight = await panel.evaluate((el) => {
+    const main = document.getElementById('main')!
+    return {
+      gap: main.getBoundingClientRect().right - el.getBoundingClientRect().right,
+      padding: parseFloat(getComputedStyle(main).paddingRight),
+      mainRight: main.getBoundingClientRect().right,
+      viewport: document.documentElement.clientWidth,
+    }
+  })
+  expect(panelRight.gap).toBeCloseTo(panelRight.padding, 0)
+  expect(panelRight.mainRight).toBeCloseTo(panelRight.viewport, 0)
+  await page.setViewportSize({ width: 1280, height: 720 })
   expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
   // Its row is marked by more than color (DL-324).
   const openRow = page.getByRole('row', { name: /Stored payload/ })

@@ -20,5 +20,6 @@ means the guard stopped something it should have.
 | 11 | S3-C0d review | `cd …; sed -n …; git log …` (reading a decision and its commit) | a compound command with git in it | two separate calls | legit; my slip (the rule is known), cost a retry |
 | 12 | S3-C0d review | `git log -S "<text>" -- docs/decision-log.md` (read-only: which commit added a decision) | `-S` isn't an allowed `git log` option | not needed: the decision's own Source line answered it | legit |
 | 13 | S3-C0d review | a `python3 -` heredoc editing the user guide, then `sed` on `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | a scratchpad script, and the Edit tool | legit |
+| 14 | fix(S3-C0d) | `cd …; git diff --stat` (read-only) | a compound command with git in it | `git -C` on its own | legit; my slip again (as #11) |
 
 None of the blocks so far stopped anything the rules forbid.

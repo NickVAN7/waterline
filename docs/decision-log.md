@@ -4440,3 +4440,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-SHL-11; build plan (S3-C0d)
 - **Source:** owner, Nov 11, 2026 (S3-C0d review, ui-reviewer finding 4)
+
+### DL-356: A list with the split pane takes the whole width
+- **Date:** 2026-11-11
+- **Decision:** A list page that opens items in the side panel's split pane (the requirements
+  page now; later the task list and board, test cases, test runs) isn't held to
+  `--content-wide`: `main` takes the whole width beside the sidebar, so the panel sits against the
+  window's right edge and the list stretches, whether or not an item is open (route meta
+  `fullWidth`). Capped at 80rem, a wide screen put the list and the panel in one column with the
+  rest of the screen empty.
+- **Supersedes:** none (an exception to UI-SHL-7)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11
+- **Source:** owner, Nov 11, 2026 (after S3-C0d, trying the split pane on a wide screen)

@@ -159,3 +159,9 @@ the separator's 1px line and its focus in forced colors.
   the manual pass.
 - **DL-355** (ui-reviewer 4): a click on the separator steps its width.
 - Before review, during the build: the Parent row goes to S3-C0e (TD-106).
+
+## After the commit: found by the owner
+
+| # | Severity | Rule | Finding | Resolution |
+|---|---|---|---|---|
+| 1 | major | UI-SHL-7, UI-SHL-11 | On a screen wider than the sidebar and 80rem, the split pane and the tree share `main`'s 80rem column, the rest of the screen empty. Escaped review: the e2e ran at 1280px, where the cap doesn't show. | **Fixed** in `fix(S3-C0d)`: owner decision DL-356, a split-pane list takes the whole width (route meta `fullWidth`); the e2e checks the panel's right edge at 1920px, failing without the meta (sabotage-checked by the implementing session: evidence, not verification; CI runs it). Siblings: the requirements page is the only split-pane list so far; later ones set the meta (UI-SHL-7). |

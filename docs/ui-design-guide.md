@@ -421,7 +421,7 @@ cover (found in the spike, to be completed per component as it is adopted, UI-ST
 │ ──────────── │ project pages: archived banner; project header      │
 │ [Waterline ▾]│ with its restriction badge                          │
 │  Home        │ ──────────────────────────────────────────          │
-│  Requirements│ content: up to 80rem; forms and settings 40rem      │
+│  Requirements│ content: up to 80rem (a split-pane list: all of it);│
 │  Tasks       │                                                     │
 │  Test cases  │                                                     │
 │  Members     │                                                     │
@@ -486,7 +486,9 @@ render inside the full shell when signed in.
   linked from the members page, not a pages item; the members page adds with Add member (the
   picker, primary) and Add by email (secondary) (DL-119).
 - **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
-  up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. Pages
+  up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. A list
+  that opens items in the split pane (UI-SHL-11) takes the whole width instead, so the panel
+  reaches the window's right edge (route meta `fullWidth`; DL-356). Pages
   reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the

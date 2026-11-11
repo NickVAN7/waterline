@@ -19,6 +19,9 @@ declare module 'vue-router' {
     /** An admin page: the sidebar shows this area's pages in place of the project selector
      * (UI-SHL-5, UI-SHL-10). */
     adminArea?: 'workspace' | 'org'
+    /** A list with the side panel's split pane: `main` takes the whole width, not
+     * `--content-wide` (UI-SHL-7, UI-SHL-11). */
+    fullWidth?: boolean
   }
 }
 
