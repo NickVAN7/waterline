@@ -195,6 +195,9 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   `<dialog>` inside it: a modal's keydown still bubbles through its DOM ancestors, and its own
   cancel comes after, so the container would close too. The e2e presses Esc in a dialog opened
   from the panel and expects the panel to stay (S3-C0d review).
+- A boundary or a control's only visible line (a pane's edge, a separator) is a `border` or an
+  `outline`, never a background: forced colors turn backgrounds into Canvas, and the line
+  vanishes. The e2e compares it with a `CanvasText` probe (S3-C0d review, after DL-356).
 - Content moved between containers (a teleport's target changing at a breakpoint) puts focus
   back where it was: moving a node that holds focus blurs it, and a dialog's open or close moves
   it again (S3-C0d review).

@@ -448,7 +448,9 @@ Entry format:
 - **Added:** S3-C0d
 - **What:** the split pane starts at 64rem and is 400 to 800px wide (DL-321, DL-322), so at
   1024px (or 1280px at 125% zoom), with the sidebar and padding, a 560px panel leaves the tree
-  about 150px, and a stored 800px leaves none, the row then scrolling sideways.
+  about 150px, and a stored 800px leaves none, the row then scrolling sideways. Since DL-356 the
+  panel is beside `main` itself, so the page header (the `h1` and **New requirement**) and its
+  alerts narrow with the tree.
 - **Why:** kept as decided by the owner (2026-11-11, S3-C0d review, ui-reviewer finding 2):
   judged at slice verification, where the manual pass checks the requirements page at 1024 to
   1280px and zoomed, before a cap or a later breakpoint is chosen.

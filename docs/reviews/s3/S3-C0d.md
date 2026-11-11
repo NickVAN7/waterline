@@ -166,3 +166,19 @@ the separator's 1px line and its focus in forced colors.
 |---|---|---|---|---|
 | 1 | major | UI-SHL-7, UI-SHL-11 | On a screen wider than the sidebar and 80rem, the split pane and the tree share `main`'s 80rem column, the rest of the screen empty. Escaped review: the e2e ran at 1280px, where the cap doesn't show. | **Fixed** in `fix(S3-C0d)`: owner decision DL-356, a split-pane list takes the whole width (route meta `fullWidth`); the e2e checks the panel's right edge at 1920px, failing without the meta (sabotage-checked by the implementing session: evidence, not verification; CI runs it). Siblings: the requirements page is the only split-pane list so far; later ones set the meta (UI-SHL-7). |
 | 2 | major | UI-SHL-11 | Still not it, after #1: the panel sat inside `main`, under the page header, so it neither ran from the app header to the window's foot nor let the page header (New requirement) narrow beside it. | **Fixed** in a second `fix(S3-C0d)`: the `<aside>` is teleported to `AppLayout`'s column after `main` (`#side-pane`), DL-356 restated; the separator's line is now the panel's border (it drew a second line beside it). The e2e checks the panel's top against the header, its foot and right edge against the window, and `main` ending where it starts, at 1920px. Checked in a screenshot at 1920px by the implementing session (evidence, not verification). |
+
+## ui-reviewer, pass 3 (the two fixes: `d69b18b..fc2c6e0`, owner-requested)
+
+Verdict: pass with findings.
+
+| # | Severity | Rule | Finding | Resolution |
+|---|---|---|---|---|
+| 1 | major | UI-TOK-6, WCAG 1.4.11 | `fc2c6e0` dropped the content's `border-l`, leaving the separator's line as a background (`w-px bg-border`): forced colors turn it into Canvas, so the panel's edge and the resize handle's line vanish. | **Fixed:** the line is a `border-l` (accent on hover and focus); an e2e under forced colors compares it with a `CanvasText` probe, and fails (border width 0) with the background line put back (sabotage by the implementing session: evidence). Rule added to `frontend/CLAUDE.md`. Siblings: no other pane edge or separator is drawn as a background in the diff. |
+| 2 | minor | UI-SHL-7, TD-108 | With the panel beside `main`, a wide panel at 64rem squeezes the page header (`h1`, New requirement) and alerts too, not only the tree. | **Fixed (docs):** TD-108 says so; the manual pass judges them at 1024 to 1280px. |
+| 3 | note | UI-TOK-4 | The aside's top and foot assume the header is exactly `--header-height`; it's `min-h`, so text spacing or a long org name could misplace it (as before). | **Manual pass** (S3-C33): text spacing at 1280px with the panel open. |
+| 4 | note | — | `provide('sidePane')` uses a bare string key. | **Left** until a second consumer (the task list): one key, one consumer. |
+
+**Needs the manual pass** (S3-C33): forced colors with the panel open at 1280 and 1920px (the
+edge, the separator, its hover and focus); 1024 to 1280px with an 800px panel (TD-108); text
+spacing with the panel open; the complementary landmark found after `main` with NVDA or
+VoiceOver.

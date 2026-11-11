@@ -229,7 +229,9 @@ defineExpose({ open, close, swapped, focusTitle: () => heading.value?.focus() })
         @pointerup="dragEnd"
         @pointercancel="dragCancel"
       >
-        <span class="w-px bg-border group-hover:bg-accent group-focus-visible:bg-accent" />
+        <span
+          class="border-l border-border group-hover:border-accent group-focus-visible:border-accent"
+        />
       </div>
       <div :id="wideId" class="min-w-0 flex-1 overflow-y-auto bg-surface" />
     </aside>

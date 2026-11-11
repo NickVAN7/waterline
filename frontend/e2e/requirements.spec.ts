@@ -344,6 +344,30 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   const create = (await page.getByRole('button', { name: 'New requirement' }).boundingBox())!
   const panelBox = (await panel.boundingBox())!
   expect(create.x + create.width).toBeLessThan(panelBox.x)
+  // Forced colors: the panel's edge, the separator's line, stays drawn, as a border in the
+  // system's CanvasText: a background line would turn into Canvas and vanish (UI-TOK-6).
+  await page.emulateMedia({ forcedColors: 'active' })
+  const edge = await page
+    .getByRole('separator', { name: 'Resize the panel' })
+    .locator('span')
+    .evaluate((el) => {
+      const probe = document.createElement('div')
+      probe.style.color = 'CanvasText'
+      document.body.append(probe)
+      const canvasText = getComputedStyle(probe).color
+      probe.remove()
+      const style = getComputedStyle(el)
+      return {
+        color: style.borderLeftColor,
+        canvasText,
+        width: parseFloat(style.borderLeftWidth),
+        height: el.getBoundingClientRect().height,
+      }
+    })
+  expect(edge.color).toBe(edge.canvasText)
+  expect(edge.width).toBeGreaterThanOrEqual(1)
+  expect(edge.height).toBeGreaterThan(panelBox.height / 2)
+  await page.emulateMedia({ forcedColors: 'none' })
   await page.setViewportSize({ width: 1280, height: 720 })
   expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
   // Its row is marked by more than color (DL-324).
