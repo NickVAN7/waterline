@@ -14,5 +14,6 @@ means the guard stopped something it should have.
 | 5 | after the trial, 2026-11-10 | `ls …; find … -name remote.git` (finding the trial clone) | a compound command mentioning git | two separate calls | legit |
 | 6 | after the trial | `git reflog show main` (read-only) | not in the allow-list | read `.git/logs/` files with `cat` | legit; the read was allowed by another route |
 | 7 | after the trial | `cat >> README.md <<'EOF'` with text mentioning git | a heredoc mentioning git | the Edit tool | legit |
+| 8 | after the trial | `python3 - <memory file> <<'PY'` editing a note that mentions git | a heredoc mentioning git | the Edit tool | legit |
 
 None of the blocks so far stopped anything the rules forbid.

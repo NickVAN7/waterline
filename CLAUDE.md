@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0b (The git guard's trial) run; its decision held to the end of S3-C0x; next: S3-C0c (The
-manual pass's setup command).
+S3-C0c (The manual pass's setup command) done; the git guard's decision held to the end of
+S3-C0x; next: S3-C0d (The item side panel as a split pane).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

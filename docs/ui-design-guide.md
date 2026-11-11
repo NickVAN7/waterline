@@ -1165,7 +1165,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 ## Appendix A — Manual keyboard and screen-reader pass
 
 **The owner's sheet** (from Slice 3, DL-320): one setup command creates every state the pass
-needs (the demo seed, S3-C0c); the checks below are stated once, for the whole pass; each
+needs (`wl seed --manual-pass`, developer guide, "Demo data"); the checks below are stated once, for the whole pass; each
 screen's own checks are concrete actions with what should happen ("On My work, press Tab from
 the header: focus goes to the first project's star, then its name"); and it's in plain
 language, with no checkpoint IDs or rule numbers.

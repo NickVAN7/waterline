@@ -135,6 +135,7 @@ container from the api service's image: `docker compose run --rm api ...`, after
 |---|---|
 | `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
 | `wl seed --demo` | Build the demo dataset instead, workspace and system admin included ("Demo data" in section 5): refused once a workspace exists, and unless `DEMO_SEED_ENABLED=true` (the `.env.example` default; off otherwise, and never on in production, since every demo account has the same public password). Takes no other values |
+| `wl seed --manual-pass` | The demo dataset plus every state the slice's manual pass needs ("Demo data" in section 5), refused as `--demo` is. Not for the end-to-end stack, whose tests count what `--demo` builds |
 | `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
 | `wl admin revoke-system-admin <email>` | Take it away, handing over their undecided approvals where the flag was their only access (logged with no actor); refused for the last active system admin |
 
@@ -527,6 +528,21 @@ permission its endpoint checks, so a step the app would refuse fails the seed.
 | `dev`, `hana`, `kira`, `quinn` | Viewers of `ERP`, `PORTAL`, `INV`, `FIN` |
 | `fiona`, `felix` | Members of `ERP` who must change their password at sign-in (one per theme run of the end-to-end flow) |
 | `nora` | No memberships: the no-access page |
+
+**For the manual pass**, `uv run wl seed --manual-pass` (instead of `--demo`, on an empty
+database) builds the same data plus every state the slice's manual keyboard and screen-reader
+pass needs (DL-320), each step again by the person who would take it:
+
+| State | Where |
+|---|---|
+| Eleven projects in one org | `acme` gains `CRM`, `WMS`, `HRS`, `BIR`, `EDI`, `MOB`, `SRV` (lead `lena`, member `sam`) and `RADAR`: sign in as `olivia` (the owner) to see all eleven, or `sam` for nine |
+| An export-controlled project | `RADAR` (lead `liam`, member `ben`) |
+| Nested requirements | `PORTAL`'s `RQ-1` › `RQ-2` › `RQ-3`, reported by `finn` |
+| Headings, a list, and a long URL in a description, three revisions | `RQ-2`, Sign-in |
+| Approval requests: pending, approved, "Approved · modified" | `RQ-4`, `RQ-5`, `RQ-6`, asked by `lena`, approver `ella` (sign in as `ella` for one waiting) |
+| Trash items | `RQ-7` deleted alone by `finn`; `RQ-8` with its child `RQ-9` by `lena` |
+| A deactivated member | `hana` (a viewer of `PORTAL`), deactivated by `wendy` |
+| A second session | `admin` has one from Firefox on Windows, beside the one you sign in with; it ends after 7 idle days, so seed shortly before the pass |
 
 ### Local Postgres
 
