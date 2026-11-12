@@ -56,7 +56,14 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
       @retry="retry"
     />
     <template v-else>
-      <ProjectHeader :project="loaded" :title="`${loaded.name} project access review`" />
+      <ProjectHeader
+        :project="loaded"
+        :title="`${loaded.name} project access review`"
+        :trail="[
+          { label: 'Members', to: { name: 'project-members', params: { key: loaded.key } } },
+          { label: 'Access review' },
+        ]"
+      />
       <p class="m-0 text-text-muted">
         Everyone who can open this project, and why: their own role on it, or an admin role they
         inherit from the organization or the workspace.

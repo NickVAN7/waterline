@@ -10,6 +10,7 @@ import { useRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { projectCrumbs } from '@/app/crumbs'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Skeleton from '@/components/Skeleton.vue'
@@ -77,12 +78,18 @@ async function created(requirement: components['schemas']['RequirementRead']) {
       @retry="retry"
     />
     <template v-else>
-      <RouterLink
-        :to="{ name: 'project-requirements', params: { key: loaded.key } }"
-        class="self-start text-sm"
-        >Requirements</RouterLink
-      >
-      <PageHeader title="Create a requirement" />
+      <PageHeader
+        title="Create a requirement"
+        :crumbs="
+          projectCrumbs(loaded, [
+            {
+              label: 'Requirements',
+              to: { name: 'project-requirements', params: { key: loaded.key } },
+            },
+            { label: 'Create a requirement' },
+          ])
+        "
+      />
       <div :aria-busy="tree.loading.value && !tree.data.value ? 'true' : 'false'">
         <!-- Only before the first load: a failed reload (after a gone parent) keeps the form and
              what was typed (UI-FRM-7). -->

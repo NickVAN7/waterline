@@ -8,6 +8,7 @@ import { ACME, failed, ok } from '@/test/api'
 import { mountOrgView } from '@/test/org'
 import { projectItem } from '@/test/projects'
 import { cleanUpAfterEach, listPage } from '@/test/workspace'
+import { trail } from '@/test/trail'
 
 import OrgOverviewView from './OrgOverviewView.vue'
 
@@ -46,6 +47,11 @@ describe('OrgOverviewView', () => {
       params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing overview')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [['Acme Manufacturing', '/acme/projects']],
+      current: 'Overview',
+    })
     expect(
       wrapper.findAll('dl > div').map((row) => [row.get('dt').text(), row.get('dd').text()]),
     ).toEqual([
@@ -167,6 +173,7 @@ describe('OrgOverviewView', () => {
     const { wrapper } = await mountOrgView(OrgOverviewView, '/acme/overview', ['org_member.manage'])
 
     expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
       'Projects pagination',
       'Archived pagination',
     ])

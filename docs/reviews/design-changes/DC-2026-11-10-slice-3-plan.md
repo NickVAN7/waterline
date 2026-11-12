@@ -156,7 +156,7 @@ docs state the refined rules.
   `app/authz/` (adding C5, C6, C8, C9 for their targeted rules), or only rows that add an action
   or rule (dropping C3 and C4, whose actions C2 registers)?
 - **R2.** Name the missing endpoints, actions, and filters before the rows start: S3-C0e's
-  `ancestors` scoping; S3-C0m's endpoint and per-project actions; S3-C13's candidates endpoints;
+  `ancestors` scoping (decided: DL-357, Nov 11); S3-C0m's endpoint and per-project actions; S3-C13's candidates endpoints;
   S3-C5's and S3-C10's declared filters and sorts.
 - **R3.** Splits: S3-C10 (the tree's filters as S3-C10a), S3-C9 (the requirement delete's linked
   tasks), S3-C27 (Timeline and Workstreams), S3-C29 (the "see all" screens), S3-C0g, S3-C0j (the

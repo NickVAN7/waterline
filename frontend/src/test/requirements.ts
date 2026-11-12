@@ -34,6 +34,7 @@ export function requirementRead(number: number, title: string): Requirement {
     effective_restriction_categories: [],
     approved_revision_number: null,
     has_children: false,
+    ancestors: [],
     can_delete_children: false,
     approved_at: null,
     version: 1,

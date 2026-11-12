@@ -6,6 +6,7 @@ import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, workspaceEntry } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { trail } from '@/test/trail'
 import {
   cleanUpAfterEach,
   emptyPastTheFirst,
@@ -46,6 +47,11 @@ describe('OrgsView', () => {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Organizations')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [['Workspace', '/workspace/staff']],
+      current: 'Organizations',
+    })
     expect(
       wrapper.findAll('tbody tr').map((tr) => [tr.get('a').text(), tr.get('a').attributes('href')]),
     ).toEqual([

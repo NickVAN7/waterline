@@ -53,6 +53,7 @@ from app.schemas.approval import (
     ApprovalRequestRead,
 )
 from app.schemas.requirement import (
+    RequirementAncestor,
     RequirementApprove,
     RequirementCreate,
     RequirementItem,
@@ -808,6 +809,10 @@ class RequirementService:
             created_at=requirement.created_at,
             updated_at=requirement.updated_at,
             allowed_actions=allowed_actions(ctx, project_target(project, requirement)),
+            ancestors=[
+                RequirementAncestor(number=number, title=title)
+                for number, title in await self.repository.ancestors(requirement)
+            ],
         )
 
     async def _revision_number(self, revision_id: uuid.UUID | None) -> int | None:

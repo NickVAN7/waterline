@@ -8,6 +8,7 @@ import { FORM_MESSAGES } from '@/composables/useFormErrors'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, validationFailed, workspaceEntry } from '@/test/api'
 import { cleanUpAfterEach, mountWorkspaceView, WORKSPACE_ID } from '@/test/workspace'
+import { trail } from '@/test/trail'
 
 import WorkspaceSettingsView from './WorkspaceSettingsView.vue'
 
@@ -41,6 +42,8 @@ describe('WorkspaceSettingsView', () => {
     )
 
     expect(wrapper.get('h1').text()).toBe('Workspace settings')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({ links: [['Workspace', '/workspace/staff']], current: 'Settings' })
     expect(wrapper.get<HTMLInputElement>('#workspace-name').element.value).toBe('Harbor Consulting')
     expect(wrapper.get<HTMLInputElement>('#workspace-slug').element.value).toBe('harbor')
     await expectNoA11yViolations(wrapper)

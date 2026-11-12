@@ -423,16 +423,6 @@ Entry format:
 - **Fix by:** S3-C0l (project & requirements feedback), or sooner if the owner says so
 - **Status:** open
 
-### TD-106: The requirement's header has no Parent row yet
-- **Added:** S3-C0d
-- **What:** DL-325 and DL-326's definition list has Priority, Reporter, and Restriction, but not
-  Parent (its ID linked, then its title): the requirement read returns only `parent_id`.
-- **Why:** the owner's decision (2026-11-11, S3-C0d): the parent's number and title come with
-  the read's `ancestors` in S3-C0e, which has the security review for what a parent's title may
-  show, rather than a second field added here.
-- **Fix by:** S3-C0e (breadcrumbs, the read's `ancestors`)
-- **Status:** open
-
 ### TD-107: An icon button's tooltip is its `title`, which keyboard focus never shows
 - **Added:** S3-C0d
 - **What:** the side panel's Open full page, Copy link, and Close, ⋯ More actions, and
@@ -467,6 +457,17 @@ Entry format:
   a dialog open (a tablet turned, a zoom) is rare; the fix, if needed, is to close or reopen the
   nested dialog on the breakpoint change.
 - **Fix by:** S3-C33 (the manual pass checks it at 1024px; fixed in the slice if it shows)
+- **Status:** open
+
+### TD-110: Focus on the trail's "…" or a middle crumb drops when the window crosses 40rem
+- **Added:** S3-C0e
+- **What:** the fold and the middle crumbs switch with CSS at 40rem (UI-SHL-14), so a resize or
+  zoom across it while one of them has focus hides that control and focus falls to `<body>`.
+- **Why:** it needs a resize while focus is on that one control; a fix (focus the nearest shown
+  crumb when the media query flips) adds a listener to every page for a rare case (ui-reviewer,
+  S3-C0e, note).
+- **Fix by:** S3-C33 (the manual pass zooms across 40rem with focus on the trail; fixed if it
+  shows)
 - **Status:** open
 
 ---
@@ -835,3 +836,8 @@ Entry format:
 ### TD-103: TextField's slot shadows its `describedBy` prop
 - **Added:** S2-C22 (CI lint warning, Slice 2 retro)
 - **Status:** resolved in S3-C0a (the slot's IDs are `ids`, as in `PasswordField.vue`)
+
+### TD-106: The requirement's header has no Parent row yet
+- **Added:** S3-C0d
+- **Status:** resolved in S3-C0e: Parent (its ID linked, then its title; None at the top level),
+  from the read's `ancestors` (DL-357)

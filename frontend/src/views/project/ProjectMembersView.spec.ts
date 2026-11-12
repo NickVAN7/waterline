@@ -13,6 +13,8 @@ import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } fr
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { project } from '@/test/projects'
 import { listPage } from '@/test/workspace'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import ProjectMembersView from './ProjectMembersView.vue'
 
@@ -66,7 +68,7 @@ async function mountAt(shown: Project, rows: Member[], next: Project[] = []) {
   }) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       { path: '/:orgSlug/projects/:key', name: 'project-home', component: Page },
@@ -78,7 +80,7 @@ async function mountAt(shown: Project, rows: Member[], next: Project[] = []) {
         component: ProjectMembersView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(`/acme/projects/${shown.key}/members`)
@@ -128,6 +130,14 @@ describe('ProjectMembersView', () => {
     ])
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout members')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+      ],
+      current: 'Members',
+    })
     expect(document.title).toBe('ERP rollout members · Waterline')
     expect(
       wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
@@ -312,7 +322,7 @@ describe('ProjectMembersView', () => {
     useCurrentUserStore().me = me()
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [
+      routes: withTrailRoutes([
         { path: '/', name: 'my-work', component: Page },
         { path: '/status', name: 'status', component: Page },
         {
@@ -321,7 +331,7 @@ describe('ProjectMembersView', () => {
           component: ProjectMembersView,
           meta: { settlesItself: true },
         },
-      ],
+      ]),
     })
     installRouteFocus(router)
     await router.push('/acme/projects/NOPE/members')

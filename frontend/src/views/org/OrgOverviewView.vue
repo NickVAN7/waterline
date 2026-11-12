@@ -8,6 +8,7 @@
 import { computed, watch } from 'vue'
 
 import { api, client } from '@/api/client'
+import { orgCrumb } from '@/app/crumbs'
 import { settlePage } from '@/app/routeFocus'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -96,7 +97,7 @@ const announcement = computed(() => {
   <!-- For whoever may manage the org: the user sees the org, so may know it's here. -->
   <ForbiddenView v-else-if="!allowed || status === 403" :who-to-ask="WHO_TO_ASK" />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader :title="`${org.name} overview`" />
+    <PageHeader :title="`${org.name} overview`" :crumbs="[orgCrumb(org), { label: 'Overview' }]" />
     <dl class="m-0 flex flex-col gap-1">
       <div class="flex flex-wrap gap-2">
         <dt class="font-medium">Name</dt>

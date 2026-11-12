@@ -14,6 +14,8 @@ import { failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver, stubWidth } from '@/test/overlay'
 import { requirementRead } from '@/test/requirements'
 import { project } from '@/test/projects'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import RequirementsView from './RequirementsView.vue'
 
@@ -81,7 +83,7 @@ async function mountAt(
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -96,7 +98,7 @@ async function mountAt(
         component: Page,
       },
       { path: '/:orgSlug/projects/:key/trash', name: 'project-trash', component: Page },
-    ],
+    ]),
   })
   installRouteFocus(router)
   // Arrived at from another page, as a reload after an action finds it: focus then settles on the
@@ -118,12 +120,18 @@ const treeCalls = (get: Spy) =>
 const projectCalls = (get: Spy) =>
   get.mock.calls.filter((call) => call[0] === '/api/projects/{key}')
 
+// The tree's Move menu button: the trail's "…" fold is a menu button too.
+const moveButton = () =>
+  [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup=menu]')].find(
+    (b) => !b.closest('nav'),
+  )
+
 async function moveUp(title: string) {
   ;[...document.querySelectorAll<HTMLElement>('tbody tr')]
     .find((r) => r.textContent!.includes(title))!
     .click()
   await flushPromises()
-  document.querySelector<HTMLButtonElement>('button[aria-haspopup=menu]')!.click()
+  moveButton()!.click()
   await flushPromises()
   ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
     .find((li) => li.textContent!.trim() === 'Move up')!
@@ -149,12 +157,20 @@ describe('RequirementsView', () => {
     const { wrapper } = await mountAt([MOVER])
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout requirements')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+      ],
+      current: 'Requirements',
+    })
     expect(document.title).toBe('ERP rollout requirements · Waterline')
     expect(wrapper.findAll('tbody tr').map((r) => r.find('td').text().trim())).toEqual([
       'Invoicing',
       'Payments',
     ])
-    expect(wrapper.find('button[aria-haspopup=menu]').text()).toBe('Move')
+    expect(moveButton()!.textContent!.trim()).toBe('Move')
     expect(wrapper.find('[role=alert]').exists()).toBe(false)
     await expectNoA11yViolations(wrapper)
   })
@@ -163,7 +179,7 @@ describe('RequirementsView', () => {
     const { wrapper } = await mountAt([READER])
 
     expect(wrapper.findAll('tbody tr')).toHaveLength(2)
-    expect(wrapper.find('button[aria-haspopup=menu]').exists()).toBe(false)
+    expect(moveButton()).toBeUndefined()
     expect(wrapper.findAll('button').map((b) => b.text())).toContain('Expand requirement')
   })
 
@@ -257,7 +273,7 @@ describe('RequirementsView', () => {
     await moveUp('Payments')
 
     expect(projectCalls(get)).toHaveLength(2)
-    expect(wrapper.find('button[aria-haspopup=menu]').exists()).toBe(false)
+    expect(moveButton()).toBeUndefined()
     expect(wrapper.get('[role=alert]').text()).toContain(
       "You don't have permission to move this requirement.",
     )
@@ -508,6 +524,25 @@ describe('RequirementsView', () => {
 
       expect(back).toHaveBeenCalledOnce()
       expect(replace).not.toHaveBeenCalled()
+    })
+
+    it("its Parent row's ID swaps the panel to the parent, and it has no trail of its own (TD-106)", async () => {
+      const child = { ...PAYMENTS, ancestors: [{ number: 1, title: 'Invoicing' }] }
+      const parent = { ...requirementRead(1, 'Invoicing') }
+      const { router } = await mountAt([READER], [ok(TREE)], {
+        direct: true,
+        at: '/acme/projects/ERP/requirements?open=RQ-2',
+        requirements: [ok(child), ok(parent)],
+      })
+      expect(panel()!.querySelector('nav[aria-label=Breadcrumb]')).toBeNull()
+      const link = inPanel('ERP-RQ-1')!
+      expect(link.getAttribute('href')).toBe('/acme/projects/ERP/requirements?open=RQ-1')
+
+      link.click()
+      await flushPromises()
+
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements?open=RQ-1')
+      expect(panel()!.querySelector('h2')!.textContent!.trim()).toBe('Invoicing')
     })
 
     it('Close on a shared link replaces it with the list, focus on its h1', async () => {

@@ -5,7 +5,7 @@ from collections.abc import Collection
 from datetime import datetime
 from typing import cast
 
-from sqlalchemy import Select, exists, false, select
+from sqlalchemy import Select, exists, false, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -258,6 +258,27 @@ class RequirementRepository:
             .order_by(Requirement.rank, Requirement.id)
         )
         return [(id_, rank) for id_, rank in rows]
+
+    async def ancestors(self, requirement: Requirement) -> list[tuple[int, str]]:
+        """The requirement's live ancestors' numbers and titles, root first (DL-328; a recursive
+        query). A live requirement's ancestors are all live: a delete moves its children up or
+        takes them with it, and a restore under a parent in the trash goes to the top (DL-217)."""
+        chain = (
+            select(Requirement.parent_requirement_id, literal(1).label("depth"))
+            .where(Requirement.id == requirement.id)
+            .cte(recursive=True)
+        )
+        chain = chain.union_all(
+            select(Requirement.parent_requirement_id, (chain.c.depth + 1).label("depth")).join(
+                chain, Requirement.id == chain.c.parent_requirement_id
+            )
+        )
+        rows = await self.session.execute(
+            select(Requirement.number, Requirement.title)
+            .join(chain, Requirement.id == chain.c.parent_requirement_id)
+            .order_by(chain.c.depth.desc())
+        )
+        return [(number, title) for number, title in rows]
 
     async def is_in_ancestry(self, requirement_id: uuid.UUID, of: uuid.UUID) -> bool:
         """Whether `requirement_id` is `of` or one of its ancestors (a recursive query, so the

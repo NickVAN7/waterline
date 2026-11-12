@@ -135,6 +135,21 @@ async def test_promoted_children_go_to_the_deleted_ones_parent(
     assert await children(session, top) == [3]
 
 
+async def test_a_promoted_childs_ancestors_skip_the_deleted_one(
+    client: AsyncClient, t: Tenancy, admin: User
+) -> None:
+    """Bug: the trail still names a parent in the trash (DL-328): a live requirement's
+    ancestors are all live."""
+    top = await item(t, 1, "i0")
+    middle = await item(t, 2, "i0", parent=top)
+    await item(t, 3, "i0", parent=middle)
+
+    await delete(client, 2)
+    response = await client.get(f"{REQUIREMENTS}/3")
+
+    assert [a["number"] for a in response.json()["ancestors"]] == [1]
+
+
 async def test_a_promote_is_logged_and_moves_updated_at_but_not_version(
     client: AsyncClient, session: AsyncSession, t: Tenancy, admin: User
 ) -> None:
@@ -363,6 +378,7 @@ async def test_a_restore_whose_parent_is_deleted_goes_to_the_bottom_of_the_top_l
     response = await restore(client, 2)
 
     assert (response.status_code, response.json()["parent_id"]) == (200, None)
+    assert response.json()["ancestors"] == []
     assert await children(session, None) == [3, 2]
     back = await stored(session, 2)
     # The restore's own save (design-doc §3), and none for the parent change (DL-215).

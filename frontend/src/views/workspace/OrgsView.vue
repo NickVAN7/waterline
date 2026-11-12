@@ -5,6 +5,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
+import { WORKSPACE_CRUMB } from '@/app/crumbs'
 import { settlePage } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -72,7 +73,7 @@ const announcement = computed(() => {
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader title="Organizations">
+    <PageHeader title="Organizations" :crumbs="[WORKSPACE_CRUMB, { label: 'Organizations' }]">
       <Button v-if="allows(workspace, 'org.create')" @click="creator?.open()"
         >Create organization</Button
       >

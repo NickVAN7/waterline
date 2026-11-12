@@ -10,6 +10,7 @@ import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok, validationFailed } from '@/test/api'
 import { acme, mountOrgPages, mountOrgView } from '@/test/org'
 import { cleanUpAfterEach, listPage } from '@/test/workspace'
+import { trail } from '@/test/trail'
 
 import OrgSettingsView from './OrgSettingsView.vue'
 
@@ -44,8 +45,15 @@ describe('OrgSettingsView', () => {
     const { wrapper } = await mountOrgView(OrgSettingsView, '/acme/settings', OWNER)
 
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing settings')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [['Acme Manufacturing', '/acme/projects']],
+      current: 'Settings',
+    })
     // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
-    expect(wrapper.find('nav').exists()).toBe(false)
+    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
+    ])
     expect(wrapper.get<HTMLInputElement>('#org-name').element.value).toBe('Acme Manufacturing')
     expect(wrapper.get<HTMLInputElement>('#org-slug').element.value).toBe('acme')
     await expectNoA11yViolations(wrapper)

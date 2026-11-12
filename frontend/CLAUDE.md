@@ -198,6 +198,10 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
 - A boundary or a control's only visible line (a pane's edge, a separator) is a `border` or an
   `outline`, never a background: forced colors turn backgrounds into Canvas, and the line
   vanishes. The e2e compares it with a `CanvasText` probe (S3-C0d review, after DL-356).
+- A PrimeVue component whose own CSS sets `overflow` or `nowrap` (Breadcrumb: `overflow-x: auto`
+  with its scrollbar hidden, `flex-wrap: nowrap`) is checked for clipped content at the
+  narrowest room it can get, beside the split pane included, not only at a 320px viewport; the
+  check measures the component, never the document (S3-C0e review).
 - Content moved between containers (a teleport's target changing at a breakpoint) puts focus
   back where it was: moving a node that holds focus blurs it, and a dialog's open or close moves
   it again (S3-C0d review).

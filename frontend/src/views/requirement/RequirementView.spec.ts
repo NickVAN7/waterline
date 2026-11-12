@@ -14,6 +14,7 @@ import { failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { project } from '@/test/projects'
 import { requirementRead } from '@/test/requirements'
+import { withTrailRoutes } from '@/test/router'
 
 import RequirementView from './RequirementView.vue'
 
@@ -62,7 +63,7 @@ async function mountAt(
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -76,7 +77,7 @@ async function mountAt(
         component: RequirementView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(direct ? path : '/')
@@ -156,8 +157,54 @@ describe('RequirementView', () => {
     // Under the Description h2, the description's ## is an h4 (UI-MD-1, UI-SHL-8).
     expect(wrapper.find('.markdown h4').text()).toBe('Context')
     expect(wrapper.findAll('.markdown h2, .markdown h3')).toHaveLength(0)
-    expect(wrapper.get('a[href="/acme/projects/ERP/requirements"]').text()).toBe('Requirements')
     await expectNoA11yViolations(wrapper)
+  })
+
+  it('has its trail above the h1: the org, the project, Requirements, its ancestors, then itself (DL-327, DL-328)', async () => {
+    const nested = {
+      ...REFUNDS,
+      ancestors: [
+        { number: 1, title: 'Finance' },
+        { number: 3, title: 'Order to cash' },
+      ],
+    }
+    const { wrapper } = await mountAt([READER], [ok(nested)])
+
+    const trail = wrapper.get('nav[aria-label=Breadcrumb]')
+    expect(trail.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Acme Manufacturing', '/acme/projects'],
+      ['ERP rollout', '/acme/projects/ERP'],
+      ['Requirements', '/acme/projects/ERP/requirements'],
+      ['ERP-RQ-1', '/acme/projects/ERP/requirements/1'],
+      ['ERP-RQ-3', '/acme/projects/ERP/requirements/3'],
+    ])
+    expect(trail.get('[aria-current=page]').text()).toBe('ERP-RQ-7')
+    // Above the h1, in document order.
+    expect(trail.element.compareDocumentPosition(wrapper.get('h1').element)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it("shows its parent's ID, linked to its page, then its title; None at the top level (TD-106)", async () => {
+    const nested = {
+      ...REFUNDS,
+      ancestors: [
+        { number: 1, title: 'Finance' },
+        { number: 3, title: 'Order to cash' },
+      ],
+    }
+    const { wrapper } = await mountAt([READER], [ok(nested)])
+
+    expect(definition('Parent')).toBe('ERP-RQ-3 Order to cash')
+    const link = wrapper.get('dd a[href="/acme/projects/ERP/requirements/3"]')
+    expect(link.text()).toBe('ERP-RQ-3')
+  })
+
+  it('says None for the Parent of a top-level requirement (TD-106)', async () => {
+    await mountAt([READER], [ok(REFUNDS)])
+
+    expect(definition('Parent')).toBe('None')
   })
 
   it('has a History tab below the description, open, with its entries (DL-268, DL-269)', async () => {
@@ -715,7 +762,7 @@ describe('RequirementView', () => {
       expect(document.activeElement).toBe(title())
       // The status menu waits: its change would make the save a 409.
       expect(button('Edit')).toBeUndefined()
-      expect(wrapper.find('[aria-haspopup]').exists()).toBe(false)
+      expect(wrapper.find('[aria-label^="Change status"]').exists()).toBe(false)
       expect(wrapper.find('#description-heading').exists()).toBe(false)
       await expectNoA11yViolations(wrapper)
     })

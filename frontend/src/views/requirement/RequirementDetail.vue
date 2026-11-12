@@ -25,6 +25,7 @@ import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { projectCrumbs } from '@/app/crumbs'
 import {
   APPROVED_MODIFIED,
   ARCHIVED_BANNER,
@@ -127,6 +128,29 @@ watch(
 // Unique: the panel's detail sits on a page that may have its own.
 const descriptionId = useId()
 const id = computed(() => `${props.project.key}-RQ-${props.number}`)
+const requirementId = (number: number) => `${props.project.key}-RQ-${number}`
+// An ancestor's ID: in the panel it swaps the panel to it (UI-SHL-11), on the page it opens its page.
+const ancestorLink = (number: number) =>
+  props.inPanel
+    ? { query: { open: `RQ-${number}` } }
+    : { name: 'project-requirement', params: { key: props.project.key, number } }
+// The page's trail: the project's, Requirements, the ancestors root first, then this one (DL-327,
+// DL-328).
+const crumbs = computed(() =>
+  projectCrumbs(props.project, [
+    {
+      label: 'Requirements',
+      to: { name: 'project-requirements', params: { key: props.project.key } },
+    },
+    ...(requirement.value?.ancestors ?? []).map((a) => ({
+      label: requirementId(a.number),
+      mono: true,
+      to: ancestorLink(a.number),
+    })),
+    { label: id.value, mono: true },
+  ]),
+)
+const parent = computed(() => requirement.value?.ancestors.at(-1))
 const statusBadge = computed(() =>
   requirement.value ? requirementStatusBadge(requirement.value) : REQUIREMENT_STATUS.draft,
 )
@@ -307,12 +331,6 @@ function restrictionSaved(saved: Requirement) {
       <Skeleton v-else :rows="6" />
     </div>
     <template v-else>
-      <RouterLink
-        v-if="!inPanel"
-        :to="{ name: 'project-requirements', params: { key: project.key } }"
-        class="self-start text-sm"
-        >Requirements</RouterLink
-      >
       <!-- In the panel too: the list's banner is behind it, inert. -->
       <Alert v-if="project.archived" tone="info">{{ ARCHIVED_BANNER }}</Alert>
       <header class="flex flex-col gap-2">
@@ -321,7 +339,9 @@ function restrictionSaved(saved: Requirement) {
         <component
           :is="inPanel ? 'div' : PageHeader"
           v-bind="
-            inPanel ? { class: 'flex flex-wrap items-center gap-3' } : { title: requirement.title }
+            inPanel
+              ? { class: 'flex flex-wrap items-center gap-3' }
+              : { title: requirement.title, crumbs }
           "
         >
           <Button
@@ -387,6 +407,16 @@ function restrictionSaved(saved: Requirement) {
               >{{ DEACTIVATED.label }}</Badge
             >
           </dd>
+        </div>
+        <div class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Parent</dt>
+          <dd v-if="parent" class="m-0">
+            <RouterLink :to="ancestorLink(parent.number)" class="font-mono">{{
+              requirementId(parent.number)
+            }}</RouterLink>
+            {{ parent.title }}
+          </dd>
+          <dd v-else class="m-0">None</dd>
         </div>
         <div class="flex flex-col gap-1">
           <dt class="text-sm font-medium text-text-muted">Restriction</dt>

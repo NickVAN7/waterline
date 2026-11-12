@@ -152,7 +152,11 @@ const announcement = computed(() => {
       @retry="retry"
     />
     <template v-else>
-      <ProjectHeader :project="loaded" :title="`${loaded.name} trash`" />
+      <ProjectHeader
+        :project="loaded"
+        :title="`${loaded.name} trash`"
+        :trail="[{ label: 'Trash' }]"
+      />
       <p class="m-0 text-text-muted">
         Deleted requirements stay here until they're restored. Restoring one brings back the
         children deleted with it.

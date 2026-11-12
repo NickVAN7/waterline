@@ -252,6 +252,31 @@ test('creating a requirement: the editor and its Preview, its full page, then ed
   await expect(heading).toBeFocused()
   await expect(page).toHaveURL(new RegExp(`/acme/projects/${key}/requirements/\\d+$`))
 
+  // Its trail, above the h1: the org, the project, Requirements, then itself (DL-327).
+  const trail = page.getByRole('navigation', { name: 'Breadcrumb' })
+  await expect(trail.getByRole('link')).toHaveText([/Acme/, /./, 'Requirements'])
+  await expect(trail.locator('[aria-current=page]')).toHaveText(new RegExp(`^${key}-RQ-\\d+$`))
+  await expect(trail.getByRole('button', { name: /more level/ })).toBeHidden()
+  // Under 40rem the middle crumbs fold into "…"; its menu opens from the keyboard with focus in
+  // it, and Esc brings focus back.
+  await page.setViewportSize({ width: 320, height: size.height })
+  const fold = trail.getByRole('button', { name: 'Show 2 more levels' })
+  await expect(fold).toBeVisible()
+  await expect(trail.getByRole('link', { name: 'Requirements' })).toBeHidden()
+  await fold.focus()
+  await page.keyboard.press('Enter')
+  const folded = page.getByRole('menu', { name: 'Show 2 more levels' })
+  await expect(folded).toBeFocused()
+  await expect(folded.getByRole('menuitem')).toHaveText([/./, 'Requirements'])
+  await expectNoA11yViolations(page)
+  await page.keyboard.press('Escape')
+  await expect(folded).toBeHidden()
+  await expect(fold).toBeFocused()
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+  ).toBeLessThanOrEqual(0)
+  await page.setViewportSize(size)
+
   // Edited in place, with a change note (DL-263).
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const title = page.getByRole('textbox', { name: 'Title', exact: true })
@@ -368,6 +393,12 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   expect(edge.width).toBeGreaterThanOrEqual(1)
   expect(edge.height).toBeGreaterThan(panelBox.height / 2)
   await page.emulateMedia({ forcedColors: 'none' })
+  // At 64rem the pane leaves the page little room: the trail wraps, nothing cut off inside its
+  // nav (UI-SHL-14). The nav is measured, not the document: PrimeVue scrolls it on its own.
+  await page.setViewportSize({ width: 1024, height: 720 })
+  const listTrail = page.getByRole('navigation', { name: 'Breadcrumb' })
+  await expect(listTrail.locator('[aria-current=page]')).toBeInViewport()
+  expect(await listTrail.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
   await page.setViewportSize({ width: 1280, height: 720 })
   expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
   // Its row is marked by more than color (DL-324).

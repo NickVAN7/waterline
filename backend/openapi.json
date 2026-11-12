@@ -10017,6 +10017,25 @@
         "title": "ProjectUpdate",
         "description": "Only the fields sent change; `lead_id: null` clears the lead. The key never changes."
       },
+      "RequirementAncestor": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "title"
+        ],
+        "title": "RequirementAncestor",
+        "description": "One of a requirement's ancestors: its number, shown as its ID, and its title, for the\nParent row (DL-328, TD-106)."
+      },
       "RequirementApprove": {
         "properties": {
           "version": {
@@ -10382,6 +10401,13 @@
             },
             "type": "array",
             "title": "Allowed Actions"
+          },
+          "ancestors": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementAncestor"
+            },
+            "type": "array",
+            "title": "Ancestors"
           }
         },
         "type": "object",
@@ -10409,7 +10435,8 @@
           "version",
           "created_at",
           "updated_at",
-          "allowed_actions"
+          "allowed_actions",
+          "ancestors"
         ],
         "title": "RequirementRead",
         "description": "One requirement, with the actions the caller may take on it. \"Approved · modified\" is\nderived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1)."

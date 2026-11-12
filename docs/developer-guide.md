@@ -978,6 +978,15 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   return focus to its opener a task later (`ConfirmDialog`). A form
   alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
   before repeating the action (UI-FRM-7).
+- **Breadcrumbs** (UI-SHL-14, DL-327): `Breadcrumbs` takes `crumbs` (`{ label, to?, mono?, icon? }`,
+  the last the page itself); `PageHeader` and `RosterPage` take `crumbs`, `ProjectHeader` takes
+  `trail` (the crumbs after the project's). A project page's trail starts from `projectCrumbs`
+  (`@/app/crumbs`, with `orgCrumb` and `WORKSPACE_CRUMB`). The fold under 40rem is CSS
+  (`sm:hidden` on the "…", `max-sm:hidden` on the middle crumbs), so jsdom shows both; its menu
+  mounts on first use. A spec's own router needs the routes the crumbs link to, or the crumb's
+  `RouterLink` throws: wrap its routes in `withTrailRoutes` (`@/test/router`), which adds a
+  placeholder for each one it leaves out; `trail()` (`@/test/trail`) reads the trail back as its
+  links and current crumb. A crumb the viewer may never open is left out (DL-358).
 - **Side panels** (UI-SHL-11, DL-321 to DL-326, DL-355, DL-356): `ItemPanel` holds its own `<aside>` (the
   split pane at 64rem and wider, named by `label`, with the resizing separator) and `<dialog>`
   (the overlay below), and one teleport that moves the content, its `meta` slot (ID and status)

@@ -4454,3 +4454,29 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11
 - **Source:** owner, Nov 11, 2026 (after S3-C0d, trying the split pane on a wide screen)
+
+### DL-357: The requirement read's `ancestors`: the read's own scope, with titles
+- **Date:** 2026-11-11
+- **Decision:** S3-C0e's part of R2. `ancestors` (root first, each `{number, title}`) comes with
+  the requirement read under its own action, with no new one: in v1 access is per project
+  (design-doc §3), so whoever reads a requirement can already see its whole tree. A live
+  requirement can't have an ancestor in the trash (a delete promotes its children or takes them
+  with it; a restore under a parent still in the trash goes to the top, DL-217), so DL-328's
+  unlinked crumb isn't built; tests pin that. The title is for the Parent row (TD-106); crumbs
+  show IDs only (DL-327). v2's per-person visibility re-scopes it.
+- **Supersedes:** none (settles DL-328's "checked in S3-C0e" and R2 for S3-C0e)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0e); ui-design-guide UI-SHL-14
+- **Source:** owner, Nov 11, 2026 (S3-C0e start; titles after the Parent row's need was raised)
+
+### DL-358: Trails show no crumb the viewer can't open; Documentation's landing page has none
+- **Date:** 2026-11-11
+- **Decision:** A person's access review (`/workspace/users/<id>/access`) shows `Workspace › Users
+  › <name>` only to whoever has `workspace.view`; an org admin who opened it from the org's
+  members gets no trail, since the route names no org to build `Org › Members` from. The
+  Documentation landing page has no trail; an article under it (from S3-C0g) has `Documentation
+  › <article>`, as DL-327's example says.
+- **Supersedes:** none (adds to DL-327)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-14; S3-C0g (the article trail)
+- **Source:** owner, Nov 11, 2026 (S3-C0e review: checkpoint-reviewer and ui-reviewer questions)

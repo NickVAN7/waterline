@@ -13,6 +13,8 @@ import { failed, me, noContent, ok, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
 import { project } from '@/test/projects'
 import { listPage } from '@/test/workspace'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import ProjectSettingsView from './ProjectSettingsView.vue'
 
@@ -85,7 +87,7 @@ async function mountAt(shown: Project, next: Project[] = [], pageSize = 200) {
   }) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       { path: '/:orgSlug/projects/:key', name: 'project-home', component: Page },
@@ -95,7 +97,7 @@ async function mountAt(shown: Project, next: Project[] = [], pageSize = 200) {
         component: ProjectSettingsView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(`/acme/projects/${shown.key}/settings`)
@@ -149,6 +151,14 @@ describe('ProjectSettingsView', () => {
       .mockResolvedValue(ok(project({ ...shown, name: 'Billing', status: 'on_hold' })))
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout settings')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+      ],
+      current: 'Settings',
+    })
     expect(document.title).toBe('ERP rollout settings · Waterline')
     expect(wrapper.get<HTMLInputElement>('#project-settings-name').element.value).toBe(
       'ERP rollout',
@@ -495,7 +505,7 @@ describe('ProjectSettingsView', () => {
     )
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [
+      routes: withTrailRoutes([
         { path: '/', name: 'my-work', component: Page },
         { path: '/status', name: 'status', component: Page },
         {
@@ -503,7 +513,7 @@ describe('ProjectSettingsView', () => {
           name: 'project-settings',
           component: ProjectSettingsView,
         },
-      ],
+      ]),
     })
     wrapper.unmount()
     await router.push('/acme/projects/ERP/settings')

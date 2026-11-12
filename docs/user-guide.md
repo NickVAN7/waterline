@@ -38,6 +38,10 @@ Every page after sign-in has the same frame:
   Once you're in a project, its pages are listed below the selector: **Home**, **Requirements**
   (if you may read its content), **Members**, **Settings** (if you may change any of its
   settings), and last **Trash** (if you may read its content).
+- **The trail**, above a page's title on every page below the top ones: where the page is, each
+  step a link back (for example **Acme Manufacturing › Customer Portal › Requirements ›
+  PORTAL-RQ-3**, a nested requirement's parents included). On a narrow screen the middle steps
+  fold into **…**: open it for the rest.
 - On a narrow screen the sidebar is behind the **Menu** button in the header, and on a phone the
   header wraps onto more than one line and scrolls away with the page.
 - **Skip to main content** is the first thing the Tab key reaches, and jumps past the header and
@@ -144,7 +148,8 @@ status, **Open full page** goes to the requirement's page (`…/requirements/<n>
 copies that page's address, for sharing. Under the title are **Edit**, **Change status**, and
 **⋯ More actions**, which holds **Change restriction…** and **Delete…**, as far as you may use them;
 then the requirement's priority, reporter (with "Deactivated" after a deactivated reporter's name),
-and restriction, and its description. The page shows the same, with the actions beside its title
+parent (its ID, a link, then its title; **None** at the top level; in the panel the link opens
+the parent there), and restriction, and its description. The page shows the same, with the actions beside its title
 and the ID and status under it. A status reads
 **Approved · modified** when the requirement is Approved and has changed since its approved revision. If the
 description has no "Acceptance Criteria" heading, a note says so. **Change status** (members and

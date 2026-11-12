@@ -13,6 +13,7 @@ import { computed, ref, watch } from 'vue'
 import { DEACTIVATED } from '@/app/labels'
 import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
+import type { Crumb } from '@/components/Breadcrumbs.vue'
 import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -58,6 +59,8 @@ const props = defineProps<{
   roleLabels: Record<string, string>
   /** May the user add people (the page-level `manage` action)? */
   canAdd?: boolean
+  /** The page's breadcrumb trail (DL-327). */
+  crumbs?: Crumb[]
   /** May the user list deactivated people too (the list's admins, DL-294)? */
   canShowDeactivated?: boolean
   /** May the user open the page at all? Otherwise, the 403 page naming `whoToAsk` (UI-FBK-14). */
@@ -182,7 +185,7 @@ const announcement = computed(() => {
   <ForbiddenView v-else-if="refused" :who-to-ask="whoToAsk" />
   <div v-else class="flex flex-col gap-6">
     <slot name="header" :add="() => adder?.open()">
-      <PageHeader :title="title">
+      <PageHeader :title="title" :crumbs="crumbs">
         <Button v-if="canAdd" @click="adder?.open()">Add person</Button>
       </PageHeader>
     </slot>

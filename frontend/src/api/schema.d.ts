@@ -2522,6 +2522,17 @@ export interface components {
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
         };
         /**
+         * RequirementAncestor
+         * @description One of a requirement's ancestors: its number, shown as its ID, and its title, for the
+         *     Parent row (DL-328, TD-106).
+         */
+        RequirementAncestor: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+        };
+        /**
          * RequirementApprove
          * @description Approve by hand the revision the admin saw: `version` the one they read (a stale one is a
          *     409, DL-169).
@@ -2658,6 +2669,8 @@ export interface components {
             updated_at: string;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
+            /** Ancestors */
+            ancestors: components["schemas"]["RequirementAncestor"][];
         };
         /**
          * RequirementRestrictionUpdate

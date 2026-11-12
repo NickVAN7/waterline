@@ -21,5 +21,8 @@ means the guard stopped something it should have.
 | 12 | S3-C0d review | `git log -S "<text>" -- docs/decision-log.md` (read-only: which commit added a decision) | `-S` isn't an allowed `git log` option | not needed: the decision's own Source line answered it | legit |
 | 13 | S3-C0d review | a `python3 -` heredoc editing the user guide, then `sed` on `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | a scratchpad script, and the Edit tool | legit |
 | 14 | fix(S3-C0d) | `cd …; git diff --stat` (read-only) | a compound command with git in it | `git -C` on its own | legit; my slip again (as #11) |
+| 15 | S3-C0e | `sed …; npx vue-tsc …; git -C … status` (read-only) | a compound command with git in it | separate calls | legit; my slip (as #11, #14) |
+| 16 | S3-C0e | a `python3 -` heredoc editing `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | a scratchpad script | legit (as #13) |
+| 17 | S3-C0e review | `grep … ; git -C … diff --stat` (read-only) | a compound command with git in it | separate calls | legit; my slip (as #15) |
 
 None of the blocks so far stopped anything the rules forbid.

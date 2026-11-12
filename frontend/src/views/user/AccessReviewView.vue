@@ -9,6 +9,7 @@ import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { api, client } from '@/api/client'
+import { WORKSPACE_CRUMB } from '@/app/crumbs'
 import {
   ACCESS_KIND,
   ACCESS_REASON,
@@ -24,7 +25,9 @@ import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Skeleton from '@/components/Skeleton.vue'
+import { allows } from '@/composables/allowedActions'
 import { useLoad } from '@/composables/useLoad'
+import { useWorkspace } from '@/composables/useWorkspace'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
 const route = useRoute()
@@ -42,6 +45,19 @@ watch(
 )
 
 const data = computed(() => review.data.value)
+// Workspace › Users › the person, for whoever may open those pages; someone who came from an org's
+// members (`user.view_access` without `workspace.view`) gets none: the route has no org to name
+// (UI-SHL-14, owner, S3-C0e review).
+const workspace = useWorkspace()
+const crumbs = computed(() =>
+  allows(workspace.value, 'workspace.view')
+    ? [
+        WORKSPACE_CRUMB,
+        { label: 'Users', to: { name: 'workspace-users' } },
+        { label: data.value ? data.value.user.name : 'Access review' },
+      ]
+    : undefined,
+)
 const orgNames = computed(
   () => new Map((data.value?.orgs ?? []).map((org) => [org.id, org.name] as const)),
 )
@@ -53,7 +69,10 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
 <template>
   <NotFoundView v-if="review.error.value?.status === 404" />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader :title="data ? `Access review: ${data.user.name}` : 'Access review'" />
+    <PageHeader
+      :title="data ? `Access review: ${data.user.name}` : 'Access review'"
+      :crumbs="crumbs"
+    />
     <section
       aria-label="Access"
       :aria-busy="review.loading.value ? 'true' : 'false'"

@@ -6,6 +6,7 @@ import { computed, ref } from 'vue'
 
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { orgCrumb } from '@/app/crumbs'
 import { ORG_ROLE } from '@/app/labels'
 import { allows } from '@/composables/allowedActions'
 import { useRouteOrg } from '@/composables/useRouteOrg'
@@ -90,6 +91,7 @@ async function list(query: { limit: number; offset: number; include_deactivated?
     v-else
     :key="org.id"
     :title="`${org.name} members`"
+    :crumbs="[orgCrumb(org), { label: 'Members' }]"
     list-name="Members"
     thing="the members"
     :roster="roster"

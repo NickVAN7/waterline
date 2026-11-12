@@ -13,6 +13,8 @@ import { failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { project } from '@/test/projects'
 import { requirementId, requirementItem, requirementRead } from '@/test/requirements'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import NewRequirementView from './NewRequirementView.vue'
 
@@ -43,7 +45,7 @@ async function mountAt(projects: (Project | Result)[], trees: unknown[] = [ok(TR
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -62,7 +64,7 @@ async function mountAt(projects: (Project | Result)[], trees: unknown[] = [ok(TR
         name: 'project-requirement',
         component: Page,
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push('/acme/projects/ERP/requirements')
@@ -106,6 +108,15 @@ describe('NewRequirementView', () => {
     const { wrapper } = await mountAt([CREATOR])
 
     expect(wrapper.get('h1').text()).toBe('Create a requirement')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+        ['Requirements', '/acme/projects/ERP/requirements'],
+      ],
+      current: 'Create a requirement',
+    })
     expect(document.title).toBe('Create a requirement · Waterline')
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(title().value).toBe('')

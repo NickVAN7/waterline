@@ -9,6 +9,7 @@ import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } fr
 import { acme, mountOrgPages, mountOrgView } from '@/test/org'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { cleanUpAfterEach, listPage } from '@/test/workspace'
+import { trail } from '@/test/trail'
 
 import OrgMembersView from './OrgMembersView.vue'
 
@@ -84,8 +85,15 @@ describe('OrgMembersView', () => {
       params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing members')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [['Acme Manufacturing', '/acme/projects']],
+      current: 'Members',
+    })
     // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
-    expect(wrapper.find('nav').exists()).toBe(false)
+    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
+    ])
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr

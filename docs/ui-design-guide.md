@@ -125,6 +125,7 @@ screen-reader pass at slice verification, **R** the `ui-reviewer` agent.
 | 2.4.1 Bypass blocks | Skip link first | UI-SHL-1 | A, M |
 | 2.4.2 / 2.4.3 Page titled, focus order | Title per route; focus moves to the page heading on navigation; dialogs return focus | UI-SHL-9, UI-FRM-14, UI-TBL-9 | M, R |
 | 2.4.7 / 2.4.11 Focus visible, not obscured | Ring on every control; sticky header, selection toolbar, and toasts never cover the focused element | UI-TOK-5, UI-SHL-3, UI-TBL-8, UI-FBK-10 | E, M |
+| 2.4.8 Location (AAA, adopted) | A breadcrumb trail above the `h1` on every page but the top-level ones | UI-SHL-14 | E, R |
 | 2.5.7 Dragging | Every drag has a single-pointer alternative (design-doc §6) | UI-TBL-5 | R, M |
 | 2.5.8 Target size | At least 24×24 CSS px | UI-TOK-6 | A (browser only), R |
 | 3.2.6 Consistent help | If a help mechanism is added, it sits in the same place on every page | UI-SHL-8 | R |
@@ -560,8 +561,27 @@ render inside the full shell when signed in.
   off) is an explanatory page inside the project, not a 404: "The Sprints module is turned off
   for this project. Contact your administrator for questions.", with the module's name. A module
   that hasn't shipped has no page at all (DL-200).
-- **Breadcrumbs** (from S3-C0e, DL-327, DL-328): a trail above the `h1` on every page but the
-  top-level ones, replacing the single back links; it becomes a numbered UI-SHL rule then.
+- **UI-SHL-14** **Breadcrumbs** (DL-327, DL-328, DL-357, DL-358): one trail (`Breadcrumbs`, on
+  PrimeVue's `Breadcrumb`, flush with the `h1` it sits above) on every page but the top-level
+  ones, in place of single back links.
+  - **What it holds:** inside an org, Org › Project › Section › Item (the org's crumb, with a
+    building icon, opens its projects; a project page's trail comes from `projectCrumbs`); outside
+    one, its area (`Workspace › Users`, `Account settings › Change password`). An item is its ID,
+    in mono, after its ancestors (the read's `ancestors`, root first). My work, Account settings,
+    an org's projects, the Documentation landing page (an article under it, from S3-C0g, has
+    `Documentation › <article>`), and the error pages have none; the side panel, not a page, has
+    none either. A crumb the viewer may never open isn't shown: a person's access review shows
+    `Workspace › Users › <name>` only with `workspace.view`, and none to an org admin who came
+    from the org's members (the route names no org) (DL-358).
+  - **How it reads:** `nav aria-label="Breadcrumb"` with an `ol`; every crumb but the last is a
+    link, the last plain text with `aria-current="page"` and the only crumb with it (a link to
+    the page it's on, Workspace on Staff, is `aria-current="false"`); the chevrons are
+    decorative. It wraps when it doesn't fit (PrimeVue's own CSS would scroll it, the scrollbar
+    hidden). 14px
+    (`--text-xs`): links in `--color-text-muted`, `--color-text` and underlined on hover and
+    focus; the current crumb in `--color-text`.
+  - **Narrow:** under 40rem the middle crumbs fold into a "…" menu button ("Show 2 more levels"),
+    the first and last kept; its menu lists them as links and opens with focus in it.
 
 ---
 

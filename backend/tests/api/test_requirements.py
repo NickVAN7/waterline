@@ -265,6 +265,53 @@ async def test_the_read_returns_the_requirement(
     assert (body["reporter_id"], body["reporter_name"]) == (str(reporter.id), "Ali Khan")
 
 
+@pytest.mark.parametrize(
+    ("number", "ancestors"),
+    [(9, []), (8, [9]), (4, [9, 8]), (6, [9, 8, 4])],
+    ids=["top-level", "child", "grandchild", "great-grandchild"],
+)
+async def test_the_read_carries_its_ancestors_root_first(
+    client: AsyncClient, t: Tenancy, member: User, number: int, ancestors: list[int]
+) -> None:
+    """Bug: ancestors leaf first, the requirement itself among them, a level skipped, or a
+    sibling's chain (DL-328)."""
+    root = await RequirementFactory.create_async(project=t.project, number=9)
+    middle = await RequirementFactory.create_async(
+        project=t.project, number=8, parent_requirement_id=root.id
+    )
+    await RequirementFactory.create_async(
+        project=t.project, number=7, parent_requirement_id=root.id
+    )
+    low = await RequirementFactory.create_async(
+        project=t.project, number=4, parent_requirement_id=middle.id
+    )
+    await RequirementFactory.create_async(project=t.project, number=6, parent_requirement_id=low.id)
+
+    response = await client.get(f"{REQUIREMENTS}/{number}")
+
+    assert [a["number"] for a in response.json()["ancestors"]] == ancestors
+
+
+async def test_each_ancestor_carries_its_own_title(
+    client: AsyncClient, t: Tenancy, member: User
+) -> None:
+    """Bug: the Parent row shows the requirement's own title, or another's (TD-106)."""
+    root = await RequirementFactory.create_async(project=t.project, number=1, title="Finance")
+    parent = await RequirementFactory.create_async(
+        project=t.project, number=2, title="Order to cash", parent_requirement_id=root.id
+    )
+    await RequirementFactory.create_async(
+        project=t.project, number=3, title="Invoice PDF", parent_requirement_id=parent.id
+    )
+
+    response = await client.get(f"{REQUIREMENTS}/3")
+
+    assert response.json()["ancestors"] == [
+        {"number": 1, "title": "Finance"},
+        {"number": 2, "title": "Order to cash"},
+    ]
+
+
 @pytest.mark.parametrize("is_active", [True, False])
 async def test_the_read_says_whether_the_reporter_is_active(
     client: AsyncClient, t: Tenancy, member: User, is_active: bool

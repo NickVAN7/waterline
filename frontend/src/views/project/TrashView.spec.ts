@@ -11,6 +11,8 @@ import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok } from '@/test/api'
 import { project } from '@/test/projects'
 import { requirementRead } from '@/test/requirements'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import TrashView from './TrashView.vue'
 
@@ -52,7 +54,7 @@ async function mountAt(projects: Project[], trashes: unknown[]) {
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -66,7 +68,7 @@ async function mountAt(projects: Project[], trashes: unknown[]) {
         name: 'project-requirement',
         component: Page,
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push('/')
@@ -112,6 +114,14 @@ describe('TrashView', () => {
     )
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout trash')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+      ],
+      current: 'Trash',
+    })
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(trashCalls(get)[0]![1]).toEqual({
       params: { path: { key: 'ERP' }, query: { limit: 25, offset: 0 } },

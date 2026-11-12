@@ -74,6 +74,12 @@ describe('UsersView', () => {
 
     const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
 
+    // Its trail: the workspace area, then this page (DL-327).
+    const trail = wrapper.get('nav[aria-label=Breadcrumb]')
+    expect(trail.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Workspace', '/workspace/staff'],
+    ])
+    expect(trail.get('[aria-current=page]').text()).toBe('Users')
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: WORKSPACE_ID },

@@ -5,14 +5,17 @@
 // on the right of the `h1`, wrapping below it at narrow widths, as `PageHeader`'s do (UI-SHL-8).
 import { computed } from 'vue'
 
+import { projectCrumbs } from '@/app/crumbs'
 import { ARCHIVED_BANNER, DEACTIVATED, NO_LEAD, PROJECT_STATUS } from '@/app/labels'
 import Alert from '@/components/Alert.vue'
 import Badge from '@/components/Badge.vue'
+import Breadcrumbs, { type Crumb } from '@/components/Breadcrumbs.vue'
 import type { Project } from '@/stores/currentOrg'
 
 import RestrictionBadge from './RestrictionBadge.vue'
 
-const props = defineProps<{ project: Project; title?: string }>()
+// `trail`: the page's crumbs after the project's (DL-327); none on the project's home.
+const props = defineProps<{ project: Project; title?: string; trail?: Crumb[] }>()
 
 const status = computed(() => PROJECT_STATUS[props.project.status])
 </script>
@@ -20,6 +23,7 @@ const status = computed(() => PROJECT_STATUS[props.project.status])
 <template>
   <Alert v-if="project.archived" tone="info">{{ ARCHIVED_BANNER }}</Alert>
   <header class="flex flex-col gap-2">
+    <Breadcrumbs :crumbs="projectCrumbs(project, trail)" />
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="m-0 text-2xl leading-tight font-semibold">{{ title ?? project.name }}</h1>
       <div v-if="$slots.default" class="flex flex-wrap items-center gap-3">

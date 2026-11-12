@@ -10,6 +10,8 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok } from '@/test/api'
 import { project } from '@/test/projects'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import ProjectAccessView from './ProjectAccessView.vue'
 
@@ -67,7 +69,7 @@ async function mountAt(shown: Project, review: unknown = ok(REVIEW)) {
       Promise.resolve(path === '/api/projects/{key}/access' ? review : ok(shown))) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -76,7 +78,7 @@ async function mountAt(shown: Project, review: unknown = ok(REVIEW)) {
         component: ProjectAccessView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(`/acme/projects/${shown.key}/access`)
@@ -104,6 +106,15 @@ describe('ProjectAccessView', () => {
     )
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout project access review')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+        ['Members', '/acme/projects/ERP/members'],
+      ],
+      current: 'Access review',
+    })
     expect(document.title).toBe('ERP rollout project access review · Waterline')
     // What the page is for, said under its title (DL-137).
     expect(wrapper.get('header + p').text()).toBe(

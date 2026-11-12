@@ -22,6 +22,8 @@ export type IconName =
   | 'external'
   | 'link'
   | 'panel'
+  | 'building'
+  | 'chevron-right'
 
 // `filled`: drawn solid, for a control's on state (a starred project, DL-305).
 const props = defineProps<{ name: IconName; label?: string; filled?: boolean }>()
@@ -57,6 +59,8 @@ const PATHS: Record<IconName, string[]> = {
     'M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1',
   ],
   panel: ['M4 5h16v14H4z', 'M14 5v14'],
+  building: ['M4 20h16', 'M6 20V4h9v16', 'M15 9h3v11', 'M9 8h3', 'M9 12h3', 'M9 16h3'],
+  'chevron-right': ['M9 6l6 6-6 6'],
   'sign-out': [
     'M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2',
     'M9 12h12',

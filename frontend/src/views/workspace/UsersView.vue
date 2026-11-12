@@ -8,6 +8,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
+import { WORKSPACE_CRUMB } from '@/app/crumbs'
 import { ACTIVE, DEACTIVATED, USER, workspaceRoleText } from '@/app/labels'
 import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
@@ -122,7 +123,7 @@ const announcement = computed(() => {
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader title="Users" />
+    <PageHeader title="Users" :crumbs="[WORKSPACE_CRUMB, { label: 'Users' }]" />
     <p class="m-0 text-text-muted">
       People join through Staff or an organization's members; their accounts are managed here.
     </p>

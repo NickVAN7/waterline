@@ -7,6 +7,7 @@ import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { trail } from '@/test/trail'
 import {
   cleanUpAfterEach,
   emptyPastTheFirst,
@@ -68,8 +69,12 @@ describe('StaffView', () => {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Workspace staff')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({ links: [['Workspace', '/workspace/staff']], current: 'Staff' })
     // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
-    expect(wrapper.find('nav').exists()).toBe(false)
+    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
+    ])
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr
