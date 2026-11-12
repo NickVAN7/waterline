@@ -274,6 +274,7 @@ These sit in the same `@theme static` block as §3.1.
   --header-height: 3.5rem;
   --sidebar-width: 15rem;
   --content-narrow: 40rem;       /* forms, settings */
+  --content-prose: 68ch;         /* a guide article's text (DL-340) */
   --content-wide: 80rem;         /* lists, tables */
 
   /* Focus ring */

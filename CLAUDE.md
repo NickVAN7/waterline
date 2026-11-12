@@ -8,7 +8,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 ## Status
 
 S3-C0g (Documentation: a guide and a reference) done; the git guard's decision held to the end
-of S3-C0x; next: S3-C0h (Generated documentation screenshots).
+of S3-C0x; next: S3-C0h (Generated documentation screenshots, with full-width pages, DL-360).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

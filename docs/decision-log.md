@@ -4451,7 +4451,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   open (route meta `fullWidth`). Inside `main` and capped at 80rem, a wide screen put the list
   and the panel in one column under the page header, the rest of the screen empty.
 - **Supersedes:** none (an exception to UI-SHL-7)
-- **Superseded by:** none
+- **Superseded by:** DL-360 (in part: `fullWidth`, since no page is capped)
 - **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11
 - **Source:** owner, Nov 11, 2026 (after S3-C0d, trying the split pane on a wide screen)
 
@@ -4496,3 +4496,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §11 "My work"; build plan (S3-C0f, the API table)
 - **Source:** owner, Nov 11, 2026 (S3-C0f start)
+
+### DL-360: Pages span the width beside the sidebar
+- **Date:** 2026-11-12
+- **Decision:** `main` takes the whole width beside the sidebar on every page: no
+  `--content-wide` cap, so a page's header, lists, tables, and card grids span it. Forms and
+  settings keep `--content-narrow`, and a guide article's text `--content-prose`, so lines stay
+  readable; a guide article's On this page sits at the right of `main` on a wide screen. With no
+  cap left, route meta `fullWidth` (DL-356) goes. Chosen over centering each page at its cap:
+  capped and left-aligned, a wide screen left the right of the screen empty, on every page.
+- **Supersedes:** UI-SHL-7's "lists and tables up to `--content-wide` … left-aligned in
+  `main`"; DL-356's `fullWidth` exception (its split pane layout stands)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11, the token table; build plan (S3-C0h)
+- **Source:** owner, Nov 12, 2026 (after S3-C0g: "the main section of the page is
+  left-justified … the entire app should be like this, not just docs"; full width chosen)
