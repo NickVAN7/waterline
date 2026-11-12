@@ -11,7 +11,7 @@ Open the menu with your name at the top right and choose **Account settings**.
 
 ## Change your profile
 
-Change your name or username, then select **Save profile**. To change your email, ask an
+Change your **Name** or **Username**, then select **Save profile**. To change your email, ask an
 administrator.
 
 ## Choose light or dark

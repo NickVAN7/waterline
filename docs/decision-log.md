@@ -1000,7 +1000,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   create does; My work's shape is `{sections: {projects: {available, items, total}}}`, 10 items
   each (docs-consistency decisions, Oct 11, 2026).
 - **Supersedes:** none
-- **Superseded by:** DL-111, in part (the project read gains `lead_name`); DL-369 (in part: the favorites' limit)
+- **Superseded by:** DL-111, in part (the project read gains `lead_name`); DL-369 (in part: the favorites' limit); DL-371 (the favorites endpoint)
 - **Applies to:** build plan ("Projects": the projects API; the S1-C11 and S1-C16 rows); design-doc
   §1.1 (the lead); schema-doc (`project.lead_id`)
 - **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C11)
@@ -3791,7 +3791,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   project still lists in Projects, with its star filled when it's a favorite. This is how the
   star "keeps it at the top" (design-doc §11).
 - **Supersedes:** none (specifies DL-197's favorites, placed in S2-C21c by DL-238)
-- **Superseded by:** DL-329 (in part: a section per org); DL-333 (in part: approvals first)
+- **Superseded by:** DL-329 (in part: a section per org); DL-333 (in part: approvals first); DL-371 (in part: the favorites endpoint)
 - **Applies to:** design-doc §11; screen inventory (My work); build plan (S2-C21c)
 - **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut)
 
@@ -4614,3 +4614,25 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §11 "My work"; build plan (the API table, S3-C0j); behavior
   reference (My work)
 - **Source:** owner, Nov 12, 2026 ("favorites should theoretically be cap-less")
+
+### DL-370: The build never inlines an asset
+- **Date:** 2026-11-12
+- **Decision:** `vite.config.ts` sets `build.assetsInlineLimit: 0`, so a small bundled image
+  stays a file on our own origin instead of a `data:` URI, which the CSP's `default-src 'self'`
+  blocks. The CSP stays as it is: no `data:` in an `img-src`. Chosen over allowing `data:`
+  images, which would widen the policy for the whole app and give up its backstop against an
+  injected image.
+- **Supersedes:** none (settles S3-C0g's security-reviewer question; its finding 1 was logged as TD-111)
+- **Superseded by:** none
+- **Applies to:** `frontend/vite.config.ts`; design-doc §4 (the CSP); ui-design-guide UI-MD-1; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026
+
+### DL-371: My work's favorites endpoint goes
+- **Date:** 2026-11-12
+- **Decision:** With Favorites uncapped (DL-369), `GET /api/me/work/favorites`, which paged past
+  the first 10, is removed; the section keeps the shape of the others, `{available, items,
+  total}`, its `total` the number of favorites.
+- **Supersedes:** the build plan API table's favorites endpoint (DL-76, DL-302)
+- **Superseded by:** none
+- **Applies to:** build plan (the API table, S3-C0j); design-doc §11 "My work"
+- **Source:** owner, Nov 12, 2026 (DC-2026-11-12c's docs-consistency decision, option a)

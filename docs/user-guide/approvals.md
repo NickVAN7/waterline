@@ -15,7 +15,7 @@ revision of the requirement, and every approver named must approve it.
 Project admins request approval from a requirement's **Approval** section:
 
 1. Select **Request approval**.
-2. Pick the approvers from the project's members, and add a note if it helps them.
+2. Pick the approvers from the project's members, and add a **Note** if it helps them.
 3. Select **Request approval**.
 
 Only one request can be pending at a time. If the requirement changes while it's pending, the
@@ -27,11 +27,11 @@ review the latest.
 When you're asked to approve, the request shows on [My work](/docs/my-work), whatever your role.
 Open it to see the revision under approval and, if it was approved before, what changed since.
 
-Add a comment if you like, then select **Approve** or **Reject**. Your decision is final, and the
+Add a **Comment** if you like, then select **Approve** or **Reject**. Your decision is final, and the
 requester and the other approvers see your comment. One rejection ends the whole request.
 
-Once everyone has approved, the revision is recorded as approved, and a draft requirement becomes
-Approved.
+Once everyone has approved, the revision is recorded as approved, and a **Draft** requirement becomes
+**Approved**.
 
 ## Other approval actions
 

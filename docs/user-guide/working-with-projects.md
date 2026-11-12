@@ -13,14 +13,14 @@ want to plan and track. Every item in it is numbered after the project's key.
 ## Create a project
 
 1. Open the project selector in the sidebar and select **New project**.
-2. Give the project a name and a short key. The key starts every item's number, and it can't be
+2. Give the project a **Name** and a short **Key**. The key starts every item's number, and it can't be
    changed later, so pick it with care. You're told as you type if it's taken.
-3. Choose its type: **Software**, **ERP implementation**, or **General**. The type suggests which
+3. Choose its **Type**: **Software**, **ERP implementation**, or **General**. The type suggests which
    modules to turn on, and sets the template new requirements start from.
-4. Set its restriction if its content is sensitive.
+4. Set its **Restriction** if its content is sensitive.
 5. Select **Create project**. The project opens, with you as its first admin and lead.
 
-Organization owners and admins can name someone else as the admin and lead instead.
+Organization owners and admins can name someone else as its **First admin** and lead instead.
 
 ## Find a project
 

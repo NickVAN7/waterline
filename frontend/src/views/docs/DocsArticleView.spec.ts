@@ -144,22 +144,25 @@ describe('DocsArticleView', () => {
         .map((a) => a.text())
 
     const below = {
-      'arrange-the-tree': 3000,
-      'edit-a-requirement': 4000,
-      'follow-its-history': 5000,
+      'open-and-edit-a-requirement': 3000,
+      'change-its-status-or-restriction': 4000,
+      'get-it-approved': 5000,
+      'see-what-changed': 6000,
+      'move-or-delete-a-requirement': 7000,
+      'who-can-do-this': 8000,
     }
-    placeHeadings({ 'create-a-requirement': 900, 'open-a-requirement': 1800, ...below })
+    placeHeadings({ 'browse-the-tree': 900, 'create-a-requirement': 1800, ...below })
     window.dispatchEvent(new Event('scroll'))
     await flushPromises()
     // Nothing past the top third yet: the first section.
-    expect(current()).toEqual(['Create a requirement'])
+    expect(current()).toEqual(['Browse the tree'])
 
     // A heading exactly on the line, a third of the window down, counts as reached.
     const line = window.innerHeight / 3
-    placeHeadings({ 'create-a-requirement': -400, 'open-a-requirement': line, ...below })
+    placeHeadings({ 'browse-the-tree': -400, 'create-a-requirement': line, ...below })
     window.dispatchEvent(new Event('scroll'))
     await flushPromises()
-    expect(current()).toEqual(['Open a requirement'])
+    expect(current()).toEqual(['Create a requirement'])
   })
 
   it("doesn't move focus on the first page load without a hash (UI-FRM-16)", async () => {
@@ -264,9 +267,9 @@ describe('DocsArticleView', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const { wrapper } = await mountAt('/docs/requirements#edit-a-requirement')
+    const { wrapper } = await mountAt('/docs/requirements#open-and-edit-a-requirement')
 
-    expect(document.activeElement?.id).toBe('edit-a-requirement')
+    expect(document.activeElement?.id).toBe('open-and-edit-a-requirement')
     await expectNoA11yViolations(wrapper)
   })
 })

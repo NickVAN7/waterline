@@ -12,14 +12,14 @@ sidebar: **Staff**, **Organizations**, **Users**, and **Settings**.
 
 ## Add staff
 
-**Staff** lists the people who work across the workspace. Select **Add person**, enter their email
-and choose a role. If they have no account yet, you create one with a temporary password. Copy it
+**Staff** lists the people who work across the workspace. Select **Add person**, enter their **Email**
+and choose a **Role**. If they have no account yet, you create one with a temporary password. Copy it
 and give it to them: it's shown only once.
 
 ## Create an organization
 
-On **Organizations**, select **Create organization**, give it a name and a web address, and name
-its first owner.
+On **Organizations**, select **Create organization**, give it a **Name** and a **Slug**, its web
+address, and name its **First owner**.
 
 ## Manage accounts
 

@@ -99,11 +99,9 @@ one-class pattern on the other two, and the `frontend/CLAUDE.md` rule covers it)
 Made during the checkpoint: DL-361 (the screenshots seed `--manual-pass`).
 
 Open for the owner:
-1. checkpoint-reviewer's question: does DL-8 (design changes in their own `docs:` commits) cover
-   an owner decision that changes the current checkpoint's row at its start (DL-359, DL-361)?
-2. ui-reviewer's proposed UI-MD-1 rule: a screenshot drawn smaller than its size links to the
-   full-size file.
+1. ~~checkpoint-reviewer's DL-8 question.~~ **Closed** (DL-362): such a decision goes in the
+   checkpoint's commit.
+2. ~~ui-reviewer's proposed screenshot link.~~ **Closed** (DL-363): a new tab, lazily loaded.
 3. The Lead select cut off in the project settings shot (`SelectField`'s `max-w-80`).
-4. Still open from S3-C0g: NOTE's callout tone, page length, `assetsInlineLimit` once a
-   production CSP is sent (every screenshot is well over 4 KB, so none is inlined today), the
-   two proposed UI-MD-1 rules, and the tone sample.
+4. ~~Still open from S3-C0g.~~ **Closed**: DL-364, DL-365, DL-366, DL-370, and the tone sample
+   (DC-2026-11-12c).

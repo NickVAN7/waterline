@@ -26,7 +26,7 @@ their organization or workspace too.
 Project admins can add people:
 
 - **Add member** adds someone already in the organization, or one of the workspace's staff. Start
-  typing their name or email, choose them, and give them a role.
+  typing their name or email in **Person**, choose them, and give them a **Role**.
 - **Add by email** adds anyone by their email address. If they have no account yet, you create one
   with a temporary password, which they change when they first sign in.
 

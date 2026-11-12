@@ -169,9 +169,11 @@ test('the user menu opens Documentation, whose pages and sections open from the 
   await expectFocusNotObscured(page)
 
   const contents = page.getByRole('navigation', { name: 'On this page' })
-  await contents.getByRole('link', { name: 'Edit a requirement' }).click()
-  await expect(page).toHaveURL('/docs/requirements#edit-a-requirement')
-  await expect(page.getByRole('heading', { level: 2, name: 'Edit a requirement' })).toBeFocused()
+  await contents.getByRole('link', { name: 'Open and edit a requirement' }).click()
+  await expect(page).toHaveURL('/docs/requirements#open-and-edit-a-requirement')
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Open and edit a requirement' }),
+  ).toBeFocused()
   await expectFocusedHeadingClear(page)
 
   await page.goBack()
