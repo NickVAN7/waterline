@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // My work, the home page after sign-in (design-doc §11): one request for every section
-// (`GET /api/me/work`): the favorite projects (DL-302), the projects, the approvals waiting for
-// the user (DL-236), and their past decisions (DL-286), each with its first items and a total.
+// (`GET /api/me/work`): the favorite projects (DL-302, DL-332), each organization's projects
+// (DL-329, DL-330, DL-349, DL-359; its heading "Projects" when the user has one org), then the
+// approvals waiting for the user (DL-236), in compact rows (DL-334).
 // A project row's star (DL-305) stars or unstars it, then the page reloads; focus stays on the
 // star pressed, or, when its row left the list, goes to the star now in its place or the `h1`.
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
@@ -9,19 +10,16 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { api, ApiError, client, NETWORK_ERROR } from '@/api/client'
 import type { components } from '@/api/schema'
 import { focusHeading } from '@/app/routeFocus'
-import { APPROVAL_DECISION, APPROVAL_REQUEST_STATUS } from '@/app/labels'
 import Alert from '@/components/Alert.vue'
-import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
-import { allows } from '@/composables/allowedActions'
 import { ANNOUNCE_DELAY_MS, FORM_MESSAGES } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
-import ProjectList from '@/views/project/ProjectList.vue'
 
-import FavoriteStar from './FavoriteStar.vue'
+import MyProjectRows from './MyProjectRows.vue'
 import MyWorkSection from './MyWorkSection.vue'
+import OrgProjects from './OrgProjects.vue'
 import WorkItemHeading from './WorkItemHeading.vue'
 
 // A failed request is one error state for the page; a section the server couldn't read comes
@@ -29,11 +27,14 @@ import WorkItemHeading from './WorkItemHeading.vue'
 // row, of either kind, key those states, so a failed Try again is a new alert. Only one of them
 // announces itself and takes focus: the one whose Try again was pressed, if it failed again,
 // otherwise the first (UI-FBK-15).
-type Section = 'favorites' | 'projects' | 'approvals' | 'decisions'
+type Section = 'favorites' | 'organizations' | 'approvals'
 type Part = 'page' | Section
-const PARTS: Part[] = ['page', 'favorites', 'projects', 'approvals', 'decisions']
+const PARTS: Part[] = ['page', 'favorites', 'organizations', 'approvals']
 const work = useLoad(() => api(client.GET('/api/me/work')))
 const sections = computed(() => work.data.value?.sections)
+const orgs = computed(() =>
+  sections.value?.organizations.available ? sections.value.organizations.items : [],
+)
 const failedPart = (part: Part) =>
   part === 'page'
     ? Boolean(work.error.value)
@@ -71,7 +72,7 @@ const starFailures = ref(0)
 const starAlert = ref<InstanceType<typeof Alert>>()
 let lastStar: { list: string; index: number; id: string } | undefined
 
-async function toggleStar(list: 'favorites' | 'projects', project: MyProject, index: number) {
+async function toggleStar(list: string, project: MyProject, index: number) {
   // One star change at a time, through its reload: a second press would send stale state.
   if (starring.value) return
   lastStar = { list, index, id: project.id }
@@ -139,13 +140,14 @@ const count = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : 
 const announcement = computed(() => {
   if (afterStar.value) return ''
   if (work.loading.value) return 'Loading your work…'
-  const { favorites, projects, approvals } = sections.value ?? {}
+  const { favorites, organizations, approvals } = sections.value ?? {}
+  const projects = organizations?.items.reduce((n, org) => n + org.total + org.hidden_total, 0)
   return [
     // Said only when there are some: "0 favorite projects" on every load would be noise.
     favorites?.available &&
       favorites.total > 0 &&
       count(favorites.total, 'favorite project', 'favorite projects'),
-    projects?.available && count(projects.total, 'project', 'projects'),
+    organizations?.available && count(projects ?? 0, 'project', 'projects'),
     approvals?.available &&
       count(approvals.total, 'approval waiting for you', 'approvals waiting for you'),
   ]
@@ -187,57 +189,48 @@ const announcement = computed(() => {
         :live="live('favorites')"
         @retry="retry('favorites')"
       >
-        <template #empty>Star a project under Projects to keep it here, at the top.</template>
+        <template #empty>Star a project below to keep it here, at the top.</template>
         <template #default="{ items, total }">
-          <ProjectList :projects="items" with-access>
-            <template #actions="{ project }">
-              <FavoriteStar
-                v-if="allows(project, 'project.favorite')"
-                :data-star="`favorites:${project.id}`"
-                :name="project.name"
-                :favorite="project.is_favorite"
-                :pending="starring === project.id"
-                @toggle="toggleStar('favorites', project, items.indexOf(project))"
-              />
-            </template>
-          </ProjectList>
+          <MyProjectRows
+            :projects="items"
+            list="favorites"
+            :starring="starring"
+            with-org
+            @toggle="(project, index) => toggleStar('favorites', project, index)"
+          />
           <p v-if="total > items.length" class="m-0 text-sm text-text-muted">
             Showing {{ items.length }} of {{ total }} favorite projects.
           </p>
         </template>
       </MyWorkSection>
 
+      <!-- One section per organization; loading, a failed read, or none at all is one Projects
+           section (UI-FBK-11, TD-40). -->
+      <template v-if="orgs.length">
+        <OrgProjects
+          v-for="org in orgs"
+          :id="orgs.length > 1 ? `org-${org.slug}` : 'projects'"
+          :key="org.id"
+          :org="org"
+          :heading="orgs.length > 1 ? org.name : 'Projects'"
+          :starring="starring"
+          :loading="work.loading.value"
+          @toggle="toggleStar"
+        />
+      </template>
       <MyWorkSection
+        v-else
         id="projects"
         heading="Projects"
         thing="your projects"
         empty-heading="No projects yet"
-        :section="sections?.projects"
+        :section="sections?.organizations"
         :loading="work.loading.value"
         :failures="failures"
-        :live="live('projects')"
-        @retry="retry('projects')"
+        :live="live('organizations')"
+        @retry="retry('organizations')"
       >
         <template #empty>Projects you're added to will appear here.</template>
-        <template #default="{ items, total }">
-          <ProjectList :projects="items" with-access>
-            <template #actions="{ project }">
-              <FavoriteStar
-                v-if="allows(project, 'project.favorite')"
-                :data-star="`projects:${project.id}`"
-                :name="project.name"
-                :favorite="project.is_favorite"
-                :pending="starring === project.id"
-                @toggle="toggleStar('projects', project, items.indexOf(project))"
-              />
-            </template>
-          </ProjectList>
-          <!-- shortcut: no "see all" list yet (TD-37); the org's project list shows the rest. -->
-          <p v-if="total > items.length" class="m-0 text-sm text-text-muted">
-            Showing {{ items.length }} of {{ total }} projects. Each organization's project list has
-            the rest.
-          </p>
-        </template>
       </MyWorkSection>
 
       <MyWorkSection
@@ -271,51 +264,6 @@ const announcement = computed(() => {
           <!-- shortcut: no "see all" list yet (TD-37). -->
           <p v-if="total > items.length" class="m-0 text-sm text-text-muted">
             Showing the {{ items.length }} oldest of {{ total }} approvals.
-          </p>
-        </template>
-      </MyWorkSection>
-
-      <MyWorkSection
-        id="decisions"
-        heading="My past decisions"
-        thing="your past decisions"
-        empty-heading="No decisions yet"
-        :section="sections?.decisions"
-        :loading="work.loading.value"
-        :failures="failures"
-        :live="live('decisions')"
-        @retry="retry('decisions')"
-      >
-        <template #empty>Requests you approve or reject will appear here.</template>
-        <template #default="{ items, total }">
-          <ul class="m-0 flex list-none flex-col gap-2 p-0">
-            <li
-              v-for="item in items"
-              :key="item.request_id"
-              class="flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-raised p-3"
-            >
-              <WorkItemHeading :item="item">
-                <Badge
-                  class="ml-auto"
-                  :tone="APPROVAL_DECISION[item.decision].tone"
-                  :icon="APPROVAL_DECISION[item.decision].icon"
-                >
-                  <span class="sr-only">Your decision: </span
-                  >{{ APPROVAL_DECISION[item.decision].label }}
-                </Badge>
-              </WorkItemHeading>
-              <p class="m-0 text-sm text-text-muted">
-                Decided on {{ day(item.decided_at) }}. Request:
-                {{ APPROVAL_REQUEST_STATUS[item.request_status].label }}
-              </p>
-              <p v-if="item.comment" class="m-0 whitespace-pre-line break-words text-sm">
-                Your comment: {{ item.comment }}
-              </p>
-            </li>
-          </ul>
-          <!-- shortcut: no "see all" list yet (TD-37). -->
-          <p v-if="total > items.length" class="m-0 text-sm text-text-muted">
-            Showing the {{ items.length }} newest of {{ total }} decisions.
           </p>
         </template>
       </MyWorkSection>

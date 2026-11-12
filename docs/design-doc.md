@@ -1550,15 +1550,21 @@ Each project shows its org, status, lead, and the user's access (their explicit 
 or inherited admin; DL-153). It is scoped like every list endpoint (§5, "Reads are authorized
 too"), leaves out the
 content of export-controlled projects where the user has no explicit membership (§3.1), and
-leaves out archived projects and every item in them (tasks, reviews, test cases; archiving
-cancels their approval requests, §6.2; DL-200), which stay visible inside the project. Until
+leaves out every item in archived projects (tasks, reviews, test cases; archiving cancels their
+approval requests, §6.2; DL-200), which stay visible inside the project, and, until S3-C0f, the
+archived projects themselves (DL-330). Until
 notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
 projects** (DL-197): a star on a My work project row keeps it at the top, per user: a Favorite
 projects section first, by name, archived ones left out (S2-C21c, DL-238, DL-302 to DL-305); favoriting items is v1.5 or later, and there's no "recently viewed".
-From S3-C0f (DL-329, DL-330, DL-332 to DL-334, DL-349), My work opens with Favorites, then a
-section per organization showing its first 10 projects you can open (active first; completed,
-cancelled, and archived behind a toggle; "Showing 10 of N" and **All N projects**), in compact
-rows, then the approvals waiting for you; the past-decisions section is removed (DL-333). From
+From S3-C0f (DL-329, DL-330, DL-332 to DL-334, DL-349, DL-359), My work opens with Favorites,
+then a section per organization you can open a project in (by name; its heading left out when
+there's one), in compact rows: its first 10 open projects (Active, Planning, On hold, each by
+name) with "Showing 10 of N" past 10, then **Show N hidden projects** revealing the first 10 of
+the rest (Completed, Cancelled, each by name, then the archived by name alone), and **All N projects**, N being what
+the org's own list shows (all but the archived; no link when that's none); the heading's count is every project of it you
+can open. Archived projects are on these lists (no star: starring is a mutation), their items
+still left out. Then the approvals waiting for you; the past-decisions section is removed
+(DL-333). From
 S3-C11 and S3-C29 (DL-349), summary tiles open the page (Approvals waiting, Assigned to you,
 Waiting for your review, Overdue or due this week: the user's open assigned tasks due before
 today plus 7 days), each a link to its section, and the two task sections follow Approvals. This

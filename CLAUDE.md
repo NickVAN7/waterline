@@ -7,7 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0e (Breadcrumbs) done; the git guard's decision held to the end of S3-C0x; next: S3-C0f (My work grouped by organization).
+S3-C0f (My work grouped by organization) done; the git guard's decision held to the end of
+S3-C0x; next: S3-C0g (Documentation: a guide and a reference).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

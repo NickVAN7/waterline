@@ -2,8 +2,8 @@
 No tables; it reads through other areas' repositories and calls no service. The project list's
 spec and rows live here so the project area (a higher layer) can share them."""
 
+import uuid
 from collections.abc import Awaitable
-from datetime import datetime
 from typing import cast
 
 from sqlalchemy.exc import DBAPIError
@@ -20,11 +20,12 @@ from app.models.project import Project
 from app.models.requirement import RequirementRevision
 from app.repositories.approval import ApprovalRepository
 from app.repositories.project import ProjectRepository
-from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
+from app.schemas.approval import ApprovalWorkItem
 from app.schemas.project import (
     INHERITED_ADMIN,
     MyProjectItem,
     MyWork,
+    OrgWork,
     ProjectItem,
     WorkSection,
     WorkSections,
@@ -45,12 +46,6 @@ APPROVALS = ListSpec(
     id_column=Approval.id,  # pyright: ignore[reportArgumentType]
     sorts={"requested_at": ApprovalRequest.created_at},  # pyright: ignore[reportArgumentType]
     default_sort=("requested_at",),
-)
-DECISIONS = ListSpec(
-    name="MyDecision",
-    id_column=Approval.id,  # pyright: ignore[reportArgumentType]
-    sorts={"decided_at": Approval.decided_at},  # pyright: ignore[reportArgumentType]
-    default_sort=("-decided_at",),
 )
 FIRST_ITEMS = 10  # each section's items in `GET /api/me/work` (DL-76)
 
@@ -101,26 +96,6 @@ def approval_item(row: Approval) -> ApprovalWorkItem:
     )
 
 
-def decision_item(row: Approval) -> DecisionWorkItem:
-    """A past decision as My work shows it (DL-286), loaded as `approval_item`'s row."""
-    request = row.approval_request
-    revision = cast(RequirementRevision, request.requirement_revision)
-    return DecisionWorkItem(
-        request_id=request.id,
-        decision=row.decision,
-        decided_at=cast(datetime, row.decided_at),  # the decision sets it (ApprovalService)
-        comment=row.comment,
-        request_status=request.status,
-        entity_type=request.entity_type,
-        entity_number=revision.requirement.number,
-        title=revision.title,
-        revision_number=revision.revision_number,
-        project_key=request.project.key,
-        project_name=request.project.name,
-        organization_slug=request.project.organization.slug,
-    )
-
-
 class MyWorkService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -134,14 +109,9 @@ class MyWorkService:
                 favorites=await self._section(
                     self.favorites(ctx, PROJECTS.query_model(limit=FIRST_ITEMS))
                 ),
-                projects=await self._section(
-                    self.projects(ctx, PROJECTS.query_model(limit=FIRST_ITEMS))
-                ),
+                organizations=await self._organizations_section(ctx),
                 approvals=await self._section(
                     self.approvals(ctx, APPROVALS.query_model(limit=FIRST_ITEMS))
-                ),
-                decisions=await self._section(
-                    self.decisions(ctx, DECISIONS.query_model(limit=FIRST_ITEMS))
                 ),
             )
         )
@@ -155,34 +125,71 @@ class MyWorkService:
             return WorkSection[T](available=False)
         return WorkSection[T](available=True, items=page.items, total=page.total)
 
-    async def projects(self, ctx: AuthzContext, query: object) -> Page[MyProjectItem]:
-        """The projects the user can open, archived left out."""
-        return await self._my_projects(ctx, query, PROJECTS, favorites_only=False)
+    async def _organizations_section(self, ctx: AuthzContext) -> WorkSection[OrgWork]:
+        """The organizations section, in its own savepoint as `_section`'s are."""
+        try:
+            async with self.session.begin_nested():
+                orgs = await self.organizations(ctx)
+        except DBAPIError:
+            return WorkSection[OrgWork](available=False)
+        return WorkSection[OrgWork](available=True, items=orgs, total=len(orgs))
+
+    async def organizations(self, ctx: AuthzContext) -> list[OrgWork]:
+        """Each organization the user can open a project in, by name, with its first open and
+        hidden projects and their counts (DL-329, DL-330, DL-359). Two queries, however many
+        orgs: the ranks and counts, then the projects shown."""
+        projects = ProjectRepository(self.session)
+        scope = project_scope(ctx)
+        ranks = await projects.ranked_by_org(scope, FIRST_ITEMS)
+        hidden_ids = {row.id for row in ranks if row.hidden}
+        rows = await projects.in_my_work_order(scope, [row.id for row in ranks])
+        starred = await projects.favorite_ids(ctx.user_id, [p.id for p in rows])
+        counts = {row.id: row for row in ranks}
+        orgs: dict[uuid.UUID, OrgWork] = {}
+        for project in rows:
+            row = counts[project.id]
+            org = orgs.get(project.organization_id)
+            if org is None:
+                org = orgs[project.organization_id] = OrgWork(
+                    id=project.organization_id,
+                    slug=project.organization.slug,
+                    name=project.organization.name,
+                    projects=[],
+                    total=0,
+                    hidden=[],
+                    hidden_total=0,
+                    listed_total=row.listed_total,
+                )
+            shown = self._row(ctx, project, project.id in starred)
+            if project.id in hidden_ids:
+                org.hidden.append(shown)
+                org.hidden_total = row.group_total
+            else:
+                org.projects.append(shown)
+                org.total = row.group_total
+        return list(orgs.values())
 
     async def favorites(self, ctx: AuthzContext, query: object) -> Page[MyProjectItem]:
         """The projects the user starred and can still open, archived left out (DL-302)."""
-        return await self._my_projects(ctx, query, PROJECTS, favorites_only=True)
-
-    async def _my_projects(
-        self, ctx: AuthzContext, query: object, spec: ListSpec, *, favorites_only: bool
-    ) -> Page[MyProjectItem]:
-        """My work's project rows, each with its star and its allowed actions (DL-306)."""
         projects = ProjectRepository(self.session)
-        statement = projects.visible(project_scope(ctx)).where(Project.archived_at.is_(None))
-        if favorites_only:
-            statement = projects.favorites_only(statement, ctx.user_id)
-        page = await fetch_page(self.session, statement, spec, query)  # pyright: ignore[reportArgumentType] -- spec.query_model
+        statement = projects.favorites_only(
+            projects.visible(project_scope(ctx)).where(Project.archived_at.is_(None)),
+            ctx.user_id,
+        )
+        page = await fetch_page(self.session, statement, PROJECTS, query)  # pyright: ignore[reportArgumentType] -- spec.query_model
         rows: list[Project] = page.items
         starred = await projects.favorite_ids(ctx.user_id, [p.id for p in rows])
-        return page.with_items(
-            [
-                MyProjectItem(
-                    **item(ctx, p).model_dump(),
-                    is_favorite=p.id in starred,
-                    allowed_actions=allowed_actions(ctx, project_target(p)),
-                )
-                for p in rows
-            ]
+        return page.with_items([self._row(ctx, p, p.id in starred) for p in rows])
+
+    @staticmethod
+    def _row(ctx: AuthzContext, project: Project, starred: bool) -> MyProjectItem:
+        """A project row on My work, with its star and its allowed actions (DL-306): an
+        archived project's deny `project.favorite`, so it has no star (DL-330)."""
+        return MyProjectItem(
+            **item(ctx, project).model_dump(),
+            is_favorite=starred,
+            allowed_actions=allowed_actions(ctx, project_target(project)),
+            archived=project.archived_at is not None,
         )
 
     async def approvals(self, ctx: AuthzContext, query: object) -> Page[ApprovalWorkItem]:
@@ -191,10 +198,3 @@ class MyWorkService:
         statement = ApprovalRepository(self.session).pending_for(ctx.user_id, content_scope(ctx))
         page = await fetch_page(self.session, statement, APPROVALS, query)  # pyright: ignore[reportArgumentType] -- APPROVALS.query_model
         return page.with_items([approval_item(row) for row in page.items])
-
-    async def decisions(self, ctx: AuthzContext, query: object) -> Page[DecisionWorkItem]:
-        """The caller's past decisions in projects whose content they can see, newest first
-        (DL-286)."""
-        statement = ApprovalRepository(self.session).decided_for(ctx.user_id, content_scope(ctx))
-        page = await fetch_page(self.session, statement, DECISIONS, query)  # pyright: ignore[reportArgumentType] -- DECISIONS.query_model
-        return page.with_items([decision_item(row) for row in page.items])

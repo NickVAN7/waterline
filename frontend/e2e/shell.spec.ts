@@ -8,10 +8,48 @@ import { signIn } from './support/demo'
 test('My work lists the projects the user can open, in the shell', async ({ page }) => {
   await signIn(page, 'casey')
 
-  const projects = page.getByRole('region', { name: 'Projects' })
-  await expect(projects.getByRole('link')).toHaveText(['Customer Portal', 'Inventory System'])
+  // In two orgs, each its own section, its rows the projects there (DL-329).
+  const rows = (org: string) =>
+    page.getByRole('region', { name: org }).getByRole('listitem').getByRole('link')
+  await expect(rows('Acme Manufacturing')).toHaveText(['Customer Portal'])
+  await expect(rows('Globex Retail')).toHaveText(['Inventory System'])
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Project' })).toHaveCount(0)
+  await expectNoA11yViolations(page)
+  await expectFocusNotObscured(page)
+})
+
+// S3-C0f: My work's sections in order, an archived project behind its org's toggle (DL-330,
+// DL-349, DL-359). ben is in one org, so its section is just Projects.
+test('My work keeps an archived project behind the toggle, starless, marked Archived', async ({
+  page,
+}) => {
+  await signIn(page, 'ben')
+
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+    'Favorite projects',
+    'Projects',
+    'Approvals waiting for you',
+  ])
+  const projects = page.getByRole('region', { name: 'Projects' })
+  await expect(projects.getByRole('link', { name: 'Legacy Cleanup' })).toBeHidden()
+  // Its name changes with its state, so it's found by what stays.
+  const toggle = projects.getByRole('button', { name: /1 hidden project$/ })
+  await expect(toggle).toHaveText('Show 1 hidden project')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await toggle.focus()
+  await page.keyboard.press('Enter')
+
+  await expect(toggle).toHaveText('Hide 1 hidden project')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(toggle).toBeFocused()
+  const legacy = projects.getByRole('listitem').filter({ hasText: 'Legacy Cleanup' })
+  await expect(legacy).toContainText('Archived')
+  await expect(legacy.getByRole('button', { name: /^Favorite/ })).toHaveCount(0)
+  await expect(projects.getByRole('link', { name: /^All \d+ projects?$/ })).toHaveAttribute(
+    'href',
+    '/acme/projects',
+  )
   await expectNoA11yViolations(page)
   await expectFocusNotObscured(page)
 })

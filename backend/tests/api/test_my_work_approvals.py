@@ -346,7 +346,8 @@ async def test_an_approvals_section_whose_query_fails_leaves_the_projects_sectio
 
     sections = (await client.get(WORK)).json()["sections"]
 
-    assert (sections["approvals"], [p["key"] for p in sections["projects"]["items"]]) == (
+    shown = [p["key"] for org in sections["organizations"]["items"] for p in org["projects"]]
+    assert (sections["approvals"], shown) == (
         {"available": False, "items": [], "total": 0},
         ["PMT"],
     )

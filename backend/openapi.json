@@ -4836,204 +4836,6 @@
         }
       }
     },
-    "/api/me/work/projects": {
-      "get": {
-        "tags": [
-          "my_work"
-        ],
-        "summary": "My Projects",
-        "description": "The projects the user can open, archived left out.",
-        "operationId": "my_projects_api_me_work_projects_get",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 200,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 9223372036854775807,
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Comma-separated, `-` for descending: key, name. Default: name",
-              "title": "Sort"
-            },
-            "description": "Comma-separated, `-` for descending: key, name. Default: name"
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ProjectStatus"
-                  },
-                  "maxItems": 50
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status"
-            }
-          },
-          {
-            "name": "status__not",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ProjectStatus"
-                  },
-                  "maxItems": 50
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status  Not"
-            }
-          },
-          {
-            "name": "status__is_null",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status  Is Null"
-            }
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ProjectType"
-                  },
-                  "maxItems": 50
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Type"
-            }
-          },
-          {
-            "name": "type__not",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ProjectType"
-                  },
-                  "maxItems": 50
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Type  Not"
-            }
-          },
-          {
-            "name": "type__is_null",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Type  Is Null"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page_MyProjectItem_"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
-          }
-        }
-      }
-    },
     "/api/me/work/favorites": {
       "get": {
         "tags": [
@@ -5291,92 +5093,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_ApprovalWorkItem_"
-                }
-              }
-            }
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            },
-            "description": "Unprocessable Content"
-          }
-        }
-      }
-    },
-    "/api/me/work/decisions": {
-      "get": {
-        "tags": [
-          "my_work"
-        ],
-        "summary": "My Decisions",
-        "description": "The caller's past decisions, newest first (DL-286).",
-        "operationId": "my_decisions_api_me_work_decisions_get",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 200,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 9223372036854775807,
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Comma-separated, `-` for descending: decided_at. Default: -decided_at",
-              "title": "Sort"
-            },
-            "description": "Comma-separated, `-` for descending: decided_at. Default: -decided_at"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page_DecisionWorkItem_"
                 }
               }
             }
@@ -7889,81 +7605,6 @@
         ],
         "title": "ChangePasswordRequest"
       },
-      "DecisionWorkItem": {
-        "properties": {
-          "request_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Request Id"
-          },
-          "decision": {
-            "$ref": "#/components/schemas/ApprovalDecision"
-          },
-          "decided_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Decided At"
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          },
-          "request_status": {
-            "$ref": "#/components/schemas/ApprovalRequestStatus"
-          },
-          "entity_type": {
-            "$ref": "#/components/schemas/ApprovalEntityType"
-          },
-          "entity_number": {
-            "type": "integer",
-            "title": "Entity Number"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "revision_number": {
-            "type": "integer",
-            "title": "Revision Number"
-          },
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "project_name": {
-            "type": "string",
-            "title": "Project Name"
-          },
-          "organization_slug": {
-            "type": "string",
-            "title": "Organization Slug"
-          }
-        },
-        "type": "object",
-        "required": [
-          "request_id",
-          "decision",
-          "decided_at",
-          "comment",
-          "request_status",
-          "entity_type",
-          "entity_number",
-          "title",
-          "revision_number",
-          "project_key",
-          "project_name",
-          "organization_slug"
-        ],
-        "title": "DecisionWorkItem",
-        "description": "One of the caller's past decisions, in My work (design-doc §11; DL-286): `title` and\n`revision_number` are the decided revision's, `request_status` the request's now."
-      },
       "DeletedChildren": {
         "type": "string",
         "enum": [
@@ -8545,6 +8186,10 @@
             },
             "type": "array",
             "title": "Allowed Actions"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived"
           }
         },
         "type": "object",
@@ -8561,7 +8206,8 @@
           "organization_name",
           "my_access",
           "is_favorite",
-          "allowed_actions"
+          "allowed_actions",
+          "archived"
         ],
         "title": "MyProjectItem",
         "description": "A project on My work (DL-302, DL-306): whether the user starred it, and what they may do\non it, so the star shows only where `project.favorite` is allowed."
@@ -8784,6 +8430,62 @@
         "title": "OrgUpdate",
         "description": "Only the fields sent change."
       },
+      "OrgWork": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/MyProjectItem"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "hidden": {
+            "items": {
+              "$ref": "#/components/schemas/MyProjectItem"
+            },
+            "type": "array",
+            "title": "Hidden"
+          },
+          "hidden_total": {
+            "type": "integer",
+            "title": "Hidden Total"
+          },
+          "listed_total": {
+            "type": "integer",
+            "title": "Listed Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "projects",
+          "total",
+          "hidden",
+          "hidden_total",
+          "listed_total"
+        ],
+        "title": "OrgWork",
+        "description": "One organization's section on My work (DL-329, DL-330, DL-349, DL-359): its first open\nprojects (Active, Planning, On hold, each by name) and how many there are, its first hidden\nones (Completed, Cancelled, then archived, each by name) and how many, and how many its org\nlist shows (all but the archived)."
+      },
       "OwnProfileUpdate": {
         "properties": {
           "name": {
@@ -8875,37 +8577,6 @@
           "offset"
         ],
         "title": "Page[ApprovalWorkItem]"
-      },
-      "Page_DecisionWorkItem_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/DecisionWorkItem"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "limit": {
-            "type": "integer",
-            "title": "Limit"
-          },
-          "offset": {
-            "type": "integer",
-            "title": "Offset"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "limit",
-          "offset"
-        ],
-        "title": "Page[DecisionWorkItem]"
       },
       "Page_MemberCandidate_": {
         "properties": {
@@ -11281,32 +10952,6 @@
         ],
         "title": "WorkSection[ApprovalWorkItem]"
       },
-      "WorkSection_DecisionWorkItem_": {
-        "properties": {
-          "available": {
-            "type": "boolean",
-            "title": "Available"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/DecisionWorkItem"
-            },
-            "type": "array",
-            "title": "Items",
-            "default": []
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "available"
-        ],
-        "title": "WorkSection[DecisionWorkItem]"
-      },
       "WorkSection_MyProjectItem_": {
         "properties": {
           "available": {
@@ -11333,27 +10978,49 @@
         ],
         "title": "WorkSection[MyProjectItem]"
       },
+      "WorkSection_OrgWork_": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrgWork"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "WorkSection[OrgWork]"
+      },
       "WorkSections": {
         "properties": {
           "favorites": {
             "$ref": "#/components/schemas/WorkSection_MyProjectItem_"
           },
-          "projects": {
-            "$ref": "#/components/schemas/WorkSection_MyProjectItem_"
+          "organizations": {
+            "$ref": "#/components/schemas/WorkSection_OrgWork_"
           },
           "approvals": {
             "$ref": "#/components/schemas/WorkSection_ApprovalWorkItem_"
-          },
-          "decisions": {
-            "$ref": "#/components/schemas/WorkSection_DecisionWorkItem_"
           }
         },
         "type": "object",
         "required": [
           "favorites",
-          "projects",
-          "approvals",
-          "decisions"
+          "organizations",
+          "approvals"
         ],
         "title": "WorkSections"
       },

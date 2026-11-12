@@ -27,7 +27,7 @@ test('the signed-in app runs under the CSP, which blocks an injected inline scri
   })
 
   await signIn(page, 'casey')
-  await expect(page.getByRole('region', { name: 'Projects' }).getByRole('link')).toHaveCount(2)
+  await expect(page.getByRole('region', { name: 'Acme Manufacturing' })).toBeVisible()
   expect(violations).toEqual([])
 
   const ran = await page.evaluate(() => {

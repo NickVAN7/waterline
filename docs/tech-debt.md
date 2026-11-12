@@ -156,8 +156,9 @@ Entry format:
 - **What:** My work's projects section shows the first 10 projects (`GET /api/me/work`) and says
   how many there are, but has no "see all" list over `GET /api/me/work/{section}` (design-doc
   §11); a user on more than 10 projects finds the rest on each org's project list. From S2-C20b,
-  the approvals and past decisions sections too (`/approvals`, `/decisions`): past 10, the page
-  says how many there are; an approval past the first 10 shows once an older one is decided.
+  the approvals section too (`/approvals`): past 10, the page says how many there are; an
+  approval past the first 10 shows once an older one is decided. From S3-C0f each org's section
+  links to its list (DL-359), and favorites (`/favorites`) still have no "see all".
 - **Why:** smallest complete change: no demo user is on more than two projects, and the org list
   already shows them all; no demo user has more than a few approvals. The "see all" list belongs with the sections that need one most.
 - **Fix by:** S3-C29 (My work's "see all" for every section; the per-section routes exist, so frontend only)

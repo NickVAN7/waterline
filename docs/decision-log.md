@@ -4480,3 +4480,19 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-SHL-14; S3-C0g (the article trail)
 - **Source:** owner, Nov 11, 2026 (S3-C0e review: checkpoint-reviewer and ui-reviewer questions)
+
+### DL-359: My work's organization sections: what each count counts
+- **Date:** 2026-11-11
+- **Decision:** `GET /api/me/work` returns, per organization, its first 10 open projects
+  (Active, Planning, On hold) with their total and its first 10 hidden ones (Completed,
+  Cancelled, then archived) with theirs, in one response. "Showing 10 of N" counts the open
+  ones; the toggle reads "Show N hidden projects" and reveals up to 10, the org's list holding the
+  rest; **All N projects** counts what that list shows (all but the archived), so the number
+  matches the page it opens, and isn't shown when that's none; the section heading counts every
+  project of the org the user can open. The archived come last, by name alone, whatever their
+  status (owner, S3-C0f review). The section replaces `projects`, and `GET /api/me/work/projects` goes. The four spec
+  tests pinning the old section are rewritten by `spec-test-writer` (owner-approved).
+- **Supersedes:** none (settles what DL-330 and DL-349 left open)
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "My work"; build plan (S3-C0f, the API table)
+- **Source:** owner, Nov 11, 2026 (S3-C0f start)

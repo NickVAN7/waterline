@@ -22,6 +22,9 @@ export const PROJECT_STATUS: Record<ProjectStatus, BadgeLabel> = {
   cancelled: { label: 'Cancelled', tone: 'neutral', icon: 'x' },
 }
 
+/** An archived project's badge, beside its status on My work's lists (DL-330). */
+export const PROJECT_ARCHIVED: BadgeLabel = { label: 'Archived', tone: 'neutral', icon: 'pause' }
+
 /** Project types (design-doc §1.1): the type seeds the modules and picks the labels. */
 export const PROJECT_TYPE: Record<ProjectType, string> = {
   software: 'Software',

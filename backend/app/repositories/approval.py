@@ -88,13 +88,6 @@ class ApprovalRepository:
             ApprovalRequest.status == ApprovalRequestStatus.PENDING,
         )
 
-    def decided_for(self, approver_id: uuid.UUID, scope: Scope) -> Select[Approval]:
-        """The rows the approver approved or rejected, whatever their request's status now (My
-        work's past decisions, DL-286)."""
-        return self._mine(approver_id, scope).where(
-            Approval.decision.in_((ApprovalDecision.APPROVED, ApprovalDecision.REJECTED))
-        )
-
     def _mine(self, approver_id: uuid.UUID, scope: Scope) -> Select[Approval]:
         """The approver's rows in the live projects of `scope` (their `content_scope`), each with
         its request, revision and requirement, requester, and project and org loaded. A deleted

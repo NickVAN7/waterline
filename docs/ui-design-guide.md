@@ -784,6 +784,9 @@ render inside the full shell when signed in.
   | `completed` | info | Completed |
   | `cancelled` | neutral | Cancelled |
 
+  An archived project on My work's lists carries **Archived** (neutral, the pause icon) beside
+  its status (DL-330, S3-C0f).
+
   The requirement status (DL-148), with "Approved · modified" for an approved requirement
   edited since (design-doc §6.1):
 

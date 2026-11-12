@@ -50,29 +50,29 @@ Every page after sign-in has the same frame:
 ## My work
 
 My work is your home page (`/`). **Favorite projects**, first, lists the projects you've
-starred, by name; archived ones, and any you can no longer open, are left out. Each project row
-on My work has a star, **Favorite <project>**: select it to add the project to your favorites,
-and again to take it off. Only you see your favorites.
+starred, by name, each with its organization; archived ones, and any you can no longer open, are
+left out. A project row has a star, **Favorite <project>**: select it to add the project to your
+favorites, and again to take it off. Only you see your favorites. An archived project has no star.
 
-Its **Projects** section lists the projects you can open,
-with each one's key, its organization, your access (your role on it, or "Admin (inherited)" if
-you administer it through its organization or the workspace), and its status, on the right;
-archived projects are left out. If you're on more than 10, it
-says how many there are, and each organization's project list has the rest. If the list can't
-be loaded, **Try again** loads it again.
+Then each organization you can open a project in has its own section, under its name and how many
+of its projects you can open (with one organization, the section is just **Projects**). Each row
+shows the project's key, your access (your role on it, or "Admin (inherited)" if you administer it
+through its organization or the workspace), and its status, on the right. The open projects come
+first: Active, then Planning, then On hold, each by name, the first 10 of them ("Showing 10 of 12"
+when there are more). **Show 3 hidden projects** reveals the completed, cancelled, and archived
+ones (an archived one marked **Archived**), and **Hide** puts them away again. **All 14 projects**
+opens the organization's project list, which has the rest (there's no such link when every project
+of yours there is archived). If the projects can't be loaded,
+**Try again** loads them again.
 
 **Approvals waiting for you** lists the approval requests that name you and that you haven't
 decided yet, across your projects, the longest-waiting first: each shows the requirement's title
 (as in the revision under approval), its ID, the revision's number, its project, who asked and
 when, and their note. Open one to review it and decide (see "Deciding", under
-Requirements). A request on a project whose content you can no longer see isn't listed.
+Requirements). A request on a project whose content you can no longer see isn't listed. A
+decision you've made shows on its requirement's Approval section.
 
-**My past decisions**, under it, lists the requests you approved or rejected, newest first: each
-shows the requirement and revision you decided on, your decision, when, the request's status now
-(it may have been cancelled or approved by hand since), and your comment. Open one to see its
-requirement.
-
-Each section shows its first 10; if there are more, it says how many. If one section can't be
+Favorites and approvals show their first 10; if there are more, they say how many. If one section can't be
 loaded, it shows **Try again** and the others still show; if the whole page can't be loaded, one
 **Try again** loads it again.
 

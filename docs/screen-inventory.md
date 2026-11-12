@@ -336,7 +336,7 @@ Any project role can be a named approver, viewers included (design-doc §6.2).
   asks the approver to confirm.** A rejection ends the whole request.
 - **A decision is final: there is no "unapprove."** Instead, an approved item can be
   re-opened (below).
-- See my past decisions (on My work, DL-286), each opening its requirement (owner, Nov 5, 2026). *Built.*
+- See my past decisions (on My work, DL-286), each opening its requirement (owner, Nov 5, 2026). *Built; removed in S3-C0f (DL-333): a decision shows on its requirement's Approval section.*
 
 **Edge cases the approver runs into**
 - The request was cancelled, or made moot by a hand approval, while I was reviewing it. I'm
@@ -527,7 +527,7 @@ panel vs. dialog.
 
 | View | Combines | Slice |
 |---|---|---|
-| **My work** | summary tiles, favorite projects, my projects (each org's first 10), approvals I owe, my tasks, reviews I owe, test cases assigned to me (DL-349); my past decisions until S3-C0f | Projects (S1), approvals I owe and my past decisions (S2-C20b) built; other sections with their slices (3, 5) |
+| **My work** | summary tiles, favorite projects, my projects (each org's first 10), approvals I owe, my tasks, reviews I owe, test cases assigned to me (DL-349); my past decisions until S3-C0f | Projects (S1), approvals I owe (S2-C20b) built; grouped by organization in S3-C0f; other sections with their slices (3, 5) |
 | **Project home** | status (a status menu for its admins), lead, current phase, milestone, and sprint; headline numbers: blocked work, untested requirements, pending approvals | Shell built (S1); current phase, status menu, blocked tasks, and pending approvals in 3 (S3-C15, S3-C30); untested requirements in 5; milestone and sprint in 4 |
 | **Org overview** | the org's projects with status and lead; archived projects below | Built (S1) |
 | **Board** | tasks by status; filter by sprint, assignee, workstream | 3 |
@@ -640,7 +640,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 | GitHub account link / unlink | section of Account settings | `/account` | 7 | — |
 | Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (S3-C32, DL-239) | — |
 | No access | page | `/account/no-access` | 1 | Built |
-| My work | page | `/` | 1, sections in 2, 3, 5 | Projects, approvals, past decisions built; grouped by organization (each org's first 10), approvals below the projects, past decisions removed, in S3-C0f (DL-329 to DL-334, DL-349); summary tiles and the task sections in S3-C29 (DL-349) |
+| My work | page | `/` | 1, sections in 2, 3, 5 | Projects and approvals built; grouped by organization (each org's first 10, hidden ones behind a toggle), approvals below the projects, past decisions removed, in S3-C0f (DL-329 to DL-334, DL-349, DL-359); summary tiles and the task sections in S3-C29 (DL-349) |
 | Favorite projects | section of My work, first; star on My work's project rows (DL-302, DL-305) | `/` | 2 (S2-C21c, DL-238) | Built |
 | Documentation (user guide) | page, from the user menu; the guide's title, a Contents list, then the guide (DL-310, DL-311); a landing page and articles from S3-C0g (DL-335 to DL-342) | `/docs` | 2 (S2-C21d, DL-238) | Built |
 | Search results | page, from the header search bar | `/search` | 6 | — |
