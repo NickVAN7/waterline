@@ -43,7 +43,7 @@ layout and utilities, both fed by one set of design tokens.**
   plain `<button>` and `<a>` are used where they do the job.
 - **SVAR for what PrimeVue does not have.** PrimeVue has no kanban board and no Gantt chart. The
   task board uses SVAR Vue **Kanban** and the editable grids **DataGrid** (V1); an orderable list's
-  widget is decided per list (UI-SVR-2; the backlog's by S3-C0i's spike, DL-344);
+  widget is decided per list (UI-SVR-2; the backlog's is PrimeVue DataTable, DL-372);
   the schedule chart uses SVAR **Gantt** (V2). SVAR is themed by one mapping file onto the same
   tokens (UI-SVR-3), so there is still one palette. Rules and known defects are in §7.1.
 
@@ -996,10 +996,12 @@ alternative.**
   except the requirement tree, which is PrimeVue's TreeTable: SVAR's free tree mode has no drag
   and no move of its own (DL-174). The tree still follows UI-SVR-5 (the server decides each move)
   and UI-SVR-6 (the move menu sits outside the widget). The task board is SVAR Kanban. The
-  backlog's component, SVAR DataGrid or PrimeVue DataTable's row reorder, is decided by S3-C0i's
-  spike (DL-344). The choice for each Task and Requirements list is written in
+  backlog is PrimeVue DataTable with row reorder and its virtual scroller, through our own
+  wrapper, which follows UI-SVR-5 (the server decides each move) and UI-SVR-6 (the move menu
+  outside the table), names the virtual scroller as the scroll region (UI-TBL-1), and keeps one
+  tab stop in the rows (DL-372, after S3-C0i's spike). The choice for each Task and Requirements list is written in
   `screen-inventory.md` when that screen is specified, and **one list never ships with two
-  implementations**. (The spike did not decide the per-list split; that is the owner's call
+  implementations**. (The Oct 10 spike did not decide the per-list split; that is the owner's call
   per list.)
 - **UI-SVR-3** **One mapping file, `src/app/theme/svar-theme.css`.** Rules: **Willow only,
   never WillowDark** (our tokens already switch with the theme); `<Willow :fonts="false">`
@@ -1192,7 +1194,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    chosen to widen the gap to placeholders. If it looks too heavy across the full app once
    pages are populated, adjust `--color-text`.
 5. **SVAR items.** (a) The per-list split between DataTable and DataGrid (UI-SVR-2): the
-   backlog's is decided by S3-C0i's spike (DL-344); any other Task or Requirements list's as its
+   backlog's is PrimeVue DataTable (DL-372); any other Task or Requirements list's as its
    screen is specified. (b) Wrapper work found by the spike and not
    yet built or tested: a visible and announced selected state for the board, focus return after
    a grid editor closes, names for the grid editors, and the `aria-rowindex="0"` and `treegrid`

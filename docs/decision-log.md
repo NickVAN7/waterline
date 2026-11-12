@@ -817,7 +817,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   server. The packages are pinned exactly and arrive in the first checkpoint that ships a board or
   an editable grid (placed when Slices 2 and 3 are planned), not in S1-C14.
 - **Supersedes:** none
-- **Superseded by:** DL-344 (in part: the backlog's component, decided by the S3-C0i spike)
+- **Superseded by:** DL-344 (in part: the backlog's component, decided by the S3-C0i spike); DL-372 (in part: the backlog is PrimeVue DataTable)
 - **Applies to:** ui-design-guide §7; build plan (Slice overview, Slice 2 notes);
   testing-strategy ("Accessibility"); `frontend/CLAUDE.md`
 - **Source:** chat session (owner's design walkthrough and the SVAR spike, Oct 10, 2026)
@@ -4297,7 +4297,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   decides S3-C19 and UI-SVR-2's backlog line.
 - **Supersedes:** DL-64 in part (the DataGrid for lists where manual order is the point, for the
   backlog, until the spike decides)
-- **Superseded by:** none
+- **Superseded by:** DL-372 (the choice made)
 - **Applies to:** ui-design-guide UI-SVR-2 and §10 item 5; build plan (S3-C0i, S3-C19)
 - **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q1)
 
@@ -4636,3 +4636,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (the API table, S3-C0j); design-doc §11 "My work"
 - **Source:** owner, Nov 12, 2026 (DC-2026-11-12c's docs-consistency decision, option a)
+
+### DL-372: The backlog is PrimeVue DataTable with row reorder
+- **Date:** 2026-11-12
+- **Decision:** The backlog is PrimeVue's DataTable with row reorder and its virtual scroller,
+  through our own wrapper, not SVAR DataGrid: in S3-C0i's spike both met the checklist, and the
+  DataTable passed axe and the theme audit with two small fixes (a name for the handle column's
+  header, one preset entry for its border), rendered 2,000 rows in 0.2 s, and is the component
+  every other list uses. The wrapper names the scroller as the table's scroll region (UI-TBL-1),
+  keeps one tab stop in the rows, sends every move to the server first (UI-SVR-5), and keeps the
+  move menu outside the table (UI-SVR-6).
+- **Supersedes:** DL-344's open choice; DL-64 in part (the DataGrid for the backlog)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §1, UI-SVR-2, §10 item 5(a); build plan (S3-C19)
+- **Source:** owner, Nov 12, 2026 (after trying S3-C0i's demo,
+  `docs/spikes/S3-C0i-backlog/results.md`)
