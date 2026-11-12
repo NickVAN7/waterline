@@ -124,7 +124,12 @@ defineExpose({ values, pending, focus: () => focus('title') })
 </script>
 
 <template>
-  <form ref="formElement" novalidate class="flex flex-col gap-4" @submit.prevent="submit">
+  <form
+    ref="formElement"
+    novalidate
+    class="flex max-w-(--content-narrow) flex-col gap-4"
+    @submit.prevent="submit"
+  >
     <FormAlert
       v-if="errors.alert.value"
       :key="errors.alertKey.value"

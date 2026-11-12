@@ -8,6 +8,8 @@ description: Ask for a requirement's sign-off, and approve or reject one you've 
 An approval records that the people who own a requirement agree with it. Each request is for one
 revision of the requirement, and every approver named must approve it.
 
+![A requirement's Approval section: a pending request for revision 1, its approver not yet decided, and the form for your decision.](images/approval.webp)
+
 ## Request approval
 
 Project admins request approval from a requirement's **Approval** section:

@@ -8,6 +8,8 @@ description: Write requirements, arrange them in a tree, edit them, and follow t
 A project's requirements say what the work must do. Open **Requirements** in the sidebar under the
 project to see them as a tree: each top-level requirement can hold others beneath it.
 
+![A project's requirements as a tree, with one requirement open in a panel beside it showing its status, details, and description.](images/requirement-panel.webp)
+
 ## Create a requirement
 
 1. Select **New requirement** at the top of the page.

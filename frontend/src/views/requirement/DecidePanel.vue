@@ -190,7 +190,7 @@ async function dismissed() {
     <section :aria-labelledby="decideId" class="flex flex-col gap-3">
       <h3 :id="decideId" class="m-0 text-base font-semibold">Your decision</h3>
       <!-- No submit: a final decision is never made by Enter in the comment. -->
-      <form novalidate class="flex flex-col gap-3" @submit.prevent>
+      <form novalidate class="flex max-w-(--content-narrow) flex-col gap-3" @submit.prevent>
         <FormAlert
           v-if="errors.alert.value"
           :key="errors.alertKey.value"

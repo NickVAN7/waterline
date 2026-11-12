@@ -94,7 +94,6 @@
   --sidebar-width: 15rem;
   --content-narrow: 40rem;       /* forms, settings */
   --content-prose: 68ch;         /* a guide article's text (DL-340) */
-  --content-wide: 80rem;         /* lists, tables */
 
   /* Focus ring */
   --focus-ring-width: 2px;

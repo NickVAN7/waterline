@@ -8,6 +8,8 @@ description: Run the workspace's staff, organizations, and user accounts.
 Workspace owners and admins find **Administration** in the account menu. Its pages are in the
 sidebar: **Staff**, **Organizations**, **Users**, and **Settings**.
 
+![The workspace's Users page, listing each account with its email, username, role, and status.](images/workspace-users.webp)
+
 ## Add staff
 
 **Staff** lists the people who work across the workspace. Select **Add person**, enter their email

@@ -91,13 +91,20 @@ function create(docs: boolean): MarkdownIt {
 
   // No remote images: one would tell its host who opened the page (design-doc §3), so image
   // syntax renders as a link to the image, named by its alt text. In docs mode a bundled image
-  // (`images/<file>`) renders as itself (DL-341).
+  // (`images/<file>`) renders as itself (DL-341), beside its `-dark` sibling when there is one,
+  // each shown only in its theme (DL-343).
   md.renderer.rules.image = (tokens, idx, _options, env) => {
     const token = tokens[idx]!
     const src = String(token.attrGet('src') ?? '')
     const alt = md.utils.escapeHtml(token.content)
-    const local = (env as RenderEnv | undefined)?.docs?.images[src]
-    if (local) return `<img src="${md.utils.escapeHtml(local)}" alt="${alt}">`
+    const images = (env as RenderEnv | undefined)?.docs?.images
+    const local = images?.[src]
+    if (local) {
+      const img = (url: string, theme = '') =>
+        `<img src="${md.utils.escapeHtml(url)}" alt="${alt}"${theme && ` class="${theme}"`}>`
+      const dark = images![src.replace(/(\.[a-z]+)$/i, '-dark$1')]
+      return dark ? img(local, 'theme-light') + img(dark, 'theme-dark') : img(local)
+    }
     return `<a href="${md.utils.escapeHtml(src)}">${alt || md.utils.escapeHtml(src)}</a>`
   }
 
@@ -149,6 +156,20 @@ const sanitizeOptions = {
 const docsSanitizeOptions = {
   ...sanitizeOptions,
   ALLOWED_URI_REGEXP: DOCS_URL,
+  // A callout's icon: without these, the URL check above strips its size and paths, and the
+  // svg falls back to 300 by 150 (DOMPurify compares lowercased names).
+  ADD_URI_SAFE_ATTR: [
+    ...sanitizeOptions.ADD_URI_SAFE_ATTR,
+    'viewbox',
+    'width',
+    'height',
+    'fill',
+    'stroke',
+    'stroke-width',
+    'stroke-linecap',
+    'stroke-linejoin',
+    'd',
+  ],
   FORBID_TAGS: ['style', 'form'],
 }
 
@@ -320,6 +341,9 @@ const html = computed(() =>
 .markdown :deep(img) {
   max-width: 100%;
   height: auto;
+  /* A screenshot's edge, where its background meets the page's. */
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
 }
 .markdown :deep(:where(li > p:only-child, :last-child)) {
   margin-block-end: 0;

@@ -7,6 +7,8 @@ description: Your profile, appearance, password, and the browsers you're signed 
 
 Open the menu with your name at the top right and choose **Account settings**.
 
+![Account settings: the profile form, then Appearance with the System, Light, and Dark choices.](images/account.webp)
+
 ## Change your profile
 
 Change your name or username, then select **Save profile**. To change your email, ask an

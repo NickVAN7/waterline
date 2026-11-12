@@ -26,5 +26,9 @@ means the guard stopped something it should have.
 | 17 | S3-C0e review | `grep … ; git -C … diff --stat` (read-only) | a compound command with git in it | separate calls | legit; my slip (as #15) |
 | 18 | S3-C0g | `cd frontend && python3 - <<'PY' … PY` then `git rm` of the replaced docs view, in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
 | 19 | S3-C0g | a `python3 -` heredoc updating the skills and agents, whose text quoted the verifier's `git -C <repo> diff` step | text mentioning git in a command | a scratchpad script | legit (as #13) |
+| 20 | after S3-C0g (owner feedback) | a spec edit, a test run, then `git … stash` of the fix to prove the test fails, in one call | a compound command with git in it | the fix copied aside and restored by `cp` | legit; my slip (as #15), and the blocked call's spec edit was lost too, found only when the sabotage passed |
+| 21 | after S3-C0g (owner feedback) | a `python3 -` heredoc updating a memory note that named the parked stash | text mentioning git in a command | the Edit tool | legit (as #8) |
+| 22 | S3-C0h | a scratchpad script written by heredoc, whose text quoted `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | the script written with the Write tool | legit (as #13, #16) |
+| 23 | S3-C0h | a `python3 -` heredoc rewrapping a docstring in `backend/tests/support/docs.py` that says "Listed through git" | text mentioning git in a command | the Edit tool | legit (as #8) |
 
 None of the blocks so far stopped anything the rules forbid.

@@ -45,7 +45,10 @@ Folder purposes only; each file says what it holds (DL-317).
   `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
   ui-design-guide UI-MD-1). Markdown is edited only in `MarkdownEditor` (UI-MD-2). Docs mode
   (`docs`: callouts, keys, heading ids, own-origin links, bundled images) is for the guide's
-  pages under `docs/user-guide/` only, never stored content (DL-341).
+  pages under `docs/user-guide/` only, never stored content (DL-341). Markup a docs-mode rule
+  makes (a callout's icon) has its attributes checked after sanitizing: DOMPurify tests every
+  attribute value against the URL pattern, so an svg's `viewBox`, size, and paths are dropped
+  unless listed in `ADD_URI_SAFE_ATTR` (owner, after S3-C0g).
 - **The guide** (`docs/user-guide/*.md`, loaded by `views/docs/guide.ts`) changes only when what
   a user does or sees changes; every behavior change goes in `docs/behavior-reference.md`
   (DL-335). `guide.spec.ts` fails on a page without its front matter, with a `#` heading, or with
@@ -76,6 +79,9 @@ Folder purposes only; each file says what it holds (DL-317).
 
 Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently:
 
+- A form on a page sets `max-w-(--content-narrow)` on itself (or a wrapper it shares): `main`
+  has no width cap, so an uncapped form's fields span the screen (UI-SHL-7, DL-360; S3-C0h
+  review). Dialogs and the auth card have their own width.
 - Tokens only: colors, type sizes, radii, and sizes come from `src/app/styles/tokens.css`,
   through Tailwind utilities or `var(--…)`. No hex, `rgb()`, or `px` literals (`0` and 1 px
   borders are fine), and no Tailwind arbitrary values like `p-[13px]` (UI-STY-1). Spacing is Tailwind's built-in scale.

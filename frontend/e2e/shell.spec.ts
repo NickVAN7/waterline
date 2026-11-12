@@ -311,3 +311,36 @@ async function expectFocusedHeadingClear(page: Page): Promise<void> {
   })
   expect(clear, 'the focused heading is under the sticky header').toBe(true)
 }
+
+test('on a wide screen, a list spans the width beside the sidebar; a form and guide text keep their caps (DL-360)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 2400, height: 900 })
+  await signIn(page, 'wendy')
+  const right = async (selector: string) => {
+    const box = (await page.locator(selector).first().boundingBox())!
+    return box.x + box.width
+  }
+
+  // The users table ends at main's padding, at the window's right edge.
+  await page.goto('/workspace/users')
+  const main = (await page.locator('main').boundingBox())!
+  expect(main.x + main.width).toBe(2400)
+  expect(await right('main table')).toBeGreaterThan(2400 - 40)
+  expect(await right('main h1 >> xpath=..')).toBeGreaterThan(2400 - 40)
+
+  // Forms stay at --content-narrow (40rem): Account settings' own, and New requirement's, whose
+  // cap is on the form itself.
+  await page.goto('/account')
+  const field = (await page.getByRole('textbox', { name: 'Name', exact: true }).boundingBox())!
+  expect(field.width).toBeLessThanOrEqual(640)
+  await page.goto('/acme/projects/PORTAL/requirements/new')
+  const title = (await page.getByRole('textbox', { name: 'Title', exact: true }).boundingBox())!
+  expect(title.width).toBeLessThanOrEqual(640)
+
+  // A guide article's text stays at --content-prose; On this page sits at the right of main.
+  await page.goto('/docs/requirements')
+  const text = (await page.locator('article .markdown').boundingBox())!
+  expect(text.width).toBeLessThan(900)
+  expect(await right('nav[aria-label="On this page"]')).toBeGreaterThan(2400 - 40)
+})

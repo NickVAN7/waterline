@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0g (Documentation: a guide and a reference) done; the git guard's decision held to the end
-of S3-C0x; next: S3-C0h (Generated documentation screenshots, with full-width pages, DL-360).
+S3-C0h (Generated documentation screenshots, with full-width pages) done; the git guard's
+decision held to the end of S3-C0x; next: S3-C0i (Backlog widget spike).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
@@ -55,6 +55,8 @@ Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <
 - `wl migrate`, `wl backend migration "<message>"` — Alembic
 - `wl gen-client` — regenerate `backend/openapi.json` and the frontend API types after any API
   change; commit both
+- `wl docs-screenshots` — regenerate the guide's screenshots (light and dark) on the e2e stack;
+  at slice verification and when a UI change affects a shot
 - `wl seed` — create the workspace and its first system admin, who is the workspace owner
   (Slice 1)
 - `wl admin <command>` — app admin commands, e.g. `grant-system-admin <email>` (Slice 1)

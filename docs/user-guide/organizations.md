@@ -8,6 +8,8 @@ description: Run an organization's members, projects, and settings.
 Organization owners and admins find their organization's pages in the organization menu, its name
 in the header: **Overview**, **Members**, and **Settings**.
 
+![An organization's overview, listing its projects with their key, type, status, and lead, and its archived projects below.](images/org-overview.webp)
+
 ## See the organization's projects
 
 **Overview** lists the organization's projects with their lead and status. Archived projects are

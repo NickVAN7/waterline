@@ -124,4 +124,20 @@ describe('the guide', () => {
       expect(images.filter(([, alt, src]) => !alt!.trim() || !IMAGES[src!])).toEqual([])
     },
   )
+
+  it('shows each image in both themes: the light file, with its -dark sibling (DL-343)', () => {
+    const shown = PAGES.flatMap((p) => [...p.body.matchAll(/!\[[^\]]*\]\((images\/[^)]*)\)/g)]).map(
+      (m) => m[1]!,
+    )
+    expect(shown.filter((src) => src.includes('-dark.'))).toEqual([])
+    expect(shown.filter((src) => !IMAGES[src.replace(/(\.[a-z]+)$/, '-dark$1')])).toEqual([])
+  })
+
+  it('bundles no image that no page shows', () => {
+    const shown = PAGES.map((p) => p.body).join('\n')
+    const unused = Object.keys(IMAGES).filter(
+      (src) => !shown.includes(`(${src.replace('-dark.', '.')})`),
+    )
+    expect(unused).toEqual([])
+  })
 })

@@ -112,6 +112,7 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
 | `wl check` | The gate before every commit (DL-99): lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates — backend, then frontend, then CLI — and mutation testing when anything it depends on changed since its last green run (the backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`; the hash is kept in `backend/mutants/inputs.sha256`), saying so when it skips it. `--full` is everything CI runs: mutation testing whatever changed, then `wl audit`, then `wl e2e` |
 | `wl e2e [args]` | The Playwright end-to-end tests on their own stack: the Compose project `waterline-e2e` (`docker-compose.e2e.yml`: no published database or API port, the web server on `127.0.0.1:5174`, `DEMO_SEED_ENABLED=true`), cleared of anything an earlier run left, built, seeded with `seed --demo`, tested in the `light` and `dark` projects, and always torn down with its volume. Runs beside the dev stack, but only one `wl e2e` at a time: a second run shares the project, and its first step clears the first run's stack. Extra args go to `playwright test` (e.g. `wl e2e sign-in --project light`) |
+| `wl docs-screenshots` | Regenerate the guide's screenshots (DL-343): the `wl e2e` stack, seeded with `seed --manual-pass` (DL-361), then Playwright through `playwright.screenshots.config.ts`, which saves each shot in `frontend/e2e/screenshots/guide.shot.ts` as light and dark WebP (1440 by 900) in `docs/user-guide/images/`, and always tears the stack down. Run it at slice verification and whenever a UI change affects a shot; a shot removed from the list leaves its files, which `guide.spec.ts` refuses as unused once no page shows them |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
 | `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
@@ -137,7 +138,7 @@ container from the api service's image: `docker compose run --rm api ...`, after
 |---|---|
 | `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
 | `wl seed --demo` | Build the demo dataset instead, workspace and system admin included ("Demo data" in section 5): refused once a workspace exists, and unless `DEMO_SEED_ENABLED=true` (the `.env.example` default; off otherwise, and never on in production, since every demo account has the same public password). Takes no other values |
-| `wl seed --manual-pass` | The demo dataset plus every state the slice's manual pass needs ("Demo data" in section 5), refused as `--demo` is. Not for the end-to-end stack, whose tests count what `--demo` builds |
+| `wl seed --manual-pass` | The demo dataset plus every state the slice's manual pass needs ("Demo data" in section 5), refused as `--demo` is. Not for `wl e2e`, whose tests count what `--demo` builds; `wl docs-screenshots` seeds its own run of that stack with it (DL-361) |
 | `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
 | `wl admin revoke-system-admin <email>` | Take it away, handing over their undecided approvals where the flag was their only access (logged with no actor); refused for the last active system admin |
 
@@ -982,10 +983,12 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `> [!TIP]`, `> [!NOTE]`, and `> [!WARNING]` are callouts, `++Esc++` a key, `[Trash](/docs/trash)`
   a link to another page (or `/docs/trash#restore-a-requirement`, a section: its words in
   lowercase, joined by hyphens), and `![What it shows](images/<file>)` an image from
-  `docs/user-guide/images/`. Leave out route paths, exact messages, and numeric limits: those
+  `docs/user-guide/images/`: a screenshot `wl docs-screenshots` takes, named in
+  `frontend/e2e/screenshots/guide.shot.ts` (add a shot there: a name, a demo user, a path), with
+  alt text saying what it shows. Leave out route paths, exact messages, and numeric limits: those
   belong in `docs/behavior-reference.md`, which changes with every behavior change, while the
   guide changes only when what a user does or sees changes. `guide.spec.ts` checks every page's
-  front matter, headings, links, and images.
+  front matter, headings, links, and images (each in light and dark, and none unused).
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
   menu button with a popover of links that the org menu and project selector share; opening
   it moves focus inside (the popover sits at the end of `<body>`, out of the Tab order). A spec
@@ -1028,8 +1031,7 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `matchMedia`), whose `resize()` crosses the breakpoint. The `<aside>` is teleported to
   `AppLayout`'s column after `main` (`#side-pane`, provided as `sidePane`; in place when mounted
   without the layout), so it runs from under the header to the window's foot and the whole page
-  narrows beside it; the list's route sets `meta.fullWidth`, so `main` drops the
-  `--content-wide` cap (DL-356).
+  narrows beside it (DL-356); `main` has no width cap on any page (DL-360).
 - **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
   only the latest answer, and gives the message for a polite live region under the field; `skip`
   leaves out a value that needs no check (the person's own username).

@@ -192,7 +192,20 @@ describe('MarkdownView', () => {
       expect(box.classes()).toContain(tone)
       expect(view.find('blockquote').exists()).toBe(false)
       expect(box.get('strong').text()).toBe(label)
-      expect(box.get('strong svg').attributes('aria-hidden')).toBe('true')
+      // The sanitizer keeps the icon's size and paths: without them it draws at 300 by 150.
+      const icon = box.get('strong svg')
+      expect(icon.attributes()).toMatchObject({
+        'aria-hidden': 'true',
+        viewBox: '0 0 24 24',
+        width: '1.25em',
+        height: '1.25em',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      })
+      expect(icon.findAll('path').every((path) => path.attributes('d'))).toBe(true)
       expect(box.text()).toBe(`${label}Keep a copy.`)
     })
 
@@ -220,6 +233,31 @@ describe('MarkdownView', () => {
         src: '/assets/panel-1a2b.webp',
         alt: 'The side panel',
       })
+    })
+
+    it('renders an image with a bundled -dark sibling as both, each marked with its theme (DL-343)', () => {
+      const view = renderDocs('![The side panel](images/panel.webp)', {
+        'images/panel.webp': '/assets/panel-1a2b.webp',
+        'images/panel-dark.webp': '/assets/panel-dark-3c4d.webp',
+      })
+
+      expect(
+        view
+          .findAll('img')
+          .map((img) => [img.attributes('src'), img.classes(), img.attributes('alt')]),
+      ).toEqual([
+        ['/assets/panel-1a2b.webp', ['theme-light'], 'The side panel'],
+        ['/assets/panel-dark-3c4d.webp', ['theme-dark'], 'The side panel'],
+      ])
+    })
+
+    it('renders an image with no -dark sibling once, in both themes', () => {
+      const view = renderDocs('![The side panel](images/panel.webp)', {
+        'images/panel.webp': '/assets/panel-1a2b.webp',
+        'images/other-dark.webp': '/assets/other-dark.webp',
+      })
+
+      expect(view.findAll('img').map((img) => img.classes())).toEqual([[]])
     })
 
     it('renders an image that is not bundled, remote included, as a link', () => {

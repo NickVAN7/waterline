@@ -361,7 +361,8 @@ the group's name above its title, and a line on what it covers. **On this page**
 sections and marks the one you're reading as you scroll; on a wide window it stays beside the
 text, on a narrow one it's below it. A section's link (`/docs/requirements#create-a-requirement`)
 opens the page at that section and puts the focus on its heading, so you can share it. Links in
-the text to other pages open them in Waterline. At the bottom, **Previous** and **Next** go to the
+the text to other pages open them in Waterline. A page's screenshot shows the screen in the
+theme you're using, light or dark, whether it follows your device or you chose it. At the bottom, **Previous** and **Next** go to the
 pages before and after it in the sidebar's order (the first page has no Previous, the last no
 Next). A page that doesn't exist shows "Page not found". An old link to a section of the former
 single-page guide (`/docs#docs-account-settings`) opens the landing page.

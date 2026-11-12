@@ -8,6 +8,8 @@ description: Create a project, choose its type and modules, and change its setti
 A project holds a piece of work: a software product, an ERP implementation, or anything else you
 want to plan and track. Every item in it is numbered after the project's key.
 
+![A project's settings page: its name, description, type, status, and lead, with the modules below.](images/project-settings.webp)
+
 ## Create a project
 
 1. Open the project selector in the sidebar and select **New project**.

@@ -65,9 +65,9 @@ def _audit_steps() -> list[Step]:
     return steps.audit(uv_ignores(allowlist))
 
 
-def _run_e2e(extra: list[str], *, dry_run: bool) -> None:
+def _run_e2e(stack_steps: list[Step], *, dry_run: bool) -> None:
     try:
-        run_steps(steps.e2e(extra), dry_run=dry_run)
+        run_steps(stack_steps, dry_run=dry_run)
     finally:
         run_steps(steps.e2e_down(), dry_run=dry_run)
 
@@ -111,14 +111,22 @@ def check(
         dry_run=dry_run,
     )
     if full:
-        _run_e2e([], dry_run=dry_run)
+        _run_e2e(steps.e2e(), dry_run=dry_run)
 
 
 @app.command(context_settings=PASS_THROUGH)
 def e2e(ctx: typer.Context, dry_run: DryRun = False) -> None:
     """End-to-end tests: start an isolated stack seeded with the demo data, run Playwright
     (extra arguments go to it), and always tear the stack down."""
-    _run_e2e(ctx.args, dry_run=dry_run)
+    _run_e2e(steps.e2e(ctx.args), dry_run=dry_run)
+
+
+@app.command("docs-screenshots")
+def docs_screenshots(dry_run: DryRun = False) -> None:
+    """Regenerate the guide's screenshots, light and dark, in docs/user-guide/images/: start an
+    isolated stack seeded with the manual pass's data, take each shot, and always tear the stack
+    down."""
+    _run_e2e(steps.docs_screenshots(), dry_run=dry_run)
 
 
 @app.command("review-copy")

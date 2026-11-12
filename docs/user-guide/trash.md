@@ -8,6 +8,8 @@ description: Delete a requirement, and bring a deleted one back.
 Deleting a requirement moves it to its project's Trash, where it can be restored. Nothing is
 removed from the Trash automatically.
 
+![A project's Trash, listing deleted requirements with who deleted them and when, each with a Restore button.](images/trash.webp)
+
 ## Delete a requirement
 
 Open the requirement, then **More actions** and **Delete…**. If it has children, choose whether

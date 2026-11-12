@@ -350,9 +350,9 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
   await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
   await expect(panel.locator('.markdown')).toContainText('Works')
-  // On a screen wider than the sidebar and `--content-wide`, the split pane is the layout's right
-  // column: from under the header to the window's foot, at its right edge; the page, its header
-  // and New requirement included, narrows beside it (UI-SHL-7, DL-356).
+  // On a wide screen, the split pane is the layout's right column: from under the header to the
+  // window's foot, at its right edge; the page, its header and New requirement included, narrows
+  // beside it (UI-SHL-7, DL-356).
   await page.setViewportSize({ width: 1920, height: 720 })
   const placed = await panel.evaluate((el) => {
     const box = el.getBoundingClientRect()

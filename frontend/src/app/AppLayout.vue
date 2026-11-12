@@ -101,12 +101,7 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
           :org-slug="nav.org?.slug"
         />
       </div>
-      <main
-        id="main"
-        tabindex="-1"
-        class="flex w-full min-w-0 flex-1 flex-col gap-4 p-4 sm:p-6"
-        :class="{ 'max-w-(--content-wide)': !route.meta.fullWidth }"
-      >
+      <main id="main" tabindex="-1" class="flex w-full min-w-0 flex-1 flex-col gap-4 p-4 sm:p-6">
         <Alert v-if="failed" :key="failures" tone="danger" live dismissible @dismiss="dismiss">
           {{ failed }}
         </Alert>

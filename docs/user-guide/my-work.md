@@ -8,6 +8,8 @@ description: Your favorite projects, your projects in each organization, and the
 My work is the page you land on after signing in. It brings together what's yours across every
 organization you belong to.
 
+![My work, with no favorite projects yet, one project with its role and status, and an approval waiting, named with its requirement, revision, and who asked.](images/my-work.webp)
+
 ## Keep your favorite projects at hand
 
 Select the star on a project's row to add it to **Favorite projects**, at the top of the page.

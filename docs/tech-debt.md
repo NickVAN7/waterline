@@ -471,17 +471,6 @@ Entry format:
   shows)
 - **Status:** open
 
-### TD-111: No test loads a bundled guide image under the CSP
-- **Added:** S3-C0g
-- **What:** docs mode renders an image from `docs/user-guide/images/` (DL-341), and the CSP's
-  `default-src 'self'` covers it because Vite serves it from our own origin, but the folder is
-  empty, so no end-to-end test loads one under the CSP. A production build would also inline an
-  image under 4 KB as a `data:` URI, which that CSP blocks (security-reviewer, S3-C0g, minor).
-- **Why:** there's no image to load until S3-C0h generates the screenshots.
-- **Fix by:** S3-C0h (an e2e opening a guide page with an image, asserting it loads and no
-  `securitypolicyviolation` fires)
-- **Status:** open
-
 ### TD-112: SidebarLink's transparent bar draws on every link under forced colors
 - **Added:** S3-C0g
 - **What:** `SidebarLink` gives links that aren't current a `border-transparent` 3px leading
@@ -864,3 +853,8 @@ Entry format:
 - **Added:** S3-C0d
 - **Status:** resolved in S3-C0e: Parent (its ID linked, then its title; None at the top level),
   from the read's `ancestors` (DL-357)
+
+### TD-111: No test loads a bundled guide image under the CSP
+- **Added:** S3-C0g
+- **Status:** resolved in S3-C0h: `csp.spec.ts` opens a guide page's screenshot, in each theme
+  and with the theme chosen against the system's, and asserts it loads with no CSP violation

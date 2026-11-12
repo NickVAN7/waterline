@@ -114,7 +114,7 @@ defineExpose({ focus: () => focus('title'), dirty })
     ref="formElement"
     novalidate
     aria-label="Edit the requirement"
-    class="flex flex-col gap-4"
+    class="flex max-w-(--content-narrow) flex-col gap-4"
     @submit.prevent="submit"
   >
     <FormAlert

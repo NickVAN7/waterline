@@ -4284,7 +4284,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   verification and when a UI change affects a shot; about one per page. Built in S3-C0h, after
   S3-C0g, whose docs mode and images folder it needs.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-361 (in part: the seed)
 - **Applies to:** build plan (S3-C0h; slice verification from Slice 3); testing strategy
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 23)
 
@@ -4511,3 +4511,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11, the token table; build plan (S3-C0h)
 - **Source:** owner, Nov 12, 2026 (after S3-C0g: "the main section of the page is
   left-justified … the entire app should be like this, not just docs"; full width chosen)
+
+### DL-361: The guide's screenshots use the manual pass's data
+- **Date:** 2026-11-12
+- **Decision:** `wl docs-screenshots` seeds the end-to-end stack with `seed --manual-pass`, not
+  `seed --demo`: the demo alone has no requirements, approvals, or Trash items, so those pages'
+  shots would be empty. The manual pass's data is the demo's plus those states, so nothing
+  outside the demo data still appears.
+- **Supersedes:** DL-343's "runs `seed --demo`"
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0h); developer guide (`wl docs-screenshots`); design-doc §11;
+  testing strategy
+- **Source:** owner, Nov 12, 2026 (S3-C0h start)

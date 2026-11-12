@@ -275,7 +275,6 @@ These sit in the same `@theme static` block as §3.1.
   --sidebar-width: 15rem;
   --content-narrow: 40rem;       /* forms, settings */
   --content-prose: 68ch;         /* a guide article's text (DL-340) */
-  --content-wide: 80rem;         /* lists, tables */
 
   /* Focus ring */
   --focus-ring-width: 2px;
@@ -423,7 +422,7 @@ cover (found in the spike, to be completed per component as it is adopted, UI-ST
 │ ──────────── │ project pages: archived banner; project header      │
 │ [Waterline ▾]│ with its restriction badge                          │
 │  Home        │ ──────────────────────────────────────────          │
-│  Requirements│ content: up to 80rem (a split-pane list: all of it);│
+│  Requirements│ content: the whole width beside the sidebar         │
 │  Tasks       │                                                     │
 │  Test cases  │                                                     │
 │  Members     │                                                     │
@@ -489,10 +488,11 @@ render inside the full shell when signed in.
   (DL-109). The per-project access review is its own page, `/{org_slug}/projects/{key}/access`,
   linked from the members page, not a pages item; the members page adds with Add member (the
   picker, primary) and Add by email (secondary) (DL-119).
-- **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
-  up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. A list
-  that opens items in the split pane (UI-SHL-11) takes the whole width instead (route meta `fullWidth`; DL-356). Pages
-  reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
+- **UI-SHL-7** **Content width:** `main` takes the whole width beside the sidebar (and beside
+  the split pane when it's open, UI-SHL-11), with at least 4 (`p-4`) side padding: a page's
+  header, lists, tables, and card grids span it (DL-360). Forms and settings stay at
+  `--content-narrow`, and a guide article's text at `--content-prose`, so lines stay readable;
+  its On this page sits at the right of `main` on a wide screen. Pages reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
   page's primary action(s) on the right (wrapping below at narrow widths); a project page's
@@ -1113,8 +1113,9 @@ the revision compare in S2-C19a (DL-267).
   above): heading ids; `> [!TIP]`, `> [!NOTE]`, `> [!WARNING]` as info, warning, and danger tone
   boxes with an icon and a bold label (a `div`, not a quote); `++Key++` as `<kbd>`; links also to
   a path on our own origin (another guide page, opened in the app), never `//host`; and an image
-  in `docs/user-guide/images/`, bundled through Vite, as itself, any other image a link. Bundled
-  images are served from our own origin, so the CSP's `default-src 'self'` covers them without
+  in `docs/user-guide/images/`, bundled through Vite, as itself, any other image a link; an
+  image with a `-dark` sibling (`trash.webp`, `trash-dark.webp`) renders as both, and only the
+  current theme's shows, the system's or the one chosen (DL-343). Bundled images are served from our own origin, so the CSP's `default-src 'self'` covers them without
   an `img-src`. The XSS corpus runs in docs mode too.
 - **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
   **Preview** tabs (a tablist), previewing with `MarkdownView` (DL-141). No WYSIWYG editor; a

@@ -60,3 +60,26 @@
     background: Highlight;
   }
 }
+
+/* Something drawn in a light and a dark version (a guide screenshot's pair, DL-343): only the
+   current theme's shows, the system's or the one chosen, as tokens.css resolves it (UI-TOK-2). A
+   hidden one isn't read out. */
+@layer base {
+  .theme-dark {
+    display: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .theme-light {
+      display: none;
+    }
+    :root:not([data-theme='light']) .theme-dark {
+      display: revert;
+    }
+  }
+  :root[data-theme='dark'] .theme-light {
+    display: none;
+  }
+  :root[data-theme='dark'] .theme-dark {
+    display: revert;
+  }
+}

@@ -120,6 +120,17 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
             [*E2E_RUN[:-1], "(cd frontend && npx playwright test --project light)", *E2E_DOWN],
             id="e2e-pass-through",
         ),
+        pytest.param(
+            ["docs-screenshots"],
+            [
+                *E2E_DOWN,
+                f"{E2E_COMPOSE} up --detach --wait --build",
+                f"{E2E_COMPOSE} run --rm api python -m app.cli seed --manual-pass",
+                "(cd frontend && npx playwright test --config playwright.screenshots.config.ts)",
+                *E2E_DOWN,
+            ],
+            id="docs-screenshots",
+        ),
         pytest.param(["audit"], AUDIT, id="audit"),
         pytest.param(["test"], [*BACKEND_TEST, *FRONTEND_TEST, *CLI_TEST], id="test"),
         pytest.param(["lint"], [*BACKEND_LINT, *FRONTEND_LINT, *CLI_LINT], id="lint"),
