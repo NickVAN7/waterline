@@ -33,7 +33,8 @@ Read the relevant sections before changing anything. If the code needs to differ
 **stop and ask** (the `design-change` skill: a proposal for the owner) — never silently diverge. An
 approved design change goes in its own `docs:` commits (tooling code in `chore:`/`ci:` commits,
 DL-18), never with checkpoint work (DL-8); a drift fix inside the checkpoint's approved scope
-updates the docs in the checkpoint's commit.
+updates the docs in the checkpoint's commit, and so does an owner decision that changes the
+current checkpoint's own row, with its decision-log entry (DL-362).
 
 ## Commands
 

@@ -4246,7 +4246,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the `##` sections and marks the one being read (`aria-current="location"`, on scroll), sticky on
   wide screens and below the content on narrow ones; hash links still move focus (UI-SHL-9).
 - **Supersedes:** DL-311 in part (the Contents list)
-- **Superseded by:** none
+- **Superseded by:** DL-367 (in part: the text's width)
 - **Applies to:** build plan (S3-C0g)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 20)
 
@@ -4259,7 +4259,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `docs/user-guide/images/`. Remote images stay links everywhere, and user content never renders
   an image; the CSP's `img-src` is checked for bundled images.
 - **Supersedes:** UI-MD-1 in part (no images), for the bundled guide only
-- **Superseded by:** none
+- **Superseded by:** DL-364 (in part: the tones)
 - **Applies to:** build plan (S3-C0g); ui-design-guide UI-MD (from S3-C0g)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 21)
 
@@ -4270,7 +4270,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   reference keeps them), callouts used sparingly, in the handoff's Requirements sample's tone.
   Docs-only search is deferred (TD-104); Slice 6's site-wide search covers the docs.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-365 (in part: the word counts)
 - **Applies to:** build plan (S3-C0g); tech debt (TD-104)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 22)
 
@@ -4493,7 +4493,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   status (owner, S3-C0f review). The section replaces `projects`, and `GET /api/me/work/projects` goes. The four spec
   tests pinning the old section are rewritten by `spec-test-writer` (owner-approved).
 - **Supersedes:** none (settles what DL-330 and DL-349 left open)
-- **Superseded by:** none
+- **Superseded by:** DL-368 (in part: 10 becomes 5)
 - **Applies to:** design-doc §11 "My work"; build plan (S3-C0f, the API table)
 - **Source:** owner, Nov 11, 2026 (S3-C0f start)
 
@@ -4507,7 +4507,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   capped and left-aligned, a wide screen left the right of the screen empty, on every page.
 - **Supersedes:** UI-SHL-7's "lists and tables up to `--content-wide` … left-aligned in
   `main`"; DL-356's `fullWidth` exception (its split pane layout stands)
-- **Superseded by:** none
+- **Superseded by:** DL-367 (in part: capped content is centered)
 - **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11, the token table; build plan (S3-C0h)
 - **Source:** owner, Nov 12, 2026 (after S3-C0g: "the main section of the page is
   left-justified … the entire app should be like this, not just docs"; full width chosen)
@@ -4523,3 +4523,82 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (S3-C0h); developer guide (`wl docs-screenshots`); design-doc §11;
   testing strategy
 - **Source:** owner, Nov 12, 2026 (S3-C0h start)
+
+### DL-362: An owner decision that changes the current checkpoint's row goes in its commit
+- **Date:** 2026-11-12
+- **Decision:** An owner decision made at a checkpoint's start or during it, changing that checkpoint's own
+  build-plan row, goes in the checkpoint's commit with its decision-log entry, as DL-359 and
+  DL-361 did; a design change about anything else still gets its own `docs:` commits (DL-8).
+- **Supersedes:** none (narrows DL-8 to changes outside the current checkpoint)
+- **Superseded by:** none
+- **Applies to:** root `CLAUDE.md` (How work is done); the `design-change` skill (step 2)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), answering S3-C0h's checkpoint-reviewer question
+
+### DL-363: A guide screenshot opens full size in a new tab, and loads lazily
+- **Date:** 2026-11-12
+- **Decision:** In docs mode each bundled image is a link to its own file, in the theme's version, opening in
+  a new tab (`target="_blank"`, `rel="noopener"`, and its name saying so), so a shot drawn at the
+  text's width can be read at full size. Each image, light and dark, has `loading="lazy"`, so
+  the browser fetches only the one the theme shows, when it scrolls near.
+- **Supersedes:** none (adds to DL-343)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-MD-1; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), from S3-C0h's ui-reviewer note
+
+### DL-364: Callout tones: TIP success, NOTE info, WARNING danger
+- **Date:** 2026-11-12
+- **Decision:** `> [!TIP]` is the success tone (green), `> [!NOTE]` the info tone (blue), and `> [!WARNING]`
+  the danger tone (red), each with its icon and bold label: amber made an aside read as a
+  caution.
+- **Supersedes:** DL-341's "as info, warning, and danger"
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-MD-1; design-doc §3; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), S3-C0g's question 1
+
+### DL-365: A guide page is as long as its task needs
+- **Date:** 2026-11-12
+- **Decision:** No word count for a guide page or the whole guide: each page is as long as its tasks need,
+  leaving out what the screen already says. Short pages stay short rather than padded or
+  merged.
+- **Supersedes:** DL-342's "about 300 to 600 words a page and 2,000 to 2,500 in all"
+- **Superseded by:** none
+- **Applies to:** the guide (`docs/user-guide/`)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), S3-C0g's question 2
+
+### DL-366: Rendered tables scope their headers; guide anchors never take the app's ids
+- **Date:** 2026-11-12
+- **Decision:** A table in rendered markdown has one header row, and the renderer gives its `th` cells
+  `scope="col"`. A guide heading's id never matches an id the shell or the docs views render
+  (`main`, `sidebar`, `side-pane`, `user-menu`, `docs-start`, `docs-group-<n>`, and the rest),
+  checked by `guide.spec.ts` against the ids a mounted shell and docs page actually render, not
+  a fixed list.
+- **Supersedes:** none (adds to UI-MD-1)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-MD-1; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), S3-C0g's ui-reviewer proposed rules
+
+### DL-367: A capped page is centered; guide text up to 80 characters
+- **Date:** 2026-11-12
+- **Decision:** A page whose content is capped (a form or settings page at `--content-narrow`) is one
+  column of that width, its header included, centered in `main`; a guide article, its text and
+  On this page together, is centered too, its text up to `--content-prose` at 80ch. Lists,
+  tables, card grids, and the docs landing page still span `main` (DL-360). To be tuned after
+  the owner's UI review.
+- **Supersedes:** DL-360's left-aligned capped content; DL-340's 68ch text
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-7, the token table; `docs/ui/tokens.css`; `frontend/CLAUDE.md`'s
+  form rule; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h) ("the content should be centered … the content can also be wider in the docs")
+
+### DL-368: My work shows 5 projects per organization
+- **Date:** 2026-11-12
+- **Decision:** Each organization's section on My work shows its first **5** projects ("Showing 5 of N"),
+  and its hidden-projects toggle up to 5; `GET /api/me/work` returns 5 of each organization's
+  `projects` and `hidden`. Favorites and Approvals keep their first 10 (DL-76's `FIRST_ITEMS`),
+  so the organizations' limit is its own constant. The spec tests
+  pinning 10 are rewritten by `spec-test-writer` (owner-approved). To be tuned after the
+  owner's UI review.
+- **Supersedes:** DL-359's 10 (and the S3-C0f row's)
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "My work"; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h)

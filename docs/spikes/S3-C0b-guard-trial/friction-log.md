@@ -30,5 +30,8 @@ means the guard stopped something it should have.
 | 21 | after S3-C0g (owner feedback) | a `python3 -` heredoc updating a memory note that named the parked stash | text mentioning git in a command | the Edit tool | legit (as #8) |
 | 22 | S3-C0h | a scratchpad script written by heredoc, whose text quoted `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | the script written with the Write tool | legit (as #13, #16) |
 | 23 | S3-C0h | a `python3 -` heredoc rewrapping a docstring in `backend/tests/support/docs.py` that says "Listed through git" | text mentioning git in a command | the Edit tool | legit (as #8) |
+| 24 | after S3-C0h's commit | `curl …; gh run list …` (checking the dev stack, then CI) in one call | a compound command with gh in it | separate calls | legit; my slip (as #15) |
+| 25 | DC-2026-11-12b review (docs-consistency) | `cd … && git status …` | a compound command with git in it | separate `git -C` calls | legit (as #15) |
+| 26 | DC-2026-11-12b review (docs-consistency) | `R=…; git -C … show …` | a variable and git in one call | separate `git -C` calls | legit (as #15) |
 
 None of the blocks so far stopped anything the rules forbid.

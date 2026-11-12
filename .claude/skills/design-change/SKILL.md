@@ -23,6 +23,9 @@ before the next group's first checkpoint starts. The slice retro's changes apply
 slice's last checkpoint report, on the slice branch, before its pull request is merged (DL-19).
 Mid-group, apply one only if the owner says it blocks the current group.
 
+An owner decision that changes only the current checkpoint's own row isn't a design change
+here: it goes in the checkpoint's commit with its decision-log entry (DL-362).
+
 If a checkpoint is in progress, **park it** first (DL-20): a design change never shares a
 commit with checkpoint work, and work in progress is never pushed.
 1. `git stash push --include-untracked -m "park <ID>"`; confirm with `git status` that the

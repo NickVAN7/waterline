@@ -407,8 +407,8 @@ Entry format:
 ### TD-104: The documentation has no search of its own
 - **Added:** DC-2026-11-09-s2-retro-and-ui-polish (DL-342)
 - **What:** the reader's guide (from S3-C0g) has no docs-only search.
-- **Why:** deferred by the owner: about 2,500 words fit in a nav, and Slice 6's site-wide
-  search covers the docs.
+- **Why:** deferred by the owner: the guide is small enough to browse from its nav, and Slice
+  6's site-wide search covers the docs.
 - **Fix by:** Slice 6 (the site-wide search): revisit a docs-only search as the docs grow
 - **Status:** open
 
