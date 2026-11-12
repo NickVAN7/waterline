@@ -1,7 +1,10 @@
-# User guide
+# Behavior reference
 
-How to use Waterline: signing in, finding your way around, your projects and their
-requirements, approvals, your account, and running a workspace or an organization.
+Everything Waterline does, screen by screen, in the words on the screen: signing in, finding your
+way around, your projects and their requirements, approvals, your account, and running a workspace
+or an organization. It's exhaustive and never shown in the app; readers get the guide under
+`docs/user-guide/` (DL-335). It changes whenever behavior changes; the guide only when what a user
+does or sees changes or is added. `user-guide-verifier` follows it literally (DL-336).
 
 ## Signing in
 
@@ -342,9 +345,26 @@ Open the menu with your name and choose **Account settings**.
 
 ## Documentation
 
-Open the menu with your name and choose **Documentation** to read this guide inside Waterline
-(`/docs`). The list of sections under its title links to each one; a section's address
-(`/docs#docs-account-settings`, say) opens the guide at that section, so you can share it.
+Open the menu with your name and choose **Documentation** to read the guide inside Waterline
+(`/docs`). The landing page has the heading **Documentation** and the line "How to plan, track,
+and sign off on your projects in Waterline.", then **Start here**, three larger cards (**Welcome
+to Waterline**, **Set up a project**, **Review and approve**), then a heading for each group of
+pages (**Get started**, **Using Waterline**, **Administration**, **Reference**) with a card for
+each page: its title and a line on what it covers, the whole card a link. **Administration** says
+it's "For workspace and organization owners and admins."; everyone can read it.
+
+While you're in Documentation, the sidebar shows **My work**, then **Documentation** (the landing
+page), then each group's pages, the one you're reading marked.
+
+A page (`/docs/<page>`, e.g. `/docs/requirements`) shows the trail **Documentation › <page>**,
+the group's name above its title, and a line on what it covers. **On this page** lists its
+sections and marks the one you're reading as you scroll; on a wide window it stays beside the
+text, on a narrow one it's below it. A section's link (`/docs/requirements#create-a-requirement`)
+opens the page at that section and puts the focus on its heading, so you can share it. Links in
+the text to other pages open them in Waterline. At the bottom, **Previous** and **Next** go to the
+pages before and after it in the sidebar's order (the first page has no Previous, the last no
+Next). A page that doesn't exist shows "Page not found". An old link to a section of the former
+single-page guide (`/docs#docs-account-settings`) opens the landing page.
 
 ## Choosing a password
 

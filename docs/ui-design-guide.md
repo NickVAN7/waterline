@@ -444,7 +444,8 @@ render inside the full shell when signed in.
   rows as its contents need and is not sticky, so the page reflows to 320 CSS px with no
   horizontal scroll and a taller header never covers focus (DL-98). The other sticky layers in v1
   are a table's selection toolbar, only while rows are selected (UI-TBL-8), and the item side
-  panel's split pane, under the header at `--header-height` (UI-SHL-11). Any later sticky
+  panel's split pane, under the header at `--header-height` (UI-SHL-11), and a guide page's On
+  this page nav, under the header from 64 rem wide and 30 rem tall (DL-340). Any later sticky
   element needs the same `scroll-padding` treatment and an end-to-end focus check
   (UI-FBK-10).
 - **UI-SHL-4** **Org menu** (DL-137; from S2-C0e and S2-C0f): the header reads "Waterline"
@@ -465,8 +466,9 @@ render inside the full shell when signed in.
   the project selector and project pages (DL-137; from S2-C0f). An item shows only when
   `allowed_actions` allows it. Text is always visible; icons only supplement it. Below 48 rem
   the sidebar becomes a "Menu" disclosure button in the header (`aria-expanded`,
-  `aria-controls`); nothing depends on hover. From S3-C0g, a docs route's sidebar shows My work,
-  Documentation, and the guide's groups and pages, the current one marked (DL-338).
+  `aria-controls`); nothing depends on hover. On a docs route the sidebar shows My work, then
+  Documentation (the landing page), then the guide's groups (a label naming each list) and pages,
+  the current one marked as an admin page's is (DL-338; from S3-C0g).
 - **UI-SHL-6** **Project selector and project pages.** The selector is a menu button showing the
   current project that opens a disclosure popover of **links** (not a Select or listbox),
   headed by the current org's name (it lists that org's projects only), with a filter field past
@@ -495,16 +497,17 @@ render inside the full shell when signed in.
   page's primary action(s) on the right (wrapping below at narrow widths); a project page's
   `ProjectHeader` holds them the same way (from S2-C0g, TD-49). Two exceptions: the auth
   card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
-  size below the app's name, the card's largest text (`text-xl`; DL-176); and the
-  Documentation page (`/docs`), whose `h1` is the user guide's own, rendered by `MarkdownView`
-  at level 0, with no `PageHeader` (DL-310). Sections use `h2`
+  size below the app's name, the card's largest text (`text-xl`; DL-176); and a
+  guide page (`/docs/<page>`), whose `h1` is its front matter's title, between the group's label
+  and the lead, with no `PageHeader` (DL-340). Sections use `h2`
   and nest in order. The help link (3.2.6) is the user menu's **Documentation** item (S2-C21d,
   DL-238), in the same place on every page.
 - **UI-SHL-9** **Route changes:** on navigation, set `document.title` to
   `<h1 text> · Waterline` and move focus to the new `h1` (`tabindex="-1"`) once the view has
   rendered. A change that only alters list state through `useListQuery` (sort, filter, page)
-  does not move focus; it updates a polite live region instead ("12 projects"). On `/docs`, a
-  hash (`#docs-<section>`) moves focus to that section's heading instead (DL-311). A user's action
+  does not move focus; it updates a polite live region instead ("12 projects"). On a guide page
+  (`/docs/<page>`), a section's hash (`#<section>`) moves focus to that section's heading instead
+  (DL-311, DL-338, DL-340). A user's action
   whose reload replaces the page (a refusal that leaves the not-found or 403 page, a save that
   finds the item gone) does the same, on a visit's first page too (`replacedPage()`; S2-C22
   review).
@@ -723,8 +726,8 @@ render inside the full shell when signed in.
   never valid and the reason is shown.
 - **UI-FRM-16** **Layout:** one column, label above control, control width suggests the expected
   input. No autofocus on page load; focus moves only in a dialog, on a failed submit, or on a
-  route change (UI-SHL-9). The one load that moves focus is `/docs` with a section's hash, to
-  that section's heading (DL-311).
+  route change (UI-SHL-9). The one load that moves focus is a guide page (`/docs/<page>`) with a
+  section's hash, to that section's heading (DL-311, DL-340).
 - **UI-FRM-17** **Field hint** (for an optional nicety, and for naming an icon-only control such
   as the row-remove X): a short text that appears on pointer hover **and** on keyboard focus, stays
   visible while the pointer is over it, and is dismissed with Esc. A hint is never the only copy:
@@ -1097,16 +1100,21 @@ the revision compare in S2-C19a (DL-267).
   link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
   shifted below the heading the content sits under (`level`, an `h1` by default), so a
   description never adds a second `h1` nor breaks the page's heading order (UI-SHL-8); `level`
-  0 only on the Documentation page, for the bundled guide, never for stored content (DL-310); code blocks in
-  the monospace font, with no syntax highlighting. Headings get ids only when the caller asks
-  (the Documentation page, from S2-C21d): `docs-` plus the text's words, `-2` on a repeat, so
-  user content never sets an id (DL-311). A task-list item's `[ ]` or `[x]` is a mark
+  0 only on a guide page, for the bundled guide, never for stored content (DL-310); code blocks in
+  the monospace font, with no syntax highlighting. Headings get ids only in docs mode: the
+  text's words joined by hyphens, `-2` on a repeat, so user content never sets an id (DL-311,
+  DL-338). A task-list item's `[ ]` or `[x]` is a mark
   drawn in tokens and named "Not done" or "Done" (`role="img"`), not a disabled checkbox, whose
   look the tokens can't reach (DL-258). A component test runs a corpus of known XSS
   payloads (the OWASP cheat sheet's) through it, and an end-to-end test (S2-C18, DL-245) proves a
   stored payload doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
-  From S3-C0g, a docs mode for the bundled guide only adds callouts, keys, and local images
-  (DL-341); user content renders as now.
+  **Docs mode** (`docs`, the bundled guide only, from S3-C0g, DL-341; user content renders as
+  above): heading ids; `> [!TIP]`, `> [!NOTE]`, `> [!WARNING]` as info, warning, and danger tone
+  boxes with an icon and a bold label (a `div`, not a quote); `++Key++` as `<kbd>`; links also to
+  a path on our own origin (another guide page, opened in the app), never `//host`; and an image
+  in `docs/user-guide/images/`, bundled through Vite, as itself, any other image a link. Bundled
+  images are served from our own origin, so the CSP's `default-src 'self'` covers them without
+  an `img-src`. The XSS corpus runs in docs mode too.
 - **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
   **Preview** tabs (a tablist), previewing with `MarkdownView` (DL-141). No WYSIWYG editor; a
   toolbar may come later if usability calls for it. Hints (such as a template's) sit beside the

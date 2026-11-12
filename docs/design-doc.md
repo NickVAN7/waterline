@@ -288,7 +288,8 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   since a remote image tracks who opens the page and leaks that a Confidential item was opened
   (uploads are v2). Links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`.
   Headings in stored content shift down one level, so a description never adds a second `h1`
-  (the bundled user guide on `/docs` is rendered at its own levels, DL-310). Code blocks are
+  (the bundled guide's pages on `/docs/<page>` are rendered at their own levels, DL-310; only they get
+  docs mode's callouts, keys, heading anchors, links to our own pages, and bundled images, DL-341). Code blocks are
   monospace, with no syntax highlighting. A server-side renderer (`markdown-it-py` and `nh3`)
   is added only when something server-side shows content (v1.5 notifications, exports). A
   Content-Security-Policy is the second layer (§4).
@@ -1603,14 +1604,17 @@ pending approvals (untested requirements join in Slice 5); its admins change the
 from a status menu there as well as in Settings.
 
 ### Documentation
-The user menu's **Documentation** item renders the user guide inside the app (DL-197), at
-`/docs` (S2-C21d, DL-238; `docs` joins the reserved slugs there, §3). The guide is bundled into
-the web app at build time, the same for every signed-in user, with no endpoint (DL-308); its own
-heading (**User guide**) is the page's, and a Contents list after it links to each section (DL-310, DL-311).
-From S3-C0g (DL-335 to DL-342), the guide is one page per topic under `docs/user-guide/`, with
-a landing page and article pages in its own sidebar nav, and today's file becomes
-`docs/behavior-reference.md`, which the app never shows; from S3-C0h its screenshots are
-generated (DL-343).
+The user menu's **Documentation** item opens the guide inside the app (DL-197; S2-C21d,
+DL-238; `docs` is a reserved slug, §3). The guide is one markdown page per topic under
+`docs/user-guide/`, with front matter (`title`, `group`, `order`, `description`), in four groups
+(DL-337), bundled into the web app at build time with its images, the same for every signed-in
+user, with no endpoint (DL-308, DL-335). `/docs` is a landing page (DL-339) and `/docs/<page>`
+an article, a section's anchor `/docs/<page>#<section>` (DL-338, DL-340); on a docs route the
+sidebar shows the guide's groups and pages. It's written for readers, task by task, leaving out
+what the screen already says (DL-342). Everything the app does, exhaustively, is in
+`docs/behavior-reference.md`, which the app never shows: the reference changes with behavior; the
+guide only when what a user does or sees changes (DL-335). Docs-only search is deferred to Slice 6's
+site-wide search (TD-104). From S3-C0h its screenshots are generated (DL-343).
 
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).

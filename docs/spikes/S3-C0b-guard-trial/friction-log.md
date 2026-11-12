@@ -24,5 +24,7 @@ means the guard stopped something it should have.
 | 15 | S3-C0e | `sed …; npx vue-tsc …; git -C … status` (read-only) | a compound command with git in it | separate calls | legit; my slip (as #11, #14) |
 | 16 | S3-C0e | a `python3 -` heredoc editing `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | a scratchpad script | legit (as #13) |
 | 17 | S3-C0e review | `grep … ; git -C … diff --stat` (read-only) | a compound command with git in it | separate calls | legit; my slip (as #15) |
+| 18 | S3-C0g | `cd frontend && python3 - <<'PY' … PY` then `git rm` of the replaced docs view, in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
+| 19 | S3-C0g | a `python3 -` heredoc updating the skills and agents, whose text quoted the verifier's `git -C <repo> diff` step | text mentioning git in a command | a scratchpad script | legit (as #13) |
 
 None of the blocks so far stopped anything the rules forbid.

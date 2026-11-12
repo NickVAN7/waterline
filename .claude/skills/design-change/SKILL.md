@@ -68,7 +68,9 @@ Work through this list for each decision, and change everything that states the 
 - `docs/build-plan.md`: the checkpoint table and its "Includes", the "Done when" list, the
   feature map, the service layer order, the slice's notes, and the slice's groups.
 - `docs/testing-strategy.md`, `docs/screen-inventory.md`.
-- `docs/developer-guide.md` and `docs/user-guide.md`.
+- `docs/developer-guide.md`, `docs/behavior-reference.md`, and the guide under `docs/user-guide/`
+  (the reference changes with behavior; the guide only when what a user does or sees changes,
+  DL-335).
 - `docs/tech-debt.md`: resolve or re-target entries the decision affects.
 - The `CLAUDE.md` files, and `.claude/` skills and agents (e.g. a reviewer's checklist); the
   root `CLAUDE.md`'s **Status** when the change alters what's next (DL-315).

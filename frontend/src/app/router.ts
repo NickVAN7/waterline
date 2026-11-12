@@ -13,6 +13,9 @@ import MyWorkView from '@/views/my_work/MyWorkView.vue'
 // Every top-level path segment here is on the backend's reserved-slug list (`ReservedSlug` in the
 // API schema), so no org slug can take it; `/` is My work, and `/:orgSlug` is an org's pages
 // (router.spec.ts checks it).
+// The segment each org page has after the org's slug (`/:orgSlug/<page>`): no guide page takes one.
+export const ORG_PAGES = ['overview', 'members', 'settings', 'projects'] as const
+
 export const routes: RouteRecordRaw[] = [
   { path: '/', name: 'my-work', component: MyWorkView },
   {
@@ -149,12 +152,21 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/project/ProjectSettingsView.vue'),
     meta: { settlesItself: true },
   },
-  // The user guide (design-doc §11, DL-308); it settles its own focus for a section's hash.
+  // Documentation (design-doc §11, DL-338): the landing page and the guide's pages, which settle
+  // their own focus for a section's hash.
   {
     path: '/docs',
     name: 'docs',
-    component: () => import('@/views/docs/DocsView.vue'),
-    meta: { settlesItself: true },
+    component: () => import('@/views/docs/DocsLandingView.vue'),
+    meta: { adminArea: 'docs' },
+  },
+  {
+    // Not an org page's name: an org that took the slug `docs` keeps those pages (DL-309). Each
+    // `)` inside is escaped: vue-router ends a param's regex at the first bare one.
+    path: `/docs/:slug((?!(?:${ORG_PAGES.join('|')}\\)$\\)[a-z0-9-]+)`,
+    name: 'docs-page',
+    component: () => import('@/views/docs/DocsArticleView.vue'),
+    meta: { adminArea: 'docs', settlesItself: true },
   },
   {
     path: '/status',

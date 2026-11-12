@@ -14,7 +14,7 @@ import { ACME, failed, me, noContent, ok, workspaceEntry } from '@/test/api'
 import { project } from '@/test/projects'
 
 import { createWaterlineApp } from './createApp'
-import { routes } from './router'
+import { ORG_PAGES, routes } from './router'
 
 const SIGNED_OUT = failed(401, {
   code: 'not_authenticated',
@@ -325,10 +325,29 @@ describe('reserved top-level routes', () => {
     ['/docs/overview', 'org-overview'],
     ['/docs/projects', 'org-projects'],
     ['/docs/projects/PORTAL', 'project-home'],
+    ['/docs/members', 'org-members'],
+    ['/docs/settings', 'org-settings'],
   ])("%s is still the `docs` org's page, not the Documentation page", (path, name) => {
     const router = createRouter({ history: createMemoryHistory(), routes })
 
     expect(router.resolve(path).name).toBe(name)
+  })
+
+  it.each([
+    ['/docs/trash', 'docs-page'],
+    ['/docs/working-with-projects', 'docs-page'],
+    ['/docs/overviews', 'docs-page'],
+  ])('%s is a Documentation page', (path, name) => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+
+    expect(router.resolve(path).name).toBe(name)
+  })
+
+  it("ORG_PAGES names every org page's own segment", () => {
+    const own = routes
+      .filter((route) => route.path.startsWith('/:orgSlug/'))
+      .map((route) => route.path.split('/')[2])
+    expect([...new Set(own)].sort()).toEqual([...ORG_PAGES].sort())
   })
 })
 

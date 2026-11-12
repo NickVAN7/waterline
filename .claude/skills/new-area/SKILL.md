@@ -159,7 +159,8 @@ Follow the `test-writer` skill. The minimum for a new area:
 
 ## 11. Docs
 
-- `docs/user-guide.md`: how to use the feature.
+- `docs/behavior-reference.md`: what the feature does, screen by screen; the guide under
+  `docs/user-guide/`: how to use it, for a reader (DL-335).
 - `docs/developer-guide.md`: only if the area introduced a new pattern.
 - Schema doc via the `migration` skill; design doc only for approved changes.
 - `docs/build-plan.md` feature map, if calls-into or ownership changed.

@@ -74,8 +74,9 @@ focus checks (`e2e/support/a11y.ts`).
 
 ## 6. Docs
 
-- `docs/user-guide.md`: what the screen is for and how to use it, in the words on the screen
-  (`user-guide-verifier` follows it literally at the slice's end).
+- `docs/behavior-reference.md`: what the screen does, in the words on the screen
+  (`user-guide-verifier` follows it literally at the slice's end); the guide's page under
+  `docs/user-guide/` when what a user does or sees changes (DL-335).
 - `ui-reviewer` reviews the screen at the checkpoint (the `checkpoint` skill). A finding that a
   rule would have prevented adds the rule to `frontend/CLAUDE.md`, and, if it changes the order
   above, to this skill.

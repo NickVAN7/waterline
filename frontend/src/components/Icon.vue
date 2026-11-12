@@ -1,7 +1,5 @@
-<script setup lang="ts">
+<script lang="ts">
 // Inline SVG icons (UI-STY-4): decorative unless given a label, in which case the icon is named.
-import { computed } from 'vue'
-
 export type IconName =
   | 'alert'
   | 'info'
@@ -25,10 +23,8 @@ export type IconName =
   | 'building'
   | 'chevron-right'
 
-// `filled`: drawn solid, for a control's on state (a starred project, DL-305).
-const props = defineProps<{ name: IconName; label?: string; filled?: boolean }>()
-
-const PATHS: Record<IconName, string[]> = {
+// Exported for MarkdownView's callouts, which draw an icon inside rendered HTML (DL-341).
+export const PATHS: Record<IconName, string[]> = {
   alert: ['M12 8v5', 'M12 16.5v.01', 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0'],
   info: ['M12 11v5', 'M12 7.5v.01', 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0'],
   warning: [
@@ -67,6 +63,13 @@ const PATHS: Record<IconName, string[]> = {
     'M18 9l3 3-3 3',
   ],
 }
+</script>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+
+// `filled`: drawn solid, for a control's on state (a starred project, DL-305).
+const props = defineProps<{ name: IconName; label?: string; filled?: boolean }>()
 
 const paths = computed(() => PATHS[props.name])
 </script>

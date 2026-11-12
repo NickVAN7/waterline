@@ -43,7 +43,13 @@ Folder purposes only; each file says what it holds (DL-317).
 - **Rendered markdown** goes only through `MarkdownView` (from S2-C16): `markdown-it` with raw
   HTML off, then DOMPurify; never `v-html` on anything else. No remote images, links only
   `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
-  ui-design-guide UI-MD-1). Markdown is edited only in `MarkdownEditor` (UI-MD-2).
+  ui-design-guide UI-MD-1). Markdown is edited only in `MarkdownEditor` (UI-MD-2). Docs mode
+  (`docs`: callouts, keys, heading ids, own-origin links, bundled images) is for the guide's
+  pages under `docs/user-guide/` only, never stored content (DL-341).
+- **The guide** (`docs/user-guide/*.md`, loaded by `views/docs/guide.ts`) changes only when what
+  a user does or sees changes; every behavior change goes in `docs/behavior-reference.md`
+  (DL-335). `guide.spec.ts` fails on a page without its front matter, with a `#` heading, or with
+  a link to a page or section that doesn't exist.
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
   slug change to the new URL; a null org is the not-found page.
@@ -224,8 +230,8 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   review).
 - `MarkdownView` under a heading gets that heading's `level` (`:level="2"` under an `h2`): its
   default shift only keeps content off `h1`, and a `#` under an `h3` would read as the page's
-  next section (UI-MD-1, UI-SHL-8; S2-C20a review). `:level="0"` is only for `/docs`'s bundled
-  guide, never stored content (DL-310).
+  next section (UI-MD-1, UI-SHL-8; S2-C20a review). `:level="0"` is only for a guide page's
+  bundled body, never stored content (DL-310).
 - A required checkbox group can't take `aria-required`: its legend carries a visually hidden
   "(required)" beside the hidden asterisk (UI-FRM-2; S2-C20 review).
 - A PrimeVue table's selected-row bar goes on the row's first cell, and only on the selected

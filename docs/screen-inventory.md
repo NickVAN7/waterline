@@ -424,7 +424,8 @@ already exists; everything else is still to build.
 - Open any item from a shared link; if I can't see it, I get the same 404 as for an item that
   doesn't exist. Page not found links to My work and System status. *Built.*
 - **System status** at `/status`, without signing in. *Built.*
-- **Documentation** in the user menu (v1): opens the user guide inside the app.
+- **Documentation** in the user menu (v1): opens the guide inside the app, a landing page and a
+  page per topic. *Built.*
 - Use everything by keyboard and screen reader (WCAG 2.2 AA).
 
 **Finding things**
@@ -642,7 +643,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 | No access | page | `/account/no-access` | 1 | Built |
 | My work | page | `/` | 1, sections in 2, 3, 5 | Projects and approvals built; grouped by organization (each org's first 10, hidden ones behind a toggle), approvals below the projects, past decisions removed, in S3-C0f (DL-329 to DL-334, DL-349, DL-359); summary tiles and the task sections in S3-C29 (DL-349) |
 | Favorite projects | section of My work, first; star on My work's project rows (DL-302, DL-305) | `/` | 2 (S2-C21c, DL-238) | Built |
-| Documentation (user guide) | page, from the user menu; the guide's title, a Contents list, then the guide (DL-310, DL-311); a landing page and articles from S3-C0g (DL-335 to DL-342) | `/docs` | 2 (S2-C21d, DL-238) | Built |
+| Documentation | pages, from the user menu: a landing page (Start here, then each group's cards, DL-339) and an article per guide page (trail, group, title, lead, the page, Previous and Next, On this page, DL-340), the guide's pages in the sidebar (DL-338) | `/docs`, `/docs/<page>` | 2 (S2-C21d, DL-238); 3 (S3-C0g, DL-335 to DL-342) | Built |
 | Search results | page, from the header search bar | `/search` | 6 | — |
 | System status | page, no sign-in | `/status` | 0 | Built |
 | Page not found (404) / Forbidden (403) | page in the shell | any | 1 | Built |

@@ -135,7 +135,7 @@ test('the user menu works from the keyboard, with a visible focus ring', async (
   await expect(button).toBeFocused()
 })
 
-test('the user menu opens the user guide, and a section link opens its section (DL-308 to DL-311)', async ({
+test('the user menu opens Documentation, whose pages and sections open from the sidebar and On this page (DL-338 to DL-340)', async ({
   page,
 }) => {
   await signIn(page, 'casey')
@@ -143,25 +143,49 @@ test('the user menu opens the user guide, and a section link opens its section (
   await page.getByRole('button', { name: /Account menu/ }).click()
   await page.getByRole('menuitem', { name: 'Documentation' }).click()
 
-  // The guide reached the page through the Compose mount and Vite's allow list (DL-308).
+  // The guide's pages reached the page through the Compose mount and Vite's allow list (DL-308).
   await expect(page).toHaveURL('/docs')
-  await expect(page.getByRole('heading', { level: 1, name: 'User guide' })).toBeFocused()
-  await expect(page).toHaveTitle('User guide · Waterline')
-  const contents = page.getByRole('navigation', { name: 'Contents' })
-  await expect(contents.getByRole('link', { name: 'Signing in' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Documentation' })).toBeFocused()
+  await expect(page).toHaveTitle('Documentation · Waterline')
+  await expect(page.getByRole('link', { name: /^Set up a project/ })).toBeVisible()
+  const sidebar = page.getByRole('navigation', { name: 'Documentation' })
+  await expect(sidebar.getByRole('link', { name: 'Documentation' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
   await expectNoA11yViolations(page)
 
-  await contents.getByRole('link', { name: 'Account settings' }).click()
-  await expect(page).toHaveURL('/docs#docs-account-settings')
-  await expect(page.getByRole('heading', { level: 2, name: 'Account settings' })).toBeFocused()
+  await sidebar.getByRole('link', { name: 'Requirements' }).click()
+  await expect(page).toHaveURL('/docs/requirements')
+  await expect(page.getByRole('heading', { level: 1, name: 'Requirements' })).toBeFocused()
+  await expect(sidebar.getByRole('link', { name: 'Requirements' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+  // Docs mode's callout and keys rendered in the real browser, under the CSP.
+  await expect(page.locator('.callout-danger strong')).toHaveText('Warning')
+  await expectNoA11yViolations(page)
+  // On this page sticks under the header here: nothing Tab reaches sits under either (UI-SHL-3).
+  await expectFocusNotObscured(page)
+
+  const contents = page.getByRole('navigation', { name: 'On this page' })
+  await contents.getByRole('link', { name: 'Edit a requirement' }).click()
+  await expect(page).toHaveURL('/docs/requirements#edit-a-requirement')
+  await expect(page.getByRole('heading', { level: 2, name: 'Edit a requirement' })).toBeFocused()
   await expectFocusedHeadingClear(page)
 
   await page.goBack()
-  await expect(page.getByRole('heading', { level: 1, name: 'User guide' })).toBeFocused()
+  await expect(page.getByRole('heading', { level: 1, name: 'Requirements' })).toBeFocused()
 
-  await page.goto('/docs#docs-documentation')
-  await expect(page.getByRole('heading', { level: 2, name: 'Documentation' })).toBeFocused()
+  // A link in the text opens the other page in the app.
+  await page.getByRole('main').getByRole('link', { name: 'Trash', exact: true }).click()
+  await expect(page).toHaveURL('/docs/trash')
+  await expect(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeFocused()
+
+  await page.goto('/docs/keyboard-and-accessibility#the-requirements-tree')
+  await expect(page.getByRole('heading', { level: 2, name: 'The requirements tree' })).toBeFocused()
   await expectFocusedHeadingClear(page)
+  await expect(page.locator('main kbd').first()).toHaveText('Tab')
 })
 
 test("a project's lowercase key is replaced with its own", async ({ page }) => {

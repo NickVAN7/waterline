@@ -103,6 +103,8 @@
   --split-pane-height: calc(100dvh - var(--header-height)); /* the side panel beside a list */
   --sidebar-width: 15rem;
   --content-narrow: 40rem; /* forms, settings */
+  --content-prose: 68ch; /* a guide article's text (DL-340) */
+  --docs-card-min: 16.25rem; /* a Documentation card's narrowest width (DL-339) */
   --content-wide: 80rem; /* lists, tables */
 
   /* Focus ring */

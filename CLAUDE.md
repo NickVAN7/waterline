@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0f (My work grouped by organization) done; the git guard's decision held to the end of
-S3-C0x; next: S3-C0g (Documentation: a guide and a reference).
+S3-C0g (Documentation: a guide and a reference) done; the git guard's decision held to the end
+of S3-C0x; next: S3-C0h (Generated documentation screenshots).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
@@ -22,7 +22,8 @@ Updated at every checkpoint, and by a design change that changes what's next (DL
 | `docs/screen-inventory.md` | People and personas, v1 scope, tenancy & access model, screens (derived step by step) |
 | `docs/ui-design-guide.md` | UI rules by ID (`UI-FRM-5`): styling approach, tokens, shell, forms, feedback, tables, SVAR widgets, how each is checked; reference copies in `docs/ui/` |
 | `docs/developer-guide.md` | Setup, commands, conventions, how-tos (kept current every checkpoint) |
-| `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
+| `docs/behavior-reference.md` | Everything the app does, screen by screen (kept current every checkpoint; never shown in the app) |
+| `docs/user-guide/` | The reader's guide, one page per topic, shown in the app's Documentation: changes only when what a user does or sees changes (DL-335) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
 | `docs/decision-log.md` | Every owner decision that changed or superseded a recorded rule, or set a process (`DL-<n>`) |
 | `docs/reviews/s<n>/<ID>.md`, `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` | Each checkpoint's independent review (one folder per slice), and each design change's review (DL-18, DL-43, DL-126): every pass, finding, and resolution |

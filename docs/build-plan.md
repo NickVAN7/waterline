@@ -54,8 +54,9 @@ minutes. The next checkpoint starts only after the current one is approved.
    - `docs/developer-guide.md` — workstation setup, developer CLI commands, architecture and
      conventions, how to add a feature through each layer, how to write each kind of test,
      troubleshooting.
-   - `docs/user-guide.md` — how to use each feature, from an end user's point of view (starts
-     filling in with Slice 1).
+   - `docs/behavior-reference.md` — everything each feature does, screen by screen, in the
+     words on the screen (from S3-C0g; before it, `docs/user-guide.md`); the reader's guide
+     under `docs/user-guide/` only when what a user does or sees changes (DL-335).
    - Design, schema, and build-plan docs, if anything drifted.
 5. **Tech-debt log** (`docs/tech-debt.md`): any shortcut is recorded with its reason and the
    checkpoint or slice that will fix it. The goal is an empty log; nothing is left unrecorded.
@@ -121,8 +122,9 @@ for approval.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
-the guide. The `user-guide-verifier` agent then follows `docs/user-guide.md` literally in a
-browser against a seeded copy of the stack and walks the slice's "Done when" list (DL-124). After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
+the guide. The `user-guide-verifier` agent then follows `docs/behavior-reference.md` literally in a
+browser against a seeded copy of the stack, checks the guide under `docs/user-guide/` against it
+(DL-336), and walks the slice's "Done when" list (DL-124). After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
 `CLAUDE.md` file, and `.claude/` file against the others, and then the `repo-auditor` agent
 audits the whole repository, not one diff: bugs, security, scale against the expected load,
 risky code without a test, and slowness (DL-41; waste is `simplicity-auditor`'s, DL-318). From S2-C0a, the `simplicity-auditor`
@@ -331,7 +333,8 @@ The sections below describe the content; the table above is the order of work.
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
 │                                       design-change/, vue-screen/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
-│                                 testing-strategy.md, developer-guide.md, user-guide.md,
+│                                 testing-strategy.md, developer-guide.md, user-guide/,
+│                                 behavior-reference.md,
 │                                 tech-debt.md, decision-log.md, screen-inventory.md,
 │                                 ui-design-guide.md, ui/ (reference copies of the token file,
 │                                 its contrast check, and the SVAR theme mapping), reviews/
@@ -592,7 +595,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - `api` — built from `backend/`; uvicorn with reload, mounted source.
 - `worker` — same image as `api`, runs the procrastinate worker.
 - `web` — built from `frontend/`; Vite dev server (in Compose or run locally); from S2-C21d it also
-  mounts `docs/user-guide.md` read-only for the Documentation page (DL-308).
+  mounts `docs/user-guide/` read-only for the Documentation pages (DL-308, DL-335).
 - **Vite proxies `/api` to the API**, so the browser sees one origin. This matters for Slice 1:
   the session cookie (`SameSite=Lax`, `__Host-` prefix) and the `Origin` check both assume the
   app and API share an origin.

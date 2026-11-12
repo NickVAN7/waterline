@@ -76,7 +76,9 @@ failing) if the pre-commit hooks aren't installed.
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
 docs/           design, schema, build plan, testing strategy, screen inventory, UI design
-                guide (ui-design-guide.md, with reference copies in ui/), these guides,
+                guide (ui-design-guide.md, with reference copies in ui/), this guide, the
+                behavior reference, the reader's guide (user-guide/: a page per topic,
+                images/),
                 tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
                 design-changes/: one per design change), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
@@ -477,7 +479,7 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 | `migrate` | `alembic upgrade head` once, then exits | — |
 | `api` | uvicorn with `--reload`, `backend/` mounted | `API_PORT` (8000) |
 | `worker` | the procrastinate worker, `backend/` mounted | — |
-| `web` | the Vite dev server, `frontend/` mounted, and `docs/user-guide.md` read-only for the Documentation page (DL-308); proxies `/api` to `api` | `WEB_PORT` (5173) |
+| `web` | the Vite dev server, `frontend/` mounted, and `docs/user-guide/` read-only for the Documentation pages (DL-308, DL-335); proxies `/api` to `api` | `WEB_PORT` (5173) |
 
 - `api`, `worker`, and `migrate` share the backend image; `migrate` runs first, and `api` and
   `worker` start only once it has succeeded (the worker can't run without procrastinate's
@@ -957,11 +959,33 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   hides an action the user may never take; the server still checks.
 - **Markdown** (UI-MD-1, UI-MD-2): show stored markdown only with `<MarkdownView :source>`,
   the one place `v-html` is allowed (markdown-it with raw HTML off, then DOMPurify; links only
-  `http`, `https`, and `mailto`; images as links; headings one level down, except `/docs`'s bundled
-  guide at level 0 with opt-in `docs-` heading ids, DL-310, DL-311; `- [ ]` task lists as
-  marks drawn in tokens, named "Done" or "Not done"). Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
+  `http`, `https`, and `mailto`; images as links; headings one level down; `- [ ]` task lists as
+  marks drawn in tokens, named "Done" or "Not done"). A guide page's body renders at level 0 in
+  docs mode (`docs`, `images`; DL-341), never stored content. Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
   and Preview tabs; `focus()` returns to Write). A new XSS vector goes in
   `MarkdownView.xss-corpus.ts`, which its spec runs through the renderer.
+- **The guide** (DL-335 to DL-342): a page is `docs/user-guide/<slug>.md` (the slug is its
+  address, `/docs/<slug>`), starting with front matter:
+
+  ```
+  ---
+  title: Trash
+  group: Using Waterline
+  order: 6
+  description: Delete a requirement, and bring a deleted one back.
+  ---
+  ```
+
+  `group` is one of Get started, Using Waterline, Administration, or Reference
+  (`views/docs/guide.ts`'s `GROUPS`); `order` places it in its group; `description` is its card's
+  line and its lead. The body starts at `##`: one section per task, named for it. In the body,
+  `> [!TIP]`, `> [!NOTE]`, and `> [!WARNING]` are callouts, `++Esc++` a key, `[Trash](/docs/trash)`
+  a link to another page (or `/docs/trash#restore-a-requirement`, a section: its words in
+  lowercase, joined by hyphens), and `![What it shows](images/<file>)` an image from
+  `docs/user-guide/images/`. Leave out route paths, exact messages, and numeric limits: those
+  belong in `docs/behavior-reference.md`, which changes with every behavior change, while the
+  guide changes only when what a user does or sees changes. `guide.spec.ts` checks every page's
+  front matter, headings, links, and images.
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
   menu button with a popover of links that the org menu and project selector share; opening
   it moves focus inside (the popover sits at the end of `<body>`, out of the Tab order). A spec
@@ -1315,7 +1339,8 @@ its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when t
   a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
   `frontend/e2e/` (read-only: accessibility and frontend conventions against
   `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`,
-  `user-guide-verifier` (the user guide followed in a browser, DL-124), `docs-consistency`, and
+  `user-guide-verifier` (the behavior reference followed in a browser and the guide checked
+  against it, DL-124, DL-336), `docs-consistency`, and
   `repo-auditor` (a whole-repository audit for bugs, security, scale, untested risk, and
   slowness, which runs no tests, DL-41; waste is `simplicity-auditor`'s alone, DL-318), then
   `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored

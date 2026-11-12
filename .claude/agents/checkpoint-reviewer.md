@@ -109,8 +109,9 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
    owner-approved change, is a **blocker**; so is a checkpoint that changes `app/rules/` or
    `app/authz/` with no "Spec tests" section.
 7. **Migrations:** match the schema doc; downgrade works; no edits to committed migrations.
-8. **Documentation:** `docs/developer-guide.md` and `docs/user-guide.md` accurately describe
-   what was built; design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`
+8. **Documentation:** `docs/developer-guide.md` and `docs/behavior-reference.md` accurately
+   describe what was built, and the guide under `docs/user-guide/` changed where what a user
+   does or sees changed (DL-335); design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`
    entries have a reason and target, and a resolved one is moved under **Resolved**, shrunk to
    its heading, Added, and Status (DL-313); the root `CLAUDE.md`'s **Status** names this
    checkpoint and the next one (DL-315).
