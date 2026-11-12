@@ -1000,7 +1000,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   create does; My work's shape is `{sections: {projects: {available, items, total}}}`, 10 items
   each (docs-consistency decisions, Oct 11, 2026).
 - **Supersedes:** none
-- **Superseded by:** DL-111, in part (the project read gains `lead_name`)
+- **Superseded by:** DL-111, in part (the project read gains `lead_name`); DL-369 (in part: the favorites' limit)
 - **Applies to:** build plan ("Projects": the projects API; the S1-C11 and S1-C16 rows); design-doc
   §1.1 (the lead); schema-doc (`project.lead_id`)
 - **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C11)
@@ -4267,7 +4267,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Date:** 2026-11-09
 - **Decision:** Task-oriented, about 300 to 600 words a page and 2,000 to 2,500 in all, leaving
   out what the screen already says (route paths, exact messages, edge limits, focus mechanics; the
-  reference keeps them), callouts used sparingly, in the handoff's Requirements sample's tone.
+  reference keeps them), callouts used sparingly, in the tone of the style sample in DC-2026-11-09, appendix.
   Docs-only search is deferred (TD-104); Slice 6's site-wide search covers the docs.
 - **Supersedes:** none
 - **Superseded by:** DL-365 (in part: the word counts)
@@ -4599,6 +4599,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   pinning 10 are rewritten by `spec-test-writer` (owner-approved). To be tuned after the
   owner's UI review.
 - **Supersedes:** DL-359's 10 (and the S3-C0f row's)
-- **Superseded by:** none
+- **Superseded by:** DL-369 (in part: favorites uncapped)
 - **Applies to:** design-doc §11 "My work"; build plan (S3-C0j)
 - **Source:** owner, Nov 12, 2026 (after S3-C0h)
+
+### DL-369: My work's Favorites have no cap
+- **Date:** 2026-11-12
+- **Decision:** Favorite projects show in full on My work: `GET /api/me/work` returns every
+  favorite, with no "Showing N of M". Only each organization's section is capped, at 5
+  (DL-368); Approvals keep their first 10.
+- **Supersedes:** DL-368's "Favorites … keep their first 10"; DL-76's first-10 limit for
+  favorites
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "My work"; build plan (the API table, S3-C0j); behavior
+  reference (My work)
+- **Source:** owner, Nov 12, 2026 ("favorites should theoretically be cap-less")

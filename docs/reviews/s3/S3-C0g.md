@@ -114,5 +114,6 @@ Open for the owner:
 2. Page length (checkpoint-reviewer question).
 3. `assetsInlineLimit: 0` once a production server sends the CSP (security-reviewer question).
 4. ui-reviewer's two proposed UI-MD-1 rules.
-5. The handoff's "Requirements sample" tone reference (DL-342) isn't in the repository; the pages
-   were written without it.
+5. ~~The handoff's "Requirements sample" tone reference (DL-342) isn't in the repository; the
+   pages were written without it.~~ **Closed** (DC-2026-11-12c): the owner supplied it; it's
+   the appendix of `DC-2026-11-09-s2-retro-and-ui-polish.md`, and the guide was compared with it.
