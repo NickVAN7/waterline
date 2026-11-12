@@ -15,6 +15,11 @@ TreeTable wrapper fixes below), `&rows=2000`, `&open=none`, `&rebuild=1` (TreeTa
 5.0.2, `@primeuix/themes` 3.0.1, Vue 3.5.43; Chromium from Playwright 1.64.0, on WSL2. Data:
 one checklist of 500 requirements, three levels (20 × 4 × 5), every branch open, unless noted.
 
+> **Note (S3-C0i):** this spike didn't import SVAR's own stylesheet (`@svar-ui/vue-grid/all.css`),
+> so its SVAR numbers (the theme audit, the timings, the keyboard) were taken on the unstyled
+> grid; see `docs/spikes/S3-C0i-backlog/results.md`. The decision rested on tree mode switching
+> drag and moves off in code, which styling doesn't change.
+
 ## Results
 
 Times are from the production build (`results-build.json`), one run; the dev server's

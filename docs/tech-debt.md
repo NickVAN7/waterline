@@ -482,6 +482,18 @@ Entry format:
 - **Fix by:** S3-C0j (shell feedback), with a forced-colors check of the sidebar
 - **Status:** open
 
+### TD-113: UI-SVR-3 doesn't say SVAR's stylesheet must be imported, or that Willow's icons go blank
+- **Added:** S3-C0i
+- **What:** the S3-C0i spike found that a SVAR widget draws unstyled unless its own stylesheet
+  (`@svar-ui/vue-grid/all.css`, and each widget's) is imported before our mapping, and that
+  `<Willow :fonts="false">`, which UI-SVR-3 requires, also leaves out Willow's icons (an icon
+  font from SVAR's CDN, which UI-STY-4 rules out), so a wrapper draws its own (the grid's drag
+  handle). UI-SVR-3 says neither, and the first SVAR wrapper would find both again.
+- **Why:** a rule change, outside a spike's scope (checkpoint-reviewer, S3-C0i, minor).
+- **Fix by:** S3-C18 (the first SVAR wrapper, the board): UI-SVR-3 gains both, and the board's
+  Willow icons are checked
+- **Status:** open
+
 ---
 
 ## Resolved

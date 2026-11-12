@@ -1197,7 +1197,9 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    yet built or tested: a visible and announced selected state for the board, focus return after
    a grid editor closes, names for the grid editors, and the `aria-rowindex="0"` and `treegrid`
    defects (patch in the wrapper or report upstream, UI-SVR-7). (c) Grid row drag with a
-   pointer was not exercised (S3-C0i exercises it, DL-344). (d) The Gantt baseline decision and the Gantt performance test
+   pointer, exercised in S3-C0i (`docs/spikes/S3-C0i-backlog/results.md`): it works once the
+   wrapper draws the handle (Willow's icons are an icon font from SVAR's CDN) and keeps the
+   drop's `mode`, which the drop's event leaves out. (d) The Gantt baseline decision and the Gantt performance test
    (§7.2). (e) Whether to report the Gantt 2.8.0 mount crash upstream, and re-check it at V2.
    (f) The Kanban card shows no visible change when selected, so the wrapper needs its own
    selected style (UI-TOK-9). (g) **Tree rows:** the spike used a flat grid. Whether the
