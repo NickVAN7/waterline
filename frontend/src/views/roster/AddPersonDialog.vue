@@ -79,7 +79,8 @@ const BAD_EMAIL = 'Enter an email address like name@example.com.'
 
 async function open(): Promise<void> {
   step.value = 'email'
-  role.value = props.roster.roles.at(-1)!.value
+  // Member: every roster has it, a project's above its lowest, Viewer (S3-C0l).
+  role.value = 'member'
   account.value = { email: '', name: '', username: '', password: '' }
   checkedEmail = ''
   usernameEdited.value = false

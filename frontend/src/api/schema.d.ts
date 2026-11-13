@@ -2525,6 +2525,8 @@ export interface components {
             current_revision_id: string | null;
             /** Approved Revision Id */
             approved_revision_id: string | null;
+            /** Awaiting Approval */
+            awaiting_approval: boolean;
         };
         /**
          * RequirementMove

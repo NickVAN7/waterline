@@ -235,6 +235,79 @@ describe('ProjectSettingsView', () => {
     expect(document.activeElement?.id).toBe('project-settings-lead-id')
   })
 
+  describe('Modules, collapsed to one line (Q12c)', () => {
+    const modules = () => document.querySelector<HTMLDetailsElement>('details')!
+
+    it('shows the modules turned on, and opens on demand', async () => {
+      const { wrapper } = await mountAt(
+        project({ enabled_modules: ['sprints', 'github'], allowed_actions: ADMIN }),
+      )
+
+      expect(modules().open).toBe(false)
+      expect(wrapper.get('summary').text()).toBe('Modules Sprints, GitHub Edit')
+      modules().open = true
+      modules().dispatchEvent(new Event('toggle'))
+      await flushPromises()
+      expect(wrapper.get('summary').text()).toBe('Modules Sprints, GitHub')
+      // What it says follows the form, before a save.
+      await wrapper.get('input[type=checkbox][value=sprints]').setValue(false)
+      await wrapper.get('input[type=checkbox][value=github]').setValue(false)
+      expect(wrapper.get('summary').text()).toBe('Modules None turned on')
+      await expectNoA11yViolations(wrapper)
+    })
+
+    it("opens for the server's 422 on the modules, and focuses them", async () => {
+      const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        validationFailed([
+          {
+            loc: ['body', 'enabled_modules'],
+            message: 'This module is not available yet.',
+            type: 'module_unavailable',
+          },
+        ]),
+      )
+      await wrapper.get('input[type=checkbox][value=github]').setValue(true)
+
+      await submitForm(wrapper, 0)
+
+      expect(modules().open).toBe(true)
+      expect(document.activeElement?.id).toBe('project-settings-enabled-modules')
+    })
+
+    it('opens for an error on the modules when focus goes to an earlier field', async () => {
+      const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        validationFailed([
+          {
+            loc: ['body', 'lead_id'],
+            message: 'This account is deactivated.',
+            type: 'account_inactive',
+          },
+          {
+            loc: ['body', 'enabled_modules'],
+            message: 'This module is not available yet.',
+            type: 'module_unavailable',
+          },
+        ]),
+      )
+      await wrapper.get('input[type=checkbox][value=github]').setValue(true)
+
+      await submitForm(wrapper, 0)
+
+      expect(document.activeElement?.id).toBe('project-settings-lead-id')
+      expect(modules().open).toBe(true)
+      expect(wrapper.text()).toContain('This module is not available yet.')
+    })
+  })
+
+  it('gives Save restriction the primary tone, as Save settings (UI-FRM-15: one per form)', async () => {
+    const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
+
+    const save = wrapper.findAll('button').find((b) => b.text() === 'Save restriction')!
+    expect(save.classes()).toContain('bg-accent')
+  })
+
   it('asks for the name first, focusing it, and sends nothing', async () => {
     const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
     const patch = vi.spyOn(client, 'PATCH')

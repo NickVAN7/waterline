@@ -1363,13 +1363,13 @@ Restore in its `allowed_actions` only when the whole restore would pass (DL-222)
 see everything in the project. An archived project's trash lists the same items, with no Restore
 (DL-220).
 
-**Trash** (DL-146): a project Trash page, the last item of the project's navigation (DL-202),
-shown to those who read the project's content (`requirement.view`, DL-291), lists deleted items
-by type (requirements from Slice 2; tasks and test
-cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
-`allowed_actions` allows it. From S3-C0l (DL-350), Trash leaves the navigation: every list page
-whose items can be deleted has a **Trash** link in its header (Requirements from S3-C0l, Tasks
-from S3-C20, Test cases in Slice 5), shown under the same check, opening this page filtered to
+**Trash** (DL-146): a project Trash page, for those who read the project's content
+(`requirement.view`, DL-291), lists deleted items by type (requirements from Slice 2; tasks and
+test cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
+`allowed_actions` allows it. It isn't in the project's navigation (DL-350; it was last there from
+DL-202 until S3-C0l): every list page whose items can be deleted has a **Trash** link in its
+header (Requirements from S3-C0l, Tasks from S3-C20, Test cases in Slice 5), shown under the same
+check, opening this page filtered to
 that page's type (`?type=task`), the filter removable; the route `…/:key/trash` stays, and its
 breadcrumb leads back to the list. Nothing is purged automatically in v1. After a restore the list
 reloads, so the descendants restored with it leave too, with a status linking to the restored

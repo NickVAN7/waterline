@@ -19,6 +19,7 @@ import Button from '@/components/Button.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import FormField from '@/components/FormField.vue'
+import Icon from '@/components/Icon.vue'
 import SelectField from '@/components/SelectField.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
 import TextField from '@/components/TextField.vue'
@@ -199,6 +200,21 @@ function moduleWarning(module: ProjectModule): string {
     return `${name} is recommended for ${PROJECT_TYPE[values.value.type]} projects: turning it off hides its features. Nothing is deleted.`
   return ''
 }
+
+// Modules, collapsed to one line until opened (Q12c): a native `<details>`, opened whenever it
+// holds an error, the first invalid field or not, so the error is never hidden (WCAG 3.3.1).
+const modulesOpen = ref(false)
+watch(
+  () => detailsErrors.fieldErrors.value.enabled_modules,
+  (error) => {
+    if (error) modulesOpen.value = true
+  },
+)
+const modulesSummary = computed(() =>
+  values.value.enabled_modules.length
+    ? values.value.enabled_modules.map((m) => MODULE[m] ?? m).join(', ')
+    : 'None turned on',
+)
 
 async function focusDetails(target: string) {
   await nextTick()
@@ -481,16 +497,36 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
               :error="detailsErrors.fieldErrors.value.lead_id"
               @update:model-value="details.edited('lead_id')"
             />
-            <ModuleFields
+            <details
               v-if="guidance"
-              v-model="values.enabled_modules"
-              prefix="project-settings"
-              :guidance="guidance"
-              :type="values.type"
-              :error="detailsErrors.fieldErrors.value.enabled_modules"
-              :warning="moduleWarning"
-              @edit="details.edited('enabled_modules')"
-            />
+              :open="modulesOpen"
+              class="flex flex-col gap-3"
+              @toggle="modulesOpen = ($event.target as HTMLDetailsElement).open"
+            >
+              <summary
+                class="flex min-h-(--control-height) cursor-pointer flex-wrap items-center gap-x-2"
+              >
+                <!-- A flex summary draws no marker: the chevron is the open state's sign. -->
+                <Icon :name="modulesOpen ? 'chevron-down' : 'chevron-right'" />
+                <!-- Real spaces between the parts: its name reads "Modules Sprints, GitHub Edit". -->
+                <span class="font-medium">Modules</span>{{ ' '
+                }}<span class="text-text-muted">{{ modulesSummary }}</span
+                ><template v-if="!modulesOpen"
+                  >{{ ' ' }}<span class="font-medium">Edit</span></template
+                >
+              </summary>
+              <div class="pt-3">
+                <ModuleFields
+                  v-model="values.enabled_modules"
+                  prefix="project-settings"
+                  :guidance="guidance"
+                  :type="values.type"
+                  :error="detailsErrors.fieldErrors.value.enabled_modules"
+                  :warning="moduleWarning"
+                  @edit="details.edited('enabled_modules')"
+                />
+              </div>
+            </details>
             <div>
               <Button type="submit" :pending="details.pending.value">Save settings</Button>
             </div>
@@ -546,10 +582,8 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
               @edit-categories="restrict.edited('categories')"
             />
             <div>
-              <!-- Secondary: one primary button per page (UI-FRM-15), Save settings. -->
-              <Button type="submit" variant="secondary" :pending="restrict.pending.value"
-                >Save restriction</Button
-              >
+              <!-- Primary: one per form (UI-FRM-15), as Save settings. -->
+              <Button type="submit" :pending="restrict.pending.value">Save restriction</Button>
             </div>
             <SuccessStatus :message="restrict.done.value" />
             <p class="sr-only" aria-live="polite">

@@ -35,5 +35,7 @@ means the guard stopped something it should have.
 | 26 | DC-2026-11-12b review (docs-consistency) | `R=…; git -C … show …` | a variable and git in one call | separate `git -C` calls | legit (as #15) |
 | 27 | S3-C0j | `sed …; grep …; git -C … hash-object …` in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
 | 28 | S3-C0j (spec-test-writer) | a `python3` heredoc edit, then `git diff --stat`, in one call | a compound command with git in it | the Edit tool and a separate call | legit (as #15) |
+| 29 | before S3-C0l (status check) | `grep … build-plan.md; git log --oneline -1; git status -s` in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
+| 30 | S3-C0l | a `python3 -` heredoc updating `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | the Edit tool | legit (as #13, #16) |
 
 None of the blocks so far stopped anything the rules forbid.

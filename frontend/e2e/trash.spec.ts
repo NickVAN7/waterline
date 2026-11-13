@@ -55,17 +55,16 @@ test('an admin deletes a requirement with its child, and restores both from Tras
   const gone = await page.request.get(`/api/projects/${KEY}/requirements/${child.number}`)
   expect(gone.status()).toBe(404)
 
-  // Trash, last in the project's navigation, lists both; Restore brings both back.
-  await page
-    .getByRole('navigation', { name: 'Project' })
-    .getByRole('link', { name: 'Trash' })
-    .click()
-  await expect(page).toHaveURL(`/globex/projects/${KEY}/trash`)
+  // Trash, linked from the Requirements header (not the navigation, DL-350), filtered to
+  // requirements, lists both; Restore brings both back.
+  await expect(
+    page.getByRole('navigation', { name: 'Project' }).getByRole('link', { name: 'Trash' }),
+  ).toHaveCount(0)
+  await page.getByRole('main').getByRole('link', { name: 'Trash', exact: true }).click()
+  await expect(page).toHaveURL(`/globex/projects/${KEY}/trash?type=requirement`)
+  await expect(page.getByRole('combobox', { name: 'Type' })).toHaveValue('requirement')
   const rows = page.getByRole('row').filter({ hasText: stamp })
   await expect(rows).toHaveCount(2)
-  await expect(
-    page.getByRole('navigation', { name: 'Project' }).getByRole('link').last(),
-  ).toHaveText('Trash')
   await expectNoA11yViolations(page)
   await expectOnlyTokenColors(page, 'main')
   await page.getByRole('button', { name: `Restore ${parentId}` }).click()

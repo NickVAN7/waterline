@@ -11,12 +11,21 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import ActivityAction, ActivityEntityType, ProjectRole, RestrictionLevel
+from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    ApprovalEntityType,
+    ApprovalRequestStatus,
+    ProjectRole,
+    RestrictionLevel,
+)
+from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
 from app.models.user import User
 from app.services import requirement as requirement_service
+from tests.factories.approval import ApprovalRequestFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
-from tests.factories.requirement import RequirementFactory
+from tests.factories.requirement import RequirementFactory, RequirementRevisionFactory
 from tests.factories.user import UserFactory
 from tests.support.activity import activity
 from tests.support.authz import Tenancy, sign_in_as, tenancy
@@ -444,3 +453,50 @@ async def test_the_tree_stops_at_the_cap_and_says_so(
 
     assert numbers(response.json()) == [1, 2]
     assert response.json()["truncated"] is truncated
+
+
+async def requested(
+    project: Project,
+    item: Requirement,
+    by: User,
+    status: ApprovalRequestStatus,
+    bound_to: Requirement | None = None,
+) -> None:
+    """A request in `project` on `item`, bound to a revision of `bound_to` (default: `item`)."""
+    revision = await RequirementRevisionFactory.create_async(
+        requirement=bound_to or item, revision_number=1
+    )
+    await ApprovalRequestFactory.create_async(
+        project=project,
+        entity_type=ApprovalEntityType.REQUIREMENT,
+        entity_id=item.id,
+        requirement_revision_id=revision.id,
+        status=status,
+        requester=by,
+        completed_at=None if status == ApprovalRequestStatus.PENDING else datetime.now(UTC),
+    )
+
+
+async def test_the_tree_marks_only_requirements_with_a_pending_request(
+    client: AsyncClient, t: Tenancy, member: User
+) -> None:
+    """Bug: "Awaiting approval" (Q12b) set by a decided or cancelled request, by another
+    project's request, or by a pending request on another kind of entity with the same id."""
+    pending, approved, cancelled, bare = [
+        await RequirementFactory.create_async(project=t.project, number=n, rank=r)
+        for n, r in [(1, "a"), (2, "b"), (3, "c"), (4, "d")]
+    ]
+    await requested(t.project, pending, member, ApprovalRequestStatus.PENDING)
+    await requested(t.project, approved, member, ApprovalRequestStatus.APPROVED)
+    await requested(t.project, cancelled, member, ApprovalRequestStatus.CANCELLED)
+    other = await ProjectFactory.create_async(organization=t.org, key="LDG")
+    elsewhere = await RequirementFactory.create_async(project=other, number=1, rank="a")
+    await requested(other, bare, member, ApprovalRequestStatus.PENDING, bound_to=elsewhere)
+    await ApprovalRequestFactory.create_async(
+        project=t.project, entity_id=bare.id, requester=member
+    )  # a milestone's pending request (the factory's default), sharing the id
+
+    response = await client.get(REQUIREMENTS)
+
+    marked = {item["number"]: item["awaiting_approval"] for item in response.json()["items"]}
+    assert marked == {1: True, 2: False, 3: False, 4: False}

@@ -29,6 +29,7 @@ function item(number: number, title: string, parent: number | null = null): Item
     restriction_categories: [],
     current_revision_id: null,
     approved_revision_id: null,
+    awaiting_approval: false,
   }
 }
 // Top level RQ-1, RQ-2, RQ-3; RQ-4 and RQ-5 under RQ-2, in rank order.
@@ -69,6 +70,10 @@ function mountTree(items: Item[] = TREE, movable = true) {
 const rows = () => [...document.querySelectorAll<HTMLElement>('tbody tr[role=row]')]
 const shown = () => rows().map((row) => row.querySelector('td')!.textContent!.trim())
 const row = (title: string) => rows().find((r) => r.textContent!.includes(title))!
+const expandButton = () =>
+  [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
+    b.textContent!.includes('Expand'),
+  )!
 const moveButton = () => document.querySelector<HTMLButtonElement>('button[aria-haspopup=menu]')!
 const menuItems = () => [...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
 const key = (target: HTMLElement, code: string) =>
@@ -212,6 +217,26 @@ describe('RequirementsTree', () => {
       expect(cell.querySelector('span.border svg')).not.toBeNull()
     },
   )
+
+  it('shows "Awaiting approval" beside the status of a requirement with a pending request (Q12b)', async () => {
+    const tree = mountTree([
+      { ...item(1, 'Invoicing'), awaiting_approval: true },
+      { ...item(2, 'Payments'), awaiting_approval: false },
+    ])
+    await flushPromises()
+
+    const cell = (title: string) => row(title).querySelectorAll('td')[2]!
+    const badges = (title: string) =>
+      [...cell(title).querySelectorAll('span.border')].map((b) => b.textContent!.trim())
+    expect(badges('Invoicing')).toEqual(['Draft', 'Awaiting approval'])
+    expect(cell('Invoicing').querySelectorAll('span.border svg')).toHaveLength(2)
+    expect(badges('Payments')).toEqual(['Draft'])
+
+    // A request decided in the side panel takes it away.
+    tree.vm.update({ id: item(1, 'Invoicing').id, awaiting_approval: false })
+    await flushPromises()
+    expect(badges('Invoicing')).toEqual(['Draft'])
+  })
 
   it('marks the selected row with the leading bar, not color alone (UI-TOK-9)', async () => {
     mountTree()
@@ -408,7 +433,7 @@ describe('RequirementsTree', () => {
       expect(document.activeElement).toBe(moveButton())
     })
 
-    it('blocks the Move button, with its reason, until a row is selected (UI-TOK-10)', async () => {
+    it('blocks the Move button, with the one hint for both buttons, until a row is selected (UI-TOK-10, S3-C0l)', async () => {
       const post = vi.spyOn(client, 'POST')
       mountTree()
       await flushPromises()
@@ -418,7 +443,10 @@ describe('RequirementsTree', () => {
 
       expect(moveButton().getAttribute('aria-disabled')).toBe('true')
       const reason = document.getElementById(moveButton().getAttribute('aria-describedby')!)
-      expect(reason!.textContent).toBe('Select a requirement to move it.')
+      expect(reason!.textContent).toBe('Select a requirement to expand or move it.')
+      // One visible hint, not one per button.
+      expect(expandButton().getAttribute('aria-describedby')).toBe(reason!.id)
+      expect(document.body.textContent!.split('Select a requirement').length).toBe(2)
       expect(menuItems()).toEqual([])
       expect(post).not.toHaveBeenCalled()
     })
@@ -788,10 +816,6 @@ describe('RequirementsTree', () => {
     // `count` leaves titled `<prefix> <n>` under `parent`, numbered from `from`.
     const leaves = (parent: number, from: number, count: number, prefix: string) =>
       Array.from({ length: count }, (_, n) => item(from + n, `${prefix} ${n + 1}`, parent))
-    const expandButton = () =>
-      [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
-        b.textContent!.includes('Expand'),
-      )!
     const note = () => document.querySelector('p[aria-live=polite]')!.textContent!.trim()
     const openByHand = async (title: string) => {
       key(row(title), 'ArrowRight')
@@ -805,10 +829,18 @@ describe('RequirementsTree', () => {
       const button = expandButton()
       expect(button.getAttribute('aria-disabled')).toBe('true')
       const reason = document.getElementById(button.getAttribute('aria-describedby')!)!
-      expect(reason.textContent!.trim()).toBe('Select a requirement to expand it.')
+      expect(reason.textContent!.trim()).toBe('Select a requirement to expand or move it.')
       button.click()
       await flushPromises()
       expect(shown()).toEqual(['Invoicing', 'Payments', 'Reporting'])
+    })
+
+    it('says only "expand" to someone who may not move requirements', async () => {
+      mountTree(DEEP, false)
+      await flushPromises()
+
+      const reason = document.getElementById(expandButton().getAttribute('aria-describedby')!)!
+      expect(reason.textContent!.trim()).toBe('Select a requirement to expand it.')
     })
 
     it('is blocked on a requirement with nothing under it', async () => {

@@ -572,3 +572,23 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expectOnlyTokenColors(page, '[role=tabpanel]')
   await expectNoA11yViolations(page)
 })
+
+// At 320 CSS px the tree reflows (WCAG 1.4.10, UI-SHL-7): the IDs don't wrap and a row can hold
+// two badges ("Awaiting approval", S3-C0l), yet nothing scrolls the page sideways. The demo's
+// PORTAL has a requirement awaiting approval; a nested branch adds the indent.
+test('the requirement tree reflows at 320 px', async ({ page }, testInfo) => {
+  const { user, key } = runFor(testInfo)
+  await signIn(page, user)
+  const top = await createRequirement(page, key, 'Reflow parent with a long title to wrap')
+  const middle = await createRequirement(page, key, 'Reflow child', top.id)
+  await createRequirement(page, key, 'Reflow grandchild with a long title', middle.id)
+
+  await page.setViewportSize({ width: 320, height: 640 })
+  await page.goto(`/acme/projects/${key}/requirements`)
+  // The title selects the row; at this width a click on the row's middle lands on its ID link.
+  await page.getByText('Reflow parent with a long title to wrap', { exact: true }).click()
+  await page.getByRole('button', { name: 'Expand requirement' }).click()
+  await expect(page.getByRole('row', { name: /Reflow grandchild/ })).toBeVisible()
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+})

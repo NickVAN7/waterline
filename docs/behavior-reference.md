@@ -41,8 +41,8 @@ Every page after sign-in has the same frame:
   list) for the organization's project list. With more than eight, **Filter projects** shows a
   field that narrows the list as you type.
   Once you're in a project, its pages are listed below the selector: **Home**, **Requirements**
-  (if you may read its content), **Members**, **Settings** (if you may change any of its
-  settings), and last **Trash** (if you may read its content).
+  (if you may read its content), **Members**, and **Settings** (if you may change any of its
+  settings). Trash isn't listed: it's a link on the Requirements page.
 - **The trail**, above a page's title on every page below the top ones: where the page is, each
   step a link back (for example **Acme Manufacturing › Customer Portal › Requirements ›
   PORTAL-RQ-3**, a nested requirement's parents included). On a narrow screen the middle steps
@@ -112,7 +112,12 @@ or a lowercase key takes you to the project's own address. A project you can't s
 not found", the same as one that doesn't exist.
 
 **Requirements**, in the sidebar under the project (`/<organization>/projects/<KEY>/requirements`),
-shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status. It opens with only the top-level
+shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status, and
+**Awaiting approval** beside the status while an approval request on it is pending (a request
+made, cancelled, or decided in the side panel shows there at once). **Expand requirement** and
+**Move** sit at the right, above the tree; until you select a row, one line before them says
+"Select a requirement to expand or move it." ("…to expand it." if you can't move requirements).
+It opens with only the top-level
 requirements showing: open a branch with its arrow, or with the Right arrow key on its row
 (Left closes it). To open a requirement's whole branch at once, select its row and choose
 **Expand requirement**; the button says "Expanding…" until it's done. It opens up to 500 rows
@@ -231,7 +236,8 @@ shows it for you to decide on:
 
 The Approval section waits while you edit, as Change status does.
 
-Below the Approval section, the **History** tab lists every change to the requirement, newest first,
+Below the Approval section, the **History** tab lists every change to the requirement, a line
+between entries, newest first,
 with who made it and when: "Ben Ortiz changed the status from Draft to In progress". A person
 since deactivated keeps their name, with "Deactivated" after it, and a change made by an app
 command reads **System**. A move names the old and the new parent by their IDs ("changed the
@@ -243,7 +249,8 @@ in its History the next time you open it.
 
 The **Revisions** tab beside it lists the saved versions of the title and description, newest
 first: each one's number, who saved it and when, and its change note ("No change note." when
-there's none); **Show more** adds older ones. **Compare revisions** shows what changed between
+there's none), a line between them; **Show more** adds older ones. **Compare revisions**, in a box
+above the list, shows what changed between
 any two: pick them in **From** and **To** (the older one is always From). It opens on the current revision against the one before, or, when the
 requirement is "Approved · modified", on the approved revision against the current one; a
 revision's **Compare revision 3 with revision 2** picks it against the one before. The title
@@ -264,8 +271,12 @@ when they go too) is cancelled; restoring doesn't bring the request back. **Dele
 deletes it and opens the requirements tree, which says "ERP-RQ-7 moved to Trash." with **Open
 Trash**. A link to a deleted requirement shows the page-not-found page.
 
-**Trash**, last in the sidebar under the project (`/<organization>/projects/<KEY>/trash`), lists
-the deleted requirements you may restore, newest first: each one's ID and title, who deleted it
+**Trash**, a link at the top of the Requirements page beside **New requirement**
+(`/<organization>/projects/<KEY>/trash?type=requirement`), lists the deleted items you may
+restore, newest first, filtered to requirements: **Type** above the list shows the filter, and
+**Any type** removes it (requirements are the only type until tasks arrive). When nothing matches,
+the page says "No deleted items match Type: Requirement", with **Clear filter**. The trail leads
+back to Requirements. Each row shows the item's ID and title, who deleted it
 ("Deactivated" after someone since deactivated; **System** for an app command), and when.
 Project admins see everything; a member sees the never-approved requirements they reported. One
 that would bring back a child you couldn't restore yourself is listed without **Restore**.
@@ -284,11 +295,12 @@ admins) can also:
   **Deactivated**. An archived project's list has no **Show deactivated**: it shows its active
   members only.
 
-- **Add member**: the list of the organization's members and the workspace's staff opens as soon
-  as you're in the field; type a name, email, or username to narrow it, choose one, and give them
-  a role.
+- **Add member**: the dialog starts on its title; the list of the organization's members and the
+  workspace's staff opens as soon as you move into the field. Type a name, email, or username to
+  narrow it, choose one, and give them a role (**Member** to start).
 - **Add by email**: works as **Add person** does under workspace administration (the email
-  first, then either an existing account or a new one with a temporary password, shown once).
+  first, then either an existing account or a new one with a temporary password, shown once),
+  the role **Member** to start.
   An account from outside the organization is added only after you confirm adding them to the
   organization too, as a member.
 - On an export-controlled project, every add first asks you to check that the person is
@@ -312,15 +324,17 @@ admins) can also:
   modules, never data or the modules on), status (for information only), lead, and modules,
   then **Save settings**. The lead is one of the project's active members, or **No lead**, which
   is flagged. A deactivated lead stays the lead, marked "Deactivated", until you name someone
-  else. A module that isn't built yet is greyed
+  else. **Modules** is one line, the modules turned on ("None turned on" if none) and **Edit**,
+  until you open it (it opens by itself to show an error); a module that isn't built yet is greyed
   out, with "Not available yet". Turning off
   a module that holds data, or one recommended for the type, warns you what will be hidden;
   nothing is deleted, and turning it back on brings everything back.
-- **Restriction** (project admins): the level and categories, then **Save restriction**. Export
+- **Restriction** (project admins): the level and categories, then **Save restriction** (a
+  primary button, as **Save settings** is). Export
   control isn't offered here; a project is made export-controlled only through the API, and
   saving keeps it. On an export-controlled project, system, workspace, and organization admins without a membership
-  can manage it but not see its content (Requirements and Trash leave their sidebar, and those
-pages say they can't open them), and may only raise its restriction: lowering the level
+  can manage it but not see its content (Requirements leaves their sidebar, and it and Trash
+  say they can't open them), and may only raise its restriction: lowering the level
   or removing a category needs one of its explicit project admins.
 - **Danger zone** (organization owners and admins), set apart at the bottom: **Archive
   project**, once confirmed with the red **Archive project** button, makes it read-only for

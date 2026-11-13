@@ -42,7 +42,7 @@ const FORBIDDEN = failed(403, { code: 'forbidden', message: '', details: {} })
 const NOT_FOUND = failed(404, { code: 'not_found', message: '', details: {} })
 
 /** Mounts the page; `projects` and `trashes` answer the GETs in turn, the last repeating. */
-async function mountAt(projects: Project[], trashes: unknown[]) {
+async function mountAt(projects: Project[], trashes: unknown[], at = '/acme/projects/ERP/trash') {
   useCurrentUserStore().me = me()
   const answers = { project: projects.map((p) => ok(p)), trash: [...trashes] }
   const next = (list: unknown[]) => (list.length > 1 ? list.shift() : list[0])
@@ -68,6 +68,11 @@ async function mountAt(projects: Project[], trashes: unknown[]) {
         name: 'project-requirement',
         component: Page,
       },
+      {
+        path: '/:orgSlug/projects/:key/requirements',
+        name: 'project-requirements',
+        component: Page,
+      },
     ]),
   })
   installRouteFocus(router)
@@ -76,9 +81,9 @@ async function mountAt(projects: Project[], trashes: unknown[]) {
     { template: '<main><RouterView /></main>' },
     { global: { plugins: [router] }, attachTo: document.body },
   )
-  await router.push('/acme/projects/ERP/trash')
+  await router.push(at)
   await flushPromises()
-  return { wrapper, get }
+  return { wrapper, get, router }
 }
 
 type Spy = { mock: { calls: unknown[][] } }
@@ -114,14 +119,17 @@ describe('TrashView', () => {
     )
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout trash')
-    // Its trail (DL-327, UI-SHL-14).
+    // Its trail (DL-327, UI-SHL-14), back to the list (DL-350).
     expect(trail()).toEqual({
       links: [
         ['Acme Manufacturing', '/acme/projects'],
         ['ERP rollout', '/acme/projects/ERP'],
+        ['Requirements', '/acme/projects/ERP/requirements'],
       ],
       current: 'Trash',
     })
+    // No explanation under the title (S3-C0l).
+    expect(wrapper.text()).not.toContain('stay here until')
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(trashCalls(get)[0]![1]).toEqual({
       params: { path: { key: 'ERP' }, query: { limit: 25, offset: 0 } },
@@ -137,6 +145,93 @@ describe('TrashView', () => {
     expect(document.querySelectorAll('tbody a')).toHaveLength(0)
     await vi.waitFor(() => expect(wrapper.text()).toContain('2 items in the trash'))
     await expectNoA11yViolations(wrapper)
+  })
+
+  describe('the Type filter (DL-350)', () => {
+    const typeSelect = () => document.querySelector<HTMLSelectElement>('#trash-type')!
+
+    it('opens filtered from a list page, and sends the type', async () => {
+      const { get } = await mountAt(
+        [READER],
+        [page([row(3, 'Refunds')])],
+        '/acme/projects/ERP/trash?type=requirement',
+      )
+
+      expect(typeSelect().value).toBe('requirement')
+      expect(trashCalls(get)[0]![1]).toEqual({
+        params: { path: { key: 'ERP' }, query: { limit: 25, offset: 0, type: ['requirement'] } },
+      })
+      await expectNoA11yViolations(document.body)
+    })
+
+    it('removes the filter, keeping focus on it', async () => {
+      const { get, router } = await mountAt(
+        [READER],
+        [page([row(3, 'Refunds')])],
+        '/acme/projects/ERP/trash?type=requirement',
+      )
+      typeSelect().focus()
+
+      typeSelect().value = ''
+      typeSelect().dispatchEvent(new Event('change'))
+      await flushPromises()
+
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/trash')
+      expect(trashCalls(get).at(-1)![1]).toEqual({
+        params: { path: { key: 'ERP' }, query: { limit: 25, offset: 0 } },
+      })
+      expect(document.activeElement).toBe(typeSelect())
+    })
+
+    it('says a filter change is loading, though the count it ends on may be the same (UI-TBL-3)', async () => {
+      // The second load never ends: the page stays on what it says while loading.
+      await mountAt(
+        [READER],
+        [page([row(3, 'Refunds')]), new Promise(() => {})],
+        '/acme/projects/ERP/trash?type=requirement',
+      )
+      const live = () =>
+        [...document.querySelectorAll('p[aria-live=polite]')].map((p) => p.textContent!.trim())
+      expect(live()).toContain('1 item in the trash')
+
+      typeSelect().value = ''
+      typeSelect().dispatchEvent(new Event('change'))
+      await flushPromises()
+
+      expect(live()).toContain('Loading the trash…')
+    })
+
+    it('ignores a type it does not know', async () => {
+      const { get } = await mountAt(
+        [READER],
+        [page([])],
+        '/acme/projects/ERP/trash?type=constructor',
+      )
+
+      expect(typeSelect().value).toBe('')
+      expect(trashCalls(get)[0]![1]).toEqual({
+        params: { path: { key: 'ERP' }, query: { limit: 25, offset: 0 } },
+      })
+    })
+
+    it('names the filter when nothing matches, and Clear filter goes back to it', async () => {
+      const { router } = await mountAt(
+        [READER],
+        [page([])],
+        '/acme/projects/ERP/trash?type=requirement',
+      )
+
+      expect(document.querySelector('h3')!.textContent).toBe(
+        'No deleted items match Type: Requirement',
+      )
+      ;[...document.querySelectorAll<HTMLButtonElement>('button')]
+        .find((b) => b.textContent!.trim() === 'Clear filter')!
+        .click()
+      await flushPromises()
+
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/trash')
+      expect(document.activeElement).toBe(typeSelect())
+    })
   })
 
   it('marks a deactivated deleter (TD-77)', async () => {

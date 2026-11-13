@@ -69,14 +69,17 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('AddMemberDialog: the picker', () => {
-  it('starts on the person, a labelled combobox, with the role defaulting to the lowest', async () => {
+  it('starts on its title, the list closed, with a labelled combobox and the role at Member (S3-C0l)', async () => {
     const { wrapper } = await openDialog()
 
     expect(wrapper.get('h2').text()).toBe('Add a member')
+    // Not the picker, whose list opens on focus (DL-137).
+    expect(document.activeElement).toBe(wrapper.get('h2').element)
+    expect(document.querySelector('[role=listbox]')).toBeNull()
     const input = wrapper.get('#add-member-person')
     expect(input.attributes('role')).toBe('combobox')
     expect(wrapper.get('label[for="add-member-person"]').text()).toContain('Person')
-    expect(wrapper.get<HTMLSelectElement>('#add-member-role').element.value).toBe('viewer')
+    expect(wrapper.get<HTMLSelectElement>('#add-member-role').element.value).toBe('member')
     await expectNoA11yViolations(wrapper)
   })
 
@@ -98,8 +101,12 @@ describe('AddMemberDialog: the picker', () => {
   })
 
   it('opens its list of candidates on focus, before anything is typed (DL-137)', async () => {
-    // The dialog starts on the picker (UI-FRM-14), so opening it focuses the picker.
+    // The dialog starts on its title (S3-C0l): the list opens when the user moves to the picker.
     const { wrapper, get } = await openDialog()
+    expect(get).not.toHaveBeenCalledWith('/api/projects/{key}/member-candidates', expect.anything())
+
+    wrapper.get<HTMLInputElement>('#add-member-person').element.focus()
+    await flushPromises()
 
     expect(document.activeElement?.id).toBe('add-member-person')
     // No `q`: the API refuses an empty one.
@@ -188,7 +195,7 @@ describe('AddMemberDialog: the picker', () => {
 
     await wrapper.get('input[type=checkbox]').setValue(true)
     await submit(wrapper)
-    expect(body(post)).toEqual({ role: 'viewer', user_id: 'u-ann', export_control_confirmed: true })
+    expect(body(post)).toEqual({ role: 'member', user_id: 'u-ann', export_control_confirmed: true })
   })
 
   it('tells the page on a 403, so it reloads what the user may do (UI-FRM-7)', async () => {

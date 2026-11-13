@@ -623,11 +623,10 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
   fill in the rest.
 - **Project navigation** stays **flat** in v1, in this order (a turned-off or unshipped
   module's entry is left out): Home, Requirements, Tasks (Board and Backlog as tabs),
-  Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings,
-  and **Trash at the bottom** of the list (changes DL-146, which linked Trash from the
-  requirements page header instead of the project pages). From S3-C0l, Trash leaves the
-  navigation: each list page whose items can be deleted links to it from its header, filtered
-  to that page's type (DL-350). Grouping the navigation is a later change if it gets crowded.
+  Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings.
+  **Trash isn't in the navigation:** each list page whose items can be deleted links to it from
+  its header, filtered to that page's type (DL-350, built in S3-C0l; it was last in the list
+  from DL-202). Grouping the navigation is a later change if it gets crowded.
 
 ### Shell, account, and errors
 
@@ -682,7 +681,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 | Phases; milestones, gates, releases | section of Timeline | `…/:key/timeline` | 3 (phases), 4 | — |
 | Repositories (connect, webhook health, disconnect) | section of Settings | `…/:key/settings` | 7 | — |
 | Activity feed | page | `…/:key/activity` | 3 | — |
-| Trash | page (bottom of the project nav; from S3-C0l, linked from each list page's header instead, filtered to its type, DL-350) | `…/:key/trash` | 2 (tasks 3) | Built (S2-C21; the header links in S3-C0l) |
+| Trash | page (linked from each list page's header, filtered to its type, DL-350) | `…/:key/trash` | 2 (tasks 3) | Built (S2-C21; the header link S3-C0l) |
 
 ### Requirements and approvals
 

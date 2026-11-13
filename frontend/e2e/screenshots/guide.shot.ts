@@ -28,7 +28,7 @@ const SHOTS: Shot[] = [
   },
   { name: 'approval', user: 'ella', path: '/acme/projects/PORTAL/requirements/4' },
   { name: 'project-members', user: 'lena', path: '/acme/projects/PORTAL/members' },
-  { name: 'trash', user: 'lena', path: '/acme/projects/PORTAL/trash' },
+  { name: 'trash', user: 'lena', path: '/acme/projects/PORTAL/trash?type=requirement' },
   { name: 'account', user: 'sam', path: '/account' },
   { name: 'org-overview', user: 'olivia', path: '/acme/overview' },
   { name: 'workspace-users', user: 'wendy', path: '/workspace/users' },

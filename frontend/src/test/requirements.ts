@@ -19,6 +19,7 @@ export function requirementItem(number: number, title: string, parent: number | 
     restriction_categories: [],
     current_revision_id: null,
     approved_revision_id: null,
+    awaiting_approval: false,
   }
 }
 

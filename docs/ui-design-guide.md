@@ -484,8 +484,8 @@ render inside the full shell when signed in.
   underlined) and "New project" (only when allowed; not indented) (DL-137). In the sidebar the
   selector fills its width, its arrow at the end (owner, S2 feedback; S3-C0j). Below it, the selected project's pages
   are links, flat, in this order (DL-202): Home, Requirements, Tasks (Board and Backlog as tabs),
-  Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings,
-  and Trash last; from S3-C0l, Trash leaves the list for a link in each list page's header
+  Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings;
+  Trash isn't listed: each list page whose items can be deleted links it from its header
   (DL-350). Each
   appears once its feature is built, and a turned-off or unshipped module's page is left out. A module that isn't
   shipped can't be enabled (DL-136), so a module page appears only once its module has shipped
@@ -719,7 +719,9 @@ render inside the full shell when signed in.
   checked live (UI-FRM-9). The member table has separate Name and Email columns.
 - **UI-FRM-14** **Dialogs:** native `<dialog>` opened with `showModal()`, so Esc closes and the
   page behind is inert (focus stays in the dialog; the browser's Tab may cycle through its own
-  UI, which is expected). Initial focus goes to the first field in a form dialog; a confirmation
+  UI, which is expected). Initial focus goes to the first field in a form dialog, or to its
+  title when that field opens a list on focus (Add a member's picker, DL-378; `ModalDialog`'s
+  `startOnTitle`); a confirmation
   dialog starts on its Cancel button, even when it holds a field such as a confirm checkbox
   (DL-115), and a confirmation step inside a dialog (an existing account, joining the
   organization) starts on its Back button (DL-117). When a dialog moves to a new step, the step's
@@ -732,7 +734,9 @@ render inside the full shell when signed in.
   destructive action on a settings page (archiving a project) sits in a **"Danger zone"**
   section with a danger-tone border and heading (DL-137; from S2-C0h). An archived project's
   Unarchive stays there, the one button changing in place so focus stays on it (DL-186).
-- **UI-FRM-15** **Buttons:** one primary button per view or dialog. A submit button is
+- **UI-FRM-15** **Buttons:** one primary button per form or dialog: a page with several forms
+  that each save on their own (project settings' **Save settings** and **Save restriction**)
+  gives each form's submit the primary tone (DL-377). A submit button is
   `type="submit"` and Enter submits; every other button is `type="button"`. Navigation is a
   link, an action is a button. Don't disable a submit button because the form is invalid: users
   can't tell why, so let them submit and show the errors. **Exception:** an export-control

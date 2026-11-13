@@ -6,10 +6,11 @@
 // `fallbackFocus()`; an action that navigates away closes with `close({ returnFocus: false })`,
 // so the new page's `h1` keeps focus (the close event comes later, in its own task). `m-auto`
 // centers it in the viewport: the base styles' reset drops the browser's own (DL-137). An item's
-// side panel is `ItemPanel`'s own (UI-SHL-11).
+// side panel is `ItemPanel`'s own (UI-SHL-11). `startOnTitle`: initial focus on the title instead,
+// for a dialog whose first field opens a list on focus (Add a member's picker; UI-FRM-14, S3-C0l).
 import { nextTick, ref, useId } from 'vue'
 
-const props = defineProps<{ title: string; fallbackFocus?: () => void }>()
+const props = defineProps<{ title: string; fallbackFocus?: () => void; startOnTitle?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const dialog = ref<HTMLDialogElement>()
@@ -62,7 +63,14 @@ defineExpose({ open, close })
     @close="closed"
   >
     <div class="flex flex-col gap-4 p-6">
-      <h2 :id="titleId" class="m-0 text-xl font-semibold">{{ title }}</h2>
+      <h2
+        :id="titleId"
+        :tabindex="startOnTitle ? -1 : undefined"
+        :data-autofocus="startOnTitle ? '' : undefined"
+        class="m-0 text-xl font-semibold"
+      >
+        {{ title }}
+      </h2>
       <slot />
     </div>
   </dialog>

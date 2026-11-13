@@ -14,7 +14,8 @@
 // as a navigation does (UI-SHL-9). Loading, the not-found page, and the redirect are
 // `useProjectPage`'s. A requirement deleted in the panel, or on its page (which comes here with
 // `history.state.deleted`), is said once the page is there, with a link to Trash, and focus is
-// on the `h1` (DL-287).
+// on the `h1` (DL-287). Trash is a link in the header, under the same check as the page, opening
+// Trash filtered to requirements (DL-350).
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import {
   onBeforeRouteLeave,
@@ -157,6 +158,11 @@ function shownChanged(requirement: Requirement) {
   const { id, title, status, priority, current_revision_id, approved_revision_id } = requirement
   treeView.value?.update({ id, title, status, priority, current_revision_id, approved_revision_id })
 }
+// A request made, cancelled, or decided in the panel shows in the tree's "Awaiting approval".
+function awaitingChanged(number: number, pending: boolean) {
+  const row = tree.data.value?.items.find((item) => item.number === number)
+  if (row) treeView.value?.update({ id: row.id, awaiting_approval: pending })
+}
 // Where a deleted requirement went: set in another task once the page is there, so the live region
 // that holds it is read (UI-FRM-6).
 const done = ref('')
@@ -202,95 +208,110 @@ async function panelDeleted(id: string) {
     />
     <template v-else>
       <ProjectHeader :trail="[{ label: 'Requirements' }]" :project="loaded" page="requirements">
+        <RouterLink
+          :to="{
+            name: 'project-trash',
+            params: { key: loaded.key },
+            query: { type: 'requirement' },
+          }"
+          class="flex min-h-(--control-height) items-center px-2 font-medium"
+          >Trash</RouterLink
+        >
         <Button v-if="allows(loaded, 'requirement.create')" @click="creating?.open()"
           >New requirement</Button
         >
       </ProjectHeader>
-      <SuccessStatus :message="done">
-        <RouterLink
-          :to="{ name: 'project-trash', params: { key: loaded.key } }"
-          class="ml-1 underline"
-          >Open Trash</RouterLink
-        >
-      </SuccessStatus>
-      <!-- At 64rem and wider the panel is a split pane beside the tree (DL-321). -->
-      <div class="flex items-start">
-        <section
-          aria-labelledby="requirements-heading"
-          :aria-busy="tree.loading.value && !tree.data.value ? 'true' : 'false'"
-          class="flex min-w-0 flex-1 flex-col gap-3"
-        >
-          <h2 id="requirements-heading" class="sr-only">Requirement tree</h2>
-          <ErrorState
-            v-if="tree.error.value"
-            :key="tree.failures.value"
-            :live="tree.failures.value > 1 || !!tree.data.value"
-            thing="the requirements"
-            :pending="tree.loading.value"
-            @retry="tree.retry"
-          />
-          <Skeleton v-else-if="!tree.data.value" />
-          <EmptyState
-            v-else-if="!tree.data.value.items.length"
-            heading="No requirements yet"
-            :level="3"
+      <!-- One gap under the header, not two: the success line adds its own only when it shows
+           (S3-C0l: the space between the title and the tree). -->
+      <div class="flex flex-col">
+        <SuccessStatus :message="done" class="not-empty:mb-3">
+          <RouterLink
+            :to="{ name: 'project-trash', params: { key: loaded.key } }"
+            class="ml-1 underline"
+            >Open Trash</RouterLink
           >
-            {{
-              allows(loaded, 'requirement.create')
-                ? 'Requirements you add show here, as a tree. Create one with New requirement, above.'
-                : "Requirements added to this project show here, as a tree. The project's members and admins can add them."
-            }}
-          </EmptyState>
-          <template v-else>
-            <Alert v-if="tree.data.value.truncated" tone="info">
-              This project has more than 2,000 requirements. The tree shows the first 2,000.
-            </Alert>
-            <RequirementsTree
-              ref="treeView"
-              :project-key="loaded.key"
-              :items="tree.data.value.items"
-              :movable="allows(loaded, 'requirement.update')"
-              :open-number="panelNumber"
-              @stale="tree.run"
-              @refused="reloadProject"
+        </SuccessStatus>
+        <!-- At 64rem and wider the panel is a split pane beside the tree (DL-321). -->
+        <div class="flex items-start">
+          <section
+            aria-labelledby="requirements-heading"
+            :aria-busy="tree.loading.value && !tree.data.value ? 'true' : 'false'"
+            class="flex min-w-0 flex-1 flex-col gap-3"
+          >
+            <h2 id="requirements-heading" class="sr-only">Requirement tree</h2>
+            <ErrorState
+              v-if="tree.error.value"
+              :key="tree.failures.value"
+              :live="tree.failures.value > 1 || !!tree.data.value"
+              thing="the requirements"
+              :pending="tree.loading.value"
+              @retry="tree.retry"
             />
-          </template>
-        </section>
-        <ItemPanel
-          v-if="panelNumber"
-          ref="panel"
-          :title="shown?.title ?? `${loaded.key}-RQ-${panelNumber}`"
-          :label="`Requirement ${loaded.key}-RQ-${panelNumber}`"
-          :full-page="{
-            name: 'project-requirement',
-            params: { key: loaded.key, number: panelNumber },
-          }"
-          :fallback-focus="focusHeading"
-          @dismiss="closePanel"
-          @closed="panelClosed"
-        >
-          <template #meta>
-            <span class="font-mono text-text-muted">{{ `${loaded.key}-RQ-${panelNumber}` }}</span>
-            <Badge
-              v-if="shown"
-              :tone="requirementStatusBadge(shown).tone"
-              :icon="requirementStatusBadge(shown).icon"
-              ><span class="sr-only">Status: </span>{{ requirementStatusBadge(shown).label }}</Badge
+            <Skeleton v-else-if="!tree.data.value" />
+            <EmptyState
+              v-else-if="!tree.data.value.items.length"
+              heading="No requirements yet"
+              :level="3"
             >
-          </template>
-          <RequirementDetail
-            ref="detail"
-            :key="panelNumber"
-            in-panel
-            :project="loaded"
-            :number="panelNumber"
-            :reload-project="reloadProject"
-            :focus-heading="() => panel?.focusTitle()"
-            @changed="shownChanged"
-            @gone="tree.run"
-            @deleted="panelDeleted"
-          />
-        </ItemPanel>
+              {{
+                allows(loaded, 'requirement.create')
+                  ? 'Requirements you add show here, as a tree. Create one with New requirement, above.'
+                  : "Requirements added to this project show here, as a tree. The project's members and admins can add them."
+              }}
+            </EmptyState>
+            <template v-else>
+              <Alert v-if="tree.data.value.truncated" tone="info">
+                This project has more than 2,000 requirements. The tree shows the first 2,000.
+              </Alert>
+              <RequirementsTree
+                ref="treeView"
+                :project-key="loaded.key"
+                :items="tree.data.value.items"
+                :movable="allows(loaded, 'requirement.update')"
+                :open-number="panelNumber"
+                @stale="tree.run"
+                @refused="reloadProject"
+              />
+            </template>
+          </section>
+          <ItemPanel
+            v-if="panelNumber"
+            ref="panel"
+            :title="shown?.title ?? `${loaded.key}-RQ-${panelNumber}`"
+            :label="`Requirement ${loaded.key}-RQ-${panelNumber}`"
+            :full-page="{
+              name: 'project-requirement',
+              params: { key: loaded.key, number: panelNumber },
+            }"
+            :fallback-focus="focusHeading"
+            @dismiss="closePanel"
+            @closed="panelClosed"
+          >
+            <template #meta>
+              <span class="font-mono text-text-muted">{{ `${loaded.key}-RQ-${panelNumber}` }}</span>
+              <Badge
+                v-if="shown"
+                :tone="requirementStatusBadge(shown).tone"
+                :icon="requirementStatusBadge(shown).icon"
+                ><span class="sr-only">Status: </span
+                >{{ requirementStatusBadge(shown).label }}</Badge
+              >
+            </template>
+            <RequirementDetail
+              ref="detail"
+              :key="panelNumber"
+              in-panel
+              :project="loaded"
+              :number="panelNumber"
+              :reload-project="reloadProject"
+              :focus-heading="() => panel?.focusTitle()"
+              @changed="shownChanged"
+              @awaiting="(pending: boolean) => awaitingChanged(panelNumber!, pending)"
+              @gone="tree.run"
+              @deleted="panelDeleted"
+            />
+          </ItemPanel>
+        </div>
       </div>
       <ConfirmDialog ref="discarding" />
       <!-- Not behind the create action: a 403 may reload it away while the dialog is open. -->

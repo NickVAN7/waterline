@@ -238,7 +238,7 @@ describe('ProjectMembersView', () => {
 
     expect((post.mock.calls[0]![1] as { body: unknown }).body).toEqual({
       email: 'out@else.example',
-      role: 'viewer',
+      role: 'member',
       export_control_confirmed: true,
     })
   })
@@ -371,7 +371,7 @@ describe('ProjectMembersView', () => {
         name: 'Jane Doe',
         username: 'jane-doe',
         password: 'fake-fake-fake-01',
-        role: 'viewer',
+        role: 'member',
         export_control_confirmed: true,
       },
     })
@@ -480,7 +480,7 @@ describe('ProjectMembersView', () => {
 
     expect((post.mock.calls[1]![1] as { body: unknown }).body).toEqual({
       email: 'out@else.example',
-      role: 'viewer',
+      role: 'member',
     })
     expect(wrapper.text()).toContain('out@else.example added to the project.')
   })

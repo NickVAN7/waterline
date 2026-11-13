@@ -47,6 +47,22 @@ describe('ModalDialog', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it('starts on its title instead with startOnTitle, a field before it no matter', async () => {
+    const wrapper = mount(ModalDialog, {
+      props: { title: 'Add a member', startOnTitle: true },
+      slots: { default: '<input id="f" aria-label="Field" data-autofocus />' },
+      attachTo: document.body,
+    })
+
+    await wrapper.vm.open()
+    await flushPromises()
+
+    const title = wrapper.get('h2').element
+    expect(document.activeElement).toBe(title)
+    expect(title.getAttribute('tabindex')).toBe('-1')
+    await expectNoA11yViolations(wrapper)
+  })
+
   it('puts focus on its first field', async () => {
     const wrapper = mountPage(
       '<input id="f" aria-label="Field" /><button type="button">Go</button>',

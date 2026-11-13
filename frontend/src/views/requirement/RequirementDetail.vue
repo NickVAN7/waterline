@@ -68,7 +68,13 @@ const props = defineProps<{
   reloadProject: () => Promise<boolean>
   focusHeading: () => void | Promise<void>
 }>()
-const emit = defineEmits<{ changed: [requirement: Requirement]; gone: []; deleted: [id: string] }>()
+const emit = defineEmits<{
+  changed: [requirement: Requirement]
+  // Whether a request on it is pending, for the tree's row (ApprovalSection's `awaiting`).
+  awaiting: [pending: boolean]
+  gone: []
+  deleted: [id: string]
+}>()
 
 const item = useLoad(() =>
   api(
@@ -436,7 +442,13 @@ function restrictionSaved(saved: Requirement) {
           </dd>
         </div>
       </dl>
-      <section v-if="!editing" :aria-labelledby="descriptionId" class="flex flex-col gap-3">
+      <!-- Each part below the details starts at a rule, with room above it, so the page doesn't
+           read as one block of text (S3-C0l). -->
+      <section
+        v-if="!editing"
+        :aria-labelledby="descriptionId"
+        class="flex flex-col gap-3 border-t border-border-subtle pt-6"
+      >
         <!-- An h2 in the panel too, beside its title: the description's own headings start at h3
              (`level` 2, UI-MD-1), so they stay under it. -->
         <h2 :id="descriptionId" class="m-0 text-lg font-semibold">Description</h2>
@@ -458,11 +470,13 @@ function restrictionSaved(saved: Requirement) {
         :requirement="requirement"
         :reload-page="reload"
         :reload-requirement="item.run"
+        class="border-t border-border-subtle pt-6"
         @changed="approvalChanged"
+        @awaiting="(pending: boolean) => emit('awaiting', pending)"
       />
       <!-- Below the details and description, on the page and in the panel, opening on History; the
            tab isn't in the URL (DL-268, DL-269). -->
-      <Tabs v-model:value="tab">
+      <Tabs v-model:value="tab" class="border-t border-border-subtle pt-6">
         <TabList :pt="{ content: { 'aria-label': 'About this requirement' } }">
           <Tab value="history">History</Tab>
           <Tab value="revisions">Revisions</Tab>

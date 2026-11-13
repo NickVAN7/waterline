@@ -4686,3 +4686,38 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide §1, UI-SVR-2, UI-SVR-5, UI-SVR-6, §10 item 5(c)
 - **Source:** owner, Nov 12, 2026 (DC-2026-11-12e's docs-consistency decision 1, option b)
+
+### DL-376: The tree's indicator reads "Awaiting approval"
+- **Date:** 2026-11-13
+- **Decision:** A requirement with a pending approval request shows an **Awaiting approval**
+  badge beside its status on the tree (Q12b's badge), from `awaiting_approval` on the tree row;
+  S3-C26's filter uses the same words. Settles the Slice 3 plan review's open item 8 ("Approval
+  pending" vs "Awaiting approval").
+- **Supersedes:** Q12b's wording ("Approval pending")
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0l, S3-C26); `docs/reviews/design-changes/DC-2026-11-10-slice-3-plan.md` (item 8)
+- **Source:** owner, Nov 13, 2026 (S3-C0l)
+
+### DL-377: One primary button per form
+- **Date:** 2026-11-13
+- **Decision:** UI-FRM-15 allows one primary button per form or dialog, not per view: a page with
+  several forms that each save on their own gives each form's submit the primary tone, as
+  project settings' **Save restriction** now has beside **Save settings** (the owner's S2
+  feedback).
+- **Supersedes:** UI-FRM-15's "one primary button per view or dialog"
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-15
+- **Source:** owner, Nov 13, 2026 (S3-C0l)
+
+### DL-378: Adding a project member starts on the dialog's title, the role at Member
+- **Date:** 2026-11-13
+- **Decision:** The **Add a member** dialog starts with focus on its title, so the picker's list
+  (which opens on focus, DL-137) opens only when the admin moves to it; UI-FRM-14's first-field
+  focus has that exception. Both project add paths (the picker and **Add by email**) start the
+  role at **Member**, not the lowest role (Viewer); the org's and the workspace's adds already
+  started there.
+- **Supersedes:** UI-FRM-14 in part (initial focus on the first field, for this dialog)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-14; behavior reference (Members); user guide (Members
+  and roles)
+- **Source:** owner, Nov 13, 2026 (S3-C0l; the owner's S2 feedback)

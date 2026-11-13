@@ -413,18 +413,6 @@ Entry format:
 - **Fix by:** Slice 6 (the site-wide search): revisit a docs-only search as the docs grow
 - **Status:** open
 
-### TD-105: A project key's API error messages describe a slug
-- **Added:** S3-C0c
-- **What:** `identifier_error` (`app/services/user.py`) has one message table, written for
-  slugs, so a bad project key's 422 reads "Use at least 2 characters" (the minimum is 3), "Use
-  at most 40 characters" (6), and "Use only lowercase letters, digits, and hyphens" (uppercase
-  letters and digits). The `code`s are right; only the messages are wrong. Found when the
-  manual-pass seed's 2-letter keys were refused.
-- **Why:** earlier code outside S3-C0c's scope; the new-project form checks the key before it
-  sends, so a user rarely sees the API's message.
-- **Fix by:** S3-C0l (project & requirements feedback), or sooner if the owner says so
-- **Status:** open
-
 ### TD-107: An icon button's tooltip is its `title`, which keyboard focus never shows
 - **Added:** S3-C0d
 - **What:** the side panel's Open full page, Copy link, and Close, ⋯ More actions, and
@@ -862,6 +850,11 @@ Entry format:
 ### TD-103: TextField's slot shadows its `describedBy` prop
 - **Added:** S2-C22 (CI lint warning, Slice 2 retro)
 - **Status:** resolved in S3-C0a (the slot's IDs are `ids`, as in `PasswordField.vue`)
+
+### TD-105: A project key's API error messages describe a slug
+- **Added:** S3-C0c
+- **Status:** resolved in S3-C0l: a key's 422 has its own messages (`PROJECT_KEY_MESSAGES`: at
+  least 3, at most 6, only letters and digits)
 
 ### TD-106: The requirement's header has no Parent row yet
 - **Added:** S3-C0d

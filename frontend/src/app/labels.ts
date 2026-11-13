@@ -215,6 +215,14 @@ export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', 
 /** A requirement named in another's history while it's in the trash (DL-276). */
 export const DELETED: BadgeLabel = { label: 'Deleted', tone: 'neutral', icon: 'x' }
 
+/** A requirement with a pending approval request, beside its status on the tree (Q12b; the
+ * S3-C26 filter uses the same words). */
+export const AWAITING_APPROVAL: BadgeLabel = {
+  label: 'Awaiting approval',
+  tone: 'info',
+  icon: 'circle',
+}
+
 /** An approval request's status (design-doc §6.2) as a badge. */
 export const APPROVAL_REQUEST_STATUS: Record<
   components['schemas']['ApprovalRequestStatus'],

@@ -11,7 +11,7 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 
 import { ApiError, NETWORK_ERROR, api, client } from '@/api/client'
 import type { components } from '@/api/schema'
-import { requirementStatusBadge } from '@/app/labels'
+import { AWAITING_APPROVAL, requirementStatusBadge } from '@/app/labels'
 import { focusHeading } from '@/app/routeFocus'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 
@@ -332,7 +332,12 @@ onBeforeUnmount(() => clearTimeout(announcing))
 watch(selectionKeys, clearNote)
 
 const expandBlocked = computed(() => {
-  if (!selected.value) return 'Select a requirement to expand it.'
+  // With nothing selected, the one hint for both buttons (the Move menu's reason too).
+  if (!selected.value) {
+    return props.movable
+      ? 'Select a requirement to expand or move it.'
+      : 'Select a requirement to expand it.'
+  }
   const node = selected.value[0][selected.value[1]]!
   return node.children.length ? '' : `${displayId(node.data)} has no requirements under it.`
 })
@@ -418,29 +423,34 @@ const headerPt = { headerCell: { scope: 'col' } }
 
 <template>
   <div ref="root" class="flex flex-col gap-3">
-    <div class="flex flex-wrap items-center gap-3">
-      <Button
-        variant="secondary"
-        :pending="expanding"
-        pending-label="Expanding…"
-        :blocked="Boolean(expandBlocked)"
-        :aria-describedby="expandBlocked ? expandReasonId : undefined"
-        @click="expandRequirement"
-        >Expand requirement</Button
-      >
+    <!-- Right-aligned over the table, with one hint for both buttons before them (S3-C0l). -->
+    <div class="flex flex-wrap items-center justify-end gap-3">
       <span v-if="expandBlocked" :id="expandReasonId" class="text-sm text-text-muted">{{
         expandBlocked
       }}</span>
-      <MoveToMenu
-        v-if="movable"
-        ref="moveMenu"
-        :name="selected ? displayId(selected[0][selected[1]]!.data) : null"
-        :actions="actions"
-        blocked-reason="Select a requirement to move it."
-        :pending="pending"
-      />
       <!-- In the controls row: an empty item here adds no gap above the tree. -->
       <p class="m-0 text-sm" aria-live="polite">{{ expandNote }}</p>
+      <!-- Together, so a narrow tree wraps the hint first; they part only below their own width
+           (320px, UI-SHL-7). -->
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <Button
+          variant="secondary"
+          :pending="expanding"
+          pending-label="Expanding…"
+          :blocked="Boolean(expandBlocked)"
+          :aria-describedby="expandBlocked ? expandReasonId : undefined"
+          @click="expandRequirement"
+          >Expand requirement</Button
+        >
+        <MoveToMenu
+          v-if="movable"
+          ref="moveMenu"
+          :name="selected ? displayId(selected[0][selected[1]]!.data) : null"
+          :actions="actions"
+          :reason-shown-at="expandReasonId"
+          :pending="pending"
+        />
+      </div>
     </div>
     <Alert v-if="failure" ref="failureAlert" :key="failures" live dismissible @dismiss="dismiss">{{
       failure
@@ -484,7 +494,7 @@ const headerPt = { headerCell: { scope: 'col' } }
               :data-requirement-row="node.key"
               :aria-current="node.data.number === openNumber ? 'true' : undefined"
               :tabindex="focusedKey === node.key ? undefined : -1"
-              class="font-mono"
+              class="font-mono whitespace-nowrap"
               >{{ displayId(node.data) }}</RouterLink
             >
             <span
@@ -497,17 +507,29 @@ const headerPt = { headerCell: { scope: 'col' } }
       </Column>
       <Column header="Status" :pt="headerPt">
         <template #body="{ node }">
-          <!-- The status badge (DL-148, DL-252), memoized as the ID cell is. -->
-          <Badge
+          <!-- The status badge (DL-148, DL-252), and "Awaiting approval" beside it while a request
+               is pending (Q12b), memoized as the ID cell is. -->
+          <span
             v-memo="[
               node.data.status,
               node.data.approved_revision_id,
               node.data.current_revision_id,
+              node.data.awaiting_approval,
             ]"
-            :tone="requirementStatusBadge(node.data).tone"
-            :icon="requirementStatusBadge(node.data).icon"
-            >{{ requirementStatusBadge(node.data).label }}</Badge
+            class="inline-flex flex-wrap items-center gap-2"
           >
+            <Badge
+              :tone="requirementStatusBadge(node.data).tone"
+              :icon="requirementStatusBadge(node.data).icon"
+              >{{ requirementStatusBadge(node.data).label }}</Badge
+            >
+            <Badge
+              v-if="node.data.awaiting_approval"
+              :tone="AWAITING_APPROVAL.tone"
+              :icon="AWAITING_APPROVAL.icon"
+              >{{ AWAITING_APPROVAL.label }}</Badge
+            >
+          </span>
         </template>
       </Column>
     </TreeTable>

@@ -66,6 +66,7 @@ from app.services.org import OrgService
 from app.services.roster import MemberRemoval, Roster, RosterSpec, register_on_member_removed
 from app.services.user import (
     ORG_REASONS,
+    PROJECT_KEY_MESSAGES,
     PROJECT_REASONS,
     WORKSPACE_REASONS,
     access_kind,
@@ -302,7 +303,7 @@ class ProjectService:
         # A taken key is the unique constraint's 422 `taken` on `key`.
         problems = [
             *required_error(values.name, field="name"),
-            *identifier_error(project_key_problem(key), field="key"),
+            *identifier_error(project_key_problem(key), field="key", messages=PROJECT_KEY_MESSAGES),
         ]
         if problems:
             raise ValidationFailedError(problems)

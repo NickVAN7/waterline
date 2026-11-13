@@ -4,7 +4,8 @@
 // A move its place rules out (Move up on the first) stays listed and focusable, `aria-disabled`
 // in the disabled tokens with the reason in its label, so the keyboard reaches the reason too
 // (PrimeVue skips a `disabled` item and fades it with opacity; UI-TOK-10). With nothing to move,
-// the button is blocked with its reason beside it.
+// the button is blocked, tied by `aria-describedby` to the reason its host shows beside its
+// controls (`reasonShownAt`: the tree's one hint for Expand requirement and Move, S3-C0l).
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { computed, ref, useId } from 'vue'
@@ -14,15 +15,14 @@ import Button from './Button.vue'
 export type MoveAction = { label: string; run: () => void; blockedReason?: string }
 
 const props = defineProps<{
-  // The item's identity, or null with nothing selected (`blockedReason` then says why).
+  // The item's identity, or null with nothing selected (the text at `reasonShownAt` says why).
   name: string | null
   actions: MoveAction[]
-  blockedReason?: string
+  reasonShownAt: string
   pending?: boolean
 }>()
 
 const id = useId()
-const reasonId = useId()
 const menu = ref<InstanceType<typeof Menu>>()
 const root = ref<HTMLElement>()
 const expanded = ref(false)
@@ -65,7 +65,7 @@ function toggle(event: MouseEvent) {
       aria-haspopup="menu"
       :aria-controls="expanded ? id : undefined"
       :aria-expanded="expanded ? 'true' : 'false'"
-      :aria-describedby="blocked ? reasonId : undefined"
+      :aria-describedby="blocked ? reasonShownAt : undefined"
       :blocked="blocked"
       :pending="pending"
       pending-label="Moving…"
@@ -73,7 +73,6 @@ function toggle(event: MouseEvent) {
     >
       {{ label }}
     </Button>
-    <span v-if="blocked" :id="reasonId" class="text-sm text-text-muted">{{ blockedReason }}</span>
     <Menu
       :id="id"
       ref="menu"

@@ -7,7 +7,8 @@
 // picker, where typing again retries it; it isn't the form's alert, whose Retry is the add. A 403,
 // or a refusal for the project's changed export control, tells the page (`refused`), so it reloads
 // what the user may do (UI-FRM-7, DL-116). The picker's list opens on focus while no one is chosen
-// (DL-137; once someone is, focus back after a refusal shows the error, not the list) and scrolls
+// (DL-137; once someone is, focus back after a refusal shows the error, not the list), so the
+// dialog starts on its title, not the picker (S3-C0l); the role starts at Member. The list scrolls
 // itself, the listbox the combobox controls, not its unnamed container: the keyboard reaches it
 // through the combobox, which axe recognises only on the listbox (`scrollable-region-focusable`).
 import AutoComplete from 'primevue/autocomplete'
@@ -66,7 +67,7 @@ const label = (c: Candidate) => `${c.name} (${c.email})`
 
 async function open(): Promise<void> {
   person.value = null
-  role.value = props.roles.at(-1)!.value
+  role.value = 'member'
   authorized.value = false
   suggestions.value = []
   searchFailed.value = false
@@ -150,7 +151,7 @@ defineExpose({ open })
 </script>
 
 <template>
-  <ModalDialog ref="dialog" title="Add a member" :fallback-focus="fallbackFocus">
+  <ModalDialog ref="dialog" title="Add a member" :fallback-focus="fallbackFocus" start-on-title>
     <form ref="formElement" novalidate class="flex flex-col gap-4" @submit.prevent="submit">
       <FormAlert
         v-if="errors.alert.value"

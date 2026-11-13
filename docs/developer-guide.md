@@ -997,7 +997,8 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   fire), waits a tick after mounting before opening it, and unmounts its wrappers
   (`enableAutoUnmount(afterEach)`) before the body is cleared.
 - **Dialogs:** `ModalDialog` is the native `<dialog>` (UI-FRM-14): `open()` puts focus on the
-  element marked `data-autofocus` (a confirmation's Cancel) or the first field, and closing
+  element marked `data-autofocus` (a confirmation's Cancel) or the first field (its title with
+  `startOnTitle`, for a first field that opens a list on focus, DL-378), and closing
   returns focus to whatever had it, or to `fallbackFocus` when that's gone (a removed row).
   `RowActions` puts focus back on its own button before an action runs, so a dialog it opens
   returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A

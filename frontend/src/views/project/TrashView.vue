@@ -10,7 +10,10 @@
 // Restore, or the row's item when it has none), or the `h1` (DL-290, UI-FRM-14). A refused
 // restore reloads the list, what the user may do with it (UI-FRM-7); a failed one leaves focus on
 // its Restore while that's still there, and the alert's dismiss goes back to it (UI-FBK-13). Loading, the not-found page, and the redirect are `useProjectPage`'s.
+// Reached from each list page's Trash link, filtered to that page's type (`?type=requirement`),
+// the filter removable; the breadcrumb leads back to the list (DL-350).
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -22,6 +25,7 @@ import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import Pagination from '@/components/Pagination.vue'
+import SelectField from '@/components/SelectField.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows } from '@/composables/allowedActions'
@@ -42,12 +46,42 @@ const WHO_TO_ASK = "Ask one of the project's admins if you need its requirements
 const { key, project, notFound, retry, reload, whoToAsk } = useProjectPage('project-trash')
 const loaded = computed(() => project.data.value)
 const allowed = computed(() => allows(loaded.value, 'requirement.view'))
-const list = useListQuery({ limit: 25 })
+const list = useListQuery({ limit: 25, filters: ['type'] as const })
+type TrashType = components['schemas']['TrashItemType']
+// A type the API doesn't know (an old or mistyped link) is ignored: the list loads at "Any type".
+const type = computed(() => {
+  const value = list.filter.value.type
+  return Object.prototype.hasOwnProperty.call(TRASH_ITEM_TYPE, value) ? (value as TrashType) : ''
+})
+const TYPE_OPTIONS = [
+  { value: '', label: 'Any type' },
+  ...(Object.keys(TRASH_ITEM_TYPE) as TrashType[]).map((value) => ({
+    value,
+    label: TRASH_ITEM_TYPE[value],
+  })),
+]
+const router = useRouter()
+const typeField = ref<InstanceType<typeof SelectField>>()
+const filterBy = (value: string) => void router.replace(list.filtered({ type: value }))
+// Clear filter returns focus to the filter (UI-FBK-8).
+async function clearFilter() {
+  await router.replace(list.filtered({ type: '' }))
+  await nextTick()
+  typeField.value?.focus()
+}
 
 const page = useLoad(() =>
   api(
     client.GET('/api/projects/{key}/trash', {
-      params: { path: { key: loaded.value!.key }, query: list.params.value },
+      params: {
+        path: { key: loaded.value!.key },
+        // The API's filter takes a list; the page sends one value.
+        query: {
+          limit: list.limit,
+          offset: list.offset.value,
+          ...(type.value ? { type: [type.value] } : {}),
+        },
+      },
     }),
   ),
 )
@@ -133,7 +167,8 @@ function dismiss() {
 }
 
 const announcement = computed(() => {
-  if (page.loading.value && !page.data.value) return 'Loading the trash…'
+  // On every load, a filter change's too: the count it then says may not have changed (UI-TBL-3).
+  if (page.loading.value) return 'Loading the trash…'
   const total = page.data.value?.total
   if (total === undefined) return ''
   return total === 1 ? '1 item in the trash' : `${total} items in the trash`
@@ -152,11 +187,27 @@ const announcement = computed(() => {
       @retry="retry"
     />
     <template v-else>
-      <ProjectHeader :project="loaded" page="trash" :trail="[{ label: 'Trash' }]" />
-      <p class="m-0 text-text-muted">
-        Deleted requirements stay here until they're restored. Restoring one brings back the
-        children deleted with it.
-      </p>
+      <ProjectHeader
+        :project="loaded"
+        page="trash"
+        :trail="[
+          {
+            label: 'Requirements',
+            to: { name: 'project-requirements', params: { key: loaded.key } },
+          },
+          { label: 'Trash' },
+        ]"
+      />
+      <div role="group" aria-label="Filters" class="flex flex-wrap gap-4">
+        <SelectField
+          id="trash-type"
+          ref="typeField"
+          :model-value="type"
+          label="Type"
+          :options="TYPE_OPTIONS"
+          @update:model-value="filterBy"
+        />
+      </div>
       <SuccessStatus :message="done">
         <RouterLink
           v-if="restored"
@@ -192,6 +243,16 @@ const announcement = computed(() => {
           @retry="page.retry"
         />
         <Skeleton v-else-if="!page.data.value" />
+        <EmptyState
+          v-else-if="!page.data.value.items.length && type"
+          :heading="`No deleted items match Type: ${TRASH_ITEM_TYPE[type]}`"
+          :level="3"
+        >
+          Try another type, or clear the filter.
+          <template #action>
+            <Button variant="secondary" @click="clearFilter">Clear filter</Button>
+          </template>
+        </EmptyState>
         <EmptyState
           v-else-if="!page.data.value.items.length"
           heading="The trash is empty"

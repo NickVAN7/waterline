@@ -145,7 +145,7 @@ C8, C11, C14, C15, C16, C17, C18, C19, C21, C23a, C24, C26, C28, C31, C33.
    its own table and groups say (owner: fix what the reviews find).
 7. A fallback for S3-C0m ("v1.5 if S3 runs long", Q12g): **open**.
 8. The tree's indicator: "Approval pending" (Q12b, the badge) vs "Awaiting approval" (S3-C0l,
-   S3-C26, the filter): **open**.
+   S3-C26, the filter): **"Awaiting approval"** (owner, Nov 13, 2026; DL-376).
 
 The plan record keeps Q13's and Q14's text as approved; answers 2 and 4 refine them, and the
 docs state the refined rules.

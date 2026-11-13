@@ -721,6 +721,9 @@ class RequirementService:
     async def tree(self, project: Project) -> RequirementTree:
         """The project's requirements for the tree, up to the cap (DL-159)."""
         rows = await self.repository.ranked(project.id, TREE_CAP + 1)
+        awaiting = await ApprovalRepository(self.session).pending_entity_ids(
+            project.id, ApprovalEntityType.REQUIREMENT
+        )
         return RequirementTree(
             items=[
                 RequirementItem(
@@ -734,6 +737,7 @@ class RequirementService:
                     restriction_categories=_categories(r),
                     current_revision_id=r.current_revision_id,
                     approved_revision_id=r.approved_revision_id,
+                    awaiting_approval=r.id in awaiting,
                 )
                 for r in rows[:TREE_CAP]
             ],

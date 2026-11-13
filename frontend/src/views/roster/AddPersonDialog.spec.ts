@@ -55,7 +55,19 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
-  it('asks for the email and role first, role defaulting to the lowest', async () => {
+  it("defaults a project's role to Member, not its lowest, Viewer (S3-C0l)", async () => {
+    const { wrapper } = await openDialog({
+      roles: [
+        { value: 'admin', label: 'Admin' },
+        { value: 'member', label: 'Member' },
+        { value: 'viewer', label: 'Viewer' },
+      ],
+    })
+
+    expect(wrapper.get<HTMLSelectElement>('#add-role').element.value).toBe('member')
+  })
+
+  it('asks for the email and role first, role defaulting to Member', async () => {
     const { wrapper } = await openDialog()
 
     expect(wrapper.get('h2').text()).toBe('Add a person')

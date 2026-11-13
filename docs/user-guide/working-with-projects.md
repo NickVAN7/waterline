@@ -8,7 +8,7 @@ description: Create a project, choose its type and modules, and change its setti
 A project holds a piece of work: a software product, an ERP implementation, or anything else you
 want to plan and track. Every item in it is numbered after the project's key.
 
-![A project's settings page: its name, description, type, status, and lead, with the modules below.](images/project-settings.webp)
+![A project's settings page: its name, description, type, status, and lead, with the modules turned on in one line below.](images/project-settings.webp)
 
 ## Create a project
 
@@ -37,6 +37,7 @@ Open **Settings** in the sidebar under the project.
 | Restriction | Project admins |
 | Archive or unarchive the project | Organization owners and admins |
 
+**Modules** shows the modules turned on in one line: select it to turn modules on or off.
 Turning a module off hides what it holds; nothing is deleted, and turning it back on brings
 everything back. An archived project is read-only for everyone until it's unarchived.
 

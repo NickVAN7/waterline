@@ -18,8 +18,9 @@ cancelled.
 
 ## Restore a requirement
 
-Open **Trash** in the sidebar under the project, find the requirement, and select **Restore**. The
-children deleted with it come back too.
+On the project's **Requirements** page, select **Trash** at the top. It lists deleted
+requirements; **Type** above the list filters by type. Find the requirement and select
+**Restore**. The children deleted with it come back too.
 
 | Who | Sees and restores |
 |---|---|

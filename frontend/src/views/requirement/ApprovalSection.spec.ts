@@ -153,6 +153,20 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('ApprovalSection', () => {
+  it.each([
+    ['a pending request', request(), true],
+    ['a decided request', request({ status: 'approved', allowed_actions: [] }), false],
+    ['no request', null, false],
+  ] as const)(
+    'tells the tree whether it awaits approval, with %s (Q12b)',
+    async (_, latest, pending) => {
+      const { wrapper } = mountSection(requirement(), latest)
+      await flushPromises()
+
+      expect(wrapper.emitted('awaiting')).toEqual([[pending]])
+    },
+  )
+
   it('says no approval was requested, and offers Request approval to an admin', async () => {
     mountSection(requirement(), null)
     await flushPromises()

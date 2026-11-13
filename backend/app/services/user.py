@@ -45,6 +45,8 @@ from app.rules.account_rank import (
     covering_orgs,
 )
 from app.rules.identifiers import (
+    PROJECT_KEY_MAX,
+    PROJECT_KEY_MIN,
     SLUG_MAX,
     SLUG_MIN,
     IdentifierProblem,
@@ -84,6 +86,13 @@ _IDENTIFIER_MESSAGES = {
     IdentifierProblem.INVALID_CHARACTERS: "Use only lowercase letters, digits, and hyphens.",
     IdentifierProblem.RESERVED: "This name is reserved.",
 }
+# A project key's own words (TD-105): the slug's limits and characters would be wrong for it.
+PROJECT_KEY_MESSAGES = {
+    IdentifierProblem.TOO_SHORT: f"Use at least {PROJECT_KEY_MIN} characters.",
+    IdentifierProblem.TOO_LONG: f"Use at most {PROJECT_KEY_MAX} characters.",
+    IdentifierProblem.MUST_START_WITH_LETTER: "Start with a letter.",
+    IdentifierProblem.INVALID_CHARACTERS: "Use only letters and digits.",
+}
 
 
 type Under = tuple[str | int, ...]
@@ -110,12 +119,17 @@ def password_errors(
 
 
 def identifier_error(
-    problem: IdentifierProblem | None, *, field: str, under: Under = BODY
+    problem: IdentifierProblem | None,
+    *,
+    field: str,
+    under: Under = BODY,
+    messages: Mapping[IdentifierProblem, str] = _IDENTIFIER_MESSAGES,
 ) -> list[FieldError]:
-    """A username or slug problem (rules/identifiers.py) as a field error on `field`."""
+    """A username, slug, or (with `PROJECT_KEY_MESSAGES`) project key problem
+    (rules/identifiers.py) as a field error on `field`."""
     if problem is None:
         return []
-    return [FieldError((*under, field), _IDENTIFIER_MESSAGES[problem], problem.value)]
+    return [FieldError((*under, field), messages[problem], problem.value)]
 
 
 def required_error(value: str, *, field: str, under: Under = BODY) -> list[FieldError]:

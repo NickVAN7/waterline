@@ -13,7 +13,8 @@ a tree, so a large requirement can be broken into smaller ones under it.
 
 Open **Requirements** in the project's sidebar. The tree starts with only the top-level
 requirements showing: open a branch with its arrow. To open everything under one requirement at
-once, select its row and choose **Expand requirement**.
+once, select its row and choose **Expand requirement**. A requirement with a pending approval
+request shows **Awaiting approval** beside its status.
 
 > [!TIP]
 > ++→++ opens a selected row's branch and ++←++ closes it.

@@ -9658,6 +9658,10 @@
               }
             ],
             "title": "Approved Revision Id"
+          },
+          "awaiting_approval": {
+            "type": "boolean",
+            "title": "Awaiting Approval"
           }
         },
         "type": "object",
@@ -9671,7 +9675,8 @@
           "restriction_level",
           "restriction_categories",
           "current_revision_id",
-          "approved_revision_id"
+          "approved_revision_id",
+          "awaiting_approval"
         ],
         "title": "RequirementItem",
         "description": "A row of the requirement tree."

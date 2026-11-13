@@ -38,6 +38,7 @@ function item(number: number, title: string): Item {
     restriction_categories: [],
     current_revision_id: null,
     approved_revision_id: null,
+    awaiting_approval: false,
   }
 }
 const TREE: Tree = { items: [item(1, 'Invoicing'), item(2, 'Payments')], truncated: false }
@@ -62,6 +63,8 @@ async function mountAt(
     at = '/acme/projects/ERP/requirements',
     requirements = [] as unknown[],
     state = undefined as Record<string, string> | undefined,
+    // The latest approval request the panel's Approval section finds, or none.
+    latest = null as components['schemas']['ApprovalRequestRead'] | null,
   } = {},
 ) {
   useCurrentUserStore().me = me()
@@ -74,12 +77,14 @@ async function mountAt(
         path === '/api/projects/{key}/requirements'
           ? next(answers.tree)
           : path === '/api/projects/{key}/requirements/{number}/approval-requests'
-            ? ok({ items: [], total: 0, limit: 1, offset: 0 })
-            : path === '/api/projects/{key}/requirements/{number}/activity'
-              ? ok({ items: [], next_cursor: null })
-              : path === '/api/projects/{key}/requirements/{number}'
-                ? next(answers.requirements)
-                : next(answers.project),
+            ? ok({ items: latest ? [latest] : [], total: latest ? 1 : 0, limit: 1, offset: 0 })
+            : path === '/api/approval-requests/{request_id}'
+              ? ok(latest)
+              : path === '/api/projects/{key}/requirements/{number}/activity'
+                ? ok({ items: [], next_cursor: null })
+                : path === '/api/projects/{key}/requirements/{number}'
+                  ? next(answers.requirements)
+                  : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
@@ -181,6 +186,14 @@ describe('RequirementsView', () => {
     expect(wrapper.findAll('tbody tr')).toHaveLength(2)
     expect(moveButton()).toBeUndefined()
     expect(wrapper.findAll('button').map((b) => b.text())).toContain('Expand requirement')
+  })
+
+  it('links Trash in its header, filtered to requirements, for anyone who reads them (DL-350)', async () => {
+    const { wrapper } = await mountAt([READER])
+
+    const header = wrapper.get('header')
+    const link = header.findAll('a').find((a) => a.text() === 'Trash')!
+    expect(link.attributes('href')).toBe('/acme/projects/ERP/trash?type=requirement')
   })
 
   it("is the 403 page, without asking for the tree, for someone who can't read an export-controlled project's content", async () => {
@@ -617,6 +630,48 @@ describe('RequirementsView', () => {
       expect(document.getElementById(panel()!.getAttribute('aria-labelledby')!)!.textContent).toBe(
         'Card payments',
       )
+    })
+
+    it('a request no longer pending, as the panel finds it, leaves the row\'s "Awaiting approval" (Q12b)', async () => {
+      const waiting = {
+        items: [item(1, 'Invoicing'), { ...item(2, 'Payments'), awaiting_approval: true }],
+        truncated: false,
+      }
+      await mountAt([READER], [ok(waiting)], { requirements: [ok(PAYMENTS)] })
+      expect(idLink(2).closest('tr')!.textContent).toContain('Awaiting approval')
+
+      await openFromTree(2)
+
+      // The panel's approval section finds no request pending.
+      expect(idLink(2).closest('tr')!.textContent).not.toContain('Awaiting approval')
+    })
+
+    it('a pending request the panel finds gives its row "Awaiting approval" (Q12b)', async () => {
+      await mountAt([READER], [ok(TREE)], {
+        requirements: [ok(PAYMENTS)],
+        latest: {
+          id: 'req-1',
+          status: 'pending',
+          requirement_revision_id: 'rev-1',
+          revision_number: 1,
+          note: null,
+          requested_by_id: 'u-ada',
+          requested_by_name: 'Ada Admin',
+          requested_by_is_active: true,
+          created_at: '2026-11-03T14:30:00Z',
+          completed_at: null,
+          newer_revision_exists: false,
+          flagged: false,
+          approvals: [],
+          allowed_actions: [],
+        },
+      })
+      expect(idLink(2).closest('tr')!.textContent).not.toContain('Awaiting approval')
+
+      await openFromTree(2)
+
+      expect(idLink(2).closest('tr')!.textContent).toContain('Awaiting approval')
+      expect(idLink(1).closest('tr')!.textContent).not.toContain('Awaiting approval')
     })
 
     it("a Try again that loads it sends focus to the panel's title, not the page behind (UI-FBK-15)", async () => {

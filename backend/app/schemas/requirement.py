@@ -133,6 +133,8 @@ class RequirementItem(BaseModel):
     restriction_categories: list[RestrictionCategory]
     current_revision_id: uuid.UUID | None
     approved_revision_id: uuid.UUID | None
+    # A pending approval request on it: the tree's "Awaiting approval" badge (Q12b).
+    awaiting_approval: bool
 
 
 class RequirementTree(BaseModel):

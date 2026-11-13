@@ -213,6 +213,29 @@ async def test_a_deactivated_first_admin_is_refused(
 
 
 @pytest.mark.parametrize(
+    ("key", "problem", "message"),
+    [
+        ("IN", "too_short", "Use at least 3 characters."),
+        ("INVOICE", "too_long", "Use at most 6 characters."),
+        ("1NV", "must_start_with_letter", "Start with a letter."),
+        ("IN-V", "invalid_characters", "Use only letters and digits."),
+    ],
+)
+async def test_a_bad_key_says_what_a_key_may_be(
+    client: AsyncClient, t: Tenancy, key: str, problem: str, message: str
+) -> None:
+    """Bug: a key's 422 in the slug's words ("at least 2", "lowercase letters, digits, and
+    hyphens"), TD-105."""
+    await signed_in(client, await org_member(t))
+
+    response = await client.post(f"/api/orgs/{t.org.id}/projects", json=new(key=key))
+
+    assert [(e["type"], e["message"]) for e in response.json()["details"]["fields"]] == [
+        (problem, message)
+    ]
+
+
+@pytest.mark.parametrize(
     ("key", "problem"),
     [
         ("IN", "too_short"),
