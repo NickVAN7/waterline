@@ -42,8 +42,9 @@ layout and utilities, both fed by one set of design tokens.**
 - **Native elements first** still holds (UI-STY-3): `<dialog>`, `<fieldset>`, `<table>`, and
   plain `<button>` and `<a>` are used where they do the job.
 - **SVAR for what PrimeVue does not have.** PrimeVue has no kanban board and no Gantt chart. The
-  task board uses SVAR Vue **Kanban** and the editable grids **DataGrid** (V1); an orderable list's
-  widget is decided per list (UI-SVR-2; the backlog's is PrimeVue DataTable, DL-372);
+  task board uses SVAR Vue **Kanban** and the editable grids **DataGrid** (V1); an ordered list
+  (the requirement tree, the backlog) is PrimeVue's TreeTable or DataTable through our wrapper
+  (UI-SVR-2, DL-375);
   the schedule chart uses SVAR **Gantt** (V2). SVAR is themed by one mapping file onto the same
   tokens (UI-SVR-3), so there is still one palette. Rules and known defects are in §7.1.
 
@@ -1004,9 +1005,10 @@ alternative.**
   §9 first, because 2.8.0 of the Gantt is broken.
 - **UI-SVR-2** **Which component for which list.** A list that is read, filtered, sorted,
   paged, and bulk-actioned uses a native `<table>` or PrimeVue's DataTable (UI-TBL-1 to 8). The
-  SVAR DataGrid is for lists where **inline cell editing or manual row order is the point**,
-  except the requirement tree, which is PrimeVue's TreeTable: SVAR's free tree mode has no drag
-  and no move of its own (DL-174). The tree still follows UI-SVR-5 (the server decides each move)
+  SVAR DataGrid is for lists where **inline cell editing is the point** (DL-375). A list where
+  manual row order is the point is PrimeVue's, through our own wrapper: the requirement tree is
+  TreeTable (SVAR's free tree mode has no drag and no move of its own, DL-174), and the backlog
+  DataTable with row reorder (DL-372). The tree still follows UI-SVR-5 (the server decides each move)
   and UI-SVR-6 (the move menu sits outside the widget). The task board is SVAR Kanban. The
   backlog is PrimeVue DataTable with row reorder and its virtual scroller, through our own
   wrapper, which follows UI-SVR-5 (the server decides each move) and UI-SVR-6 (the move menu
@@ -1037,7 +1039,8 @@ alternative.**
   selected state itself (the widgets expose none); gives the grid editors accessible names;
   and supplies the non-drag alternative (UI-SVR-6).
 - **UI-SVR-5** **The server decides every move and edit.** Wrap each mutating action
-  (`move-card`, `move-item`, `update-task`, `move-task`) with `api.intercept(action, handler)`.
+  (`move-card`, `update-task`, `move-task`; no DataGrid list orders rows, DL-375) with
+  `api.intercept(action, handler)`.
   The handler returns `false` and asks the server, applying the confirmed result through
   `api.exec`, or returns `true` for an optimistic move and reverts on error. Calls the wrapper
   makes through `api.exec` re-enter the same handler, so the wrapper marks its own calls and the
@@ -1053,8 +1056,9 @@ alternative.**
   alternative sits **outside** the widget and calls the store. Board: Enter or Space selects a
   card (`select-card`); then the card's **status control** (design-doc §6: the alternative to a
   cross-column drop) and our "Move to top / up / down / bottom / after…" menu (order inside a
-  column) call `api.exec('move-card', { id, column, before? })`. Grid: our row-actions menu
-  (UI-TBL-4) calls `move-item` with `up`, `down`, `before`, or `after`; changing a requirement's
+  column) call `api.exec('move-card', { id, column, before? })`. An ordered list (the tree,
+  the backlog, both PrimeVue, DL-375): our row-actions menu (UI-TBL-4) moves a row up, down, to
+  the top or bottom, or after another, each through the server first; changing a requirement's
   parent stays the separate "Move to…" action of design-doc §6. Gantt: our edit dialog for dates and our
   "Move…" menu call `update-task` and `move-task`. SVAR's own card menu is not used for anything
   a keyboard user needs.
@@ -1217,9 +1221,8 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
    yet built or tested: a visible and announced selected state for the board, focus return after
    a grid editor closes, names for the grid editors, and the `aria-rowindex="0"` and `treegrid`
    defects (patch in the wrapper or report upstream, UI-SVR-7). (c) Grid row drag with a
-   pointer, exercised in S3-C0i (`docs/spikes/S3-C0i-backlog/results.md`): it works once the
-   wrapper draws the handle (Willow's icons are an icon font from SVAR's CDN) and keeps the
-   drop's `mode`, which the drop's event leaves out. (d) The Gantt baseline decision and the Gantt performance test
+   pointer, exercised in S3-C0i (`docs/spikes/S3-C0i-backlog/results.md`). **Closed by DL-375**:
+   no DataGrid list orders rows, so no wrapper builds row drag. (d) The Gantt baseline decision and the Gantt performance test
    (§7.2). (e) Whether to report the Gantt 2.8.0 mount crash upstream, and re-check it at V2.
    (f) The Kanban card shows no visible change when selected, so the wrapper needs its own
    selected style (UI-TOK-9). (g) **Tree rows:** the spike used a flat grid. Whether the

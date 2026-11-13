@@ -817,7 +817,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   server. The packages are pinned exactly and arrive in the first checkpoint that ships a board or
   an editable grid (placed when Slices 2 and 3 are planned), not in S1-C14.
 - **Supersedes:** none
-- **Superseded by:** DL-344 (in part: the backlog's component, decided by the S3-C0i spike); DL-372 (in part: the backlog is PrimeVue DataTable)
+- **Superseded by:** DL-344 (in part: the backlog's component, decided by the S3-C0i spike); DL-372 (in part: the backlog is PrimeVue DataTable); DL-375 (in part: ordered lists are PrimeVue's)
 - **Applies to:** ui-design-guide §7; build plan (Slice overview, Slice 2 notes);
   testing-strategy ("Accessibility"); `frontend/CLAUDE.md`
 - **Source:** chat session (owner's design walkthrough and the SVAR spike, Oct 10, 2026)
@@ -4674,3 +4674,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S3-C0j, S3-C0n, the polish group)
 - **Source:** owner, Nov 12, 2026 (S3-C0j)
+
+### DL-375: SVAR DataGrid is for inline cell editing only
+- **Date:** 2026-11-12
+- **Decision:** UI-SVR-2's SVAR DataGrid is for lists where inline cell editing is the point; a
+  list where manual row order is the point is PrimeVue's (TreeTable or DataTable with row
+  reorder) through our own wrapper, with the server deciding each move and the move menu
+  outside the widget. Both ordered lists specified so far already are (the tree, DL-174; the
+  backlog, DL-372), and S3-C0i's spike found the DataTable needs less wrapper work.
+- **Supersedes:** DL-64 in part (the DataGrid for lists where manual row order is the point)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §1, UI-SVR-2, UI-SVR-5, UI-SVR-6, §10 item 5(c)
+- **Source:** owner, Nov 12, 2026 (DC-2026-11-12e's docs-consistency decision 1, option b)
