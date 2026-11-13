@@ -16,10 +16,22 @@ class OrgRead(BaseModel):
     allowed_actions: list[Action]
 
 
+class OrgOwner(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class OrgListItem(BaseModel):
+    """An org on the workspace's list, with its counts and owners (S3-C0k)."""
+
     id: uuid.UUID
     name: str
     slug: str
+    # Its projects, archived left out; its members whose accounts are active; its active owners,
+    # by name.
+    project_count: int
+    member_count: int
+    owners: list[OrgOwner]
 
 
 class OrgCreate(BaseModel):

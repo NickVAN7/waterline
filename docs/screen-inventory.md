@@ -565,7 +565,7 @@ and fills the gaps.
 | Admin page, not an admin | 403 naming who to ask (UI-FBK-14) |
 | Edit conflict | 409 alert with Reload (UI-FRM-7) |
 | Archived project | Non-dismissible read-only banner (UI-FBK-6); actions disabled with the reason beside them (UI-FBK-4) |
-| Deactivated user | "Deactivated" badge after their name (UI-FBK-6); narrowed below |
+| Deactivated user | "Deactivated" badge after their name (UI-FBK-6); in a people list (a roster, an access review), the row's text muted and "· Deactivated" after the name, the columns fixed so showing them moves nothing (S3-C0k); narrowed below |
 | Session ended | Sign in again, then back to the page (built) |
 | Signed in, belongs to nothing | No access page (built) |
 | Restricted item or project | Restriction badge in the header and on items (UI-FBK-6) |

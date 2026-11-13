@@ -8113,15 +8113,53 @@
           "slug": {
             "type": "string",
             "title": "Slug"
+          },
+          "project_count": {
+            "type": "integer",
+            "title": "Project Count"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
+          },
+          "owners": {
+            "items": {
+              "$ref": "#/components/schemas/OrgOwner"
+            },
+            "type": "array",
+            "title": "Owners"
           }
         },
         "type": "object",
         "required": [
           "id",
           "name",
-          "slug"
+          "slug",
+          "project_count",
+          "member_count",
+          "owners"
         ],
-        "title": "OrgListItem"
+        "title": "OrgListItem",
+        "description": "An org on the workspace's list, with its counts and owners (S3-C0k)."
+      },
+      "OrgOwner": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "OrgOwner"
       },
       "OrgReach": {
         "properties": {
@@ -10536,6 +10574,47 @@
         ],
         "title": "TypeRecommendation"
       },
+      "UserOrgMembership": {
+        "properties": {
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Org Id"
+          },
+          "org_name": {
+            "type": "string",
+            "title": "Org Name"
+          },
+          "org_slug": {
+            "type": "string",
+            "title": "Org Slug"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrgRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_count": {
+            "type": "integer",
+            "title": "Project Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_id",
+          "org_name",
+          "org_slug",
+          "role",
+          "project_count"
+        ],
+        "title": "UserOrgMembership",
+        "description": "One org in a user's row (S3-C0k): their org role, if they hold one, and how many of its\nprojects they're on."
+      },
       "UserRow": {
         "properties": {
           "id": {
@@ -10573,6 +10652,13 @@
               }
             ]
           },
+          "memberships": {
+            "items": {
+              "$ref": "#/components/schemas/UserOrgMembership"
+            },
+            "type": "array",
+            "title": "Memberships"
+          },
           "allowed_actions": {
             "items": {
               "$ref": "#/components/schemas/Action"
@@ -10590,6 +10676,7 @@
           "is_active",
           "is_system_admin",
           "workspace_role",
+          "memberships",
           "allowed_actions"
         ],
         "title": "UserRow",

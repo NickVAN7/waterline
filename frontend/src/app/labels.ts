@@ -199,6 +199,11 @@ export const ACCESS_KIND: Record<AccessKind, string> = {
 export const ACTIVE = 'Active'
 export const USER = 'User'
 export const NO_ROLE = 'None'
+/** An access review's project role for someone with none who administers the project through a
+ * role above it (Q12h, S3-C0k). */
+export const INHERITED_ADMIN_ROLE = 'Admin (inherited)'
+/** An org with no active owner, on the workspace's org list (S3-C0k). */
+export const NO_OWNERS = 'None'
 
 /** A per-person access review's Access cell on a project that isn't export-controlled, read by
  * screen readers only (DL-184). */
@@ -257,6 +262,19 @@ export function workspaceRoleText(
 ): string {
   const parts = [role && WORKSPACE_ROLE[role], isSystemAdmin && ACCESS_REASON.system_admin]
   return parts.filter(Boolean).join(', ') || none
+}
+
+/** One of a user's orgs on the workspace users list (S3-C0k): "Acme · Admin · 2 projects", the
+ * role left out when they're on its projects alone. */
+export function orgMembershipText(m: {
+  org_name: string
+  role: OrgRole | null
+  project_count: number
+}): string {
+  const projects = m.project_count === 1 ? '1 project' : `${m.project_count} projects`
+  return [m.org_name, m.role && ORG_ROLE[m.role], m.project_count > 0 && projects]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 /** What a live availability check says about a slug or username (UI-FRM-9), after the field's

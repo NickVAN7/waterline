@@ -1912,7 +1912,10 @@ export interface components {
             owner_id?: string | null;
             new_owner?: components["schemas"]["NewUser"] | null;
         };
-        /** OrgListItem */
+        /**
+         * OrgListItem
+         * @description An org on the workspace's list, with its counts and owners (S3-C0k).
+         */
         OrgListItem: {
             /**
              * Id
@@ -1923,6 +1926,22 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+            /** Project Count */
+            project_count: number;
+            /** Member Count */
+            member_count: number;
+            /** Owners */
+            owners: components["schemas"]["OrgOwner"][];
+        };
+        /** OrgOwner */
+        OrgOwner: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** OrgReach */
         OrgReach: {
@@ -2867,6 +2886,25 @@ export interface components {
             recommended: string[];
         };
         /**
+         * UserOrgMembership
+         * @description One org in a user's row (S3-C0k): their org role, if they hold one, and how many of its
+         *     projects they're on.
+         */
+        UserOrgMembership: {
+            /**
+             * Org Id
+             * Format: uuid
+             */
+            org_id: string;
+            /** Org Name */
+            org_name: string;
+            /** Org Slug */
+            org_slug: string;
+            role: components["schemas"]["OrgRole"] | null;
+            /** Project Count */
+            project_count: number;
+        };
+        /**
          * UserRow
          * @description A user as the workspace users list shows them (DL-72), with the account actions the caller
          *     may take on them.
@@ -2888,6 +2926,8 @@ export interface components {
             /** Is System Admin */
             is_system_admin: boolean;
             workspace_role: components["schemas"]["WorkspaceRole"] | null;
+            /** Memberships */
+            memberships: components["schemas"]["UserOrgMembership"][];
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };

@@ -85,6 +85,11 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A click handler that routes a container's links in the app (the guide article's `follow`)
   leaves to the browser a link with a `target` and a modified or middle click: routing it opens
   the URL as an app page, a 404 (owner, S3-C0j). Its spec and e2e click such a link.
+- A table's scroll region (`role="region"`, `overflow-x-auto`) is also `relative`: a visually
+  hidden label inside is absolutely positioned, and escapes a static scroll container, widening
+  the page at 320 px (UI-SHL-7; S3-C0k review). A table with a fixed layout sets a minimum width
+  (`min-w-(--content-narrow)`), so below it the region scrolls instead of the columns crushing,
+  and a column that holds a badge or a button gets a `rem` width that fits it, never a fraction.
 - A sidebar section's visible caption names its landmark (`aria-labelledby`), or is
   `aria-hidden` when the landmark or its control already says it: never a caption and a
   matching `aria-label`, read twice (UI-SHL-5; S3-C0j review).

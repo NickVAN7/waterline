@@ -536,7 +536,8 @@ render inside the full shell when signed in.
   `/workspace/users/{user_id}/access`), and `/workspace/settings`; org administration at
   `/{org_slug}/overview` (the landing page: the org's details and its projects, each with its
   name, key, type, status, and lead, linking to its settings, its archived projects in a section
-  below headed "Archived" (DL-180; from S2-C0g); anyone who opens org admin pages holds inherited
+  below headed "Archived projects", each marked Archived in place of its status (DL-180; from
+  S2-C0g; S3-C0k), the slug under the title; anyone who opens org admin pages holds inherited
   project admin, design-doc §5), `/{org_slug}/members`, and
   `/{org_slug}/settings`.
 - **UI-SHL-11** **Opening an item** (a requirement, task, test case, or test run) from a list or
@@ -840,8 +841,9 @@ render inside the full shell when signed in.
   "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A content item's
   badge (a requirement's, from S2-C18) shows its effective restriction, its own with the
   project's (design-doc §3.1, DL-265). A "Deactivated" neutral badge follows a deactivated
-  user's name everywhere it appears, except the workspace users list, where it is in the Status
-  column (DL-137, from S2-C0g), and whose Role column shows the workspace role and system
+  user's name everywhere it appears, except in a people list (a roster, an access review), where
+  the row's text is muted and "· Deactivated" follows the name (`PersonName`; owner, S3-C0k), and
+  the workspace users list, where it is in the Status column (DL-137, from S2-C0g), and whose Role column shows the workspace role and system
   admin as text ("Owner, System admin", "System admin", "Admin"), or "User" for neither, with
   system admins who have no workspace role listed last (DL-183, DL-188; from S2-C0j); the
   per-person access review shows system admin as text too (DL-189, from S2-C0j). **Deactivated

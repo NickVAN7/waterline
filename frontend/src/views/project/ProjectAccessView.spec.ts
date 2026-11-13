@@ -124,7 +124,7 @@ describe('ProjectAccessView', () => {
       'Name',
       'Email',
       'Project role',
-      'Why they reach it',
+      'Access through',
       'Access',
     ])
     expect(
@@ -132,14 +132,24 @@ describe('ProjectAccessView', () => {
     ).toEqual([
       ['Ann Lee', 'ann@acme.example', 'Admin', 'Project admin', 'Content and management'],
       [
-        'Dee Gone Deactivated',
+        'Dee Gone · Deactivated',
         'dee@acme.example',
         'Viewer',
         'Project viewer',
         'Content and management',
       ],
-      ['Wes Admin', 'wes@harbor.example', 'None', 'Workspace admin, Org owner', 'Management only'],
+      [
+        'Wes Admin',
+        'wes@harbor.example',
+        'Admin (inherited)',
+        'Workspace admin, Org owner',
+        'Management only',
+      ],
     ])
+    // The deactivated person's row muted, the others not (UI-FBK-6, S3-C0k).
+    expect(
+      wrapper.findAll('tbody tr').map((tr) => tr.classes().includes('text-text-muted')),
+    ).toEqual([false, true, false])
     await expectNoA11yViolations(wrapper)
   })
 
@@ -155,14 +165,19 @@ describe('ProjectAccessView', () => {
       'Name',
       'Email',
       'Project role',
-      'Why they reach it',
+      'Access through',
     ])
     expect(
       wrapper
         .findAll('tbody tr')[2]!
         .findAll('td')
         .map((c) => c.text().trim()),
-    ).toEqual(['Wes Admin', 'wes@harbor.example', 'None', 'Workspace admin, Org owner'])
+    ).toEqual([
+      'Wes Admin',
+      'wes@harbor.example',
+      'Admin (inherited)',
+      'Workspace admin, Org owner',
+    ])
     await expectNoA11yViolations(wrapper)
   })
 

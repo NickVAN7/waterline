@@ -10,11 +10,10 @@
 // "Show deactivated", kept in the URL (DL-293, DL-295).
 import { computed, ref, watch } from 'vue'
 
-import { DEACTIVATED } from '@/app/labels'
 import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
-import Badge from '@/components/Badge.vue'
 import type { Crumb } from '@/components/Breadcrumbs.vue'
 import Button from '@/components/Button.vue'
+import PersonName from '@/components/PersonName.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -228,12 +227,25 @@ const announcement = computed(() => {
         }}
       </EmptyState>
       <template v-else>
-        <div role="region" aria-labelledby="roster-heading" tabindex="0" class="overflow-x-auto">
+        <div
+          role="region"
+          aria-labelledby="roster-heading"
+          tabindex="0"
+          class="relative overflow-x-auto"
+        >
           <table
             ref="table"
             aria-labelledby="roster-heading"
-            class="w-full border-collapse text-sm"
+            class="w-full min-w-(--content-narrow) table-fixed border-collapse text-sm"
           >
+            <!-- Fixed widths, so showing the deactivated never moves the columns (owner, S3-C0k); its
+                 minimum width scrolls it in its region on a narrow screen. -->
+            <colgroup>
+              <col class="w-1/3" />
+              <col />
+              <col class="w-1/4" />
+              <col class="w-16" />
+            </colgroup>
             <thead>
               <tr class="border-b border-border text-left">
                 <th scope="col" class="p-2">Name</th>
@@ -246,20 +258,12 @@ const announcement = computed(() => {
               <tr
                 v-for="row in page.data.value.items"
                 :key="row.user_id"
-                class="border-b border-border-subtle"
+                :class="['border-b border-border-subtle', !row.is_active && 'text-text-muted']"
               >
-                <td class="p-2">
-                  <span class="flex flex-wrap items-center gap-2">
-                    {{ row.name }}
-                    <Badge
-                      v-if="!row.is_active"
-                      :tone="DEACTIVATED.tone"
-                      :icon="DEACTIVATED.icon"
-                      >{{ DEACTIVATED.label }}</Badge
-                    >
-                  </span>
+                <td class="p-2 break-words">
+                  <PersonName :name="row.name" :active="row.is_active" />
                 </td>
-                <td class="p-2">{{ row.email }}</td>
+                <td class="p-2 break-words">{{ row.email }}</td>
                 <td class="p-2">{{ roleLabels[row.role] }}</td>
                 <td class="p-2 text-right">
                   <RowActions :name="row.name" :actions="actionsFor(row)" />

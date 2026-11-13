@@ -2,7 +2,7 @@
 
 import uuid
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Collection, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -30,12 +30,20 @@ from app.enums import (
     RestrictionCategory,
     WorkspaceRole,
 )
+from app.models.org import Organization
 from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
+from app.repositories.org import OrgRepository
 from app.repositories.user import NO_ROLE_SYSTEM_ADMIN, UserRepository
 from app.repositories.workspace import WorkspaceRepository
-from app.rules.account_rank import Account, WorkspaceRoleHeld, covering_orgs
+from app.rules.account_rank import (
+    Account,
+    OrgRoleHeld,
+    ProjectRoleHeld,
+    WorkspaceRoleHeld,
+    covering_orgs,
+)
 from app.rules.identifiers import (
     SLUG_MAX,
     SLUG_MIN,
@@ -55,6 +63,7 @@ from app.schemas.user import (
     OwnProfileUpdate,
     ProjectReach,
     UsernameSuggestion,
+    UserOrgMembership,
     UserRow,
     UserUpdate,
 )
@@ -382,8 +391,49 @@ class UserService:
             user_target(workspace_id, user.id, account),
         )
 
-    def row(self, ctx: AuthzContext, subject: AccountSubject) -> UserRow:
-        """A users-list row, with the account actions the caller may take on the user."""
+    async def orgs_of(
+        self, subjects: Collection[AccountSubject]
+    ) -> Mapping[uuid.UUID, Organization]:
+        """The orgs these users belong to in their workspace, for their rows' memberships."""
+        ids = {
+            held.org_id
+            for subject in subjects
+            for held in subject.account.memberships
+            if isinstance(held, OrgRoleHeld | ProjectRoleHeld)
+            and held.workspace_id == subject.workspace_id
+        }
+        return await OrgRepository(self.session).by_ids(ids)
+
+    @staticmethod
+    def memberships(
+        subject: AccountSubject, orgs: Mapping[uuid.UUID, Organization]
+    ) -> list[UserOrgMembership]:
+        """Each of the workspace's orgs the user belongs to, by name: their org role, if any, and
+        how many of its projects they're on (S3-C0k)."""
+        roles: dict[uuid.UUID, OrgRole] = {}
+        projects: defaultdict[uuid.UUID, int] = defaultdict(int)
+        for held in subject.account.memberships:
+            if isinstance(held, OrgRoleHeld) and held.workspace_id == subject.workspace_id:
+                roles[held.org_id] = held.role
+            elif isinstance(held, ProjectRoleHeld) and held.workspace_id == subject.workspace_id:
+                projects[held.org_id] += 1
+        items = [
+            UserOrgMembership(
+                org_id=org_id,
+                org_name=orgs[org_id].name,
+                org_slug=orgs[org_id].slug,
+                role=roles.get(org_id),
+                project_count=projects[org_id],
+            )
+            for org_id in roles.keys() | projects.keys()
+        ]
+        return sorted(items, key=lambda m: (m.org_name, str(m.org_id)))
+
+    def row(
+        self, ctx: AuthzContext, subject: AccountSubject, orgs: Mapping[uuid.UUID, Organization]
+    ) -> UserRow:
+        """A users-list row, with the user's orgs and the account actions the caller may take on
+        the user."""
         user = subject.user
         # The staff role, from the memberships the rank rule already loaded (DL-183).
         staff = (
@@ -399,6 +449,7 @@ class UserService:
             is_active=user.is_active,
             is_system_admin=user.is_system_admin,
             workspace_role=next(staff, None),
+            memberships=self.memberships(subject, orgs),
             allowed_actions=allowed_actions(
                 ctx, user_target(subject.workspace_id, user.id, subject.account)
             ),
@@ -419,9 +470,9 @@ class UserService:
             permitted={INCLUDE_DEACTIVATED} if admin else frozenset(),
         )
         accounts = await users.accounts(page.items)
-        return page.with_items(
-            [self.row(ctx, AccountSubject(u, accounts[u.id], workspace.id)) for u in page.items]
-        )
+        subjects = [AccountSubject(u, accounts[u.id], workspace.id) for u in page.items]
+        orgs = await self.orgs_of(subjects)
+        return page.with_items([self.row(ctx, subject, orgs) for subject in subjects])
 
     def log_account_event(
         self,
@@ -522,7 +573,7 @@ class UserService:
             if "email" in changed:
                 for handler in _ON_EMAIL_CHANGED:
                     await handler(self.session, user)
-        return self.row(ctx, subject)
+        return self.row(ctx, subject, await self.orgs_of([subject]))
 
     async def update_own(self, user: User, values: OwnProfileUpdate) -> MeUser:
         """The user's own name or username (`user_updated`)."""

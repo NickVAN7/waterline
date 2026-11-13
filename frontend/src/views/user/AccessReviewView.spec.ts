@@ -106,7 +106,7 @@ describe('AccessReviewView', () => {
     expect(projects.findAll('th').map((th) => th.text())).toEqual([
       'Project',
       'Organization',
-      'Why they reach it',
+      'Access through',
       'Access',
     ])
     expect(

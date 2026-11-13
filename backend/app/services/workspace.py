@@ -18,7 +18,7 @@ from app.models.workspace import Workspace, WorkspaceMembership
 from app.repositories.org import OrgRepository
 from app.repositories.workspace import WorkspaceRepository
 from app.rules.identifiers import slug_problem
-from app.schemas.org import OrgListItem
+from app.schemas.org import OrgListItem, OrgOwner
 from app.schemas.workspace import (
     SlugAvailability,
     StaffCreate,
@@ -259,4 +259,24 @@ class WorkspaceService:
             ORGS,
             query,  # pyright: ignore[reportArgumentType] -- ORGS.query_model
         )
-        return page.with_items([OrgListItem(id=o.id, name=o.name, slug=o.slug) for o in page.items])
+        orgs = OrgRepository(self.session)
+        ids = [o.id for o in page.items]
+        # Three grouped queries for the page, however many orgs (S3-C0k).
+        projects, members, owners = (
+            await orgs.project_counts(ids),
+            await orgs.member_counts(ids),
+            await orgs.owners_of(ids),
+        )
+        return page.with_items(
+            [
+                OrgListItem(
+                    id=o.id,
+                    name=o.name,
+                    slug=o.slug,
+                    project_count=projects.get(o.id, 0),
+                    member_count=members.get(o.id, 0),
+                    owners=[OrgOwner(id=i, name=n) for i, n in owners[o.id]],
+                )
+                for o in page.items
+            ]
+        )

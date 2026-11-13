@@ -9,7 +9,7 @@ import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
 import { WORKSPACE_CRUMB } from '@/app/crumbs'
-import { ACTIVE, DEACTIVATED, USER, workspaceRoleText } from '@/app/labels'
+import { ACTIVE, DEACTIVATED, orgMembershipText, USER, workspaceRoleText } from '@/app/labels'
 import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -154,8 +154,27 @@ const announcement = computed(() => {
       />
       <Skeleton v-else-if="!page.data.value" />
       <template v-else>
-        <div role="region" aria-labelledby="users-heading" tabindex="0" class="overflow-x-auto">
-          <table ref="table" aria-labelledby="users-heading" class="w-full border-collapse text-sm">
+        <div
+          role="region"
+          aria-labelledby="users-heading"
+          tabindex="0"
+          class="relative overflow-x-auto"
+        >
+          <!-- Fixed widths, so showing the deactivated never moves the columns (owner, S3-C0k); its
+               minimum width scrolls it in its region on a narrow screen. -->
+          <table
+            ref="table"
+            aria-labelledby="users-heading"
+            class="w-full min-w-(--content-narrow) table-fixed border-collapse text-sm"
+          >
+            <colgroup>
+              <col class="w-1/6" />
+              <col class="w-1/5" />
+              <col class="w-1/8" />
+              <col />
+              <col class="w-36" />
+              <col class="w-16" />
+            </colgroup>
             <thead>
               <tr class="border-b border-border text-left">
                 <th scope="col" class="p-2">Name</th>
@@ -172,12 +191,23 @@ const announcement = computed(() => {
                 :key="user.id"
                 class="border-b border-border-subtle"
               >
-                <td class="p-2">{{ user.name }}</td>
-                <td class="p-2">{{ user.email }}</td>
-                <td class="p-2 font-mono">{{ user.username }}</td>
+                <td class="p-2 break-words">{{ user.name }}</td>
+                <td class="p-2 break-words">{{ user.email }}</td>
+                <td class="p-2 font-mono break-words">{{ user.username }}</td>
                 <td class="p-2">
-                  <!-- The staff role and system admin as text, or "User" with neither (DL-188). -->
-                  {{ workspaceRoleText(user.workspace_role, user.is_system_admin, USER) }}
+                  <!-- The staff role and system admin, then each org the user belongs to (S3-C0k);
+                       "User" only with neither (DL-188). -->
+                  <p
+                    v-if="user.workspace_role || user.is_system_admin || !user.memberships.length"
+                    class="m-0"
+                  >
+                    {{ workspaceRoleText(user.workspace_role, user.is_system_admin, USER) }}
+                  </p>
+                  <ul v-if="user.memberships.length" class="m-0 list-none p-0 text-text-muted">
+                    <li v-for="m in user.memberships" :key="m.org_id">
+                      {{ orgMembershipText(m) }}
+                    </li>
+                  </ul>
                 </td>
                 <td class="p-2">
                   <Badge v-if="!user.is_active" :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{

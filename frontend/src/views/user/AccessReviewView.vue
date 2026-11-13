@@ -116,13 +116,13 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
             role="region"
             aria-labelledby="orgs-heading"
             tabindex="0"
-            class="overflow-x-auto"
+            class="relative overflow-x-auto"
           >
             <table aria-labelledby="orgs-heading" class="w-full border-collapse text-sm">
               <thead>
                 <tr class="border-b border-border text-left">
                   <th scope="col" class="p-2">Organization</th>
-                  <th scope="col" class="p-2">Why they reach it</th>
+                  <th scope="col" class="p-2">Access through</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,14 +145,14 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
             role="region"
             aria-labelledby="projects-heading"
             tabindex="0"
-            class="overflow-x-auto"
+            class="relative overflow-x-auto"
           >
             <table aria-labelledby="projects-heading" class="w-full border-collapse text-sm">
               <thead>
                 <tr class="border-b border-border text-left">
                   <th scope="col" class="p-2">Project</th>
                   <th scope="col" class="p-2">Organization</th>
-                  <th scope="col" class="p-2">Why they reach it</th>
+                  <th scope="col" class="p-2">Access through</th>
                   <th v-if="exportControlled" scope="col" class="p-2">Access</th>
                 </tr>
               </thead>

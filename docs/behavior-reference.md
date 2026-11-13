@@ -88,7 +88,7 @@ loaded, it shows **Try again** and the others still show; if the whole page can'
 
 An organization's project list (`/<organization>/projects`) shows its projects that you can
 see, each with its key, type, and status, 25 to a page (archived projects are left out:
-organization owners and admins find them in the Overview's **Archived** list), with **Previous page** and **Next page** links when there are more. **Status**
+organization owners and admins find them in the Overview's **Archived projects** list), with **Previous page** and **Next page** links when there are more. **Status**
 and **Type** narrow the list; when no project matches, **Clear filters** shows them all again. The page you're on and the
 filters are in the address, so a link or a reload opens the same list.
 
@@ -300,9 +300,10 @@ admins) can also:
   admin.
 - **Access review**, at the top beside the add buttons, opens the project's access review
   (`/<organization>/projects/<KEY>/access`): everyone who can open the project, with their
-  project role, if any, why they reach it (the
-  role, or an admin role above it), and, on an export-controlled project, whether they reach its
-  content or only its management.
+  **Project role** (**Admin (inherited)** for someone with none who administers it through a role
+  above it), **Access through** (the role, or the admin role above it), and, on an
+  export-controlled project, whether they reach its content or only its management. A
+  deactivated person's row is muted, **· Deactivated** after the name.
 
 **Settings**, in the sidebar under the project, is there if you may change any of its settings
 (`/<organization>/projects/<KEY>/settings`). Each part shows only if you may use it:
@@ -403,7 +404,9 @@ the top right. Its pages are listed in the sidebar, under the caption **Workspac
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
 its **Actions for …** menu, which lists only what you may do to that person. **Staff**,
 **Users**, and an organization's **Members** list active people only: select **Show
-deactivated**, above the list, to include deactivated people, each marked **Deactivated**. That's
+deactivated**, above the list, to include deactivated people: on **Staff** and **Members** each
+such row's text is muted and **· Deactivated** follows the name; on **Users** the **Status**
+column says **Deactivated**. The columns keep their widths. That's
 how you find someone to reactivate. A list with only deactivated people shows as empty ("No
 staff yet"), with a pointer to **Show deactivated**.
 
@@ -421,13 +424,17 @@ staff yet"), with a pointer to **Show deactivated**.
   choose who becomes owner: Waterline asks for that person when it happens. A role change or
   removal that leaves someone unable to see a project's content hands their undecided approvals
   there to whoever requested each one, if that person is still a project admin.
-- **Organizations** lists the workspace's organizations. **Create organization** asks for its
+- **Organizations** lists the workspace's organizations, each with its slug, its number of
+  **Projects** (the archived left out), **Members** (active accounts), and **Owners** (**None**
+  if it has none). **Create organization** asks for its
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
   existing person, or a new account with a temporary password, shown once.
 - **Users** lists everyone in the workspace. **Role** shows their workspace role (**Owner**,
   **Admin**, or **Member**) and **System admin** for system admins (**Owner, System admin**;
-  granted outside the app, so you can read it but not change it); someone with neither shows
-  **User**. System admins with no workspace role are listed last. **Status** shows **Active** or
+  granted outside the app, so you can read it but not change it), then each organization they
+  belong to, with their role there and how many of its projects they're on, archived ones included (**Acme Manufacturing
+  · Admin · 2 projects**, the role left out when they're on its projects alone); someone with
+  none of these shows **User**. System admins with no workspace role are listed last. **Status** shows **Active** or
   **Deactivated**.
 - **Settings** renames the workspace and changes its slug (workspace owners and system admins).
 
@@ -437,13 +444,13 @@ username; changing the email signs them out everywhere), **Reset password** (a n
 password, shown once), **Sign out everywhere**, and **Deactivate** (they're signed out and can't
 sign in until reactivated; their work stays, and their undecided approvals go to whoever
 requested each one, if that person is still a project admin). Once deactivated, they leave the
-list unless **Show deactivated** is selected, where they show a **Deactivated** badge and are
+list unless **Show deactivated** is selected, where they show **Deactivated** in the Status column and are
 offered **Reactivate** instead. The last active owner, or the last system admin, can't be
 deactivated.
 
 **Access review.** A person's row offers **Access review** to those who may see it: their
 **Role** as the users list shows it (**None** with neither), then every organization and
-project they can reach, why (their role, or a role above it), and, for each
+project they can reach, and **Access through** (their role, or a role above it), and, for each
 export-controlled project, whether they reach its content or only its management (the **Access**
 column shows only when one of their projects is export-controlled).
 
@@ -456,10 +463,11 @@ organizations first to administer another). They're listed in the sidebar, under
 **Members**, and **Settings**. Anyone else who opens these pages
 is told to ask the organization's owners or admins.
 
-- **Overview** (`/<organization>/overview`) shows the organization's name and slug, and its
-  projects with their key, type, status, and lead ("No lead" if there's none); each project's
-  name opens its settings. Archived projects are listed below, under **Archived**; open one's
-  settings to unarchive it.
+- **Overview** (`/<organization>/overview`) shows the organization's slug under its title, and
+  its projects with their key, type, status, and lead ("No lead" if there's none); each
+  project's name opens its settings. Archived projects are listed below, under **Archived
+  projects**, each marked **Archived** in place of its status; open one's settings to unarchive
+  it.
 
 - **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
   as **Staff** does under workspace administration: **Add person** asks for the email and the role first,

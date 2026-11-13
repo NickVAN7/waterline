@@ -200,7 +200,12 @@ const announcement = computed(() => {
           Requirements deleted from this project show here, until they're restored.
         </EmptyState>
         <template v-else>
-          <div role="region" aria-labelledby="trash-heading" tabindex="0" class="overflow-x-auto">
+          <div
+            role="region"
+            aria-labelledby="trash-heading"
+            tabindex="0"
+            class="relative overflow-x-auto"
+          >
             <table aria-labelledby="trash-heading" class="w-full border-collapse text-sm">
               <thead>
                 <tr class="border-b border-border text-left">

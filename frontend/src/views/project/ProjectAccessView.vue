@@ -8,9 +8,9 @@
 import { computed, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { ACCESS_KIND, ACCESS_REASON, DEACTIVATED, NO_ROLE, PROJECT_ROLE } from '@/app/labels'
-import Badge from '@/components/Badge.vue'
+import { ACCESS_KIND, ACCESS_REASON, INHERITED_ADMIN_ROLE, PROJECT_ROLE } from '@/app/labels'
 import ErrorState from '@/components/ErrorState.vue'
+import PersonName from '@/components/PersonName.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
 import { settlePage } from '@/app/routeFocus'
@@ -88,7 +88,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
           role="region"
           aria-labelledby="access-heading"
           tabindex="0"
-          class="overflow-x-auto"
+          class="relative overflow-x-auto"
         >
           <table aria-labelledby="access-heading" class="w-full border-collapse text-sm">
             <thead>
@@ -96,7 +96,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
                 <th scope="col" class="p-2">Name</th>
                 <th scope="col" class="p-2">Email</th>
                 <th scope="col" class="p-2">Project role</th>
-                <th scope="col" class="p-2">Why they reach it</th>
+                <th scope="col" class="p-2">Access through</th>
                 <th v-if="exportControlled" scope="col" class="p-2">Access</th>
               </tr>
             </thead>
@@ -104,21 +104,19 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
               <tr
                 v-for="entry in review.data.value.people"
                 :key="entry.user.id"
-                class="border-b border-border-subtle"
+                :class="[
+                  'border-b border-border-subtle',
+                  !entry.user.is_active && 'text-text-muted',
+                ]"
               >
                 <td class="p-2">
-                  <span class="flex flex-wrap items-center gap-2">
-                    {{ entry.user.name }}
-                    <Badge
-                      v-if="!entry.user.is_active"
-                      :tone="DEACTIVATED.tone"
-                      :icon="DEACTIVATED.icon"
-                      >{{ DEACTIVATED.label }}</Badge
-                    >
-                  </span>
+                  <PersonName :name="entry.user.name" :active="entry.user.is_active" />
                 </td>
-                <td class="p-2">{{ entry.user.email }}</td>
-                <td class="p-2">{{ entry.role ? PROJECT_ROLE[entry.role] : NO_ROLE }}</td>
+                <td class="p-2 break-words">{{ entry.user.email }}</td>
+                <!-- With no project role, they reach it through an admin role above it (Q12h). -->
+                <td class="p-2">
+                  {{ entry.role ? PROJECT_ROLE[entry.role] : INHERITED_ADMIN_ROLE }}
+                </td>
                 <td class="p-2">{{ reasons(entry.reasons) }}</td>
                 <td v-if="exportControlled" class="p-2">{{ ACCESS_KIND[entry.access] }}</td>
               </tr>

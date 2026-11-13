@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
 import { WORKSPACE_CRUMB } from '@/app/crumbs'
+import { NO_OWNERS } from '@/app/labels'
 import { settlePage } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -102,12 +103,21 @@ const announcement = computed(() => {
         }}
       </EmptyState>
       <template v-else>
-        <div role="region" aria-labelledby="orgs-heading" tabindex="0" class="overflow-x-auto">
+        <div
+          role="region"
+          aria-labelledby="orgs-heading"
+          tabindex="0"
+          class="relative overflow-x-auto"
+        >
           <table aria-labelledby="orgs-heading" class="w-full border-collapse text-sm">
             <thead>
               <tr class="border-b border-border text-left">
                 <th scope="col" class="p-2">Name</th>
                 <th scope="col" class="p-2">Slug</th>
+                <!-- Counts and owners (S3-C0k): the archived projects and deactivated people left out. -->
+                <th scope="col" class="p-2 text-right">Projects</th>
+                <th scope="col" class="p-2 text-right">Members</th>
+                <th scope="col" class="p-2">Owners</th>
               </tr>
             </thead>
             <tbody>
@@ -122,6 +132,14 @@ const announcement = computed(() => {
                   }}</RouterLink>
                 </td>
                 <td class="p-2 font-mono">{{ org.slug }}</td>
+                <td class="p-2 text-right tabular-nums">{{ org.project_count }}</td>
+                <td class="p-2 text-right tabular-nums">{{ org.member_count }}</td>
+                <td class="p-2">
+                  <template v-if="org.owners.length">{{
+                    org.owners.map((owner) => owner.name).join(', ')
+                  }}</template>
+                  <span v-else class="text-text-muted">{{ NO_OWNERS }}</span>
+                </td>
               </tr>
             </tbody>
           </table>

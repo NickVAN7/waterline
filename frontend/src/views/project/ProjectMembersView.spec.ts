@@ -143,7 +143,7 @@ describe('ProjectMembersView', () => {
       wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
     ).toEqual([
       ['Ann Lee', 'ann@acme.example', 'Admin', ''],
-      ['Dee Gone Deactivated', 'dee@acme.example', 'Viewer', ''],
+      ['Dee Gone · Deactivated', 'dee@acme.example', 'Viewer', ''],
     ])
     await expectNoA11yViolations(wrapper)
   })
