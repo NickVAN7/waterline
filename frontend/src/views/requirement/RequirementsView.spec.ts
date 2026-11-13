@@ -165,7 +165,7 @@ describe('RequirementsView', () => {
       ],
       current: 'Requirements',
     })
-    expect(document.title).toBe('ERP rollout requirements · Waterline')
+    expect(document.title).toBe('ERP requirements · Waterline')
     expect(wrapper.findAll('tbody tr').map((r) => r.find('td').text().trim())).toEqual([
       'Invoicing',
       'Payments',

@@ -33,5 +33,7 @@ means the guard stopped something it should have.
 | 24 | after S3-C0h's commit | `curl …; gh run list …` (checking the dev stack, then CI) in one call | a compound command with gh in it | separate calls | legit; my slip (as #15) |
 | 25 | DC-2026-11-12b review (docs-consistency) | `cd … && git status …` | a compound command with git in it | separate `git -C` calls | legit (as #15) |
 | 26 | DC-2026-11-12b review (docs-consistency) | `R=…; git -C … show …` | a variable and git in one call | separate `git -C` calls | legit (as #15) |
+| 27 | S3-C0j | `sed …; grep …; git -C … hash-object …` in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
+| 28 | S3-C0j (spec-test-writer) | a `python3` heredoc edit, then `git diff --stat`, in one call | a compound command with git in it | the Edit tool and a separate call | legit (as #15) |
 
 None of the blocks so far stopped anything the rules forbid.

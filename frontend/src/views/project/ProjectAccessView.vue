@@ -58,7 +58,7 @@ const reasons = (list: (keyof typeof ACCESS_REASON)[]) =>
     <template v-else>
       <ProjectHeader
         :project="loaded"
-        :title="`${loaded.name} project access review`"
+        page="project access review"
         :trail="[
           { label: 'Members', to: { name: 'project-members', params: { key: loaded.key } } },
           { label: 'Access review' },

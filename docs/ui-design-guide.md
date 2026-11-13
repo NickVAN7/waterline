@@ -273,8 +273,9 @@ These sit in the same `@theme static` block as §3.1.
   --control-height: 2.25rem;     /* 36px: buttons and inputs */
   --header-height: 3.5rem;
   --sidebar-width: 15rem;
-  --content-narrow: 40rem;       /* forms, settings */
-  --content-prose: 68ch;         /* a guide article's text (DL-340) */
+  --sidebar-height: calc(100dvh - var(--header-height)); /* it stays put as the page scrolls */
+  --content-narrow: 48rem;       /* forms, settings, dialogs (DL-373) */
+  --content-prose: 100ch;        /* a guide article's text (DL-373) */
 
   /* Focus ring */
   --focus-ring-width: 2px;
@@ -445,7 +446,9 @@ render inside the full shell when signed in.
   horizontal scroll and a taller header never covers focus (DL-98). The other sticky layers in v1
   are a table's selection toolbar, only while rows are selected (UI-TBL-8), and the item side
   panel's split pane, under the header at `--header-height` (UI-SHL-11), and a guide page's On
-  this page nav, under the header from 64 rem wide and 30 rem tall (DL-340). Any later sticky
+  this page nav, under the header from 64 rem wide and 30 rem tall (DL-340), and from 48 rem the
+  sidebar, under the header at `--sidebar-height`, scrolling within itself if it's taller (owner,
+  S2 feedback; S3-C0j). Any later sticky
   element needs the same `scroll-padding` treatment and an end-to-end focus check
   (UI-FBK-10).
 - **UI-SHL-4** **Org menu** (DL-137; from S2-C0e and S2-C0f): the header reads "Waterline"
@@ -463,7 +466,10 @@ render inside the full shell when signed in.
   selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). **On an admin page**
   (UI-SHL-10) the sidebar shows My work and then that admin area's section nav (the org's
   Overview, Members, and Settings; the workspace's Staff, Orgs, Users, and Settings) in place of
-  the project selector and project pages (DL-137; from S2-C0f). An item shows only when
+  the project selector and project pages (DL-137; from S2-C0f). A small caption says whose pages
+  follow: **Project** above the selector (hidden from screen readers, whose button already says
+  "Project:"), **Organization** and the org's name above its pages, **Workspace administration**
+  above the workspace's (owner, S2 feedback; S3-C0j). An item shows only when
   `allowed_actions` allows it. Text is always visible; icons only supplement it. Below 48 rem
   the sidebar becomes a "Menu" disclosure button in the header (`aria-expanded`,
   `aria-controls`); nothing depends on hover. On a docs route the sidebar shows My work, then
@@ -471,9 +477,11 @@ render inside the full shell when signed in.
   the current one marked as an admin page's is (DL-338; from S3-C0g).
 - **UI-SHL-6** **Project selector and project pages.** The selector is a menu button showing the
   current project that opens a disclosure popover of **links** (not a Select or listbox),
-  headed by the current org's name (it lists that org's projects only), with a filter field past
-  about eight projects, and "All projects" (styled apart from the project links) and "New
-  project" (only when allowed; not indented) (DL-137). Below it, the selected project's pages
+  headed by the current org's name (it lists that org's projects only); past about eight projects,
+  a **Filter projects** button shows a filter field and moves focus to it (the org menu's the same,
+  shared `LinkPopover`); then "All projects" (a menu row with an arrow, below a rule, not
+  underlined) and "New project" (only when allowed; not indented) (DL-137). In the sidebar the
+  selector fills its width, its arrow at the end (owner, S2 feedback; S3-C0j). Below it, the selected project's pages
   are links, flat, in this order (DL-202): Home, Requirements, Tasks (Board and Backlog as tabs),
   Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings,
   and Trash last; from S3-C0l, Trash leaves the list for a link in each list page's header
@@ -490,9 +498,10 @@ render inside the full shell when signed in.
   picker, primary) and Add by email (secondary) (DL-119).
 - **UI-SHL-7** **Content width:** `main` takes the whole width beside the sidebar (and beside
   the split pane when it's open, UI-SHL-11), with at least 4 (`p-4`) side padding: a page's
-  header, lists, tables, and card grids span it (DL-360). Forms and settings stay at
-  `--content-narrow`, and a guide article's text at `--content-prose`, so lines stay readable;
-  its On this page sits at the right of `main` on a wide screen. Pages reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
+  header, lists, tables, and card grids span it (DL-360). A form or settings page keeps its form
+  at `--content-narrow` (48 rem), left-aligned like every other page; a page's form sets the cap
+  on itself, since `main` has none. A guide article, its text up to `--content-prose` (100ch)
+  and its On this page beside it, is centered in `main` (DL-367, DL-373). Pages reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
   page's primary action(s) on the right (wrapping below at narrow widths); a project page's
@@ -504,7 +513,10 @@ render inside the full shell when signed in.
   and nest in order. The help link (3.2.6) is the user menu's **Documentation** item (S2-C21d,
   DL-238), in the same place on every page.
 - **UI-SHL-9** **Route changes:** on navigation, set `document.title` to
-  `<h1 text> · Waterline` and move focus to the new `h1` (`tabindex="-1"`) once the view has
+  `<short title> · Waterline`, the part that tells tabs apart first: the `h1`'s `data-tab-title`
+  when it has one (an item's ID, `PORTAL-RQ-2`; a project page's key and page, `PORTAL members`,
+  through `PageHeader`'s `tabTitle` and `ProjectHeader`'s `page`), otherwise the `h1`'s text
+  (owner, S2 feedback; S3-C0j); and move focus to the new `h1` (`tabindex="-1"`) once the view has
   rendered. A change that only alters list state through `useListQuery` (sort, filter, page)
   does not move focus; it updates a polite live region instead ("12 projects"). On a guide page
   (`/docs/<page>`), a section's hash (`#<section>`) moves focus to that section's heading instead
@@ -1108,16 +1120,22 @@ the revision compare in S2-C19a (DL-267).
   text's words joined by hyphens, `-2` on a repeat, so user content never sets an id (DL-311,
   DL-338). A task-list item's `[ ]` or `[x]` is a mark
   drawn in tokens and named "Not done" or "Done" (`role="img"`), not a disabled checkbox, whose
-  look the tokens can't reach (DL-258). A component test runs a corpus of known XSS
+  look the tokens can't reach (DL-258). A table has one header row, its `th` cells
+  `scope="col"` from the renderer (DL-366). A component test runs a corpus of known XSS
   payloads (the OWASP cheat sheet's) through it, and an end-to-end test (S2-C18, DL-245) proves a
   stored payload doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
   **Docs mode** (`docs`, the bundled guide only, from S3-C0g, DL-341; user content renders as
-  above): heading ids; `> [!TIP]`, `> [!NOTE]`, `> [!WARNING]` as info, warning, and danger tone
-  boxes with an icon and a bold label (a `div`, not a quote); `++Key++` as `<kbd>`; links also to
+  above): heading ids; `> [!TIP]`, `> [!NOTE]`, `> [!WARNING]` as success, info, and danger tone
+  boxes (DL-364) with an icon and a bold label (a `div`, not a quote); `++Key++` as `<kbd>`; links also to
   a path on our own origin (another guide page, opened in the app), never `//host`; and an image
   in `docs/user-guide/images/`, bundled through Vite, as itself, any other image a link; an
   image with a `-dark` sibling (`trash.webp`, `trash-dark.webp`) renders as both, and only the
-  current theme's shows, the system's or the one chosen (DL-343). Bundled images are served from our own origin, so the CSP's `default-src 'self'` covers them without
+  current theme's shows, the system's or the one chosen (DL-343). Each version is a link to it,
+  opening in a new tab (its name ends "(opens in a new tab)", visually hidden), which the article's
+  in-app link handling leaves to the browser, and loads lazily, so only the shown one is fetched
+  (DL-363). A guide heading's id never matches one the shell or the docs views render, checked
+  against a mounted app (`router.spec.ts`, DL-366). The build never inlines an asset
+  (`assetsInlineLimit: 0`, DL-370), so a bundled image is never a `data:` URI. Bundled images are served from our own origin, so the CSP's `default-src 'self'` covers them without
   an `img-src`. The XSS corpus runs in docs mode too.
 - **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
   **Preview** tabs (a tablist), previewing with `MarkdownView` (DL-141). No WYSIWYG editor; a

@@ -592,7 +592,9 @@ Workspace (the firm: tenant boundary)
   scripts only from our own origin, a second layer behind the markdown sanitizer (§3). Styles
   are `style-src 'self' 'unsafe-inline'` (DL-246): PrimeVue and the Vite dev server inject
   `<style>` tags, and a nonce needs a server that mints one per response, which comes with the
-  first deployment (TD-87).
+  first deployment (TD-87). The build never inlines an asset (`assetsInlineLimit: 0`), so a
+  bundled image stays a file on our own origin, not a `data:` URI the policy would block, and no
+  `img-src` widening is needed (DL-370).
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
@@ -1556,12 +1558,12 @@ approval requests, §6.2; DL-200), which stay visible inside the project, and, u
 archived projects themselves (DL-330). Until
 notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
 projects** (DL-197): a star on a My work project row keeps it at the top, per user: a Favorite
-projects section first, by name, archived ones left out (S2-C21c, DL-238, DL-302 to DL-305); favoriting items is v1.5 or later, and there's no "recently viewed".
+projects section first, by name, archived ones left out, every favorite shown (no cap, DL-369; S2-C21c, DL-238, DL-302 to DL-305); favoriting items is v1.5 or later, and there's no "recently viewed".
 From S3-C0f (DL-329, DL-330, DL-332 to DL-334, DL-349, DL-359), My work opens with Favorites,
 then a section per organization you can open a project in (by name; its heading left out when
-there's one), in compact rows: its first 10 open projects (Active, Planning, On hold, each by
-name) with "Showing 10 of N" past 10, then **Show N hidden projects** revealing the first 10 of
-the rest (Completed, Cancelled, each by name, then the archived by name alone), and **All N projects**, N being what
+there's one), in compact rows: its first 5 open projects (Active, Planning, On hold, each by
+name; DL-368) with "Showing 5 of N" past 5, then **Show N hidden projects** revealing the first 5
+of the rest (Completed, Cancelled, each by name, then the archived by name alone), and **All N projects**, N being what
 the org's own list shows (all but the archived; no link when that's none); the heading's count is every project of it you
 can open. Archived projects are on these lists (no star: starring is a mutation), their items
 still left out. Then the approvals waiting for you; the past-decisions section is removed
@@ -1585,7 +1587,8 @@ through the other areas' repositories and calls no service (build plan, "Feature
   section's query runs in a savepoint, so one that fails is returned as unavailable and the
   rest still show.
 - `GET /api/me/work/{section}`: one section as an ordinary offset-paged list (build plan,
-  "API conventions"), for "see all".
+  "API conventions"), for "see all": approvals only, since favorites are shown in full (DL-371)
+  and each organization links to its own list.
 
 ### Project home: Get started checklist
 DL-201. A new project's home page shows three items, each linking to where it's done and ticked

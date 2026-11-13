@@ -138,11 +138,7 @@ const refused = () => reload()
       @refused="refused"
     >
       <template #header="{ add }">
-        <ProjectHeader
-          :project="loaded"
-          :title="`${loaded.name} members`"
-          :trail="[{ label: 'Members' }]"
-        >
+        <ProjectHeader :project="loaded" page="members" :trail="[{ label: 'Members' }]">
           <Button v-if="canManage" @click="picker?.open()">Add member</Button>
           <Button v-if="canManage && workspaceId" variant="secondary" @click="add()"
             >Add by email</Button

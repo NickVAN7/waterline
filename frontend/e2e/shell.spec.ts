@@ -3,6 +3,18 @@ import { expect, type Page, test } from '@playwright/test'
 import { expectFocusNotObscured, expectNoA11yViolations } from './support/a11y'
 import { signIn } from './support/demo'
 
+/** The background a tone's token resolves to, here (a callout's, DL-364). */
+function toneBackground(page: Page, tone: string): Promise<string> {
+  return page.evaluate((t) => {
+    const probe = document.createElement('div')
+    probe.style.background = `var(--color-tone-${t}-bg)`
+    document.body.append(probe)
+    const color = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return color
+  }, tone)
+}
+
 // `casey` is in both demo orgs, on PORTAL (acme) and INV (globex): the org menu's user.
 
 test('My work lists the projects the user can open, in the shell', async ({ page }) => {
@@ -81,7 +93,8 @@ test('the org menu opens an org, and the project selector one of its projects', 
 
   await expect(page).toHaveURL('/globex/projects/INV')
   await expect(page.getByRole('heading', { level: 1, name: 'Inventory System' })).toBeFocused()
-  await expect(page).toHaveTitle('Inventory System · Waterline')
+  // The tab shows what tells it apart first: the project's key (UI-SHL-9).
+  await expect(page).toHaveTitle('INV · Waterline')
   const projectNav = page.getByRole('navigation', { name: 'Project' })
   await expect(projectNav.getByRole('link', { name: 'Home' })).toHaveAttribute(
     'aria-current',
@@ -164,6 +177,15 @@ test('the user menu opens Documentation, whose pages and sections open from the 
   )
   // Docs mode's callout and keys rendered in the real browser, under the CSP.
   await expect(page.locator('.callout-danger strong')).toHaveText('Warning')
+  // Each callout draws its own tone (DL-364): a class without its style would pass a spec.
+  await expect(page.locator('.callout-success').first()).toHaveCSS(
+    'background-color',
+    await toneBackground(page, 'success'),
+  )
+  await expect(page.locator('.callout-danger').first()).toHaveCSS(
+    'background-color',
+    await toneBackground(page, 'danger'),
+  )
   await expectNoA11yViolations(page)
   // On this page sticks under the header here: nothing Tab reaches sits under either (UI-SHL-3).
   await expectFocusNotObscured(page)
@@ -183,6 +205,11 @@ test('the user menu opens Documentation, whose pages and sections open from the 
   await page.getByRole('main').getByRole('link', { name: 'Trash', exact: true }).click()
   await expect(page).toHaveURL('/docs/trash')
   await expect(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeFocused()
+  // Trash's NOTE, in the info tone.
+  await expect(page.locator('.callout-info').first()).toHaveCSS(
+    'background-color',
+    await toneBackground(page, 'info'),
+  )
 
   await page.goto('/docs/keyboard-and-accessibility#the-requirements-tree')
   await expect(page.getByRole('heading', { level: 2, name: 'The requirements tree' })).toBeFocused()
@@ -331,18 +358,56 @@ test('on a wide screen, a list spans the width beside the sidebar; a form and gu
   expect(await right('main table')).toBeGreaterThan(2400 - 40)
   expect(await right('main h1 >> xpath=..')).toBeGreaterThan(2400 - 40)
 
-  // Forms stay at --content-narrow (40rem): Account settings' own, and New requirement's, whose
+  // Forms stay at --content-narrow (48rem): Account settings' own, and New requirement's, whose
   // cap is on the form itself.
   await page.goto('/account')
   const field = (await page.getByRole('textbox', { name: 'Name', exact: true }).boundingBox())!
-  expect(field.width).toBeLessThanOrEqual(640)
+  expect(field.width).toBeLessThanOrEqual(768)
   await page.goto('/acme/projects/PORTAL/requirements/new')
   const title = (await page.getByRole('textbox', { name: 'Title', exact: true }).boundingBox())!
-  expect(title.width).toBeLessThanOrEqual(640)
+  expect(title.width).toBeLessThanOrEqual(768)
 
-  // A guide article's text stays at --content-prose; On this page sits at the right of main.
+  // A guide article's text stays at --content-prose, and the article with On this page is
+  // centered in main (DL-367).
   await page.goto('/docs/requirements')
   const text = (await page.locator('article .markdown').boundingBox())!
-  expect(text.width).toBeLessThan(900)
-  expect(await right('nav[aria-label="On this page"]')).toBeGreaterThan(2400 - 40)
+  expect(text.width).toBeLessThan(1100)
+  const body = (await page.locator('main').boundingBox())!
+  const group = (await page.locator('article').locator('xpath=..').boundingBox())!
+  const left = group.x - body.x
+  const rightGap = body.x + body.width - (group.x + group.width)
+  expect(Math.abs(left - rightGap)).toBeLessThan(4)
+  expect(left).toBeGreaterThan(100)
+})
+
+test('the sidebar stays put while the page scrolls, and under forced colors only the current link has its bar (TD-112)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 500 })
+  await signIn(page, 'wendy')
+  await page.goto('/workspace/users')
+  const myWork = page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'My work' })
+  await expect(page.getByRole('table')).toBeVisible()
+  const before = (await myWork.boundingBox())!.y
+
+  await page.mouse.wheel(0, 2000)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  expect(Math.abs((await myWork.boundingBox())!.y - before)).toBeLessThanOrEqual(1)
+
+  // Forced colors draw a transparent border, so a bar on every link would show (UI-TOK-9).
+  await page.emulateMedia({ forcedColors: 'active' })
+  const bars = await page
+    .getByRole('navigation', { name: 'Workspace administration' })
+    .getByRole('link')
+    .evaluateAll((links) =>
+      links.map((a) => [a.textContent?.trim(), getComputedStyle(a).borderLeftWidth]),
+    )
+  expect(bars).toEqual([
+    ['Staff', '0px'],
+    ['Organizations', '0px'],
+    ['Users', '3px'],
+    ['Settings', '0px'],
+  ])
 })

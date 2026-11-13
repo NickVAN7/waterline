@@ -115,7 +115,7 @@ describe('ProjectAccessView', () => {
       ],
       current: 'Access review',
     })
-    expect(document.title).toBe('ERP rollout project access review · Waterline')
+    expect(document.title).toBe('ERP project access review · Waterline')
     // What the page is for, said under its title (DL-137).
     expect(wrapper.get('header + p').text()).toBe(
       'Everyone who can open this project, and why: their own role on it, or an admin role they inherit from the organization or the workspace.',

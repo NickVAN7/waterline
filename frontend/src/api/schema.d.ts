@@ -967,26 +967,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/me/work/favorites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Favorites
-         * @description The projects the user starred and can open, archived left out, by name (DL-302).
-         */
-        get: operations["my_favorites_api_me_work_favorites_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/me/work/approvals": {
         parameters: {
             query?: never;
@@ -2068,17 +2048,6 @@ export interface components {
         Page_MemberRead_: {
             /** Items */
             items: components["schemas"]["MemberRead"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
-        /** Page[MyProjectItem] */
-        Page_MyProjectItem_: {
-            /** Items */
-            items: components["schemas"]["MyProjectItem"][];
             /** Total */
             total: number;
             /** Limit */
@@ -6209,55 +6178,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyWork"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-        };
-    };
-    my_favorites_api_me_work_favorites_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                /** @description Comma-separated, `-` for descending: key, name. Default: name */
-                sort?: string | null;
-                status?: components["schemas"]["ProjectStatus"][] | null;
-                status__not?: components["schemas"]["ProjectStatus"][] | null;
-                status__is_null?: boolean | null;
-                type?: components["schemas"]["ProjectType"][] | null;
-                type__not?: components["schemas"]["ProjectType"][] | null;
-                type__is_null?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Page_MyProjectItem_"];
                 };
             };
             /** @description Unauthorized */

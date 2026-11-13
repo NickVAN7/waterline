@@ -158,10 +158,11 @@ Entry format:
   §11); a user on more than 10 projects finds the rest on each org's project list. From S2-C20b,
   the approvals section too (`/approvals`): past 10, the page says how many there are; an
   approval past the first 10 shows once an older one is decided. From S3-C0f each org's section
-  links to its list (DL-359), and favorites (`/favorites`) still have no "see all".
+  links to its list (DL-359); from S3-C0j favorites are shown in full (DL-369), so approvals
+  alone need one.
 - **Why:** smallest complete change: no demo user is on more than two projects, and the org list
   already shows them all; no demo user has more than a few approvals. The "see all" list belongs with the sections that need one most.
-- **Fix by:** S3-C29 (My work's "see all" for every section; the per-section routes exist, so frontend only)
+- **Fix by:** S3-C29 (My work's "see all" for approvals; its route exists, so frontend only)
 - **Status:** open
 
 ### TD-38: The project selector lists an org's first 200 projects
@@ -471,17 +472,6 @@ Entry format:
   shows)
 - **Status:** open
 
-### TD-112: SidebarLink's transparent bar draws on every link under forced colors
-- **Added:** S3-C0g
-- **What:** `SidebarLink` gives links that aren't current a `border-transparent` 3px leading
-  border, which forced colors draw, so every sidebar link shows the current page's bar and only
-  bold text marks it (UI-TOK-9). The docs sidebar adds 13 such links; On this page was fixed
-  in S3-C0g (the bar only on the current entry, padding on the rest).
-- **Why:** the pattern dates from Slice 1's shell, outside this checkpoint (DL-106; ui-reviewer,
-  S3-C0g, minor).
-- **Fix by:** S3-C0j (shell feedback), with a forced-colors check of the sidebar
-- **Status:** open
-
 ### TD-113: UI-SVR-3 doesn't say SVAR's stylesheet must be imported, or that Willow's icons go blank
 - **Added:** S3-C0i
 - **What:** the S3-C0i spike found that a SVAR widget draws unstyled unless its own stylesheet
@@ -492,6 +482,18 @@ Entry format:
 - **Why:** a rule change, outside a spike's scope (checkpoint-reviewer, S3-C0i, minor).
 - **Fix by:** S3-C18 (the first SVAR wrapper, the board): UI-SVR-3 gains both, and the board's
   Willow icons are checked
+- **Status:** open
+
+### TD-114: No e2e opens a popover past eight links from the keyboard
+- **Added:** S3-C0j
+- **What:** the project selector and org menu show a **Filter** button past eight links
+  (UI-SHL-6). Its spec opens one, runs axe, and checks focus; no e2e opens one from the keyboard,
+  as `frontend/CLAUDE.md`'s overlay rule asks, because the e2e stack's demo data has no org with
+  more than eight projects (`--manual-pass`'s `acme` has eleven).
+- **Why:** the e2e stack counts what `--demo` builds; growing it means reworking its counts
+  (ui-reviewer, S3-C0j, a coverage gap).
+- **Fix by:** S3-C33 (slice verification's manual pass on `--manual-pass`), or the first e2e
+  that needs a bigger org
 - **Status:** open
 
 ---
@@ -870,3 +872,8 @@ Entry format:
 - **Added:** S3-C0g
 - **Status:** resolved in S3-C0h: `csp.spec.ts` opens a guide page's screenshot, in each theme
   and with the theme chosen against the system's, and asserts it loads with no CSP violation
+
+### TD-112: SidebarLink's transparent bar draws on every link under forced colors
+- **Added:** S3-C0g
+- **Status:** resolved in S3-C0j: the bar only on the current link, the others padded by its
+  width; `shell.spec.ts` checks under forced colors that only the current link has it

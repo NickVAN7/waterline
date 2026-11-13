@@ -631,7 +631,6 @@ async def test_module_guidance_lists_every_module_and_each_types_recommendations
     [
         "/api/module-guidance",
         "/api/me/work",
-        "/api/me/work/favorites",
         "/api/me/work/approvals",
     ],
 )
@@ -644,9 +643,11 @@ async def test_signed_in_endpoints_need_a_session(client: AsyncClient, path: str
 # --- My work --------------------------------------------------------------------------------------
 
 
-async def test_my_work_shows_the_first_ten_projects_and_the_total(
+async def test_my_work_shows_each_orgs_first_five_projects_and_the_total(
     client: AsyncClient, t: Tenancy
 ) -> None:
+    """DL-368: 5 per organization, the total counting all of them. Bug: the cap left at 10, or
+    shared with approvals'."""
     pia = await signed_in(client, await UserFactory.create_async())
     await projects_of(pia, t, 11)
     archived = await ProjectFactory.create_async(
@@ -663,7 +664,7 @@ async def test_my_work_shows_the_first_ten_projects_and_the_total(
         1,
         11,
     )
-    assert [p["key"] for p in org["projects"]] == [f"P{n:02d}" for n in range(10)]
+    assert [p["key"] for p in org["projects"]] == ["P00", "P01", "P02", "P03", "P04"]
     # The archived one is on the list, behind the toggle (DL-330), and says so.
     assert [(p["key"], p["archived"]) for p in org["hidden"]] == [("ARC", True)]
     assert org["projects"][0]["archived"] is False
@@ -828,12 +829,35 @@ async def test_favorites_are_the_users_starred_projects_they_can_open_by_name(
     await star(await UserFactory.create_async(), plain)
 
     work = (await client.get("/api/me/work")).json()["sections"]
-    paged = (await client.get("/api/me/work/favorites", params={"limit": 1, "offset": 1})).json()
 
     favorites = work["favorites"]
     assert (favorites["available"], favorites["total"]) == (True, 2)
     assert [p["key"] for p in favorites["items"]] == ["ABE", "ZED"]
-    assert ([p["key"] for p in paged["items"]], paged["total"]) == (["ZED"], 2)
+
+
+async def test_my_work_shows_every_favorite_with_no_cap(client: AsyncClient, t: Tenancy) -> None:
+    """DL-369: favorites aren't cut at 10 as approvals are. Bug: the section still limited."""
+    pia = await signed_in(client, await UserFactory.create_async())
+    for n in range(12):
+        project = await ProjectFactory.create_async(
+            organization=t.org, key=f"P{n:02d}", name=f"Project {n:02d}"
+        )
+        await ProjectMembershipFactory.create_async(project=project, user=pia)
+        await star(pia, project)
+
+    favorites = (await client.get("/api/me/work")).json()["sections"]["favorites"]
+
+    assert favorites["total"] == 12
+    assert [p["key"] for p in favorites["items"]] == [f"P{n:02d}" for n in range(12)]
+
+
+async def test_the_favorites_endpoint_is_gone(client: AsyncClient) -> None:
+    """DL-371: favorites are shown in full, so their paging endpoint was removed."""
+    await signed_in(client, await UserFactory.create_async())
+
+    response = await client.get("/api/me/work/favorites")
+
+    assert (response.status_code, response.json()["code"]) == (404, "not_found")
 
 
 async def test_my_work_rows_say_whether_each_is_a_favorite_and_carry_their_actions(

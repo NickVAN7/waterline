@@ -64,6 +64,13 @@ test("a guide page's screenshot loads under the CSP, and only the theme's versio
   await expect(shown).toHaveAccessibleName(/^A project's Trash/)
   await expect.poll(() => shown.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1440)
 
+  // Selecting it opens the image full size in a new tab, and this page stays (DL-363).
+  const [tab] = await Promise.all([page.context().waitForEvent('page'), shown.click()])
+  await tab.waitForLoadState()
+  expect(tab.url()).toMatch(file(theme))
+  await tab.close()
+  await expect(page).toHaveURL('/docs/trash')
+
   // A theme chosen in Account settings, against the system's, swaps the image too (UI-TOK-2).
   const other = theme === 'dark' ? 'light' : 'dark'
   await page.evaluate((other) => (document.documentElement.dataset.theme = other), other)

@@ -8,6 +8,7 @@ const First = { template: '<h1>My work</h1>' }
 const Second = { template: '<h1>  Page not found </h1>' }
 const NoHeading = { template: '<p>nothing</p>' }
 const Loading = { template: '<h1>Loading heading</h1>' }
+const Item = { template: '<h1 data-tab-title="ERP-RQ-7">Refunds and returns</h1>' }
 
 async function setUp(first = '/') {
   const router = createRouter({
@@ -16,6 +17,7 @@ async function setUp(first = '/') {
       { path: '/', component: First },
       { path: '/missing', component: Second },
       { path: '/bare', component: NoHeading },
+      { path: '/item', component: Item },
       { path: '/later', component: Loading, meta: { settlesItself: true } },
       { path: '/later-fixed', component: Loading, meta: { settlesItself: true } },
     ],
@@ -53,6 +55,15 @@ describe('route focus', () => {
     expect(document.activeElement).toBe(heading)
     expect(heading?.getAttribute('tabindex')).toBe('-1')
     expect(document.title).toBe('Page not found · Waterline')
+  })
+
+  it("names the page after its h1's short tab title when it has one (UI-SHL-9)", async () => {
+    const router = await setUp()
+
+    await router.push('/item')
+    await new Promise((resolve) => setTimeout(resolve))
+
+    expect(document.title).toBe('ERP-RQ-7 · Waterline')
   })
 
   it('falls back to the app name for a page with no h1', async () => {

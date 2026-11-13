@@ -190,7 +190,7 @@ const announcement = computed(() => {
         @retry="retry('favorites')"
       >
         <template #empty>Star a project below to keep it here, at the top.</template>
-        <template #default="{ items, total }">
+        <template #default="{ items }">
           <MyProjectRows
             :projects="items"
             list="favorites"
@@ -198,9 +198,6 @@ const announcement = computed(() => {
             with-org
             @toggle="(project, index) => toggleStar('favorites', project, index)"
           />
-          <p v-if="total > items.length" class="m-0 text-sm text-text-muted">
-            Showing {{ items.length }} of {{ total }} favorite projects.
-          </p>
         </template>
       </MyWorkSection>
 

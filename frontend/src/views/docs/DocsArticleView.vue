@@ -75,7 +75,8 @@ function reselect(id: string) {
 function follow(event: MouseEvent) {
   const link = (event.target as HTMLElement).closest('a')
   const href = link?.getAttribute('href')
-  if (!href?.startsWith('/') || event.button !== 0) return
+  // A link with a target (a screenshot, opening in a new tab) is the browser's to open.
+  if (!href?.startsWith('/') || link!.hasAttribute('target') || event.button !== 0) return
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   event.preventDefault()
   void router.push(href)
@@ -84,7 +85,7 @@ function follow(event: MouseEvent) {
 
 <template>
   <NotFoundView v-if="!page" />
-  <div v-else class="flex flex-col gap-8 lg:flex-row lg:items-start">
+  <div v-else class="mx-auto flex w-full max-w-max flex-col gap-8 lg:flex-row lg:items-start">
     <article class="flex min-w-0 flex-1 flex-col gap-6">
       <div class="flex flex-col gap-2">
         <Breadcrumbs :crumbs="crumbs" />

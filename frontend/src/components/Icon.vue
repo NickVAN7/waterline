@@ -22,6 +22,7 @@ export type IconName =
   | 'panel'
   | 'building'
   | 'chevron-right'
+  | 'search'
 
 // Exported for MarkdownView's callouts, which draw an icon inside rendered HTML (DL-341).
 export const PATHS: Record<IconName, string[]> = {
@@ -57,6 +58,7 @@ export const PATHS: Record<IconName, string[]> = {
   panel: ['M4 5h16v14H4z', 'M14 5v14'],
   building: ['M4 20h16', 'M6 20V4h9v16', 'M15 9h3v11', 'M9 8h3', 'M9 12h3', 'M9 16h3'],
   'chevron-right': ['M9 6l6 6-6 6'],
+  search: ['M4 10a6 6 0 1 0 12 0a6 6 0 1 0 -12 0', 'M20 20l-5.6-5.6'],
   'sign-out': [
     'M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2',
     'M9 12h12',

@@ -201,11 +201,7 @@ async function panelDeleted(id: string) {
       @retry="retry"
     />
     <template v-else>
-      <ProjectHeader
-        :trail="[{ label: 'Requirements' }]"
-        :project="loaded"
-        :title="`${loaded.name} requirements`"
-      >
+      <ProjectHeader :trail="[{ label: 'Requirements' }]" :project="loaded" page="requirements">
         <Button v-if="allows(loaded, 'requirement.create')" @click="creating?.open()"
           >New requirement</Button
         >

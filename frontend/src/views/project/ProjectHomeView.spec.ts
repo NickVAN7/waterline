@@ -65,7 +65,7 @@ describe('ProjectHomeView', () => {
     // No level and no categories: no restriction badge (UI-FBK-6).
     expect(wrapper.get('header').text()).not.toContain('Internal')
     expect(wrapper.get('header').text()).not.toContain('No restriction level')
-    expect(document.title).toBe('ERP rollout · Waterline')
+    expect(document.title).toBe('ERP · Waterline')
     expect(useCurrentOrgStore().project?.key).toBe('ERP')
     await expectNoA11yViolations(wrapper)
   })

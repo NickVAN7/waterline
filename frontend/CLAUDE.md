@@ -81,7 +81,15 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 
 - A form on a page sets `max-w-(--content-narrow)` on itself (or a wrapper it shares): `main`
   has no width cap, so an uncapped form's fields span the screen (UI-SHL-7, DL-360; S3-C0h
-  review). Dialogs and the auth card have their own width.
+  review). Dialogs, the auth card, and the side panel's overlay cap themselves with the same token.
+- A click handler that routes a container's links in the app (the guide article's `follow`)
+  leaves to the browser a link with a `target` and a modified or middle click: routing it opens
+  the URL as an app page, a 404 (owner, S3-C0j). Its spec and e2e click such a link.
+- A sidebar section's visible caption names its landmark (`aria-labelledby`), or is
+  `aria-hidden` when the landmark or its control already says it: never a caption and a
+  matching `aria-label`, read twice (UI-SHL-5; S3-C0j review).
+- A style that only a class turns on (a callout's tone) is checked in an e2e by its computed value
+  against the token: a spec of the class passes with the style missing (owner, S3-C0j).
 - Tokens only: colors, type sizes, radii, and sizes come from `src/app/styles/tokens.css`,
   through Tailwind utilities or `var(--…)`. No hex, `rgb()`, or `px` literals (`0` and 1 px
   borders are fine), and no Tailwind arbitrary values like `p-[13px]` (UI-STY-1). Spacing is Tailwind's built-in scale.

@@ -19,6 +19,12 @@ const DANGEROUS =
   'script, iframe, frame, frameset, object, embed, img, svg, math, style, link, meta, base, form, button, body'
 
 describe('MarkdownView', () => {
+  it("gives a table's header cells scope=col, in stored content too (DL-366)", () => {
+    const view = render('| Who | Can |\n|---|---|\n| Admin | All |')
+
+    expect(view.findAll('th').map((th) => th.attributes('scope'))).toEqual(['col', 'col'])
+  })
+
   it('renders CommonMark with tables, strikethrough, and autolinks', () => {
     const view = render('A *b* `c`\n\n| H |\n|---|\n| d |\n\n~~gone~~ https://example.com')
 
@@ -181,8 +187,9 @@ describe('MarkdownView', () => {
     })
 
     it.each([
-      ['TIP', 'callout-info', 'Tip'],
-      ['NOTE', 'callout-warning', 'Note'],
+      // Each its own tone (DL-364).
+      ['TIP', 'callout-success', 'Tip'],
+      ['NOTE', 'callout-info', 'Note'],
       ['WARNING', 'callout-danger', 'Warning'],
     ])('renders > [!%s] as a %s box with an icon and the bold label %s', (kind, tone, label) => {
       const view = renderDocs(`> [!${kind}]\n> Keep a copy.`)
@@ -241,14 +248,35 @@ describe('MarkdownView', () => {
         'images/panel-dark.webp': '/assets/panel-dark-3c4d.webp',
       })
 
+      // The theme class is on each version's link, so a hidden one leaves no empty link.
       expect(
         view
-          .findAll('img')
-          .map((img) => [img.attributes('src'), img.classes(), img.attributes('alt')]),
+          .findAll('a')
+          .map((a) => [a.classes(), a.attributes('href'), a.get('img').attributes('src')]),
       ).toEqual([
-        ['/assets/panel-1a2b.webp', ['theme-light'], 'The side panel'],
-        ['/assets/panel-dark-3c4d.webp', ['theme-dark'], 'The side panel'],
+        [['theme-light'], '/assets/panel-1a2b.webp', '/assets/panel-1a2b.webp'],
+        [['theme-dark'], '/assets/panel-dark-3c4d.webp', '/assets/panel-dark-3c4d.webp'],
       ])
+      expect(view.findAll('img').map((img) => img.attributes('alt'))).toEqual([
+        'The side panel',
+        'The side panel',
+      ])
+    })
+
+    it('makes a bundled image a link to it full size, in a new tab, and loads it lazily (DL-363)', () => {
+      const view = renderDocs('![The side panel](images/panel.webp)', {
+        'images/panel.webp': '/assets/panel-1a2b.webp',
+      })
+
+      const link = view.get('a')
+      expect(link.attributes()).toMatchObject({
+        href: '/assets/panel-1a2b.webp',
+        target: '_blank',
+      })
+      expect(link.attributes('rel')).toContain('noopener')
+      // Its name says where it opens (the image's alt, then the hidden words).
+      expect(link.text()).toBe('(opens in a new tab)')
+      expect(link.get('img').attributes('loading')).toBe('lazy')
     })
 
     it('renders an image with no -dark sibling once, in both themes', () => {
@@ -257,7 +285,8 @@ describe('MarkdownView', () => {
         'images/other-dark.webp': '/assets/other-dark.webp',
       })
 
-      expect(view.findAll('img').map((img) => img.classes())).toEqual([[]])
+      expect(view.findAll('a').map((a) => a.classes())).toEqual([[]])
+      expect(view.findAll('img')).toHaveLength(1)
     })
 
     it('renders an image that is not bundled, remote included, as a link', () => {
@@ -278,9 +307,16 @@ describe('MarkdownView', () => {
     })
 
     it('has no accessibility violations', async () => {
-      const view = renderDocs('## Section\n\n> [!WARNING]\n> Careful.\n\nPress ++Esc++.')
+      const view = renderDocs(
+        '## Section\n\n> [!WARNING]\n> Careful.\n\nPress ++Esc++.\n\n![The panel](images/panel.webp)',
+        {
+          'images/panel.webp': '/assets/panel.webp',
+          'images/panel-dark.webp': '/assets/panel-dark.webp',
+        },
+      )
 
-      expect(view.findAll('.callout, kbd')).toHaveLength(2)
+      // A screenshot's two links included (DL-363).
+      expect(view.findAll('.callout, kbd, a[target]')).toHaveLength(4)
       await expectNoA11yViolations(view)
     })
   })

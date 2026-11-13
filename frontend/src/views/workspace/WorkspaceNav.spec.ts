@@ -13,7 +13,11 @@ describe('WorkspaceNav', () => {
   it('links to every workspace administration page, the current one marked (DL-104, DL-137)', async () => {
     const { wrapper } = await mountWorkspaceView(WorkspaceNav, '/workspace/orgs')
 
-    expect(wrapper.get('nav').attributes('aria-label')).toBe('Workspace administration')
+    // Its caption says whose pages these are, and names the landmark, said once (S3-C0j).
+    const caption = wrapper.get('#workspace-nav-caption')
+    expect(caption.text()).toBe('Workspace administration')
+    expect(wrapper.get('nav').attributes('aria-labelledby')).toBe('workspace-nav-caption')
+    expect(wrapper.get('nav').element.firstElementChild).toBe(caption.element)
     const links = wrapper.findAll('a')
     expect(links.map((a) => a.text())).toEqual(['Staff', 'Organizations', 'Users', 'Settings'])
     expect(links.map((a) => a.attributes('aria-current'))).toEqual([

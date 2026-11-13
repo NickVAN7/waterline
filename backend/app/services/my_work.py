@@ -13,7 +13,7 @@ from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext
 from app.authz.scoping import content_scope, project_scope
 from app.authz.target import project_target
-from app.core.lists import Filter, FilterType, ListSpec, Page, PageResult, fetch_page
+from app.core.lists import Filter, FilterType, ListSpec, Page, PageResult, fetch_page, order_by
 from app.enums import ProjectStatus, ProjectType
 from app.models.approval import Approval, ApprovalRequest
 from app.models.project import Project
@@ -47,7 +47,8 @@ APPROVALS = ListSpec(
     sorts={"requested_at": ApprovalRequest.created_at},  # pyright: ignore[reportArgumentType]
     default_sort=("requested_at",),
 )
-FIRST_ITEMS = 10  # each section's items in `GET /api/me/work` (DL-76)
+FIRST_ITEMS = 10  # the approvals section's items in `GET /api/me/work` (DL-76)
+FIRST_PER_ORG = 5  # each organization's open and hidden projects shown (DL-368)
 
 
 def item(ctx: AuthzContext, project: Project) -> ProjectItem:
@@ -106,10 +107,8 @@ class MyWorkService:
         (backend/CLAUDE.md: the one sanctioned savepoint-and-continue)."""
         return MyWork(
             sections=WorkSections(
-                favorites=await self._section(
-                    self.favorites(ctx, PROJECTS.query_model(limit=FIRST_ITEMS))
-                ),
-                organizations=await self._organizations_section(ctx),
+                favorites=await self._whole_section(self.favorites(ctx)),
+                organizations=await self._whole_section(self.organizations(ctx)),
                 approvals=await self._section(
                     self.approvals(ctx, APPROVALS.query_model(limit=FIRST_ITEMS))
                 ),
@@ -125,14 +124,15 @@ class MyWorkService:
             return WorkSection[T](available=False)
         return WorkSection[T](available=True, items=page.items, total=page.total)
 
-    async def _organizations_section(self, ctx: AuthzContext) -> WorkSection[OrgWork]:
-        """The organizations section, in its own savepoint as `_section`'s are."""
+    async def _whole_section[T](self, read: Awaitable[list[T]]) -> WorkSection[T]:
+        """A section shown in full (favorites, organizations), in its own savepoint as `_section`'s
+        are."""
         try:
             async with self.session.begin_nested():
-                orgs = await self.organizations(ctx)
+                items = await read
         except DBAPIError:
-            return WorkSection[OrgWork](available=False)
-        return WorkSection[OrgWork](available=True, items=orgs, total=len(orgs))
+            return WorkSection[T](available=False)
+        return WorkSection[T](available=True, items=items, total=len(items))
 
     async def organizations(self, ctx: AuthzContext) -> list[OrgWork]:
         """Each organization the user can open a project in, by name, with its first open and
@@ -140,7 +140,7 @@ class MyWorkService:
         orgs: the ranks and counts, then the projects shown."""
         projects = ProjectRepository(self.session)
         scope = project_scope(ctx)
-        ranks = await projects.ranked_by_org(scope, FIRST_ITEMS)
+        ranks = await projects.ranked_by_org(scope, FIRST_PER_ORG)
         hidden_ids = {row.id for row in ranks if row.hidden}
         rows = await projects.in_my_work_order(scope, [row.id for row in ranks])
         starred = await projects.favorite_ids(ctx.user_id, [p.id for p in rows])
@@ -169,17 +169,16 @@ class MyWorkService:
                 org.total = row.group_total
         return list(orgs.values())
 
-    async def favorites(self, ctx: AuthzContext, query: object) -> Page[MyProjectItem]:
-        """The projects the user starred and can still open, archived left out (DL-302)."""
+    async def favorites(self, ctx: AuthzContext) -> list[MyProjectItem]:
+        """Every project the user starred and can still open, archived left out, by name
+        (DL-302; no cap, DL-369)."""
         projects = ProjectRepository(self.session)
         statement = projects.favorites_only(
             projects.visible(project_scope(ctx)).where(Project.archived_at.is_(None)),
             ctx.user_id,
         )
-        page = await fetch_page(self.session, statement, PROJECTS, query)  # pyright: ignore[reportArgumentType] -- spec.query_model
-        rows: list[Project] = page.items
-        starred = await projects.favorite_ids(ctx.user_id, [p.id for p in rows])
-        return page.with_items([self._row(ctx, p, p.id in starred) for p in rows])
+        rows = (await self.session.scalars(statement.order_by(*order_by(PROJECTS, None)))).all()
+        return [self._row(ctx, p, True) for p in rows]
 
     @staticmethod
     def _row(ctx: AuthzContext, project: Project, starred: bool) -> MyProjectItem:

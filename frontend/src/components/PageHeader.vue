@@ -4,14 +4,17 @@
 // (UI-SHL-9).
 import Breadcrumbs, { type Crumb } from './Breadcrumbs.vue'
 
-defineProps<{ title: string; crumbs?: Crumb[] }>()
+// `tabTitle`: a shorter browser tab title than the heading, e.g. an item's ID (UI-SHL-9).
+defineProps<{ title: string; crumbs?: Crumb[]; tabTitle?: string }>()
 </script>
 
 <template>
   <div class="flex flex-col gap-2">
     <Breadcrumbs v-if="crumbs" :crumbs="crumbs" />
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h1 class="m-0 text-2xl leading-tight font-semibold">{{ title }}</h1>
+      <h1 class="m-0 text-2xl leading-tight font-semibold" :data-tab-title="tabTitle">
+        {{ title }}
+      </h1>
       <div v-if="$slots.default" class="flex flex-wrap gap-3">
         <slot />
       </div>

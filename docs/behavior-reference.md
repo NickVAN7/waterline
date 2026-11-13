@@ -35,9 +35,11 @@ Every page after sign-in has the same frame:
   menu if you belong to more than one organization or may administer it: open it to choose
   another organization (to see its projects), or, if you're one of its owners or admins, its
   **Overview**, **Members**, or **Settings**. Otherwise it's just its name.
-- **The sidebar**, on the left: **My work**, then the **project selector**. Open the selector to
-  see the current organization's projects, under its name, and choose one, or choose **All
-  projects** (a link below the list) for the organization's project list. With more than eight, a filter field narrows the list as you type.
+- **The sidebar**, on the left, stays where it is while the page scrolls: **My work**, then, under
+  the caption **Project**, the **project selector**. Open the selector to see the current
+  organization's projects, under its name, and choose one, or choose **All projects** (below the
+  list) for the organization's project list. With more than eight, **Filter projects** shows a
+  field that narrows the list as you type.
   Once you're in a project, its pages are listed below the selector: **Home**, **Requirements**
   (if you may read its content), **Members**, **Settings** (if you may change any of its
   settings), and last **Trash** (if you may read its content).
@@ -47,6 +49,9 @@ Every page after sign-in has the same frame:
   fold into **…**: open it for the rest.
 - On a narrow screen the sidebar is behind the **Menu** button in the header, and on a phone the
   header wraps onto more than one line and scrolls away with the page.
+- **The browser tab** shows the page's name, shortest part first: a requirement's ID
+  (`PORTAL-RQ-2 · Waterline`), a project page's key and page (`PORTAL members · Waterline`), or the
+  page's title.
 - **Skip to main content** is the first thing the Tab key reaches, and jumps past the header and
   sidebar.
 
@@ -61,7 +66,7 @@ Then each organization you can open a project in has its own section, under its 
 of its projects you can open (with one organization, the section is just **Projects**). Each row
 shows the project's key, your access (your role on it, or "Admin (inherited)" if you administer it
 through its organization or the workspace), and its status, on the right. The open projects come
-first: Active, then Planning, then On hold, each by name, the first 10 of them ("Showing 10 of 12"
+first: Active, then Planning, then On hold, each by name, the first 5 of them ("Showing 5 of 12"
 when there are more). **Show 3 hidden projects** reveals the completed, cancelled, and archived
 ones (an archived one marked **Archived**), and **Hide** puts them away again. **All 14 projects**
 opens the organization's project list, which has the rest (there's no such link when every project
@@ -75,7 +80,7 @@ when, and their note. Open one to review it and decide (see "Deciding", under
 Requirements). A request on a project whose content you can no longer see isn't listed. A
 decision you've made shows on its requirement's Approval section.
 
-Favorites and approvals show their first 10; if there are more, they say how many. If one section can't be
+Favorites shows every favorite. Approvals show their first 10; if there are more, they say how many. If one section can't be
 loaded, it shows **Try again** and the others still show; if the whole page can't be loaded, one
 **Try again** loads it again.
 
@@ -362,7 +367,9 @@ sections and marks the one you're reading as you scroll; on a wide window it sta
 text, on a narrow one it's below it. A section's link (`/docs/requirements#create-a-requirement`)
 opens the page at that section and puts the focus on its heading, so you can share it. Links in
 the text to other pages open them in Waterline. A page's screenshot shows the screen in the
-theme you're using, light or dark, whether it follows your device or you chose it. At the bottom, **Previous** and **Next** go to the
+theme you're using, light or dark, whether it follows your device or you chose it; selecting
+it opens it full size in a new tab. Callouts are a green **Tip**, a blue **Note**, and a red
+**Warning**. At the bottom, **Previous** and **Next** go to the
 pages before and after it in the sidebar's order (the first page has no Previous, the last no
 Next). A page that doesn't exist shows "Page not found". An old link to a section of the former
 single-page guide (`/docs#docs-account-settings`) opens the landing page.
@@ -391,7 +398,7 @@ still work.
 ## Workspace administration
 
 Workspace owners and admins (and system admins) find **Administration** in the account menu, at
-the top right. Its pages are listed in the sidebar, in place of the project selector: **Staff**, **Organizations**,
+the top right. Its pages are listed in the sidebar, under the caption **Workspace administration**, in place of the project selector: **Staff**, **Organizations**,
 **Users**, and **Settings** (workspace admins see the settings; owners and system admins change
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
 its **Actions for …** menu, which lists only what you may do to that person. **Staff**,
@@ -444,8 +451,9 @@ column shows only when one of their projects is export-controlled).
 
 Organization owners and admins (and workspace owners and admins, in every organization) find
 the organization's pages in the organization menu, the organization's name in the header (switch
-organizations first to administer another). They're listed in the sidebar, in place of the
-project selector: **Overview**, **Members**, and **Settings**. Anyone else who opens these pages
+organizations first to administer another). They're listed in the sidebar, under the caption
+**Organization** and the organization's name, in place of the project selector: **Overview**,
+**Members**, and **Settings**. Anyone else who opens these pages
 is told to ask the organization's owners or admins.
 
 - **Overview** (`/<organization>/overview`) shows the organization's name and slug, and its

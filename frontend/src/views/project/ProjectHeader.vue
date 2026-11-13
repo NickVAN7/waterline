@@ -15,7 +15,9 @@ import type { Project } from '@/stores/currentOrg'
 import RestrictionBadge from './RestrictionBadge.vue'
 
 // `trail`: the page's crumbs after the project's (DL-327); none on the project's home.
-const props = defineProps<{ project: Project; title?: string; trail?: Crumb[] }>()
+// `page` names a project page ("members"): the heading is the project's name and it, and the tab
+// title the key and it, so tabs differ at their start (UI-SHL-9).
+const props = defineProps<{ project: Project; page?: string; trail?: Crumb[] }>()
 
 const status = computed(() => PROJECT_STATUS[props.project.status])
 </script>
@@ -25,7 +27,12 @@ const status = computed(() => PROJECT_STATUS[props.project.status])
   <header class="flex flex-col gap-2">
     <Breadcrumbs :crumbs="projectCrumbs(project, trail)" />
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h1 class="m-0 text-2xl leading-tight font-semibold">{{ title ?? project.name }}</h1>
+      <h1
+        class="m-0 text-2xl leading-tight font-semibold"
+        :data-tab-title="page ? `${project.key} ${page}` : project.key"
+      >
+        {{ page ? `${project.name} ${page}` : project.name }}
+      </h1>
       <div v-if="$slots.default" class="flex flex-wrap items-center gap-3">
         <slot />
       </div>

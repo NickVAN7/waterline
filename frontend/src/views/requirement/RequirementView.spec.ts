@@ -147,7 +147,7 @@ describe('RequirementView', () => {
     const { wrapper } = await mountAt([READER], [ok(REFUNDS)])
 
     expect(wrapper.get('h1').text()).toBe('Refunds')
-    expect(document.title).toBe('Refunds · Waterline')
+    expect(document.title).toBe('ERP-RQ-7 · Waterline')
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(wrapper.text()).toContain('ERP-RQ-7')
     expect(wrapper.text()).toContain('Status: Draft')
@@ -782,7 +782,7 @@ describe('RequirementView', () => {
         body: { version: 1, title: 'Refunds and returns', change_note: 'Returns too' },
       })
       expect(wrapper.get('h1').text()).toBe('Refunds and returns')
-      expect(document.title).toBe('Refunds and returns · Waterline')
+      expect(document.title).toBe('ERP-RQ-7 · Waterline')
       expect(document.querySelector('#edit-requirement-title')).toBeNull()
       expect(document.activeElement).toBe(button('Edit'))
       await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_DELAY_MS * 2))

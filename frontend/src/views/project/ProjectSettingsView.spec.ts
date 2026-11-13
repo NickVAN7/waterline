@@ -159,7 +159,7 @@ describe('ProjectSettingsView', () => {
       ],
       current: 'Settings',
     })
-    expect(document.title).toBe('ERP rollout settings · Waterline')
+    expect(document.title).toBe('ERP settings · Waterline')
     expect(wrapper.get<HTMLInputElement>('#project-settings-name').element.value).toBe(
       'ERP rollout',
     )

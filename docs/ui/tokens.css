@@ -92,8 +92,9 @@
   --control-height: 2.25rem;     /* 36px: buttons and inputs */
   --header-height: 3.5rem;
   --sidebar-width: 15rem;
-  --content-narrow: 40rem;       /* forms, settings */
-  --content-prose: 68ch;         /* a guide article's text (DL-340) */
+  --sidebar-height: calc(100dvh - var(--header-height)); /* it stays put as the page scrolls */
+  --content-narrow: 48rem;       /* forms, settings, dialogs (DL-373) */
+  --content-prose: 100ch;        /* a guide article's text (DL-373) */
 
   /* Focus ring */
   --focus-ring-width: 2px;

@@ -19,10 +19,11 @@ type RenderEnv = {
   docs?: { ids: Map<string, number>; images: Record<string, string> }
 }
 
-// `> [!TIP]`, `> [!NOTE]`, `> [!WARNING]` as info, warning, and danger tone boxes (DL-341).
+// `> [!TIP]`, `> [!NOTE]`, `> [!WARNING]` as success, info, and danger tone boxes (DL-341, DL-364).
 const CALLOUTS: Record<string, { label: string; tone: string; icon: IconName }> = {
-  TIP: { label: 'Tip', tone: 'info', icon: 'info' },
-  NOTE: { label: 'Note', tone: 'warning', icon: 'warning' },
+  // Each its own tone, so an aside never reads as a caution (DL-364).
+  TIP: { label: 'Tip', tone: 'success', icon: 'check' },
+  NOTE: { label: 'Note', tone: 'info', icon: 'info' },
   WARNING: { label: 'Warning', tone: 'danger', icon: 'alert' },
 }
 
@@ -92,7 +93,9 @@ function create(docs: boolean): MarkdownIt {
   // No remote images: one would tell its host who opened the page (design-doc §3), so image
   // syntax renders as a link to the image, named by its alt text. In docs mode a bundled image
   // (`images/<file>`) renders as itself (DL-341), beside its `-dark` sibling when there is one,
-  // each shown only in its theme (DL-343).
+  // each shown only in its theme (DL-343). Each is a link opening it full size in a new tab, and
+  // loads only when shown and near the view (DL-363); the theme class is on the link, so a hidden
+  // version leaves no empty link behind.
   md.renderer.rules.image = (tokens, idx, _options, env) => {
     const token = tokens[idx]!
     const src = String(token.attrGet('src') ?? '')
@@ -100,8 +103,14 @@ function create(docs: boolean): MarkdownIt {
     const images = (env as RenderEnv | undefined)?.docs?.images
     const local = images?.[src]
     if (local) {
-      const img = (url: string, theme = '') =>
-        `<img src="${md.utils.escapeHtml(url)}" alt="${alt}"${theme && ` class="${theme}"`}>`
+      const img = (url: string, theme = '') => {
+        const href = md.utils.escapeHtml(url)
+        return (
+          `<a href="${href}" target="_blank" rel="noopener"${theme && ` class="${theme}"`}>` +
+          `<img src="${href}" alt="${alt}" loading="lazy">` +
+          `<span class="sr-only"> (opens in a new tab)</span></a>`
+        )
+      }
       const dark = images![src.replace(/(\.[a-z]+)$/i, '-dark$1')]
       return dark ? img(local, 'theme-light') + img(dark, 'theme-dark') : img(local)
     }
@@ -112,6 +121,8 @@ function create(docs: boolean): MarkdownIt {
     const tokens = state.tokens
     const env = state.env as RenderEnv
     tokens.forEach((token, i) => {
+      // A table's one header row names its columns (DL-366, UI-MD-1).
+      if (token.type === 'th_open') token.attrSet('scope', 'col')
       if (env.docs && token.type === 'heading_open') {
         token.attrSet('id', headingId(headingText(tokens[i + 1]), env.docs.ids))
       }
@@ -148,7 +159,7 @@ const docsMd = create(true)
 const sanitizeOptions = {
   ALLOWED_URI_REGEXP: SAFE_URL,
   // DOMPurify checks every other attribute's value against that regex too.
-  ADD_URI_SAFE_ATTR: ['start'],
+  ADD_URI_SAFE_ATTR: ['start', 'scope'],
   FORBID_TAGS: ['img', 'style', 'form'],
   FORBID_ATTR: ['style'],
 }
@@ -169,7 +180,11 @@ const docsSanitizeOptions = {
     'stroke-linecap',
     'stroke-linejoin',
     'd',
+    // A screenshot's link and image (DL-363).
+    'target',
+    'loading',
   ],
+  ADD_ATTR: ['target', 'loading'],
   FORBID_TAGS: ['style', 'form'],
 }
 
@@ -316,10 +331,10 @@ const html = computed(() =>
   background: var(--color-tone-info-bg);
   color: var(--color-tone-info-fg);
 }
-.markdown :deep(.callout-warning) {
-  border-color: var(--color-tone-warning-edge);
-  background: var(--color-tone-warning-bg);
-  color: var(--color-tone-warning-fg);
+.markdown :deep(.callout-success) {
+  border-color: var(--color-tone-success-edge);
+  background: var(--color-tone-success-bg);
+  color: var(--color-tone-success-fg);
 }
 .markdown :deep(.callout-danger) {
   border-color: var(--color-tone-danger-edge);

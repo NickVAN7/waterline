@@ -1048,7 +1048,9 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
   page's primary actions (UI-SHL-8; the auth card's pages use a plain, smaller `h1`, and `/docs`
   the guide's own): navigation sets the title
-  to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
+  to `<short title> · Waterline` (the `h1`'s `data-tab-title`, through `PageHeader`'s `tabTitle` or
+  `ProjectHeader`'s `page`, else its text; UI-SHL-9) and moves focus to it. A form page caps its
+  form at `--content-narrow` itself: `main` has no cap (UI-SHL-7). A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
   `src/views/project/ProjectHomeView.vue`); a reload after a user's action that replaces the page
   (now the not-found or 403 page) calls `replacedPage()` instead, which focuses the new `h1` on a

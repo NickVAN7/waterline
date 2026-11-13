@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0i (Backlog widget spike) done, the backlog PrimeVue DataTable (DL-372); the git guard's
-decision held to the end of S3-C0x; next: S3-C0j (Shell feedback).
+S3-C0j (Shell feedback) done; the git guard's decision held to the end of S3-C0x; next: S3-C0k
+(Admin pages feedback).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

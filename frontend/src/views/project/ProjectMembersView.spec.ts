@@ -138,7 +138,7 @@ describe('ProjectMembersView', () => {
       ],
       current: 'Members',
     })
-    expect(document.title).toBe('ERP rollout members · Waterline')
+    expect(document.title).toBe('ERP members · Waterline')
     expect(
       wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
     ).toEqual([

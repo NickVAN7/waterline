@@ -314,8 +314,8 @@ async def test_another_projects_request_is_listed_with_its_own_project(
 async def test_my_work_shows_the_first_ten_approvals_and_the_total(
     client: AsyncClient, t: Tenancy, ada: User
 ) -> None:
-    """§11: each section's first 10 items and its total (DL-76). Bug: the section left out of
-    the home page's one request, or not limited."""
+    """§11: the approvals section's first 10 items and its total (DL-76). Bug: the section left
+    out of the home page's one request, or not limited."""
     vera = await viewer(t, "Vera Viewer")
     for number in range(1, 12):  # setup only
         item, revision = await requirement_at(

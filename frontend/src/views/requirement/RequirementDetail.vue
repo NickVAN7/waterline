@@ -341,7 +341,7 @@ function restrictionSaved(saved: Requirement) {
           v-bind="
             inPanel
               ? { class: 'flex flex-wrap items-center gap-3' }
-              : { title: requirement.title, crumbs }
+              : { title: requirement.title, crumbs, tabTitle: id }
           "
         >
           <Button

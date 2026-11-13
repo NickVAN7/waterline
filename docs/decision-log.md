@@ -4585,7 +4585,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   tables, card grids, and the docs landing page still span `main` (DL-360). To be tuned after
   the owner's UI review.
 - **Supersedes:** DL-360's left-aligned capped content; DL-340's 68ch text
-- **Superseded by:** none
+- **Superseded by:** DL-373 (in part: capped pages left-aligned; the widths)
 - **Applies to:** ui-design-guide UI-SHL-7, the token table; `docs/ui/tokens.css`; `frontend/CLAUDE.md`'s
   form rule; build plan (S3-C0j)
 - **Source:** owner, Nov 12, 2026 (after S3-C0h) ("the content should be centered … the content can also be wider in the docs")
@@ -4651,3 +4651,26 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide §1, UI-SVR-2, §10 item 5(a); build plan (S3-C19)
 - **Source:** owner, Nov 12, 2026 (after trying S3-C0i's demo,
   `docs/spikes/S3-C0i-backlog/results.md`)
+
+### DL-373: Form pages left-aligned and wider; guide text to 100ch
+- **Date:** 2026-11-12
+- **Decision:** After trying DL-367's centered columns, a form or settings page is left-aligned
+  like every other page, its form at `--content-narrow`, widened from 40 to 48 rem (dialogs share
+  it, so the New project dialog widens too); a guide article stays centered, its text widened to
+  `--content-prose` 100ch. To be tuned after the owner's UI review.
+- **Supersedes:** DL-367 in part (capped pages centered; 80ch); `--content-narrow` 40rem
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-7, the token table; `docs/ui/tokens.css`; build plan
+  (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (S3-C0j's UI review: "the content area isn't wide enough")
+
+### DL-374: The frontend design skill's trial is its own spike, S3-C0n
+- **Date:** 2026-11-12
+- **Decision:** Q12i's trial of a frontend design skill (Impeccable, Addy Osmani's agent skills,
+  or Anthropic's frontend-design) leaves S3-C0j for its own spike checkpoint, S3-C0n, after
+  S3-C0m: the owner installs the skill, and the trial goes through `design-change` as the git
+  guard's did.
+- **Supersedes:** Q12i's "trial one with `vue-screen` on S3-C0j"
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0j, S3-C0n, the polish group)
+- **Source:** owner, Nov 12, 2026 (S3-C0j)

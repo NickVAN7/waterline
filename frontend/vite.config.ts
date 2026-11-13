@@ -23,6 +23,9 @@ const contentSecurityPolicy = [
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  // Every bundled asset stays a file on our own origin: a small one inlined as a `data:` URI
+  // would be blocked by the CSP's `default-src 'self'` (DL-370).
+  build: { assetsInlineLimit: 0 },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

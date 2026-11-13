@@ -387,11 +387,7 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
   <div v-else class="flex flex-col gap-6">
     <ProjectPageLoading :project="project" :title="key.toUpperCase()" :rows="4" @retry="retryLoad">
       <template v-if="loaded">
-        <ProjectHeader
-          :project="loaded"
-          :title="`${loaded.name} settings`"
-          :trail="[{ label: 'Settings' }]"
-        />
+        <ProjectHeader :project="loaded" page="settings" :trail="[{ label: 'Settings' }]" />
 
         <!-- After a 403 that took the action away, the section stays for its alert (UI-FRM-7). -->
         <section

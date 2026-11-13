@@ -620,11 +620,12 @@ async def test_any_signed_in_user_gets_the_module_guidance(client: AsyncClient) 
     ]
 
 
-# --- My work's organizations section (design-doc §11 from S3-C0f; DL-329, DL-330, DL-349, DL-359)
-# One item per org the caller can open a project in, by org name: its first 10 open projects
-# (Active, Planning, On hold, each by name) with `total`, the first 10 hidden ones (Completed,
-# Cancelled, then archived, each by name) with `hidden_total`, and `listed_total` (all but the
-# archived). The projects are those the caller can open (§5, §3.1), archived included.
+# --- My work's organizations section (design-doc §11 from S3-C0f; DL-329, DL-330, DL-349, DL-359,
+# DL-368). One item per org the caller can open a project in, by org name: its first 5 open
+# projects (Active, Planning, On hold, each by name) with `total`, the first 5 hidden ones
+# (Completed, Cancelled, each by name, then the archived by name alone) with `hidden_total`, and
+# `listed_total` (all but the archived). The projects are those the caller can open (§5, §3.1),
+# archived included.
 
 
 async def my_work_layout(session: AsyncSession, t: Tenancy) -> None:
@@ -754,25 +755,26 @@ async def test_my_work_shows_a_favorite_in_its_orgs_section_too(
 
 
 async def ordering_layout(t: Tenancy) -> None:
-    """Bolt Foods gets 11 more open projects (12 with PMT, Planning) and 12 hidden ones; another
-    org, "Alpine Dairy", created after it but first by name, gets one."""
+    """Bolt Foods gets 5 more open projects (6 with PMT "Payments", Planning) and 6 hidden ones,
+    each list one past the 5 shown, the first 5 of each crossing every status; another org,
+    "Alpine Dairy", created after it but first by name, gets one."""
     for status, projects in [
-        ("active", [("WIL", "Willow"), ("ASP", "Aspen"), ("MAP", "Maple"), ("CED", "Cedar")]),
-        ("planning", [("OAK", "Oak"), ("BIR", "Birch"), ("ELM", "Elm")]),
-        ("on_hold", [("YEW", "Yew"), ("HAZ", "Hazel"), ("ALD", "Alder"), ("FIR", "Fir")]),
-        ("completed", [("ROW", "Rowan"), ("ASH", "Ash"), ("LAR", "Larch"), ("HOL", "Holly")]),
-        ("cancelled", [("SPR", "Spruce"), ("BEE", "Beech"), ("POP", "Poplar"), ("JUN", "Juniper")]),
+        ("active", [("WIL", "Willow"), ("ASP", "Aspen")]),
+        ("planning", [("BIR", "Birch")]),
+        ("on_hold", [("YEW", "Yew"), ("ALD", "Alder")]),
+        ("completed", [("ROW", "Rowan"), ("ASH", "Ash")]),
+        ("cancelled", [("BEE", "Beech")]),
     ]:
         for key, name in projects:
             await ProjectFactory.create_async(
                 organization=t.org, key=key, name=name, status=ProjectStatus(status)
             )
-    # Archived, whatever their status.
+    # Archived, whatever their status: by status, Teak would lead them and Ebony sit among the
+    # completed.
     for key, name, status in [
-        ("TEA", "Teak", "planning"),
-        ("ACA", "Acacia", "active"),
-        ("LIM", "Lime", "on_hold"),
-        ("EBO", "Ebony", "active"),
+        ("TEA", "Teak", "active"),
+        ("EBO", "Ebony", "completed"),
+        ("ACA", "Acacia", "on_hold"),
     ]:
         await ProjectFactory.create_async(
             organization=t.org,
@@ -790,7 +792,7 @@ async def ordering_layout(t: Tenancy) -> None:
 async def test_my_work_orders_orgs_by_name_and_projects_by_status_then_name(
     client: AsyncClient, session: AsyncSession
 ) -> None:
-    """DL-330, DL-349, DL-359: each org's first 10 open and first 10 hidden projects, in order,
+    """DL-330, DL-359, DL-368: each org's first 5 open and first 5 hidden projects, in order,
     with their totals and the count its org list shows (all but the archived)."""
     t = await signed_in(client, "workspace_admin")
     await ordering_layout(t)
@@ -807,17 +809,17 @@ async def test_my_work_orders_orgs_by_name_and_projects_by_status_then_name(
             (
                 "bolt-foods",
                 "Bolt Foods",
-                ["ASP", "CED", "MAP", "WIL", "BIR", "ELM", "OAK", "PMT", "ALD", "FIR"],
-                12,
-                ["ASH", "HOL", "LAR", "ROW", "BEE", "JUN", "POP", "SPR", "ACA", "EBO"],
-                12,
-                20,
+                ["ASP", "WIL", "BIR", "PMT", "ALD"],
+                6,
+                ["ASH", "ROW", "BEE", "ACA", "EBO"],
+                6,
+                9,
             ),
         ],
     )
     bolt = section["items"][1]
     assert bolt["id"] == str(t.org.id)
-    assert [p["archived"] for p in bolt["hidden"]] == [False] * 8 + [True] * 2
+    assert [p["archived"] for p in bolt["hidden"]] == [False] * 3 + [True] * 2
 
 
 # --- PUT / DELETE /api/projects/{key}/favorite (project.favorite; DL-303, DL-304) ---------------

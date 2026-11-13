@@ -75,7 +75,7 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
         v-if="store.me"
         id="sidebar"
         :class="[
-          'w-full shrink-0 flex-col gap-4 border-r border-border-subtle bg-surface p-4 md:flex md:w-(--sidebar-width)',
+          'w-full shrink-0 flex-col gap-4 border-r border-border-subtle bg-surface p-4 md:sticky md:top-(--header-height) md:flex md:h-(--sidebar-height) md:w-(--sidebar-width) md:overflow-y-auto',
           menuOpen ? 'flex' : 'hidden',
         ]"
       >
@@ -83,7 +83,12 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
           <div class="border-b border-border-subtle pb-4 font-semibold">
             <SidebarLink to="/"><Icon name="home" />My work</SidebarLink>
           </div>
-          <ProjectSelector v-if="!route.meta.adminArea" />
+          <div v-if="!route.meta.adminArea && nav.org" class="flex flex-col gap-1">
+            <!-- Whose pages are below (owner, S2 feedback); the button itself says "Project:" to a
+                 screen reader, so this isn't read twice. -->
+            <p class="m-0 px-2 text-sm font-semibold text-text-muted" aria-hidden="true">Project</p>
+            <ProjectSelector />
+          </div>
         </nav>
         <WorkspaceNav v-if="route.meta.adminArea === 'workspace'" />
         <DocsNav v-else-if="route.meta.adminArea === 'docs'" />

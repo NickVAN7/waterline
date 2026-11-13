@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One organization's projects on My work (DL-329, DL-330, DL-349, DL-359): its heading (the org's
 // name, or "Projects" when it's the user's only org) with how many projects of it they can open,
-// its first open projects ("Showing 10 of N" past them), a "Show N hidden projects" toggle for
+// its first open projects ("Showing 5 of N" past them, DL-368), a "Show N hidden projects" toggle for
 // its completed, cancelled, and archived ones, and "All N projects", its org list, counted as
 // that list counts (all but the archived), left out when that's none.
 import { computed, ref } from 'vue'

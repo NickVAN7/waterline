@@ -258,6 +258,18 @@ describe('DocsArticleView', () => {
     expect(router.currentRoute.value.path).toBe('/docs/requirements')
   })
 
+  it("a screenshot's link, which opens in a new tab, is left to the browser (DL-363)", async () => {
+    const { wrapper, router } = await mountAt('/docs/requirements')
+
+    const link = wrapper.get('article .markdown a[target="_blank"]')
+    const click = new MouseEvent('click', { button: 0, cancelable: true, bubbles: true })
+    link.element.dispatchEvent(click)
+    await flushPromises()
+
+    expect(click.defaultPrevented).toBe(false)
+    expect(router.currentRoute.value.path).toBe('/docs/requirements')
+  })
+
   it("leaving a page from a section leaves focus to the next page's own settling", async () => {
     const { router } = await mountAt('/docs/trash#restore-a-requirement')
 
