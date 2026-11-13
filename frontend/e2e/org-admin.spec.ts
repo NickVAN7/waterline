@@ -126,3 +126,36 @@ test("the members table's columns are fixed, and scroll in their region on a nar
   expect(overflowing).toBe(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
 })
+
+// The add's last step (Q12g, DL-379): a new account joins the org and a chosen project in one
+// add. Each theme's run creates its own person. The demo's ERP project isn't export-controlled.
+test('adding someone to the org adds them to the projects chosen on the last step (S3-C0m)', async ({
+  page,
+}, testInfo) => {
+  const handle = `e2e-org-${testInfo.project.name}-${Date.now()}`
+  await signIn(page, 'olivia')
+  await page.goto('/acme/members')
+
+  await page.getByRole('button', { name: 'Add person' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add a person' })
+  await dialog.getByRole('textbox', { name: 'Email', exact: true }).fill(`${handle}@harbor.example`)
+  await dialog.getByRole('button', { name: 'Continue' }).click()
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Pia Projects')
+  await dialog.getByRole('textbox', { name: 'Username', exact: true }).fill(handle)
+
+  const step = dialog.getByRole('group', { name: /Also add to projects/ })
+  await step.getByRole('checkbox', { name: /^ERP Rollout/ }).check()
+  await expect(step.getByRole('combobox', { name: 'Role on ERP Rollout' })).toHaveValue('member')
+  await expectNoA11yViolations(page)
+  await dialog.getByRole('button', { name: 'Create account' }).click()
+  await expect(dialog.getByText('This password is shown once.')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Done' }).click()
+  await expect(
+    page.getByText('Pia Projects added to Acme Manufacturing and 1 project.'),
+  ).toBeVisible()
+
+  await page.goto('/acme/projects/ERP/members')
+  await expect(page.getByRole('row').filter({ hasText: `${handle}@harbor.example` })).toContainText(
+    'Member',
+  )
+})

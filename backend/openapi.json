@@ -2102,7 +2102,7 @@
           "org"
         ],
         "summary": "Add Member",
-        "description": "Add an existing account by email. 422 on `email`: `already_member`, `no_account`, or\n`account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`.",
+        "description": "Add an existing account by email, and to `projects` too, all or nothing (DL-379; the\nproject service, which calls the org's). 422 on `email`: `already_member`, `no_account`, or\n`account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`. A\nproject entry: 422 `duplicate` or an export-control confirmation's on\n`projects.<i>`, 404 for a project outside the org, 403 for one archived.",
         "operationId": "add_member_api_orgs__org_id__members_post",
         "parameters": [
           {
@@ -2186,7 +2186,7 @@
           "org"
         ],
         "summary": "Create Member",
-        "description": "Create the account and its membership in one step; the user must change the temporary\npassword at their first sign-in.",
+        "description": "Create the account and its membership in one step, and add it to `projects` too, as the\nadd does (DL-379); the user must change the temporary password at their first sign-in.",
         "operationId": "create_member_api_orgs__org_id__members_new_post",
         "parameters": [
           {
@@ -4229,6 +4229,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProjectMemberRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/orgs/{org_id}/member-projects": {
+      "get": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Org Member Projects",
+        "description": "An org add's projects step (DL-379): the org's live projects, by name, with whether each\nis export-controlled; for whoever may add org members.",
+        "operationId": "org_member_projects_api_orgs__org_id__member_projects_get",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: name. Default: name",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: name. Default: name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MemberProject_"
                 }
               }
             }
@@ -7716,6 +7832,14 @@
           },
           "role": {
             "$ref": "#/components/schemas/OrgRole"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/MemberProjectAdd"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Projects"
           }
         },
         "type": "object",
@@ -7724,7 +7848,7 @@
           "role"
         ],
         "title": "MemberAdd",
-        "description": "Add an existing account, found by email (design-doc §4: the email comes first)."
+        "description": "Add an existing account, found by email (design-doc §4: the email comes first), and to\n`projects` too, all or nothing (DL-379)."
       },
       "MemberCandidate": {
         "properties": {
@@ -7777,6 +7901,14 @@
           },
           "role": {
             "$ref": "#/components/schemas/OrgRole"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/MemberProjectAdd"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Projects"
           }
         },
         "type": "object",
@@ -7788,6 +7920,60 @@
           "role"
         ],
         "title": "MemberCreate"
+      },
+      "MemberProject": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "export_controlled": {
+            "type": "boolean",
+            "title": "Export Controlled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "export_controlled"
+        ],
+        "title": "MemberProject",
+        "description": "A project an org add can add the person to as well (Q12g, DL-379): the org's live\nprojects; whoever may add org members administers each."
+      },
+      "MemberProjectAdd": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Project Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole",
+            "default": "member"
+          },
+          "export_control_confirmed": {
+            "type": "boolean",
+            "title": "Export Control Confirmed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "title": "MemberProjectAdd",
+        "description": "One of the org's projects to add the new member to as well (Q12g, DL-379).\n`export_control_confirmed`: on an export-controlled project only, and required there (DL-81)."
       },
       "MemberRead": {
         "properties": {
@@ -8448,6 +8634,37 @@
           "offset"
         ],
         "title": "Page[MemberCandidate]"
+      },
+      "Page_MemberProject_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemberProject"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[MemberProject]"
       },
       "Page_MemberRead_": {
         "properties": {

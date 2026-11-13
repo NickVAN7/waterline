@@ -21,6 +21,11 @@ listed below. Open a project's settings from here to change it or unarchive it.
 row offers **Change role** and **Remove from organization**. Removing someone also removes them
 from the organization's projects, unless you choose otherwise.
 
+When you add someone, the last step can also add them to some of the organization's projects:
+tick each one and choose their role there. On an export-controlled project, confirm they're
+authorized for its data. They join the organization and every project you chose, or none of them
+if anything is refused.
+
 ## Rename the organization
 
 **Settings** changes the organization's name and its web address. Links to its projects keep

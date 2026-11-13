@@ -484,6 +484,17 @@ Entry format:
   that needs a bigger org
 - **Status:** open
 
+### TD-115: The org add's projects step shows only the first 200 projects
+- **Added:** S3-C0m
+- **What:** the add-person dialog's **Also add to projects** loads one page of
+  `GET …/member-projects` at the list cap (200, `MAX_LIMIT`), by name; an org with more live
+  projects can't pick the rest there, and nothing says so. They can still be added from each
+  project's Members.
+- **Why:** an org with 200 live projects is past v1's expected size (the cap matches the add's
+  `projects` limit, `MEMBER_PROJECTS_MAX`).
+- **Fix by:** Slice 6 (search): a filter on the step, or a "more" note, if an org nears it
+- **Status:** open
+
 ---
 
 ## Resolved

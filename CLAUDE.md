@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0l (Project & requirements feedback) done; the git guard's decision held to the end of
-S3-C0x; next: S3-C0m (Add an org member to projects too).
+S3-C0m (Add an org member to projects too) done; the git guard's decision held to the end of
+S3-C0x; next: S3-C0n (Frontend design skill trial).
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

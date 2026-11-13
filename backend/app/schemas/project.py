@@ -99,6 +99,16 @@ class ProjectItem(BaseModel):
     my_access: ProjectRole | Literal["inherited_admin"]
 
 
+class MemberProject(BaseModel):
+    """A project an org add can add the person to as well (Q12g, DL-379): the org's live
+    projects; whoever may add org members administers each."""
+
+    id: uuid.UUID
+    key: str
+    name: str
+    export_controlled: bool
+
+
 class ModuleNote(BaseModel):
     module: str
     note: str

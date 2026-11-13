@@ -21,6 +21,7 @@ from app.schemas.org import (
 )
 from app.schemas.workspace import SlugAvailability
 from app.services.org import MEMBERS, OrgEntity, OrgService
+from app.services.project import ProjectService
 from app.services.workspace import WorkspaceEntity
 
 router = APIRouter(tags=["org"])
@@ -83,18 +84,21 @@ async def list_members(
 async def add_member(
     org: MembersManaged, body: MemberAdd, ctx: AuthzContextDep, session: SessionDep
 ) -> MemberRead:
-    """Add an existing account by email. 422 on `email`: `already_member`, `no_account`, or
-    `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`."""
-    return await OrgService(session).add_member(ctx, org, body.email, body.role)
+    """Add an existing account by email, and to `projects` too, all or nothing (DL-379; the
+    project service, which calls the org's). 422 on `email`: `already_member`, `no_account`, or
+    `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`. A
+    project entry: 422 `duplicate` or an export-control confirmation's on
+    `projects.<i>`, 404 for a project outside the org, 403 for one archived."""
+    return await ProjectService(session).add_org_member(ctx, org, body)
 
 
 @router.post("/orgs/{org_id}/members/new", status_code=status.HTTP_201_CREATED, responses=ERRORS)
 async def create_member(
     org: MembersManaged, body: MemberCreate, ctx: AuthzContextDep, session: SessionDep
 ) -> MemberRead:
-    """Create the account and its membership in one step; the user must change the temporary
-    password at their first sign-in."""
-    return await OrgService(session).create_member(ctx, org, body)
+    """Create the account and its membership in one step, and add it to `projects` too, as the
+    add does (DL-379); the user must change the temporary password at their first sign-in."""
+    return await ProjectService(session).create_org_member(ctx, org, body)
 
 
 @router.patch("/orgs/{org_id}/members/{user_id}", responses=ERRORS)

@@ -7,16 +7,17 @@ import { computed, ref } from 'vue'
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { orgCrumb } from '@/app/crumbs'
-import { ORG_ROLE } from '@/app/labels'
+import { ORG_ROLE, PROJECT_ROLE } from '@/app/labels'
 import { allows } from '@/composables/allowedActions'
 import { useRouteOrg } from '@/composables/useRouteOrg'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RosterPage from '@/views/roster/RosterPage.vue'
-import type { Roster } from '@/views/roster/roster'
+import type { AddOptions, Roster } from '@/views/roster/roster'
 
 import { WHO_TO_ASK } from './orgAdmin'
 
 type Role = components['schemas']['OrgRole']
+type ProjectRole = components['schemas']['ProjectRole']
 
 const org = useRouteOrg()
 // The org's workspace, for the user check (DL-66): `/me` lists an org without it. There's one
@@ -24,25 +25,50 @@ const org = useRouteOrg()
 const workspaceId = ref('')
 
 const path = () => ({ org_id: org.value!.id })
+// The org add's last step (DL-379): each chosen project, its confirmation only where the list
+// loaded it export-controlled. Cast: the schema types the confirmation as always sent (it has a
+// default), but the server refuses it where none is needed (`confirmation_not_needed`).
+const projectsOf = (options: AddOptions) =>
+  Object.entries(options.projects).map(
+    ([project_id, pick]) =>
+      ({
+        project_id,
+        role: pick.role as ProjectRole,
+        ...(pick.exportControlled ? { export_control_confirmed: pick.confirmed } : {}),
+      }) as components['schemas']['MemberProjectAdd'],
+  )
 const roster = computed<Roster>(() => ({
   scope: org.value?.name ?? '',
   projects: `${org.value?.name ?? ''}'s projects`,
   roles: (Object.keys(ORG_ROLE) as Role[]).map((value) => ({ value, label: ORG_ROLE[value] })),
   workspaceId: workspaceId.value,
-  add: (email, role) =>
+  add: (email, role, options) =>
     api(
       client.POST('/api/orgs/{org_id}/members', {
         params: { path: path() },
-        body: { email, role: role as Role },
+        body: { email, role: role as Role, projects: projectsOf(options) },
       }),
     ),
-  create: (person) =>
+  create: (person, options) =>
     api(
       client.POST('/api/orgs/{org_id}/members/new', {
         params: { path: path() },
-        body: { ...person, role: person.role as Role },
+        body: { ...person, role: person.role as Role, projects: projectsOf(options) },
       }),
     ),
+  memberProjects: async () =>
+    (
+      await api(
+        client.GET('/api/orgs/{org_id}/member-projects', {
+          // The list cap, which the add's `projects` limit matches (TD-115).
+          params: { path: path(), query: { limit: 200 } },
+        }),
+      )
+    ).items,
+  projectRoles: (Object.keys(PROJECT_ROLE) as ProjectRole[]).map((value) => ({
+    value,
+    label: PROJECT_ROLE[value],
+  })),
   changeRole: (userId, role, newOwnerId) =>
     api(
       client.PATCH('/api/orgs/{org_id}/members/{user_id}', {

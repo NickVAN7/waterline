@@ -37,5 +37,8 @@ means the guard stopped something it should have.
 | 28 | S3-C0j (spec-test-writer) | a `python3` heredoc edit, then `git diff --stat`, in one call | a compound command with git in it | the Edit tool and a separate call | legit (as #15) |
 | 29 | before S3-C0l (status check) | `grep … build-plan.md; git log --oneline -1; git status -s` in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
 | 30 | S3-C0l | a `python3 -` heredoc updating `CLAUDE.md`'s Status ("the git guard's decision") | text mentioning git in a command | the Edit tool | legit (as #13, #16) |
+| 31 | S3-C0m | a sabotage script (copy, edit, test, restore) ending in `git -C … diff --stat`, in one call | a compound command with git in it | `cmp` against the copy instead | legit; my slip (as #15) |
+| 32 | S3-C0m review | `review-copy` then `diff … > $D/fix.diff`, the path in a shell variable | a redirect to a file named only at run time | literal paths | legit (DL-24) |
+| 33 | S3-C0m review | the snapshot diff, `diff -ruN -x .git …`, as a plain command | text mentioning git in a command | a scratchpad script (`fixdiff.sh`) | legit (as #13) |
 
 None of the blocks so far stopped anything the rules forbid.

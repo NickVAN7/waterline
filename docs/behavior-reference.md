@@ -485,8 +485,22 @@ is told to ask the organization's owners or admins.
 
 - **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
   as **Staff** does under workspace administration: **Add person** asks for the email and the role first,
-  then either confirms an existing account or creates one with a temporary password, shown once; a
-  row offers **Change role** and **Remove from organization**, which by default also removes the
+  then either confirms an existing account or creates one with a temporary password, shown once.
+  That last step also offers **Also add to projects** (the confirm step's question says "You can
+  also add them to some of the organization's projects, below."): the organization's projects that
+  aren't archived (the first 200 by name), each a checkbox; a chosen one gets **Role on
+  Payments** (Member to start) and, on an export-controlled project, its own box, "I confirm this
+  person is authorized for Payments's export-controlled data.", without which **Add person** (or
+  **Create account**) waits, saying "Confirm each export-controlled project to continue." Going
+  **Back** keeps the projects chosen and clears their boxes. The add is all or nothing: the person
+  joins the organization and every chosen project, or none of them, and the page says "… added to
+  Acme Manufacturing and 2 projects." If the projects can't load, the step says so, with **Try
+  again**; if a project changed since (archived, gone, or export control turned on), the add is
+  refused and the list loads again, the step saying what changed ("Payments is no longer offered,
+  so it was removed from your choices.", or "… is now export-controlled: confirm it in the list."; the note goes once you change the
+  choices). After
+  a new account, the step that shows its password says "… is added to Acme Manufacturing and 2
+  projects." A row offers **Change role** and **Remove from organization**, which by default also removes the
   person from the organization's projects (a role change or removal that leaves someone unable
   to see a project's content hands their undecided approvals there to whoever requested each
   one, as for staff); and the last owner can't step down or leave until you choose who becomes

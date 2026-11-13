@@ -220,7 +220,7 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         user: User,
         role: R,
         *,
-        loc: tuple[str, ...] = ("body", "email"),
+        loc: tuple[str | int, ...] = ("body", "email"),
         details: Mapping[str, JsonValue] | None = None,
     ) -> Row:
         """Add `user`, already checked, with `role`; `details` go in the added event beside the

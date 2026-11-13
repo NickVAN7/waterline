@@ -230,6 +230,10 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
 - Content moved between containers (a teleport's target changing at a breakpoint) puts focus
   back where it was: moving a node that holds focus blurs it, and a dialog's open or close moves
   it again (S3-C0d review).
+- Try again inside a dialog or one of its steps never calls `useLoad`'s `run` or `retry` bare: on
+  success it moves focus to the first control loaded (the button goes with the failure, and
+  `retry()`'s `h1` is behind the modal), and a failed retry is a new element keyed on `failures`,
+  with `role="alert"` only after the user's own retry (`AlsoAddToProjects`; S3-C0m review).
 - A status note that reports an action's result (not a form alert) is cleared when what it
   describes changes: a new selection, a reload, or the next run of the action
   (`RequirementsTree`'s expand note; S2-C18c review).

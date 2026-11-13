@@ -435,8 +435,11 @@ export interface paths {
         put?: never;
         /**
          * Add Member
-         * @description Add an existing account by email. 422 on `email`: `already_member`, `no_account`, or
-         *     `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`.
+         * @description Add an existing account by email, and to `projects` too, all or nothing (DL-379; the
+         *     project service, which calls the org's). 422 on `email`: `already_member`, `no_account`, or
+         *     `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`. A
+         *     project entry: 422 `duplicate` or an export-control confirmation's on
+         *     `projects.<i>`, 404 for a project outside the org, 403 for one archived.
          */
         post: operations["add_member_api_orgs__org_id__members_post"];
         delete?: never;
@@ -456,8 +459,8 @@ export interface paths {
         put?: never;
         /**
          * Create Member
-         * @description Create the account and its membership in one step; the user must change the temporary
-         *     password at their first sign-in.
+         * @description Create the account and its membership in one step, and add it to `projects` too, as the
+         *     add does (DL-379); the user must change the temporary password at their first sign-in.
          */
         post: operations["create_member_api_orgs__org_id__members_new_post"];
         delete?: never;
@@ -836,6 +839,27 @@ export interface paths {
          *     `already_member`, `no_account`, `account_inactive`, or `outside_org` unless `join_org`).
          */
         post: operations["add_project_member_api_projects__key__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/orgs/{org_id}/member-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Org Member Projects
+         * @description An org add's projects step (DL-379): the org's live projects, by name, with whether each
+         *     is export-controlled; for whoever may add org members.
+         */
+        get: operations["org_member_projects_api_orgs__org_id__member_projects_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1750,12 +1774,15 @@ export interface components {
         };
         /**
          * MemberAdd
-         * @description Add an existing account, found by email (design-doc §4: the email comes first).
+         * @description Add an existing account, found by email (design-doc §4: the email comes first), and to
+         *     `projects` too, all or nothing (DL-379).
          */
         MemberAdd: {
             /** Email */
             email: string;
             role: components["schemas"]["OrgRole"];
+            /** Projects */
+            projects?: components["schemas"]["MemberProjectAdd"][];
         };
         /**
          * MemberCandidate
@@ -1785,6 +1812,45 @@ export interface components {
             /** Password */
             password: string;
             role: components["schemas"]["OrgRole"];
+            /** Projects */
+            projects?: components["schemas"]["MemberProjectAdd"][];
+        };
+        /**
+         * MemberProject
+         * @description A project an org add can add the person to as well (Q12g, DL-379): the org's live
+         *     projects; whoever may add org members administers each.
+         */
+        MemberProject: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Export Controlled */
+            export_controlled: boolean;
+        };
+        /**
+         * MemberProjectAdd
+         * @description One of the org's projects to add the new member to as well (Q12g, DL-379).
+         *     `export_control_confirmed`: on an export-controlled project only, and required there (DL-81).
+         */
+        MemberProjectAdd: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** @default member */
+            role: components["schemas"]["ProjectRole"];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
         };
         /**
          * MemberRead
@@ -2056,6 +2122,17 @@ export interface components {
         Page_MemberCandidate_: {
             /** Items */
             items: components["schemas"]["MemberCandidate"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[MemberProject] */
+        Page_MemberProject_: {
+            /** Items */
+            items: components["schemas"]["MemberProject"][];
             /** Total */
             total: number;
             /** Limit */
@@ -5804,6 +5881,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectMemberRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    org_member_projects_api_orgs__org_id__member_projects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberProject_"];
                 };
             };
             /** @description Unauthorized */

@@ -239,6 +239,23 @@ class ProjectRepository:
         )
         return select(User).where(User.is_active, or_(User.id.in_(org_members), User.id.in_(staff)))
 
+    async def in_org(self, organization_id: uuid.UUID, ids: Collection[uuid.UUID]) -> list[Project]:
+        """Those of the projects that are the org's, in one query (an org add's projects,
+        DL-379)."""
+        return list(
+            await self.session.scalars(
+                select(Project).where(
+                    Project.organization_id == organization_id, Project.id.in_(ids)
+                )
+            )
+        )
+
+    def live_in_org(self, organization_id: uuid.UUID) -> Select[Project]:
+        """The org's projects that aren't archived (an org add's projects step, DL-379)."""
+        return select(Project).where(
+            Project.organization_id == organization_id, Project.archived_at.is_(None)
+        )
+
     def candidates(self, project: Project) -> Select[User]:
         """The members picker: the same people for the project's org, less those already on it."""
         on_project = select(ProjectMembership.user_id).where(

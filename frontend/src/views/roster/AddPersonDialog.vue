@@ -13,9 +13,14 @@
 // (UI-FRM-15). A confirmation step starts on Back (DL-117), and each step's text is read with the
 // control that gets focus (DL-118). A 403, or a refusal for a project's changed export control,
 // tells the page (`refused`), so it reloads what the user may do (UI-FRM-7, DL-116).
-import { computed, nextTick, ref } from 'vue'
+// On an org (S3-C0m, Q12g, DL-379): the last step (confirm or create) also offers the org's
+// projects (`AlsoAddToProjects`), optional, sent with the add, all or nothing; their picks are the
+// dialog's, kept across steps, each export-controlled one confirmed, its box cleared when the
+// person changes. A refusal that says the list is out of date (a 403, a 404, export control
+// changed) loads it again.
+import { computed, nextTick, ref, watch } from 'vue'
 
-import { api, client } from '@/api/client'
+import { api, ApiError, client } from '@/api/client'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
@@ -23,9 +28,11 @@ import SelectField from '@/components/SelectField.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
 import TextField from '@/components/TextField.vue'
 import { dismissToSubmit, refetchNeeded, useFormErrors } from '@/composables/useFormErrors'
+import { useLoad } from '@/composables/useLoad'
 
+import AlsoAddToProjects from './AlsoAddToProjects.vue'
 import NewAccountFields, { type NewAccount, type NewAccountField } from './NewAccountFields.vue'
-import type { Roster } from './roster'
+import type { ProjectPick, Roster } from './roster'
 
 // `fallbackFocus`: where focus goes on close when the opener is gone (a 403 reload hid it).
 const props = defineProps<{ roster: Roster; fallbackFocus?: () => void }>()
@@ -43,7 +50,20 @@ const usernameEdited = ref(false)
 const authorized = ref(false)
 // The server's reason the account needs adding to the org too (`outside_org`).
 const joining = ref('')
-const blocked = computed(() => !!props.roster.exportControlled && !authorized.value)
+const picks = ref<Record<string, ProjectPick>>({})
+const projectList = useLoad(() => props.roster.memberProjects!())
+// A chosen export-controlled project not confirmed yet blocks the add, as the project's own box.
+const projectUnconfirmed = computed(() =>
+  Object.values(picks.value).some((pick) => pick.exportControlled && !pick.confirmed),
+)
+const blocked = computed(
+  () => (!!props.roster.exportControlled && !authorized.value) || projectUnconfirmed.value,
+)
+const blockedReason = computed(() =>
+  projectUnconfirmed.value
+    ? 'Confirm each export-controlled project to continue.'
+    : 'Check the box to continue.',
+)
 
 const emailErrors = useFormErrors({ email: 'Email', role: 'Role' })
 const createErrors = useFormErrors({
@@ -89,7 +109,61 @@ async function open(): Promise<void> {
   emailErrors.reset()
   createErrors.reset()
   status.value = ''
+  picks.value = {}
+  projectNote.value = ''
+  projectsRetried.value = false
+  if (props.roster.memberProjects) void projectList.run()
   await dialog.value?.open()
+}
+
+// The confirmations were for the person shown then (design-doc §3.1): another email clears them.
+function clearConfirmations() {
+  authorized.value = false
+  // What the note said a reload changed is about the picks as they were (frontend/CLAUDE.md).
+  projectNote.value = ''
+  picks.value = Object.fromEntries(
+    Object.entries(picks.value).map(([id, pick]) => [id, { ...pick, confirmed: false }]),
+  )
+}
+
+// The list again after a refusal that may mean it's out of date (the watch below reconciles).
+async function reloadProjects() {
+  if (props.roster.memberProjects) await projectList.run()
+}
+
+// Whenever the list loads, the picks follow it: one no longer listed goes, one whose export
+// control changed takes the list's state, unconfirmed, and the step says which (UI-FBK-3).
+const projectNote = ref('')
+watch(projectList.data, (list) => {
+  if (!list) return
+  const listed = new Map(list.map((p) => [p.id, p]))
+  const said: string[] = []
+  const next: Record<string, ProjectPick> = {}
+  for (const [id, pick] of Object.entries(picks.value)) {
+    const project = listed.get(id)
+    if (!project) {
+      said.push(`${pick.name} is no longer offered, so it was removed from your choices.`)
+      continue
+    }
+    if (project.export_controlled !== pick.exportControlled) {
+      said.push(
+        project.export_controlled
+          ? `${project.name} is now export-controlled: confirm it in the list.`
+          : `${project.name} is no longer export-controlled.`,
+      )
+      next[id] = { ...pick, exportControlled: project.export_controlled, confirmed: false }
+    } else next[id] = pick
+  }
+  picks.value = next
+  projectNote.value = said.join(' ')
+})
+
+// Try again on the step: a failure is a new alert; a load puts focus in the list, as its button goes.
+const projectsRetried = ref(false)
+const projectsStep = ref<InstanceType<typeof AlsoAddToProjects>>()
+async function retryProjects() {
+  projectsRetried.value = true
+  if (await projectList.run()) await projectsStep.value?.focusFirst()
 }
 
 async function focus(target: NewAccountField | 'role' | 'alert') {
@@ -111,6 +185,8 @@ async function run(work: () => Promise<void>, saying: string): Promise<void> {
     status.value = ''
     const target = errors.value.apply(error)
     if (refetchNeeded(error)) emit('refused')
+    if (refetchNeeded(error) || (error instanceof ApiError && error.status === 404))
+      await reloadProjects()
     const outside = emailErrors.fieldProblems.value.email?.find((p) => p.type === 'outside_org')
     if (step.value === 'confirm' && outside) {
       emailErrors.reset()
@@ -150,7 +226,7 @@ async function checkEmail(): Promise<void> {
 function options() {
   // From the project as it is now: a reload may have taken the export control, and the box, away.
   const exportControlConfirmed = !!props.roster.exportControlled && authorized.value
-  return { joinOrg: step.value === 'join', exportControlConfirmed }
+  return { joinOrg: step.value === 'join', exportControlConfirmed, projects: picks.value }
 }
 
 async function addExisting(): Promise<void> {
@@ -159,7 +235,7 @@ async function addExisting(): Promise<void> {
   await run(async () => {
     await props.roster.add(account.value.email, role.value, options())
     dialog.value?.close()
-    emit('done', `${account.value.email} added to ${props.roster.scope}.`)
+    emit('done', `${account.value.email} added to ${props.roster.scope}${alsoTo()}.`)
   }, 'Adding…')
 }
 
@@ -176,7 +252,7 @@ async function create(): Promise<void> {
       const { exists } = (await userCheck({ email })) as { exists: boolean }
       if (exists) {
         // The confirmation was for the account being created; this is another person (§3.1).
-        authorized.value = false
+        clearConfirmations()
         step.value = 'confirm'
         await nextTick()
         return focusBack()
@@ -185,22 +261,28 @@ async function create(): Promise<void> {
     }
     await props.roster.create({ ...account.value, role: role.value }, options())
     step.value = 'created'
-    emit('done', `${account.value.name} added to ${props.roster.scope}.`)
+    emit('done', `${account.value.name} added to ${props.roster.scope}${alsoTo()}.`)
     await nextTick()
     ;(doneButton.value?.$el as HTMLElement | undefined)?.focus()
   }, 'Creating the account…')
 }
 
+// " and 2 projects", for the done message, when the last step chose any.
+function alsoTo() {
+  const count = Object.keys(picks.value).length
+  return count === 0 ? '' : count === 1 ? ' and 1 project' : ` and ${count} projects`
+}
+
 function accountEdited(field: NewAccountField) {
   createErrors.clearField(field)
-  // Another email is another person: their confirmation is asked again (§3.1), as on Back.
-  if (field === 'email') authorized.value = false
+  // Another email is another person: their confirmations are asked again (§3.1), as on Back.
+  if (field === 'email') clearConfirmations()
 }
 
 async function back(): Promise<void> {
   step.value = 'email'
-  // The confirmation was for that email's person; another email is another person (§3.1).
-  authorized.value = false
+  // The confirmations were for that email's person; another email is another person (§3.1).
+  clearConfirmations()
   await focus('email')
 }
 
@@ -288,12 +370,30 @@ defineExpose({ open })
     </form>
     <div v-else-if="step === 'confirm'" class="flex flex-col gap-4">
       <p id="add-confirm-what" class="m-0">
-        An account already exists for {{ account.email }}. Add them?
+        An account already exists for {{ account.email }}. Add them?<template
+          v-if="roster.memberProjects"
+        >
+          You can also add them to some of the organization's projects, below.</template
+        >
       </p>
       <label v-if="roster.exportControlled" class="flex items-start gap-2">
         <input v-model="authorized" type="checkbox" class="size-(--target-min) shrink-0" />
         <span>I confirm this person is authorized for export-controlled data.</span>
       </label>
+      <AlsoAddToProjects
+        v-if="roster.memberProjects"
+        ref="projectsStep"
+        v-model="picks"
+        :projects="projectList.data.value"
+        :failed="!!projectList.error.value"
+        :failures="projectList.failures.value"
+        :retried="projectsRetried"
+        :loading="projectList.loading.value"
+        :roles="roster.projectRoles ?? []"
+        :note="projectNote"
+        @update:model-value="projectNote = ''"
+        @retry="retryProjects"
+      />
       <div class="flex flex-wrap items-center gap-3">
         <Button
           ref="confirmButton"
@@ -312,7 +412,7 @@ defineExpose({ open })
           >Back</Button
         >
         <p v-if="blocked" id="add-blocked" class="m-0 text-sm text-text-muted">
-          Check the box to continue.
+          {{ blockedReason }}
         </p>
       </div>
     </div>
@@ -364,6 +464,20 @@ defineExpose({ open })
         <input v-model="authorized" type="checkbox" class="size-(--target-min) shrink-0" />
         <span>I confirm this person is authorized for export-controlled data.</span>
       </label>
+      <AlsoAddToProjects
+        v-if="roster.memberProjects"
+        ref="projectsStep"
+        v-model="picks"
+        :projects="projectList.data.value"
+        :failed="!!projectList.error.value"
+        :failures="projectList.failures.value"
+        :retried="projectsRetried"
+        :loading="projectList.loading.value"
+        :roles="roster.projectRoles ?? []"
+        :note="projectNote"
+        @update:model-value="projectNote = ''"
+        @retry="retryProjects"
+      />
       <div class="flex flex-wrap items-center gap-3">
         <Button
           type="submit"
@@ -375,12 +489,14 @@ defineExpose({ open })
         >
         <Button variant="secondary" @click="back">Back</Button>
         <p v-if="blocked" id="add-new-blocked" class="m-0 text-sm text-text-muted">
-          Check the box to continue.
+          {{ blockedReason }}
         </p>
       </div>
     </form>
     <template v-else>
-      <p id="add-created-what" class="m-0">{{ account.name }} is added to {{ roster.scope }}.</p>
+      <p id="add-created-what" class="m-0">
+        {{ account.name }} is added to {{ roster.scope }}{{ alsoTo() }}.
+      </p>
       <TemporaryPasswordNotice :password="account.password" warning-id="add-created-warning" />
       <div>
         <Button

@@ -103,7 +103,7 @@ C8, C11, C14, C15, C16, C17, C18, C19, C21, C23a, C24, C26, C28, C31, C33.
 | # | Row | Rule | Finding | Resolution |
 |---|---|---|---|---|
 | 1 | S3-C12 | 2 | `project.view_activity` is a new action, but S3-C12 isn't in the `spec-test-writer` list; the list's reasons are also uneven (C3 and C4 listed though C2 registers their actions; C5, C6, C8, C9's targeted rules not listed) | **Fixed:** S3-C12 added (build plan, plan record). The uneven reasons: **open**, decision R1 below |
-| 2 | S3-C0m | 2 | No endpoint or actions named for the add's project step | **Open**, R2 |
+| 2 | S3-C0m | 2 | No endpoint or actions named for the add's project step | **Decided** (owner, Nov 13, 2026): both org adds take `projects`, the project service doing it; no new action; the list from `GET …/member-projects` (DL-379) |
 | 3 | S3-C13 | 2 | The candidates endpoints' paths and actions aren't named | **Open**, R2 |
 | 4 | S3-C5, S3-C10 | 2 | The task list's and the tree's declared filters and sorts aren't named | **Open**, R2 |
 | 5 | S3-C10 | 1 | Two units: the requirement ↔ task reads, and the filtered tree | **Open**, R3 |
@@ -156,8 +156,9 @@ docs state the refined rules.
   `app/authz/` (adding C5, C6, C8, C9 for their targeted rules), or only rows that add an action
   or rule (dropping C3 and C4, whose actions C2 registers)?
 - **R2.** Name the missing endpoints, actions, and filters before the rows start: S3-C0e's
-  `ancestors` scoping (decided: DL-357, Nov 11); S3-C0m's endpoint and per-project actions; S3-C13's candidates endpoints;
-  S3-C5's and S3-C10's declared filters and sorts.
+  `ancestors` scoping (decided: DL-357, Nov 11); S3-C0m's endpoint and per-project actions
+  (decided: DL-379, Nov 13); S3-C13's candidates endpoints; S3-C5's and S3-C10's declared
+  filters and sorts.
 - **R3.** Splits: S3-C10 (the tree's filters as S3-C10a), S3-C9 (the requirement delete's linked
   tasks), S3-C27 (Timeline and Workstreams), S3-C29 (the "see all" screens), S3-C0g, S3-C0j (the
   design-skill trial), S3-C0k (the backend fields), S3-C0l.

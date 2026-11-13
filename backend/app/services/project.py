@@ -40,9 +40,10 @@ from app.repositories.user import UserRepository
 from app.rules.identifiers import normalize_project_key, project_key_problem
 from app.rules.modules import ALL_MODULES, is_available, recommended_modules, seed_modules
 from app.rules.restriction import Restriction, change
-from app.schemas.org import MemberCreate
+from app.schemas.org import MemberAdd, MemberCreate, MemberProjectAdd, MemberRead
 from app.schemas.project import (
     MemberCandidate,
+    MemberProject,
     ModuleGuidance,
     ModuleNote,
     ProjectAccessEntry,
@@ -102,6 +103,24 @@ MEMBER_CANDIDATES = ListSpec(
     search=(User.name, User.email, User.username),  # pyright: ignore[reportArgumentType]
 )
 
+MEMBER_PROJECTS = ListSpec(
+    name="MemberProject",
+    id_column=Project.id,  # pyright: ignore[reportArgumentType]
+    sorts={"name": Project.name},  # pyright: ignore[reportArgumentType]
+    default_sort=("name",),
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class _OrgAddProject:
+    """An org add's project (DL-379), locked: its entry's index, its role, its confirmation."""
+
+    index: int
+    project: Project
+    role: ProjectRole
+    confirmation: dict[str, JsonValue]
+
+
 # A project has no owner role: the roster's add, list, and lock order only (DL-71).
 _MEMBER_ROSTER = RosterSpec(
     owner=None,
@@ -154,17 +173,22 @@ _MEMBER_IDS = "confirmed_member_ids"
 
 
 def _confirmation(
-    values: BaseModel, *, needed: bool, members: set[uuid.UUID] | None = None
+    values: BaseModel,
+    *,
+    needed: bool,
+    members: set[uuid.UUID] | None = None,
+    under: tuple[str | int, ...] = ("body",),
 ) -> dict[str, JsonValue]:
     """Check an export-control confirmation (design-doc §3.1; DL-81) and return it for the audit
     event. Where it's `needed`, `export_control_confirmed` must be true, and, when `members` is
     given, `confirmed_member_ids` must list exactly them; where it isn't, neither field may be
-    sent. 422s: `confirmation_required`, `members_changed`, `confirmation_not_needed`."""
+    sent. 422s: `confirmation_required`, `members_changed`, `confirmation_not_needed`, on the
+    fields `under` (an org add's project entry, `("body", "projects", 0)`)."""
     sent = values.model_fields_set
     if not needed:
         errors = [
             FieldError(
-                ("body", f),
+                (*under, f),
                 "No export-control confirmation is needed here.",
                 "confirmation_not_needed",
             )
@@ -178,7 +202,7 @@ def _confirmation(
     if not getattr(values, _CONFIRMED):
         errors.append(
             FieldError(
-                ("body", _CONFIRMED),
+                (*under, _CONFIRMED),
                 "Confirm that the people involved are authorized for export-controlled data.",
                 "confirmation_required",
             )
@@ -189,7 +213,7 @@ def _confirmation(
         if listed is None:
             errors.append(
                 FieldError(
-                    ("body", _MEMBER_IDS),
+                    (*under, _MEMBER_IDS),
                     "List the project's members you confirm.",
                     "confirmation_required",
                 )
@@ -197,7 +221,7 @@ def _confirmation(
         elif set(listed) != members:
             errors.append(
                 FieldError(
-                    ("body", _MEMBER_IDS),
+                    (*under, _MEMBER_IDS),
                     "The project's members have changed. Review them and confirm again.",
                     "members_changed",
                 )
@@ -689,6 +713,104 @@ class ProjectService:
         return await roster.add_user(
             ctx, user, payload.role, loc=("body", "user_id"), details=confirmation
         )
+
+    async def member_projects(self, org: Organization, query: object) -> Page[MemberProject]:
+        """An org add's projects step (Q12g, DL-379): the org's live projects. Whoever may add
+        org members (`org_member.manage`) administers every one of them, so none is filtered out
+        here; the add still authorizes each."""
+        page = await fetch_page(
+            self.session,
+            self.repository.live_in_org(org.id),
+            MEMBER_PROJECTS,
+            query,  # pyright: ignore[reportArgumentType] -- MEMBER_PROJECTS.query_model
+        )
+        return page.with_items(
+            [
+                MemberProject(
+                    id=p.id,
+                    key=p.key,
+                    name=p.name,
+                    export_controlled=project_target(p).export_controlled,
+                )
+                for p in page.items
+            ]
+        )
+
+    async def add_org_member(
+        self, ctx: AuthzContext, org: Organization, payload: MemberAdd
+    ) -> MemberRead:
+        """An org add (by email) and, with `projects`, a membership on each of them, all or
+        nothing in the one request (Q12g, DL-379): the org's service adds the org member, then
+        this one each project's, each its own `project_member_added`."""
+        projects = await self._lock_projects_for_org_add(ctx, org, payload.projects)
+        row = await OrgService(self.session).add_member(ctx, org, payload.email, payload.role)
+        await self._add_to_projects(ctx, row.user_id, projects)
+        return row
+
+    async def create_org_member(
+        self, ctx: AuthzContext, org: Organization, payload: MemberCreate
+    ) -> MemberRead:
+        """As `add_org_member`, creating the account first (`user_created`)."""
+        projects = await self._lock_projects_for_org_add(ctx, org, payload.projects)
+        row = await OrgService(self.session).create_member(ctx, org, payload)
+        await self._add_to_projects(ctx, row.user_id, projects)
+        return row
+
+    async def _lock_projects_for_org_add(
+        self, ctx: AuthzContext, org: Organization, entries: list[MemberProjectAdd]
+    ) -> list[_OrgAddProject]:
+        """Each entry's project, locked live, in ID order, before the person's rows (DL-235),
+        with its export-control confirmation checked under the lock (DL-81); one query to read
+        them, one to lock them. A project sent twice is a 422 `duplicate`; one outside the org, or
+        one the caller can't see, a 404 before any lock; one they may not add members to, or
+        archived, a 403."""
+        index_of: dict[uuid.UUID, int] = {}
+        for index, entry in enumerate(entries):
+            if entry.project_id in index_of:
+                raise ValidationFailedError.on(
+                    ("body", "projects", index, "project_id"),
+                    "This project is listed twice.",
+                    "duplicate",
+                )
+            index_of[entry.project_id] = index
+        found = {p.id: p for p in await self.repository.in_org(org.id, index_of)}
+        for entry in entries:
+            project = found.get(entry.project_id)
+            if project is None:
+                raise NotFoundError
+            # As DL-379 asks: today `org_member.manage`, which the route requires, carries this
+            # on every project in the org (actions.py), so it refuses no one yet.
+            ensure(ctx, Action.PROJECT_MEMBER_MANAGE, project_target(project))
+        locked: list[_OrgAddProject] = []
+        for project in await self.repository.lock_all(index_of):
+            # Archived since it was read: a member change is denied (design-doc §5).
+            if project.archived_at is not None:
+                raise ForbiddenError
+            index = index_of[project.id]
+            confirmation = _confirmation(
+                entries[index],
+                needed=project_target(project).export_controlled,
+                under=("body", "projects", index),
+            )
+            locked.append(_OrgAddProject(index, project, entries[index].role, confirmation))
+        return locked
+
+    async def _add_to_projects(
+        self, ctx: AuthzContext, user_id: uuid.UUID, projects: list[_OrgAddProject]
+    ) -> None:
+        """Each membership; one the person already holds (workspace staff can be on a project
+        outside its org) is a 422 `already_member` on its entry."""
+        if not projects:
+            return
+        user = cast(User, await UserRepository(self.session).get(user_id))  # just added
+        for add in projects:
+            await self._members(add.project).add_user(
+                ctx,
+                user,
+                add.role,
+                loc=("body", "projects", add.index, "project_id"),
+                details=add.confirmation,
+            )
 
     async def create_member(
         self, ctx: AuthzContext, project: Project, payload: ProjectMemberCreate

@@ -4721,3 +4721,21 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** ui-design-guide UI-FRM-14; behavior reference (Members); user guide (Members
   and roles)
 - **Source:** owner, Nov 13, 2026 (S3-C0l; the owner's S2 feedback)
+
+### DL-379: An org add takes its projects; the project service does it
+- **Date:** 2026-11-13
+- **Decision:** R2 for S3-C0m. Both org adds (`POST /api/orgs/{org_id}/members` and
+  `…/members/new`) take an optional `projects` (`project_id`, `role` defaulting to member,
+  `export_control_confirmed` where the project is export-controlled, at most 200). The router
+  calls the project service, which adds the org member through the org service and then each
+  project membership through the project roster, in one transaction, all or nothing; the org
+  service never calls the project area (the layer rule). No new action: each project is checked
+  with `project_member.manage`, and any refusal fails the whole add. The step's list is a new
+  endpoint, `GET /api/orgs/{org_id}/member-projects`: the org's live projects with whether each is
+  export-controlled, for `org_member.manage` (whose holders administer every project in the org).
+  The step sits on the add's last screen (the confirm or the create step), as Q12g says.
+- **Supersedes:** none (settles the Slice 3 plan review's R2 for S3-C0m)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0m; "The org members API"); behavior reference (Members); user
+  guide (Organizations); `docs/reviews/design-changes/DC-2026-11-10-slice-3-plan.md` (R2, row 2)
+- **Source:** owner, Nov 13, 2026 (S3-C0m)
