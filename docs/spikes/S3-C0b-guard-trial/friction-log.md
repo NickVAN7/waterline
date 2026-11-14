@@ -40,5 +40,9 @@ means the guard stopped something it should have.
 | 31 | S3-C0m | a sabotage script (copy, edit, test, restore) ending in `git -C … diff --stat`, in one call | a compound command with git in it | `cmp` against the copy instead | legit; my slip (as #15) |
 | 32 | S3-C0m review | `review-copy` then `diff … > $D/fix.diff`, the path in a shell variable | a redirect to a file named only at run time | literal paths | legit (DL-24) |
 | 33 | S3-C0m review | the snapshot diff, `diff -ruN -x .git …`, as a plain command | text mentioning git in a command | a scratchpad script (`fixdiff.sh`) | legit (as #13) |
+| 34 | S3-C0n (supply-chain check) | a `grep` of Impeccable's downloaded source for `ensure_hook_git_excludes` (read-only) | text mentioning git in a command | a scratchpad script (`impsearch.sh`) | legit (as #13) |
+| 35 | S3-C0n (supply-chain check) | `curl` of GitHub's API for the 4.8.0 tag (`…/git/ref/tags/…`, read-only) with a download, in one call | text mentioning git in a command | a scratchpad script (`fetch480.sh`) | legit (as #13) |
+| 36 | S3-C0n | a `python3 -` heredoc tidying `setup.py`, whose text holds its `git add` line | text mentioning git in a command | the Edit tool | legit (as #8) |
+| 37 | S3-C0n | `cat >> docs/decision-log.md <<'EOF'` adding DL-380, whose text names the clone's `.git/info/exclude` | text mentioning git in a command | the Edit tool | legit (as #7) |
 
 None of the blocks so far stopped anything the rules forbid.

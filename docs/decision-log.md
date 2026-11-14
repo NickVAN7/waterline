@@ -4739,3 +4739,21 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (S3-C0m; "The org members API"); behavior reference (Members); user
   guide (Organizations); `docs/reviews/design-changes/DC-2026-11-10-slice-3-plan.md` (R2, row 2)
 - **Source:** owner, Nov 13, 2026 (S3-C0m)
+
+### DL-380: The design skill's trial runs Impeccable at full strength, in a scratch clone
+- **Date:** 2026-11-13
+- **Decision:** S3-C0n's skill is Impeccable (github.com/pbakaus/impeccable), installed as a
+  Claude Code plugin pinned to 4.8.0 (the marketplace's tag `skill-v4.8.0`, the newest release
+  over two weeks old), at local scope in a scratch clone with a local bare remote, as S3-C0b's
+  trial was (DL-316). It runs at full strength: its design hook on (it writes its cache and the
+  clone's `.git/info/exclude`, accepted for the trial), `PRODUCT.md` by `/impeccable init`,
+  `DESIGN.md` by `/impeccable document`, and live mode, with `http://localhost:8400` added to
+  `script-src` and `connect-src` in the clone's `frontend/vite.config.ts` only. Its telemetry,
+  update checks, and live mode's copy-edit agent (which launches an agent CLI with its
+  permissions bypassed) are off. The trial screen is the requirement detail panel. The
+  repository's `.claude/settings.json`, `frontend/vite.config.ts` (DL-142), `csp.spec.ts`, and
+  `.gitignore` don't change in S3-C0n.
+- **Supersedes:** none (settles S3-C0n's open choices: the skill, the screen, how it's installed)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0n); `docs/spikes/S3-C0n-impeccable/`
+- **Source:** owner, Nov 13, 2026 (S3-C0n)
