@@ -10,7 +10,10 @@
 // Restore, or the row's item when it has none), or the `h1` (DL-290, UI-FRM-14). A refused
 // restore reloads the list, what the user may do with it (UI-FRM-7); a failed one leaves focus on
 // its Restore while that's still there, and the alert's dismiss goes back to it (UI-FBK-13). Loading, the not-found page, and the redirect are `useProjectPage`'s.
+// Reached from each list page's Trash link, filtered to that page's type (`?type=requirement`),
+// the filter removable; the breadcrumb leads back to the list (DL-350).
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -22,38 +25,63 @@ import Button from '@/components/Button.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import Pagination from '@/components/Pagination.vue'
+import SelectField from '@/components/SelectField.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows } from '@/composables/allowedActions'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useListQuery } from '@/composables/useListQuery'
 import { useLoad } from '@/composables/useLoad'
-import { useCurrentOrgStore } from '@/stores/currentOrg'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 
 import ProjectHeader from './ProjectHeader.vue'
+import ProjectPageLoading from './ProjectPageLoading.vue'
 import { useProjectPage } from './useProjectPage'
 
 type Item = components['schemas']['TrashItem']
 
-const WHO_TO_ASK_EXPORT =
-  "This project's content is export-controlled: only its members can read it. Ask one of its admins to add you."
 const WHO_TO_ASK = "Ask one of the project's admins if you need its requirements."
 
-const { key, project, notFound, retry } = useProjectPage('project-trash')
-const nav = useCurrentOrgStore()
+const { key, project, notFound, retry, reload, whoToAsk } = useProjectPage('project-trash')
 const loaded = computed(() => project.data.value)
 const allowed = computed(() => allows(loaded.value, 'requirement.view'))
-const exportControlled = computed(
-  () => !!loaded.value?.restriction_categories.includes('export_controlled'),
-)
-const list = useListQuery({ limit: 25 })
+const list = useListQuery({ limit: 25, filters: ['type'] as const })
+type TrashType = components['schemas']['TrashItemType']
+// A type the API doesn't know (an old or mistyped link) is ignored: the list loads at "Any type".
+const type = computed(() => {
+  const value = list.filter.value.type
+  return Object.prototype.hasOwnProperty.call(TRASH_ITEM_TYPE, value) ? (value as TrashType) : ''
+})
+const TYPE_OPTIONS = [
+  { value: '', label: 'Any type' },
+  ...(Object.keys(TRASH_ITEM_TYPE) as TrashType[]).map((value) => ({
+    value,
+    label: TRASH_ITEM_TYPE[value],
+  })),
+]
+const router = useRouter()
+const typeField = ref<InstanceType<typeof SelectField>>()
+const filterBy = (value: string) => void router.replace(list.filtered({ type: value }))
+// Clear filter returns focus to the filter (UI-FBK-8).
+async function clearFilter() {
+  await router.replace(list.filtered({ type: '' }))
+  await nextTick()
+  typeField.value?.focus()
+}
 
 const page = useLoad(() =>
   api(
     client.GET('/api/projects/{key}/trash', {
-      params: { path: { key: loaded.value!.key }, query: list.params.value },
+      params: {
+        path: { key: loaded.value!.key },
+        // The API's filter takes a list; the page sends one value.
+        query: {
+          limit: list.limit,
+          offset: list.offset.value,
+          ...(type.value ? { type: [type.value] } : {}),
+        },
+      },
     }),
   ),
 )
@@ -117,10 +145,8 @@ async function restore(row: Item, index: number) {
         : error.status === 404
           ? `${id} isn't in the Trash any more.`
           : `Couldn't restore ${id}. Try again in a moment.`
-    if (error.status === 403) {
-      await project.run()
-      if (project.data.value) nav.select(project.data.value)
-    }
+    // The content closed to the user: the 403 page has replaced this one, so no list to read.
+    if (error.status === 403 && !(await reload(() => allowed.value))) return
     if (error.status === 403 || error.status === 404) await page.run()
     // Its button may be gone with the row or the permission: then the alert takes focus.
     await nextTick()
@@ -141,7 +167,8 @@ function dismiss() {
 }
 
 const announcement = computed(() => {
-  if (page.loading.value && !page.data.value) return 'Loading the trash…'
+  // On every load, a filter change's too: the count it then says may not have changed (UI-TBL-3).
+  if (page.loading.value) return 'Loading the trash…'
   const total = page.data.value?.total
   if (total === undefined) return ''
   return total === 1 ? '1 item in the trash' : `${total} items in the trash`
@@ -150,34 +177,37 @@ const announcement = computed(() => {
 
 <template>
   <NotFoundView v-if="notFound || page.error.value?.status === 404" />
-  <ForbiddenView
-    v-else-if="loaded && !allowed"
-    :who-to-ask="exportControlled ? WHO_TO_ASK_EXPORT : WHO_TO_ASK"
-  />
+  <ForbiddenView v-else-if="loaded && !allowed" :who-to-ask="whoToAsk(WHO_TO_ASK)" />
   <div v-else class="flex flex-col gap-6">
-    <div
+    <ProjectPageLoading
       v-if="!loaded"
-      class="flex flex-col gap-6"
-      :aria-busy="project.loading.value ? 'true' : 'false'"
-    >
-      <template v-if="project.error.value">
-        <h1 class="m-0 text-2xl leading-tight font-semibold font-mono">{{ key.toUpperCase() }}</h1>
-        <ErrorState
-          :key="project.failures.value"
-          :live="project.failures.value > 1"
-          thing="this project"
-          :pending="project.loading.value"
-          @retry="retry"
-        />
-      </template>
-      <Skeleton v-else :rows="4" />
-    </div>
+      :project="project"
+      :title="key.toUpperCase()"
+      :rows="4"
+      @retry="retry"
+    />
     <template v-else>
-      <ProjectHeader :project="loaded" :title="`${loaded.name} trash`" />
-      <p class="m-0 text-text-muted">
-        Deleted requirements stay here until they're restored. Restoring one brings back the
-        children deleted with it.
-      </p>
+      <ProjectHeader
+        :project="loaded"
+        page="trash"
+        :trail="[
+          {
+            label: 'Requirements',
+            to: { name: 'project-requirements', params: { key: loaded.key } },
+          },
+          { label: 'Trash' },
+        ]"
+      />
+      <div role="group" aria-label="Filters" class="flex flex-wrap gap-4">
+        <SelectField
+          id="trash-type"
+          ref="typeField"
+          :model-value="type"
+          label="Type"
+          :options="TYPE_OPTIONS"
+          @update:model-value="filterBy"
+        />
+      </div>
       <SuccessStatus :message="done">
         <RouterLink
           v-if="restored"
@@ -214,6 +244,16 @@ const announcement = computed(() => {
         />
         <Skeleton v-else-if="!page.data.value" />
         <EmptyState
+          v-else-if="!page.data.value.items.length && type"
+          :heading="`No deleted items match Type: ${TRASH_ITEM_TYPE[type]}`"
+          :level="3"
+        >
+          Try another type, or clear the filter.
+          <template #action>
+            <Button variant="secondary" @click="clearFilter">Clear filter</Button>
+          </template>
+        </EmptyState>
+        <EmptyState
           v-else-if="!page.data.value.items.length"
           heading="The trash is empty"
           :level="3"
@@ -221,7 +261,12 @@ const announcement = computed(() => {
           Requirements deleted from this project show here, until they're restored.
         </EmptyState>
         <template v-else>
-          <div role="region" aria-labelledby="trash-heading" tabindex="0" class="overflow-x-auto">
+          <div
+            role="region"
+            aria-labelledby="trash-heading"
+            tabindex="0"
+            class="relative overflow-x-auto"
+          >
             <table aria-labelledby="trash-heading" class="w-full border-collapse text-sm">
               <thead>
                 <tr class="border-b border-border text-left">

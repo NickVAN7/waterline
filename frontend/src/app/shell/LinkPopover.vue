@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// A menu button opening a popover of links (UI-SHL-4, UI-SHL-6): PrimeVue's Popover (UI-STY-3),
-// with a filter field once there are more than FILTER_AFTER links. Following a link closes it.
-// Opening it moves focus inside (the filter, the current link, or the first): the popover sits
+// A menu button opening a popover of links (UI-SHL-4, UI-SHL-6): PrimeVue's Popover (UI-STY-3).
+// Past FILTER_AFTER links, a Filter button shows a filter field and moves focus to it. Following a
+// link closes it. Opening it moves focus inside (the current link, or the first): the popover sits
 // at the end of `<body>`, so Tab from the button would never reach it. Esc returns to the button.
 import Popover from 'primevue/popover'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -18,6 +18,8 @@ const props = defineProps<{
   currentId?: string
   /** The links are loading (the list is `aria-busy`). */
   busy?: boolean
+  /** The button fills its container, the arrow at its end (the sidebar's project selector). */
+  wide?: boolean
 }>()
 const emit = defineEmits<{ open: [] }>()
 
@@ -30,6 +32,14 @@ const button = ref<HTMLButtonElement>()
 defineExpose({ focus: () => button.value?.focus() })
 const expanded = ref(false)
 const filter = ref('')
+const filtering = ref(false)
+const filterInput = ref<HTMLInputElement>()
+
+async function startFilter() {
+  filtering.value = true
+  await nextTick()
+  filterInput.value?.focus()
+}
 const popoverId = `popover-${props.name.toLowerCase().replace(/\W+/g, '-')}`
 
 const shown = computed(() => {
@@ -83,6 +93,7 @@ watch(
 function onHide() {
   expanded.value = false
   filter.value = ''
+  filtering.value = false
 }
 </script>
 
@@ -93,7 +104,10 @@ function onHide() {
     aria-haspopup="dialog"
     :aria-expanded="expanded ? 'true' : 'false'"
     :aria-controls="expanded ? popoverId : undefined"
-    class="inline-flex min-h-(--control-height) max-w-full items-center gap-2 rounded-md border border-border bg-bg px-3 text-left text-text hover:bg-hover"
+    :class="[
+      'inline-flex min-h-(--control-height) max-w-full items-center gap-2 rounded-md border border-border bg-bg px-3 text-left text-text hover:bg-hover',
+      wide && 'w-full justify-between',
+    ]"
     @click="toggle"
   >
     <span class="break-words"><slot name="button" /></span>
@@ -110,18 +124,29 @@ function onHide() {
     <div class="flex w-72 max-w-full flex-col gap-2">
       <!-- The popover's description, read with its name: focus goes straight to a link. -->
       <div v-if="$slots.header" :id="`${popoverId}-header`"><slot name="header" /></div>
-      <div v-if="links.length > FILTER_AFTER" class="flex flex-col gap-1">
-        <label :for="`${popoverId}-filter`" class="text-sm font-medium"
-          >Filter {{ name.toLowerCase() }}</label
+      <template v-if="links.length > FILTER_AFTER">
+        <div v-if="filtering" class="flex flex-col gap-1">
+          <label :for="`${popoverId}-filter`" class="text-sm font-medium"
+            >Filter {{ name.toLowerCase() }}</label
+          >
+          <input
+            :id="`${popoverId}-filter`"
+            ref="filterInput"
+            v-model="filter"
+            type="search"
+            autocomplete="off"
+            class="min-h-(--control-height) rounded-md border border-border bg-bg px-3 text-text"
+          />
+        </div>
+        <button
+          v-else
+          type="button"
+          class="inline-flex min-h-(--control-height) items-center gap-2 self-start rounded-md px-2 text-text-muted hover:bg-hover hover:text-text"
+          @click="startFilter"
         >
-        <input
-          :id="`${popoverId}-filter`"
-          v-model="filter"
-          type="search"
-          autocomplete="off"
-          class="min-h-(--control-height) rounded-md border border-border bg-bg px-3 text-text"
-        />
-      </div>
+          <Icon name="search" />Filter {{ name.toLowerCase() }}
+        </button>
+      </template>
       <ul
         :aria-busy="busy ? 'true' : 'false'"
         class="m-0 flex max-h-80 list-none flex-col overflow-y-auto p-0"

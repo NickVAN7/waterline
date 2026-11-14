@@ -18,6 +18,7 @@ from app.routers.deps import (
 )
 from app.schemas.project import (
     MemberCandidate,
+    MemberProject,
     ModuleGuidance,
     ProjectAccessReview,
     ProjectCreate,
@@ -34,6 +35,7 @@ from app.schemas.workspace import SlugAvailability
 from app.services.org import OrgEntity
 from app.services.project import (
     MEMBER_CANDIDATES,
+    MEMBER_PROJECTS,
     ORG_PROJECTS,
     PROJECT_MEMBERS,
     ProjectEntity,
@@ -63,6 +65,8 @@ AccessViewed = Annotated[
 ProjectQuery = Annotated[ORG_PROJECTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 MemberQuery = Annotated[PROJECT_MEMBERS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 CandidateQuery = Annotated[MEMBER_CANDIDATES.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+MemberProjectQuery = Annotated[MEMBER_PROJECTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+OrgMembersManaged = Annotated[OrgEntity, Depends(authorized(load_org, Action.ORG_MEMBER_MANAGE))]
 
 
 @router.post("/orgs/{org_id}/projects", status_code=status.HTTP_201_CREATED, responses=ERRORS)
@@ -159,6 +163,15 @@ async def list_project_members(
 ) -> Page[ProjectMemberRead]:
     """The project's explicit memberships, each row with the actions the caller may take on it."""
     return await ProjectService(session).list_members(ctx, project, query)
+
+
+@router.get("/orgs/{org_id}/member-projects", responses=ERRORS)
+async def org_member_projects(
+    org: OrgMembersManaged, query: MemberProjectQuery, session: SessionDep
+) -> Page[MemberProject]:
+    """An org add's projects step (DL-379): the org's live projects, by name, with whether each
+    is export-controlled; for whoever may add org members."""
+    return await ProjectService(session).member_projects(org, query)
 
 
 @router.get("/projects/{key}/member-candidates", responses=ERRORS)

@@ -22,6 +22,9 @@ export const PROJECT_STATUS: Record<ProjectStatus, BadgeLabel> = {
   cancelled: { label: 'Cancelled', tone: 'neutral', icon: 'x' },
 }
 
+/** An archived project's badge, beside its status on My work's lists (DL-330). */
+export const PROJECT_ARCHIVED: BadgeLabel = { label: 'Archived', tone: 'neutral', icon: 'pause' }
+
 /** Project types (design-doc §1.1): the type seeds the modules and picks the labels. */
 export const PROJECT_TYPE: Record<ProjectType, string> = {
   software: 'Software',
@@ -196,6 +199,11 @@ export const ACCESS_KIND: Record<AccessKind, string> = {
 export const ACTIVE = 'Active'
 export const USER = 'User'
 export const NO_ROLE = 'None'
+/** An access review's project role for someone with none who administers the project through a
+ * role above it (Q12h, S3-C0k). */
+export const INHERITED_ADMIN_ROLE = 'Admin (inherited)'
+/** An org with no active owner, on the workspace's org list (S3-C0k). */
+export const NO_OWNERS = 'None'
 
 /** A per-person access review's Access cell on a project that isn't export-controlled, read by
  * screen readers only (DL-184). */
@@ -206,6 +214,14 @@ export const DEACTIVATED: BadgeLabel = { label: 'Deactivated', tone: 'neutral', 
 
 /** A requirement named in another's history while it's in the trash (DL-276). */
 export const DELETED: BadgeLabel = { label: 'Deleted', tone: 'neutral', icon: 'x' }
+
+/** A requirement with a pending approval request, beside its status on the tree (Q12b; the
+ * S3-C26 filter uses the same words). */
+export const AWAITING_APPROVAL: BadgeLabel = {
+  label: 'Awaiting approval',
+  tone: 'info',
+  icon: 'circle',
+}
 
 /** An approval request's status (design-doc §6.2) as a badge. */
 export const APPROVAL_REQUEST_STATUS: Record<
@@ -254,6 +270,19 @@ export function workspaceRoleText(
 ): string {
   const parts = [role && WORKSPACE_ROLE[role], isSystemAdmin && ACCESS_REASON.system_admin]
   return parts.filter(Boolean).join(', ') || none
+}
+
+/** One of a user's orgs on the workspace users list (S3-C0k): "Acme · Admin · 2 projects", the
+ * role left out when they're on its projects alone. */
+export function orgMembershipText(m: {
+  org_name: string
+  role: OrgRole | null
+  project_count: number
+}): string {
+  const projects = m.project_count === 1 ? '1 project' : `${m.project_count} projects`
+  return [m.org_name, m.role && ORG_ROLE[m.role], m.project_count > 0 && projects]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 /** What a live availability check says about a slug or username (UI-FRM-9), after the field's

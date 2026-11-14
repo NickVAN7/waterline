@@ -730,11 +730,15 @@ def _log_entries(relative_path: str, prefix: str) -> list[tuple[int, dict[str, s
 # --- Cross-file references --------------------------------------------------------------------
 
 
+# Binary files under docs/ (the guide's screenshots, DL-343) hold no references.
+_IMAGE_SUFFIXES = frozenset({".webp", ".png", ".jpg", ".gif"})
+
+
 def reference_files() -> list[Path]:
     """Files whose TD-n, DL-n, and § references must resolve: docs/ (except the historical review
-    records in docs/reviews/), the CLAUDE.md files, and .claude/. Listed through git (tracked
-    plus untracked-but-not-ignored), so caches, editor backups, and local settings are never
-    scanned."""
+    records in docs/reviews/, and images), the CLAUDE.md files, and .claude/. Listed through git
+    (tracked plus untracked-but-not-ignored), so caches, editor backups, and local settings are
+    never scanned."""
     listed = _git(
         "ls-files",
         "--cached",
@@ -750,7 +754,9 @@ def reference_files() -> list[Path]:
     files = [
         REPO_ROOT / name
         for name in sorted(set(listed.splitlines()))
-        if not name.startswith("docs/reviews/") and (REPO_ROOT / name).is_file()
+        if not name.startswith("docs/reviews/")
+        and Path(name).suffix not in _IMAGE_SUFFIXES
+        and (REPO_ROOT / name).is_file()
     ]
     if not files:
         raise DocsStructureError("git lists no docs, CLAUDE.md, or .claude files to scan")

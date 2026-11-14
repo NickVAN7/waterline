@@ -13,7 +13,8 @@ DL-77; design-doc §5, "Org roles", §4 "Visibility", §9 archiving, §11 "My wo
   nothing) for who doesn't see it; an archived project is still readable, and denies every
   mutation but unarchive (archiving it again included);
 - module guidance: any signed-in user;
-- My work's projects section: the projects the user can open, archived left out;
+- My work's organizations section: each org the user can open a project in, with the projects
+  they can open there, archived ones hidden (DL-330, DL-359);
 - starring and unstarring (`project.favorite`, DL-303, DL-304): whoever sees the project, 204
   and idempotent, only the caller's own row, no audit event or activity entry; 403 on an
   archived project, 404 to who doesn't see it.
@@ -26,13 +27,14 @@ workspace "Acme Consulting", org "Bolt Foods" (bolt-foods), and project "Payment
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from httpx import AsyncClient, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums import OrgRole, ProjectRole, WorkspaceRole
+from app.enums import OrgRole, ProjectRole, ProjectStatus, WorkspaceRole
 from app.models.audit_event import AuditEvent
 from app.models.project import Project, ProjectFavorite
 from app.models.user import User
@@ -618,13 +620,24 @@ async def test_any_signed_in_user_gets_the_module_guidance(client: AsyncClient) 
     ]
 
 
-# --- My work's projects section (design-doc §11: scoped, archived left out) ---------------------
+# --- My work's organizations section (design-doc §11 from S3-C0f; DL-329, DL-330, DL-349, DL-359,
+# DL-368). One item per org the caller can open a project in, by org name: its first 5 open
+# projects (Active, Planning, On hold, each by name) with `total`, the first 5 hidden ones
+# (Completed, Cancelled, each by name, then the archived by name alone) with `hidden_total`, and
+# `listed_total` (all but the archived). The projects are those the caller can open (§5, §3.1),
+# archived included.
 
 
 async def my_work_layout(session: AsyncSession, t: Tenancy) -> None:
-    """Besides PMT: OPS in the same org, ARC archived in it, DUN in another org of the
-    workspace, ECH in another workspace."""
+    """Besides PMT: OPS in the same org, XCT export-controlled in it, ARC archived in it, DUN in
+    another org of the workspace, ECH in another workspace. Every one is Planning."""
     await ProjectFactory.create_async(organization=t.org, key="OPS", name="Operations")
+    await ProjectFactory.create_async(
+        organization=t.org,
+        key="XCT",
+        name="Exports",
+        restriction_categories=["export_controlled"],
+    )
     await ProjectFactory.create_async(
         organization=t.org, key="ARC", name="Archive", archived_at=ARCHIVED_AT
     )
@@ -640,17 +653,28 @@ async def my_work_layout(session: AsyncSession, t: Tenancy) -> None:
     await session.flush()
 
 
-MY_PROJECTS: list[tuple[str, list[str]]] = [
-    ("system_admin", ["DUN", "ECH", "OPS", "PMT"]),
-    ("workspace_owner", ["DUN", "OPS", "PMT"]),
-    ("workspace_admin", ["DUN", "OPS", "PMT"]),
-    ("org_owner", ["OPS", "PMT"]),
-    ("org_admin", ["OPS", "PMT"]),
+# (slug, name, open keys, total, hidden keys, hidden_total, listed_total)
+OrgRow = tuple[str, str, list[str], int, list[str], int, int]
+
+BOLT_ALL: OrgRow = ("bolt-foods", "Bolt Foods", ["XCT", "OPS", "PMT"], 3, ["ARC"], 1, 3)
+BOLT_PMT: OrgRow = ("bolt-foods", "Bolt Foods", ["PMT"], 1, [], 0, 1)
+BOLT_LDG: OrgRow = ("bolt-foods", "Bolt Foods", ["LDG"], 1, [], 0, 1)
+DUNE: OrgRow = ("dune-labs", "Dune Labs", ["DUN"], 1, [], 0, 1)
+ECHO: OrgRow = ("echo-org", "Echo Org", ["ECH"], 1, [], 0, 1)
+
+# Inherited admins keep export-controlled projects in lists (management, §3.1); an org
+# membership alone opens none of the org's projects (§5, "Org roles").
+MY_ORGS: list[tuple[str, list[OrgRow]]] = [
+    ("system_admin", [BOLT_ALL, DUNE, ECHO]),
+    ("workspace_owner", [BOLT_ALL, DUNE]),
+    ("workspace_admin", [BOLT_ALL, DUNE]),
+    ("org_owner", [BOLT_ALL]),
+    ("org_admin", [BOLT_ALL]),
     ("org_member", []),
-    ("project_admin", ["PMT"]),
-    ("project_member", ["PMT"]),
-    ("project_viewer", ["PMT"]),
-    ("other_project_admin", ["LDG"]),
+    ("project_admin", [BOLT_PMT]),
+    ("project_member", [BOLT_PMT]),
+    ("project_viewer", [BOLT_PMT]),
+    ("other_project_admin", [BOLT_LDG]),
     ("workspace_member", []),
     ("other_org_owner", []),
     ("other_workspace_owner", []),
@@ -658,9 +682,24 @@ MY_PROJECTS: list[tuple[str, list[str]]] = [
 ]
 
 
-@pytest.mark.parametrize(("who", "expected"), MY_PROJECTS)
-async def test_my_work_lists_the_projects_the_user_can_open(
-    client: AsyncClient, session: AsyncSession, who: str, expected: list[str]
+def org_rows(section: dict[str, Any]) -> list[OrgRow]:
+    return [
+        (
+            org["slug"],
+            org["name"],
+            [p["key"] for p in org["projects"]],
+            org["total"],
+            [p["key"] for p in org["hidden"]],
+            org["hidden_total"],
+            org["listed_total"],
+        )
+        for org in section["items"]
+    ]
+
+
+@pytest.mark.parametrize(("who", "expected"), MY_ORGS)
+async def test_my_work_lists_each_org_with_the_projects_the_user_can_open(
+    client: AsyncClient, session: AsyncSession, who: str, expected: list[OrgRow]
 ) -> None:
     t = await signed_in(client, who)
     await my_work_layout(session, t)
@@ -668,51 +707,119 @@ async def test_my_work_lists_the_projects_the_user_can_open(
     response = await client.get("/api/me/work")
 
     assert response.status_code == 200
-    section = response.json()["sections"]["projects"]
-    assert (section["available"], [i["key"] for i in section["items"]], section["total"]) == (
+    section = response.json()["sections"]["organizations"]
+    assert (section["available"], org_rows(section), section["total"]) == (
         True,
         expected,
         len(expected),
     )
 
 
-@pytest.mark.parametrize(("who", "expected"), MY_PROJECTS)
-async def test_my_projects_page_lists_the_projects_the_user_can_open(
-    client: AsyncClient, session: AsyncSession, who: str, expected: list[str]
-) -> None:
-    t = await signed_in(client, who)
-    await my_work_layout(session, t)
-
-    response = await client.get("/api/me/work/projects")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert ([item["key"] for item in body["items"]], body["total"]) == (expected, len(expected))
-
-
-async def test_my_work_leaves_out_an_archived_project_the_user_is_a_member_of(
+async def test_my_work_lists_an_archived_project_the_user_is_a_member_of_as_hidden(
     client: AsyncClient, session: AsyncSession
 ) -> None:
+    """DL-330: archived projects come onto My work's org lists, behind the toggle, with no star
+    (starring is a mutation); the org's list doesn't show them, so `listed_total` leaves it out."""
     t = await signed_in(client, "project_admin")
     await archive(session, t)
 
     response = await client.get("/api/me/work")
 
     assert response.status_code == 200
-    section = response.json()["sections"]["projects"]
-    assert (section["items"], section["total"]) == ([], 0)
+    section = response.json()["sections"]["organizations"]
+    assert org_rows(section) == [("bolt-foods", "Bolt Foods", [], 0, ["PMT"], 1, 0)]
+    row = section["items"][0]["hidden"][0]
+    assert (row["archived"], "project.favorite" in row["allowed_actions"]) == (True, False)
 
 
-async def test_my_projects_page_leaves_out_an_archived_project_the_user_is_a_member_of(
+async def test_my_work_shows_a_favorite_in_its_orgs_section_too(
     client: AsyncClient, session: AsyncSession
 ) -> None:
-    t = await signed_in(client, "project_admin")
-    await archive(session, t)
+    """DL-332: favorites also appear in their org's section, starred; the user's other project
+    there is not."""
+    t = await tenancy()
+    user = await persona_user(t, "project_viewer")
+    ops = await ProjectFactory.create_async(organization=t.org, key="OPS", name="Operations")
+    await ProjectMembershipFactory.create_async(project=ops, user=user, role=ProjectRole.VIEWER)
+    await sign_in_as(client, user)
+    await star(session, user, t.project)
 
-    response = await client.get("/api/me/work/projects")
+    response = await client.get("/api/me/work")
 
     assert response.status_code == 200
-    assert (response.json()["items"], response.json()["total"]) == ([], 0)
+    projects = response.json()["sections"]["organizations"]["items"][0]["projects"]
+    assert [(p["key"], p["is_favorite"], p["archived"]) for p in projects] == [
+        ("OPS", False, False),
+        ("PMT", True, False),
+    ]
+
+
+async def ordering_layout(t: Tenancy) -> None:
+    """Bolt Foods gets 5 more open projects (6 with PMT "Payments", Planning) and 6 hidden ones,
+    each list one past the 5 shown, the first 5 of each crossing every status; another org,
+    "Alpine Dairy", created after it but first by name, gets one."""
+    for status, projects in [
+        ("active", [("WIL", "Willow"), ("ASP", "Aspen")]),
+        ("planning", [("BIR", "Birch")]),
+        ("on_hold", [("YEW", "Yew"), ("ALD", "Alder")]),
+        ("completed", [("ROW", "Rowan"), ("ASH", "Ash")]),
+        ("cancelled", [("BEE", "Beech")]),
+    ]:
+        for key, name in projects:
+            await ProjectFactory.create_async(
+                organization=t.org, key=key, name=name, status=ProjectStatus(status)
+            )
+    # Archived, whatever their status: by status, Teak would lead them and Ebony sit among the
+    # completed.
+    for key, name, status in [
+        ("TEA", "Teak", "active"),
+        ("EBO", "Ebony", "completed"),
+        ("ACA", "Acacia", "on_hold"),
+    ]:
+        await ProjectFactory.create_async(
+            organization=t.org,
+            key=key,
+            name=name,
+            status=ProjectStatus(status),
+            archived_at=ARCHIVED_AT,
+        )
+    alpine = await OrganizationFactory.create_async(
+        workspace=t.workspace, name="Alpine Dairy", slug="the-dairy"
+    )
+    await ProjectFactory.create_async(organization=alpine, key="MLK", name="Milk")
+
+
+async def test_my_work_orders_orgs_by_name_and_projects_by_status_then_name(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """DL-330, DL-359, DL-368: each org's first 5 open and first 5 hidden projects, in order,
+    with their totals and the count its org list shows (all but the archived)."""
+    t = await signed_in(client, "workspace_admin")
+    await ordering_layout(t)
+    await session.flush()
+
+    response = await client.get("/api/me/work")
+
+    assert response.status_code == 200
+    section = response.json()["sections"]["organizations"]
+    assert (section["total"], org_rows(section)) == (
+        2,
+        [
+            ("the-dairy", "Alpine Dairy", ["MLK"], 1, [], 0, 1),
+            (
+                "bolt-foods",
+                "Bolt Foods",
+                ["ASP", "WIL", "BIR", "PMT", "ALD"],
+                6,
+                ["ASH", "ROW", "BEE", "ACA", "EBO"],
+                6,
+                9,
+            ),
+        ],
+    )
+    bolt = section["items"][1]
+    assert bolt["id"] == str(t.org.id)
+    assert [p["archived"] for p in bolt["hidden"]] == [False] * 3 + [True] * 2
 
 
 # --- PUT / DELETE /api/projects/{key}/favorite (project.favorite; DL-303, DL-304) ---------------

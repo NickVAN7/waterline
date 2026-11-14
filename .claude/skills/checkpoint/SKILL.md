@@ -33,7 +33,11 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   goes in the commit and the review record, not there (DL-315).
 - `docs/developer-guide.md`: anything a developer now needs (setup steps, commands, conventions,
   how-tos, troubleshooting).
-- `docs/user-guide.md`: any user-visible behavior.
+- `docs/behavior-reference.md`: any change to behavior, exhaustively, in the words on the screen.
+  The guide (`docs/user-guide/`, one page per topic) only when something a user does or sees
+  changes or is added: the reference changes with behavior; the guide only when what a user does
+  or sees changes (DL-335). The guide leaves out route paths, exact messages, and numeric limits
+  (DL-342).
 - `docs/design-doc.md`, `docs/schema-doc.md`, `docs/build-plan.md`: any drift between the docs
   and what was built (approved changes only; unapproved divergence goes back to the owner).
 - `docs/tech-debt.md`: add entries for any shortcut, using this format:
@@ -97,7 +101,8 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   any other finding.
 - **Last checkpoint of a slice:** with the dev stack still down, invoke the `user-guide-verifier`
   agent with the repository's absolute path, the checkpoint ID, and the slice whose "Done when"
-  list to walk (DL-124). Its findings are fixed in `docs/user-guide.md`, or in the app when the
+  list to walk (DL-124). Its findings are fixed in `docs/behavior-reference.md` or the guide under
+  `docs/user-guide/`, or in the app when the
   app is what's wrong, like any other finding. Run `uv run wl up` again afterwards.
 - **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
   agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit

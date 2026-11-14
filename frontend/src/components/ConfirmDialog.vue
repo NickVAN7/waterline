@@ -14,6 +14,9 @@ export type Confirmation = {
   button: string
   variant?: 'primary' | 'danger'
   dismiss?: string
+  // Confirmed, the caller moves focus itself (a navigation, a panel's swap): the dialog doesn't
+  // return it to its opener, whose close event would come a task later and take it back.
+  navigates?: boolean
 }
 
 const shown = ref<Confirmation>({ title: '', text: '', button: '' })
@@ -33,7 +36,7 @@ function finish(result: boolean) {
 
 function confirm() {
   finish(true)
-  dialog.value?.close()
+  dialog.value?.close({ returnFocus: !shown.value.navigates })
 }
 
 defineExpose({ open })

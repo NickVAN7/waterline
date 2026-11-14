@@ -5,6 +5,7 @@
 import { watch } from 'vue'
 
 import { api, client } from '@/api/client'
+import { WORKSPACE_CRUMB } from '@/app/crumbs'
 import { settlePage } from '@/app/routeFocus'
 import NameSlugSettings from '@/components/NameSlugSettings.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -71,7 +72,7 @@ async function save(changes: { name?: string; slug?: string }, current: Workspac
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader title="Workspace settings" />
+    <PageHeader title="Workspace settings" :crumbs="[WORKSPACE_CRUMB, { label: 'Settings' }]" />
     <NameSlugSettings
       :page="page"
       prefix="workspace"

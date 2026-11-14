@@ -817,7 +817,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   server. The packages are pinned exactly and arrive in the first checkpoint that ships a board or
   an editable grid (placed when Slices 2 and 3 are planned), not in S1-C14.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-344 (in part: the backlog's component, decided by the S3-C0i spike); DL-372 (in part: the backlog is PrimeVue DataTable); DL-375 (in part: ordered lists are PrimeVue's)
 - **Applies to:** ui-design-guide §7; build plan (Slice overview, Slice 2 notes);
   testing-strategy ("Accessibility"); `frontend/CLAUDE.md`
 - **Source:** chat session (owner's design walkthrough and the SVAR spike, Oct 10, 2026)
@@ -1000,7 +1000,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   create does; My work's shape is `{sections: {projects: {available, items, total}}}`, 10 items
   each (docs-consistency decisions, Oct 11, 2026).
 - **Supersedes:** none
-- **Superseded by:** DL-111, in part (the project read gains `lead_name`)
+- **Superseded by:** DL-111, in part (the project read gains `lead_name`); DL-369 (in part: the favorites' limit); DL-371 (the favorites endpoint)
 - **Applies to:** build plan ("Projects": the projects API; the S1-C11 and S1-C16 rows); design-doc
   §1.1 (the lead); schema-doc (`project.lead_id`)
 - **Source:** chat session (owner, Oct 11, 2026: the proposal at the start of S1-C11)
@@ -2564,7 +2564,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   all three are ticked, and a project admin can hide it sooner, through a per-project flag
   designed with its slice (the owner's to place). GitHub isn't part of it.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-354 (in part: Compile your plan is live from Slice 3)
 - **Applies to:** design-doc §11; screen-inventory step 5, step 6
 - **Source:** owner, Oct 27, 2026 (handoff decision 27; who sees it and the loose ticks answered
   in chat, Oct 27, 2026)
@@ -2578,7 +2578,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   Backlog tabs), Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash
   last, leaving out turned-off and unshipped modules.
 - **Supersedes:** DL-146 (in part: Trash linked from the requirements page's header)
-- **Superseded by:** DL-321 (in part: a split pane at wide widths)
+- **Superseded by:** DL-321 (in part: a split pane at wide widths); DL-348 (in part:
+  Workstreams after Timeline); DL-350 (in part: Trash leaves the navigation)
 - **Applies to:** design-doc §9; ui-design-guide UI-SHL-6, UI-SHL-11, UI-SHL-12; build plan
   (S2-C17, S2-C21); screen-inventory step 6
 - **Source:** owner, Oct 27, 2026 (handoff decisions 28 to 30; test runs opening like the other
@@ -2752,7 +2753,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   project's whole task order) and whether task moves run one at a time are decided in Slice 3
   planning.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-345
 - **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering"; build plan ("Later
   slices")
 - **Source:** owner, Oct 28, 2026 (`docs/reviews/s2/S2-C7.md`, open question 2)
@@ -3654,7 +3655,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the trash endpoint's check, as Requirements' link does; each user's Trash lists what they may
   restore, project admins everything (design-doc §9).
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-350 (in part: the link in the project navigation)
 - **Applies to:** design-doc §9; build plan (S2-C21)
 - **Source:** owner, Nov 5, 2026 (chat session, S2-C21 re-cut)
 
@@ -3790,7 +3791,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   project still lists in Projects, with its star filled when it's a favorite. This is how the
   star "keeps it at the top" (design-doc §11).
 - **Supersedes:** none (specifies DL-197's favorites, placed in S2-C21c by DL-238)
-- **Superseded by:** DL-329 (in part: a section per org); DL-333 (in part: approvals first)
+- **Superseded by:** DL-329 (in part: a section per org); DL-333 (in part: approvals first); DL-371 (in part: the favorites endpoint)
 - **Applies to:** design-doc §11; screen inventory (My work); build plan (S2-C21c)
 - **Source:** owner, Nov 6, 2026 (chat session, S2-C21c re-cut)
 
@@ -4141,7 +4142,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   safety cap (about 500) and a note if it's reached, as the list conventions do, and per-org
   totals. "Showing 10 of N; each organization's list has the rest" goes.
 - **Supersedes:** design-doc §11's first-10 Projects section
-- **Superseded by:** none
+- **Superseded by:** DL-349
 - **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 11)
 
@@ -4162,7 +4163,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   decisions** is removed from My work, with its API section and endpoint (the owner's amendment to
   the handoff, which kept it as a link at the bottom).
 - **Supersedes:** DL-286; DL-302 in part (Favorites first)
-- **Superseded by:** none
+- **Superseded by:** DL-349 (in part: approvals below the projects)
 - **Applies to:** build plan (S3-C0f); design-doc §11 (from S3-C0f)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 13, amended in the
   Claude Code session the same day)
@@ -4245,7 +4246,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the `##` sections and marks the one being read (`aria-current="location"`, on scroll), sticky on
   wide screens and below the content on narrow ones; hash links still move focus (UI-SHL-9).
 - **Supersedes:** DL-311 in part (the Contents list)
-- **Superseded by:** none
+- **Superseded by:** DL-367 (in part: the text's width)
 - **Applies to:** build plan (S3-C0g)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 20)
 
@@ -4258,7 +4259,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `docs/user-guide/images/`. Remote images stay links everywhere, and user content never renders
   an image; the CSP's `img-src` is checked for bundled images.
 - **Supersedes:** UI-MD-1 in part (no images), for the bundled guide only
-- **Superseded by:** none
+- **Superseded by:** DL-364 (in part: the tones)
 - **Applies to:** build plan (S3-C0g); ui-design-guide UI-MD (from S3-C0g)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 21)
 
@@ -4266,10 +4267,10 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Date:** 2026-11-09
 - **Decision:** Task-oriented, about 300 to 600 words a page and 2,000 to 2,500 in all, leaving
   out what the screen already says (route paths, exact messages, edge limits, focus mechanics; the
-  reference keeps them), callouts used sparingly, in the handoff's Requirements sample's tone.
+  reference keeps them), callouts used sparingly, in the tone of the style sample in DC-2026-11-09, appendix.
   Docs-only search is deferred (TD-104); Slice 6's site-wide search covers the docs.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-365 (in part: the word counts)
 - **Applies to:** build plan (S3-C0g); tech debt (TD-104)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 22)
 
@@ -4283,6 +4284,476 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   verification and when a UI change affects a shot; about one per page. Built in S3-C0h, after
   S3-C0g, whose docs mode and images folder it needs.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-361 (in part: the seed)
 - **Applies to:** build plan (S3-C0h; slice verification from Slice 3); testing strategy
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 23)
+
+### DL-344: The backlog's widget is decided by a spike, S3-C0i
+- **Date:** 2026-11-10
+- **Decision:** Whether the backlog is SVAR DataGrid or PrimeVue DataTable with row reorder is
+  decided by a spike, S3-C0i (one checklist: pointer drag, the move menu outside the widget, a
+  server-denied move snapping back, keyboard, axe, the token theme audit, about 2,000 rows), with
+  a working example of each option shown to the owner before the choice; its decision-log entry
+  decides S3-C19 and UI-SVR-2's backlog line.
+- **Supersedes:** DL-64 in part (the DataGrid for lists where manual order is the point, for the
+  backlog, until the spike decides)
+- **Superseded by:** DL-372 (the choice made)
+- **Applies to:** ui-design-guide UI-SVR-2 and §10 item 5; build plan (S3-C0i, S3-C19)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q1)
+
+### DL-345: Task rank rewrites cover the project's task order; task moves share the tree lock
+- **Date:** 2026-11-10
+- **Decision:** A task drop between tied neighbors or past the 255-character cap rewrites the
+  project's whole task order, in one statement; task moves run one at a time per project under
+  the requirement tree's project-row lock (DL-214). The tree's rewrite becomes the same one
+  statement (TD-73, in S3-C7).
+- **Supersedes:** DL-216
+- **Superseded by:** none
+- **Applies to:** design-doc §3 "Manual ordering", §6 "Manual ordering"; build plan (S3-C7,
+  "Later slices"); tech debt TD-73
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q3)
+
+### DL-346: The backlog and board before sprints
+- **Date:** 2026-11-10
+- **Decision:** Until sprints ship, the backlog lists every task not `done` or `cancelled` (the
+  filter bar shows the rest), in rank order; the board has five columns, To do, In progress,
+  Blocked, In review, and Done, with Cancelled left off. Slice 4 narrows the backlog to tasks
+  without a sprint.
+- **Supersedes:** the screen inventory's "Backlog: ranked tasks not in a sprint" (Step 4), until
+  Slice 4
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Manual ordering"; screen inventory (Step 4); build plan (S3-C20,
+  S3-C21, "Later slices")
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q4)
+
+### DL-347: Who may be a task's assignee or reviewer
+- **Date:** 2026-11-10
+- **Decision:** A task's assignee or reviewer is an active user who may update tasks in the
+  project (members and up with content access, and inherited admins on a project that isn't
+  export-controlled), checked by the one person check that reporter and approver share; a
+  deactivated assignee or reviewer stays on existing tasks, with the "Deactivated" badge.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §5 "Other targeted rules", §6 "Task"; build plan (S3-C6, S3-C13)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q5)
+
+### DL-348: Workstreams have their own page
+- **Date:** 2026-11-10
+- **Decision:** Workstreams are managed on their own page, `…/:key/workstreams`, after Timeline
+  in the project navigation, since members manage them and Settings is a project admins' page.
+- **Supersedes:** the screen inventory's "Workstreams: a section of Settings (or its own tab)";
+  DL-202 in part (the navigation's order gains Workstreams)
+- **Superseded by:** none
+- **Applies to:** screen inventory (Step 6, "Project"; layout patterns); ui-design-guide UI-SHL-6;
+  build plan (S3-C27)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q7)
+
+### DL-349: My work: summary tiles, projects first, ten per organization
+- **Date:** 2026-11-10
+- **Decision:** My work opens with summary tiles (Approvals waiting, Assigned to you, Waiting for
+  your review, Overdue or due this week), then Favorites, then each organization with its first
+  10 projects ("Showing 10 of N", its count, and **All N projects**), then Approvals waiting for
+  you, Assigned to you, and Waiting for your review. `GET /api/me/work` returns each org's first
+  10 projects and its total, which settles S3-C0f's open question (DC-2026-11-09, decision B). A
+  fuller dashboard is v1.5 or v2.
+- **Supersedes:** DL-331 (every project); DL-333 in part (approvals first, above Favorites)
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "My work", §16; screen inventory (My work); build plan (S3-C0f,
+  S3-C11, S3-C29)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`, Q9)
+
+### DL-350: Trash is reached from each list page, not the navigation
+- **Date:** 2026-11-10
+- **Decision:** Trash leaves the project navigation. Every list page whose items can be deleted
+  has a **Trash** link in its header (Requirements from S3-C0l, Tasks from S3-C20, Test cases in
+  Slice 5), shown under the nav link's check (`requirement.view`, DL-291), opening the one Trash
+  page filtered to that page's type (`?type=task`), the filter removable; the route
+  `…/:key/trash` stays, and its breadcrumb leads back to the list. The delete status's Trash link
+  (DL-287) stays.
+- **Supersedes:** DL-291 in part (the link in the project navigation); DL-202 in part (Trash last
+  in the navigation)
+- **Superseded by:** none
+- **Applies to:** design-doc §9 "Trash"; screen inventory (layout patterns; Step 6, "Project");
+  ui-design-guide UI-SHL-6; build plan (S3-C0l, S3-C20, "Later slices")
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`,
+  Q12a)
+
+### DL-351: Ranked views take declared filters; a filtered tree shows ancestors
+- **Date:** 2026-11-10
+- **Decision:** A ranked view may take declared filters and returns the matches, complete up to
+  the cap; the requirement tree returns each match's ancestors too, marked as context. While the
+  tree is filtered, its move menu is off, with a polite note saying so (a match's siblings may be
+  hidden); a filtered task view keeps drag and the move menu, since a task's rank is one order
+  for the project and a move names its neighbors. A CSV export of a filtered tree holds the
+  matches only.
+- **Supersedes:** build plan, API conventions, "Ranked views" in part (ranked views returned the
+  complete list, with no filters)
+- **Superseded by:** none
+- **Applies to:** build plan (API conventions; S3-C10, S3-C14, S3-C26); design-doc §6
+  "Requirement tree"; screen inventory (Requirements)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`,
+  Q13)
+
+### DL-352: Task types per project type
+- **Date:** 2026-11-10
+- **Decision:** Software projects offer the task types feature, bug, chore, and spike; ERP and
+  general projects offer all seven (config, data, and training too). The rule lives in `rules/`
+  and the API exposes a project's allowed types; the display labels stay a frontend constant
+  (design-doc §1.1), as the acceptance-criteria templates do (DL-149). An existing task's type is
+  always shown, even after its project's type changes.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** design-doc §6 "Task"; build plan (S3-C2, S3-C5, S3-C22)
+- **Source:** owner, Nov 10, 2026 (chat session, Slice 3 planning; `docs/reviews/s3/S3-plan.md`,
+  Q14)
+
+### DL-353: The plan's readiness review is an independent agent's
+- **Date:** 2026-11-10
+- **Decision:** A slice plan's readiness review (build plan, "Planning a slice") is run by an
+  independent read-only agent on the same snapshot as the plan's design change's
+  `docs-consistency` pass. It returns a finding per row and rule, and the findings and their
+  fixes are recorded in that design change's record.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan ("Planning a slice")
+- **Source:** owner, Nov 10, 2026 (Claude Code session, Slice 3 plan's design change)
+
+### DL-354: "Compile your plan" is live from Slice 3, ticked by a dated phase
+- **Date:** 2026-11-10
+- **Decision:** The Get started checklist's **Compile your plan** item shows from S3-C27, when
+  phases ship, ticked once the project has a phase with a date; a dated milestone ticks it too
+  from Slice 4.
+- **Supersedes:** DL-201 in part ("hidden until phases and milestones ship")
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "Project home: Get started checklist"; screen inventory (Step 5);
+  build plan (S3-C15, S3-C27)
+- **Source:** owner, Nov 10, 2026 (Claude Code session, Slice 3 plan's design change;
+  `docs-consistency` decision 1)
+
+### DL-355: A click on the split pane's separator steps its width
+- **Date:** 2026-11-11
+- **Decision:** Besides dragging and the arrow keys (DL-322), a click on the separator without a
+  drag (under 4px of movement) steps the panel's width through 400, 560, and 800px, then back to
+  400, and the width is kept as a drag's is. It's the single-pointer alternative WCAG 2.5.7 asks
+  for a drag; the separator says its width as "560 pixels wide".
+- **Supersedes:** none (adds to DL-322)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-11; build plan (S3-C0d)
+- **Source:** owner, Nov 11, 2026 (S3-C0d review, ui-reviewer finding 4)
+
+### DL-356: A list with the split pane takes the whole width
+- **Date:** 2026-11-11
+- **Decision:** The split pane is the layout's own column, right of `main`: from under the app
+  header to the window's foot, against its right edge. The page beside it, its header and
+  primary action included, narrows as the panel opens or widens. A list page that opens items
+  this way (the requirements page now; later the task list and board, test cases, test runs)
+  isn't held to `--content-wide`: `main` takes the whole width left, whether or not an item is
+  open (route meta `fullWidth`). Inside `main` and capped at 80rem, a wide screen put the list
+  and the panel in one column under the page header, the rest of the screen empty.
+- **Supersedes:** none (an exception to UI-SHL-7)
+- **Superseded by:** DL-360 (in part: `fullWidth`, since no page is capped)
+- **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11
+- **Source:** owner, Nov 11, 2026 (after S3-C0d, trying the split pane on a wide screen)
+
+### DL-357: The requirement read's `ancestors`: the read's own scope, with titles
+- **Date:** 2026-11-11
+- **Decision:** S3-C0e's part of R2. `ancestors` (root first, each `{number, title}`) comes with
+  the requirement read under its own action, with no new one: in v1 access is per project
+  (design-doc §3), so whoever reads a requirement can already see its whole tree. A live
+  requirement can't have an ancestor in the trash (a delete promotes its children or takes them
+  with it; a restore under a parent still in the trash goes to the top, DL-217), so DL-328's
+  unlinked crumb isn't built; tests pin that. The title is for the Parent row (TD-106); crumbs
+  show IDs only (DL-327). v2's per-person visibility re-scopes it.
+- **Supersedes:** none (settles DL-328's "checked in S3-C0e" and R2 for S3-C0e)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0e); ui-design-guide UI-SHL-14
+- **Source:** owner, Nov 11, 2026 (S3-C0e start; titles after the Parent row's need was raised)
+
+### DL-358: Trails show no crumb the viewer can't open; Documentation's landing page has none
+- **Date:** 2026-11-11
+- **Decision:** A person's access review (`/workspace/users/<id>/access`) shows `Workspace › Users
+  › <name>` only to whoever has `workspace.view`; an org admin who opened it from the org's
+  members gets no trail, since the route names no org to build `Org › Members` from. The
+  Documentation landing page has no trail; an article under it (from S3-C0g) has `Documentation
+  › <article>`, as DL-327's example says.
+- **Supersedes:** none (adds to DL-327)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-14; S3-C0g (the article trail)
+- **Source:** owner, Nov 11, 2026 (S3-C0e review: checkpoint-reviewer and ui-reviewer questions)
+
+### DL-359: My work's organization sections: what each count counts
+- **Date:** 2026-11-11
+- **Decision:** `GET /api/me/work` returns, per organization, its first 10 open projects
+  (Active, Planning, On hold) with their total and its first 10 hidden ones (Completed,
+  Cancelled, then archived) with theirs, in one response. "Showing 10 of N" counts the open
+  ones; the toggle reads "Show N hidden projects" and reveals up to 10, the org's list holding the
+  rest; **All N projects** counts what that list shows (all but the archived), so the number
+  matches the page it opens, and isn't shown when that's none; the section heading counts every
+  project of the org the user can open. The archived come last, by name alone, whatever their
+  status (owner, S3-C0f review). The section replaces `projects`, and `GET /api/me/work/projects` goes. The four spec
+  tests pinning the old section are rewritten by `spec-test-writer` (owner-approved).
+- **Supersedes:** none (settles what DL-330 and DL-349 left open)
+- **Superseded by:** DL-368 (in part: 10 becomes 5)
+- **Applies to:** design-doc §11 "My work"; build plan (S3-C0f, the API table)
+- **Source:** owner, Nov 11, 2026 (S3-C0f start)
+
+### DL-360: Pages span the width beside the sidebar
+- **Date:** 2026-11-12
+- **Decision:** `main` takes the whole width beside the sidebar on every page: no
+  `--content-wide` cap, so a page's header, lists, tables, and card grids span it. Forms and
+  settings keep `--content-narrow`, and a guide article's text `--content-prose`, so lines stay
+  readable; a guide article's On this page sits at the right of `main` on a wide screen. With no
+  cap left, route meta `fullWidth` (DL-356) goes. Chosen over centering each page at its cap:
+  capped and left-aligned, a wide screen left the right of the screen empty, on every page.
+- **Supersedes:** UI-SHL-7's "lists and tables up to `--content-wide` … left-aligned in
+  `main`"; DL-356's `fullWidth` exception (its split pane layout stands)
+- **Superseded by:** DL-367 (in part: capped content is centered)
+- **Applies to:** ui-design-guide UI-SHL-7, UI-SHL-11, the token table; build plan (S3-C0h)
+- **Source:** owner, Nov 12, 2026 (after S3-C0g: "the main section of the page is
+  left-justified … the entire app should be like this, not just docs"; full width chosen)
+
+### DL-361: The guide's screenshots use the manual pass's data
+- **Date:** 2026-11-12
+- **Decision:** `wl docs-screenshots` seeds the end-to-end stack with `seed --manual-pass`, not
+  `seed --demo`: the demo alone has no requirements, approvals, or Trash items, so those pages'
+  shots would be empty. The manual pass's data is the demo's plus those states, so nothing
+  outside the demo data still appears.
+- **Supersedes:** DL-343's "runs `seed --demo`"
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0h); developer guide (`wl docs-screenshots`); design-doc §11;
+  testing strategy
+- **Source:** owner, Nov 12, 2026 (S3-C0h start)
+
+### DL-362: An owner decision that changes the current checkpoint's row goes in its commit
+- **Date:** 2026-11-12
+- **Decision:** An owner decision made at a checkpoint's start or during it, changing that checkpoint's own
+  build-plan row, goes in the checkpoint's commit with its decision-log entry, as DL-359 and
+  DL-361 did; a design change about anything else still gets its own `docs:` commits (DL-8).
+- **Supersedes:** none (narrows DL-8 to changes outside the current checkpoint)
+- **Superseded by:** none
+- **Applies to:** root `CLAUDE.md` (How work is done); the `design-change` skill (step 2)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), answering S3-C0h's checkpoint-reviewer question
+
+### DL-363: A guide screenshot opens full size in a new tab, and loads lazily
+- **Date:** 2026-11-12
+- **Decision:** In docs mode each bundled image is a link to its own file, in the theme's version, opening in
+  a new tab (`target="_blank"`, `rel="noopener"`, and its name saying so), so a shot drawn at the
+  text's width can be read at full size. Each image, light and dark, has `loading="lazy"`, so
+  the browser fetches only the one the theme shows, when it scrolls near.
+- **Supersedes:** none (adds to DL-343)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-MD-1; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), from S3-C0h's ui-reviewer note
+
+### DL-364: Callout tones: TIP success, NOTE info, WARNING danger
+- **Date:** 2026-11-12
+- **Decision:** `> [!TIP]` is the success tone (green), `> [!NOTE]` the info tone (blue), and `> [!WARNING]`
+  the danger tone (red), each with its icon and bold label: amber made an aside read as a
+  caution.
+- **Supersedes:** DL-341's "as info, warning, and danger"
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-MD-1; design-doc §3; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), S3-C0g's question 1
+
+### DL-365: A guide page is as long as its task needs
+- **Date:** 2026-11-12
+- **Decision:** No word count for a guide page or the whole guide: each page is as long as its tasks need,
+  leaving out what the screen already says. Short pages stay short rather than padded or
+  merged.
+- **Supersedes:** DL-342's "about 300 to 600 words a page and 2,000 to 2,500 in all"
+- **Superseded by:** none
+- **Applies to:** the guide (`docs/user-guide/`)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), S3-C0g's question 2
+
+### DL-366: Rendered tables scope their headers; guide anchors never take the app's ids
+- **Date:** 2026-11-12
+- **Decision:** A table in rendered markdown has one header row, and the renderer gives its `th` cells
+  `scope="col"`. A guide heading's id never matches an id the shell or the docs views render
+  (`main`, `sidebar`, `side-pane`, `user-menu`, `docs-start`, `docs-group-<n>`, and the rest),
+  checked by `guide.spec.ts` against the ids a mounted shell and docs page actually render, not
+  a fixed list.
+- **Supersedes:** none (adds to UI-MD-1)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-MD-1; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h), S3-C0g's ui-reviewer proposed rules
+
+### DL-367: A capped page is centered; guide text up to 80 characters
+- **Date:** 2026-11-12
+- **Decision:** A page whose content is capped (a form or settings page at `--content-narrow`) is one
+  column of that width, its header included, centered in `main`; a guide article, its text and
+  On this page together, is centered too, its text up to `--content-prose` at 80ch. Lists,
+  tables, card grids, and the docs landing page still span `main` (DL-360). To be tuned after
+  the owner's UI review.
+- **Supersedes:** DL-360's left-aligned capped content; DL-340's 68ch text
+- **Superseded by:** DL-373 (in part: capped pages left-aligned; the widths)
+- **Applies to:** ui-design-guide UI-SHL-7, the token table; `docs/ui/tokens.css`; `frontend/CLAUDE.md`'s
+  form rule; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h) ("the content should be centered … the content can also be wider in the docs")
+
+### DL-368: My work shows 5 projects per organization
+- **Date:** 2026-11-12
+- **Decision:** Each organization's section on My work shows its first **5** projects ("Showing 5 of N"),
+  and its hidden-projects toggle up to 5; `GET /api/me/work` returns 5 of each organization's
+  `projects` and `hidden`. Favorites and Approvals keep their first 10 (DL-76's `FIRST_ITEMS`),
+  so the organizations' limit is its own constant. The spec tests
+  pinning 10 are rewritten by `spec-test-writer` (owner-approved). To be tuned after the
+  owner's UI review.
+- **Supersedes:** DL-359's 10 (and the S3-C0f row's)
+- **Superseded by:** DL-369 (in part: favorites uncapped)
+- **Applies to:** design-doc §11 "My work"; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (after S3-C0h)
+
+### DL-369: My work's Favorites have no cap
+- **Date:** 2026-11-12
+- **Decision:** Favorite projects show in full on My work: `GET /api/me/work` returns every
+  favorite, with no "Showing N of M". Only each organization's section is capped, at 5
+  (DL-368); Approvals keep their first 10.
+- **Supersedes:** DL-368's "Favorites … keep their first 10"; DL-76's first-10 limit for
+  favorites
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "My work"; build plan (the API table, S3-C0j); behavior
+  reference (My work)
+- **Source:** owner, Nov 12, 2026 ("favorites should theoretically be cap-less")
+
+### DL-370: The build never inlines an asset
+- **Date:** 2026-11-12
+- **Decision:** `vite.config.ts` sets `build.assetsInlineLimit: 0`, so a small bundled image
+  stays a file on our own origin instead of a `data:` URI, which the CSP's `default-src 'self'`
+  blocks. The CSP stays as it is: no `data:` in an `img-src`. Chosen over allowing `data:`
+  images, which would widen the policy for the whole app and give up its backstop against an
+  injected image.
+- **Supersedes:** none (settles S3-C0g's security-reviewer question; its finding 1 was logged as TD-111)
+- **Superseded by:** none
+- **Applies to:** `frontend/vite.config.ts`; design-doc §4 (the CSP); ui-design-guide UI-MD-1; build plan (S3-C0j)
+- **Source:** owner, Nov 12, 2026
+
+### DL-371: My work's favorites endpoint goes
+- **Date:** 2026-11-12
+- **Decision:** With Favorites uncapped (DL-369), `GET /api/me/work/favorites`, which paged past
+  the first 10, is removed; the section keeps the shape of the others, `{available, items,
+  total}`, its `total` the number of favorites.
+- **Supersedes:** the build plan API table's favorites endpoint (DL-76, DL-302)
+- **Superseded by:** none
+- **Applies to:** build plan (the API table, S3-C0j); design-doc §11 "My work"
+- **Source:** owner, Nov 12, 2026 (DC-2026-11-12c's docs-consistency decision, option a)
+
+### DL-372: The backlog is PrimeVue DataTable with row reorder
+- **Date:** 2026-11-12
+- **Decision:** The backlog is PrimeVue's DataTable with row reorder and its virtual scroller,
+  through our own wrapper, not SVAR DataGrid: in S3-C0i's spike both met the checklist, and the
+  DataTable passed axe and the theme audit with two small fixes (a name for the handle column's
+  header, one preset entry for its border), rendered 2,000 rows in 0.2 s, and is the component
+  every other list uses. The wrapper names the scroller as the table's scroll region (UI-TBL-1),
+  keeps one tab stop in the rows, sends every move to the server first (UI-SVR-5), and keeps the
+  move menu outside the table (UI-SVR-6).
+- **Supersedes:** DL-344's open choice; DL-64 in part (the DataGrid for the backlog)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §1, UI-SVR-2, §10 item 5(a); build plan (S3-C19)
+- **Source:** owner, Nov 12, 2026 (after trying S3-C0i's demo,
+  `docs/spikes/S3-C0i-backlog/results.md`)
+
+### DL-373: Form pages left-aligned and wider; guide text to 100ch
+- **Date:** 2026-11-12
+- **Decision:** After trying DL-367's centered columns, a form or settings page is left-aligned
+  like every other page, its form at `--content-narrow`, widened from 40 to 48 rem (dialogs share
+  it, so the New project dialog widens too); a guide article stays centered, its text widened to
+  `--content-prose` 100ch. To be tuned after the owner's UI review.
+- **Supersedes:** DL-367 in part (capped pages centered; 80ch); `--content-narrow` 40rem
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-7, the token table; `docs/ui/tokens.css`; build plan
+  (S3-C0j)
+- **Source:** owner, Nov 12, 2026 (S3-C0j's UI review: "the content area isn't wide enough")
+
+### DL-374: The frontend design skill's trial is its own spike, S3-C0n
+- **Date:** 2026-11-12
+- **Decision:** Q12i's trial of a frontend design skill (Impeccable, Addy Osmani's agent skills,
+  or Anthropic's frontend-design) leaves S3-C0j for its own spike checkpoint, S3-C0n, after
+  S3-C0m: the owner installs the skill, and the trial goes through `design-change` as the git
+  guard's did.
+- **Supersedes:** Q12i's "trial one with `vue-screen` on S3-C0j"
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0j, S3-C0n, the polish group)
+- **Source:** owner, Nov 12, 2026 (S3-C0j)
+
+### DL-375: SVAR DataGrid is for inline cell editing only
+- **Date:** 2026-11-12
+- **Decision:** UI-SVR-2's SVAR DataGrid is for lists where inline cell editing is the point; a
+  list where manual row order is the point is PrimeVue's (TreeTable or DataTable with row
+  reorder) through our own wrapper, with the server deciding each move and the move menu
+  outside the widget. Both ordered lists specified so far already are (the tree, DL-174; the
+  backlog, DL-372), and S3-C0i's spike found the DataTable needs less wrapper work.
+- **Supersedes:** DL-64 in part (the DataGrid for lists where manual row order is the point)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide §1, UI-SVR-2, UI-SVR-5, UI-SVR-6, §10 item 5(c)
+- **Source:** owner, Nov 12, 2026 (DC-2026-11-12e's docs-consistency decision 1, option b)
+
+### DL-376: The tree's indicator reads "Awaiting approval"
+- **Date:** 2026-11-13
+- **Decision:** A requirement with a pending approval request shows an **Awaiting approval**
+  badge beside its status on the tree (Q12b's badge), from `awaiting_approval` on the tree row;
+  S3-C26's filter uses the same words. Settles the Slice 3 plan review's open item 8 ("Approval
+  pending" vs "Awaiting approval").
+- **Supersedes:** Q12b's wording ("Approval pending")
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0l, S3-C26); `docs/reviews/design-changes/DC-2026-11-10-slice-3-plan.md` (item 8)
+- **Source:** owner, Nov 13, 2026 (S3-C0l)
+
+### DL-377: One primary button per form
+- **Date:** 2026-11-13
+- **Decision:** UI-FRM-15 allows one primary button per form or dialog, not per view: a page with
+  several forms that each save on their own gives each form's submit the primary tone, as
+  project settings' **Save restriction** now has beside **Save settings** (the owner's S2
+  feedback).
+- **Supersedes:** UI-FRM-15's "one primary button per view or dialog"
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-15
+- **Source:** owner, Nov 13, 2026 (S3-C0l)
+
+### DL-378: Adding a project member starts on the dialog's title, the role at Member
+- **Date:** 2026-11-13
+- **Decision:** The **Add a member** dialog starts with focus on its title, so the picker's list
+  (which opens on focus, DL-137) opens only when the admin moves to it; UI-FRM-14's first-field
+  focus has that exception. Both project add paths (the picker and **Add by email**) start the
+  role at **Member**, not the lowest role (Viewer); the org's and the workspace's adds already
+  started there.
+- **Supersedes:** UI-FRM-14 in part (initial focus on the first field, for this dialog)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-FRM-14; behavior reference (Members); user guide (Members
+  and roles)
+- **Source:** owner, Nov 13, 2026 (S3-C0l; the owner's S2 feedback)
+
+### DL-379: An org add takes its projects; the project service does it
+- **Date:** 2026-11-13
+- **Decision:** R2 for S3-C0m. Both org adds (`POST /api/orgs/{org_id}/members` and
+  `…/members/new`) take an optional `projects` (`project_id`, `role` defaulting to member,
+  `export_control_confirmed` where the project is export-controlled, at most 200). The router
+  calls the project service, which adds the org member through the org service and then each
+  project membership through the project roster, in one transaction, all or nothing; the org
+  service never calls the project area (the layer rule). No new action: each project is checked
+  with `project_member.manage`, and any refusal fails the whole add. The step's list is a new
+  endpoint, `GET /api/orgs/{org_id}/member-projects`: the org's live projects with whether each is
+  export-controlled, for `org_member.manage` (whose holders administer every project in the org).
+  The step sits on the add's last screen (the confirm or the create step), as Q12g says.
+- **Supersedes:** none (settles the Slice 3 plan review's R2 for S3-C0m)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0m; "The org members API"); behavior reference (Members); user
+  guide (Organizations); `docs/reviews/design-changes/DC-2026-11-10-slice-3-plan.md` (R2, row 2)
+- **Source:** owner, Nov 13, 2026 (S3-C0m)
+
+### DL-380: The design skill's trial runs Impeccable at full strength, in a scratch clone
+- **Date:** 2026-11-13
+- **Decision:** S3-C0n's skill is Impeccable (github.com/pbakaus/impeccable), installed as a
+  Claude Code plugin pinned to 4.8.0 (the marketplace's tag `skill-v4.8.0`, the newest release
+  over two weeks old), at local scope in a scratch clone with a local bare remote, as S3-C0b's
+  trial was (DL-316). It runs at full strength: its design hook on (it writes its cache and the
+  clone's `.git/info/exclude`, accepted for the trial), `PRODUCT.md` by `/impeccable init`,
+  `DESIGN.md` by `/impeccable document`, and live mode, with `http://localhost:8400` added to
+  `script-src` and `connect-src` in the clone's `frontend/vite.config.ts` only. Its telemetry,
+  update checks, and live mode's copy-edit agent (which launches an agent CLI with its
+  permissions bypassed) are off. The trial screen is the requirement detail panel. The
+  repository's `.claude/settings.json`, `frontend/vite.config.ts` (DL-142), `csp.spec.ts`, and
+  `.gitignore` don't change in S3-C0n.
+- **Supersedes:** none (settles S3-C0n's open choices: the skill, the screen, how it's installed)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0n); `docs/spikes/S3-C0n-impeccable/`
+- **Source:** owner, Nov 13, 2026 (S3-C0n)

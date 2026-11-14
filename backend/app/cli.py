@@ -4,7 +4,8 @@
 - `seed`: create the workspace and its first system admin, who is its owner. Each value comes
   from its flag (none for the password), else its `SEED_*` environment variable, else a prompt
   (only on a terminal), so CI runs it non-interactively. `seed --demo` builds the demo dataset
-  instead (`app/demo.py`), only where `demo_seed_enabled` is on (DL-90).
+  instead (`app/demo.py`), only where `demo_seed_enabled` is on (DL-90); `seed --manual-pass`
+  builds it with the manual pass's states too (DL-320).
 - `grant-system-admin <email>` / `revoke-system-admin <email>`: the system-admin flag, which
   nothing else can change (design-doc §4, "Users").
 
@@ -73,6 +74,11 @@ def parser() -> argparse.ArgumentParser:
         "--demo",
         action="store_true",
         help="Build the demo dataset instead (dev and end-to-end stacks only).",
+    )
+    seed.add_argument(
+        "--manual-pass",
+        action="store_true",
+        help="Build the demo dataset with every state the manual pass needs (dev stacks only).",
     )
     # No flag for the password: `wl seed` prints the command it runs, and a flag would put the
     # first system admin's password in the terminal, its scrollback, and CI logs.
@@ -143,14 +149,14 @@ async def _command(
 ) -> str:
     auth = AuthService(session, settings)
     match args.command:
-        case "seed" if args.demo:
+        case "seed" if args.demo or args.manual_pass:
             if not settings.demo_seed_enabled:
                 raise ForbiddenError(
                     "The demo seed is off here: its accounts share a public password. Set"
                     " DEMO_SEED_ENABLED=true on a dev or end-to-end stack only.",
                     code="demo_seed_disabled",
                 )
-            return await build_demo(session, settings)
+            return await build_demo(session, settings, manual_pass=args.manual_pass)
         case "seed":
             workspace, user = await WorkspaceService(session).seed(**seed)
             return f"Created workspace {workspace.slug} with system admin {user.email} as owner."
@@ -165,7 +171,7 @@ async def _command(
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     seed: dict[str, str] = {}
-    if args.command == "seed" and not args.demo:
+    if args.command == "seed" and not (args.demo or args.manual_pass):
         try:
             seed = seed_values(args, environ=os.environ, interactive=sys.stdin.isatty())
         except InputError as exc:

@@ -145,6 +145,9 @@ export const overrides = {
     // and a 1 px bar; 3 px makes the bar a cue of its own (base.css keeps it in forced colors).
     // The tab's focus ring stays inset, as the menu item's does: the tab list clips overflow.
     tabs: { activeBar: { height: '3px' } },
+    // The breadcrumb trail (S3-C0e, DL-327): flush with the h1 below it, on the page's own
+    // background; its crumbs' colors are `Breadcrumbs`' (muted links, the current one in text).
+    breadcrumb: { root: { padding: '0', background: 'transparent' } },
     button: {
       root: {
         primary: buttonSeverity('accent', 'accent-hover', 'on-accent'),

@@ -11,11 +11,11 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-async function opened() {
+async function opened(navigates?: boolean) {
   const wrapper = mount(ConfirmDialog, { attachTo: document.body })
   let result: boolean | undefined
   void wrapper.vm
-    .open({ title: 'Archive Alpha?', text: 'It becomes read-only.', button: 'Archive' })
+    .open({ title: 'Archive Alpha?', text: 'It becomes read-only.', button: 'Archive', navigates })
     .then((confirmed) => (result = confirmed))
   await flushPromises()
   return { wrapper, result: () => result }
@@ -46,5 +46,20 @@ describe('ConfirmDialog', () => {
     await flushPromises()
 
     expect(result()).toBe(false)
+  })
+
+  it.each([
+    [undefined, true],
+    [true, false],
+  ])('confirmed with navigates %s, returns focus to its opener: %s', async (navigates, back) => {
+    const opener = document.createElement('button')
+    document.body.append(opener)
+    opener.focus()
+    const { wrapper } = await opened(navigates)
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(document.activeElement === opener).toBe(back)
   })
 })

@@ -2,11 +2,11 @@
 // The app shell (docs/ui-design-guide.md §4): the skip link, a sticky header ("Waterline", then
 // the current org's name, which is the org menu, UI-SHL-4, DL-137; the user menu at the end),
 // the sidebar (My work, then the project selector and the selected project's pages, or on an admin
-// page that area's pages, UI-SHL-5, DL-137), and `main`. Below
+// page or Documentation that area's pages, UI-SHL-5, DL-137, DL-338), and `main`. Below
 // 40rem the header wraps and scrolls with the page (DL-98); below 48rem the sidebar is behind a
 // "Menu" disclosure in the header. Signed out (the status and not-found pages), the header has
 // only the app name and Sign in.
-import { ref, watch } from 'vue'
+import { provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import Alert from '@/components/Alert.vue'
@@ -20,6 +20,7 @@ import ProjectPages from './shell/ProjectPages.vue'
 import ProjectSelector from './shell/ProjectSelector.vue'
 import SidebarLink from './shell/SidebarLink.vue'
 import UserMenu from './shell/UserMenu.vue'
+import DocsNav from '@/views/docs/DocsNav.vue'
 import OrgNav from '@/views/org/OrgNav.vue'
 import WorkspaceNav from '@/views/workspace/WorkspaceNav.vue'
 
@@ -27,6 +28,9 @@ const store = useCurrentUserStore()
 const nav = useCurrentOrgStore()
 const route = useRoute()
 const { signOut, failed, failures, status, dismiss: dismissAlert } = useSignOut()
+
+// Where a list's split pane goes: the column after `main` (ItemPanel, DL-356).
+provide('sidePane', 'side-pane')
 
 const menuOpen = ref(false)
 const userMenu = ref<InstanceType<typeof UserMenu>>()
@@ -71,7 +75,7 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
         v-if="store.me"
         id="sidebar"
         :class="[
-          'w-full shrink-0 flex-col gap-4 border-r border-border-subtle bg-surface p-4 md:flex md:w-(--sidebar-width)',
+          'w-full shrink-0 flex-col gap-4 border-r border-border-subtle bg-surface p-4 md:sticky md:top-(--header-height) md:flex md:h-(--sidebar-height) md:w-(--sidebar-width) md:overflow-y-auto',
           menuOpen ? 'flex' : 'hidden',
         ]"
       >
@@ -79,9 +83,15 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
           <div class="border-b border-border-subtle pb-4 font-semibold">
             <SidebarLink to="/"><Icon name="home" />My work</SidebarLink>
           </div>
-          <ProjectSelector v-if="!route.meta.adminArea" />
+          <div v-if="!route.meta.adminArea && nav.org" class="flex flex-col gap-1">
+            <!-- Whose pages are below (owner, S2 feedback); the button itself says "Project:" to a
+                 screen reader, so this isn't read twice. -->
+            <p class="m-0 px-2 text-sm font-semibold text-text-muted" aria-hidden="true">Project</p>
+            <ProjectSelector />
+          </div>
         </nav>
         <WorkspaceNav v-if="route.meta.adminArea === 'workspace'" />
+        <DocsNav v-else-if="route.meta.adminArea === 'docs'" />
         <!-- The URL's org only: on a slug the user doesn't see (the not-found page), none. -->
         <OrgNav
           v-else-if="
@@ -96,17 +106,14 @@ const dismiss = () => dismissAlert(() => userMenu.value?.focus())
           :org-slug="nav.org?.slug"
         />
       </div>
-      <main
-        id="main"
-        tabindex="-1"
-        class="flex w-full max-w-(--content-wide) min-w-0 flex-1 flex-col gap-4 p-4 sm:p-6"
-      >
+      <main id="main" tabindex="-1" class="flex w-full min-w-0 flex-1 flex-col gap-4 p-4 sm:p-6">
         <Alert v-if="failed" :key="failures" tone="danger" live dismissible @dismiss="dismiss">
           {{ failed }}
         </Alert>
         <slot />
         <p class="sr-only" aria-live="polite">{{ status }}</p>
       </main>
+      <div id="side-pane" class="contents" />
     </div>
   </div>
 </template>

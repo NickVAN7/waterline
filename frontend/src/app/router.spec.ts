@@ -13,8 +13,10 @@ import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, noContent, ok, workspaceEntry } from '@/test/api'
 import { project } from '@/test/projects'
 
+import { PAGES } from '@/views/docs/guide'
+
 import { createWaterlineApp } from './createApp'
-import { routes } from './router'
+import { ORG_PAGES, routes } from './router'
 
 const SIGNED_OUT = failed(401, {
   code: 'not_authenticated',
@@ -68,15 +70,23 @@ describe('routes', () => {
     expect(root.querySelector('nav[aria-label=Main]')?.textContent).toContain('My work')
     // No project selected, so no project navigation (UI-SHL-2).
     expect(root.querySelector('nav[aria-label=Project]')).toBeNull()
+    // The selector's caption says whose pages follow, hidden from a screen reader, whose button
+    // already says "Project:" (S3-C0j).
+    const caption = root.querySelector('nav[aria-label=Main] p')
+    expect([caption?.textContent, caption?.getAttribute('aria-hidden')]).toEqual([
+      'Project',
+      'true',
+    ])
     await expectNoA11yViolations(root)
   })
 
   it.each([
-    ['/workspace/staff', 'Workspace administration'],
-    ['/acme/overview', 'Organization administration'],
+    // Named by its caption (S3-C0j).
+    ['/workspace/staff', 'nav[aria-labelledby="workspace-nav-caption"]'],
+    ['/acme/overview', 'nav[aria-label="Organization administration"]'],
   ])(
     "shows an admin page's area in the sidebar in place of the project selector: %s (UI-SHL-5, DL-137)",
-    async (path, label) => {
+    async (path, nav) => {
       const { root } = await mountAt(path, {
         user: me({
           orgs: [{ ...ACME, allowed_actions: ['org_member.manage'] }],
@@ -85,7 +95,7 @@ describe('routes', () => {
       })
 
       const sidebar = root.querySelector('#sidebar')!
-      expect(sidebar.querySelector(`nav[aria-label="${label}"]`)).not.toBeNull()
+      expect(sidebar.querySelector(nav)).not.toBeNull()
       expect(sidebar.querySelector('nav[aria-label=Main]')?.textContent?.trim()).toBe('My work')
       expect(sidebar.textContent).not.toContain('Choose a project')
     },
@@ -325,10 +335,29 @@ describe('reserved top-level routes', () => {
     ['/docs/overview', 'org-overview'],
     ['/docs/projects', 'org-projects'],
     ['/docs/projects/PORTAL', 'project-home'],
+    ['/docs/members', 'org-members'],
+    ['/docs/settings', 'org-settings'],
   ])("%s is still the `docs` org's page, not the Documentation page", (path, name) => {
     const router = createRouter({ history: createMemoryHistory(), routes })
 
     expect(router.resolve(path).name).toBe(name)
+  })
+
+  it.each([
+    ['/docs/trash', 'docs-page'],
+    ['/docs/working-with-projects', 'docs-page'],
+    ['/docs/overviews', 'docs-page'],
+  ])('%s is a Documentation page', (path, name) => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+
+    expect(router.resolve(path).name).toBe(name)
+  })
+
+  it("ORG_PAGES names every org page's own segment", () => {
+    const own = routes
+      .filter((route) => route.path.startsWith('/:orgSlug/'))
+      .map((route) => route.path.split('/')[2])
+    expect([...new Set(own)].sort()).toEqual([...ORG_PAGES].sort())
   })
 })
 
@@ -364,4 +393,39 @@ describe('the session hook, wired into the app', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('change-password'))
     expect(useCurrentUserStore(pinia).me?.must_change_password).toBe(true)
   })
+})
+
+// The ids the shell and the docs views render on a guide page, its menus open (some ids exist
+// only then: the account menu's `user-menu`, a popover's), and the guide's own, inside its text.
+async function idsOn(path: string): Promise<{ app: string[]; guide: string[] }> {
+  const { root } = await mountAt(path)
+  await vi.waitFor(() => expect(root.querySelector('main h1')).not.toBeNull())
+  for (const button of root.querySelectorAll<HTMLButtonElement>('[aria-haspopup]')) {
+    button.click()
+    await flushPromises()
+  }
+  const all = [...document.querySelectorAll('[id]')]
+  return {
+    app: all.filter((el) => !el.closest('.markdown')).map((el) => el.id),
+    guide: all.filter((el) => el.closest('.markdown')).map((el) => el.id),
+  }
+}
+
+describe("the guide's heading ids", () => {
+  it('see the shell, the docs views, and the menus that render ids only while open', async () => {
+    const { app } = await idsOn('/docs/account')
+
+    expect(app).toEqual(expect.arrayContaining(['main', 'sidebar', 'docs-nav-0', 'user-menu']))
+  })
+
+  // Only a collision on the same page matters: an id is unique per document (DL-366).
+  it.each(PAGES.map((page) => [page.slug]))(
+    '%s never takes an id the shell or the docs views render (DL-366)',
+    async (slug) => {
+      const { app, guide } = await idsOn(`/docs/${slug}`)
+
+      expect(guide.length).toBeGreaterThan(0)
+      expect(guide.filter((id) => app.includes(id))).toEqual([])
+    },
+  )
 })

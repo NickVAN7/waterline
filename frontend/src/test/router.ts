@@ -1,5 +1,5 @@
 /** A router with the app's route names, for mounting one view in a component test. */
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router'
 
 const Page = { template: '<h1>page</h1>' }
 
@@ -49,4 +49,29 @@ export async function testRouter(path = '/') {
   })
   await router.push(path)
   return router
+}
+
+// The pages a breadcrumb trail links to (DL-327), as placeholders: a crumb's RouterLink throws on
+// a route its router doesn't have.
+const TRAIL_TARGETS: Record<string, string> = {
+  'org-projects': '/:orgSlug/projects',
+  'project-home': '/:orgSlug/projects/:key',
+  'project-requirements': '/:orgSlug/projects/:key/requirements',
+  'project-requirement': '/:orgSlug/projects/:key/requirements/:number',
+  'project-members': '/:orgSlug/projects/:key/members',
+  'workspace-staff': '/workspace/staff',
+  'workspace-users': '/workspace/users',
+  account: '/account',
+}
+
+/** A spec's own routes, then a placeholder for each trail target they leave out (after them, and
+ * never under a name they use: a second route with a name replaces the first). */
+export function withTrailRoutes(routes: RouteRecordRaw[]): RouteRecordRaw[] {
+  const named = new Set(routes.map((route) => route.name))
+  return [
+    ...routes,
+    ...Object.entries(TRAIL_TARGETS)
+      .filter(([name]) => !named.has(name))
+      .map(([name, path]) => ({ path, name, component: { template: '<p />' } })),
+  ]
 }

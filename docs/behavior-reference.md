@@ -1,7 +1,10 @@
-# User guide
+# Behavior reference
 
-How to use Waterline: signing in, finding your way around, your projects and their
-requirements, approvals, your account, and running a workspace or an organization.
+Everything Waterline does, screen by screen, in the words on the screen: signing in, finding your
+way around, your projects and their requirements, approvals, your account, and running a workspace
+or an organization. It's exhaustive and never shown in the app; readers get the guide under
+`docs/user-guide/` (DL-335). It changes whenever behavior changes; the guide only when what a user
+does or sees changes or is added. `user-guide-verifier` follows it literally (DL-336).
 
 ## Signing in
 
@@ -32,43 +35,52 @@ Every page after sign-in has the same frame:
   menu if you belong to more than one organization or may administer it: open it to choose
   another organization (to see its projects), or, if you're one of its owners or admins, its
   **Overview**, **Members**, or **Settings**. Otherwise it's just its name.
-- **The sidebar**, on the left: **My work**, then the **project selector**. Open the selector to
-  see the current organization's projects, under its name, and choose one, or choose **All
-  projects** (a link below the list) for the organization's project list. With more than eight, a filter field narrows the list as you type.
+- **The sidebar**, on the left, stays where it is while the page scrolls: **My work**, then, under
+  the caption **Project**, the **project selector**. Open the selector to see the current
+  organization's projects, under its name, and choose one, or choose **All projects** (below the
+  list) for the organization's project list. With more than eight, **Filter projects** shows a
+  field that narrows the list as you type.
   Once you're in a project, its pages are listed below the selector: **Home**, **Requirements**
-  (if you may read its content), **Members**, **Settings** (if you may change any of its
-  settings), and last **Trash** (if you may read its content).
+  (if you may read its content), **Members**, and **Settings** (if you may change any of its
+  settings). Trash isn't listed: it's a link on the Requirements page.
+- **The trail**, above a page's title on every page below the top ones: where the page is, each
+  step a link back (for example **Acme Manufacturing › Customer Portal › Requirements ›
+  PORTAL-RQ-3**, a nested requirement's parents included). On a narrow screen the middle steps
+  fold into **…**: open it for the rest.
 - On a narrow screen the sidebar is behind the **Menu** button in the header, and on a phone the
   header wraps onto more than one line and scrolls away with the page.
+- **The browser tab** shows the page's name, shortest part first: a requirement's ID
+  (`PORTAL-RQ-2 · Waterline`), a project page's key and page (`PORTAL members · Waterline`), or the
+  page's title.
 - **Skip to main content** is the first thing the Tab key reaches, and jumps past the header and
   sidebar.
 
 ## My work
 
 My work is your home page (`/`). **Favorite projects**, first, lists the projects you've
-starred, by name; archived ones, and any you can no longer open, are left out. Each project row
-on My work has a star, **Favorite <project>**: select it to add the project to your favorites,
-and again to take it off. Only you see your favorites.
+starred, by name, each with its organization; archived ones, and any you can no longer open, are
+left out. A project row has a star, **Favorite <project>**: select it to add the project to your
+favorites, and again to take it off. Only you see your favorites. An archived project has no star.
 
-Its **Projects** section lists the projects you can open,
-with each one's key, its organization, your access (your role on it, or "Admin (inherited)" if
-you administer it through its organization or the workspace), and its status, on the right;
-archived projects are left out. If you're on more than 10, it
-says how many there are, and each organization's project list has the rest. If the list can't
-be loaded, **Try again** loads it again.
+Then each organization you can open a project in has its own section, under its name and how many
+of its projects you can open (with one organization, the section is just **Projects**). Each row
+shows the project's key, your access (your role on it, or "Admin (inherited)" if you administer it
+through its organization or the workspace), and its status, on the right. The open projects come
+first: Active, then Planning, then On hold, each by name, the first 5 of them ("Showing 5 of 12"
+when there are more). **Show 3 hidden projects** reveals the completed, cancelled, and archived
+ones (an archived one marked **Archived**), and **Hide** puts them away again. **All 14 projects**
+opens the organization's project list, which has the rest (there's no such link when every project
+of yours there is archived). If the projects can't be loaded,
+**Try again** loads them again.
 
 **Approvals waiting for you** lists the approval requests that name you and that you haven't
 decided yet, across your projects, the longest-waiting first: each shows the requirement's title
 (as in the revision under approval), its ID, the revision's number, its project, who asked and
 when, and their note. Open one to review it and decide (see "Deciding", under
-Requirements). A request on a project whose content you can no longer see isn't listed.
+Requirements). A request on a project whose content you can no longer see isn't listed. A
+decision you've made shows on its requirement's Approval section.
 
-**My past decisions**, under it, lists the requests you approved or rejected, newest first: each
-shows the requirement and revision you decided on, your decision, when, the request's status now
-(it may have been cancelled or approved by hand since), and your comment. Open one to see its
-requirement.
-
-Each section shows its first 10; if there are more, it says how many. If one section can't be
+Favorites shows every favorite. Approvals show their first 10; if there are more, they say how many. If one section can't be
 loaded, it shows **Try again** and the others still show; if the whole page can't be loaded, one
 **Try again** loads it again.
 
@@ -76,7 +88,7 @@ loaded, it shows **Try again** and the others still show; if the whole page can'
 
 An organization's project list (`/<organization>/projects`) shows its projects that you can
 see, each with its key, type, and status, 25 to a page (archived projects are left out:
-organization owners and admins find them in the Overview's **Archived** list), with **Previous page** and **Next page** links when there are more. **Status**
+organization owners and admins find them in the Overview's **Archived projects** list), with **Previous page** and **Next page** links when there are more. **Status**
 and **Type** narrow the list; when no project matches, **Clear filters** shows them all again. The page you're on and the
 filters are in the address, so a link or a reload opens the same list.
 
@@ -100,7 +112,12 @@ or a lowercase key takes you to the project's own address. A project you can't s
 not found", the same as one that doesn't exist.
 
 **Requirements**, in the sidebar under the project (`/<organization>/projects/<KEY>/requirements`),
-shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status. It opens with only the top-level
+shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status, and
+**Awaiting approval** beside the status while an approval request on it is pending (a request
+made, cancelled, or decided in the side panel shows there at once). **Expand requirement** and
+**Move** sit at the right, above the tree; until you select a row, one line before them says
+"Select a requirement to expand or move it." ("…to expand it." if you can't move requirements).
+It opens with only the top-level
 requirements showing: open a branch with its arrow, or with the Right arrow key on its row
 (Left closes it). To open a requirement's whole branch at once, select its row and choose
 **Expand requirement**; the button says "Expanding…" until it's done. It opens up to 500 rows
@@ -130,18 +147,28 @@ children move with it. A move that doesn't apply says why in the menu ("already 
 If a requirement's place changed since you opened the page, the move is refused and the tree
 reloads to show where things are now.
 
-A requirement's ID in the tree opens it in a side panel over the tree, which keeps its place
-(clicking elsewhere on the row only selects it). The panel has its own address
-(`…/requirements?open=RQ-<n>`), so the browser's Back closes it, as do **Close** and Esc; a change
-you make there shows in the tree. **Open full page** goes to the requirement's page
-(`…/requirements/<n>`), and **Copy link** copies that page's address, for sharing. The panel and
-the page show the same: its title, ID, status, restriction, priority, reporter (with
-"Deactivated" after a deactivated reporter's name), and its description. A status reads
+A requirement's ID in the tree opens it in a side panel (clicking elsewhere on the row only
+selects it). On a wide window the panel runs down the right side of the window, and the page beside
+it narrows; you can still scroll the tree, select in it, and open other requirements from it. On
+a narrower window the panel covers the tree. Its row is marked
+**Open**, in bold. To make the panel wider or narrower, drag the bar between the tree and the
+panel, click the bar to step between narrow, medium, and wide, or focus it and press the Left or
+Right arrow; the width is kept for next time. Another
+requirement's ID shows that one in the panel instead. The panel has its own address
+(`…/requirements?open=RQ-<n>`), so the browser's Back closes it, as do **Close** (the ✕ at its top)
+and Esc; a change you make there shows in the tree. At the top of the panel, beside the ID and
+status, **Open full page** goes to the requirement's page (`…/requirements/<n>`) and **Copy link**
+copies that page's address, for sharing. Under the title are **Edit**, **Change status**, and
+**⋯ More actions**, which holds **Change restriction…** and **Delete…**, as far as you may use them;
+then the requirement's priority, reporter (with "Deactivated" after a deactivated reporter's name),
+parent (its ID, a link, then its title; **None** at the top level; in the panel the link opens
+the parent there), and restriction, and its description. The page shows the same, with the actions beside its title
+and the ID and status under it. A status reads
 **Approved · modified** when the requirement is Approved and has changed since its approved revision. If the
 description has no "Acceptance Criteria" heading, a note says so. **Change status** (members and
 admins) sets any status but its own and Approved, which comes only from an approval. If someone
 changed the requirement since you opened it, the change is refused and the page shows the latest.
-**Change restriction** sets the requirement's restriction level and categories: members can raise
+**Change restriction…** sets the requirement's restriction level and categories: members can raise
 it, only the project's admins can lower it (None and Internal count as the same level, so a member
 may switch between them), and it is never below the project's own. The badge
 shows the restriction that applies, the stricter of the requirement's and the project's levels
@@ -154,8 +181,10 @@ description is saved as a new version, with the note, while a priority change al
 keeps no note). **Cancel** drops them. If someone else saved the requirement while you were
 editing, Save is refused: **Reload** shows the latest, and your changes are lost once you press
 it, so copy anything you need first. While you edit, Change status waits until you save or
-cancel. In the side panel, Esc doesn't close the panel while you edit; **Close**, Back, or
-**Open full page** closes it and drops what you typed.
+cancel. In the side panel, Esc doesn't close the panel while you edit. If you've changed
+anything, **Close**, Back, another requirement's ID, or **Open full page** first asks **Discard
+your changes?**: **Keep editing** returns you to the form with what you typed, and **Discard
+changes** drops it and goes on.
 
 Below the description, the **Approval** section shows the revision last approved ("Last approved:
 revision 3") and the latest approval request: its status (Pending, Approved, Rejected, or
@@ -207,7 +236,8 @@ shows it for you to decide on:
 
 The Approval section waits while you edit, as Change status does.
 
-Below the Approval section, the **History** tab lists every change to the requirement, newest first,
+Below the Approval section, the **History** tab lists every change to the requirement, a line
+between entries, newest first,
 with who made it and when: "Ben Ortiz changed the status from Draft to In progress". A person
 since deactivated keeps their name, with "Deactivated" after it, and a change made by an app
 command reads **System**. A move names the old and the new parent by their IDs ("changed the
@@ -219,7 +249,8 @@ in its History the next time you open it.
 
 The **Revisions** tab beside it lists the saved versions of the title and description, newest
 first: each one's number, who saved it and when, and its change note ("No change note." when
-there's none); **Show more** adds older ones. **Compare revisions** shows what changed between
+there's none), a line between them; **Show more** adds older ones. **Compare revisions**, in a box
+above the list, shows what changed between
 any two: pick them in **From** and **To** (the older one is always From). It opens on the current revision against the one before, or, when the
 requirement is "Approved · modified", on the approved revision against the current one; a
 revision's **Compare revision 3 with revision 2** picks it against the one before. The title
@@ -230,8 +261,8 @@ and a screen reader says so.
 Runs of more than three unchanged lines fold away behind **Show 12 unchanged lines**. With only
 one revision there's nothing to compare yet.
 
-**Delete** (the requirement's reporter, while it has never been approved, and project admins), at
-the top of the requirement, on its page and in the side panel, asks first: **Delete ERP-RQ-7?**
+**Delete…** (the requirement's reporter, while it has never been approved, and project admins), in
+**⋯ More actions** on its page and in the side panel, asks first: **Delete ERP-RQ-7?**
 says it moves to the project's Trash, where it can be restored. If it has children, choose what
 happens to them: **Move them up to its parent** (the default; they take its place) or **Delete
 them too**, with their own children. When you can't delete one of them yourself, only moving them
@@ -240,8 +271,12 @@ when they go too) is cancelled; restoring doesn't bring the request back. **Dele
 deletes it and opens the requirements tree, which says "ERP-RQ-7 moved to Trash." with **Open
 Trash**. A link to a deleted requirement shows the page-not-found page.
 
-**Trash**, last in the sidebar under the project (`/<organization>/projects/<KEY>/trash`), lists
-the deleted requirements you may restore, newest first: each one's ID and title, who deleted it
+**Trash**, a link at the top of the Requirements page beside **New requirement**
+(`/<organization>/projects/<KEY>/trash?type=requirement`), lists the deleted items you may
+restore, newest first, filtered to requirements: **Type** above the list shows the filter, and
+**Any type** removes it (requirements are the only type until tasks arrive). When nothing matches,
+the page says "No deleted items match Type: Requirement", with **Clear filter**. The trail leads
+back to Requirements. Each row shows the item's ID and title, who deleted it
 ("Deactivated" after someone since deactivated; **System** for an app command), and when.
 Project admins see everything; a member sees the never-approved requirements they reported. One
 that would bring back a child you couldn't restore yourself is listed without **Restore**.
@@ -260,11 +295,12 @@ admins) can also:
   **Deactivated**. An archived project's list has no **Show deactivated**: it shows its active
   members only.
 
-- **Add member**: the list of the organization's members and the workspace's staff opens as soon
-  as you're in the field; type a name, email, or username to narrow it, choose one, and give them
-  a role.
+- **Add member**: the dialog starts on its title; the list of the organization's members and the
+  workspace's staff opens as soon as you move into the field. Type a name, email, or username to
+  narrow it, choose one, and give them a role (**Member** to start).
 - **Add by email**: works as **Add person** does under workspace administration (the email
-  first, then either an existing account or a new one with a temporary password, shown once).
+  first, then either an existing account or a new one with a temporary password, shown once),
+  the role **Member** to start.
   An account from outside the organization is added only after you confirm adding them to the
   organization too, as a member.
 - On an export-controlled project, every add first asks you to check that the person is
@@ -276,9 +312,10 @@ admins) can also:
   admin.
 - **Access review**, at the top beside the add buttons, opens the project's access review
   (`/<organization>/projects/<KEY>/access`): everyone who can open the project, with their
-  project role, if any, why they reach it (the
-  role, or an admin role above it), and, on an export-controlled project, whether they reach its
-  content or only its management.
+  **Project role** (**Admin (inherited)** for someone with none who administers it through a role
+  above it), **Access through** (the role, or the admin role above it), and, on an
+  export-controlled project, whether they reach its content or only its management. A
+  deactivated person's row is muted, **· Deactivated** after the name.
 
 **Settings**, in the sidebar under the project, is there if you may change any of its settings
 (`/<organization>/projects/<KEY>/settings`). Each part shows only if you may use it:
@@ -287,15 +324,17 @@ admins) can also:
   modules, never data or the modules on), status (for information only), lead, and modules,
   then **Save settings**. The lead is one of the project's active members, or **No lead**, which
   is flagged. A deactivated lead stays the lead, marked "Deactivated", until you name someone
-  else. A module that isn't built yet is greyed
+  else. **Modules** is one line, the modules turned on ("None turned on" if none) and **Edit**,
+  until you open it (it opens by itself to show an error); a module that isn't built yet is greyed
   out, with "Not available yet". Turning off
   a module that holds data, or one recommended for the type, warns you what will be hidden;
   nothing is deleted, and turning it back on brings everything back.
-- **Restriction** (project admins): the level and categories, then **Save restriction**. Export
+- **Restriction** (project admins): the level and categories, then **Save restriction** (a
+  primary button, as **Save settings** is). Export
   control isn't offered here; a project is made export-controlled only through the API, and
   saving keeps it. On an export-controlled project, system, workspace, and organization admins without a membership
-  can manage it but not see its content (Requirements and Trash leave their sidebar, and those
-pages say they can't open them), and may only raise its restriction: lowering the level
+  can manage it but not see its content (Requirements leaves their sidebar, and it and Trash
+  say they can't open them), and may only raise its restriction: lowering the level
   or removing a category needs one of its explicit project admins.
 - **Danger zone** (organization owners and admins), set apart at the bottom: **Archive
   project**, once confirmed with the red **Archive project** button, makes it read-only for
@@ -326,9 +365,29 @@ Open the menu with your name and choose **Account settings**.
 
 ## Documentation
 
-Open the menu with your name and choose **Documentation** to read this guide inside Waterline
-(`/docs`). The list of sections under its title links to each one; a section's address
-(`/docs#docs-account-settings`, say) opens the guide at that section, so you can share it.
+Open the menu with your name and choose **Documentation** to read the guide inside Waterline
+(`/docs`). The landing page has the heading **Documentation** and the line "How to plan, track,
+and sign off on your projects in Waterline.", then **Start here**, three larger cards (**Welcome
+to Waterline**, **Set up a project**, **Review and approve**), then a heading for each group of
+pages (**Get started**, **Using Waterline**, **Administration**, **Reference**) with a card for
+each page: its title and a line on what it covers, the whole card a link. **Administration** says
+it's "For workspace and organization owners and admins."; everyone can read it.
+
+While you're in Documentation, the sidebar shows **My work**, then **Documentation** (the landing
+page), then each group's pages, the one you're reading marked.
+
+A page (`/docs/<page>`, e.g. `/docs/requirements`) shows the trail **Documentation › <page>**,
+the group's name above its title, and a line on what it covers. **On this page** lists its
+sections and marks the one you're reading as you scroll; on a wide window it stays beside the
+text, on a narrow one it's below it. A section's link (`/docs/requirements#create-a-requirement`)
+opens the page at that section and puts the focus on its heading, so you can share it. Links in
+the text to other pages open them in Waterline. A page's screenshot shows the screen in the
+theme you're using, light or dark, whether it follows your device or you chose it; selecting
+it opens it full size in a new tab. Callouts are a green **Tip**, a blue **Note**, and a red
+**Warning**. At the bottom, **Previous** and **Next** go to the
+pages before and after it in the sidebar's order (the first page has no Previous, the last no
+Next). A page that doesn't exist shows "Page not found". An old link to a section of the former
+single-page guide (`/docs#docs-account-settings`) opens the landing page.
 
 ## Choosing a password
 
@@ -354,12 +413,14 @@ still work.
 ## Workspace administration
 
 Workspace owners and admins (and system admins) find **Administration** in the account menu, at
-the top right. Its pages are listed in the sidebar, in place of the project selector: **Staff**, **Organizations**,
+the top right. Its pages are listed in the sidebar, under the caption **Workspace administration**, in place of the project selector: **Staff**, **Organizations**,
 **Users**, and **Settings** (workspace admins see the settings; owners and system admins change
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
 its **Actions for …** menu, which lists only what you may do to that person. **Staff**,
 **Users**, and an organization's **Members** list active people only: select **Show
-deactivated**, above the list, to include deactivated people, each marked **Deactivated**. That's
+deactivated**, above the list, to include deactivated people: on **Staff** and **Members** each
+such row's text is muted and **· Deactivated** follows the name; on **Users** the **Status**
+column says **Deactivated**. The columns keep their widths. That's
 how you find someone to reactivate. A list with only deactivated people shows as empty ("No
 staff yet"), with a pointer to **Show deactivated**.
 
@@ -377,13 +438,17 @@ staff yet"), with a pointer to **Show deactivated**.
   choose who becomes owner: Waterline asks for that person when it happens. A role change or
   removal that leaves someone unable to see a project's content hands their undecided approvals
   there to whoever requested each one, if that person is still a project admin.
-- **Organizations** lists the workspace's organizations. **Create organization** asks for its
+- **Organizations** lists the workspace's organizations, each with its slug, its number of
+  **Projects** (the archived left out), **Members** (active accounts), and **Owners** (**None**
+  if it has none). **Create organization** asks for its
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
   existing person, or a new account with a temporary password, shown once.
 - **Users** lists everyone in the workspace. **Role** shows their workspace role (**Owner**,
   **Admin**, or **Member**) and **System admin** for system admins (**Owner, System admin**;
-  granted outside the app, so you can read it but not change it); someone with neither shows
-  **User**. System admins with no workspace role are listed last. **Status** shows **Active** or
+  granted outside the app, so you can read it but not change it), then each organization they
+  belong to, with their role there and how many of its projects they're on, archived ones included (**Acme Manufacturing
+  · Admin · 2 projects**, the role left out when they're on its projects alone); someone with
+  none of these shows **User**. System admins with no workspace role are listed last. **Status** shows **Active** or
   **Deactivated**.
 - **Settings** renames the workspace and changes its slug (workspace owners and system admins).
 
@@ -393,13 +458,13 @@ username; changing the email signs them out everywhere), **Reset password** (a n
 password, shown once), **Sign out everywhere**, and **Deactivate** (they're signed out and can't
 sign in until reactivated; their work stays, and their undecided approvals go to whoever
 requested each one, if that person is still a project admin). Once deactivated, they leave the
-list unless **Show deactivated** is selected, where they show a **Deactivated** badge and are
+list unless **Show deactivated** is selected, where they show **Deactivated** in the Status column and are
 offered **Reactivate** instead. The last active owner, or the last system admin, can't be
 deactivated.
 
 **Access review.** A person's row offers **Access review** to those who may see it: their
 **Role** as the users list shows it (**None** with neither), then every organization and
-project they can reach, why (their role, or a role above it), and, for each
+project they can reach, and **Access through** (their role, or a role above it), and, for each
 export-controlled project, whether they reach its content or only its management (the **Access**
 column shows only when one of their projects is export-controlled).
 
@@ -407,19 +472,35 @@ column shows only when one of their projects is export-controlled).
 
 Organization owners and admins (and workspace owners and admins, in every organization) find
 the organization's pages in the organization menu, the organization's name in the header (switch
-organizations first to administer another). They're listed in the sidebar, in place of the
-project selector: **Overview**, **Members**, and **Settings**. Anyone else who opens these pages
+organizations first to administer another). They're listed in the sidebar, under the caption
+**Organization** and the organization's name, in place of the project selector: **Overview**,
+**Members**, and **Settings**. Anyone else who opens these pages
 is told to ask the organization's owners or admins.
 
-- **Overview** (`/<organization>/overview`) shows the organization's name and slug, and its
-  projects with their key, type, status, and lead ("No lead" if there's none); each project's
-  name opens its settings. Archived projects are listed below, under **Archived**; open one's
-  settings to unarchive it.
+- **Overview** (`/<organization>/overview`) shows the organization's slug under its title, and
+  its projects with their key, type, status, and lead ("No lead" if there's none); each
+  project's name opens its settings. Archived projects are listed below, under **Archived
+  projects**, each marked **Archived** in place of its status; open one's settings to unarchive
+  it.
 
 - **Members** lists the organization's members and their roles (Owner, Admin, Member). It works
   as **Staff** does under workspace administration: **Add person** asks for the email and the role first,
-  then either confirms an existing account or creates one with a temporary password, shown once; a
-  row offers **Change role** and **Remove from organization**, which by default also removes the
+  then either confirms an existing account or creates one with a temporary password, shown once.
+  That last step also offers **Also add to projects** (the confirm step's question says "You can
+  also add them to some of the organization's projects, below."): the organization's projects that
+  aren't archived (the first 200 by name), each a checkbox; a chosen one gets **Role on
+  Payments** (Member to start) and, on an export-controlled project, its own box, "I confirm this
+  person is authorized for Payments's export-controlled data.", without which **Add person** (or
+  **Create account**) waits, saying "Confirm each export-controlled project to continue." Going
+  **Back** keeps the projects chosen and clears their boxes. The add is all or nothing: the person
+  joins the organization and every chosen project, or none of them, and the page says "… added to
+  Acme Manufacturing and 2 projects." If the projects can't load, the step says so, with **Try
+  again**; if a project changed since (archived, gone, or export control turned on), the add is
+  refused and the list loads again, the step saying what changed ("Payments is no longer offered,
+  so it was removed from your choices.", or "… is now export-controlled: confirm it in the list."; the note goes once you change the
+  choices). After
+  a new account, the step that shows its password says "… is added to Acme Manufacturing and 2
+  projects." A row offers **Change role** and **Remove from organization**, which by default also removes the
   person from the organization's projects (a role change or removal that leaves someone unable
   to see a project's content hands their undecided approvals there to whoever requested each
   one, as for staff); and the last owner can't step down or leave until you choose who becomes

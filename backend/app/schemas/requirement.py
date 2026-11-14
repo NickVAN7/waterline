@@ -74,6 +74,14 @@ class RequirementMove(BaseModel):
     before_id: uuid.UUID | None = None
 
 
+class RequirementAncestor(BaseModel):
+    """One of a requirement's ancestors: its number, shown as its ID, and its title, for the
+    Parent row (DL-328, TD-106)."""
+
+    number: int
+    title: str
+
+
 class RequirementRead(BaseModel):
     """One requirement, with the actions the caller may take on it. "Approved · modified" is
     derived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1)."""
@@ -107,6 +115,9 @@ class RequirementRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     allowed_actions: list[Action]
+    # Its ancestors, root first, for the breadcrumb trail and the Parent row (DL-327, DL-328):
+    # under the read's own scope, since v1 access is per project (design-doc §3).
+    ancestors: list[RequirementAncestor]
 
 
 class RequirementItem(BaseModel):
@@ -122,6 +133,8 @@ class RequirementItem(BaseModel):
     restriction_categories: list[RestrictionCategory]
     current_revision_id: uuid.UUID | None
     approved_revision_id: uuid.UUID | None
+    # A pending approval request on it: the tree's "Awaiting approval" badge (Q12b).
+    awaiting_approval: bool
 
 
 class RequirementTree(BaseModel):

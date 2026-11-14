@@ -12,7 +12,7 @@ reference screen for your kind before writing anything, and copy its shape.
 | Kind | Reference | Its pieces |
 |---|---|---|
 | A paged list | `views/workspace/UsersView.vue` | `useLoad` + `useListQuery` (`returnWhenEmpty`), `Pagination`, `RowActions`, `SuccessStatus` |
-| A project page | `views/project/ProjectAccessView.vue` | `useProjectPage` (loading, not found, the redirect), `ProjectHeader` |
+| A project page | `views/project/ProjectAccessView.vue` | `useProjectPage` (loading, not found, the redirect; `reload` after a refusal, `exportControlled`, a content page's `whoToAsk`), `ProjectPageLoading`, `ProjectHeader` |
 | A settings form | `views/project/ProjectSettingsView.vue`, `components/NameSlugSettings.vue` | `useSettingsSave`, `useFormErrors`, only changed fields sent (TD-56) |
 | A dialog | `views/roster/ChangeRoleDialog.vue`; multi-step: `views/roster/AddPersonDialog.vue` | `ModalDialog`, `useFormErrors`, `retryFromSubmit`, `fallbackFocus` |
 | An admin page | any view under `views/workspace/` or `views/org/` | `meta.adminArea`, `ForbiddenView` with `WHO_TO_ASK` |
@@ -74,8 +74,9 @@ focus checks (`e2e/support/a11y.ts`).
 
 ## 6. Docs
 
-- `docs/user-guide.md`: what the screen is for and how to use it, in the words on the screen
-  (`user-guide-verifier` follows it literally at the slice's end).
+- `docs/behavior-reference.md`: what the screen does, in the words on the screen
+  (`user-guide-verifier` follows it literally at the slice's end); the guide's page under
+  `docs/user-guide/` when what a user does or sees changes (DL-335).
 - `ui-reviewer` reviews the screen at the checkpoint (the `checkpoint` skill). A finding that a
   rule would have prevented adds the rule to `frontend/CLAUDE.md`, and, if it changes the order
   above, to this skill.

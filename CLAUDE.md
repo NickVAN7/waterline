@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S2-C22 (Slice verification) done, and the Slice 2 retro and the UI polish handoff decided
-(DL-312 to DL-343); next: Slice 3's planning, whose first rows are S3-C0a to S3-C0h.
+S3-C0n (Frontend design skill trial) set up, waiting for the owner's run of the trial; the git
+guard's decision held to the end of S3-C0x; next: the trial's outcome through `design-change`.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
@@ -22,7 +22,8 @@ Updated at every checkpoint, and by a design change that changes what's next (DL
 | `docs/screen-inventory.md` | People and personas, v1 scope, tenancy & access model, screens (derived step by step) |
 | `docs/ui-design-guide.md` | UI rules by ID (`UI-FRM-5`): styling approach, tokens, shell, forms, feedback, tables, SVAR widgets, how each is checked; reference copies in `docs/ui/` |
 | `docs/developer-guide.md` | Setup, commands, conventions, how-tos (kept current every checkpoint) |
-| `docs/user-guide.md` | How to use each feature (kept current every checkpoint) |
+| `docs/behavior-reference.md` | Everything the app does, screen by screen (kept current every checkpoint; never shown in the app) |
+| `docs/user-guide/` | The reader's guide, one page per topic, shown in the app's Documentation: changes only when what a user does or sees changes (DL-335) |
 | `docs/tech-debt.md` | Every known shortcut, with reason and target |
 | `docs/decision-log.md` | Every owner decision that changed or superseded a recorded rule, or set a process (`DL-<n>`) |
 | `docs/reviews/s<n>/<ID>.md`, `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` | Each checkpoint's independent review (one folder per slice), and each design change's review (DL-18, DL-43, DL-126): every pass, finding, and resolution |
@@ -32,7 +33,8 @@ Read the relevant sections before changing anything. If the code needs to differ
 **stop and ask** (the `design-change` skill: a proposal for the owner) — never silently diverge. An
 approved design change goes in its own `docs:` commits (tooling code in `chore:`/`ci:` commits,
 DL-18), never with checkpoint work (DL-8); a drift fix inside the checkpoint's approved scope
-updates the docs in the checkpoint's commit.
+updates the docs in the checkpoint's commit, and so does an owner decision that changes the
+current checkpoint's own row, with its decision-log entry (DL-362).
 
 ## Commands
 
@@ -54,6 +56,8 @@ Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <
 - `wl migrate`, `wl backend migration "<message>"` — Alembic
 - `wl gen-client` — regenerate `backend/openapi.json` and the frontend API types after any API
   change; commit both
+- `wl docs-screenshots` — regenerate the guide's screenshots (light and dark) on the e2e stack;
+  at slice verification and when a UI change affects a shot
 - `wl seed` — create the workspace and its first system admin, who is the workspace owner
   (Slice 1)
 - `wl admin <command>` — app admin commands, e.g. `grant-system-admin <email>` (Slice 1)
@@ -136,7 +140,9 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   variables, or `$(...)`); use `git -C <path>` for another directory and
   `git commit -F - <<'EOF'` for a commit message. Commits and pushes to `main`, history
   rewrites, and skipped hooks are blocked; merging a PR asks the owner. Anything the allow-list
-  doesn't cover, ask the owner to run. When a hook blocks you, do what its message says. Never
+  doesn't cover, ask the owner to run. When a hook blocks you, do what its message says. Until
+the guard's decision at the end of S3-C0x, log every block or workaround in
+`docs/spikes/S3-C0b-guard-trial/friction-log.md`, committed with the work it happened in. Never
   work around a hook with shell commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
 
 See `backend/CLAUDE.md` and `frontend/CLAUDE.md` for the rules specific to each half.

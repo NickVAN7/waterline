@@ -97,7 +97,12 @@ const timeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', tim
 <template>
   <div class="flex flex-col gap-6">
     <h2 class="sr-only">Revisions</h2>
-    <section v-if="newest > 1" :aria-labelledby="compareId" class="flex flex-col gap-3">
+    <!-- Compare, kept (Q12e), set apart from the list in its own box (S3-C0l). -->
+    <section
+      v-if="newest > 1"
+      :aria-labelledby="compareId"
+      class="flex flex-col gap-4 rounded-lg border border-border-subtle p-4"
+    >
       <h3 :id="compareId" ref="compareHeading" tabindex="-1" class="m-0 text-lg font-semibold">
         Compare revisions
       </h3>

@@ -5,6 +5,7 @@ import { computed } from 'vue'
 
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { WORKSPACE_CRUMB } from '@/app/crumbs'
 import { WORKSPACE_ROLE } from '@/app/labels'
 import { allows } from '@/composables/allowedActions'
 import { useWorkspace } from '@/composables/useWorkspace'
@@ -79,6 +80,7 @@ async function list(query: { limit: number; offset: number; include_deactivated?
 <template>
   <RosterPage
     title="Workspace staff"
+    :crumbs="[WORKSPACE_CRUMB, { label: 'Staff' }]"
     list-name="Staff"
     thing="the staff"
     :roster="roster"

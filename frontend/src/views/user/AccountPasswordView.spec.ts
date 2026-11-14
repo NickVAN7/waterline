@@ -19,7 +19,7 @@ afterEach(() => {
 })
 
 describe('AccountPasswordView', () => {
-  it('is its own page, with the form as its primary action and a way back (DL-137)', async () => {
+  it('is its own page, with the form as its primary action and its trail back (DL-137, DL-327)', async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(ok(PASSWORD_POLICY))
     useCurrentUserStore().me = me()
     const router = await testRouter('/account/password')
@@ -36,7 +36,10 @@ describe('AccountPasswordView', () => {
     const change = wrapper.findAll('button').find((b) => b.text() === 'Change password')!
     expect(change.classes()).toContain('bg-accent')
     expect(wrapper.findAll('button').map((b) => b.text())).not.toContain('Sign out')
-    expect(wrapper.get('a[href="/account"]').text()).toBe('Back to account settings')
+    // The way back is its trail (DL-327), the page itself last.
+    const trail = wrapper.get('nav[aria-label=Breadcrumb]')
+    expect(trail.get('a[href="/account"]').text()).toBe('Account settings')
+    expect(trail.get('[aria-current=page]').text()).toBe('Change password')
     await expectNoA11yViolations(wrapper)
   })
 })

@@ -28,6 +28,7 @@ const USERS: Row[] = [
     is_active: true,
     is_system_admin: true,
     workspace_role: 'admin',
+    memberships: [],
     allowed_actions: [],
   },
   {
@@ -38,6 +39,7 @@ const USERS: Row[] = [
     is_active: false,
     is_system_admin: false,
     workspace_role: null,
+    memberships: [],
     allowed_actions: ['user.manage'],
   },
   {
@@ -48,6 +50,7 @@ const USERS: Row[] = [
     is_active: true,
     is_system_admin: true,
     workspace_role: null,
+    memberships: [],
     allowed_actions: [],
   },
 ]
@@ -74,6 +77,12 @@ describe('UsersView', () => {
 
     const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
 
+    // Its trail: the workspace area, then this page (DL-327).
+    const trail = wrapper.get('nav[aria-label=Breadcrumb]')
+    expect(trail.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Workspace', '/workspace/staff'],
+    ])
+    expect(trail.get('[aria-current=page]').text()).toBe('Users')
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: WORKSPACE_ID },
@@ -105,6 +114,44 @@ describe('UsersView', () => {
       ['Ola Root', 'ola@harbor.example', 'ola', 'System admin', 'Active'],
     ])
     expect(wrapper.get('table').findAll('input, select')).toHaveLength(0)
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it("lists each user's orgs under their role: the org, its role, their projects (S3-C0k)", async () => {
+    const pia: Row = {
+      ...USERS[2]!,
+      id: 'u-pia',
+      name: 'Pia Projects',
+      is_system_admin: false,
+      memberships: [
+        { org_id: 'o-acme', org_name: 'Acme', org_slug: 'acme', role: 'admin', project_count: 2 },
+        { org_id: 'o-glob', org_name: 'Globex', org_slug: 'globex', role: null, project_count: 1 },
+      ],
+    }
+    const sam: Row = {
+      ...USERS[0]!,
+      memberships: [
+        { org_id: 'o-acme', org_name: 'Acme', org_slug: 'acme', role: 'owner', project_count: 0 },
+      ],
+    }
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage([sam, pia])))
+
+    const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
+
+    const role = (row: number) => wrapper.findAll('tbody tr')[row]!.findAll('td')[3]!
+    // The staff role first, then each org; with no staff role, no "User": the orgs say it.
+    expect(role(0).find('p').text()).toBe('Admin, System admin')
+    expect(
+      role(0)
+        .findAll('li')
+        .map((li) => li.text()),
+    ).toEqual(['Acme · Owner'])
+    expect(role(1).find('p').exists()).toBe(false)
+    expect(
+      role(1)
+        .findAll('li')
+        .map((li) => li.text()),
+    ).toEqual(['Acme · Admin · 2 projects', 'Globex · 1 project'])
     await expectNoA11yViolations(wrapper)
   })
 

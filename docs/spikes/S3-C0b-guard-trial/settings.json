@@ -1,0 +1,64 @@
+{
+  "permissions": {
+    "ask": ["Bash(gh pr merge *)", "Bash(gh api *)"],
+    "deny": [
+      "Bash(git * --no-verify*)",
+      "Bash(git commit -n*)",
+      "Bash(git commit * -n)",
+      "Bash(git commit * -n *)",
+      "Bash(git -c *)",
+      "Bash(git -C *)",
+      "Bash(git config *)",
+      "Bash(git push *--force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * -f)",
+      "Bash(git push * -f *)",
+      "Bash(git push *+*)",
+      "Bash(git push *--delete*)",
+      "Bash(git push * :*)",
+      "Bash(git push *main*)",
+      "Bash(git rebase *)",
+      "Edit(.git/**)",
+      "Edit(.pre-commit-config.yaml)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --no-project --quiet python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect_files.py",
+            "timeout": 15,
+            "statusMessage": "Checking protected files"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/refuse_main_commit.py",
+            "timeout": 15,
+            "statusMessage": "Checking for a commit on main"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --no-project --quiet python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format_file.py",
+            "timeout": 60,
+            "statusMessage": "Formatting"
+          }
+        ]
+      }
+    ]
+  }
+}

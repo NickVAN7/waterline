@@ -4,6 +4,7 @@ module guidance, and My work. Who gets 2xx/403/404 is in tests/api/authz/test_pr
 tests)."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -18,6 +19,7 @@ from app.enums import (
     AuditAction,
     OrgRole,
     ProjectRole,
+    ProjectStatus,
     WorkspaceRole,
 )
 from app.models.audit_event import AuditEvent
@@ -95,6 +97,11 @@ def new(**values: object) -> dict[str, object]:
 
 
 # --- Create ---------------------------------------------------------------------------------------
+
+
+def org_projects(work: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every open project on My work, across its organization sections (DL-359)."""
+    return [p for org in work["sections"]["organizations"]["items"] for p in org["projects"]]
 
 
 async def test_a_new_project_makes_its_creator_first_admin_and_lead_and_records_both(
@@ -203,6 +210,29 @@ async def test_a_deactivated_first_admin_is_refused(
         [(["body", "first_admin_id"], "account_inactive")],
     )
     assert await events(session) == []
+
+
+@pytest.mark.parametrize(
+    ("key", "problem", "message"),
+    [
+        ("IN", "too_short", "Use at least 3 characters."),
+        ("INVOICE", "too_long", "Use at most 6 characters."),
+        ("1NV", "must_start_with_letter", "Start with a letter."),
+        ("IN-V", "invalid_characters", "Use only letters and digits."),
+    ],
+)
+async def test_a_bad_key_says_what_a_key_may_be(
+    client: AsyncClient, t: Tenancy, key: str, problem: str, message: str
+) -> None:
+    """Bug: a key's 422 in the slug's words ("at least 2", "lowercase letters, digits, and
+    hyphens"), TD-105."""
+    await signed_in(client, await org_member(t))
+
+    response = await client.post(f"/api/orgs/{t.org.id}/projects", json=new(key=key))
+
+    assert [(e["type"], e["message"]) for e in response.json()["details"]["fields"]] == [
+        (problem, message)
+    ]
 
 
 @pytest.mark.parametrize(
@@ -525,12 +555,12 @@ async def test_each_listed_project_names_its_org_and_the_users_access(
     await session.flush()
 
     org_list = await client.get(f"/api/orgs/{t.org.id}/projects", params={"sort": "key"})
-    my_work = await client.get("/api/me/work/projects", params={"sort": "key"})
+    my_work = await client.get("/api/me/work")
 
     expected = [("PMT", "Bolt Foods", "inherited_admin"), ("VWR", "Bolt Foods", "viewer")]
     fields = ("key", "organization_name", "my_access")
     assert [tuple(p[f] for f in fields) for p in org_list.json()["items"]] == expected
-    assert [tuple(p[f] for f in fields) for p in my_work.json()["items"]] == expected
+    assert sorted(tuple(p[f] for f in fields) for p in org_projects(my_work.json())) == expected
 
 
 async def test_each_listed_project_names_its_lead_or_none(
@@ -546,11 +576,11 @@ async def test_each_listed_project_names_its_lead_or_none(
     await session.flush()
 
     org_list = await client.get(f"/api/orgs/{t.org.id}/projects", params={"sort": "key"})
-    my_work = await client.get("/api/me/work/projects", params={"sort": "key"})
+    my_work = await client.get("/api/me/work")
 
     expected = [("NOL", None), ("PMT", "Lena Lead")]
     assert [(p["key"], p["lead_name"]) for p in org_list.json()["items"]] == expected
-    assert [(p["key"], p["lead_name"]) for p in my_work.json()["items"]] == expected
+    assert sorted((p["key"], p["lead_name"]) for p in org_projects(my_work.json())) == expected
 
 
 async def test_the_org_list_holds_only_that_orgs_projects(client: AsyncClient, t: Tenancy) -> None:
@@ -621,7 +651,11 @@ async def test_module_guidance_lists_every_module_and_each_types_recommendations
 @pytest.mark.security
 @pytest.mark.parametrize(
     "path",
-    ["/api/module-guidance", "/api/me/work", "/api/me/work/projects", "/api/me/work/approvals"],
+    [
+        "/api/module-guidance",
+        "/api/me/work",
+        "/api/me/work/approvals",
+    ],
 )
 async def test_signed_in_endpoints_need_a_session(client: AsyncClient, path: str) -> None:
     response = await client.get(path)
@@ -632,9 +666,11 @@ async def test_signed_in_endpoints_need_a_session(client: AsyncClient, path: str
 # --- My work --------------------------------------------------------------------------------------
 
 
-async def test_my_work_shows_the_first_ten_projects_and_the_total(
+async def test_my_work_shows_each_orgs_first_five_projects_and_the_total(
     client: AsyncClient, t: Tenancy
 ) -> None:
+    """DL-368: 5 per organization, the total counting all of them. Bug: the cap left at 10, or
+    shared with approvals'."""
     pia = await signed_in(client, await UserFactory.create_async())
     await projects_of(pia, t, 11)
     archived = await ProjectFactory.create_async(
@@ -644,19 +680,62 @@ async def test_my_work_shows_the_first_ten_projects_and_the_total(
 
     response = await client.get("/api/me/work")
 
-    projects = response.json()["sections"]["projects"]
-    assert (projects["available"], projects["total"]) == (True, 11)
-    assert [p["key"] for p in projects["items"]] == [f"P{n:02d}" for n in range(10)]
-    assert projects["items"][0]["organization_slug"] == "bolt-foods"
+    (org,) = response.json()["sections"]["organizations"]["items"]
+    assert (org["slug"], org["total"], org["hidden_total"], org["listed_total"]) == (
+        "bolt-foods",
+        11,
+        1,
+        11,
+    )
+    assert [p["key"] for p in org["projects"]] == ["P00", "P01", "P02", "P03", "P04"]
+    # The archived one is on the list, behind the toggle (DL-330), and says so.
+    assert [(p["key"], p["archived"]) for p in org["hidden"]] == [("ARC", True)]
+    assert org["projects"][0]["archived"] is False
 
 
-async def test_my_projects_page_through_the_rest(client: AsyncClient, t: Tenancy) -> None:
+async def test_an_archived_project_sorts_with_the_archived_whatever_its_status(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-330, DL-359: hidden is Completed, Cancelled, then archived; an archived Completed
+    project goes with the archived, after a live Cancelled one, not with the Completed."""
     pia = await signed_in(client, await UserFactory.create_async())
-    await projects_of(pia, t, 3)
+    for key, status, archived in (
+        ("ARC", ProjectStatus.COMPLETED, True),
+        ("CAN", ProjectStatus.CANCELLED, False),
+        ("COM", ProjectStatus.COMPLETED, False),
+    ):
+        project = await ProjectFactory.create_async(
+            organization=t.org,
+            key=key,
+            name=f"A {key}",
+            status=status,
+            archived_at=datetime.now(UTC) if archived else None,
+        )
+        await ProjectMembershipFactory.create_async(project=project, user=pia)
 
-    response = await client.get("/api/me/work/projects", params={"limit": 2, "offset": 2})
+    (org,) = (await client.get("/api/me/work")).json()["sections"]["organizations"]["items"]
 
-    assert ([p["key"] for p in response.json()["items"]], response.json()["total"]) == (["P02"], 3)
+    assert [p["key"] for p in org["hidden"]] == ["COM", "CAN", "ARC"]
+
+
+async def test_the_archived_come_by_name_alone_whatever_their_status(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """DL-359 (owner, S3-C0f review): the archived group is in name order only, so an archived
+    Planning "Alpha" comes before an archived Active "Zeta"."""
+    pia = await signed_in(client, await UserFactory.create_async())
+    for key, name, status in (
+        ("ZET", "Zeta", ProjectStatus.ACTIVE),
+        ("ALP", "Alpha", ProjectStatus.PLANNING),
+    ):
+        project = await ProjectFactory.create_async(
+            organization=t.org, key=key, name=name, status=status, archived_at=datetime.now(UTC)
+        )
+        await ProjectMembershipFactory.create_async(project=project, user=pia)
+
+    (org,) = (await client.get("/api/me/work")).json()["sections"]["organizations"]["items"]
+
+    assert [p["key"] for p in org["hidden"]] == ["ALP", "ZET"]
 
 
 async def test_a_section_whose_query_fails_is_unavailable(
@@ -677,12 +756,11 @@ async def test_a_section_whose_query_fails_is_unavailable(
     assert (response.status_code, response.json()["sections"]) == (
         200,
         {
-            # Both read the visible projects (DL-302).
+            # Both read the visible projects (DL-302, DL-359).
             "favorites": {"available": False, "items": [], "total": 0},
-            "projects": {"available": False, "items": [], "total": 0},
-            # TD-40: the other sections still show.
+            "organizations": {"available": False, "items": [], "total": 0},
+            # TD-40: the other section still shows.
             "approvals": {"available": True, "items": [], "total": 0},
-            "decisions": {"available": True, "items": [], "total": 0},
         },
     )
 
@@ -774,12 +852,35 @@ async def test_favorites_are_the_users_starred_projects_they_can_open_by_name(
     await star(await UserFactory.create_async(), plain)
 
     work = (await client.get("/api/me/work")).json()["sections"]
-    paged = (await client.get("/api/me/work/favorites", params={"limit": 1, "offset": 1})).json()
 
     favorites = work["favorites"]
     assert (favorites["available"], favorites["total"]) == (True, 2)
     assert [p["key"] for p in favorites["items"]] == ["ABE", "ZED"]
-    assert ([p["key"] for p in paged["items"]], paged["total"]) == (["ZED"], 2)
+
+
+async def test_my_work_shows_every_favorite_with_no_cap(client: AsyncClient, t: Tenancy) -> None:
+    """DL-369: favorites aren't cut at 10 as approvals are. Bug: the section still limited."""
+    pia = await signed_in(client, await UserFactory.create_async())
+    for n in range(12):
+        project = await ProjectFactory.create_async(
+            organization=t.org, key=f"P{n:02d}", name=f"Project {n:02d}"
+        )
+        await ProjectMembershipFactory.create_async(project=project, user=pia)
+        await star(pia, project)
+
+    favorites = (await client.get("/api/me/work")).json()["sections"]["favorites"]
+
+    assert favorites["total"] == 12
+    assert [p["key"] for p in favorites["items"]] == [f"P{n:02d}" for n in range(12)]
+
+
+async def test_the_favorites_endpoint_is_gone(client: AsyncClient) -> None:
+    """DL-371: favorites are shown in full, so their paging endpoint was removed."""
+    await signed_in(client, await UserFactory.create_async())
+
+    response = await client.get("/api/me/work/favorites")
+
+    assert (response.status_code, response.json()["code"]) == (404, "not_found")
 
 
 async def test_my_work_rows_say_whether_each_is_a_favorite_and_carry_their_actions(
@@ -798,7 +899,7 @@ async def test_my_work_rows_say_whether_each_is_a_favorite_and_carry_their_actio
     # Someone else's star is theirs: `is_favorite` is the caller's own (DL-304).
     await star(await UserFactory.create_async(), other)
 
-    items = (await client.get("/api/me/work/projects", params={"sort": "key"})).json()["items"]
+    items = sorted(org_projects((await client.get("/api/me/work")).json()), key=lambda p: p["key"])
     read = (await client.get("/api/projects/OTH")).json()
 
     assert [(p["key"], p["is_favorite"]) for p in items] == [("OTH", False), ("STR", True)]

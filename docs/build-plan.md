@@ -2,8 +2,8 @@
 
 Companion to `design-doc.md`, `schema-doc.md`, and `testing-strategy.md` (section references
 like §3 point to the design doc). This document covers **Slice 0 (skeleton)**, **Slice 1 (auth,
-tenancy, projects)**, and **Slice 2 (requirements and approvals)**, plus placements for later
-slices. Later slices get the same treatment when they're next up.
+tenancy, projects)**, **Slice 2 (requirements and approvals)**, and **Slice 3 (tasks)**, plus
+placements for later slices. Later slices get the same treatment when they're next up.
 
 ## How slices work
 
@@ -27,7 +27,7 @@ marked for the slice is in the model (the `checkpoint` skill, step 2).
 | **0** | Skeleton: stack, shared conventions, CI, app shell. No features. |
 | **1** | Auth, tenancy (workspace, organizations, workspace/org/project memberships), projects (types, modules, keys, status, lead), number allocation, `authorize()`, admin audit events, the API conventions (lists, errors, allowed actions, identifiers), access review, and My work as the home page (its projects section). |
 | **2** | Requirements & approvals: Slice 1's leftovers and the owner's UI feedback first (S2-C0a to S2-C0j); requirements (tree, `RQ` numbering, rank, revisions compared, item history, delete and trash), approvals with named approvers and their replacement (My work's approvals section), `log_change()` and the activity log, the export-control gate, rendered markdown and the CSP; then "Show deactivated" on the built lists, the session list, favorite projects, and the Documentation page (DL-238). |
-| 3 | Tasks and subtasks, phases, workstreams, transition rules, rank for tasks; backlog and board (the board is SVAR Kanban through a wrapper, ui-design-guide §7.1; DL-64); copy branch name; My work's task sections (assigned, awaiting review). Its first group, S3-C0a to S3-C0h, polishes Slice 2's screens and applies the Slice 2 retro's code changes. |
+| 3 | Tasks and subtasks, phases, workstreams, transition rules, rank for tasks; backlog and board (the board is SVAR Kanban through a wrapper, ui-design-guide §7.1; DL-64); copy branch name; My work's task sections (assigned, awaiting review) and summary; the project activity feed, the filter bar, CSV export, saved filters, and the project home's Get started checklist. Its first group, S3-C0a to S3-C0n, polishes Slice 2's screens, applies the Slice 2 retro's code changes and the rest of the owner's Slice 2 feedback, and spikes the backlog's widget. |
 | 4 | Sprints (module), including completing a sprint with unfinished tasks; milestones/gates. |
 | 5 | Test cases, runs, results (with assignees), ad-hoc runs, re-running failed cases; My work's test-case section. |
 | 6 | Comments, tags (with the built-in per-type defaults, copied into new orgs and backfilled into existing ones), dependencies, links, search; the comment prompt when a task is sent back from review. |
@@ -54,8 +54,9 @@ minutes. The next checkpoint starts only after the current one is approved.
    - `docs/developer-guide.md` — workstation setup, developer CLI commands, architecture and
      conventions, how to add a feature through each layer, how to write each kind of test,
      troubleshooting.
-   - `docs/user-guide.md` — how to use each feature, from an end user's point of view (starts
-     filling in with Slice 1).
+   - `docs/behavior-reference.md` — everything each feature does, screen by screen, in the
+     words on the screen (from S3-C0g; before it, `docs/user-guide.md`); the reader's guide
+     under `docs/user-guide/` only when what a user does or sees changes (DL-335).
    - Design, schema, and build-plan docs, if anything drifted.
 5. **Tech-debt log** (`docs/tech-debt.md`): any shortcut is recorded with its reason and the
    checkpoint or slice that will fix it. The goal is an empty log; nothing is left unrecorded.
@@ -121,8 +122,9 @@ for approval.
 
 **End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
-the guide. The `user-guide-verifier` agent then follows `docs/user-guide.md` literally in a
-browser against a seeded copy of the stack and walks the slice's "Done when" list (DL-124). After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
+the guide. The `user-guide-verifier` agent then follows `docs/behavior-reference.md` literally in a
+browser against a seeded copy of the stack, checks the guide under `docs/user-guide/` against it
+(DL-336), and walks the slice's "Done when" list (DL-124). After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
 `CLAUDE.md` file, and `.claude/` file against the others, and then the `repo-auditor` agent
 audits the whole repository, not one diff: bugs, security, scale against the expected load,
 risky code without a test, and slowness (DL-41; waste is `simplicity-auditor`'s, DL-318). From S2-C0a, the `simplicity-auditor`
@@ -206,7 +208,10 @@ Each slice is planned before its first checkpoint (DL-139):
      screens, and are re-cut before they start; a re-cut before a row starts isn't a split.
   3. **A shared piece used for the first time gets its own row** (a widget wrapper, the markdown
      view and editor).
-- The plan's readiness review checks every row against these rules.
+- The plan's readiness review checks every row against these rules: an independent read-only
+  agent, on the same snapshot as
+  the plan's design change's `docs-consistency` pass, returns a finding per row and rule; the
+  findings and their fixes are recorded in that design change's record (DL-353).
 
 ### Where the work happens
 Code is written and run on the owner's workstation(s) in the `waterline` repository (the working
@@ -328,7 +333,8 @@ The sections below describe the content; the table above is the order of work.
 │   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
 │                                       design-change/, vue-screen/
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
-│                                 testing-strategy.md, developer-guide.md, user-guide.md,
+│                                 testing-strategy.md, developer-guide.md, user-guide/,
+│                                 behavior-reference.md,
 │                                 tech-debt.md, decision-log.md, screen-inventory.md,
 │                                 ui-design-guide.md, ui/ (reference copies of the token file,
 │                                 its contrast check, and the SVAR theme mapping), reviews/
@@ -374,7 +380,7 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
   | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
   | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl seed --demo` (from S1-C13a, DL-83), `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
-  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>`, `wl e2e` (from S1-C14, DL-65) | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29); Playwright against an isolated, seeded stack it starts and always tears down |
+  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>`, `wl e2e` (from S1-C14, DL-65), `wl docs-screenshots` (from S3-C0h, DL-343) | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29); Playwright against an isolated, seeded stack it starts and always tears down; the guide's screenshots, on that stack |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
   on any surviving mutant; `wl check --full` always includes it, and `wl check` when anything it
@@ -472,7 +478,7 @@ when the owning service calls it (DL-70).
 | `activity` *(read side)* | none (reads activity_log) | 2 | — |
 | `phase` | phase | 3 | — |
 | `workstream` | workstream | 3 | — |
-| `task` | task, subtask, task_dependency | 3 | numbering |
+| `task` | task, subtask, task_dependency (from Slice 6) | 3 | numbering |
 | `milestone` | milestone | 4 | approval (registers `on_approved`) |
 | `sprint` | sprint | 4 | task |
 | `testcase` | testcase, requirement_testcase | 5 | numbering |
@@ -481,6 +487,7 @@ when the owning service calls it (DL-70).
 | `tag` | tag, entity_tag | 6 | — |
 | `link` | link_attachment | 6 | — |
 | `search` *(no tables)* | none (reads requirements, tasks, test cases) | 6 | — |
+| `saved_filter` | saved_filter | 3 | — |
 | `my_work` *(read side; no tables)* | none (reads projects, approvals, tasks, test results) | 1 | — |
 | `github` | github_installation, project_repository, task_github_link | 7 | task |
 | `webhook` | github_webhook_delivery (and its processing job) | 7 | github |
@@ -533,7 +540,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 
   | Layer | Services | May call |
   |---|---|---|
-  | 1 | user, numbering, approval, activity, comment, tag, link, search, my_work, health | no other service (approval and user reach areas only through registered handlers) |
+  | 1 | user, numbering, approval, activity, saved_filter, comment, tag, link, search, my_work, health | no other service (approval and user reach areas only through registered handlers) |
   | 1b | roster (the membership rules workspace staff, org members, and from S1-C12 project members share, DL-70, DL-71) | layer 1 |
   | 2 | auth, workspace, org | layers 1–1b |
   | 3 | project, phase, workstream, milestone | layers 1–2 |
@@ -588,7 +595,7 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 - `api` — built from `backend/`; uvicorn with reload, mounted source.
 - `worker` — same image as `api`, runs the procrastinate worker.
 - `web` — built from `frontend/`; Vite dev server (in Compose or run locally); from S2-C21d it also
-  mounts `docs/user-guide.md` read-only for the Documentation page (DL-308).
+  mounts `docs/user-guide/` read-only for the Documentation pages (DL-308, DL-335).
 - **Vite proxies `/api` to the API**, so the browser sees one origin. This matters for Slice 1:
   the session cookie (`SameSite=Lax`, `__Host-` prefix) and the `Origin` check both assume the
   app and API share an origin.
@@ -640,7 +647,16 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 - **Ranked views** (backlog, board, requirement tree) return complete lists with a hard cap,
   because drag-and-drop needs the whole list: 2,000 items per view (the requirement tree: per
   project; DL-159); above it the response carries `truncated: true` and the page says so, with a
-  tech-debt entry to page the view if a project nears it.
+  tech-debt entry to page the view if a project nears it. A ranked view may take declared filters
+  (from Slice 3, DL-351): it returns the matches, complete up to the cap, and a tree returns each
+  match's ancestors too, marked as context; while the tree is filtered, its move menu is off and
+  the page says so, while a filtered task view keeps drag and its move menu (a task's rank is one
+  order for the project).
+- **CSV export** (from Slice 3; `docs/reviews/s3/S3-plan.md`, C2) is a sibling endpoint,
+  `…/export.csv`, taking the list's own query parameters plus `columns=`, with the list's
+  scoping and cap; every cell is formula-escaped.
+- **Pickers search on the server** (from Slice 3; S3-plan C3): `?q=` on the candidates endpoint,
+  offset-paged, never a client-filtered first page.
 - **Sorting:** `?sort=name,-created_at`, from a per-endpoint allowlist; `id` is always the last
   tiebreaker, so order is deterministic and offsets never skip or repeat rows. Each endpoint
   documents its default sort.
@@ -1060,7 +1076,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | `POST /api/workspaces/{workspace_id}/staff/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `workspace_member_added`) | `workspace_staff.manage` |
   | `PATCH /api/workspaces/{workspace_id}/staff/{user_id}` | change the role (`workspace_member_role_changed`) | `workspace_staff.manage` |
   | `DELETE /api/workspaces/{workspace_id}/staff/{user_id}?with_projects=true` | remove; `with_projects` (default true) calls the `on_member_removed` handler (a stub until Checkpoint 12) (`workspace_member_removed`) | `workspace_staff.manage` |
-  | `GET /api/workspaces/{workspace_id}/orgs` | the workspace's orgs (offset paging, sort by name) | `workspace.view` |
+  | `GET /api/workspaces/{workspace_id}/orgs` | the workspace's orgs (offset paging, sort by name); each `id`, `name`, `slug`, and, from S3-C0k, `project_count` (archived left out), `member_count` (active accounts), and `owners` (`{id, name}`, the active owners, by name), from three grouped queries per page | `workspace.view` |
   | `POST /api/workspaces/{workspace_id}/orgs` | create an org (name, slug) and its first owner: exactly one of `owner_id` (an existing active user: no such user is a 404, a deactivated one a 422 `account_inactive` on `owner_id`) or `new_owner` (email, username, name, temporary password; `user_created`) (`org_created`, `org_member_added`) | `org.create` |
   | `GET /api/workspaces/{workspace_id}/org-slug-availability?slug=` | the same shape, for a new org | `org.create` |
   | `GET /api/orgs/{org_id}` | the org with its `allowed_actions` | `org.view` |
@@ -1094,8 +1110,9 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | Endpoint | Does | Action |
   |---|---|---|
   | `GET /api/orgs/{org_id}/members` | the member list (offset paging, `ListSpec`: sort by name or email, filter by role; deactivated people only with `include_deactivated=true`, from S2-C21a, DL-293, DL-294), each row with its `is_active` and `allowed_actions` (from S1-C15, DL-102) | `org_member.manage` |
-  | `POST /api/orgs/{org_id}/members` | add an existing account, email first (design-doc §4): `email`, `role`; already a member is a 422 `already_member` on `email`, no account a 422 `no_account` on `email` (the form goes on to create one), a deactivated account a 422 `account_inactive` on `email`; the web form first checks the email (the user check, DL-66) and confirms by the email alone (`org_member_added`) | `org_member.manage` |
-  | `POST /api/orgs/{org_id}/members/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `org_member_added`) | `org_member.manage` |
+  | `POST /api/orgs/{org_id}/members` | add an existing account, email first (design-doc §4): `email`, `role`; already a member is a 422 `already_member` on `email`, no account a 422 `no_account` on `email` (the form goes on to create one), a deactivated account a 422 `account_inactive` on `email`; the web form first checks the email (the user check, DL-66) and confirms by the email alone (`org_member_added`); from S3-C0m, an optional `projects` (`project_id`, `role` defaulting to member, `export_control_confirmed` where the project is export-controlled, at most 200) adds the person to each too, all or nothing, each project locked first and its confirmation checked under the lock, each its own `project_member_added`: the project service does it, calling the org's (DL-379); a project sent twice is a 422 `duplicate` on `projects.<i>.project_id`, one outside the org a 404, an archived one a 403 | `org_member.manage`, and `project_member.manage` on each project |
+  | `POST /api/orgs/{org_id}/members/new` | create the user (email, username, name, temporary password; `must_change_password` set) and the membership (`role`) in one step (`user_created`, `org_member_added`); `projects` as the add (DL-379) | `org_member.manage`, and `project_member.manage` on each project |
+  | `GET /api/orgs/{org_id}/member-projects` | the add's projects step (S3-C0m, DL-379): the org's live projects (offset paging, `ListSpec`, by name, at most 200 a page), each with `id`, `key`, `name`, and `export_controlled`; whoever holds `org_member.manage` holds `project_member.manage` on each | `org_member.manage` |
   | `PATCH /api/orgs/{org_id}/members/{user_id}` | change the role, with an optional `new_owner_id` (`org_member_role_changed`) | `org_member.manage` |
   | `DELETE /api/orgs/{org_id}/members/{user_id}?with_projects=true` | remove, with an optional `new_owner_id` query parameter; `with_projects` (default true) calls the `on_member_removed` handler (a stub until Checkpoint 12) (`org_member_removed`) | `org_member.manage` |
   | `GET /api/workspaces/{workspace_id}/user-check` | the user check (DL-66, above) | `user.check` |
@@ -1153,7 +1170,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
 
   | Endpoint | Does | Action |
   |---|---|---|
-  | `GET /api/workspaces/{workspace_id}/users` | the users list: everyone with a membership in the workspace (staff, org members, project members) and every account with no memberships; each row `id`, `email`, `username`, `name`, `is_active`, `is_system_admin` (read-only), `workspace_role` (the person's staff role, or null; from S2-C0h, DL-183), and its `allowed_actions` (offset paging, `ListSpec`: sort by name or email, with system admins who have no workspace role after everyone else, from S2-C0j, DL-188; deactivated people only with `include_deactivated=true`, which replaces the `is_active` filter, from S2-C21a, DL-293, DL-294) | `workspace.view` |
+  | `GET /api/workspaces/{workspace_id}/users` | the users list: everyone with a membership in the workspace (staff, org members, project members) and every account with no memberships; each row `id`, `email`, `username`, `name`, `is_active`, `is_system_admin` (read-only), `workspace_role` (the person's staff role, or null; from S2-C0h, DL-183), from S3-C0k `memberships` (each of the workspace's orgs they belong to, by name: `org_id`, `org_name`, `org_slug`, `role`, their org role or null on its projects alone, and `project_count`, every project of it they're on, the archived included, from the memberships the rank rule loads, one query for the orgs' names), and its `allowed_actions` (offset paging, `ListSpec`: sort by name or email, with system admins who have no workspace role after everyone else, from S2-C0j, DL-188; deactivated people only with `include_deactivated=true`, which replaces the `is_active` filter, from S2-C21a, DL-293, DL-294) | `workspace.view` |
   | `POST /api/users/{user_id}/deactivate` | set `is_active` false and delete the user's sessions (`user_deactivated`); already inactive changes and records nothing | `user.manage` |
   | `POST /api/users/{user_id}/reactivate` | set `is_active` true (`user_reactivated`); already active changes and records nothing | `user.manage` |
   | `POST /api/users/{user_id}/reset-password` | `password` (the temporary password the form generates, under the password policy): set it and `must_change_password`, and delete the user's sessions (`password_reset`) | `user.manage` |
@@ -1243,7 +1260,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   | `POST /api/projects/{key}/unarchive` | clear it (`project_unarchived`); already unarchived changes and records nothing; 204 | `project.unarchive` |
   | `PUT /api/projects/{key}/favorite`, `DELETE /api/projects/{key}/favorite` | from S2-C21c: star or unstar the project for the caller (`project_favorite`); 204, idempotent; no audit event or activity entry (DL-304) | `project.favorite` |
   | `GET /api/module-guidance` | for each type, the recommended modules; for each module in design-doc §1.1's table, v2 included (`available` false, so its names aren't typed by `ProjectModule`), a best-practice note and `available` (static, for the create dialog before a project exists) | signed in |
-  | `GET /api/me/work`, `GET /api/me/work/projects`, `GET /api/me/work/approvals`, `GET /api/me/work/decisions` | My work (design-doc §11): `{sections: {projects: {available, items, total}, approvals: {…}}}`, the first 10 items of each section (a section whose query failed is `{available: false}`); `/projects` is the section as an offset-paged list. A project item: `id`, `key`, `name`, `type`, `status`, `lead_id`, `lead_name` (from S2-C0f, DL-153), `organization_id`, `organization_slug`, and, from S2-C0g, `organization_name` and `my_access` (the user's explicit project role, or `inherited_admin`; DL-153), sorted by name; the projects the user can open, archived left out. From S2-C14, `approvals` (and `GET /api/me/work/approvals`, offset-paged): the caller's pending `approval` rows, each `request_id`, `requested_at`, `requested_by_id`, `requested_by_name`, `note`, `entity_type`, `entity_number`, `title` (the revision's under approval), `revision_number`, `project_key`, `project_name`, `organization_slug`, oldest request first; requests not pending, deleted requirements, archived projects, and every project whose content the caller can't see (§5, §3.1) left out (DL-236). From S2-C20b, `decisions` (and `GET /api/me/work/decisions`, offset-paged): the caller's decided rows (`approved` or `rejected`), each `request_id`, `decision`, `decided_at`, `comment`, `request_status`, and the approvals item's entity, revision, and project fields, newest decision first, left out as for `approvals` (DL-286). From S2-C21c, each project item also has `is_favorite` and its `allowed_actions` (DL-306), and `favorites` (and `GET /api/me/work/favorites`, offset-paged) lists the caller's favorite projects they can open, archived left out, by name, as project items (DL-302) | signed in |
+  | `GET /api/me/work`, `GET /api/me/work/approvals` | My work (design-doc §11): `{sections: {favorites: {available, items, total}, organizations: {…}, approvals: {…}}}` (a section whose query failed is `{available: false}`); `favorites` holds every favorite (DL-369; its endpoint, `GET /api/me/work/favorites`, went in S3-C0j, DL-371); `approvals` holds its first 10 items, and its own endpoint pages them (offset-paged). A project item: `id`, `key`, `name`, `type`, `status`, `lead_id`, `lead_name` (from S2-C0f, DL-153), `organization_id`, `organization_slug`, and, from S2-C0g, `organization_name` and `my_access` (the user's explicit project role, or `inherited_admin`; DL-153); from S2-C21c `is_favorite` and its `allowed_actions` (DL-306); from S3-C0f `archived`. `favorites` (S2-C21c): the caller's favorite projects they can open, archived left out, by name (DL-302, DL-332). From S3-C0f, `organizations` (DL-329, DL-330, DL-349, DL-359) replaces `projects` (and `GET /api/me/work/projects` goes): one item per org the caller can open a project in, by org name, each `id`, `slug`, `name`, `projects` (the first 5 open projects, DL-368: Active, Planning, On hold, each by name) with `total` (all its open ones), `hidden` (the first 5 of the rest: Completed, Cancelled, each by name, then the archived by name alone) with `hidden_total`, and `listed_total` (the projects its org list shows: every one but the archived; the page shows no "All" link at 0); the projects are those the caller can open (`project_scope`), archived included. From S2-C14, `approvals`: the caller's pending `approval` rows, each `request_id`, `requested_at`, `requested_by_id`, `requested_by_name`, `note`, `entity_type`, `entity_number`, `title` (the revision's under approval), `revision_number`, `project_key`, `project_name`, `organization_slug`, oldest request first; requests not pending, deleted requirements, archived projects, and every project whose content the caller can't see (§5, §3.1) left out (DL-236). From S3-C0f, the past decisions (`decisions`, `GET /api/me/work/decisions`) are gone (DL-333) | signed in |
 
   `/me`'s org entries carry their org-level `allowed_actions` (`project.create`,
   `project.assign_first_admin`, …). **Errors:** 422 on `key` (the key rule's problems, `taken`);
@@ -1689,85 +1706,168 @@ fixes, decisions, conventions, each row's actions, threat-model pass, and open q
 
 ## Slice 3 — Tasks
 
-**Being planned** (the owner, from Nov 9, 2026). Recorded so far: its first group, the polish of
-Slice 2's screens and the Slice 2 retro's code changes, which run before Slice 3's features (the
-Slice 2 retro, DL-312 to DL-320; the owner's UI polish handoff, DL-321 to DL-343). The rest of the
-slice (its goal, plan record, feature rows, and the rest of "Done when") comes with its planning.
+**Goal:** tasks can be created, triaged, ordered, worked on a board and a backlog, broken into
+subtasks, moved through the transition rules, deleted and restored; requirements show their
+tasks; phases and workstreams exist; every list has the filter bar and CSV export where
+decided (saved filters last, as a nice-to-have); My work shows the user's tasks and reviews; the project activity feed
+exists; and the owner's Slice 2 feedback is in. After this slice Waterline can track its own
+build (build plan, slice overview).
 
-**Before starting:** the plan record's open questions answered; `uv run wl audit` green.
+**Before starting:** the plan record's open questions (`docs/reviews/s3/S3-plan.md`, Q1 to Q14;
+a `Qn` below is one of them) answered by the owner before S3-C0a (done, Nov 10, 2026); `uv run wl audit` green; the web rows (S3-C16 onward) provisional, re-cut before each
+starts (DL-139). The slice-boundary audit findings are all placed already: Y4 in S3-C0a, Y6 in
+S3-C0d, A2 and A3 as TD-100 and TD-101; Y1, Y2, Y3, Y5 were applied by the retro.
 
-**Carry-in tech debt** (Fix by: Slice 3 or an S3 row, `tech-debt.md`): TD-19, TD-31, TD-37,
-TD-38, TD-41, TD-42, TD-64, TD-68, TD-86, TD-92 (S3-C0d), TD-96, TD-97, TD-100, TD-101, TD-102,
-TD-103 (S3-C0a).
+**Carry-in tech debt** (Fix by: Slice 3 or an S3 row):
+
+| TD | Row |
+|---|---|
+| TD-103 | S3-C0a |
+| TD-92 | S3-C0d |
+| TD-101 | S3-C6 (assignee and reviewer would be a third and fourth copy of the check: one shared helper) |
+| TD-38, TD-41, TD-96 | S3-C13 (server search) and S3-C17 (the pickers) |
+| TD-97, TD-102 | S3-C16 (the filter bar) |
+| TD-37 | S3-C29 (My work's "see all" for approvals: its route exists, so frontend only) |
+| TD-19, TD-31, TD-42, TD-64, TD-68, TD-86, TD-100 | S3-C33 (the tech-debt review; TD-64 is 387 of 600 lines, and Slice 3's ~16 actions shouldn't cross it; TD-100 only if no row touches approval reads first) |
+| TD-73 | S3-C7 (DL-345 decided: the one-statement rewrite, shared with the tree; it was due Slice 7) |
 
 ### Checkpoints
 
-The polish group (S3-C0a to S3-C0h) runs first, in this order: the panel before tasks are built
-on it, the breadcrumbs before the docs pages that use them, and the full page's header with the
-panel's. Each row but 0b (a tooling trial whose outcome goes through `design-change`, DL-316)
-changes built code, so each is a checkpoint with its tests and full review (`ui-reviewer` when
-the diff touches the frontend, DL-62), and each updates the rules it changes (ui-design-guide, design-doc §11,
+The polish group (S3-C0a to S3-C0n) runs first. S3-C0a to S3-C0h are as decided (DL-312 to
+DL-343; S3-C0h also DL-360; S3-C0j also DL-363 to DL-371), in this order: the panel before tasks are built on it, the breadcrumbs before the docs
+pages that use them, and the full page's header with the panel's. S3-C0i to S3-C0m are new: a
+spike, and the Slice 2 feedback the handoff didn't cover (each `S2-ui-feedback.md` item marked
+with its row, as Slice 2 did, DL-137, DL-158). Each polish row but 0b (a tooling trial whose
+outcome goes through `design-change`, DL-316) and 0i (a spike, no product code) changes built
+code, so each is a checkpoint with its tests and full review (`ui-reviewer` when the diff touches
+the frontend, DL-62), and each updates the rules it changes (ui-design-guide, design-doc §11,
 screen inventory, user guide) when it's built.
 
 | # | Checkpoint | Includes |
 |---|---|---|
-| 0a | Project pages share their setup | `useProjectPage` (`frontend/src/views/project/useProjectPage.ts`) also returns the reload after a refusal, `exportControlled`, and the not-found page's who-to-ask sentence, and a `ProjectPageLoading.vue` holds the loading block; the eight project pages (home, settings, members, access review, Trash, requirements, new requirement, the requirement page) use them; it holds only what every project page needs. Specs for both; every page's specs still pass (Slice 2 retro, simplicity finding Y4). TD-103 |
+| 0a | Project pages share their setup | `useProjectPage` (`frontend/src/views/project/useProjectPage.ts`) also returns the reload after a refusal, `exportControlled`, and the 403 page's who-to-ask sentence on a content page, and a `ProjectPageLoading.vue` holds the loading block; the eight project pages (home, settings, members, access review, Trash, requirements, new requirement, the requirement page) use them; it holds only what every project page needs. Specs for both; every page's specs still pass (Slice 2 retro, simplicity finding Y4). TD-103 |
 | 0b | The git guard's trial | A scratch clone with Claude Code permission rules (`ask` for `gh pr merge` and `gh api`; `deny` for `--no-verify` and force-push) and a hook refusing commits on `main`; a checklist of about 15 commands the owner runs in a scratch session, including a forbidden command inside a compound one and a redirect into `.git/` or git config (DL-24); the outcome, replacing the guard (superseding DL-26) or keeping it, goes through `design-change` (DL-316). Tooling: no app code |
 | 0c | The manual pass's setup command | The demo seed (`wl seed --demo`, or a `--manual-pass` variant) creates every state the slice-verification pass needs: nested requirements, one with headings, a long URL, and a list in its description and three revisions; approval requests pending, approved, and "Approved · modified"; Trash items; more than eight projects in one org; an export-controlled project; a deactivated member; a second session (DL-320). Tests for the seed |
 | 0d | The item side panel as a split pane | DL-321 to DL-326: a split pane at 64rem and wider, the overlay below; resizable (560px, 400 to 800px, a keyboard separator, the width in `localStorage`); swapping items, and **Discard your changes?** before leaving unsaved edits (TD-92); focus on the title, a labelled complementary region, the open row marked by more than color; the panel's header (ID and status, the three icon buttons, Edit, Change status, ⋯ More actions) and definition list; the full page's matching header. `ItemPanel` is shared, so tasks inherit it. UI-SHL-11 rewritten. With Y6 if the requirement forms' shared fields still match: a `RequirementFields.vue` for Title, Description, and Priority, with the refs the 422 focus needs; otherwise dropped, said in its record |
 | 0e | Breadcrumbs | DL-327, DL-328: one breadcrumb component on PrimeVue's `Breadcrumb` above the `h1` of every page but the top-level ones, replacing the single back links; the requirement read's `ancestors` (or what already serves it), and a parent in the Trash shown unlinked if that can happen; a new UI-SHL rule; WCAG 2.4.8 in the guide's table |
-| 0f | My work grouped by organization | DL-329 to DL-334: approvals first (one line with none); Favorites, a cross-org section; a section per org with its count and **All projects**; every project, with a safety cap of about 500 and per-org totals; active first, completed, cancelled, and archived behind a per-org toggle; archived rows without a star; compact rows. My past decisions removed, with its `GET /api/me/work` section and `GET /api/me/work/decisions` (`wl gen-client`). Design-doc §11 rewritten. **Open**, decided at the row's re-cut: how the API returns up to about 500 projects when a list page holds 200 (one response up to the cap, a named exception like the requirement tree's 2,000; the client paging; or a call per org) |
+| 0f | My work grouped by organization | As decided (DL-329, DL-330, DL-332, DL-334; past decisions removed, DL-333), with three changes: the order is Favorites, then each organization, then Approvals waiting for you (below the projects, superseding DL-333's approvals-first); each organization's section shows its first **10** projects (active first) with "Showing 10 of N", its count, and **All N projects**, and the hidden-projects toggle (superseding DL-331's "every project"); so `GET /api/me/work` returns each org's first 10 and its total, which settles the row's open question (DC-2026-11-09, decision B) |
 | 0g | Documentation: a guide and a reference | DL-335 to DL-342: `docs/user-guide.md` moved to `docs/behavior-reference.md` (history kept, never shown in the app) and a reader's guide, one page per topic under `docs/user-guide/`, with front matter, groups, and pages; `/docs` a landing page and `/docs/:slug` articles, with the docs nav in the sidebar; the article layout with On this page; `MarkdownView`'s docs mode (callouts, keys, local images; the CSP's `img-src` checked); the guide rewritten for readers. The rule "the reference changes with behavior; the guide only when what a user does or sees changes" in the `checkpoint` and `design-change` skills, the `CLAUDE.md` files, and `docs-consistency`; `user-guide-verifier` checks both (DL-336); every pointer to `docs/user-guide.md` updated. TD-104 is logged for docs-only search |
-| 0h | Generated documentation screenshots | DL-343: `wl docs-screenshots` (the e2e stack, `seed --demo`, Playwright through a short list of named shots, light and dark WebP in `docs/user-guide/images/`); docs mode shows the `-dark` image in the dark theme; alt text on every image; regenerated at slice verification. Developer tooling, but a checkpoint: it needs S3-C0g's docs mode and images folder (recorded in `DC-2026-11-09-s2-retro-and-ui-polish.md`) |
+| 0h | Generated documentation screenshots | DL-343: `wl docs-screenshots` (the e2e stack, `seed --manual-pass` (DL-361), Playwright through a short list of named shots, light and dark WebP in `docs/user-guide/images/`); docs mode shows the `-dark` image in the dark theme; alt text on every image; regenerated at slice verification. Developer tooling, but a checkpoint: it needs S3-C0g's docs mode and images folder (recorded in `DC-2026-11-09-s2-retro-and-ui-polish.md`). With DL-360: `main` without the `--content-wide` cap (the token, route meta `fullWidth`, and its type removed; every statement of the cap rewritten: UI-SHL-7, UI-SHL-11, the shell diagram, the token table, and the developer guide's Side panels); forms keep `--content-narrow`, guide text `--content-prose`; On this page at the right of `main` on a wide screen; e2e: a list page's table and a guide article at a wide viewport. And the owner's feedback on S3-C0g (DL-131): a callout's icon lost its `viewBox`, size, and paths to the sanitizer (DOMPurify checks each attribute against the URL pattern) and drew at 300 by 150; the attributes kept in docs mode, a spec asserting them |
+| 0i | Backlog widget spike | DL-344: SVAR DataGrid (row drag, never exercised in the Oct 10 spike, UI-SVR open item 5c) against PrimeVue DataTable's row reorder, on one checklist: pointer drag, the move menu outside the widget, a server-denied move snapping back, keyboard, axe, the token theme audit, ~2,000 rows. Evidence in `docs/spikes/`; the result is a decision-log entry deciding S3-C19 and UI-SVR-2's backlog line. The owner sees a working example of each option (a runnable demo in the spike folder, and screenshots or a short recording in the results) before deciding; no product code |
+| 0j | Shell feedback | The sidebar stays put while the page scrolls; browser tab titles (one short pattern, e.g. `WTL-RQ-12 · Waterline`, as a UI-SHL rule); the sidebar says whose items it shows (org vs project, a heading or label); project selector (arrow right-aligned, "All projects" styled apart without the link look, the filter behind a search button); Account's "Change password" a button; the design skill's trial moved to S3-C0n (DL-374); and the owner's decisions after S3-C0h (to be tuned after their UI review): form pages left-aligned at 48rem and a guide article centered at 100ch (DL-367, DL-373, after the owner's look; UI-SHL-7, the token tables in the guide and `docs/ui/tokens.css`, and `frontend/CLAUDE.md`'s form rule), My work at 5 projects per organization and Favorites uncapped, `GET /api/me/work/favorites` removed (DL-368, DL-369, DL-371; backend, the spec tests rewritten, `wl gen-client`), `build.assetsInlineLimit: 0` (DL-370); with the code, every doc that states the old behavior: the API table's My work row, design-doc §11 "My work" and §4's CSP bullet, the screen inventory's My work rows, UI-MD-1, and TD-37 with its line in the slice's tech-debt table (favorites need no "see all"), callout tones (DL-364), guide screenshots opening full size in a new tab and loading lazily (DL-363), table header scope and the guide's id check (DL-366) |
+| 0k | Admin pages feedback | Org overview ("Archived projects" heading; an archived project shown as Archived, not its old status; the "Name" line removed; the slug under the title, the owner's "or a better way"); the deactivated marker on people lists reworked, with fixed column widths when shown; workspace users' Role column gains the user's orgs and projects (backend: a memberships summary on the user row, API tests, `wl gen-client`); workspace orgs table gains project and member counts and owners (backend, same); access review ("Why they reach it" renamed; an inherited admin's project role shown as "Admin (inherited)", per Q12h). The org-member add's project step is its own row, S3-C0m (Q12g) |
+| 0l | Project & requirements feedback | Project settings (Save restriction in the primary tone, DL-377; Modules per Q12c); add-member dialog (focus on the dialog's title, the list not opening on its own; both add paths default to Member, DL-378); requirements page (the selection hints, the toolbar right-aligned to the table, the title-to-table spacing); "Awaiting approval" on the tree per Q12b (DL-376; backend: a field on `RequirementItem`, which has none today); History and Revisions spacing with a rule between entries; the full page's spacing (title vs description); compare revisions per Q12e; Trash per DL-350, its explanation text removed, the nav link replaced by a Trash link in the Requirements header |
+| 0m | Add an org member to projects too | Q12g: the org's add-person form gains an optional last step, a multi-select of the org's projects the actor may add members to, each with a role (Member by default); backend: the add takes the projects, adds each membership through the project service in the same request (each its own audit event; the export-control confirmation where it applies), all or nothing; API and race tests; `wl gen-client`. R2 for this row (DL-379): both org adds take an optional `projects`, the project service doing the add (it calls the org's), each project checked with `project_member.manage`, no new action; the step's list from `GET /api/orgs/{org_id}/member-projects` |
+| 0n | Frontend design skill trial | DL-374, Q12i, DL-380: Impeccable 4.8.0, installed by the owner as a Claude Code plugin at local scope in a scratch clone (`docs/spikes/S3-C0n-impeccable/`: its `setup.py`, the supply-chain findings, the checklist), at full strength (its hook, `PRODUCT.md`, `DESIGN.md`, live mode with a development-only CSP allowance in the clone), telemetry and live mode's copy-edit agent off; it's tried with `vue-screen` on the requirement detail panel, its result compared with the current process; the outcome (keep it, with where it sits in the screen process, or drop it) goes through `design-change`, as the git guard's trial did (DL-316). A spike: no product code beyond the trial screen's changes, which the owner keeps or discards |
+| 1 | Models & migration | `phase`, `workstream`, `task`, `subtask` (schema-doc), one migration; `requirement.workstream_id` (marked Slice 3); `task`'s `(project_id, status, rank)`, `ix_task_assignee_id_status`, `ix_task_reviewer_id_status`; `RestrictionMixin` on `task`; not built: `task.sprint_id`, `milestone_id` (Slice 4), `search_vector` (Slice 6), `task_dependency` (Slice 6, F1); constraint tests; factories |
+| 2 | Task rules & actions | `rules/task_transitions.py` (design-doc §5's table: who may make each transition, `allowed_transitions` computed from it), `rules/branch_name.py` (the lowercase ID plus a title slug, design-doc §6; non-ASCII and length handled), the task types allowed per project type (DL-352), all test-first by `spec-test-writer` and mutation-tested; the `task.*`, `subtask.*`, `phase.*`, `workstream.*` actions in the registry, each marked content or management; their matrix rows (export control included) |
+| 3 | Phases | `GET/POST /api/projects/{key}/phases`, `GET/PATCH/DELETE …/phases/{id}`, `POST …/phases/{id}/move` (rank among the project's phases); hard delete only while no task references it (422 `in_use`); `status`, dates, and baselines logged (`entity_type = phase`); members and up |
+| 4 | Workstreams | `GET/POST /api/projects/{key}/workstreams` (`include_archived`), `GET/PATCH …/workstreams/{id}`, `POST …/move`, `…/archive`, `…/unarchive`; the lead a project member (the project lead's rule); archived hidden from pickers, still shown on items; `workstream_id` on a requirement's `PATCH`, logged, same project |
+| 5 | Tasks: create, read, list | `POST /api/projects/{key}/tasks` (the `TA` number, `todo`, reporter = creator, priority `medium`, rank at the bottom, restriction at creation, requirement/phase/workstream in the same project and visible, title and description limits, DL-143); `GET …/tasks` per Q2 (the ranked view, declared filters, display sorts, the 2,000 cap with `truncated`); `GET …/tasks/{number}` with `allowed_actions` and `allowed_transitions`; the project's allowed task types on the project read (DL-352, `wl gen-client`) |
+| 6 | Tasks: update | `PATCH …/tasks/{number}` (`version`, 409 when stale; every field in design-doc §6; status through `rules/task_transitions.py`, a denied transition 403; assignee and reviewer per DL-347, through one shared person check replacing `_check_reporter`/`_check_approver`'s copies, TD-101; reporter reassignment admins only, as requirements, DL-211; every logged field through `log_change()`, §10); `PUT …/tasks/{number}/restriction` (no `version`, as requirements, DL-162) |
+| 7 | Task order | `POST …/tasks/{number}/move` (`after_id` or `before_id`, optional `status` for a cross-column drop: status and rank in one request, the transition checked first, nothing saved if denied); rank from `rules/rank.py`; the whole project's task order rewritten in one statement on a tie or past the cap, moves one at a time under the tree's project-row lock (DL-345, closing DL-216), with race tests; TD-73 (the tree's rewrite becomes the same one statement) |
+| 8 | Subtasks | `GET/POST …/tasks/{number}/subtasks`, `PATCH/DELETE …/subtasks/{n}`, `POST …/subtasks/{n}/move`; numbers from `task.next_subtask_number` (`allocate_subtask_number`, a direct `UPDATE … RETURNING`, concurrency-tested like `project_counter`); hard delete; members and up; the task read's `subtasks_done` / `subtasks_total` |
+| 9 | Delete, restore & trash | `DELETE …/tasks/{number}` (`task.delete`: reporter as member, or admin, design-doc §5), `POST …/restore` (`task.restore`, as `requirement.restore`); subtasks hidden and restored with the task (§9); `GET /api/projects/{key}/trash` across both tables: `TRASH` becomes a union of deleted requirements and tasks (its `type` filter, declared already, gains `task`), newest first, each row's `allowed_actions`; the requirement delete's linked-tasks choice beside `children` (`tasks=detach\|delete`; delete only when the user could delete each task directly, `can_delete_tasks` on the read; each unlink logged `unlinked`; restore re-links nothing) |
+| 10 | Requirement ↔ task reads | `GET …/requirements/{number}/tasks` (the requirement's tasks, for its page and the approver's review panel, DL-196); the tree items' coverage fields (`task_count`, `tasks_done`, DL-199); the tree's filters per DL-351 |
+| 11 | My work: tasks | `GET /api/me/work/tasks` (assigned to the user, any status but `done`/`cancelled`) and `GET /api/me/work/reviews` (`in_review`, the user reviewer), each also a section of `GET /api/me/work` with its total, on the two indexes; the summary's `due_soon` count (the user's open assigned tasks with `due_date` before today plus 7 days, overdue included, and the overdue part); export-controlled content and archived projects left out (design-doc §11) |
+| 12 | Activity | In the `activity` router: `GET /api/projects/{key}/activity` (cursor-paged, declared filters: entity type, actor, field, date; names resolved server-side, "System" for actorless entries, parents and revisions named as on History, DL-275, DL-276; scoping per Q10); `GET …/tasks/{number}/activity` (the task's History, as the requirement's) |
+| 13 | Server-side pickers | `?q=` search on the people candidates the pickers need: task assignee/reviewer candidates (DL-347), approver candidates for everyone §6.2 allows (TD-96), and the existing pickers' sources (TD-41); the project selector's `?q=` (TD-38); offset-paged, scoped as their lists |
+| 14 | CSV export | `GET …/requirements/export.csv` and `GET …/tasks/export.csv`: the list's filters (the tree's per DL-351) and the visible columns (`columns=`), same scoping and cap as the list, formula-injection escaping, a `Content-Disposition` filename with the project key and date |
+| 15 | Get started & home numbers | The checklist (design-doc §11, DL-201) computed on the project home read (member besides the creator; a dated phase; a requirement and a task); the per-project hide flag (a column, its migration, `PUT/DELETE …/get-started/hidden`, project admins); headline numbers per Q11 |
+| 16 | Filter bar *(provisional)* | The shared `FilterBar` (chips for any number of declared filters, operators per type, `me`, Clear, the URL through `useListQuery`, UI-TBL-2/3), first used on the four people lists with "Show deactivated" moved into it (TD-97, TD-102); a UI-TBL rule |
+| 17 | Searchable pickers *(provisional)* | One searchable person picker on S3-C13's endpoints, replacing the 200-row pickers (TD-41) and the approver picker (TD-96); the project selector's search (TD-38) |
+| 18 | Board widget *(provisional)* | The `TaskBoard` wrapper on SVAR Kanban (DL-64; UI-SVR-1 to 7): pinned packages and their licenses, `svar-theme.css`, accessible name, visible and announced selection, server-decided moves (`api.intercept`), the move menu and status control outside the widget, `e2e/svar-known-issues.ts`; component specs on a fixture; task status, priority, and severity tones (UI guide open item 8) |
+| 19 | Backlog widget *(provisional)* | DL-372: our own wrapper on PrimeVue DataTable's row reorder and virtual scroller (S3-C0i's fixes: the handle column's header named, `datatable.root.borderColor` in the preset, the scroller named as the scroll region, one tab stop in the rows), every move to the server first, the move menu outside the table; its component specs |
+| 20 | Backlog page *(provisional)* | Tasks in the project nav with Board and Backlog tabs (`…/:key/tasks/backlog`); the ranked list per DL-346, the move menu (top, up, down, bottom, after…), manual vs display sort, the filter bar; opening a task in the split pane; the Trash link in the Tasks header (DL-350); Export CSV (S3-C14) |
+| 21 | Board page *(provisional)* | `…/:key/tasks/board`: columns per DL-346, a cross-column drop through S3-C7 (a denial snaps back with its message), the card's status control, the filter bar (assignee, workstream, type, priority) |
+| 22 | Create task *(provisional)* | The create dialog (title, type per DL-352, description with `MarkdownEditor`, priority, requirement, assignee), expandable to `…/:key/tasks/new`, landing on the new task; "Add task" on a requirement (its requirement pre-filled); ERP type labels (`bug` → Defect, design-doc §1.1) |
+| 23 | Task detail *(provisional)* | The task in `ItemPanel` and at `…/:key/tasks/:number` (S3-C0d's header): fields, status menu from `allowed_transitions`, assignee and reviewer, phase and workstream, dates, estimate and time taken, the requirement link or the "No requirement" flag, Copy branch name, restriction |
+| 23a | Edit task *(provisional)* | Edit mode as the requirement's (DL-263): title, description, priority, severity (bugs), type; 409 handling; unsaved-edits prompt (S3-C0d) |
+| 24 | Subtasks & History *(provisional)* | The subtask checklist on the task (add, check off, rename, reorder menu, delete with confirm; "3 of 5 done"); the task's History tab on S3-C12's endpoint, reusing the requirement's |
+| 25 | Requirement ↔ tasks *(provisional)* | The requirement's Tasks section (list, "Add task"); the tree's coverage columns; the approver's review panel gains the tasks and subtasks (DL-196); the delete dialog's linked-tasks choice; tasks in Trash; the end-to-end "deleting a requirement with tasks" |
+| 26 | Requirement tree filters & CSV *(provisional)* | The filter bar on the requirement tree per DL-351 (matches with their ancestors as context, drag and the move menu off while filtered, a polite note saying so), including the "Awaiting approval" filter (Q12b); Export CSV of the matches (S3-C14) |
+| 27 | Timeline & workstreams *(provisional)* | `…/:key/timeline`, the basic Timeline: a dated table of phases (create, edit dates and baselines, status, reorder, delete while unreferenced; DL-199); the Workstreams page (`…/:key/workstreams`, after Timeline in the nav; DL-348); the Get started item "Compile your plan" now live |
+| 28 | Activity page *(provisional)* | `…/:key/activity`: the feed with the filter bar over a cursor feed (UI-TBL-9), plain-language entries as on History |
+| 29 | My work: tasks and summary *(provisional)* | The summary tiles at the top (DL-349): Approvals waiting, Assigned to you, Waiting for your review, Overdue or due this week, each a link to its section with its full text ("2 approvals waiting"), never color alone, a zero shown as such; the two task sections below Approvals, each opening the task; "see all" for every section (TD-37); design-doc §11 and the user guide updated |
+| 30 | Project home *(provisional)* | The Get started checklist (ticks, links, hide); the current phase (screen inventory, "Project home"); the headline numbers per Q11; the status control per Q12f |
+| 31 | Item-ID auto-links *(provisional)* | `{KEY}-RQ-n`, `{KEY}-TA-n(.m)` (and `TC` from Slice 5) linked in `MarkdownView` (DL-144), routed by key; never inside code spans or existing links; XSS-corpus cases added |
+| 32 | Saved filters *(nice-to-have; last feature row; the web half provisional)* | Backend: the `saved_filter` table (Q8: per list, per project; `UNIQUE(user_id, project_id, list, name)`), its migration and constraint tests; `GET/POST /api/me/saved-filters`, `PATCH/DELETE …/{id}` (the user's own only); a saved query validated against its list's spec when applied, not when saved. Web: the filter bar's saved-filter menu (save, apply, rename, delete) and Account settings' Saved filters section; saved filters only on project lists (the menu isn't shown on the org and workspace people lists). If the slice runs long, it moves to a later slice through `design-change` rather than being split |
+| 33 | Slice verification | As S2-C22, with the `checkpoint` skill's slice-end reviewers (`fresh-clone-verifier`, `user-guide-verifier` in both parts, DL-336, `docs-consistency`, `repo-auditor`, then `simplicity-auditor`); `wl docs-screenshots` (DL-343); "Done when" walked through; the owner's manual pass on the DL-320 sheet; the tech-debt review (TD-19, TD-31, TD-42, TD-64, TD-68, TD-86, TD-100); every `S2-ui-feedback.md` item done or logged; the retro |
 
-**The rest of the owner's Slice 2 UI feedback** (`docs/reviews/s2/S2-ui-feedback.md`): the
-items the handoff doesn't cover get a row each in the slice's planning, or a tech-debt entry, and
-each item is marked with its row, as Slice 2 did with Slice 1's (DL-137, DL-158).
+**Groups** ("Pull requests"), on `s3` with one PR:
 
-**Groups** ("Pull requests"): on the `s3` branch with one PR. The first is `s3-polish`, 0a–0h;
-the rest come with the slice's planning.
+| Group | Name | Checkpoints |
+|---|---|---|
+| 1 | `s3-polish` | 0a–0n (Slice 2 polish, the retro's changes, the spike, the rest of the feedback) |
+| 2 | `s3-foundations` | 1–4 (models, rules and actions, phases, workstreams) |
+| 3 | `s3-tasks` | 5–10 (tasks, order, subtasks, delete and trash, requirement links) |
+| 4 | `s3-views` | 11–15 (My work, activity, pickers, CSV, project home) |
+| 5 | `s3-web` | 16–33 (saved filters, 32, last) |
+
+**`spec-test-writer`:** S3-C2, S3-C0j (the My work spec tests at 5, DL-368), and each row that adds an action or changes `app/rules/` (S3-C3,
+C4, C7 if the rank rule changes, C12 for `project.view_activity`, C15, C32); each row confirms
+it when it starts.
+**`security-reviewer`:** every row from S3-C1 to S3-C15 (routers, authorization, scoping), S3-C0e (the
+requirement read's `ancestors`), S3-C0f (My work's cross-project read), S3-C0g (rendered
+markdown's docs mode and the CSP's `img-src`), S3-C0j (docs mode's new attributes, DL-363 and DL-366; My work's limit, DL-368; the build's asset inlining, DL-370; the favorites endpoint removed, DL-371), S3-C0k
+and S3-C0l (new backend fields), S3-C0m (membership adds), S3-C31 (rendered markdown), S3-C32 (saved filters' backend),
+and each web row that adds a route. **`ui-reviewer`:** whenever the diff touches `frontend/` (DL-62).
 
 **Slice verification, from Slice 3:** runs `wl docs-screenshots` (DL-343), and
 `user-guide-verifier` in its two parts, the behavior reference followed literally and the guide
 checked against it (DL-336); the owner's manual pass on the sheet DL-320 describes.
+
+The table above is the order of work. The plan's fixes, decisions, conventions, each row's
+actions, threat-model pass, and the owner's answers are in `docs/reviews/s3/S3-plan.md`.
 
 ### Done when
 - [ ] (The polish group) An item opened from a list opens beside it at wide widths, the list
       still usable, resizable by mouse and keyboard; leaving unsaved edits asks first; below
       64rem it's the overlay it was.
 - [ ] Every page but the top-level ones shows its breadcrumb trail, folding under 40rem.
-- [ ] My work lists approvals first, then Favorites, then every project you can open grouped by
-      organization, with hidden projects behind each org's toggle; past decisions are gone.
+- [ ] My work lists Favorites, then each organization's first 5 projects you can open (DL-368), with
+      hidden projects behind each org's toggle, then approvals; past decisions are gone (DL-349).
 - [ ] `/docs` is a landing page and articles for readers, generated screenshots in both themes;
       `docs/behavior-reference.md` holds the exact behavior, and `user-guide-verifier` checks both.
+- [ ] Pages span the width beside the sidebar (DL-360); a form or settings page is one centered
+      column at `--content-narrow`, header included, and a guide article is centered, its text
+      up to 80ch (DL-367).
 - [ ] The eight project pages share `useProjectPage`'s setup; the git guard's trial is decided;
       the manual pass is set up by one command.
 - [ ] Every item in `S2-ui-feedback.md` is done or logged.
-- [ ] (The rest of "Done when" comes with the slice's planning.)
+- [ ] A member creates a task with and without a requirement (the latter flagged), triages it,
+      and orders the backlog by drag and by the move menu; a server-denied move snaps back.
+- [ ] On the board, a drop into another column changes status and rank in one request; a
+      transition the rules deny is refused and the card returns; the status control does the same
+      without a drag.
+- [ ] The transition table holds for assignee, reviewer, both, neither, and project admin.
+- [ ] Subtasks number as `TA-n.m`, never reused after a delete, concurrency-tested.
+- [ ] Deleting a requirement offers detach or delete for its tasks, delete only where allowed;
+      tasks appear in Trash and restore with their subtasks.
+- [ ] Copy branch name gives `wtl-ta-45-sign-in-throttling`.
+- [ ] Phases are created, dated, reordered, and deleted only while unreferenced; workstreams
+      archived and unarchived; date, status, and workstream changes are logged.
+- [ ] My work shows the summary tiles, Favorites, each organization's first 5 projects, then
+      approvals, tasks assigned to me, and tasks waiting for my review, with "see all".
+- [ ] The project activity feed shows every logged change with filters (scoped by the
+      export-control gate like all content; export control itself is on hold, Q10).
+- [ ] Every list has the filter bar (the requirement tree showing matches with their
+      ancestors); CSV export holds the list's rows as filtered (a filtered tree's matches, without
+      their context ancestors) and escapes formula cells.
+- [ ] A saved filter reapplies (S3-C32, unless moved to a later slice).
+- [ ] A new project's home shows the Get started checklist to its admins, ticking itself.
+- [ ] Item IDs in markdown link to their items.
+- [ ] Accessibility: axe passes in component and end-to-end tests (SVAR's known issues listed,
+      not hidden); the manual pass finds no unresolved problem.
+- [ ] CI is green.
 
 ## Later slices — placements decided so far
 
 Journey decisions (Oct 6–7, 2026) placed in the slice that builds their feature. These are
 notes for each slice's planning, not plans.
 
-- **Slice 3** (DL-262, DL-321): a task opens in the shared item panel, a split pane from S3-C0d.
-- **Slice 3:** "copy branch name" on tasks (design-doc §6, Task); My work's task sections:
-  tasks assigned to the user and tasks awaiting their review, with `ix_task_assignee_id_status`
-  and `ix_task_reviewer_id_status` (schema-doc, `task`).
-- **Slice 3** (DL-216): decide which items a task rank rewrite (the tie and cap rewrites,
-  DL-204, DL-213) covers (a board column, a sprint section, or the project's whole task order),
-  and whether task moves run one at a time (DL-214's lock).
-- **Slice 3** (DL-155): the project activity feed's API and page, with the filter bar (DL-147),
-  an actorless entry's actor shown as "System" (DL-275), and a parent and an approved revision
-  named as on History (DL-276);
-  item IDs (`WTL-RQ-12`) auto-linked in rendered markdown, once there are tasks to link (DL-144).
-- **Slice 3** (DL-239): saved filters (design-doc §11, "Lists"; their table designed with them);
-  CSV export of the requirement and task lists; the project home's Get started checklist, with
-  its per-project hide flag (design-doc §11, DL-201).
-- **Slice 3** (DL-199): a basic Timeline page holding phases; the requirement tree's task
-  coverage columns (task count and progress); the approver's review panel gains the item's tasks
-  and subtasks (DL-196). **Slice 5:** its test coverage columns (test-case
-  count, latest result).
+- **Slice 4** (DL-346): the backlog narrows to tasks without a sprint, beside its sprint
+  sections (design-doc §6, "Manual ordering").
 - **Slice 4** (DL-199): the Sprints page and a completed sprint's summary (from `activity_log`);
   hard-deleting a planned sprint (its tasks back to the backlog); the Timeline's milestones and
   slippage; releases as a milestone filter on lists and the board, with a progress bar on each
@@ -1787,6 +1887,10 @@ notes for each slice's planning, not plans.
   My work's test-case section, with `ix_test_result_assignee_id_status` (schema-doc,
   `test_result`).
 - **Slice 5** (DL-239): CSV export of the test-case and test-result lists.
+- **Slice 5** (DL-199): the requirement tree's test coverage columns (test-case count, latest
+  result).
+- **Slice 5** (DL-350): the Test cases page gets the Trash link in its header.
+- **Slice 6** (`docs/reviews/s3/S3-plan.md`, F1): builds `task_dependency` (schema-doc).
 - **Slice 6:** sending a task back from review prompts for an optional comment (design-doc §5,
   "Targeted rules — Task status transitions").
 - **Slice 6** (DL-197): comment edit and delete by their authors, with the "edited" marker

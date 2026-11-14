@@ -76,7 +76,9 @@ failing) if the pre-commit hooks aren't installed.
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
 docs/           design, schema, build plan, testing strategy, screen inventory, UI design
-                guide (ui-design-guide.md, with reference copies in ui/), these guides,
+                guide (ui-design-guide.md, with reference copies in ui/), this guide, the
+                behavior reference, the reader's guide (user-guide/: a page per topic,
+                images/),
                 tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
                 design-changes/: one per design change), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
@@ -110,6 +112,7 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
 | `wl check` | The gate before every commit (DL-99): lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates — backend, then frontend, then CLI — and mutation testing when anything it depends on changed since its last green run (the backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`; the hash is kept in `backend/mutants/inputs.sha256`), saying so when it skips it. `--full` is everything CI runs: mutation testing whatever changed, then `wl audit`, then `wl e2e` |
 | `wl e2e [args]` | The Playwright end-to-end tests on their own stack: the Compose project `waterline-e2e` (`docker-compose.e2e.yml`: no published database or API port, the web server on `127.0.0.1:5174`, `DEMO_SEED_ENABLED=true`), cleared of anything an earlier run left, built, seeded with `seed --demo`, tested in the `light` and `dark` projects, and always torn down with its volume. Runs beside the dev stack, but only one `wl e2e` at a time: a second run shares the project, and its first step clears the first run's stack. Extra args go to `playwright test` (e.g. `wl e2e sign-in --project light`) |
+| `wl docs-screenshots` | Regenerate the guide's screenshots (DL-343): the `wl e2e` stack, seeded with `seed --manual-pass` (DL-361), then Playwright through `playwright.screenshots.config.ts`, which saves each shot in `frontend/e2e/screenshots/guide.shot.ts` as light and dark WebP (1440 by 900) in `docs/user-guide/images/`, and always tears the stack down. Run it at slice verification and whenever a UI change affects a shot; a shot removed from the list leaves its files, which `guide.spec.ts` refuses as unused once no page shows them |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
 | `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
@@ -135,6 +138,7 @@ container from the api service's image: `docker compose run --rm api ...`, after
 |---|---|
 | `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
 | `wl seed --demo` | Build the demo dataset instead, workspace and system admin included ("Demo data" in section 5): refused once a workspace exists, and unless `DEMO_SEED_ENABLED=true` (the `.env.example` default; off otherwise, and never on in production, since every demo account has the same public password). Takes no other values |
+| `wl seed --manual-pass` | The demo dataset plus every state the slice's manual pass needs ("Demo data" in section 5), refused as `--demo` is. Not for `wl e2e`, whose tests count what `--demo` builds; `wl docs-screenshots` seeds its own run of that stack with it (DL-361) |
 | `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
 | `wl admin revoke-system-admin <email>` | Take it away, handing over their undecided approvals where the flag was their only access (logged with no actor); refused for the last active system admin |
 
@@ -476,7 +480,7 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 | `migrate` | `alembic upgrade head` once, then exits | — |
 | `api` | uvicorn with `--reload`, `backend/` mounted | `API_PORT` (8000) |
 | `worker` | the procrastinate worker, `backend/` mounted | — |
-| `web` | the Vite dev server, `frontend/` mounted, and `docs/user-guide.md` read-only for the Documentation page (DL-308); proxies `/api` to `api` | `WEB_PORT` (5173) |
+| `web` | the Vite dev server, `frontend/` mounted, and `docs/user-guide/` read-only for the Documentation pages (DL-308, DL-335); proxies `/api` to `api` | `WEB_PORT` (5173) |
 
 - `api`, `worker`, and `migrate` share the backend image; `migrate` runs first, and `api` and
   `worker` start only once it has succeeded (the worker can't run without procrastinate's
@@ -527,6 +531,21 @@ permission its endpoint checks, so a step the app would refuse fails the seed.
 | `dev`, `hana`, `kira`, `quinn` | Viewers of `ERP`, `PORTAL`, `INV`, `FIN` |
 | `fiona`, `felix` | Members of `ERP` who must change their password at sign-in (one per theme run of the end-to-end flow) |
 | `nora` | No memberships: the no-access page |
+
+**For the manual pass**, `uv run wl seed --manual-pass` (instead of `--demo`, on an empty
+database) builds the same data plus every state the slice's manual keyboard and screen-reader
+pass needs (DL-320), each step again by the person who would take it:
+
+| State | Where |
+|---|---|
+| Eleven projects in one org | `acme` gains `CRM`, `WMS`, `HRS`, `BIR`, `EDI`, `MOB`, `SRV` (lead `lena`, member `sam`) and `RADAR`: sign in as `olivia` (the owner) to see all eleven, or `sam` for nine |
+| An export-controlled project | `RADAR` (lead `liam`, member `ben`) |
+| Nested requirements | `PORTAL`'s `RQ-1` › `RQ-2` › `RQ-3`, reported by `finn` |
+| Headings, a list, and a long URL in a description, three revisions | `RQ-2`, Sign-in |
+| Approval requests: pending, approved, "Approved · modified" | `RQ-4`, `RQ-5`, `RQ-6`, asked by `lena`, approver `ella` (sign in as `ella` for one waiting) |
+| Trash items | `RQ-7` deleted alone by `finn`; `RQ-8` with its child `RQ-9` by `lena` |
+| A deactivated member | `hana` (a viewer of `PORTAL`), deactivated by `wendy` |
+| A second session | `admin` has one from Firefox on Windows, beside the one you sign in with; it ends after 7 idle days, so seed shortly before the pass |
 
 ### Local Postgres
 
@@ -819,7 +838,8 @@ frontend/src/
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
                      Pagination, SuccessStatus, PageHeader, ModalDialog, ItemPanel,
-                     ConfirmDialog, GroupError, RowActions, Icon, NameSlugSettings,
+                     ConfirmDialog, GroupError, RowActions, MoreActionsMenu, Icon,
+                     NameSlugSettings,
                      CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9)
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
                      useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
@@ -837,7 +857,8 @@ frontend/src/
                      person, change role, and remove dialogs); plus status/ and errors/ (404,
                      403, no access)
   test/              helpers for the specs: a11y.ts, api.ts (typed responses), projects.ts,
-                     overlay.ts (`stubResizeObserver`, `stubDialog`), router.ts, workspace.ts
+                     overlay.ts (`stubResizeObserver`, `stubDialog`, `stubWidth`), router.ts,
+                     workspace.ts
                      (`mountWorkspaceView`, `mountSignedIn`), org.ts (`mountOrgView`,
                      `mountOrgPages`)
 frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
@@ -939,11 +960,35 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   hides an action the user may never take; the server still checks.
 - **Markdown** (UI-MD-1, UI-MD-2): show stored markdown only with `<MarkdownView :source>`,
   the one place `v-html` is allowed (markdown-it with raw HTML off, then DOMPurify; links only
-  `http`, `https`, and `mailto`; images as links; headings one level down, except `/docs`'s bundled
-  guide at level 0 with opt-in `docs-` heading ids, DL-310, DL-311; `- [ ]` task lists as
-  marks drawn in tokens, named "Done" or "Not done"). Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
+  `http`, `https`, and `mailto`; images as links; headings one level down; `- [ ]` task lists as
+  marks drawn in tokens, named "Done" or "Not done"). A guide page's body renders at level 0 in
+  docs mode (`docs`, `images`; DL-341), never stored content. Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
   and Preview tabs; `focus()` returns to Write). A new XSS vector goes in
   `MarkdownView.xss-corpus.ts`, which its spec runs through the renderer.
+- **The guide** (DL-335 to DL-342): a page is `docs/user-guide/<slug>.md` (the slug is its
+  address, `/docs/<slug>`), starting with front matter:
+
+  ```
+  ---
+  title: Trash
+  group: Using Waterline
+  order: 6
+  description: Delete a requirement, and bring a deleted one back.
+  ---
+  ```
+
+  `group` is one of Get started, Using Waterline, Administration, or Reference
+  (`views/docs/guide.ts`'s `GROUPS`); `order` places it in its group; `description` is its card's
+  line and its lead. The body starts at `##`: one section per task, named for it. In the body,
+  `> [!TIP]`, `> [!NOTE]`, and `> [!WARNING]` are callouts, `++Esc++` a key, `[Trash](/docs/trash)`
+  a link to another page (or `/docs/trash#restore-a-requirement`, a section: its words in
+  lowercase, joined by hyphens), and `![What it shows](images/<file>)` an image from
+  `docs/user-guide/images/`: a screenshot `wl docs-screenshots` takes, named in
+  `frontend/e2e/screenshots/guide.shot.ts` (add a shot there: a name, a demo user, a path), with
+  alt text saying what it shows. Leave out route paths, exact messages, and numeric limits: those
+  belong in `docs/behavior-reference.md`, which changes with every behavior change, while the
+  guide changes only when what a user does or sees changes. `guide.spec.ts` checks every page's
+  front matter, headings, links, and images (each in light and dark, and none unused).
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
   menu button with a popover of links that the org menu and project selector share; opening
   it moves focus inside (the popover sits at the end of `<body>`, out of the Tab order). A spec
@@ -952,19 +997,42 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   fire), waits a tick after mounting before opening it, and unmounts its wrappers
   (`enableAutoUnmount(afterEach)`) before the body is cleared.
 - **Dialogs:** `ModalDialog` is the native `<dialog>` (UI-FRM-14): `open()` puts focus on the
-  element marked `data-autofocus` (a confirmation's Cancel) or the first field, and closing
+  element marked `data-autofocus` (a confirmation's Cancel) or the first field (its title with
+  `startOnTitle`, for a first field that opens a list on focus, DL-378), and closing
   returns focus to whatever had it, or to `fallbackFocus` when that's gone (a removed row).
   `RowActions` puts focus back on its own button before an action runs, so a dialog it opens
-  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A form
+  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A
+  confirmation whose action moves focus itself (a navigation) passes `navigates`, so it doesn't
+  return focus to its opener a task later (`ConfirmDialog`). A form
   alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
   before repeating the action (UI-FRM-7).
-- **Side panels** (UI-SHL-11): `ItemPanel` is `ModalDialog` with `panel` (docked at the right,
-  opening on its title), Open full page, Copy link, and Close. The list page owns it from its URL
-  (`?open=RQ-7`): it opens the panel when the query names an item and closes it when the query
-  goes; the panel's `close` (Esc, Close) goes Back when the entry before is the list without it,
-  else replaces the URL. The item's view is shared with its full page (`RequirementDetail`, with
-  `inPanel`), and tells the list what it shows (`changed`), so the list updates its row in place
-  (`RequirementsTree`'s `update()`; the tree's data is a shallow ref).
+- **Breadcrumbs** (UI-SHL-14, DL-327): `Breadcrumbs` takes `crumbs` (`{ label, to?, mono?, icon? }`,
+  the last the page itself); `PageHeader` and `RosterPage` take `crumbs`, `ProjectHeader` takes
+  `trail` (the crumbs after the project's). A project page's trail starts from `projectCrumbs`
+  (`@/app/crumbs`, with `orgCrumb` and `WORKSPACE_CRUMB`). The fold under 40rem is CSS
+  (`sm:hidden` on the "…", `max-sm:hidden` on the middle crumbs), so jsdom shows both; its menu
+  mounts on first use. A spec's own router needs the routes the crumbs link to, or the crumb's
+  `RouterLink` throws: wrap its routes in `withTrailRoutes` (`@/test/router`), which adds a
+  placeholder for each one it leaves out; `trail()` (`@/test/trail`) reads the trail back as its
+  links and current crumb. A crumb the viewer may never open is left out (DL-358).
+- **Side panels** (UI-SHL-11, DL-321 to DL-326, DL-355, DL-356): `ItemPanel` holds its own `<aside>` (the
+  split pane at 64rem and wider, named by `label`, with the resizing separator) and `<dialog>`
+  (the overlay below), and one teleport that moves the content, its `meta` slot (ID and status)
+  and default slot (the item) under its header, between them. The list page owns it from its URL
+  (`?open=RQ-7`): it calls `open()` when the query names an item, `swapped()` when it names
+  another, and `close()` when it goes. Close and Esc only emit `dismiss`, and the page changes
+  the URL (Back when the entry before is the list without it, else a replace); `closed` comes
+  once it has closed. So every way out goes through the page's `onBeforeRouteUpdate` and
+  `onBeforeRouteLeave`, which ask **Discard your changes?** (`ConfirmDialog` with `navigates`)
+  while the item's `dirty` is true. The item's view is shared with its full page
+  (`RequirementDetail`, with `inPanel`; its ⋯ menu is `MoreActionsMenu`, its fields in the forms
+  `RequirementFields`), and tells the list what it shows (`changed`), so the list updates its row
+  in place (`RequirementsTree`'s `update()`; the tree's data is a shallow ref) and marks the open
+  row (`openNumber`). Specs set the width with `stubWidth(wide)` (`@/test/overlay`; jsdom has no
+  `matchMedia`), whose `resize()` crosses the breakpoint. The `<aside>` is teleported to
+  `AppLayout`'s column after `main` (`#side-pane`, provided as `sidePane`; in place when mounted
+  without the layout), so it runs from under the header to the window's foot and the whole page
+  narrows beside it (DL-356); `main` has no width cap on any page (DL-360).
 - **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
   only the latest answer, and gives the message for a polite live region under the field; `skip`
   leaves out a value that needs no check (the person's own username).
@@ -981,7 +1049,9 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
   page's primary actions (UI-SHL-8; the auth card's pages use a plain, smaller `h1`, and `/docs`
   the guide's own): navigation sets the title
-  to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
+  to `<short title> · Waterline` (the `h1`'s `data-tab-title`, through `PageHeader`'s `tabTitle` or
+  `ProjectHeader`'s `page`, else its text; UI-SHL-9) and moves focus to it. A form page caps its
+  form at `--content-narrow` itself: `main` has no cap (UI-SHL-7). A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
   `src/views/project/ProjectHomeView.vue`); a reload after a user's action that replaces the page
   (now the not-found or 403 page) calls `replacedPage()` instead, which focuses the new `h1` on a
@@ -1274,7 +1344,8 @@ its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when t
   a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
   `frontend/e2e/` (read-only: accessibility and frontend conventions against
   `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`,
-  `user-guide-verifier` (the user guide followed in a browser, DL-124), `docs-consistency`, and
+  `user-guide-verifier` (the behavior reference followed in a browser and the guide checked
+  against it, DL-124, DL-336), `docs-consistency`, and
   `repo-auditor` (a whole-repository audit for bugs, security, scale, untested risk, and
   slowness, which runs no tests, DL-41; waste is `simplicity-auditor`'s alone, DL-318), then
   `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored

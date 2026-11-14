@@ -7,14 +7,14 @@ import { stubDialog } from '@/test/overlay'
 
 import ModalDialog from './ModalDialog.vue'
 
-/** A page with a button that opens a dialog holding `content`; `panel`, as a side panel. */
-function mountPage(content: string, fallbackFocus?: () => void, panel = false) {
+/** A page with a button that opens a dialog holding `content`. */
+function mountPage(content: string, fallbackFocus?: () => void) {
   const Page = defineComponent({
     components: { ModalDialog },
-    setup: () => ({ dialog: ref<InstanceType<typeof ModalDialog>>(), fallbackFocus, panel }),
+    setup: () => ({ dialog: ref<InstanceType<typeof ModalDialog>>(), fallbackFocus }),
     template: `
       <button id="opener" type="button" @click="dialog.open()">Open</button>
-      <ModalDialog ref="dialog" title="Remove Jane?" :fallback-focus="fallbackFocus" :panel="panel">
+      <ModalDialog ref="dialog" title="Remove Jane?" :fallback-focus="fallbackFocus">
         ${content}
       </ModalDialog>`,
   })
@@ -44,6 +44,22 @@ describe('ModalDialog', () => {
     expect(document.getElementById(dialog.attributes('aria-labelledby')!)?.textContent).toBe(
       'Remove Jane?',
     )
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('starts on its title instead with startOnTitle, a field before it no matter', async () => {
+    const wrapper = mount(ModalDialog, {
+      props: { title: 'Add a member', startOnTitle: true },
+      slots: { default: '<input id="f" aria-label="Field" data-autofocus />' },
+      attachTo: document.body,
+    })
+
+    await wrapper.vm.open()
+    await flushPromises()
+
+    const title = wrapper.get('h2').element
+    expect(document.activeElement).toBe(title)
+    expect(title.getAttribute('tabindex')).toBe('-1')
     await expectNoA11yViolations(wrapper)
   })
 
@@ -129,19 +145,9 @@ describe('ModalDialog', () => {
     expect(document.activeElement?.id).toBe('opener')
   })
 
-  it('as a side panel, opens on its title, as a page on its h1 (UI-SHL-11)', async () => {
-    const wrapper = mountPage('<input id="f" aria-label="Field" />', undefined, true)
-
-    await openFrom(wrapper)
-
-    expect(document.activeElement?.tagName).toBe('H2')
-    expect(document.activeElement?.textContent).toBe('Remove Jane?')
-    await expectNoA11yViolations(wrapper)
-  })
-
-  it('opened with nothing focused (a panel opened by its URL), sends focus to the fallback', async () => {
+  it('opened with nothing focused, sends focus to the fallback on close', async () => {
     const fallback = vi.fn()
-    const wrapper = mountPage('<button type="button">Go</button>', fallback, true)
+    const wrapper = mountPage('<button type="button">Go</button>', fallback)
     const dialog = wrapper.findComponent(ModalDialog)
     ;(document.activeElement as HTMLElement | null)?.blur()
     await dialog.vm.open()

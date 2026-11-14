@@ -29,6 +29,7 @@ Full setup, commands, and conventions: [docs/developer-guide.md](docs/developer-
 | [build-plan.md](docs/build-plan.md) | Slices, checkpoints, architecture |
 | [testing-strategy.md](docs/testing-strategy.md) | Test layers and gates |
 | [developer-guide.md](docs/developer-guide.md) | Setup, commands, how-tos |
-| [user-guide.md](docs/user-guide.md) | Using the app |
+| [user-guide/](docs/user-guide/) | Using the app: the guide shown in the app's Documentation |
+| [behavior-reference.md](docs/behavior-reference.md) | Everything the app does, screen by screen |
 | [tech-debt.md](docs/tech-debt.md) | Known shortcuts and when they get fixed |
 | [reviews/](docs/reviews/) | Review records: `s<n>/` per slice, `design-changes/` for design-change tooling reviews |

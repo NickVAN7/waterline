@@ -5,7 +5,7 @@ import { signIn } from './support/demo'
 import { expectOnlyTokenColors } from './support/theme'
 
 // Requesting and deciding an approval (build plan Slice 2, "End-to-end tests"; S2-C20, S2-C20a,
-// S2-C20b: the approver finds it on My work, and it's in their past decisions after).
+// S2-C20b: the approver finds it on My work, and it leaves once decided).
 // In Globex's INV, which no other test's requirements use (the tree tests count ERP's and PORTAL's,
 // DL-87): its admin requests, and each theme run's own approver decides on its own requirement,
 // a viewer in one (a viewer may be an approver, design-doc §6.2).
@@ -85,13 +85,10 @@ test('an admin requests approval, and the approver reviews and decides', async (
   await expect(section).toContainText('Matches the card rules.')
   await expect(section.getByRole('button', { name: 'Approve' })).toHaveCount(0)
 
-  // My work: no longer waiting, now a past decision (DL-286).
+  // My work: no longer waiting; the decision stays on the requirement (past decisions left My
+  // work, DL-333).
   await page.getByRole('link', { name: 'My work' }).first().click()
-  const past = page.getByRole('region', { name: 'My past decisions' }).locator('li', {
-    has: page.locator(`a[href="${url}"]`),
-  })
-  await expect(past).toContainText('Your decision: Approved')
-  await expect(past).toContainText('Your comment: Matches the card rules.')
+  await expect(page.getByRole('heading', { level: 1, name: 'My work' })).toBeVisible()
   await expect(waiting.locator(`a[href="${url}"]`)).toHaveCount(0)
   await expectNoA11yViolations(page)
 })

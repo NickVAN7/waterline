@@ -1,16 +1,16 @@
 """`project` and `project_membership` (design-doc §1.1, §3)."""
 
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, Select, delete, exists, or_, select
+from sqlalchemy import ColumnElement, Row, Select, case, delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from app.authz.scoping import Scope
-from app.enums import OrgRole, ProjectRole, RestrictionCategory, WorkspaceRole
+from app.enums import OrgRole, ProjectRole, ProjectStatus, RestrictionCategory, WorkspaceRole
 from app.models.org import Membership, Organization
 from app.models.project import Project, ProjectFavorite, ProjectMembership
 from app.models.user import User
@@ -90,14 +90,53 @@ class ProjectRepository:
             select(Project)
             .join(Organization, Project.organization_id == Organization.id)
             .options(contains_eager(Project.organization), selectinload(Project.lead))
-            .where(
-                scope_clause(
-                    scope,
-                    Project.id,
-                    Project.workspace_id,
-                    Project.organization_id,
-                    export_controlled=export_controlled(),
+            .where(in_scope(scope))
+        )
+
+    async def ranked_by_org(
+        self, scope: Scope, first: int
+    ) -> Sequence[Row[uuid.UUID, bool, int, int]]:
+        """For My work's organization sections (DL-359): the first `first` projects in `scope` of
+        each org's open ones (Active, Planning, On hold, each by name) and of its hidden ones
+        (Completed, Cancelled, each by name, then the archived by name; `MY_WORK_ORDER`), as
+        `(id, hidden)`, with each group's count (`group_total`) and the org's projects that aren't
+        archived (`listed_total`). One query, however many orgs."""
+        archived = _ARCHIVED
+        hidden = or_(archived, Project.status.not_in(OPEN_STATUSES)).label("hidden")
+        group = (Project.organization_id, hidden)
+        ranked = (
+            select(
+                Project.id,
+                hidden,
+                func.row_number()
+                .over(
+                    partition_by=group,
+                    order_by=MY_WORK_ORDER,
                 )
+                .label("rank"),
+                func.count().over(partition_by=group).label("group_total"),
+                func.count(case((~archived, 1)))
+                .over(partition_by=Project.organization_id)
+                .label("listed_total"),
+            )
+            .where(in_scope(scope))
+            .subquery()
+        )
+        rows = await self.session.execute(
+            select(ranked.c.id, ranked.c.hidden, ranked.c.group_total, ranked.c.listed_total).where(
+                ranked.c.rank <= first
+            )
+        )
+        return rows.all()
+
+    async def in_my_work_order(self, scope: Scope, ids: Collection[uuid.UUID]) -> list[Project]:
+        """These projects of `scope`, each org and lead loaded, by org name, then in My work's
+        order (`MY_WORK_ORDER`, as `ranked_by_org` picked them)."""
+        return list(
+            await self.session.scalars(
+                self.visible(scope)
+                .where(Project.id.in_(ids))
+                .order_by(Organization.name, Organization.id, *MY_WORK_ORDER)
             )
         )
 
@@ -200,6 +239,23 @@ class ProjectRepository:
         )
         return select(User).where(User.is_active, or_(User.id.in_(org_members), User.id.in_(staff)))
 
+    async def in_org(self, organization_id: uuid.UUID, ids: Collection[uuid.UUID]) -> list[Project]:
+        """Those of the projects that are the org's, in one query (an org add's projects,
+        DL-379)."""
+        return list(
+            await self.session.scalars(
+                select(Project).where(
+                    Project.organization_id == organization_id, Project.id.in_(ids)
+                )
+            )
+        )
+
+    def live_in_org(self, organization_id: uuid.UUID) -> Select[Project]:
+        """The org's projects that aren't archived (an org add's projects step, DL-379)."""
+        return select(Project).where(
+            Project.organization_id == organization_id, Project.archived_at.is_(None)
+        )
+
     def candidates(self, project: Project) -> Select[User]:
         """The members picker: the same people for the project's org, less those already on it."""
         on_project = select(ProjectMembership.user_id).where(
@@ -286,6 +342,31 @@ def _in(organization_id: uuid.UUID | None, workspace_id: uuid.UUID | None) -> Co
     if organization_id is not None:
         return Project.organization_id == organization_id
     return Project.workspace_id == workspace_id
+
+
+# My work's open projects, in their order there, then the hidden statuses (DL-330).
+OPEN_STATUSES = (ProjectStatus.ACTIVE, ProjectStatus.PLANNING, ProjectStatus.ON_HOLD)
+_STATUS_ORDER = case(
+    {status: index for index, status in enumerate((*OPEN_STATUSES, ProjectStatus.COMPLETED))},
+    value=Project.status,
+    else_=len(OPEN_STATUSES) + 1,
+)
+_ARCHIVED = Project.archived_at.is_not(None)
+# My work's order within an org's open or hidden projects (DL-330, DL-359): by status, then name;
+# the archived last, by name alone. One definition, for the ranking that picks the first ones and
+# the query that shows them.
+MY_WORK_ORDER = (_ARCHIVED, case((_ARCHIVED, 0), else_=_STATUS_ORDER), Project.name, Project.id)
+
+
+def in_scope(scope: Scope) -> ColumnElement[bool]:
+    """The projects in `scope`: `visible`'s filter."""
+    return scope_clause(
+        scope,
+        Project.id,
+        Project.workspace_id,
+        Project.organization_id,
+        export_controlled=export_controlled(),
+    )
 
 
 def export_controlled() -> ColumnElement[bool]:

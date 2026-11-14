@@ -1,7 +1,5 @@
-<script setup lang="ts">
+<script lang="ts">
 // Inline SVG icons (UI-STY-4): decorative unless given a label, in which case the icon is named.
-import { computed } from 'vue'
-
 export type IconName =
   | 'alert'
   | 'info'
@@ -19,11 +17,15 @@ export type IconName =
   | 'sign-out'
   | 'pause'
   | 'star'
+  | 'external'
+  | 'link'
+  | 'panel'
+  | 'building'
+  | 'chevron-right'
+  | 'search'
 
-// `filled`: drawn solid, for a control's on state (a starred project, DL-305).
-const props = defineProps<{ name: IconName; label?: string; filled?: boolean }>()
-
-const PATHS: Record<IconName, string[]> = {
+// Exported for MarkdownView's callouts, which draw an icon inside rendered HTML (DL-341).
+export const PATHS: Record<IconName, string[]> = {
   alert: ['M12 8v5', 'M12 16.5v.01', 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0'],
   info: ['M12 11v5', 'M12 7.5v.01', 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0'],
   warning: [
@@ -48,12 +50,28 @@ const PATHS: Record<IconName, string[]> = {
   menu: ['M4 6h16', 'M4 12h16', 'M4 18h16'],
   home: ['M4 11l8-7 8 7', 'M6 9.5V20h12V9.5'],
   more: ['M5 12h.01', 'M12 12h.01', 'M19 12h.01'],
+  external: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'],
+  link: [
+    'M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1',
+    'M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1',
+  ],
+  panel: ['M4 5h16v14H4z', 'M14 5v14'],
+  building: ['M4 20h16', 'M6 20V4h9v16', 'M15 9h3v11', 'M9 8h3', 'M9 12h3', 'M9 16h3'],
+  'chevron-right': ['M9 6l6 6-6 6'],
+  search: ['M4 10a6 6 0 1 0 12 0a6 6 0 1 0 -12 0', 'M20 20l-5.6-5.6'],
   'sign-out': [
     'M14 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2',
     'M9 12h12',
     'M18 9l3 3-3 3',
   ],
 }
+</script>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+
+// `filled`: drawn solid, for a control's on state (a starred project, DL-305).
+const props = defineProps<{ name: IconName; label?: string; filled?: boolean }>()
 
 const paths = computed(() => PATHS[props.name])
 </script>

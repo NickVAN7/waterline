@@ -43,7 +43,16 @@ Folder purposes only; each file says what it holds (DL-317).
 - **Rendered markdown** goes only through `MarkdownView` (from S2-C16): `markdown-it` with raw
   HTML off, then DOMPurify; never `v-html` on anything else. No remote images, links only
   `http`/`https`/`mailto`; the API carries only the markdown (design-doc §3, DL-140;
-  ui-design-guide UI-MD-1). Markdown is edited only in `MarkdownEditor` (UI-MD-2).
+  ui-design-guide UI-MD-1). Markdown is edited only in `MarkdownEditor` (UI-MD-2). Docs mode
+  (`docs`: callouts, keys, heading ids, own-origin links, bundled images) is for the guide's
+  pages under `docs/user-guide/` only, never stored content (DL-341). Markup a docs-mode rule
+  makes (a callout's icon) has its attributes checked after sanitizing: DOMPurify tests every
+  attribute value against the URL pattern, so an svg's `viewBox`, size, and paths are dropped
+  unless listed in `ADD_URI_SAFE_ATTR` (owner, after S3-C0g).
+- **The guide** (`docs/user-guide/*.md`, loaded by `views/docs/guide.ts`) changes only when what
+  a user does or sees changes; every behavior change goes in `docs/behavior-reference.md`
+  (DL-335). `guide.spec.ts` fails on a page without its front matter, with a `#` heading, or with
+  a link to a page or section that doesn't exist.
 - **Routes:** add new routes above the catch-all not-found route in `src/app/router.ts`; it
   must stay last. An org page (`/:orgSlug/…`) finds its org with `useRouteOrg`, which follows a
   slug change to the new URL; a null org is the not-found page.
@@ -70,6 +79,22 @@ Folder purposes only; each file says what it holds (DL-317).
 
 Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently:
 
+- A form on a page sets `max-w-(--content-narrow)` on itself (or a wrapper it shares): `main`
+  has no width cap, so an uncapped form's fields span the screen (UI-SHL-7, DL-360; S3-C0h
+  review). Dialogs, the auth card, and the side panel's overlay cap themselves with the same token.
+- A click handler that routes a container's links in the app (the guide article's `follow`)
+  leaves to the browser a link with a `target` and a modified or middle click: routing it opens
+  the URL as an app page, a 404 (owner, S3-C0j). Its spec and e2e click such a link.
+- A table's scroll region (`role="region"`, `overflow-x-auto`) is also `relative`: a visually
+  hidden label inside is absolutely positioned, and escapes a static scroll container, widening
+  the page at 320 px (UI-SHL-7; S3-C0k review). A table with a fixed layout sets a minimum width
+  (`min-w-(--content-narrow)`), so below it the region scrolls instead of the columns crushing,
+  and a column that holds a badge or a button gets a `rem` width that fits it, never a fraction.
+- A sidebar section's visible caption names its landmark (`aria-labelledby`), or is
+  `aria-hidden` when the landmark or its control already says it: never a caption and a
+  matching `aria-label`, read twice (UI-SHL-5; S3-C0j review).
+- A style that only a class turns on (a callout's tone) is checked in an e2e by its computed value
+  against the token: a spec of the class passes with the style missing (owner, S3-C0j).
 - Tokens only: colors, type sizes, radii, and sizes come from `src/app/styles/tokens.css`,
   through Tailwind utilities or `var(--…)`. No hex, `rgb()`, or `px` literals (`0` and 1 px
   borders are fine), and no Tailwind arbitrary values like `p-[13px]` (UI-STY-1). Spacing is Tailwind's built-in scale.
@@ -191,6 +216,24 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   layer, `@keydown.esc.prevent`), and so is an in-place edit form's (`RequirementDetail`):
   PrimeVue doesn't cancel it, and an uncancelled Escape also closes the dialog. The e2e presses
   Esc in the open popup and expects the dialog to stay (S2-C18b review).
+- A container that handles Esc for itself (the split pane, `ItemPanel`) ignores an Esc from a
+  `<dialog>` inside it: a modal's keydown still bubbles through its DOM ancestors, and its own
+  cancel comes after, so the container would close too. The e2e presses Esc in a dialog opened
+  from the panel and expects the panel to stay (S3-C0d review).
+- A boundary or a control's only visible line (a pane's edge, a separator) is a `border` or an
+  `outline`, never a background: forced colors turn backgrounds into Canvas, and the line
+  vanishes. The e2e compares it with a `CanvasText` probe (S3-C0d review, after DL-356).
+- A PrimeVue component whose own CSS sets `overflow` or `nowrap` (Breadcrumb: `overflow-x: auto`
+  with its scrollbar hidden, `flex-wrap: nowrap`) is checked for clipped content at the
+  narrowest room it can get, beside the split pane included, not only at a 320px viewport; the
+  check measures the component, never the document (S3-C0e review).
+- Content moved between containers (a teleport's target changing at a breakpoint) puts focus
+  back where it was: moving a node that holds focus blurs it, and a dialog's open or close moves
+  it again (S3-C0d review).
+- Try again inside a dialog or one of its steps never calls `useLoad`'s `run` or `retry` bare: on
+  success it moves focus to the first control loaded (the button goes with the failure, and
+  `retry()`'s `h1` is behind the modal), and a failed retry is a new element keyed on `failures`,
+  with `role="alert"` only after the user's own retry (`AlsoAddToProjects`; S3-C0m review).
 - A status note that reports an action's result (not a form alert) is cleared when what it
   describes changes: a new selection, a reload, or the next run of the action
   (`RequirementsTree`'s expand note; S2-C18c review).
@@ -210,8 +253,8 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   review).
 - `MarkdownView` under a heading gets that heading's `level` (`:level="2"` under an `h2`): its
   default shift only keeps content off `h1`, and a `#` under an `h3` would read as the page's
-  next section (UI-MD-1, UI-SHL-8; S2-C20a review). `:level="0"` is only for `/docs`'s bundled
-  guide, never stored content (DL-310).
+  next section (UI-MD-1, UI-SHL-8; S2-C20a review). `:level="0"` is only for a guide page's
+  bundled body, never stored content (DL-310).
 - A required checkbox group can't take `aria-required`: its legend carries a visually hidden
   "(required)" beside the hidden asterisk (UI-FRM-2; S2-C20 review).
 - A PrimeVue table's selected-row bar goes on the row's first cell, and only on the selected

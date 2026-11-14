@@ -3,8 +3,8 @@ import uuid
 from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
-from app.enums import OrgRole
-from app.schemas.limits import NAME_MAX
+from app.enums import OrgRole, ProjectRole
+from app.schemas.limits import MEMBER_PROJECTS_MAX, NAME_MAX
 from app.schemas.workspace import NewUser
 
 
@@ -16,10 +16,22 @@ class OrgRead(BaseModel):
     allowed_actions: list[Action]
 
 
+class OrgOwner(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class OrgListItem(BaseModel):
+    """An org on the workspace's list, with its counts and owners (S3-C0k)."""
+
     id: uuid.UUID
     name: str
     slug: str
+    # Its projects, archived left out; its members whose accounts are active; its active owners,
+    # by name.
+    project_count: int
+    member_count: int
+    owners: list[OrgOwner]
 
 
 class OrgCreate(BaseModel):
@@ -51,15 +63,31 @@ class MemberRead(BaseModel):
     allowed_actions: list[Action]
 
 
+class MemberProjectAdd(BaseModel):
+    """One of the org's projects to add the new member to as well (Q12g, DL-379).
+    `export_control_confirmed`: on an export-controlled project only, and required there (DL-81)."""
+
+    project_id: uuid.UUID
+    role: ProjectRole = ProjectRole.MEMBER
+    export_control_confirmed: bool = False
+
+
 class MemberAdd(BaseModel):
-    """Add an existing account, found by email (design-doc §4: the email comes first)."""
+    """Add an existing account, found by email (design-doc §4: the email comes first), and to
+    `projects` too, all or nothing (DL-379)."""
 
     email: str
     role: OrgRole
+    projects: list[MemberProjectAdd] = Field(
+        default_factory=list[MemberProjectAdd], max_length=MEMBER_PROJECTS_MAX
+    )
 
 
 class MemberCreate(NewUser):
     role: OrgRole
+    projects: list[MemberProjectAdd] = Field(
+        default_factory=list[MemberProjectAdd], max_length=MEMBER_PROJECTS_MAX
+    )
 
 
 class MemberRoleUpdate(BaseModel):

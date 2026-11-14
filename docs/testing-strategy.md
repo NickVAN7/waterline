@@ -321,7 +321,7 @@ saying why.
   `audit-allowlist.toml` entry with a reason and an open tech-debt entry whose Fix by is the
   deadline. A red audit is fixed before any checkpoint starts (`chore(deps):` commit).
 - **Slice verification, from Slice 3:** `wl docs-screenshots` regenerates the guide's
-  screenshots, in light and dark (also whenever a UI change affects one; DL-343), and
+  screenshots, in light and dark, from the manual pass's data (DL-361) (also whenever a UI change affects one; DL-343), and
   `user-guide-verifier` checks in two parts: the behavior reference followed literally in a
   browser, and the reader's guide checked against it (DL-336). Both arrive in S3-C0g and S3-C0h.
 - **Pull requests:** each slice works on one branch with one draft PR, and CI runs on every

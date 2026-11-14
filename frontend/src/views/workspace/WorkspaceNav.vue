@@ -20,9 +20,14 @@ const LINKS = [
   <!-- A landmark with nothing in it isn't rendered (UI-SHL-2). -->
   <nav
     v-if="allows(workspace, 'workspace.view')"
-    aria-label="Workspace administration"
+    aria-labelledby="workspace-nav-caption"
     class="flex flex-col gap-1"
   >
+    <!-- Whose pages these are (owner, S2 feedback): the workspace's; it names the landmark, so
+         it's said once. -->
+    <p id="workspace-nav-caption" class="m-0 px-2 text-sm font-semibold text-text-muted">
+      Workspace administration
+    </p>
     <SidebarLink v-for="link in LINKS" :key="link.name" :to="{ name: link.name }">{{
       link.label
     }}</SidebarLink>

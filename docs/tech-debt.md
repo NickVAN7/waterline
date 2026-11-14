@@ -156,11 +156,13 @@ Entry format:
 - **What:** My work's projects section shows the first 10 projects (`GET /api/me/work`) and says
   how many there are, but has no "see all" list over `GET /api/me/work/{section}` (design-doc
   §11); a user on more than 10 projects finds the rest on each org's project list. From S2-C20b,
-  the approvals and past decisions sections too (`/approvals`, `/decisions`): past 10, the page
-  says how many there are; an approval past the first 10 shows once an older one is decided.
+  the approvals section too (`/approvals`): past 10, the page says how many there are; an
+  approval past the first 10 shows once an older one is decided. From S3-C0f each org's section
+  links to its list (DL-359); from S3-C0j favorites are shown in full (DL-369), so approvals
+  alone need one.
 - **Why:** smallest complete change: no demo user is on more than two projects, and the org list
   already shows them all; no demo user has more than a few approvals. The "see all" list belongs with the sections that need one most.
-- **Fix by:** Slice 3 (with My work's tasks section, whose lists are long)
+- **Fix by:** S3-C29 (My work's "see all" for approvals; its route exists, so frontend only)
 - **Status:** open
 
 ### TD-38: The project selector lists an org's first 200 projects
@@ -170,7 +172,7 @@ Entry format:
   shows only the first 200 there (all of them are on its project list).
 - **Why:** smallest complete change: v1's orgs have tens of projects. A server-side search
   parameter would be new API.
-- **Fix by:** Slice 3 (the filter bar's text search, which the selector can call)
+- **Fix by:** S3-C17 (the selector's search, on S3-C13's server-side `?q=`)
 - **Status:** open
 
 ### TD-41: Pickers of people load the first 200
@@ -181,7 +183,7 @@ Entry format:
   offer those; a roster, workspace, or org with more people shows only the first 200 by name.
 - **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
   would be new API (the lists have no text filter yet).
-- **Fix by:** Slice 3 (the filter bar's text search, which the pickers can call)
+- **Fix by:** S3-C17 (one searchable person picker, on S3-C13's server-side `?q=`)
 - **Status:** open
 
 ### TD-42: The own-row reset is hidden by a client-side check
@@ -261,7 +263,7 @@ Entry format:
 - **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
   statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
   helper that does it now.
-- **Fix by:** Slice 7 (the end of v1), or sooner if a rewrite's timing is noticed: one statement (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** S3-C7 (one statement, shared with the task order's rewrite, DL-345)
 - **Status:** open
 
 ### TD-76: The revision feed has no `(requirement_id, id)` index
@@ -347,17 +349,6 @@ Entry format:
   nears the cap
 - **Status:** open
 
-### TD-92: Closing the side panel drops an open edit
-- **Added:** S2-C18b
-- **What:** while the requirement's edit form is open in the side panel, **Close**, the browser's
-  Back, and **Open full page** close the panel and drop what was typed, without asking. Esc in
-  the form is the form's (it does nothing, as on the page), so it no longer closes the panel.
-- **Why:** no rule says what an item's panel does with unsaved changes (keep them, or ask
-  first); that's the owner's to decide (S2-C18b review, `ui-reviewer`'s proposed UI-SHL-11
-  addition), and the panel is the shared one tasks reuse in Slice 3.
-- **Fix by:** S3-C0d (the split pane asks **Discard your changes?** first, DL-323)
-- **Status:** open
-
 ### TD-96: The approver picker can't name an inherited project admin
 - **Added:** DC-2026-11-05 (DL-278)
 - **What:** the request dialog's approver picker lists the project's explicit members only, so an
@@ -365,7 +356,7 @@ Entry format:
   be picked in the UI; the API accepts them.
 - **Why:** the members list already exists; a candidates endpoint for everyone §6.2 allows is a
   new endpoint the owner chose not to build in S2-C20 (DL-278).
-- **Fix by:** Slice 3 (the filter bar's text search, with TD-41): the approver picker becomes a searchable dropdown, with a candidates endpoint for everyone §6.2 allows (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** S3-C17 (the approver picker becomes the searchable person picker, on S3-C13's candidates endpoint for everyone §6.2 allows)
 - **Status:** open
 
 ### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
@@ -374,8 +365,7 @@ Entry format:
   their "Show deactivated" checkbox above the list, not in a filter bar.
 - **Why:** the filter bar is built in Slice 3 (build plan, API conventions, "Frontend"); S2-C21a
   needs only the one checkbox.
-- **Fix by:** Slice 3, the checkpoint that builds the filter bar: the checkbox moves into it on
-  the four lists
+- **Fix by:** S3-C16 (the filter bar: the checkbox moves into it on the four lists)
 - **Status:** open
 
 ### TD-98: The session list shows the 200 most recently active sessions only
@@ -395,7 +385,7 @@ Entry format:
   total=…, limit=…, offset=…)` itself rather than `page.with_items(rows)`, the helper TD-54
   added for every list.
 - **Why:** S2-C20 code, fixed only when needed (DL-106); it behaves the same.
-- **Fix by:** Slice 3 (the next checkpoint that touches approval reads, or its tech-debt review)
+- **Fix by:** Slice 3 (its tech-debt review, S3-C33: no Slice 3 row touches approval reads)
 - **Status:** open
 
 ### TD-101: The reporter and approver checks are near-copies
@@ -404,7 +394,7 @@ Entry format:
   (hold the access, get the user, load their context and authorize, check `is_active`); only the
   action and the error differ, so a change to one (TD-79's batching) has to be made in both.
 - **Why:** S2-C11 and S2-C10 code, fixed only when needed (DL-106).
-- **Fix by:** Slice 3 (with TD-79, or the next change to either check)
+- **Fix by:** S3-C6 (one shared person check for reporter, approver, assignee, and reviewer)
 - **Status:** open
 
 ### TD-102: A members list with no row actions still shows an Actions column
@@ -412,24 +402,97 @@ Entry format:
 - **What:** for someone who may change nobody (a project member), the roster's table keeps its
   "Actions" header over empty cells.
 - **Why:** Slice 1 and S2-C17 roster code, fixed only when needed (DL-106); it's cosmetic.
-- **Fix by:** Slice 3 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
-- **Status:** open
-
-### TD-103: TextField's slot shadows its `describedBy` prop
-- **Added:** S2-C22 (CI lint warning, Slice 2 retro)
-- **What:** `frontend/src/components/TextField.vue`'s `FormField` slot names its merged IDs
-  `describedBy`, the prop's name, so ESLint warns "already declared in the upper scope".
-  Behavior is correct: the input should use the slot's merged value.
-- **Why:** app code, which waits for Slice 3 (the owner, Slice 2 retro).
-- **Fix by:** S3-C0a (rename it in the slot, as `PasswordField.vue` does: `describedBy: ids`)
+- **Fix by:** S3-C16 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
 - **Status:** open
 
 ### TD-104: The documentation has no search of its own
 - **Added:** DC-2026-11-09-s2-retro-and-ui-polish (DL-342)
 - **What:** the reader's guide (from S3-C0g) has no docs-only search.
-- **Why:** deferred by the owner: about 2,500 words fit in a nav, and Slice 6's site-wide
-  search covers the docs.
+- **Why:** deferred by the owner: the guide is small enough to browse from its nav, and Slice
+  6's site-wide search covers the docs.
 - **Fix by:** Slice 6 (the site-wide search): revisit a docs-only search as the docs grow
+- **Status:** open
+
+### TD-107: An icon button's tooltip is its `title`, which keyboard focus never shows
+- **Added:** S3-C0d
+- **What:** the side panel's Open full page, Copy link, and Close, ⋯ More actions, and
+  `RowActions` before them, show their name on hover through the native `title` only: it doesn't
+  appear on keyboard focus and can't be dismissed with Esc (WCAG 1.4.13), so a sighted keyboard
+  user sees bare icons. Their accessible names are right.
+- **Why:** the repo's one pattern for a tooltip; a focus-showing hint (the guide's `FieldHint`)
+  isn't built yet, and building one is its own component (ui-reviewer, S3-C0d, finding 5).
+- **Fix by:** S3-C33 (the tech-debt review: build the hint then, or before the first new icon button)
+- **Status:** open
+
+### TD-108: Just above 64rem, the split pane leaves the list little room
+- **Added:** S3-C0d
+- **What:** the split pane starts at 64rem and is 400 to 800px wide (DL-321, DL-322), so at
+  1024px (or 1280px at 125% zoom), with the sidebar and padding, a 560px panel leaves the tree
+  about 150px, and a stored 800px leaves none, the row then scrolling sideways. Since DL-356 the
+  panel is beside `main` itself, so the page header (the `h1` and **New requirement**) and its
+  alerts narrow with the tree.
+- **Why:** kept as decided by the owner (2026-11-11, S3-C0d review, ui-reviewer finding 2):
+  judged at slice verification, where the manual pass checks the requirements page at 1024 to
+  1280px and zoomed, before a cap or a later breakpoint is chosen.
+- **Fix by:** S3-C33 (slice verification's manual pass)
+- **Status:** open
+
+### TD-109: A dialog opened from the panel may stop being modal when the window crosses 64rem
+- **Added:** S3-C0d
+- **What:** Change restriction…, Delete…, and Request approval are `<dialog>`s inside the side
+  panel's teleported content. If one is open when the window crosses 64rem, the move takes it
+  out of the top layer: by the HTML spec it stays open but isn't modal any more, so the page
+  behind isn't inert and its Esc may reach the panel instead (ui-reviewer, S3-C0d pass 2).
+- **Why:** unconfirmed: it needs a real browser to see what happens, and crossing the width with
+  a dialog open (a tablet turned, a zoom) is rare; the fix, if needed, is to close or reopen the
+  nested dialog on the breakpoint change.
+- **Fix by:** S3-C33 (the manual pass checks it at 1024px; fixed in the slice if it shows)
+- **Status:** open
+
+### TD-110: Focus on the trail's "…" or a middle crumb drops when the window crosses 40rem
+- **Added:** S3-C0e
+- **What:** the fold and the middle crumbs switch with CSS at 40rem (UI-SHL-14), so a resize or
+  zoom across it while one of them has focus hides that control and focus falls to `<body>`.
+- **Why:** it needs a resize while focus is on that one control; a fix (focus the nearest shown
+  crumb when the media query flips) adds a listener to every page for a rare case (ui-reviewer,
+  S3-C0e, note).
+- **Fix by:** S3-C33 (the manual pass zooms across 40rem with focus on the trail; fixed if it
+  shows)
+- **Status:** open
+
+### TD-113: UI-SVR-3 doesn't say SVAR's stylesheet must be imported, or that Willow's icons go blank
+- **Added:** S3-C0i
+- **What:** the S3-C0i spike found that a SVAR widget draws unstyled unless its own stylesheet
+  (`@svar-ui/vue-grid/all.css`, and each widget's) is imported before our mapping, and that
+  `<Willow :fonts="false">`, which UI-SVR-3 requires, also leaves out Willow's icons (an icon
+  font from SVAR's CDN, which UI-STY-4 rules out), so a wrapper draws its own (in the spike, the
+  grid's drag handle; for the board, any Willow icon its card shows). UI-SVR-3 says neither, and the first SVAR wrapper would find both again.
+- **Why:** a rule change, outside a spike's scope (checkpoint-reviewer, S3-C0i, minor).
+- **Fix by:** S3-C18 (the first SVAR wrapper, the board): UI-SVR-3 gains both, and the board's
+  Willow icons are checked
+- **Status:** open
+
+### TD-114: No e2e opens a popover past eight links from the keyboard
+- **Added:** S3-C0j
+- **What:** the project selector and org menu show a **Filter** button past eight links
+  (UI-SHL-6). Its spec opens one, runs axe, and checks focus; no e2e opens one from the keyboard,
+  as `frontend/CLAUDE.md`'s overlay rule asks, because the e2e stack's demo data has no org with
+  more than eight projects (`--manual-pass`'s `acme` has eleven).
+- **Why:** the e2e stack counts what `--demo` builds; growing it means reworking its counts
+  (ui-reviewer, S3-C0j, a coverage gap).
+- **Fix by:** S3-C33 (slice verification's manual pass on `--manual-pass`), or the first e2e
+  that needs a bigger org
+- **Status:** open
+
+### TD-115: The org add's projects step shows only the first 200 projects
+- **Added:** S3-C0m
+- **What:** the add-person dialog's **Also add to projects** loads one page of
+  `GET …/member-projects` at the list cap (200, `MAX_LIMIT`), by name; an org with more live
+  projects can't pick the rest there, and nothing says so. They can still be added from each
+  project's Members.
+- **Why:** an org with 200 live projects is past v1's expected size (the cap matches the add's
+  `projects` limit, `MEMBER_PROJECTS_MAX`).
+- **Fix by:** Slice 6 (search): a filter on the step, or a "more" note, if an org nears it
 - **Status:** open
 
 ---
@@ -771,6 +834,11 @@ Entry format:
   `:level="2"`, so a description's `#` is an `h3` under "Description"); closed in S2-C22 by the
   owner
 
+### TD-92: Closing the side panel drops an open edit
+- **Added:** S2-C18b
+- **Status:** resolved in S3-C0d: Close, Esc, Back, another item's ID, and Open full page ask
+  **Discard your changes?** first (DL-323)
+
 ### TD-93: Expand all may not be the right action for the tree
 - **Added:** DC-2026-11-04b (DL-270)
 - **Status:** resolved in S2-C18c ("Expand requirement" in place of "Expand all", DL-271, DL-272)
@@ -789,3 +857,27 @@ Entry format:
 - **Added:** S2-C21c
 - **Status:** resolved in DC-2026-11-09-s2-retro-and-ui-polish (UI-FRM-7: a row or inline
   action's control is its own retry, DL-319)
+
+### TD-103: TextField's slot shadows its `describedBy` prop
+- **Added:** S2-C22 (CI lint warning, Slice 2 retro)
+- **Status:** resolved in S3-C0a (the slot's IDs are `ids`, as in `PasswordField.vue`)
+
+### TD-105: A project key's API error messages describe a slug
+- **Added:** S3-C0c
+- **Status:** resolved in S3-C0l: a key's 422 has its own messages (`PROJECT_KEY_MESSAGES`: at
+  least 3, at most 6, only letters and digits)
+
+### TD-106: The requirement's header has no Parent row yet
+- **Added:** S3-C0d
+- **Status:** resolved in S3-C0e: Parent (its ID linked, then its title; None at the top level),
+  from the read's `ancestors` (DL-357)
+
+### TD-111: No test loads a bundled guide image under the CSP
+- **Added:** S3-C0g
+- **Status:** resolved in S3-C0h: `csp.spec.ts` opens a guide page's screenshot, in each theme
+  and with the theme chosen against the system's, and asserts it loads with no CSP violation
+
+### TD-112: SidebarLink's transparent bar draws on every link under forced colors
+- **Added:** S3-C0g
+- **Status:** resolved in S3-C0j: the bar only on the current link, the others padded by its
+  width; `shell.spec.ts` checks under forced colors that only the current link has it

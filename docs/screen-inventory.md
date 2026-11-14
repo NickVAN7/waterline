@@ -336,7 +336,7 @@ Any project role can be a named approver, viewers included (design-doc §6.2).
   asks the approver to confirm.** A rejection ends the whole request.
 - **A decision is final: there is no "unapprove."** Instead, an approved item can be
   re-opened (below).
-- See my past decisions (on My work, DL-286), each opening its requirement (owner, Nov 5, 2026). *Built.*
+- See my past decisions (on My work, DL-286), each opening its requirement (owner, Nov 5, 2026). *Built; removed in S3-C0f (DL-333): a decision shows on its requirement's Approval section.*
 
 **Edge cases the approver runs into**
 - The request was cancelled, or made moot by a hand approval, while I was reviewing it. I'm
@@ -424,7 +424,8 @@ already exists; everything else is still to build.
 - Open any item from a shared link; if I can't see it, I get the same 404 as for an item that
   doesn't exist. Page not found links to My work and System status. *Built.*
 - **System status** at `/status`, without signing in. *Built.*
-- **Documentation** in the user menu (v1): opens the user guide inside the app.
+- **Documentation** in the user menu (v1): opens the guide inside the app, a landing page and a
+  page per topic. *Built.*
 - Use everything by keyboard and screen reader (WCAG 2.2 AA).
 
 **Finding things**
@@ -527,13 +528,13 @@ panel vs. dialog.
 
 | View | Combines | Slice |
 |---|---|---|
-| **My work** | favorite projects, my projects, my tasks, reviews I owe, approvals I owe, my past decisions, test cases assigned to me | Projects (S1), approvals I owe and my past decisions (S2-C20b) built; other sections with their slices (3, 5) |
-| **Project home** | status, lead, current phase, milestone, and sprint; headline numbers: blocked work, untested requirements, pending approvals | Shell built (S1); numbers fill in with their slices |
+| **My work** | summary tiles, favorite projects, my projects (each org's first 5, DL-368), approvals I owe, my tasks, reviews I owe, test cases assigned to me (DL-349); my past decisions until S3-C0f | Projects (S1), approvals I owe (S2-C20b) built; grouped by organization in S3-C0f; other sections with their slices (3, 5) |
+| **Project home** | status (a status menu for its admins), lead, current phase, milestone, and sprint; headline numbers: blocked work, untested requirements, pending approvals | Shell built (S1); current phase, status menu, blocked tasks, and pending approvals in 3 (S3-C15, S3-C30); untested requirements in 5; milestone and sprint in 4 |
 | **Org overview** | the org's projects with status and lead; archived projects below | Built (S1) |
 | **Board** | tasks by status; filter by sprint, assignee, workstream | 3 |
-| **Backlog** | ranked tasks not in a sprint | 3 |
+| **Backlog** | ranked tasks not `done` or `cancelled` (DL-346); from Slice 4, those not in a sprint | 3 |
 | **Sprints page and sprint summary** | sprints, their tasks, what finished and what rolled over | 4 |
-| **Requirement tree with coverage** | requirements with **coverage columns**: task count and progress, test-case count, latest result, approval state. **This is the traceability view in v1**; a separate requirement × test case matrix is not built | 2 (tree, approval), 3 (tasks), 5 (tests) |
+| **Requirement tree with coverage** | requirements, filterable (matches with their ancestors, DL-351), with **coverage columns**: task count and progress, test-case count, latest result, approval state. **This is the traceability view in v1**; a separate requirement × test case matrix is not built | 2 (tree, approval), 3 (tasks), 5 (tests) |
 | **Timeline (dated table)** | phases and milestones with baseline vs. current dates and **slippage**; the Gantt chart replaces the visual in v2 | 3 (a basic page holding phases), 4 (milestones, slippage) |
 | **Releases** | no separate page in v1: the board and task list **filter by milestone**, and each milestone shows a **progress bar** | 4 |
 | **Test run execution** | a run's cases, results, assignees, and the bugs filed from failures | 5 |
@@ -564,7 +565,7 @@ and fills the gaps.
 | Admin page, not an admin | 403 naming who to ask (UI-FBK-14) |
 | Edit conflict | 409 alert with Reload (UI-FRM-7) |
 | Archived project | Non-dismissible read-only banner (UI-FBK-6); actions disabled with the reason beside them (UI-FBK-4) |
-| Deactivated user | "Deactivated" badge after their name (UI-FBK-6); narrowed below |
+| Deactivated user | "Deactivated" badge after their name (UI-FBK-6); in a people list (a roster, an access review), the row's text muted and "· Deactivated" after the name, the columns fixed so showing them moves nothing (S3-C0k); narrowed below |
 | Session ended | Sign in again, then back to the page (built) |
 | Signed in, belongs to nothing | No access page (built) |
 | Restricted item or project | Restriction badge in the header and on items (UI-FBK-6) |
@@ -596,7 +597,8 @@ and fills the gaps.
   1. **Invite your team:** add members and set up their roles. Ticked once the project has a
      member besides its creator.
   2. **Compile your plan:** add milestones and phases, with dates. Ticked once the project has
-     a phase or milestone with a date; the item stays hidden until phases and milestones ship.
+     a phase or milestone with a date; shown from S3-C27, when phases ship, a dated milestone
+     counting too from Slice 4 (DL-354).
   3. **Start your project:** add a requirement, a test case, and a task. (Each part appears
      once its feature ships: requirements in Slice 2, tasks in Slice 3, test cases in Slice 5.)
 
@@ -614,17 +616,17 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
   a **side panel** over the list, so the list keeps its place, with **Open full page**. The
   panel has its own URL (the list's route with the item open, e.g. `?open=TA-45`), so Back
   closes it and the address can be shared. A direct link to an item, and **Copy link**, use
-  the **full-page** route. From S3-C0d, a split pane beside the list at wide widths
-  (DL-321 to DL-326).
+  the **full-page** route. At 64rem and wider it's a split pane beside the list, below that an
+  overlay (DL-321 to DL-326; UI-SHL-11).
 - **Creating an item:** a **dialog** with the essential fields, which the user can **expand
   into a full page** (typed values kept). After creating, the user lands on the new item to
   fill in the rest.
 - **Project navigation** stays **flat** in v1, in this order (a turned-off or unshipped
   module's entry is left out): Home, Requirements, Tasks (Board and Backlog as tabs),
-  Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and **Trash at the
-  bottom** of the list (changes DL-146, which linked Trash from the requirements page header
-  instead of the project pages). Grouping the navigation is a later change if it gets
-  crowded.
+  Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings.
+  **Trash isn't in the navigation:** each list page whose items can be deleted links to it from
+  its header, filtered to that page's type (DL-350, built in S3-C0l; it was last in the list
+  from DL-202). Grouping the navigation is a later change if it gets crowded.
 
 ### Shell, account, and errors
 
@@ -636,11 +638,11 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 | Change password | page | `/account/password` | 1 | Built |
 | Active sessions, sign out others | section of Account settings | `/account` | 2 (S2-C21b, DL-238) | Built |
 | GitHub account link / unlink | section of Account settings | `/account` | 7 | — |
-| Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (DL-239) | — |
+| Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (S3-C32, DL-239) | — |
 | No access | page | `/account/no-access` | 1 | Built |
-| My work | page | `/` | 1, sections in 2, 3, 5 | Projects, approvals, past decisions built; grouped by organization, past decisions removed, in S3-C0f (DL-329 to DL-334) |
+| My work | page | `/` | 1, sections in 2, 3, 5 | Projects and approvals built; grouped by organization (each org's first 5, DL-368, hidden ones behind a toggle), approvals below the projects, past decisions removed, in S3-C0f (DL-329 to DL-334, DL-349, DL-359); summary tiles and the task sections in S3-C29 (DL-349) |
 | Favorite projects | section of My work, first; star on My work's project rows (DL-302, DL-305) | `/` | 2 (S2-C21c, DL-238) | Built |
-| Documentation (user guide) | page, from the user menu; the guide's title, a Contents list, then the guide (DL-310, DL-311); a landing page and articles from S3-C0g (DL-335 to DL-342) | `/docs` | 2 (S2-C21d, DL-238) | Built |
+| Documentation | pages, from the user menu: a landing page (Start here, then each group's cards, DL-339) and an article per guide page (trail, group, title, lead, the page, Previous and Next, On this page, DL-340), the guide's pages in the sidebar (DL-338) | `/docs`, `/docs/<page>` | 2 (S2-C21d, DL-238); 3 (S3-C0g, DL-335 to DL-342) | Built |
 | Search results | page, from the header search bar | `/search` | 6 | — |
 | System status | page, no sign-in | `/status` | 0 | Built |
 | Page not found (404) / Forbidden (403) | page in the shell | any | 1 | Built |
@@ -671,28 +673,28 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
-| Project home (headline numbers, Get started checklist) | page | `…/:key` | 1; numbers with their slices; checklist 3 (DL-239) | Shell built |
+| Project home (current phase, headline numbers, Get started checklist, a status menu for its admins) | page | `…/:key` | 1; numbers with their slices; current phase, status menu, and checklist 3 (S3-C30, DL-239) | Shell built |
 | Members (add, role, remove; "Show deactivated" for admins) | page + dialogs | `…/:key/members` | 1 | Built (deactivated filter in S2-C21a, DL-238, DL-293 to DL-295) |
 | Project access review | page | `…/:key/access` | 1 | Built |
 | Project settings (details, modules, restriction, archive) | page | `…/:key/settings` | 1 | Built |
-| Workstreams | section of Settings (or its own tab) | `…/:key/settings` | 3 | — |
+| Workstreams | page, after Timeline in the project nav (DL-348) | `…/:key/workstreams` | 3 | — |
 | Phases; milestones, gates, releases | section of Timeline | `…/:key/timeline` | 3 (phases), 4 | — |
 | Repositories (connect, webhook health, disconnect) | section of Settings | `…/:key/settings` | 7 | — |
 | Activity feed | page | `…/:key/activity` | 3 | — |
-| Trash | page (bottom of the project nav) | `…/:key/trash` | 2 | — |
+| Trash | page (linked from each list page's header, filtered to its type, DL-350) | `…/:key/trash` | 2 (tasks 3) | Built (S2-C21; the header link S3-C0l) |
 
 ### Requirements and approvals
 
 | Screen | Type | Route | Slice | Status |
 |---|---|---|---|---|
-| Requirement tree with coverage columns | page | `…/:key/requirements` | 2 (coverage 3, 5) | — |
-| Requirement detail (History, Revisions tabs; approval) | side panel / full page | `…/:key/requirements/:number` | 2 | — |
-| Create requirement | dialog, expandable to full page | `…/:key/requirements/new` | 2 | — |
-| Revision compare | inline in the Revisions tab | — | 2 | — |
-| Delete requirement (detach, promote, delete) | dialog | — | 2 | — |
-| Request approval (approver picker); cancel; re-open | dialogs | — | 2 | — |
-| Decide (approve, reject with comment prompt) | panel on the item | — | 2 | — |
-| Approve by hand | confirm dialog | — | 2 | — |
+| Requirement tree with coverage columns; filter bar (matches with their ancestors, DL-351) | page | `…/:key/requirements` | 2 (coverage 3, 5; filters 3) | Built (S2-C17; coverage and filters to come) |
+| Requirement detail (History, Revisions tabs; approval; its Tasks section) | side panel / full page | `…/:key/requirements/:number` | 2 (Tasks section 3, S3-C25) | Built (S2-C18 to S2-C20a; the Tasks section to come) |
+| Create requirement | dialog, expandable to full page | `…/:key/requirements/new` | 2 | Built (S2-C17a, S2-C18a) |
+| Revision compare | inline in the Revisions tab | — | 2 | Built (S2-C19a) |
+| Delete requirement (detach, promote, delete) | dialog | — | 2 (tasks 3) | Built (S2-C21; the linked tasks to come) |
+| Request approval (approver picker); cancel; re-open | dialogs | — | 2 | Built (S2-C20) |
+| Decide (approve, reject with comment prompt) | panel on the item | — | 2 | Built (S2-C20a) |
+| Approve by hand | confirm dialog | — | 2 | Built (S2-C20) |
 
 ### Tasks, sprints, and timeline
 

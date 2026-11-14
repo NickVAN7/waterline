@@ -12,6 +12,7 @@ let carried = ''
 import { computed, watch } from 'vue'
 
 import { api, client } from '@/api/client'
+import { orgCrumb } from '@/app/crumbs'
 import { settlePage, syncTitle } from '@/app/routeFocus'
 import NameSlugSettings from '@/components/NameSlugSettings.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -90,7 +91,7 @@ async function save(changes: { name?: string; slug?: string }, current: Org): Pr
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader :title="`${org.name} settings`" />
+    <PageHeader :title="`${org.name} settings`" :crumbs="[orgCrumb(org), { label: 'Settings' }]" />
     <NameSlugSettings
       :page="page"
       prefix="org"

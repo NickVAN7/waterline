@@ -39,6 +39,9 @@ test('the organizations and users pages list the workspace', async ({ page }) =>
   await page.goto('/workspace/users')
   const users = page.getByRole('table', { name: 'Users in the workspace' })
   await expect(users.getByRole('row', { name: /Admin/ }).first()).toBeVisible()
+  // Its widths are the table's, so the rows Show deactivated adds can't move them (S3-C0k).
+  await expect(users).toHaveCSS('table-layout', 'fixed')
+  await expect(users.locator('colgroup > col')).toHaveCount(6)
   await expectNoA11yViolations(page)
   await expectFocusNotObscured(page)
 })

@@ -9,6 +9,7 @@ import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } fr
 import { acme, mountOrgPages, mountOrgView } from '@/test/org'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { cleanUpAfterEach, listPage } from '@/test/workspace'
+import { trail } from '@/test/trail'
 
 import OrgMembersView from './OrgMembersView.vue'
 
@@ -40,7 +41,13 @@ function row(name: string, overrides: Partial<Row> = {}): Row {
 const OLIVIA = row('Olivia Owner', { role: 'owner' })
 const ANN = row('Ann Admin', { role: 'admin', allowed_actions: ['org_member.manage'] })
 
-/** The API: the org, the password policy, the user check (`exists`), and the members, by path. */
+const PROJECTS = [
+  { id: 'p-pay', key: 'PAY', name: 'Payments', export_controlled: false },
+  { id: 'p-sec', key: 'SEC', name: 'Secure', export_controlled: true },
+]
+
+/** The API: the org, the password policy, the user check (`exists`), the add's projects (DL-379),
+ * and the members, by path. */
 function answers(rows: Row[] = [OLIVIA, ANN], exists = true) {
   return vi
     .spyOn(client, 'GET')
@@ -52,7 +59,9 @@ function answers(rows: Row[] = [OLIVIA, ANN], exists = true) {
             ? ok(PASSWORD_POLICY)
             : path.endsWith('user-check')
               ? ok({ email: 'ben@acme.example', exists })
-              : ok(listPage(rows)),
+              : path === '/api/orgs/{org_id}/member-projects'
+                ? ok(listPage(PROJECTS))
+                : ok(listPage(rows)),
       )) as never)
 }
 
@@ -84,8 +93,15 @@ describe('OrgMembersView', () => {
       params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing members')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [['Acme Manufacturing', '/acme/projects']],
+      current: 'Members',
+    })
     // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
-    expect(wrapper.find('nav').exists()).toBe(false)
+    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
+    ])
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr
@@ -146,9 +162,53 @@ describe('OrgMembersView', () => {
     })
     expect(post).toHaveBeenCalledWith('/api/orgs/{org_id}/members', {
       params: { path: { org_id: ACME.id } },
-      body: { email: 'ben@acme.example', role: 'member' },
+      body: { email: 'ben@acme.example', role: 'member', projects: [] },
     })
     expect(wrapper.text()).toContain('ben@acme.example added to Acme Manufacturing.')
+  })
+
+  it('adds them to the projects chosen on the last step, confirming an export-controlled one (DL-379)', async () => {
+    const get = answers()
+    const post = vi.spyOn(client, 'POST').mockResolvedValue(ok(row('Ben Lee'), 201))
+    const { wrapper } = await mountOrgView(OrgMembersView, '/acme/members', [...ADMIN])
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Add person')!
+      .trigger('click')
+    await flushPromises()
+    await wrapper.get('#add-email').setValue('ben@acme.example')
+    await wrapper.get<HTMLInputElement>('#add-email').element.form!.requestSubmit()
+    await flushPromises()
+    const box = (text: string) =>
+      wrapper
+        .findAll('fieldset li input[type=checkbox]')
+        .find((i) => i.element.closest('label')!.textContent!.includes(text))!
+
+    await box('Payments').setValue(true)
+    await box('Secure').setValue(true)
+    await wrapper.get('#add-project-p-sec-role').setValue('viewer')
+    await box("Secure's export-controlled").setValue(true)
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Add person' && b.element.closest('dialog'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/member-projects', {
+      params: { path: { org_id: ACME.id }, query: { limit: 200 } },
+    })
+    expect(post).toHaveBeenCalledWith('/api/orgs/{org_id}/members', {
+      params: { path: { org_id: ACME.id } },
+      body: {
+        email: 'ben@acme.example',
+        role: 'member',
+        projects: [
+          { project_id: 'p-pay', role: 'member' },
+          { project_id: 'p-sec', role: 'viewer', export_control_confirmed: true },
+        ],
+      },
+    })
+    expect(wrapper.text()).toContain('ben@acme.example added to Acme Manufacturing and 2 projects.')
   })
 
   it('creates an account and its membership in one step when the email has none', async () => {
@@ -179,6 +239,7 @@ describe('OrgMembersView', () => {
         name: 'Ben Lee',
         password: 'fake-fake-fake-01',
         role: 'admin',
+        projects: [],
       },
     })
   })

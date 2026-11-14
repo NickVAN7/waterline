@@ -35,7 +35,7 @@ test("org administration opens from the org menu, by keyboard, on the org's over
     page.getByRole('heading', { level: 1, name: 'Acme Manufacturing overview' }),
   ).toBeFocused()
   // Each project with its lead, linking to its settings (DL-153, DL-163).
-  const projects = page.getByRole('table', { name: 'Projects' })
+  const projects = page.getByRole('table', { name: 'Projects', exact: true })
   await expect(projects.getByRole('row', { name: /ERP Rollout/ })).toContainText('Liam Lewis')
   await expect(projects.getByRole('link', { name: /^ERP Rollout/ })).toHaveAttribute(
     'href',
@@ -43,7 +43,7 @@ test("org administration opens from the org menu, by keyboard, on the org's over
   )
   await expect(projects.getByRole('row', { name: /Legacy Cleanup/ })).toHaveCount(0)
   // Archived projects in their own section below, each linking to its settings (DL-180).
-  const archived = page.getByRole('table', { name: 'Archived' })
+  const archived = page.getByRole('table', { name: 'Archived projects' })
   await expect(archived.getByRole('link', { name: /^Legacy Cleanup/ })).toHaveAttribute(
     'href',
     '/acme/projects/LEGACY/settings',
@@ -97,4 +97,65 @@ test("someone who can't manage the org gets the 403 page (UI-FBK-14)", async ({ 
   await expect(menu.getByRole('link').first()).toBeVisible()
   await expect(menu.getByRole('link', { name: 'Overview' })).toHaveCount(0)
   await expectNoA11yViolations(page)
+})
+
+test("the members table's columns are fixed, and scroll in their region on a narrow screen (S3-C0k)", async ({
+  page,
+}) => {
+  await signIn(page, 'olivia')
+  await page.goto('/acme/members')
+  const table = page.getByRole('table', { name: /members/i })
+  await expect(table).toBeVisible()
+  // The table's own widths hold its columns, so the rows "Show deactivated" adds can't move them
+  // (the e2e data has no deactivated member to add: what holds the widths is what's checked).
+  await expect(table).toHaveCSS('table-layout', 'fixed')
+  await expect(table.locator('colgroup > col')).toHaveCount(4)
+
+  await page.getByRole('checkbox', { name: 'Show deactivated' }).check()
+  await expect(page).toHaveURL(/deactivated/)
+  await expectNoA11yViolations(page)
+
+  // At 320 CSS px the table keeps its minimum width and scrolls in its region; no cell's text
+  // runs over its column (UI-SHL-7, WCAG 1.4.10).
+  await page.setViewportSize({ width: 320, height: 640 })
+  const region = table.locator('xpath=..')
+  await expect.poll(() => region.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+  const overflowing = await table
+    .locator('td')
+    .evaluateAll((cells) => cells.filter((td) => td.scrollWidth > td.clientWidth).length)
+  expect(overflowing).toBe(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+})
+
+// The add's last step (Q12g, DL-379): a new account joins the org and a chosen project in one
+// add. Each theme's run creates its own person. The demo's ERP project isn't export-controlled.
+test('adding someone to the org adds them to the projects chosen on the last step (S3-C0m)', async ({
+  page,
+}, testInfo) => {
+  const handle = `e2e-org-${testInfo.project.name}-${Date.now()}`
+  await signIn(page, 'olivia')
+  await page.goto('/acme/members')
+
+  await page.getByRole('button', { name: 'Add person' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add a person' })
+  await dialog.getByRole('textbox', { name: 'Email', exact: true }).fill(`${handle}@harbor.example`)
+  await dialog.getByRole('button', { name: 'Continue' }).click()
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Pia Projects')
+  await dialog.getByRole('textbox', { name: 'Username', exact: true }).fill(handle)
+
+  const step = dialog.getByRole('group', { name: /Also add to projects/ })
+  await step.getByRole('checkbox', { name: /^ERP Rollout/ }).check()
+  await expect(step.getByRole('combobox', { name: 'Role on ERP Rollout' })).toHaveValue('member')
+  await expectNoA11yViolations(page)
+  await dialog.getByRole('button', { name: 'Create account' }).click()
+  await expect(dialog.getByText('This password is shown once.')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Done' }).click()
+  await expect(
+    page.getByText('Pia Projects added to Acme Manufacturing and 1 project.'),
+  ).toBeVisible()
+
+  await page.goto('/acme/projects/ERP/members')
+  await expect(page.getByRole('row').filter({ hasText: `${handle}@harbor.example` })).toContainText(
+    'Member',
+  )
 })

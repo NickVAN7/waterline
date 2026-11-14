@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 import { signIn } from './support/demo'
 
@@ -13,9 +13,8 @@ test('pages carry a CSP that allows scripts only from our own origin', async ({ 
   expect(csp).toContain("object-src 'none'")
 })
 
-test('the signed-in app runs under the CSP, which blocks an injected inline script', async ({
-  page,
-}) => {
+/** Each CSP violation's directive, as the page reports them. */
+async function watchViolations(page: Page): Promise<string[]> {
   const violations: string[] = []
   await page.exposeFunction('reportViolation', (directive: string) => violations.push(directive))
   await page.addInitScript(() => {
@@ -25,9 +24,16 @@ test('the signed-in app runs under the CSP, which blocks an injected inline scri
       ),
     )
   })
+  return violations
+}
+
+test('the signed-in app runs under the CSP, which blocks an injected inline script', async ({
+  page,
+}) => {
+  const violations = await watchViolations(page)
 
   await signIn(page, 'casey')
-  await expect(page.getByRole('region', { name: 'Projects' }).getByRole('link')).toHaveCount(2)
+  await expect(page.getByRole('region', { name: 'Acme Manufacturing' })).toBeVisible()
   expect(violations).toEqual([])
 
   const ran = await page.evaluate(() => {
@@ -40,4 +46,35 @@ test('the signed-in app runs under the CSP, which blocks an injected inline scri
 
   expect(ran).toBe(false)
   await expect.poll(() => violations).toEqual(['script-src-elem'])
+})
+
+test("a guide page's screenshot loads under the CSP, and only the theme's version shows (DL-343, TD-111)", async ({
+  page,
+}, testInfo) => {
+  const violations = await watchViolations(page)
+  await signIn(page, 'casey')
+  await page.goto('/docs/trash')
+
+  const theme = testInfo.project.name
+  const shown = page.locator('article .markdown img:visible')
+  const file = (name: string) => (name === 'dark' ? /\/trash-dark\.webp$/ : /\/trash\.webp$/)
+  await expect(page.locator('article .markdown img')).toHaveCount(2)
+  await expect(shown).toHaveCount(1)
+  await expect(shown).toHaveAttribute('src', file(theme))
+  await expect(shown).toHaveAccessibleName(/^A project's Trash/)
+  await expect.poll(() => shown.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1440)
+
+  // Selecting it opens the image full size in a new tab, and this page stays (DL-363).
+  const [tab] = await Promise.all([page.context().waitForEvent('page'), shown.click()])
+  await tab.waitForLoadState()
+  expect(tab.url()).toMatch(file(theme))
+  await tab.close()
+  await expect(page).toHaveURL('/docs/trash')
+
+  // A theme chosen in Account settings, against the system's, swaps the image too (UI-TOK-2).
+  const other = theme === 'dark' ? 'light' : 'dark'
+  await page.evaluate((other) => (document.documentElement.dataset.theme = other), other)
+  await expect(shown).toHaveAttribute('src', file(other))
+  await expect.poll(() => shown.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1440)
+  expect(violations).toEqual([])
 })

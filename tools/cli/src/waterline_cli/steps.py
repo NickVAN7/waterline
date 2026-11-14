@@ -145,16 +145,23 @@ E2E_COMPOSE = (
 )
 
 
-def e2e(extra: Sequence[str] = ()) -> list[Step]:
+def e2e(extra: Sequence[str] = (), *, seed: str = "--demo") -> list[Step]:
     """Clear any stack an earlier run left behind (its database would refuse the demo seed),
     start the end-to-end stack, seed it with the demo data, and run Playwright (extra arguments
     go to Playwright). `e2e_down` always follows, pass or fail (DL-65)."""
     return [
         *e2e_down(),
         step(*E2E_COMPOSE, "up", "--detach", "--wait", "--build"),
-        step(*E2E_COMPOSE, "run", "--rm", "api", "python", "-m", "app.cli", "seed", "--demo"),
+        step(*E2E_COMPOSE, "run", "--rm", "api", "python", "-m", "app.cli", "seed", seed),
         step("npx", "playwright", "test", *extra, cwd=FRONTEND),
     ]
+
+
+def docs_screenshots() -> list[Step]:
+    """The guide's screenshots (DL-343): the end-to-end stack with the manual pass's data, whose
+    requirements, approvals, and Trash the demo alone lacks (DL-361), through the shots' own
+    Playwright config, which saves each in light and dark under `docs/user-guide/images/`."""
+    return e2e(["--config", "playwright.screenshots.config.ts"], seed="--manual-pass")
 
 
 def e2e_down() -> list[Step]:

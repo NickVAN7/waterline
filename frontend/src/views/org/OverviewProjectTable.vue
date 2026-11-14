@@ -1,19 +1,21 @@
 <script setup lang="ts">
 // One of the org overview's project tables (UI-SHL-10): name, key, type, status, and lead, each
-// project linking to its settings. Its region and table are named by the section's heading.
+// project linking to its settings. Its region and table are named by the section's heading. In the
+// archived table the status reads Archived: its old status means nothing there (owner, S3-C0k).
 import type { components } from '@/api/schema'
-import { NO_LEAD, PROJECT_STATUS, PROJECT_TYPE } from '@/app/labels'
+import { NO_LEAD, PROJECT_ARCHIVED, PROJECT_STATUS, PROJECT_TYPE } from '@/app/labels'
 import Badge from '@/components/Badge.vue'
 
 defineProps<{
   projects: components['schemas']['ProjectItem'][]
   orgSlug: string
   labelledBy: string
+  archived?: boolean
 }>()
 </script>
 
 <template>
-  <div role="region" :aria-labelledby="labelledBy" tabindex="0" class="overflow-x-auto">
+  <div role="region" :aria-labelledby="labelledBy" tabindex="0" class="relative overflow-x-auto">
     <table :aria-labelledby="labelledBy" class="w-full border-collapse text-sm">
       <thead>
         <tr class="border-b border-border text-left">
@@ -34,7 +36,11 @@ defineProps<{
           <td class="p-2 font-mono">{{ project.key }}</td>
           <td class="p-2">{{ PROJECT_TYPE[project.type] }}</td>
           <td class="p-2">
+            <Badge v-if="archived" :tone="PROJECT_ARCHIVED.tone" :icon="PROJECT_ARCHIVED.icon">{{
+              PROJECT_ARCHIVED.label
+            }}</Badge>
             <Badge
+              v-else
               :tone="PROJECT_STATUS[project.status].tone"
               :icon="PROJECT_STATUS[project.status].icon"
               >{{ PROJECT_STATUS[project.status].label }}</Badge

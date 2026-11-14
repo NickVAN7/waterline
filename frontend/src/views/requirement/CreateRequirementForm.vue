@@ -13,12 +13,10 @@ import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
-import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import SelectField from '@/components/SelectField.vue'
-import TextField from '@/components/TextField.vue'
 import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 
-import PriorityField from './PriorityField.vue'
+import RequirementFields from './RequirementFields.vue'
 import { DESCRIPTION_TEMPLATE, type RequirementDraft } from './templates'
 
 type Item = components['schemas']['RequirementItem']
@@ -58,8 +56,7 @@ const errors = useFormErrors({
 })
 
 const alertBox = ref<InstanceType<typeof FormAlert>>()
-const titleField = ref<InstanceType<typeof TextField>>()
-const descriptionField = ref<InstanceType<typeof MarkdownEditor>>()
+const fields = ref<InstanceType<typeof RequirementFields>>()
 const parentField = ref<InstanceType<typeof SelectField>>()
 const formElement = ref<HTMLFormElement>()
 
@@ -75,9 +72,8 @@ const parents = computed(() => [
 async function focus(target: string) {
   await nextTick()
   if (target === 'alert') alertBox.value?.focus()
-  else if (target === 'title') titleField.value?.focus()
-  else if (target === 'description_md') await descriptionField.value?.focus()
-  else if (target === 'priority') document.getElementById(`${PREFIX}-priority`)?.focus()
+  else if (target === 'title' || target === 'description_md' || target === 'priority')
+    await fields.value?.focus(target)
   else parentField.value?.focus()
 }
 
@@ -128,7 +124,12 @@ defineExpose({ values, pending, focus: () => focus('title') })
 </script>
 
 <template>
-  <form ref="formElement" novalidate class="flex flex-col gap-4" @submit.prevent="submit">
+  <form
+    ref="formElement"
+    novalidate
+    class="flex max-w-(--content-narrow) flex-col gap-4"
+    @submit.prevent="submit"
+  >
     <FormAlert
       v-if="errors.alert.value"
       :key="errors.alertKey.value"
@@ -140,30 +141,14 @@ defineExpose({ values, pending, focus: () => focus('title') })
     <p class="m-0 text-sm text-text-muted">
       <span aria-hidden="true" class="font-bold text-danger">*</span> Required field
     </p>
-    <TextField
-      :id="`${PREFIX}-title`"
-      ref="titleField"
-      v-model="values.title"
-      label="Title"
-      autocomplete="off"
-      required
-      :error="errors.fieldErrors.value.title"
-      @update:model-value="errors.clearField('title')"
-    />
-    <MarkdownEditor
-      :id="`${PREFIX}-description`"
-      ref="descriptionField"
-      v-model="values.description_md"
-      label="Description"
-      help="Write the acceptance criteria as a numbered list under Acceptance Criteria. Markdown: see how it reads in Preview."
-      :error="errors.fieldErrors.value.description_md"
-      @update:model-value="errors.clearField('description_md')"
-    />
-    <PriorityField
-      v-model="values.priority"
+    <RequirementFields
+      ref="fields"
+      v-model:title="values.title"
+      v-model:description="values.description_md"
+      v-model:priority="values.priority"
       :prefix="PREFIX"
-      :error="errors.fieldErrors.value.priority"
-      @edit="errors.clearField('priority')"
+      :errors="errors.fieldErrors.value"
+      @edit="errors.clearField"
     />
     <SelectField
       :id="`${PREFIX}-parent`"

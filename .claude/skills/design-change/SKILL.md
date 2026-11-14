@@ -23,6 +23,9 @@ before the next group's first checkpoint starts. The slice retro's changes apply
 slice's last checkpoint report, on the slice branch, before its pull request is merged (DL-19).
 Mid-group, apply one only if the owner says it blocks the current group.
 
+An owner decision that changes only the current checkpoint's own row isn't a design change
+here: it goes in the checkpoint's commit with its decision-log entry (DL-362).
+
 If a checkpoint is in progress, **park it** first (DL-20): a design change never shares a
 commit with checkpoint work, and work in progress is never pushed.
 1. `git stash push --include-untracked -m "park <ID>"`; confirm with `git status` that the
@@ -68,7 +71,9 @@ Work through this list for each decision, and change everything that states the 
 - `docs/build-plan.md`: the checkpoint table and its "Includes", the "Done when" list, the
   feature map, the service layer order, the slice's notes, and the slice's groups.
 - `docs/testing-strategy.md`, `docs/screen-inventory.md`.
-- `docs/developer-guide.md` and `docs/user-guide.md`.
+- `docs/developer-guide.md`, `docs/behavior-reference.md`, and the guide under `docs/user-guide/`
+  (the reference changes with behavior; the guide only when what a user does or sees changes,
+  DL-335).
 - `docs/tech-debt.md`: resolve or re-target entries the decision affects.
 - The `CLAUDE.md` files, and `.claude/` skills and agents (e.g. a reviewer's checklist); the
   root `CLAUDE.md`'s **Status** when the change alters what's next (DL-315).

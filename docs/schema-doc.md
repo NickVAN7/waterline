@@ -591,6 +591,7 @@ leave, be demoted, or be deactivated unless a replacement owner is named in the 
 | restriction_level | enum: internal / confidential, nullable | `RestrictionMixin`; null = None; the floor for the project's items (design-doc §3.1) |
 | restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
 | archived_at | timestamptz, nullable | archived = read-only, hidden by default |
+| get_started_hidden | boolean | Added in Slice 3. NOT NULL, default false; a project admin hid the home's Get started checklist (design-doc §11, DL-201; `PUT/DELETE …/get-started/hidden`, S3-C15) |
 | created_at / updated_at | timestamptz | |
 
 Composite FK `(organization_id, workspace_id)` → `organization(id, workspace_id)`: keeps
@@ -1115,6 +1116,25 @@ created. Project members create tags; renaming, deleting, and setting a tag's ty
 | created_at / updated_at | timestamptz | |
 
 Index `(entity_type, entity_id)`. Links only in v1; file uploads are v2+ (design-doc §16).
+
+### `saved_filter`
+A user's named filter-bar setup for one list in one project (design-doc §11, "Lists";
+`docs/reviews/s3/S3-plan.md`, Q8). Owned by the `saved_filter` area; added in S3-C32.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → user) | the owner; every query is scoped to the caller |
+| project_id | UUID (FK → project) | |
+| list | enum: requirements / tasks / activity / trash / project_members | the project list it filters; the backlog and the board share `tasks` (one task list, `GET …/tasks`) |
+| name | varchar | at most 100 characters |
+| query | text | the list's query string as the filter bar puts it in the URL; at most 2,000 characters; checked against the list's declared filters when applied, not when saved |
+| created_at / updated_at | timestamptz | |
+
+`UNIQUE(user_id, project_id, list, name)`, `user_error("name", "taken", …)`: a user can't reuse a
+name on the same list. No other index: rows are read by user (and project and list), which the
+unique constraint leads with, never by project alone. A saved filter of a project the user can
+no longer open stays and is left out.
 
 ---
 

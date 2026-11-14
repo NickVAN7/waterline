@@ -45,7 +45,8 @@ const props = defineProps<{
   // True when the requirement loaded.
   reloadRequirement: () => Promise<boolean>
 }>()
-const emit = defineEmits<{ changed: [requirement: Requirement] }>()
+// `awaiting`: whether a request is pending, each time the latest loads, for the tree's row (Q12b).
+const emit = defineEmits<{ changed: [requirement: Requirement]; awaiting: [pending: boolean] }>()
 
 // The latest request, with the actions the caller may take on it; null when there's none.
 const latest = useLoad(async (): Promise<Request | null> => {
@@ -73,6 +74,7 @@ watch(
 )
 const request = computed(() => latest.data.value ?? null)
 const isPending = computed(() => request.value?.status === 'pending')
+watch(latest.data, (loaded) => loaded !== undefined && emit('awaiting', isPending.value))
 
 const headingId = useId()
 const blockedId = useId()

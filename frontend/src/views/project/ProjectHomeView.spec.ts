@@ -9,6 +9,7 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok } from '@/test/api'
 import { project } from '@/test/projects'
+import { withTrailRoutes } from '@/test/router'
 
 import ProjectHomeView from './ProjectHomeView.vue'
 
@@ -19,11 +20,11 @@ async function mountAt(path: string) {
   useCurrentUserStore().me = me()
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       { path: '/:orgSlug/projects/:key', name: 'project-home', component: ProjectHomeView },
-    ],
+    ]),
   })
   await router.push(path)
   const wrapper = mount(
@@ -50,6 +51,12 @@ describe('ProjectHomeView', () => {
 
     expect(get).toHaveBeenCalledWith('/api/projects/{key}', { params: { path: { key: 'ERP' } } })
     expect(wrapper.get('h1').text()).toBe('ERP rollout')
+    // Its trail: the org, then the project, the page itself (DL-327).
+    const trail = wrapper.get('nav[aria-label=Breadcrumb]')
+    expect(trail.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Acme Manufacturing', '/acme/projects'],
+    ])
+    expect(trail.get('[aria-current=page]').text()).toBe('ERP rollout')
     expect(wrapper.get('header').text()).toContain('ERP')
     expect(wrapper.get('header').text()).toContain('Active')
     expect(wrapper.get('header').text()).toContain('Lead: Liam Lead')
@@ -58,7 +65,7 @@ describe('ProjectHomeView', () => {
     // No level and no categories: no restriction badge (UI-FBK-6).
     expect(wrapper.get('header').text()).not.toContain('Internal')
     expect(wrapper.get('header').text()).not.toContain('No restriction level')
-    expect(document.title).toBe('ERP rollout · Waterline')
+    expect(document.title).toBe('ERP · Waterline')
     expect(useCurrentOrgStore().project?.key).toBe('ERP')
     await expectNoA11yViolations(wrapper)
   })

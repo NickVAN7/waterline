@@ -3,16 +3,19 @@
 // on its page or in the list's side panel (`inPanel`, UI-SHL-11, S2-C18b): its title, ID, status
 // (DL-148; "Approved · modified" when edited since its approval, design-doc §6.1), restriction,
 // priority, reporter, and its description through `MarkdownView` (the one sanitizing renderer,
-// UI-MD-1), with a note when it has no "Acceptance Criteria" heading (DL-149). The status menu
-// (`requirement.update`) and the restriction control (`requirement.raise_restriction` or
-// `.lower_restriction`, DL-251) act on it; the server decides each change. Edit
+// UI-MD-1), with a note when it has no "Acceptance Criteria" heading (DL-149). Its header (DL-325,
+// DL-326): Edit, the status menu (`requirement.update`), and ⋯ More actions (Change restriction…
+// for `requirement.raise_restriction` or `.lower_restriction`, DL-251; Delete…), then Priority,
+// Reporter, and Restriction as a definition list; on the page the ID and status go under the
+// `h1`, in the panel in its top row. The server decides each change. Edit
 // (`requirement.update`) turns the title, description, and priority into a form in place
 // (DL-263); the status menu waits while it's open, since its change would make the form's save a
 // 409. What it shows is told to its host (`changed`), so the list's row follows a change made in
 // the panel. A refused change asks the host to reload what the user may do (`reloadProject`,
 // false when the user may no longer read it); `focusHeading` is where focus goes when the control
 // that had it is gone (the page's `h1`, the panel's title). Delete (`requirement.delete`) opens
-// the delete dialog; once deleted, the host moves to the tree (`deleted`, DL-287).
+// the delete dialog; once deleted, the host moves to the tree (`deleted`, DL-287). `dirty`: an
+// edit with unsaved changes, for the panel's Discard your changes? (DL-323).
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -22,10 +25,12 @@ import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { projectCrumbs } from '@/app/crumbs'
 import {
   APPROVED_MODIFIED,
   ARCHIVED_BANNER,
   DEACTIVATED,
+  NO_RESTRICTION,
   PRIORITY,
   REQUIREMENT_STATUS,
   requirementStatusBadge,
@@ -36,6 +41,7 @@ import Badge from '@/components/Badge.vue'
 import Button from '@/components/Button.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import MoreActionsMenu, { type MoreAction } from '@/components/MoreActionsMenu.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
@@ -62,7 +68,13 @@ const props = defineProps<{
   reloadProject: () => Promise<boolean>
   focusHeading: () => void | Promise<void>
 }>()
-const emit = defineEmits<{ changed: [requirement: Requirement]; gone: []; deleted: [id: string] }>()
+const emit = defineEmits<{
+  changed: [requirement: Requirement]
+  // Whether a request on it is pending, for the tree's row (ApprovalSection's `awaiting`).
+  awaiting: [pending: boolean]
+  gone: []
+  deleted: [id: string]
+}>()
 
 const item = useLoad(() =>
   api(
@@ -122,6 +134,29 @@ watch(
 // Unique: the panel's detail sits on a page that may have its own.
 const descriptionId = useId()
 const id = computed(() => `${props.project.key}-RQ-${props.number}`)
+const requirementId = (number: number) => `${props.project.key}-RQ-${number}`
+// An ancestor's ID: in the panel it swaps the panel to it (UI-SHL-11), on the page it opens its page.
+const ancestorLink = (number: number) =>
+  props.inPanel
+    ? { query: { open: `RQ-${number}` } }
+    : { name: 'project-requirement', params: { key: props.project.key, number } }
+// The page's trail: the project's, Requirements, the ancestors root first, then this one (DL-327,
+// DL-328).
+const crumbs = computed(() =>
+  projectCrumbs(props.project, [
+    {
+      label: 'Requirements',
+      to: { name: 'project-requirements', params: { key: props.project.key } },
+    },
+    ...(requirement.value?.ancestors ?? []).map((a) => ({
+      label: requirementId(a.number),
+      mono: true,
+      to: ancestorLink(a.number),
+    })),
+    { label: id.value, mono: true },
+  ]),
+)
+const parent = computed(() => requirement.value?.ancestors.at(-1))
 const statusBadge = computed(() =>
   requirement.value ? requirementStatusBadge(requirement.value) : REQUIREMENT_STATUS.draft,
 )
@@ -251,6 +286,24 @@ function approvalChanged(saved: Requirement) {
 
 const restricting = ref<InstanceType<typeof RestrictionDialog>>()
 const deleting = ref<InstanceType<typeof DeleteRequirementDialog>>()
+const moreMenu = ref<InstanceType<typeof MoreActionsMenu>>()
+// ⋯ More actions (DL-325): Change restriction…, then Delete… after a separator; only those
+// `allowed_actions` allow, so an empty menu isn't shown.
+const moreActions = computed<MoreAction[]>(() => {
+  const shown = requirement.value
+  if (!shown) return []
+  return [
+    ...(canRestrict.value
+      ? [{ label: 'Change restriction…', run: () => restricting.value?.open(shown) }]
+      : []),
+    ...(!editing.value && allows(shown, 'requirement.delete')
+      ? [{ label: 'Delete…', danger: true, run: () => deleting.value?.open(shown) }]
+      : []),
+  ]
+})
+
+// Typed in the edit form and not saved: the side panel asks before it drops it (DL-323).
+defineExpose({ dirty: computed(() => editing.value && !!editForm.value?.dirty) })
 
 function restrictionSaved(saved: Requirement) {
   item.data.value = saved
@@ -284,20 +337,18 @@ function restrictionSaved(saved: Requirement) {
       <Skeleton v-else :rows="6" />
     </div>
     <template v-else>
-      <RouterLink
-        v-if="!inPanel"
-        :to="{ name: 'project-requirements', params: { key: project.key } }"
-        class="self-start text-sm"
-        >Requirements</RouterLink
-      >
       <!-- In the panel too: the list's banner is behind it, inert. -->
       <Alert v-if="project.archived" tone="info">{{ ARCHIVED_BANNER }}</Alert>
       <header class="flex flex-col gap-2">
-        <!-- The page's h1 with its actions; in the panel, whose title is the requirement's, the
-             actions alone. -->
+        <!-- The page's h1 with its actions beside it (DL-326); in the panel, whose title is the
+             requirement's and whose top row holds its ID and status (DL-325), the actions alone. -->
         <component
           :is="inPanel ? 'div' : PageHeader"
-          v-bind="inPanel ? { class: 'flex flex-wrap gap-3' } : { title: requirement.title }"
+          v-bind="
+            inPanel
+              ? { class: 'flex flex-wrap items-center gap-3' }
+              : { title: requirement.title, crumbs, tabTitle: id }
+          "
         >
           <Button
             v-if="!editing && allows(requirement, 'requirement.update')"
@@ -314,28 +365,13 @@ function restrictionSaved(saved: Requirement) {
             :pending="changing"
             @change="changeStatus"
           />
-          <Button v-if="canRestrict" variant="secondary" @click="restricting?.open(requirement)"
-            >Change restriction</Button
-          >
-          <Button
-            v-if="!editing && allows(requirement, 'requirement.delete')"
-            variant="danger"
-            @click="deleting?.open(requirement)"
-            >Delete</Button
-          >
+          <MoreActionsMenu ref="moreMenu" :name="id" :actions="moreActions" />
         </component>
-        <div class="flex flex-wrap items-center gap-3">
+        <div v-if="!inPanel" class="flex flex-wrap items-center gap-3">
           <span class="font-mono text-text-muted">{{ id }}</span>
           <Badge :tone="statusBadge.tone" :icon="statusBadge.icon"
             ><span class="sr-only">Status: </span>{{ statusBadge.label }}</Badge
           >
-          <!-- The restriction that applies, its own with the project's (DL-265). -->
-          <RestrictionBadge
-            :project="{
-              restriction_level: requirement.effective_restriction_level,
-              restriction_categories: requirement.effective_restriction_categories,
-            }"
-          />
         </div>
       </header>
       <Alert
@@ -360,13 +396,14 @@ function restrictionSaved(saved: Requirement) {
         @refused="editRefused"
         @gone="editGone"
       />
-      <dl class="m-0 flex flex-col gap-1">
-        <div v-if="!editing" class="flex flex-wrap gap-2">
-          <dt class="font-medium">Priority:</dt>
+      <!-- Two columns of term and value (DL-325, DL-326); the parent comes with S3-C0e (TD-106). -->
+      <dl class="m-0 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div v-if="!editing" class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Priority</dt>
           <dd class="m-0">{{ PRIORITY[requirement.priority] }}</dd>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <dt class="font-medium">Reporter:</dt>
+        <div class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Reporter</dt>
           <dd class="m-0 flex flex-wrap items-center gap-2">
             {{ requirement.reporter_name }}
             <Badge
@@ -377,8 +414,41 @@ function restrictionSaved(saved: Requirement) {
             >
           </dd>
         </div>
+        <div class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Parent</dt>
+          <dd v-if="parent" class="m-0">
+            <RouterLink :to="ancestorLink(parent.number)" class="font-mono">{{
+              requirementId(parent.number)
+            }}</RouterLink>
+            {{ parent.title }}
+          </dd>
+          <dd v-else class="m-0">None</dd>
+        </div>
+        <div class="flex flex-col gap-1">
+          <dt class="text-sm font-medium text-text-muted">Restriction</dt>
+          <!-- The restriction that applies, its own with the project's (DL-265). -->
+          <dd class="m-0">
+            <RestrictionBadge
+              v-if="
+                requirement.effective_restriction_level ||
+                requirement.effective_restriction_categories.length
+              "
+              :project="{
+                restriction_level: requirement.effective_restriction_level,
+                restriction_categories: requirement.effective_restriction_categories,
+              }"
+            />
+            <template v-else>{{ NO_RESTRICTION.label }}</template>
+          </dd>
+        </div>
       </dl>
-      <section v-if="!editing" :aria-labelledby="descriptionId" class="flex flex-col gap-3">
+      <!-- Each part below the details starts at a rule, with room above it, so the page doesn't
+           read as one block of text (S3-C0l). -->
+      <section
+        v-if="!editing"
+        :aria-labelledby="descriptionId"
+        class="flex flex-col gap-3 border-t border-border-subtle pt-6"
+      >
         <!-- An h2 in the panel too, beside its title: the description's own headings start at h3
              (`level` 2, UI-MD-1), so they stay under it. -->
         <h2 :id="descriptionId" class="m-0 text-lg font-semibold">Description</h2>
@@ -400,11 +470,13 @@ function restrictionSaved(saved: Requirement) {
         :requirement="requirement"
         :reload-page="reload"
         :reload-requirement="item.run"
+        class="border-t border-border-subtle pt-6"
         @changed="approvalChanged"
+        @awaiting="(pending: boolean) => emit('awaiting', pending)"
       />
       <!-- Below the details and description, on the page and in the panel, opening on History; the
            tab isn't in the URL (DL-268, DL-269). -->
-      <Tabs v-model:value="tab">
+      <Tabs v-model:value="tab" class="border-t border-border-subtle pt-6">
         <TabList :pt="{ content: { 'aria-label': 'About this requirement' } }">
           <Tab value="history">History</Tab>
           <Tab value="revisions">Revisions</Tab>

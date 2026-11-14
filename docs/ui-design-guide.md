@@ -42,7 +42,9 @@ layout and utilities, both fed by one set of design tokens.**
 - **Native elements first** still holds (UI-STY-3): `<dialog>`, `<fieldset>`, `<table>`, and
   plain `<button>` and `<a>` are used where they do the job.
 - **SVAR for what PrimeVue does not have.** PrimeVue has no kanban board and no Gantt chart. The
-  task board and the editable or orderable lists use SVAR Vue **Kanban** and **DataGrid** (V1);
+  task board uses SVAR Vue **Kanban** and the editable grids **DataGrid** (V1); an ordered list
+  (the requirement tree, the backlog) is PrimeVue's TreeTable or DataTable through our wrapper
+  (UI-SVR-2, DL-375);
   the schedule chart uses SVAR **Gantt** (V2). SVAR is themed by one mapping file onto the same
   tokens (UI-SVR-3), so there is still one palette. Rules and known defects are in §7.1.
 
@@ -124,6 +126,7 @@ screen-reader pass at slice verification, **R** the `ui-reviewer` agent.
 | 2.4.1 Bypass blocks | Skip link first | UI-SHL-1 | A, M |
 | 2.4.2 / 2.4.3 Page titled, focus order | Title per route; focus moves to the page heading on navigation; dialogs return focus | UI-SHL-9, UI-FRM-14, UI-TBL-9 | M, R |
 | 2.4.7 / 2.4.11 Focus visible, not obscured | Ring on every control; sticky header, selection toolbar, and toasts never cover the focused element | UI-TOK-5, UI-SHL-3, UI-TBL-8, UI-FBK-10 | E, M |
+| 2.4.8 Location (AAA, adopted) | A breadcrumb trail above the `h1` on every page but the top-level ones | UI-SHL-14 | E, R |
 | 2.5.7 Dragging | Every drag has a single-pointer alternative (design-doc §6) | UI-TBL-5 | R, M |
 | 2.5.8 Target size | At least 24×24 CSS px | UI-TOK-6 | A (browser only), R |
 | 3.2.6 Consistent help | If a help mechanism is added, it sits in the same place on every page | UI-SHL-8 | R |
@@ -271,8 +274,9 @@ These sit in the same `@theme static` block as §3.1.
   --control-height: 2.25rem;     /* 36px: buttons and inputs */
   --header-height: 3.5rem;
   --sidebar-width: 15rem;
-  --content-narrow: 40rem;       /* forms, settings */
-  --content-wide: 80rem;         /* lists, tables */
+  --sidebar-height: calc(100dvh - var(--header-height)); /* it stays put as the page scrolls */
+  --content-narrow: 48rem;       /* forms, settings, dialogs (DL-373) */
+  --content-prose: 100ch;        /* a guide article's text (DL-373) */
 
   /* Focus ring */
   --focus-ring-width: 2px;
@@ -420,7 +424,7 @@ cover (found in the spike, to be completed per component as it is adopted, UI-ST
 │ ──────────── │ project pages: archived banner; project header      │
 │ [Waterline ▾]│ with its restriction badge                          │
 │  Home        │ ──────────────────────────────────────────          │
-│  Requirements│ content: up to 80rem; forms and settings 40rem      │
+│  Requirements│ content: the whole width beside the sidebar         │
 │  Tasks       │                                                     │
 │  Test cases  │                                                     │
 │  Members     │                                                     │
@@ -440,8 +444,12 @@ render inside the full shell when signed in.
   Main nav while signed out) is left out, not left empty (DL-93).
 - **UI-SHL-3** The header is sticky at `--header-height`. Below 40 rem it wraps onto as many
   rows as its contents need and is not sticky, so the page reflows to 320 CSS px with no
-  horizontal scroll and a taller header never covers focus (DL-98). The only other sticky layer in v1 is a
-  table's selection toolbar, and only while rows are selected (UI-TBL-8). Any later sticky
+  horizontal scroll and a taller header never covers focus (DL-98). The other sticky layers in v1
+  are a table's selection toolbar, only while rows are selected (UI-TBL-8), and the item side
+  panel's split pane, under the header at `--header-height` (UI-SHL-11), and a guide page's On
+  this page nav, under the header from 64 rem wide and 30 rem tall (DL-340), and from 48 rem the
+  sidebar, under the header at `--sidebar-height`, scrolling within itself if it's taller (owner,
+  S2 feedback; S3-C0j). Any later sticky
   element needs the same `scroll-padding` treatment and an end-to-end focus check
   (UI-FBK-10).
 - **UI-SHL-4** **Org menu** (DL-137; from S2-C0e and S2-C0f): the header reads "Waterline"
@@ -459,18 +467,26 @@ render inside the full shell when signed in.
   selector** (UI-SHL-6); then the **selected project's pages** (UI-SHL-6). **On an admin page**
   (UI-SHL-10) the sidebar shows My work and then that admin area's section nav (the org's
   Overview, Members, and Settings; the workspace's Staff, Orgs, Users, and Settings) in place of
-  the project selector and project pages (DL-137; from S2-C0f). An item shows only when
+  the project selector and project pages (DL-137; from S2-C0f). A small caption says whose pages
+  follow: **Project** above the selector (hidden from screen readers, whose button already says
+  "Project:"), **Organization** and the org's name above its pages, **Workspace administration**
+  above the workspace's (owner, S2 feedback; S3-C0j). An item shows only when
   `allowed_actions` allows it. Text is always visible; icons only supplement it. Below 48 rem
   the sidebar becomes a "Menu" disclosure button in the header (`aria-expanded`,
-  `aria-controls`); nothing depends on hover. From S3-C0g, a docs route's sidebar shows My work,
-  Documentation, and the guide's groups and pages, the current one marked (DL-338).
+  `aria-controls`); nothing depends on hover. On a docs route the sidebar shows My work, then
+  Documentation (the landing page), then the guide's groups (a label naming each list) and pages,
+  the current one marked as an admin page's is (DL-338; from S3-C0g).
 - **UI-SHL-6** **Project selector and project pages.** The selector is a menu button showing the
   current project that opens a disclosure popover of **links** (not a Select or listbox),
-  headed by the current org's name (it lists that org's projects only), with a filter field past
-  about eight projects, and "All projects" (styled apart from the project links) and "New
-  project" (only when allowed; not indented) (DL-137). Below it, the selected project's pages
+  headed by the current org's name (it lists that org's projects only); past about eight projects,
+  a **Filter projects** button shows a filter field and moves focus to it (the org menu's the same,
+  shared `LinkPopover`); then "All projects" (a menu row with an arrow, below a rule, not
+  underlined) and "New project" (only when allowed; not indented) (DL-137). In the sidebar the
+  selector fills its width, its arrow at the end (owner, S2 feedback; S3-C0j). Below it, the selected project's pages
   are links, flat, in this order (DL-202): Home, Requirements, Tasks (Board and Backlog as tabs),
-  Sprints, Timeline, Test cases, Test runs, Activity, Members, Settings, and Trash last. Each
+  Sprints, Timeline, Workstreams (DL-348), Test cases, Test runs, Activity, Members, Settings;
+  Trash isn't listed: each list page whose items can be deleted links it from its header
+  (DL-350). Each
   appears once its feature is built, and a turned-off or unshipped module's page is left out. A module that isn't
   shipped can't be enabled (DL-136), so a module page appears only once its module has shipped
   and is enabled. **Only the page you are on has `aria-current="page"`**: "All projects" is
@@ -481,24 +497,31 @@ render inside the full shell when signed in.
   (DL-109). The per-project access review is its own page, `/{org_slug}/projects/{key}/access`,
   linked from the members page, not a pages item; the members page adds with Add member (the
   picker, primary) and Add by email (secondary) (DL-119).
-- **UI-SHL-7** **Content width:** lists and tables up to `--content-wide`, forms and settings
-  up to `--content-narrow`, left-aligned in `main`, with at least 4 (`p-4`) side padding. Pages
-  reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
+- **UI-SHL-7** **Content width:** `main` takes the whole width beside the sidebar (and beside
+  the split pane when it's open, UI-SHL-11), with at least 4 (`p-4`) side padding: a page's
+  header, lists, tables, and card grids span it (DL-360). A form or settings page keeps its form
+  at `--content-narrow` (48 rem), left-aligned like every other page; a page's form sets the cap
+  on itself, since `main` has none. A guide article, its text up to `--content-prose` (100ch)
+  and its On this page beside it, is centered in `main` (DL-367, DL-373). Pages reflow down to 320 CSS px with no horizontal page scroll. A wide table scrolls inside its own
   region (`role="region"`, an accessible name, `tabindex="0"`).
 - **UI-SHL-8** **Page structure:** exactly one `h1` per page, in a `PageHeader` that holds the
   page's primary action(s) on the right (wrapping below at narrow widths); a project page's
   `ProjectHeader` holds them the same way (from S2-C0g, TD-49). Two exceptions: the auth
   card's pages (sign-in, the forced password change): no actions, and a plain `h1` one
-  size below the app's name, the card's largest text (`text-xl`; DL-176); and the
-  Documentation page (`/docs`), whose `h1` is the user guide's own, rendered by `MarkdownView`
-  at level 0, with no `PageHeader` (DL-310). Sections use `h2`
+  size below the app's name, the card's largest text (`text-xl`; DL-176); and a
+  guide page (`/docs/<page>`), whose `h1` is its front matter's title, between the group's label
+  and the lead, with no `PageHeader` (DL-340). Sections use `h2`
   and nest in order. The help link (3.2.6) is the user menu's **Documentation** item (S2-C21d,
   DL-238), in the same place on every page.
 - **UI-SHL-9** **Route changes:** on navigation, set `document.title` to
-  `<h1 text> · Waterline` and move focus to the new `h1` (`tabindex="-1"`) once the view has
+  `<short title> · Waterline`, the part that tells tabs apart first: the `h1`'s `data-tab-title`
+  when it has one (an item's ID, `PORTAL-RQ-2`; a project page's key and page, `PORTAL members`,
+  through `PageHeader`'s `tabTitle` and `ProjectHeader`'s `page`), otherwise the `h1`'s text
+  (owner, S2 feedback; S3-C0j); and move focus to the new `h1` (`tabindex="-1"`) once the view has
   rendered. A change that only alters list state through `useListQuery` (sort, filter, page)
-  does not move focus; it updates a polite live region instead ("12 projects"). On `/docs`, a
-  hash (`#docs-<section>`) moves focus to that section's heading instead (DL-311). A user's action
+  does not move focus; it updates a polite live region instead ("12 projects"). On a guide page
+  (`/docs/<page>`), a section's hash (`#<section>`) moves focus to that section's heading instead
+  (DL-311, DL-338, DL-340). A user's action
   whose reload replaces the page (a refusal that leaves the not-found or 403 page, a save that
   finds the item gone) does the same, on a visit's first page too (`replacedPage()`; S2-C22
   review).
@@ -513,17 +536,40 @@ render inside the full shell when signed in.
   `/workspace/users/{user_id}/access`), and `/workspace/settings`; org administration at
   `/{org_slug}/overview` (the landing page: the org's details and its projects, each with its
   name, key, type, status, and lead, linking to its settings, its archived projects in a section
-  below headed "Archived" (DL-180; from S2-C0g); anyone who opens org admin pages holds inherited
+  below headed "Archived projects", each marked Archived in place of its status (DL-180; from
+  S2-C0g; S3-C0k), the slug under the title; anyone who opens org admin pages holds inherited
   project admin, design-doc §5), `/{org_slug}/members`, and
   `/{org_slug}/settings`.
 - **UI-SHL-11** **Opening an item** (a requirement, task, test case, or test run) from a list or
-  the board opens a **side panel** over the list, so the list keeps its place, with **Open full
-  page** (DL-202). The panel has its own URL, the list's route with the item open (e.g.
-  `?open=TA-45`), so Back closes it and the address can be shared. A direct link to an item, and
-  **Copy link**, use the full-page route. For requirements, the tree's ID opens it at
-  `…/requirements?open=RQ-<n>` (DL-262). From S3-C0d, at 64rem and wider the panel is a
-  resizable split pane beside a list that stays usable, and below it this overlay; its header,
-  swapping, unsaved edits, and focus are DL-321 to DL-326, and this rule is rewritten then.
+  the board opens it in the shared **side panel** (`ItemPanel`; DL-202, DL-321 to DL-326):
+  - **Where:** at 64rem and wider, a split pane right of the page, from under the app header to
+    the window's foot, the page (its header too) narrowing beside it (DL-356); the list stays
+    usable (scroll, select, expand, open another item); below 64rem, a modal overlay (the page inert, focus kept
+    in it, Esc closes). Crossing the width keeps what the panel holds, and the focus in it.
+  - **Size:** 560px by default, 400 to 800px, by a vertical separator that drags, steps through
+    400, 560, and 800 on a click without a drag (WCAG 2.5.7, DL-355), and works from the keyboard
+    (`role="separator"`, named, `aria-valuenow/min/max` and a value text, Left and Right
+    arrows); the width is kept per viewer in `localStorage`, in try/catch.
+  - **Address:** the list's route with the item open (e.g. `?open=TA-45`), so Back closes it and
+    the address can be shared; another item's ID swaps it and updates `?open`. A direct link to
+    an item, and **Copy link**, use the full-page route. For requirements, the tree's ID opens it
+    at `…/requirements?open=RQ-<n>` (DL-262).
+  - **Header:** the item's ID (mono) and status badge, with **Open full page**, **Copy link**,
+    and **Close** as icon buttons (each with an accessible name and a tooltip); the title, the
+    panel's heading; then **Edit**, **Change status**, and **⋯ More actions** (its danger items
+    after a separator, the menu hidden when empty), and the item's fields as a two-column
+    definition list. The item's full page has the same actions beside its `h1`, the ID and
+    status under it.
+  - **Focus and landmarks:** opening or swapping focuses the title; at wide widths focus isn't
+    trapped and the panel is a complementary region named for the item ("Requirement
+    PORTAL-RQ-3"); Esc closes it when focus is inside and nothing there used the key (an edit
+    form, a menu, a dialog opened from the panel); closing returns focus to the ID that opened
+    it, or the page's `h1`. The open item's row is marked by more than color: the selected
+    background, a bold title, and an "Open" label with a panel icon; its ID link has
+    `aria-current="true"`.
+  - **Unsaved edits:** Close, Esc from outside the edit form (in it, Esc does nothing), Back,
+    another item's ID, and Open full page first ask **Discard your changes?**, naming the item and
+    what happens, with **Keep editing** (initial focus) and **Discard changes** (danger).
 - **UI-SHL-12** **Creating an item** is a dialog with the essential fields that the user can
   **expand into a full page**, keeping what they typed; after creating, they land on the new
   item to fill in the rest (DL-202). For requirements, **Open as a full page** carries what was
@@ -533,8 +579,27 @@ render inside the full shell when signed in.
   off) is an explanatory page inside the project, not a 404: "The Sprints module is turned off
   for this project. Contact your administrator for questions.", with the module's name. A module
   that hasn't shipped has no page at all (DL-200).
-- **Breadcrumbs** (from S3-C0e, DL-327, DL-328): a trail above the `h1` on every page but the
-  top-level ones, replacing the single back links; it becomes a numbered UI-SHL rule then.
+- **UI-SHL-14** **Breadcrumbs** (DL-327, DL-328, DL-357, DL-358): one trail (`Breadcrumbs`, on
+  PrimeVue's `Breadcrumb`, flush with the `h1` it sits above) on every page but the top-level
+  ones, in place of single back links.
+  - **What it holds:** inside an org, Org › Project › Section › Item (the org's crumb, with a
+    building icon, opens its projects; a project page's trail comes from `projectCrumbs`); outside
+    one, its area (`Workspace › Users`, `Account settings › Change password`). An item is its ID,
+    in mono, after its ancestors (the read's `ancestors`, root first). My work, Account settings,
+    an org's projects, the Documentation landing page (an article under it, from S3-C0g, has
+    `Documentation › <article>`), and the error pages have none; the side panel, not a page, has
+    none either. A crumb the viewer may never open isn't shown: a person's access review shows
+    `Workspace › Users › <name>` only with `workspace.view`, and none to an org admin who came
+    from the org's members (the route names no org) (DL-358).
+  - **How it reads:** `nav aria-label="Breadcrumb"` with an `ol`; every crumb but the last is a
+    link, the last plain text with `aria-current="page"` and the only crumb with it (a link to
+    the page it's on, Workspace on Staff, is `aria-current="false"`); the chevrons are
+    decorative. It wraps when it doesn't fit (PrimeVue's own CSS would scroll it, the scrollbar
+    hidden). 14px
+    (`--text-xs`): links in `--color-text-muted`, `--color-text` and underlined on hover and
+    focus; the current crumb in `--color-text`.
+  - **Narrow:** under 40rem the middle crumbs fold into a "…" menu button ("Show 2 more levels"),
+    the first and last kept; its menu lists them as links and opens with focus in it.
 
 ---
 
@@ -654,7 +719,9 @@ render inside the full shell when signed in.
   checked live (UI-FRM-9). The member table has separate Name and Email columns.
 - **UI-FRM-14** **Dialogs:** native `<dialog>` opened with `showModal()`, so Esc closes and the
   page behind is inert (focus stays in the dialog; the browser's Tab may cycle through its own
-  UI, which is expected). Initial focus goes to the first field in a form dialog; a confirmation
+  UI, which is expected). Initial focus goes to the first field in a form dialog, or to its
+  title when that field opens a list on focus (Add a member's picker, DL-378; `ModalDialog`'s
+  `startOnTitle`); a confirmation
   dialog starts on its Cancel button, even when it holds a field such as a confirm checkbox
   (DL-115), and a confirmation step inside a dialog (an existing account, joining the
   organization) starts on its Back button (DL-117). When a dialog moves to a new step, the step's
@@ -667,7 +734,9 @@ render inside the full shell when signed in.
   destructive action on a settings page (archiving a project) sits in a **"Danger zone"**
   section with a danger-tone border and heading (DL-137; from S2-C0h). An archived project's
   Unarchive stays there, the one button changing in place so focus stays on it (DL-186).
-- **UI-FRM-15** **Buttons:** one primary button per view or dialog. A submit button is
+- **UI-FRM-15** **Buttons:** one primary button per form or dialog: a page with several forms
+  that each save on their own (project settings' **Save settings** and **Save restriction**)
+  gives each form's submit the primary tone (DL-377). A submit button is
   `type="submit"` and Enter submits; every other button is `type="button"`. Navigation is a
   link, an action is a button. Don't disable a submit button because the form is invalid: users
   can't tell why, so let them submit and show the errors. **Exception:** an export-control
@@ -676,8 +745,8 @@ render inside the full shell when signed in.
   never valid and the reason is shown.
 - **UI-FRM-16** **Layout:** one column, label above control, control width suggests the expected
   input. No autofocus on page load; focus moves only in a dialog, on a failed submit, or on a
-  route change (UI-SHL-9). The one load that moves focus is `/docs` with a section's hash, to
-  that section's heading (DL-311).
+  route change (UI-SHL-9). The one load that moves focus is a guide page (`/docs/<page>`) with a
+  section's hash, to that section's heading (DL-311, DL-340).
 - **UI-FRM-17** **Field hint** (for an optional nicety, and for naming an icon-only control such
   as the row-remove X): a short text that appears on pointer hover **and** on keyboard focus, stays
   visible while the pointer is over it, and is dismissed with Esc. A hint is never the only copy:
@@ -737,6 +806,9 @@ render inside the full shell when signed in.
   | `completed` | info | Completed |
   | `cancelled` | neutral | Cancelled |
 
+  An archived project on My work's lists carries **Archived** (neutral, the pause icon) beside
+  its status (DL-330, S3-C0f).
+
   The requirement status (DL-148), with "Approved · modified" for an approved requirement
   edited since (design-doc §6.1):
 
@@ -773,8 +845,9 @@ render inside the full shell when signed in.
   "Restriction: ", so read alone it says what it is (DL-179; from S2-C0g). A content item's
   badge (a requirement's, from S2-C18) shows its effective restriction, its own with the
   project's (design-doc §3.1, DL-265). A "Deactivated" neutral badge follows a deactivated
-  user's name everywhere it appears, except the workspace users list, where it is in the Status
-  column (DL-137, from S2-C0g), and whose Role column shows the workspace role and system
+  user's name everywhere it appears, except in a people list (a roster, an access review), where
+  the row's text is muted and "· Deactivated" follows the name (`PersonName`; owner, S3-C0k), and
+  the workspace users list, where it is in the Status column (DL-137, from S2-C0g), and whose Role column shows the workspace role and system
   admin as text ("Owner, System admin", "System admin", "Admin"), or "User" for neither, with
   system admins who have no workspace role listed last (DL-183, DL-188; from S2-C0j); the
   per-person access review shows system admin as text too (DL-189, from S2-C0j). **Deactivated
@@ -938,12 +1011,17 @@ alternative.**
   §9 first, because 2.8.0 of the Gantt is broken.
 - **UI-SVR-2** **Which component for which list.** A list that is read, filtered, sorted,
   paged, and bulk-actioned uses a native `<table>` or PrimeVue's DataTable (UI-TBL-1 to 8). The
-  SVAR DataGrid is for lists where **inline cell editing or manual row order is the point**,
-  except the requirement tree, which is PrimeVue's TreeTable: SVAR's free tree mode has no drag
-  and no move of its own (DL-174). The tree still follows UI-SVR-5 (the server decides each move)
-  and UI-SVR-6 (the move menu sits outside the widget). The task board is SVAR Kanban. The choice for each Task and Requirements list is written in
+  SVAR DataGrid is for lists where **inline cell editing is the point** (DL-375). A list where
+  manual row order is the point is PrimeVue's, through our own wrapper: the requirement tree is
+  TreeTable (SVAR's free tree mode has no drag and no move of its own, DL-174), and the backlog
+  DataTable with row reorder (DL-372). The tree still follows UI-SVR-5 (the server decides each move)
+  and UI-SVR-6 (the move menu sits outside the widget). The task board is SVAR Kanban. The
+  backlog is PrimeVue DataTable with row reorder and its virtual scroller, through our own
+  wrapper, which follows UI-SVR-5 (the server decides each move) and UI-SVR-6 (the move menu
+  outside the table), names the virtual scroller as the scroll region (UI-TBL-1), and keeps one
+  tab stop in the rows (DL-372, after S3-C0i's spike). The choice for each Task and Requirements list is written in
   `screen-inventory.md` when that screen is specified, and **one list never ships with two
-  implementations**. (The spike did not decide the per-list split; that is the owner's call
+  implementations**. (The Oct 10 spike did not decide the per-list split; that is the owner's call
   per list.)
 - **UI-SVR-3** **One mapping file, `src/app/theme/svar-theme.css`.** Rules: **Willow only,
   never WillowDark** (our tokens already switch with the theme); `<Willow :fonts="false">`
@@ -967,7 +1045,8 @@ alternative.**
   selected state itself (the widgets expose none); gives the grid editors accessible names;
   and supplies the non-drag alternative (UI-SVR-6).
 - **UI-SVR-5** **The server decides every move and edit.** Wrap each mutating action
-  (`move-card`, `move-item`, `update-task`, `move-task`) with `api.intercept(action, handler)`.
+  (`move-card`, `update-task`, `move-task`; no DataGrid list orders rows, DL-375) with
+  `api.intercept(action, handler)`.
   The handler returns `false` and asks the server, applying the confirmed result through
   `api.exec`, or returns `true` for an optimistic move and reverts on error. Calls the wrapper
   makes through `api.exec` re-enter the same handler, so the wrapper marks its own calls and the
@@ -983,8 +1062,9 @@ alternative.**
   alternative sits **outside** the widget and calls the store. Board: Enter or Space selects a
   card (`select-card`); then the card's **status control** (design-doc §6: the alternative to a
   cross-column drop) and our "Move to top / up / down / bottom / after…" menu (order inside a
-  column) call `api.exec('move-card', { id, column, before? })`. Grid: our row-actions menu
-  (UI-TBL-4) calls `move-item` with `up`, `down`, `before`, or `after`; changing a requirement's
+  column) call `api.exec('move-card', { id, column, before? })`. An ordered list (the tree,
+  the backlog, both PrimeVue, DL-375): our row-actions menu (UI-TBL-4) moves a row up, down, to
+  the top or bottom, or after another, each through the server first; changing a requirement's
   parent stays the separate "Move to…" action of design-doc §6. Gantt: our edit dialog for dates and our
   "Move…" menu call `update-task` and `move-task`. SVAR's own card menu is not used for anything
   a keyboard user needs.
@@ -1045,16 +1125,28 @@ the revision compare in S2-C19a (DL-267).
   link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
   shifted below the heading the content sits under (`level`, an `h1` by default), so a
   description never adds a second `h1` nor breaks the page's heading order (UI-SHL-8); `level`
-  0 only on the Documentation page, for the bundled guide, never for stored content (DL-310); code blocks in
-  the monospace font, with no syntax highlighting. Headings get ids only when the caller asks
-  (the Documentation page, from S2-C21d): `docs-` plus the text's words, `-2` on a repeat, so
-  user content never sets an id (DL-311). A task-list item's `[ ]` or `[x]` is a mark
+  0 only on a guide page, for the bundled guide, never for stored content (DL-310); code blocks in
+  the monospace font, with no syntax highlighting. Headings get ids only in docs mode: the
+  text's words joined by hyphens, `-2` on a repeat, so user content never sets an id (DL-311,
+  DL-338). A task-list item's `[ ]` or `[x]` is a mark
   drawn in tokens and named "Not done" or "Done" (`role="img"`), not a disabled checkbox, whose
-  look the tokens can't reach (DL-258). A component test runs a corpus of known XSS
+  look the tokens can't reach (DL-258). A table has one header row, its `th` cells
+  `scope="col"` from the renderer (DL-366). A component test runs a corpus of known XSS
   payloads (the OWASP cheat sheet's) through it, and an end-to-end test (S2-C18, DL-245) proves a
   stored payload doesn't run; the Content-Security-Policy is the second layer (design-doc §4, DL-142).
-  From S3-C0g, a docs mode for the bundled guide only adds callouts, keys, and local images
-  (DL-341); user content renders as now.
+  **Docs mode** (`docs`, the bundled guide only, from S3-C0g, DL-341; user content renders as
+  above): heading ids; `> [!TIP]`, `> [!NOTE]`, `> [!WARNING]` as success, info, and danger tone
+  boxes (DL-364) with an icon and a bold label (a `div`, not a quote); `++Key++` as `<kbd>`; links also to
+  a path on our own origin (another guide page, opened in the app), never `//host`; and an image
+  in `docs/user-guide/images/`, bundled through Vite, as itself, any other image a link; an
+  image with a `-dark` sibling (`trash.webp`, `trash-dark.webp`) renders as both, and only the
+  current theme's shows, the system's or the one chosen (DL-343). Each version is a link to it,
+  opening in a new tab (its name ends "(opens in a new tab)", visually hidden), which the article's
+  in-app link handling leaves to the browser, and loads lazily, so only the shown one is fetched
+  (DL-363). A guide heading's id never matches one the shell or the docs views render, checked
+  against a mounted app (`router.spec.ts`, DL-366). The build never inlines an asset
+  (`assetsInlineLimit: 0`, DL-370), so a bundled image is never a `data:` URI. Bundled images are served from our own origin, so the CSP's `default-src 'self'` covers them without
+  an `img-src`. The XSS corpus runs in docs mode too.
 - **UI-MD-2** **The editor, `MarkdownEditor`,** is a labelled textarea with **Write** and
   **Preview** tabs (a tablist), previewing with `MarkdownView` (DL-141). No WYSIWYG editor; a
   toolbar may come later if usability calls for it. Hints (such as a template's) sit beside the
@@ -1129,12 +1221,14 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 4. **Text darkness:** body text is a very dark `#0a1018` (light) and near-white `#f6f9fc` (dark),
    chosen to widen the gap to placeholders. If it looks too heavy across the full app once
    pages are populated, adjust `--color-text`.
-5. **SVAR items.** (a) Decide the per-list split between DataTable and DataGrid (UI-SVR-2) as
-   each Task and Requirements screen is specified. (b) Wrapper work found by the spike and not
+5. **SVAR items.** (a) The per-list split between DataTable and DataGrid (UI-SVR-2): the
+   backlog's is PrimeVue DataTable (DL-372); any other Task or Requirements list's as its
+   screen is specified. (b) Wrapper work found by the spike and not
    yet built or tested: a visible and announced selected state for the board, focus return after
    a grid editor closes, names for the grid editors, and the `aria-rowindex="0"` and `treegrid`
    defects (patch in the wrapper or report upstream, UI-SVR-7). (c) Grid row drag with a
-   pointer was not exercised. (d) The Gantt baseline decision and the Gantt performance test
+   pointer, exercised in S3-C0i (`docs/spikes/S3-C0i-backlog/results.md`). **Closed by DL-375**:
+   no DataGrid list orders rows, so no wrapper builds row drag. (d) The Gantt baseline decision and the Gantt performance test
    (§7.2). (e) Whether to report the Gantt 2.8.0 mount crash upstream, and re-check it at V2.
    (f) The Kanban card shows no visible change when selected, so the wrapper needs its own
    selected style (UI-TOK-9). (g) **Tree rows:** the spike used a flat grid. Whether the
@@ -1159,7 +1253,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 ## Appendix A — Manual keyboard and screen-reader pass
 
 **The owner's sheet** (from Slice 3, DL-320): one setup command creates every state the pass
-needs (the demo seed, S3-C0c); the checks below are stated once, for the whole pass; each
+needs (`wl seed --manual-pass`, developer guide, "Demo data"); the checks below are stated once, for the whole pass; each
 screen's own checks are concrete actions with what should happen ("On My work, press Tab from
 the header: focus goes to the first project's star, then its name"); and it's in plain
 language, with no checkpoint IDs or rule numbers.

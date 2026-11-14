@@ -19,6 +19,12 @@ const DANGEROUS =
   'script, iframe, frame, frameset, object, embed, img, svg, math, style, link, meta, base, form, button, body'
 
 describe('MarkdownView', () => {
+  it("gives a table's header cells scope=col, in stored content too (DL-366)", () => {
+    const view = render('| Who | Can |\n|---|---|\n| Admin | All |')
+
+    expect(view.findAll('th').map((th) => th.attributes('scope'))).toEqual(['col', 'col'])
+  })
+
   it('renders CommonMark with tables, strikethrough, and autolinks', () => {
     const view = render('A *b* `c`\n\n| H |\n|---|\n| d |\n\n~~gone~~ https://example.com')
 
@@ -144,33 +150,181 @@ describe('MarkdownView', () => {
     expect(view.text()).toBe('second')
   })
 
-  it('gives headings no id unless the caller asks, so stored content never sets one (DL-311)', () => {
+  it('gives headings no id outside docs mode, so stored content never sets one (DL-311)', () => {
     const view = render('# One\n\n## Two')
 
     expect(view.findAll('[id]')).toHaveLength(0)
   })
 
-  it('with anchors, ids each heading docs- and its words, a repeat -2 and on (DL-311)', () => {
-    const view = mount(MarkdownView, {
-      props: {
-        source: '# User guide\n\n## My work\n\n### The `star`!\n\n## My work',
-        level: 0,
-        anchors: true,
-      },
-    })
+  it('outside docs mode, renders no callout, key, image, or link to our own pages (DL-341)', () => {
+    const view = render('> [!TIP]\n> Hint\n\n++Esc++ [page](/docs/trash) ![shot](images/a.webp)')
 
-    expect(view.findAll('h1, h2, h3').map((h) => [h.element.tagName, h.attributes('id')])).toEqual([
-      ['H1', 'docs-user-guide'],
-      ['H2', 'docs-my-work'],
-      ['H3', 'docs-the-star'],
-      ['H2', 'docs-my-work-2'],
-    ])
+    expect(view.find('.callout').exists()).toBe(false)
+    expect(view.find('blockquote').text()).toBe('[!TIP]\nHint')
+    expect(view.find('kbd').exists()).toBe(false)
+    expect(view.text()).toContain('++Esc++')
+    expect(view.find('img').exists()).toBe(false)
+    // Neither link is allowed there, so both stay as their source text.
+    expect(view.find('a').exists()).toBe(false)
   })
 
-  it('lists the ## sections with the ids their headings get (the Contents, DL-311)', () => {
-    expect(sections('# Title\n\n## Signing in\n\n### Detail\n\n## Signing in')).toEqual([
-      { id: 'docs-signing-in', text: 'Signing in' },
-      { id: 'docs-signing-in-2', text: 'Signing in' },
+  describe('docs mode (DL-341)', () => {
+    function renderDocs(source: string, images: Record<string, string> = {}) {
+      return mount(MarkdownView, {
+        props: { source, level: 0, docs: true, images },
+        attachTo: document.body,
+      })
+    }
+
+    it('ids each heading by its words, a repeat -2 and on (DL-338)', () => {
+      const view = renderDocs('## My work\n\n### The `star`!\n\n## My work')
+
+      expect(view.findAll('h2, h3').map((h) => [h.element.tagName, h.attributes('id')])).toEqual([
+        ['H2', 'my-work'],
+        ['H3', 'the-star'],
+        ['H2', 'my-work-2'],
+      ])
+    })
+
+    it.each([
+      // Each its own tone (DL-364).
+      ['TIP', 'callout-success', 'Tip'],
+      ['NOTE', 'callout-info', 'Note'],
+      ['WARNING', 'callout-danger', 'Warning'],
+    ])('renders > [!%s] as a %s box with an icon and the bold label %s', (kind, tone, label) => {
+      const view = renderDocs(`> [!${kind}]\n> Keep a copy.`)
+
+      const box = view.get('.callout')
+      expect(box.element.tagName).toBe('DIV')
+      expect(box.classes()).toContain(tone)
+      expect(view.find('blockquote').exists()).toBe(false)
+      expect(box.get('strong').text()).toBe(label)
+      // The sanitizer keeps the icon's size and paths: without them it draws at 300 by 150.
+      const icon = box.get('strong svg')
+      expect(icon.attributes()).toMatchObject({
+        'aria-hidden': 'true',
+        viewBox: '0 0 24 24',
+        width: '1.25em',
+        height: '1.25em',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '2',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      })
+      expect(icon.findAll('path').every((path) => path.attributes('d'))).toBe(true)
+      expect(box.text()).toBe(`${label}Keep a copy.`)
+    })
+
+    it('leaves a plain quote a quote', () => {
+      const view = renderDocs('> Just a quote')
+
+      expect(view.find('.callout').exists()).toBe(false)
+      expect(view.get('blockquote').text()).toBe('Just a quote')
+    })
+
+    it('renders ++keys++ as kbd, a plus inside included, their text escaped', () => {
+      const view = renderDocs('Press ++Shift+Tab++, then ++<b>++.')
+
+      expect(view.findAll('kbd').map((k) => k.text())).toEqual(['Shift+Tab', '<b>'])
+      expect(view.find('b').exists()).toBe(false)
+      expect(view.text()).toBe('Press Shift+Tab, then <b>.')
+    })
+
+    it('renders a bundled image as itself, with its alt text', () => {
+      const view = renderDocs('![The side panel](images/panel.webp)', {
+        'images/panel.webp': '/assets/panel-1a2b.webp',
+      })
+
+      expect(view.get('img').attributes()).toMatchObject({
+        src: '/assets/panel-1a2b.webp',
+        alt: 'The side panel',
+      })
+    })
+
+    it('renders an image with a bundled -dark sibling as both, each marked with its theme (DL-343)', () => {
+      const view = renderDocs('![The side panel](images/panel.webp)', {
+        'images/panel.webp': '/assets/panel-1a2b.webp',
+        'images/panel-dark.webp': '/assets/panel-dark-3c4d.webp',
+      })
+
+      // The theme class is on each version's link, so a hidden one leaves no empty link.
+      expect(
+        view
+          .findAll('a')
+          .map((a) => [a.classes(), a.attributes('href'), a.get('img').attributes('src')]),
+      ).toEqual([
+        [['theme-light'], '/assets/panel-1a2b.webp', '/assets/panel-1a2b.webp'],
+        [['theme-dark'], '/assets/panel-dark-3c4d.webp', '/assets/panel-dark-3c4d.webp'],
+      ])
+      expect(view.findAll('img').map((img) => img.attributes('alt'))).toEqual([
+        'The side panel',
+        'The side panel',
+      ])
+    })
+
+    it('makes a bundled image a link to it full size, in a new tab, and loads it lazily (DL-363)', () => {
+      const view = renderDocs('![The side panel](images/panel.webp)', {
+        'images/panel.webp': '/assets/panel-1a2b.webp',
+      })
+
+      const link = view.get('a')
+      expect(link.attributes()).toMatchObject({
+        href: '/assets/panel-1a2b.webp',
+        target: '_blank',
+      })
+      expect(link.attributes('rel')).toContain('noopener')
+      // Its name says where it opens (the image's alt, then the hidden words).
+      expect(link.text()).toBe('(opens in a new tab)')
+      expect(link.get('img').attributes('loading')).toBe('lazy')
+    })
+
+    it('renders an image with no -dark sibling once, in both themes', () => {
+      const view = renderDocs('![The side panel](images/panel.webp)', {
+        'images/panel.webp': '/assets/panel-1a2b.webp',
+        'images/other-dark.webp': '/assets/other-dark.webp',
+      })
+
+      expect(view.findAll('a').map((a) => a.classes())).toEqual([[]])
+      expect(view.findAll('img')).toHaveLength(1)
+    })
+
+    it('renders an image that is not bundled, remote included, as a link', () => {
+      const view = renderDocs('![Remote](https://example.com/a.png) ![Missing](images/none.webp)')
+
+      expect(view.find('img').exists()).toBe(false)
+      expect(view.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+        ['Remote', 'https://example.com/a.png'],
+        ['Missing', 'images/none.webp'],
+      ])
+    })
+
+    it("links to a path on our own origin, never to another host's //", () => {
+      const view = renderDocs('[Trash](/docs/trash#restore) [evil](//evil.example/x)')
+
+      expect(view.findAll('a').map((a) => a.attributes('href'))).toEqual(['/docs/trash#restore'])
+      expect(view.text()).toBe('Trash [evil](//evil.example/x)')
+    })
+
+    it('has no accessibility violations', async () => {
+      const view = renderDocs(
+        '## Section\n\n> [!WARNING]\n> Careful.\n\nPress ++Esc++.\n\n![The panel](images/panel.webp)',
+        {
+          'images/panel.webp': '/assets/panel.webp',
+          'images/panel-dark.webp': '/assets/panel-dark.webp',
+        },
+      )
+
+      // A screenshot's two links included (DL-363).
+      expect(view.findAll('.callout, kbd, a[target]')).toHaveLength(4)
+      await expectNoA11yViolations(view)
+    })
+  })
+
+  it('lists the ## sections with the ids their headings get (On this page, DL-340)', () => {
+    expect(sections('## Signing in\n\n### Detail\n\n## Signing in')).toEqual([
+      { id: 'signing-in', text: 'Signing in' },
+      { id: 'signing-in-2', text: 'Signing in' },
     ])
   })
 
@@ -199,18 +353,24 @@ describe('MarkdownView', () => {
       ).toEqual([])
     })
 
-    // The Documentation page's heading ids keep every payload as harmless (DL-311).
-    it.each(XSS_CORPUS)('neutralizes %s with anchors', (payload) => {
+    // Docs mode's ids, callouts, keys, and own-origin links keep every payload as harmless.
+    it.each(XSS_CORPUS)('neutralizes %s in docs mode', (payload) => {
       const root = mount(MarkdownView, {
-        props: { source: payload, level: 0, anchors: true },
+        props: { source: payload, level: 0, docs: true },
         attachTo: document.body,
       }).element as HTMLElement
 
       expect(root.querySelectorAll(DANGEROUS)).toHaveLength(0)
       const attributes = [...root.querySelectorAll('*')].flatMap((el) => [...el.attributes])
       expect(attributes.filter((a) => /^on/i.test(a.name)).map((a) => a.name)).toEqual([])
+      expect(attributes.filter((a) => a.name === 'id' && !/^[a-z0-9-]*$/.test(a.value))).toEqual([])
+      const urls = attributes.filter((a) =>
+        ['href', 'src', 'action', 'formaction', 'data'].includes(a.name),
+      )
       expect(
-        attributes.filter((a) => a.name === 'id' && !/^docs-[a-z0-9-]*$/.test(a.value)),
+        urls
+          .filter((a) => !/^(?:https?:|mailto:|\/(?!\/)|images\/)/i.test(a.value))
+          .map((a) => a.value),
       ).toEqual([])
     })
   })

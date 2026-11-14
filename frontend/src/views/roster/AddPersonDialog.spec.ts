@@ -55,7 +55,19 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
-  it('asks for the email and role first, role defaulting to the lowest', async () => {
+  it("defaults a project's role to Member, not its lowest, Viewer (S3-C0l)", async () => {
+    const { wrapper } = await openDialog({
+      roles: [
+        { value: 'admin', label: 'Admin' },
+        { value: 'member', label: 'Member' },
+        { value: 'viewer', label: 'Viewer' },
+      ],
+    })
+
+    expect(wrapper.get<HTMLSelectElement>('#add-role').element.value).toBe('member')
+  })
+
+  it('asks for the email and role first, role defaulting to Member', async () => {
     const { wrapper } = await openDialog()
 
     expect(wrapper.get('h2').text()).toBe('Add a person')
@@ -78,6 +90,7 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
     expect(roster.add).toHaveBeenCalledWith('ann@acme.example', 'member', {
       joinOrg: false,
       exportControlConfirmed: false,
+      projects: {},
     })
     expect(wrapper.emitted('done')).toEqual([["ann@acme.example added to the workspace's staff."]])
     expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
@@ -318,7 +331,7 @@ describe('AddPersonDialog: email first (UI-FRM-13, DL-66)', () => {
         username: 'jane-doe',
         password: 'fake-fake-fake-01',
       },
-      { joinOrg: false, exportControlConfirmed: false },
+      { joinOrg: false, exportControlConfirmed: false, projects: {} },
     )
     expect(wrapper.get('output').text()).toBe('fake-fake-fake-01')
     expect(document.activeElement?.textContent?.trim()).toBe('Done')
@@ -438,6 +451,7 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
     expect(roster.add).toHaveBeenLastCalledWith('out@else.example', 'member', {
       joinOrg: true,
       exportControlConfirmed: false,
+      projects: {},
     })
     expect(wrapper.emitted('done')).toEqual([["out@else.example added to the workspace's staff."]])
   })
@@ -463,6 +477,7 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
     expect(roster.add).toHaveBeenCalledWith('ann@acme.example', 'member', {
       joinOrg: false,
       exportControlConfirmed: true,
+      projects: {},
     })
   })
 
@@ -486,6 +501,7 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
       {
         joinOrg: false,
         exportControlConfirmed: true,
+        projects: {},
       },
     )
   })
@@ -649,5 +665,235 @@ describe('AddPersonDialog on a project (DL-78, design-doc §3.1)', () => {
     await flushPromises()
 
     expect(wrapper.emitted('refused')).toBeUndefined()
+  })
+})
+
+describe("AddPersonDialog: an org's projects on the last step (Q12g, DL-379)", () => {
+  const PAY = { id: 'p-pay', key: 'PAY', name: 'Payments', export_controlled: false }
+  const SEC = { id: 'p-sec', key: 'SEC', name: 'Secure', export_controlled: true }
+  const PROJECT_ROLES = [
+    { value: 'admin', label: 'Admin' },
+    { value: 'member', label: 'Member' },
+    { value: 'viewer', label: 'Viewer' },
+  ]
+  const onOrg = (memberProjects = vi.fn().mockResolvedValue([PAY, SEC])) => ({
+    memberProjects,
+    projectRoles: PROJECT_ROLES,
+  })
+  const projectBox = (wrapper: Awaited<ReturnType<typeof openDialog>>['wrapper'], name: string) =>
+    wrapper
+      .findAll('fieldset li label')
+      .find((l) => l.text().startsWith(name))!
+      .get('input')
+
+  it('offers the projects, each chosen at Member, and sends them with the add', async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog(onOrg())
+    await continueWith(wrapper, 'ann@acme.example')
+
+    expect(wrapper.get('legend').text()).toBe('Also add to projects')
+    // Back reads the question, which says the projects are there (DL-118).
+    expect(wrapper.get('#add-confirm-what').text()).toContain(
+      "You can also add them to some of the organization's projects, below.",
+    )
+    await projectBox(wrapper, 'Payments').setValue(true)
+    expect(wrapper.get<HTMLSelectElement>('#add-project-p-pay-role').element.value).toBe('member')
+    await wrapper.get('#add-project-p-pay-role').setValue('admin')
+    await expectNoA11yViolations(wrapper)
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    expect(roster.add).toHaveBeenCalledWith('ann@acme.example', 'member', {
+      joinOrg: false,
+      exportControlConfirmed: false,
+      projects: {
+        'p-pay': { name: 'Payments', role: 'admin', exportControlled: false, confirmed: false },
+      },
+    })
+    expect(wrapper.emitted('done')).toEqual([
+      ["ann@acme.example added to the workspace's staff and 1 project."],
+    ])
+  })
+
+  it('blocks the add until a chosen export-controlled project is confirmed', async () => {
+    userCheck(true)
+    const { wrapper, roster } = await openDialog(onOrg())
+    await continueWith(wrapper, 'ann@acme.example')
+
+    await projectBox(wrapper, 'Secure').setValue(true)
+    const add = button(wrapper, 'Add person')
+    expect(add.attributes('aria-disabled')).toBe('true')
+    expect(wrapper.get(`#${add.attributes('aria-describedby')}`).text()).toBe(
+      'Confirm each export-controlled project to continue.',
+    )
+    await add.trigger('click')
+    await flushPromises()
+    expect(roster.add).not.toHaveBeenCalled()
+
+    await wrapper
+      .findAll('input[type=checkbox]')
+      .find((i) => i.element.closest('label')!.textContent!.includes("Secure's export-controlled"))!
+      .setValue(true)
+    expect(button(wrapper, 'Add person').attributes('aria-disabled')).toBeUndefined()
+  })
+
+  it("clears the projects' confirmations on Back, another person, keeping the picks", async () => {
+    userCheck(true)
+    const { wrapper } = await openDialog(onOrg())
+    await continueWith(wrapper, 'ann@acme.example')
+    await projectBox(wrapper, 'Secure').setValue(true)
+    const confirm = () =>
+      wrapper
+        .findAll('input[type=checkbox]')
+        .find((i) =>
+          i.element.closest('label')!.textContent!.includes("Secure's export-controlled"),
+        )!
+    await confirm().setValue(true)
+
+    await button(wrapper, 'Back').trigger('click')
+    await continueWith(wrapper, 'bob@acme.example')
+
+    expect((projectBox(wrapper, 'Secure').element as HTMLInputElement).checked).toBe(true)
+    expect((confirm().element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('clears the confirmations when the email changes on the create step', async () => {
+    userCheck(false)
+    const { wrapper } = await openDialog(onOrg())
+    await continueWith(wrapper, 'new@acme.example')
+    await projectBox(wrapper, 'Secure').setValue(true)
+    const confirm = () =>
+      wrapper
+        .findAll('input[type=checkbox]')
+        .find((i) =>
+          i.element.closest('label')!.textContent!.includes("Secure's export-controlled"),
+        )!
+    await confirm().setValue(true)
+
+    await wrapper.get('#add-email').setValue('other@acme.example')
+
+    expect((confirm().element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('loads the projects again each time it opens', async () => {
+    userCheck(true)
+    const memberProjects = vi.fn().mockResolvedValue([PAY])
+    const { wrapper } = await openDialog(onOrg(memberProjects))
+
+    await wrapper.vm.open()
+    await flushPromises()
+
+    expect(memberProjects).toHaveBeenCalledTimes(2)
+  })
+
+  it('puts focus on the first project after a Try again loads them, and a failed one is an alert', async () => {
+    userCheck(true)
+    const failure = () =>
+      new ApiError(500, { code: 'internal_error', message: 'Boom', details: {} })
+    const memberProjects = vi
+      .fn()
+      .mockRejectedValueOnce(failure())
+      .mockRejectedValueOnce(failure())
+      .mockResolvedValue([PAY])
+    const { wrapper } = await openDialog(onOrg(memberProjects))
+    await continueWith(wrapper, 'ann@acme.example')
+    // The first failure came with the dialog, not an action: not an alert.
+    expect(wrapper.find('fieldset [role=alert]').exists()).toBe(false)
+
+    const before = wrapper.get('fieldset p.text-tone-danger-fg').element
+    await button(wrapper, 'Try again').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('fieldset [role=alert]').text()).toBe(
+      "Couldn't load the organization's projects.",
+    )
+    // A new element, so it's announced again (UI-FBK-2).
+    expect(wrapper.get('fieldset [role=alert]').element).not.toBe(before)
+
+    await button(wrapper, 'Try again').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(projectBox(wrapper, 'Payments').element)
+  })
+
+  it('says which chosen project a reload dropped, after a 404', async () => {
+    userCheck(true)
+    const memberProjects = vi.fn().mockResolvedValueOnce([PAY, SEC]).mockResolvedValue([SEC])
+    const { wrapper } = await openDialog({
+      ...onOrg(memberProjects),
+      add: vi
+        .fn()
+        .mockRejectedValue(
+          new ApiError(404, { code: 'not_found', message: 'Not found.', details: {} }),
+        ),
+    })
+    await continueWith(wrapper, 'ann@acme.example')
+    await projectBox(wrapper, 'Payments').setValue(true)
+
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(
+      'Payments is no longer offered, so it was removed from your choices.',
+    )
+    expect(wrapper.findAll('fieldset li').map((li) => li.text())).toEqual(['Secure SEC'])
+  })
+
+  it('says at the step when the projects fail to load, and Try again loads them', async () => {
+    userCheck(true)
+    const memberProjects = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new ApiError(500, { code: 'internal_error', message: 'Boom', details: {} }),
+      )
+      .mockResolvedValue([PAY])
+    const { wrapper } = await openDialog(onOrg(memberProjects))
+    await continueWith(wrapper, 'ann@acme.example')
+
+    expect(wrapper.text()).toContain("Couldn't load the organization's projects.")
+    expect(wrapper.find('[role=alert]').exists()).toBe(false)
+    await button(wrapper, 'Try again').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('fieldset li').map((li) => li.text())).toEqual(['Payments PAY'])
+  })
+
+  it('loads the projects again when a refusal says one became export-controlled', async () => {
+    userCheck(true)
+    const memberProjects = vi
+      .fn()
+      .mockResolvedValueOnce([PAY])
+      .mockResolvedValue([{ ...PAY, export_controlled: true }])
+    const { wrapper, roster } = await openDialog({
+      ...onOrg(memberProjects),
+      add: vi.fn().mockRejectedValue(
+        invalid({
+          // The server's loc holds the entry's index, a number (`fakeRoster` types it as strings).
+          loc: ['body', 'projects', 0 as unknown as string, 'export_control_confirmed'],
+          message: 'Confirm that the people involved are authorized for export-controlled data.',
+          type: 'confirmation_required',
+        }),
+      ),
+    })
+    await continueWith(wrapper, 'ann@acme.example')
+    await projectBox(wrapper, 'Payments').setValue(true)
+
+    await button(wrapper, 'Add person').trigger('click')
+    await flushPromises()
+
+    expect(roster.add).toHaveBeenCalledOnce()
+    expect(memberProjects).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain("I confirm this person is authorized for Payments's")
+    expect(button(wrapper, 'Add person').attributes('aria-disabled')).toBe('true')
+    // Said in the step's polite region, and gone once the user changes the choices.
+    const note = wrapper.get('fieldset p[aria-live=polite]')
+    expect(note.text()).toBe('Payments is now export-controlled: confirm it in the list.')
+    await projectBox(wrapper, 'Payments').setValue(false)
+    expect(note.text()).toBe('')
+  })
+
+  it("isn't offered on a roster without projects to add to (the workspace's, a project's)", async () => {
+    userCheck(true)
+    const { wrapper } = await openDialog()
+    await continueWith(wrapper, 'ann@acme.example')
+
+    expect(wrapper.text()).not.toContain('Also add to projects')
   })
 })
