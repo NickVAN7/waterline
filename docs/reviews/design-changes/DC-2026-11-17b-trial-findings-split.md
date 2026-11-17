@@ -44,6 +44,10 @@ refresh duty is recorded, and how `DESIGN.md` is kept out.
   where sessions look first, at the cost of one more entry.
 - (c) Leave the refresh unenforced. `PRODUCT.md` can then drift from the guide.
 
+**Answered** (owner, Nov 17, 2026): (a). S3-C0o's row names `PRODUCT.md` at the repository
+root, `DESIGN.md` and `.impeccable/` in `.gitignore`, and the refresh check as the first part of
+`vue-screen`'s Impeccable step (DL-312).
+
 Noted by the reviewer: DL-388 leaves the request's own "approved" status row out of History. The
 requirement's approval entry already shows it, so this reads as intended.
 
