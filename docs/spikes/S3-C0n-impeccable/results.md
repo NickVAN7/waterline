@@ -2,7 +2,8 @@
 
 The trial's recorded results, written by the trial session from its own runs (2026-11-16 and
 17) and accepted by the owner on 2026-11-17; the outcome is DL-381 to DL-385. The owner's
-decisions are listed as decisions; findings marked "recorded only" were moved into S3-C0o. Each claim says who verified it. "Session" means the session that did the work: under
+decisions are listed as decisions; the trial's code went to S3-C0o, and the findings marked "recorded only" (F13 to F18, F21) to
+S3-C0p (DC-2026-11-17b). Each claim says who verified it. "Session" means the session that did the work: under
 the root `CLAUDE.md`, that alone doesn't count as verified.
 
 Clone: `~/scratch/impeccable-trial/waterline`, branch `trial`, at `aca8710` plus uncommitted
@@ -121,7 +122,7 @@ are costs or rejections.
    (480px). Never below 400px. A width the viewer chose is kept.
    - Changes: DL-322's default.
 
-All the code goes in one checkpoint, S3-C0o (DL-131), together with the trial's fixes that are
+The code goes in S3-C0o (DL-131), the open findings in S3-C0p (DC-2026-11-17b), together with the trial's fixes that are
 kept, re-applied by hand on `s3`. `trial` is never merged or cherry-picked.
 
 ## Costs

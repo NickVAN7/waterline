@@ -50,9 +50,12 @@
    - (c) Commit `PRODUCT.md` only, since it defers to the guide. Shared context with no second
      token list, though the critique may work less well without `DESIGN.md`.
 
-   Copies from the trial are in `docs/spikes/S3-C0n-impeccable/results/`. Due before S3-C0o is
-   built.
+   Copies from the trial are in `docs/spikes/S3-C0n-impeccable/results/`.
+
+   **Answered** (owner, Nov 17, 2026): (c), `PRODUCT.md` only. It's detail of an unbuilt row, so
+   it goes in S3-C0o's row (DL-312). In the same answer, the owner put S3-C0o on the slice's
+   `security-reviewer` list, for the third-party plugin and its settings.
 
 Not checked by the reviewer: `results/trial.diff`, the critiques, and the shots (evidence). Also
 not checked: whether S3-C0o should name `security-reviewer` for the third-party plugin's setup
-(the build plan's call).
+(the build plan's call; answered under decision 1: it does).

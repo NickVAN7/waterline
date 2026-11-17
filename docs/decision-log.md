@@ -1925,7 +1925,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   feed's API and page move to Slice 3, with the filter bar; Slice 2 still logs project status and
   lead changes.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-388 (in part: the approval requests' entries too)
 - **Applies to:** design-doc §1.1, §10, §11; build plan (S2-C3, S2-C19, "Later slices")
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
 
@@ -4073,7 +4073,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   Restriction as a two-column definition list. The actions stay in the header, not at the bottom
   (the owner, over `S2-ui-feedback.md`).
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-387 (in part: the icon buttons after the title)
 - **Applies to:** build plan (S3-C0d)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 5)
 
@@ -4694,7 +4694,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   S3-C26's filter uses the same words. Settles the Slice 3 plan review's open item 8 ("Approval
   pending" vs "Awaiting approval").
 - **Supersedes:** Q12b's wording ("Approval pending")
-- **Superseded by:** none
+- **Superseded by:** DL-386 (in part: the header and the request's label too)
 - **Applies to:** build plan (S3-C0l, S3-C26); `docs/reviews/design-changes/DC-2026-11-10-slice-3-plan.md` (item 8)
 - **Source:** owner, Nov 13, 2026 (S3-C0l)
 
@@ -4814,3 +4814,39 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** ui-design-guide UI-SHL-11 (from S3-C0o)
 - **Source:** owner, Nov 16, 2026 (S3-C0n trial, decision 5)
+
+### DL-386: The waiting state reads "Awaiting approval" everywhere
+- **Date:** 2026-11-17
+- **Decision:** While a request is pending, the panel's and the full page's header show the
+  tree's **Awaiting approval** badge beside the status, and the request's own status label reads
+  **Awaiting approval** instead of "Pending". Each approver's **Not decided** stays: it's that
+  approver's decision, not the request's. Trial finding F13.
+- **Supersedes:** DL-376 (in part: the badge on the tree only)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0p); ui-design-guide UI-FBK-5, behavior reference, user guide
+  (from S3-C0p)
+- **Source:** owner, Nov 17, 2026 (S3-C0n trial findings)
+
+### DL-387: The panel's icon buttons follow the title
+- **Date:** 2026-11-17
+- **Decision:** **Open full page**, **Copy link**, and **Close** move from the header's top row
+  to the right end of the title's row, after the title in reading and Tab order, so Tab from the
+  focused title (DL-324) reaches them. The ID and status stay on the top row. The full page keeps
+  its own header (DL-326). Trial finding F16.
+- **Supersedes:** DL-325 (in part: the icon buttons on the top row)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0p); ui-design-guide UI-SHL-11, behavior reference (from
+  S3-C0p)
+- **Source:** owner, Nov 17, 2026 (S3-C0n trial findings)
+
+### DL-388: History shows the approval's steps; the status menu shows the current status
+- **Date:** 2026-11-17
+- **Decision:** A requirement's History also lists its approval requests' entries (requested,
+  rejected, cancelled, an approver replaced), read from the request's activity rows already
+  logged. **Change status** shows the current status, marked and disabled, and a line saying
+  Approved comes only from an approval. Trial finding F21.
+- **Supersedes:** DL-147 (in part: the requirement's own entries only)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0p, the "Change log (§10)" note); design-doc §6 ("History"),
+  §10; behavior reference, user guide (from S3-C0p)
+- **Source:** owner, Nov 17, 2026 (S3-C0n trial findings)
