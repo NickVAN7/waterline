@@ -434,7 +434,8 @@ Entry format:
 - **Why:** kept as decided by the owner (2026-11-11, S3-C0d review, ui-reviewer finding 2):
   judged at slice verification, where the manual pass checks the requirements page at 1024 to
   1280px and zoomed, before a cap or a later breakpoint is chosen.
-- **Fix by:** S3-C33 (slice verification's manual pass)
+- **Fix by:** S3-C0o (the split pane from 80rem, DL-383, and a default width that leaves the
+  list 30rem, DL-385; owner, S3-C0n trial)
 - **Status:** open
 
 ### TD-109: A dialog opened from the panel may stop being modal when the window crosses 64rem

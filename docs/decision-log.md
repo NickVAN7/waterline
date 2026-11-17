@@ -1953,7 +1953,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   "Acceptance Criteria" heading (any level, case-insensitive) shows a "No acceptance criteria"
   note, never a block.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-384 (in part: a warning at approval too)
 - **Applies to:** design-doc §6 ("Requirement"); build plan (S2-C17, S2-C18)
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
 
@@ -4023,7 +4023,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   being a `showModal()` dialog there. Below 64rem it keeps today's modal overlay (inert page,
   focus kept in the panel, Esc closes). Shared, so tasks inherit it. Built in S3-C0d.
 - **Supersedes:** DL-202 and DL-262 in part (the panel over the list)
-- **Superseded by:** none
+- **Superseded by:** DL-383 (in part: 80rem)
 - **Applies to:** build plan (S3-C0d); ui-design-guide UI-SHL-11 (from S3-C0d)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 1)
 
@@ -4034,7 +4034,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `aria-orientation="vertical"`, `aria-valuenow/min/max`, an accessible name, arrow keys). The
   width is remembered per viewer in `localStorage`, in try/catch, falling back to the default.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-385 (in part: the default)
 - **Applies to:** build plan (S3-C0d)
 - **Source:** owner, Nov 9, 2026 (chat session, UI polish; handoff decision 2)
 
@@ -4757,3 +4757,60 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S3-C0n); `docs/spikes/S3-C0n-impeccable/`
 - **Source:** owner, Nov 13, 2026 (S3-C0n)
+
+### DL-381: Impeccable stays for critique and audit, inside `vue-screen`
+- **Date:** 2026-11-17
+- **Decision:** S3-C0n's outcome: Impeccable is kept, pinned to 4.8.0 (tag `skill-v4.8.0`, commit
+  `414603b`), as a Claude Code plugin each developer installs at local scope in the repository.
+  Only `/impeccable critique` and `/impeccable audit` are used, as a `vue-screen` step on every
+  new or reshaped screen or dialog, before `ui-reviewer`; their findings are accepted, rejected,
+  or matched to a UI rule like any review's. Its design hook is off (it flagged nothing in the
+  trial and once broke `wl check`), live mode isn't used (its accept dropped a `v-if` and a
+  `ref`), and the CSP doesn't change (its overlay needs `'wasm-unsafe-eval'`). Telemetry and
+  update checks are off. A newer release is a supply-chain check and an owner decision first.
+  Set up and first used in S3-C0o.
+- **Supersedes:** none (S3-C0n's outcome, DL-374, DL-380)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0o); the `vue-screen` skill, the developer guide, and the
+  repository's Claude Code settings (from S3-C0o)
+- **Source:** owner, Nov 17, 2026 (S3-C0n trial, `docs/spikes/S3-C0n-impeccable/results.md`)
+
+### DL-382: A description's headings shift relative to its own top heading
+- **Date:** 2026-11-17
+- **Decision:** `MarkdownView` at `level` n makes the content's highest heading h(n+1); deeper
+  headings keep their distance from it, capped at h6, and an author's own skips stay. Docs mode
+  (`level` 0) is unchanged. A description whose top heading is `##` no longer skips from the
+  panel's h2 to h4 (trial finding F7).
+- **Supersedes:** UI-MD-1's fixed shift (in part)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-MD-1, design-doc §3, `frontend/CLAUDE.md` (from S3-C0o)
+- **Source:** owner, Nov 16, 2026 (S3-C0n trial, decision 1)
+
+### DL-383: The split pane starts at 80rem
+- **Date:** 2026-11-17
+- **Decision:** The item side panel is a split pane at 80rem (1280px) and wider; below it, the
+  modal overlay. At 64rem the list kept about 176px (TD-108, trial finding F5).
+- **Supersedes:** DL-321 (in part: 64rem)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-11, screen inventory, developer guide, build plan's
+  "Done when", TD-108, TD-109 (from S3-C0o)
+- **Source:** owner, Nov 16, 2026 (S3-C0n trial, decision 2)
+
+### DL-384: No acceptance criteria warns at approval, never blocks
+- **Date:** 2026-11-17
+- **Decision:** Request approval's dialog and Approve by hand's confirmation warn when the
+  description has no "Acceptance Criteria" heading; the action still goes ahead.
+- **Supersedes:** DL-149 (in part: only a note on the detail page)
+- **Superseded by:** none
+- **Applies to:** design-doc §6 ("Requirement"), behavior reference, user guide's approvals page
+  (from S3-C0o)
+- **Source:** owner, Nov 16, 2026 (S3-C0n trial, decision 4)
+
+### DL-385: The split pane's default width leaves the list 30rem
+- **Date:** 2026-11-17
+- **Decision:** With no stored width, the panel opens at 560px, or narrower so the list keeps
+  30rem (480px), never below 400px. A width the viewer chose is kept as it is.
+- **Supersedes:** DL-322 (in part: the 560px default)
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-SHL-11 (from S3-C0o)
+- **Source:** owner, Nov 16, 2026 (S3-C0n trial, decision 5)

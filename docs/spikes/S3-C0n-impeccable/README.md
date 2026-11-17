@@ -81,7 +81,13 @@ Run in order, in the clone's session. Rows 5 to 6 note the hook's messages and t
 | 9 | **Every push against our rules**: anything Impeccable proposed or did against a UI-* rule or a decision (system fonts, tokens only, one primary button per form (DL-377), the panel's layout (DL-321, DL-325)). | Listed in the results; each a cost |
 | 10 | **The gates on the trial's changes** (rows 5 and 6, the live tag removed): `uv run wl check` and `uv run wl e2e` in the clone. | `wl check` green. `csp.spec.ts` most likely still passes: it checks the header contains `script-src 'self'`, which the allowance keeps. Nothing else fails. |
 
-## Results (the owner fills these in)
+## Results
+
+**Recorded in [`results.md`](results.md)** (rows 1 to 10, the findings F1 to F29, the costs, the
+owner's decisions), with the evidence in `results/`: Impeccable's `PRODUCT.md` and `DESIGN.md`,
+the three critiques, the baseline and after shots, and `trial.diff` (the trial's code, for
+S3-C0o to re-apply by hand). The outcome: DL-381 to DL-385. The empty tables below are the
+checklist's template.
 
 Claude Code version: · permission mode: · date:
 
@@ -106,7 +112,8 @@ Claude Code version: · permission mode: · date:
 
 **For the decision:** what Impeccable found that our process missed, against what it cost (rejected
 findings, pushes against our rules, the hook's noise and time, setup and supply-chain weight).
-Friction during the trial goes in `friction-log.md`.
+Friction during the trial was recorded in `results.md` ("Costs", C1 to C6), not in
+`friction-log.md`, which stayed empty.
 
 **Bringing changes to `s3`:** only the panel's own files, as their own checkpoint. Never merge or
 cherry-pick `trial`: its setup commit widens the CSP (`frontend/vite.config.ts`), which no gate
@@ -115,6 +122,7 @@ would catch (`csp.spec.ts` still passes), and live mode's tag may be in `fronten
 ## Tear down
 
 After the trial, from the clone: `claude plugin uninstall impeccable@impeccable --scope local`,
-then `claude plugin marketplace remove impeccable` (so no later marketplace update pulls a newer
-release anywhere), `uv run wl down -v`, and delete the scratch directory and any
-`/tmp/impeccable-pre-*`.
+`uv run wl down -v`, and delete the scratch directory and any `/tmp/impeccable-pre-*`. The
+pinned marketplace stays, since Impeccable is kept (DL-381; S3-C0o installs it in the
+repository). If it's ever dropped, `claude plugin marketplace remove impeccable` too, so no later
+marketplace update pulls a newer release anywhere.

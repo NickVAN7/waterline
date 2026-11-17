@@ -7,8 +7,9 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0n (Frontend design skill trial) set up, waiting for the owner's run of the trial; the git
-guard's decision held to the end of S3-C0x; next: the trial's outcome through `design-change`.
+S3-C0n (Frontend design skill trial) run; its outcome applied (DL-381 to DL-385: Impeccable kept
+for critique and audit); the git guard's decision held to the end of S3-C0x; next: S3-C0o (The
+design trial's outcome), after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

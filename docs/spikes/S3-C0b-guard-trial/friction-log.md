@@ -44,5 +44,10 @@ means the guard stopped something it should have.
 | 35 | S3-C0n (supply-chain check) | `curl` of GitHub's API for the 4.8.0 tag (`…/git/ref/tags/…`, read-only) with a download, in one call | text mentioning git in a command | a scratchpad script (`fetch480.sh`) | legit (as #13) |
 | 36 | S3-C0n | a `python3 -` heredoc tidying `setup.py`, whose text holds its `git add` line | text mentioning git in a command | the Edit tool | legit (as #8) |
 | 37 | S3-C0n | `cat >> docs/decision-log.md <<'EOF'` adding DL-380, whose text names the clone's `.git/info/exclude` | text mentioning git in a command | the Edit tool | legit (as #7) |
+| 38 | S3-C0n trial (`/impeccable critique`) | `sha256sum …; git diff --stat HEAD -- frontend; …` (checking the target was unchanged since the last critique) in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
+| 39 | S3-C0n outcome (reading the trial's state) | `docker ps …; git -C <clone> log …; git -C <clone> status …; ls …` in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
+| 40 | S3-C0n outcome (reading the trial's results) | `ls`, then a `find` excluding `*/.git/*` paths | text mentioning git in a command | `ls` alone | legit (as #13) |
+| 41 | S3-C0n outcome (reading the trial's results) | `cd <clone> && ls … ; find … \| grep -v '/\.git/'` | a compound command with git in it | `ls` alone | legit; my slip (as #15) |
+| 42 | S3-C0n outcome (saving the trial's diff) | `git -C <clone> diff --output=<spike folder>/results/trial.diff` | `--output` isn't an allowed `git diff` option | the owner runs it | legit (allow-list) |
 
 None of the blocks so far stopped anything the rules forbid.
