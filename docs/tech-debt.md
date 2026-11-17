@@ -496,6 +496,19 @@ Entry format:
 - **Fix by:** Slice 6 (search): a filter on the step, or a "more" note, if an org nears it
 - **Status:** open
 
+### TD-116: npm advisory GHSA-fc5q-39xc-vjpf (picomatch) is allowlisted
+- **Added:** `chore(deps)` after DC-2026-11-17b (Nov 17, 2026)
+- **What:** `wl audit` ignores GHSA-fc5q-39xc-vjpf (high: a regular-expression denial of service
+  in `picomatch`), through its entry in `audit-allowlist.toml`. `picomatch` comes only through
+  dev tooling: `vite`, `vitest`, `vue-router`'s build plugin, `vue-tsc`, and
+  `@vue/eslint-config-typescript` → `fast-glob` → `micromatch`.
+- **Why:** No fixed release exists: the advisory covers every `picomatch` version up to 4.0.7, the
+  latest. npm's only "fix" is a major `vitest` downgrade. The vulnerable code only matches glob
+  patterns from the repository's own build, test and lint configuration, never untrusted input,
+  and never ships in the app.
+- **Fix by:** Slice 3 (its tech-debt review), or sooner when `wl audit` shows a fixed release
+- **Status:** open
+
 ---
 
 ## Resolved
