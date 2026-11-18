@@ -255,6 +255,34 @@ def test_check_full_runs_everything_ci_runs(monkeypatch: pytest.MonkeyPatch) -> 
     ]
 
 
+CI = Path(__file__).parents[3] / ".github/workflows/ci.yml"
+
+
+def test_ci_jobs_run_exactly_what_check_full_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI's parallel jobs (DL-392) together are `wl check --full`: no step dropped or added, so
+    a green `wl check --full` locally still means a green CI (DL-99)."""
+    monkeypatch.setattr(mutation, "is_current", _current)
+    commands = re.findall(r"^\s+run: uv run wl (.+)$", CI.read_text(), re.M)
+    assert commands == ["backend check", "frontend check", "cli check", "audit", "e2e"]
+
+    results = [runner.invoke(app, [*command.split(), "--dry-run"]) for command in commands]
+    assert [result.exit_code for result in results] == [0] * len(commands)
+    ci_steps = [line for result in results for line in result.stdout.splitlines()]
+
+    full = runner.invoke(app, ["check", "--full", "--dry-run"]).stdout.splitlines()
+    assert ci_steps == full
+
+
+def test_the_required_ci_check_fails_when_any_job_does() -> None:
+    """The ruleset's required check (DL-27) waits for every job and runs whatever they did:
+    without `if: always()` a failed job leaves it skipped, which GitHub counts as passed."""
+    check = re.search(r"^  check:\n(?:    .*\n|\n)*", CI.read_text(), re.M)
+    assert check is not None
+    assert "    name: wl check\n" in check[0]
+    assert "    needs: [backend, frontend, cli, audit, e2e]\n    if: always()\n" in check[0]
+    assert 'test "$RESULTS" = "success success success success success"' in check[0]
+
+
 def test_check_leaves_the_audit_and_end_to_end_tests_to_full(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

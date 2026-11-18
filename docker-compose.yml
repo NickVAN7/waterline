@@ -32,6 +32,9 @@ x-backend: &backend
 services:
   postgres:
     image: postgres:18
+    # Room for reviewers' test runs at once, each with its own databases (DL-392): one full run
+    # takes up to 8 workers' connections and the concurrency tests' pools; the default is 100.
+    command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env (copy .env.example)}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env (copy .env.example)}
