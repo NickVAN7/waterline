@@ -63,7 +63,12 @@ CLI_FMT = [
     "(cd tools/cli && uv run ruff check --fix . ../../.claude/hooks)",
 ]
 CLI_TEST = ["(cd tools/cli && uv run pytest)"]
-CLI_CHECK = ["uv lock --check", *CLI_LINT, *CLI_TEST]
+CLI_CHECK = [
+    "uv run python -m waterline_cli.doctor repo-state",
+    "uv lock --check",
+    *CLI_LINT,
+    *CLI_TEST,
+]
 E2E_COMPOSE = (
     "docker compose --project-name waterline-e2e --file docker-compose.yml"
     " --file docker-compose.e2e.yml"

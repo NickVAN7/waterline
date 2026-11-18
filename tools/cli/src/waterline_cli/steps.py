@@ -233,7 +233,9 @@ def cli_test() -> list[Step]:
 
 
 def cli_check() -> list[Step]:
-    return [step("uv", "lock", "--check"), *cli_lint(), *cli_test()]
+    # The repository's state first: the git guard's scope leaves its evasion to this (DL-391).
+    repo_state = step("uv", "run", "python", "-m", "waterline_cli.doctor", "repo-state")
+    return [repo_state, step("uv", "lock", "--check"), *cli_lint(), *cli_test()]
 
 
 def audit(uv_ignores: Sequence[str] = ()) -> list[Step]:

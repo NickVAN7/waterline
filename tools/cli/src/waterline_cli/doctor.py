@@ -1,7 +1,9 @@
 """`wl doctor`: check the workstation toolchain (docs/developer-guide.md, "Workstation setup")."""
 
+import os
 import re
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -151,6 +153,37 @@ def _hooks(probe: Probe) -> Result:
     return Result(name, Status.WARN, "not installed", hint)
 
 
+HOOKS_PATH = ("git", "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-commit")
+
+
+def repo_state(probe: Prober = run_probe, *, ci: bool = False) -> list[str]:
+    """`wl check`'s repository-state step (DL-391): what the git guard leaves out of its scope,
+    checked by its result. In CI, only the hooks path: CI installs no hooks, and checks out no
+    branch."""
+    problems: list[str] = []
+    if probe(("git", "config", "--get", "core.hooksPath")).returncode == 0:
+        problems.append("core.hooksPath is set, so git skips the repository's hooks: unset it")
+    if not ci:
+        hooks = _hooks(probe(HOOKS_PATH))
+        if hooks.status is not Status.OK:
+            problems.append(f"the pre-commit hook: {hooks.detail} ({hooks.hint})")
+        branch = probe(("git", "symbolic-ref", "--quiet", "--short", "HEAD"))
+        if branch.returncode == 0 and branch.output.strip() == "main":
+            problems.append("the current branch is main: work on the slice branch")
+    return problems
+
+
+def main(argv: list[str], probe: Prober = run_probe) -> int:
+    """`python -m waterline_cli.doctor repo-state`: exit 1, saying why, when the state is wrong."""
+    if argv != ["repo-state"]:
+        print("usage: python -m waterline_cli.doctor repo-state", file=sys.stderr)
+        return 2
+    problems = repo_state(probe, ci=bool(os.environ.get("CI")))
+    for problem in problems:
+        print(f"Repository state: {problem}", file=sys.stderr)
+    return 1 if problems else 0
+
+
 CHECKS: tuple[Check, ...] = (
     Check("Git", ("git", "--version"), _minimum("Git", MIN_GIT, "Install Git")),
     Check(
@@ -173,13 +206,13 @@ CHECKS: tuple[Check, ...] = (
     Check("Node", ("node", "--version"), _node),
     Check("npm", ("npm", "--version"), _npm),
     # Resolves worktrees and core.hooksPath, unlike reading .git/hooks directly.
-    Check(
-        "pre-commit hooks",
-        ("git", "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-commit"),
-        _hooks,
-    ),
+    Check("pre-commit hooks", HOOKS_PATH, _hooks),
 )
 
 
 def run_checks(probe: Prober = run_probe) -> list[Result]:
     return [check.evaluate(probe(check.cmd)) for check in CHECKS]
+
+
+if __name__ == "__main__":  # pragma: no cover -- the entry point; main() is tested directly
+    sys.exit(main(sys.argv[1:]))
