@@ -85,29 +85,6 @@ Entry format:
 - **Fix by:** Slice 3 (its tech-debt review): still no fixed `braces` (3.0.3 is the latest) (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
-### TD-20: What the git guard can't see
-- **Added:** DC-2026-10-08 (review passes 3, 6, and 7; narrowed by DC-2026-10-08b and DL-31)
-- **What:** The git guard (`.claude/hooks/guard_git.py`) checks the shell commands Claude runs. It
-  doesn't see (1) a script or program that runs git itself or changes `.git/hooks/` (`bash
-  <script>`, `python <file>`, a tool that commits, `uv run pre-commit uninstall`), (2) a write to a
-  shell startup file (`~/.bashrc`: an exported `SKIP`, a `git` function) that changes later shells,
-  or (3) a call that doesn't mention git redirecting to a target built by an expansion (`>>
-  .gi$'t'/config`); blocking every expansion in a target would also block the common `>
-  "$TMP/x"`. The deny-list guard's gaps (a `cd` in a subshell, exported variables, `include.path`,
-  nested shells, run-time `gh api` arguments) are closed by the allow-list (DL-26), and so are
-  review DC-2026-10-08b's (redirects into `.git/` or a git config file from a call that mentions
-  git, read options that run or write, unquoted heredocs, expansions that hide a command, a glob
-  in a redirect target). Claude's file tools editing `.git/` or a git config file are blocked by
-  the protected-files hook (DL-31), and `.pre-commit-config.yaml` is the owner's (DL-30). Push and
-  fetch configuration is left to the rulesets (DL-28). A program that writes a git config file
-  without naming it is part of (1).
-- **Why:** No command guard can read what another program does. GitHub's rulesets (DL-27) refuse
-  pushes to `main`, force-pushes, and deletions whatever runs them; a skipped local hook is
-  caught by CI's `wl check`.
-- **Fix by:** Slice 7 (the owner decides whether this closes as won't-fix now that the
-  rulesets are on).
-- **Status:** open
-
 ### TD-28: A user's name is one field, so username suggestions guess first and last names
 - **Added:** design change DL-66 (Oct 10, 2026)
 - **What:** `user.name` is a single column, so the username suggestion (DL-66) takes the first and
@@ -603,6 +580,12 @@ Entry format:
 - **Added:** S1-C2
 - **Status:** resolved in S1-C3 (`test_any_interleaving_numbers_each_sequence_1_2_3`; an
   allocator that ignores the prefix fails it)
+
+### TD-20: What the git guard can't see
+- **Added:** DC-2026-10-08 (review passes 3, 6, and 7; narrowed by DC-2026-10-08b and DL-31)
+- **Status:** resolved in DC-2026-11-18b, accepted by the guard's stated scope (DL-391): evasion
+  (a script, a shell startup file, a redirect built at run time) is out of it, and GitHub's
+  rulesets (DL-27), CI, and `wl check`'s repository-state step cover it
 
 ### TD-21: A user-level audit event's workspace is null when it's ambiguous
 - **Added:** S1-C6

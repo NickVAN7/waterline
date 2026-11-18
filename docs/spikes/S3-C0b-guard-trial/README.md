@@ -124,3 +124,10 @@ Weigh those against the guard's cost: one git command per Bash call, no `cd` or 
 The decision waits for the end of Slice 3's pre-work checkpoints, now the outside review
 handoff's Package 1 (DL-390). Until then, every
 time the guard gets in the way of work is recorded in `friction-log.md`, as evidence for it.
+
+## Outcome: replaced by the small allow-list (owner, 2026-11-18)
+
+The outside review's Package 1 (DL-391): a guard of under 150 lines that stops the direct form
+of a forbidden git or gh command and leaves evasion to GitHub's rulesets, CI, and `wl check`'s
+repository-state step. Text that only mentions git is no longer checked, which ends most of the
+51 blocks in `friction-log.md`; a second command beside git in one call is still refused.

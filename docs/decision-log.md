@@ -274,7 +274,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `git commit` only off `main` and blocks every merge except `--abort`; on `main` it allows only
   `git pull --ff-only` from `main` and a reset to `main` itself.
 - **Supersedes:** DL-12 (in part)
-- **Superseded by:** none
+- **Superseded by:** DL-391 (in part: how the guard enforces it)
 - **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
 - **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
 
@@ -284,7 +284,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   <branch>` with a literal branch other than `main`, or a bare `git push` off `main` whose
   push destination (`@{push}`) isn't `main`.
 - **Supersedes:** DL-12 (in part)
-- **Superseded by:** none
+- **Superseded by:** DL-391 (in part: how the guard enforces it)
 - **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
 - **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
 
@@ -295,7 +295,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   unpushed and a reset only when it drops no pushed commit; no push option is allowed beyond
   `-u`.
 - **Supersedes:** DL-12 (in part)
-- **Superseded by:** none
+- **Superseded by:** DL-391 (in part: how the guard enforces it)
 - **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
 - **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
 
@@ -305,7 +305,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   environment that skips them: no `--no-verify` or `-n`, no `-c`, no variable prefixes, and no
   `git config` writes.
 - **Supersedes:** DL-12 (in part)
-- **Superseded by:** none
+- **Superseded by:** DL-391 (in part: how the guard enforces it)
 - **Applies to:** `.claude/hooks/guard_git.py`; developer guide section 11
 - **Source:** chat session (git guard rebuild, after review DC-2026-10-08)
 
@@ -325,7 +325,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   and the owner runs it with `! <command>`. Every allowed form's effect is verified by tests
   that run real git. The guard's reviews judge it against DL-21 to DL-25.
 - **Supersedes:** DL-12 (a deny-list guard that followed compound and wrapped commands)
-- **Superseded by:** none
+- **Superseded by:** DL-391
 - **Applies to:** `.claude/hooks/guard_git.py` and its tests; root `CLAUDE.md`; build plan
   ("Claude configuration"); developer guide section 11; `checkpoint` and `design-change`
   skills; TD-20
@@ -381,7 +381,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   redirect naming it (by file name, in any call). Claude proposes a change to it to the owner, who
   makes it.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-391 (in part: the guard's redirect block; the protected-files hook still
+  blocks the file tools)
 - **Applies to:** `.claude/hooks/protect_files.py`, `.claude/hooks/guard_git.py` and their
   tests; root `CLAUDE.md`; `design-change` skill; build plan ("Claude configuration"); developer
   guide section 11
@@ -4877,3 +4878,30 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (Slice 3's "Checkpoints" note); root `CLAUDE.md` (Status, the
   guard's logging rule); the guard trial's README and friction log
 - **Source:** owner, Nov 18, 2026 (after S3-C0o)
+
+### DL-391: The git guard is a small allow-list, scoped to the direct form
+- **Date:** 2026-11-18
+- **Decision:** The outside review's Package 1, and the git guard trial's outcome (DL-390): the
+  guard (`.claude/hooks/guard_git.py`, under 150 lines, `shlex`) stops the direct form of a
+  forbidden git or gh command and keeps git to one plain command per call; evasion (scripts,
+  `bash -c`, redirects) is out of its scope, left to GitHub's rulesets (DL-27), CI, and a new
+  repository-state step in `wl check` (`core.hooksPath` unset, pre-commit's hook installed, not
+  on `main`; in CI, only the first). It looks only at a call whose program is git or gh, never at
+  text that mentions git. It allows by subcommand, not by flag: the reads and the working-tree
+  writes with any flags; `commit` (not `--no-verify`/`-n`, not on `main`, no `--amend` of a pushed
+  HEAD); `push` (no force, delete, mirror, hook skipping, `:` or `+` refspec, or `main`); and a
+  short list of other forms, `merge`/`rebase`/`cherry-pick`/`revert`/`am --abort`, `stash drop`,
+  `config get`/`list`, and `hash-object <file>` with no options (DL-29) kept by the owner.
+  `switch -C`, `reset`, `clean`, `checkout -- <paths>`, and every unlisted form go to the
+  owner. A refused flag is refused with `=<value>`, abbreviated, or among short flags; a push
+  of `HEAD` or `@` is checked as the current branch. A variable prefix (`SKIP=<hook> git commit`) is evasion, out of scope (owner, Nov 18). gh keeps its list, with `run rerun`
+  added; `gh pr merge` and gh api writes still ask (DL-25). Blocks are no longer logged.
+- **Supersedes:** DL-26; DL-21 to DL-24 in part (how the guard enforces each outcome: resets and
+  pulls on `main`, flag-level read lists, variable and redirect checks); DL-30 in part (the
+  guard's redirect block); TD-20, resolved as accepted by the guard's scope
+- **Superseded by:** none
+- **Applies to:** `.claude/hooks/guard_git.py` and its tests; `wl check` (`doctor.py`'s
+  `repo_state`, `steps.cli_check`); root `CLAUDE.md`; developer guide section 11; build plan
+  ("Pull requests"); `checkpoint` and `design-change` skills; TD-20; the guard trial's README and
+  friction log
+- **Source:** owner, Nov 18, 2026 (the outside review's handoff, Package 1; the forms kept, Nov 18)

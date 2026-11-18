@@ -59,4 +59,7 @@ means the guard stopped something it should have.
 | 50 | DC-2026-11-18 (docs-consistency, read-only) | a compound command with `git status` in it | a compound command with git in it | separate calls | legit (as #15) |
 | 51 | DC-2026-11-18 (docs-consistency, read-only) | a `grep` chained with `git rev-parse` | a compound command with git in it | separate calls | legit (as #15) |
 
-None of the blocks so far stopped anything the rules forbid.
+None of the blocks stopped anything the rules forbid.
+
+**Closed, 2026-11-18: replaced by the small allow-list** (DL-391, the outside review's
+Package 1). Its tests run each command shape above against the new guard.

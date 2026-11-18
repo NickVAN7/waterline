@@ -104,7 +104,7 @@ history in the docs; the log holds it.
 One `docs:` commit per logical change set (tooling code in `chore:` or `ci:` commits), each
 with its review record, docs-only or tooling (DL-126), on the current slice branch (`docs/build-plan.md`, "Pull requests"). Push
 (`git push -u origin s<n>` at the branch's first push, `git push` after; each git or gh
-command its own Bash call, DL-26). If the slice branch has no pull request yet, open it as a
+command its own Bash call, DL-391). If the slice branch has no pull request yet, open it as a
 draft at this push (`gh pr create --draft`, as in the `checkpoint` skill, step 6): CI runs
 only on pull requests and on `main`. CI must be green.
 

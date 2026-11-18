@@ -7,9 +7,10 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0o (The design trial's outcome) done; next: the outside review's handoff
-(`docs/reviews/design-changes/2026-11-18-outside-review-handoff.md`, DL-390), Package 1 (the
-git guard's decision), then Packages 2 and 3, then S3-C0p, each after the owner's approval.
+S3-C0o (The design trial's outcome) done; the outside review's handoff
+(`docs/reviews/design-changes/2026-11-18-outside-review-handoff.md`, DL-390): Package 1 (the git
+guard, DL-391) applied; next: Package 2, then Package 3, then S3-C0p, each after the owner's
+approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
@@ -44,8 +45,8 @@ Use the developer CLI (`waterline`, alias `wl`) from the repo root: `uv run wl <
 - `wl doctor` — check the toolchain
 - `wl up` / `wl down` — the Docker Compose stack (`wl up` also applies migrations);
   `wl logs [service]`
-- `wl check` — the gate before every commit (lint, types, tests, coverage, import rules,
-  migrations, client freshness, and mutation testing when anything it depends on changed). Must
+- `wl check` — the gate before every commit (the repository's state, lint, types, tests,
+  coverage, import rules, migrations, client freshness, and mutation testing when anything it depends on changed). Must
   pass before any checkpoint goes to review. `wl check --full` adds mutation testing whatever
   changed, `wl audit`, and `wl e2e`: it's what CI runs, and CI must be green before a
   checkpoint is reported (DL-99).
@@ -136,14 +137,13 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).
 - Hooks block edits to generated files, committed migrations, `.pre-commit-config.yaml` (the
   owner's, DL-30), and git's own files (`.git/`, git config; DL-31), format files after edits, and
-  guard git. The git guard is an allow-list (DL-26; developer guide, section 11): **each git or
-  gh command is its own Bash call, with nothing else in it** (no `&&`, `;`, `|`, `cd`,
-  variables, or `$(...)`); use `git -C <path>` for another directory and
-  `git commit -F - <<'EOF'` for a commit message. Commits and pushes to `main`, history
-  rewrites, and skipped hooks are blocked; merging a PR asks the owner. Anything the allow-list
-  doesn't cover, ask the owner to run. When a hook blocks you, do what its message says. Until
-the guard's decision in the handoff's Package 1 (DL-390), log every block or workaround in
-`docs/spikes/S3-C0b-guard-trial/friction-log.md`, committed with the work it happened in. Never
-  work around a hook with shell commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
+  guard git. The git guard (DL-391; developer guide, section 11) stops the direct form of a
+  forbidden git or gh command: **each git or gh command is its own Bash call, with nothing else in
+  it** (no `&&`, `;`, `|`, `$(...)`, or redirects); use `git -C <path>` for another directory and
+  `git commit -F - <<'EOF'` for a commit message. Text that only mentions git isn't checked.
+  Commits and pushes to `main`, force-pushes, resets and other history rewrites, and `--no-verify`
+  are blocked; merging a PR asks the owner. Anything the allow-list doesn't cover, ask the owner to
+  run. When a hook blocks you, do what its message says. Never work around a hook with shell
+  commands (`sed`, `echo >`, `cp`, `git checkout` onto the file).
 
 See `backend/CLAUDE.md` and `frontend/CLAUDE.md` for the rules specific to each half.

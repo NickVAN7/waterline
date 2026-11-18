@@ -92,8 +92,9 @@ with the workflow changes of DL-7 to DL-14).
   checkpoint in its history (the docs consistency tests read them).
 - **GitHub enforces it** (DL-27), with two rulesets and no bypass: on every branch, no
   force-push or deletion; on `main`, changes only through a pull request with the `wl check`
-  status check green, merged with a merge commit. The git guard hook catches Claude's own
-  mistakes before they reach GitHub (developer guide section 11).
+  status check green, merged with a merge commit. The git guard hook stops the direct form of
+  Claude's own mistakes before they reach GitHub, and `wl check`'s repository-state step checks
+  the hooks and the branch (DL-391; developer guide section 11).
 
 ### Verification (three layers)
 **Nothing counts as verified because the session that did the work says so** (DL-11). A claim is

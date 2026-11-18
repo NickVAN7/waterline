@@ -213,7 +213,7 @@ Then:
 - Push the branch: `git push -u origin s<n>` at its first push, `git push` after. At the
   first push, open the slice's PR as a draft (`gh pr create --draft`, titled with the slice,
   listing its groups), with a literal `--title '…'` and `--body '…'` or `--body-file <file>`:
-  the git guard allows no heredoc or `$(...)` with gh (DL-26).
+  the git guard allows no heredoc or `$(...)` with gh (DL-391).
 - Push only the finished checkpoint commit, never work in progress. Wait for CI on it
   (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
@@ -232,7 +232,7 @@ Then:
   (`gh pr ready`) and merge it with a merge commit (`gh pr merge --merge`; the branch stays,
   since GitHub blocks deleting any branch, DL-27),
   never squash or rebase. The git guard asks the owner to confirm the merge (DL-25).
-- Under the git guard (DL-26), run each git or gh command as its own Bash call: `git add …`,
+- Under the git guard (DL-391), run each git or gh command as its own Bash call: `git add …`,
   then `git commit -F - <<'EOF'` with the message, then the push above. When it blocks a command,
   do what its message says.
 
