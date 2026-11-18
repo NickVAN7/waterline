@@ -4770,7 +4770,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   update checks are off. A newer release is a supply-chain check and an owner decision first.
   Set up and first used in S3-C0o.
 - **Supersedes:** none (S3-C0n's outcome, DL-374, DL-380)
-- **Superseded by:** none
+- **Superseded by:** DL-389 (in part: the engine cache)
 - **Applies to:** build plan (S3-C0o); the `vue-screen` skill, the developer guide, and the
   repository's Claude Code settings (from S3-C0o)
 - **Source:** owner, Nov 17, 2026 (S3-C0n trial, `docs/spikes/S3-C0n-impeccable/results.md`)
@@ -4850,3 +4850,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (S3-C0p, the "Change log (§10)" note); design-doc §6 ("History"),
   §10; behavior reference, user guide (from S3-C0p)
 - **Source:** owner, Nov 17, 2026 (S3-C0n trial findings)
+
+### DL-389: Impeccable's engine cache is its default, outside the repository
+- **Date:** 2026-11-18
+- **Decision:** `IMPECCABLE_HOME` isn't set, so the engine downloads into its default,
+  `~/.impeccable`, one cache per developer. The relative `.impeccable/home` the row named put a
+  second copy of the engine in `backend/.impeccable/` when the shell was in `backend/`: the
+  plugin's launcher starts on every edit even with its hook off. Everything else in
+  `.claude/settings.json`'s `env` stays as DL-381 set it.
+- **Supersedes:** DL-381 (in part: S3-C0o's "its cache in the repository")
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C0o); `.claude/settings.json`, developer guide section 11
+- **Source:** owner, Nov 18, 2026 (S3-C0o, Impeccable's first run)

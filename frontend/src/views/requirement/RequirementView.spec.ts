@@ -154,9 +154,10 @@ describe('RequirementView', () => {
     expect(definition('Priority')).toBe('High')
     expect(definition('Reporter')).toBe('Ben Ortiz')
     expect(definition('Restriction')).toBe('None')
-    // Under the Description h2, the description's ## is an h4 (UI-MD-1, UI-SHL-8).
-    expect(wrapper.find('.markdown h4').text()).toBe('Context')
-    expect(wrapper.findAll('.markdown h2, .markdown h3')).toHaveLength(0)
+    // Under the Description h2, the description's top heading, a ##, is an h3, never skipping a
+    // level (UI-MD-1, DL-382, UI-SHL-8).
+    expect(wrapper.find('.markdown h3').text()).toBe('Context')
+    expect(wrapper.findAll('.markdown h2, .markdown h4')).toHaveLength(0)
     await expectNoA11yViolations(wrapper)
   })
 
@@ -334,10 +335,13 @@ describe('RequirementView', () => {
     },
   )
 
-  it('says so when there is no description', async () => {
+  // One note, never two (S3-C0n, F11). Bug: "No description." under a criteria note too.
+  it('says so in one note when there is no description', async () => {
     const { wrapper } = await mountAt([READER], [ok({ ...REFUNDS, description_md: '' })])
 
-    expect(wrapper.text()).toContain('No description.')
+    expect(wrapper.text()).toContain('No description: the requirement has no acceptance criteria.')
+    expect(wrapper.text()).not.toContain('No acceptance criteria')
+    expect(wrapper.text()).not.toContain('No description.')
   })
 
   it('renders the description without running what it holds (UI-MD-1)', async () => {

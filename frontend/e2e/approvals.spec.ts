@@ -50,7 +50,7 @@ test('an admin requests approval, and the approver reviews and decides', async (
   await dialog.getByRole('textbox', { name: 'Note' }).fill('Before the release')
   await dialog.getByRole('button', { name: 'Request approval' }).click()
   await expect(dialog).toBeHidden()
-  await expect(section).toContainText(/Latest request:\s*Pending/)
+  await expect(section).toContainText(/Latest request\s*Pending/)
   await signOut(page)
 
   // The approver's side: on My work, then the revision under approval, then the decision.
@@ -80,7 +80,7 @@ test('an admin requests approval, and the approver reviews and decides', async (
 
   await comment.fill('Matches the card rules.')
   await section.getByRole('button', { name: 'Approve' }).click()
-  await expect(section).toContainText(/Latest request:\s*Approved/)
+  await expect(section).toContainText(/Latest request\s*Approved/)
   await expect(section).toContainText('Last approved: revision 1')
   await expect(section).toContainText('Matches the card rules.')
   await expect(section.getByRole('button', { name: 'Approve' })).toHaveCount(0)

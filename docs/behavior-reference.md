@@ -117,7 +117,9 @@ shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status, 
 made, cancelled, or decided in the side panel shows there at once). **Expand requirement** and
 **Move** sit at the right, above the tree; until you select a row, one line before them says
 "Select a requirement to expand or move it." ("…to expand it." if you can't move requirements).
-It opens with only the top-level
+The tree is one Tab stop of its own before its rows: when it's wider than its room (beside the
+side panel, or in a narrow window), the Left and Right arrow keys there scroll it sideways; its
+status badges stay whole. It opens with only the top-level
 requirements showing: open a branch with its arrow, or with the Right arrow key on its row
 (Left closes it). To open a requirement's whole branch at once, select its row and choose
 **Expand requirement**; the button says "Expanding…" until it's done. It opens up to 500 rows
@@ -148,12 +150,13 @@ If a requirement's place changed since you opened the page, the move is refused 
 reloads to show where things are now.
 
 A requirement's ID in the tree opens it in a side panel (clicking elsewhere on the row only
-selects it). On a wide window the panel runs down the right side of the window, and the page beside
-it narrows; you can still scroll the tree, select in it, and open other requirements from it. On
+selects it). On a window 1280 pixels wide or wider the panel runs down the right side of the
+window, and the page beside it narrows; you can still scroll the tree, select in it, and open other requirements from it. On
 a narrower window the panel covers the tree. Its row is marked
 **Open**, in bold. To make the panel wider or narrower, drag the bar between the tree and the
 panel, click the bar to step between narrow, medium, and wide, or focus it and press the Left or
-Right arrow; the width is kept for next time. Another
+Right arrow; the width is kept for next time. Until you choose one, the panel opens 560 pixels
+wide, or narrower (down to 400) so the tree keeps room beside it. Another
 requirement's ID shows that one in the panel instead. The panel has its own address
 (`…/requirements?open=RQ-<n>`), so the browser's Back closes it, as do **Close** (the ✕ at its top)
 and Esc; a change you make there shows in the tree. At the top of the panel, beside the ID and
@@ -165,7 +168,9 @@ parent (its ID, a link, then its title; **None** at the top level; in the panel 
 the parent there), and restriction, and its description. The page shows the same, with the actions beside its title
 and the ID and status under it. A status reads
 **Approved · modified** when the requirement is Approved and has changed since its approved revision. If the
-description has no "Acceptance Criteria" heading, a note says so. **Change status** (members and
+description has no "Acceptance Criteria" heading, a note says so: "No acceptance criteria: the
+description has no "Acceptance Criteria" heading.", or, with no description at all, "No
+description: the requirement has no acceptance criteria." **Change status** (members and
 admins) sets any status but its own and Approved, which comes only from an approval. If someone
 changed the requirement since you opened it, the change is refused and the page shows the latest.
 **Change restriction…** sets the requirement's restriction level and categories: members can raise
@@ -198,7 +203,8 @@ approval has been requested." A project admin can:
   approval**. The request is for the current revision. Only one request can be pending at a
   time: while one is, Request approval is unavailable and says why. After a rejection, the dialog
   opens with the same approvers ticked; anyone who can no longer be named is left out, and the
-  dialog says who.
+  dialog says who. On a requirement without an "Acceptance Criteria" heading, the dialog warns
+  that it has no acceptance criteria; you can still send the request.
 - **Re-open approval:** on an Approved requirement that hasn't changed since, the same dialog
   starts a new round. The requirement stays Approved while it's pending; if it's rejected, the
   requirement goes back to Draft.
@@ -206,7 +212,8 @@ approval has been requested." A project admin can:
   already made stay on record. **Keep request** leaves it as it is.
 - **Approve by hand:** after you confirm, the requirement is approved at its current revision
   without a request, with you as the approver (to record a sign-off made outside Waterline). A
-  pending request is cancelled.
+  pending request is cancelled. On a requirement without an "Acceptance Criteria" heading, the
+  confirmation warns that it has no acceptance criteria; you can still approve.
 
 If the requirement changed after approval was requested, a warning says approvers still decide
 on the requested revision; cancel and request again to have them review the latest. If an

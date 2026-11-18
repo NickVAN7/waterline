@@ -149,7 +149,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   stubResizeObserver()
   stubDialog()
-  // The overlay, below 64rem, unless a test widens it (DL-321).
+  // The overlay, below 80rem, unless a test widens it (DL-321, DL-383).
   stubWidth(false)
 })
 afterEach(() => {
@@ -830,7 +830,7 @@ describe('RequirementsView: the split pane, swapping, and unsaved edits (DL-321 
     await flushPromises()
   }
 
-  it('opens beside the tree at 64rem and wider: a named region, the tree still usable', async () => {
+  it('opens beside the tree at 80rem and wider: a named region, the tree still usable', async () => {
     stubWidth(true)
     await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
 

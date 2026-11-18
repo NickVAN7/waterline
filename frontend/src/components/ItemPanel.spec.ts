@@ -53,11 +53,12 @@ beforeEach(() => {
 })
 afterEach(() => {
   document.body.innerHTML = ''
+  document.documentElement.style.fontSize = ''
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
-describe('ItemPanel below 64rem', () => {
+describe('ItemPanel below 80rem', () => {
   it('is a modal dialog named by its title, with its ID, the item, and the three buttons', async () => {
     const { wrapper } = await mountPanel()
 
@@ -88,7 +89,7 @@ describe('ItemPanel below 64rem', () => {
   })
 })
 
-describe('ItemPanel at 64rem and wider', () => {
+describe('ItemPanel at 80rem and wider', () => {
   it('is a complementary region named by its label, not a dialog, its title focused', async () => {
     const { wrapper } = await mountPanel({ wide: true })
 
@@ -296,6 +297,15 @@ describe("ItemPanel's separator", () => {
         ['pointercancel', 400, 0],
       ],
     ],
+    [
+      'a drag whose capture is lost before its release',
+      [
+        ['pointerdown', 500, 0],
+        ['pointermove', 400, 0],
+        ['lostpointercapture', 400, 0],
+        ['pointermove', 300, 0],
+      ],
+    ],
   ] as const)('%s leaves the width as it was, unsaved', async (_, events) => {
     await mountPanel({ wide: true })
     separator().setPointerCapture = vi.fn()
@@ -321,6 +331,152 @@ describe("ItemPanel's separator", () => {
 
     expect(separator().getAttribute('aria-valuenow')).toBe('660')
     expect(window.localStorage.getItem(STORED)).toBe('660')
+  })
+
+  it("takes focus on a press without the press's own default: no text selection, so no drag of a link nearby, which would cancel the pointer", async () => {
+    await mountPanel({ wide: true })
+    separator().setPointerCapture = vi.fn()
+    const press = new PointerEvent('pointerdown', { clientX: 500, bubbles: true, cancelable: true })
+
+    separator().dispatchEvent(press)
+
+    expect(press.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(separator())
+  })
+
+  it('drags again after a drag whose capture was lost', async () => {
+    await mountPanel({ wide: true })
+    separator().setPointerCapture = vi.fn()
+    const pointer = (type: string, clientX: number) =>
+      separator().dispatchEvent(new MouseEvent(type, { clientX, bubbles: true }))
+
+    pointer('pointerdown', 500)
+    pointer('pointermove', 450)
+    pointer('lostpointercapture', 450)
+    // From elsewhere on the separator: a drag still running from 500 would land somewhere else.
+    pointer('pointerdown', 600)
+    pointer('pointermove', 500)
+    pointer('pointerup', 500)
+    await flushPromises()
+
+    expect(separator().getAttribute('aria-valuenow')).toBe('660')
+    expect(window.localStorage.getItem(STORED)).toBe('660')
+  })
+
+  // Each case's second pointer would leave its own mark if it were followed: a restart from 300
+  // (the first pointer's moves then ignored, 560), a move to 250 (800), a release as a click
+  // (a step to 800), a cancel (back to 560).
+  it.each([
+    [
+      'press',
+      [
+        ['pointerdown', 1, 500],
+        ['pointerdown', 2, 300],
+        ['pointermove', 1, 400],
+        ['pointerup', 1, 400],
+      ],
+      '660',
+    ],
+    [
+      'move',
+      [
+        ['pointerdown', 1, 500],
+        ['pointermove', 1, 400],
+        ['pointermove', 2, 250],
+        ['pointerup', 1, 400],
+      ],
+      '660',
+    ],
+    [
+      'release',
+      [
+        ['pointerdown', 1, 500],
+        ['pointerup', 2, 250],
+        ['pointermove', 1, 380],
+        ['pointerup', 1, 380],
+      ],
+      '680',
+    ],
+    [
+      'cancel',
+      [
+        ['pointerdown', 1, 500],
+        ['pointermove', 1, 400],
+        ['pointercancel', 2, 400],
+        ['pointerup', 1, 400],
+      ],
+      '660',
+    ],
+  ] as const)(
+    "follows only the pointer that started the drag: a second one's %s is ignored",
+    async (_, events, width) => {
+      await mountPanel({ wide: true })
+      separator().setPointerCapture = vi.fn()
+
+      for (const [type, pointerId, clientX] of events)
+        separator().dispatchEvent(new PointerEvent(type, { pointerId, clientX, bubbles: true }))
+      await flushPromises()
+
+      expect(separator().getAttribute('aria-valuenow')).toBe(width)
+      expect(window.localStorage.getItem(STORED)).toBe(width)
+    },
+  )
+})
+
+// With no width of the viewer's own, the panel leaves the list in `main` 30rem (480px) of its
+// content box (DL-385): here `main` starts after a 240px sidebar with 24px padding each side, so
+// a window of 1280 leaves 1280 - 240 - 48 - 480 = 512.
+describe("ItemPanel's default width", () => {
+  function layout(windowWidth: number) {
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(windowWidth)
+    const main = document.createElement('main')
+    main.id = 'main'
+    main.style.padding = '24px'
+    main.getBoundingClientRect = () => ({ left: 240 }) as DOMRect
+    document.body.append(main)
+  }
+
+  it.each([
+    [1280, '512'],
+    [1920, '560'],
+    [1100, '400'],
+  ])('at a window of %ipx opens at %s', async (windowWidth, expected) => {
+    layout(windowWidth)
+    await mountPanel({ wide: true })
+
+    expect(separator().getAttribute('aria-valuenow')).toBe(expected)
+    expect(window.localStorage.getItem(STORED)).toBeNull()
+  })
+
+  // A larger text size: the width is drawn in rem, so the room is measured in rem too. At 20px
+  // the 1280 window leaves 1280 - 240 - 48 = 992px, 793.6 in the width's units; less 480, 313.6,
+  // so the minimum. Bug: measured in px, it opened at 512, drawn 640px, the list keeping 352px.
+  it('measures the room in rem, so a larger text size keeps the list its 30rem', async () => {
+    layout(1280)
+    document.documentElement.style.fontSize = '20px'
+    await mountPanel({ wide: true })
+
+    expect(separator().getAttribute('aria-valuenow')).toBe('400')
+  })
+
+  it('fits the room again when it opened as the overlay and the window widens', async () => {
+    layout(1100)
+    const { width } = await mountPanel({ wide: false })
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1920)
+
+    width.resize(true)
+    await flushPromises()
+
+    expect(separator().getAttribute('aria-valuenow')).toBe('560')
+    expect(window.localStorage.getItem(STORED)).toBeNull()
+  })
+
+  it('keeps a width the viewer chose, wider than the list leaves', async () => {
+    layout(1280)
+    window.localStorage.setItem(STORED, '700')
+    await mountPanel({ wide: true })
+
+    expect(separator().getAttribute('aria-valuenow')).toBe('700')
   })
 })
 

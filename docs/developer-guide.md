@@ -1016,7 +1016,9 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   placeholder for each one it leaves out; `trail()` (`@/test/trail`) reads the trail back as its
   links and current crumb. A crumb the viewer may never open is left out (DL-358).
 - **Side panels** (UI-SHL-11, DL-321 to DL-326, DL-355, DL-356): `ItemPanel` holds its own `<aside>` (the
-  split pane at 64rem and wider, named by `label`, with the resizing separator) and `<dialog>`
+  split pane at 80rem and wider, DL-383, named by `label`, with the resizing separator; its
+  default width leaves `main`'s list 30rem, DL-385, and a drag belongs to the pointer that
+  started it, a lost capture reverting it) and `<dialog>`
   (the overlay below), and one teleport that moves the content, its `meta` slot (ID and status)
   and default slot (the item) under its header, between them. The list page owns it from its URL
   (`?open=RQ-7`): it calls `open()` when the query names an item, `swapped()` when it names
@@ -1437,6 +1439,39 @@ its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when t
     and the other hooks', are in `tools/cli/tests/hooks/`. All three hooks, and the
     `hook_paths.py` helpers they share, are linted, formatted, type-checked, and tested with the
     developer CLI (`wl lint`, `wl test`).
+- **Impeccable** (DL-381), a third-party Claude Code plugin pinned to 4.8.0 (commit `414603b`,
+  Apache-2.0), used only for `/impeccable critique` and `/impeccable audit`, as `vue-screen`'s
+  step before `ui-reviewer`. Each developer installs it at local scope, from the repository root,
+  with the shell CLI (the `/plugin` command in a session ignored `--scope local` in S3-C0o).
+  Local, never project scope: a committed `enabledPlugins` names only the marketplace, not the
+  pinned commit, so a clone whose marketplace follows `main` would run an unreviewed release; it
+  would also enable a third-party plugin, its hooks, and its engine for everyone who clones,
+  where installing it yourself is the only consent they get.
+  ```
+  claude plugin marketplace add pbakaus/impeccable#skill-v4.8.0
+  claude plugin install impeccable@impeccable --scope local
+  ```
+  Then check it's the reviewed code, not only the tag (a tag can be moved): in
+  `~/.claude/plugins/installed_plugins.json`, `impeccable@impeccable`'s local entry for this
+  repository has `"gitCommitSha": "414603bf14c7a344edb466bb1f85690c77ce8b7d"`. If it doesn't,
+  `claude plugin uninstall impeccable@impeccable --scope local` and tell the owner. A marketplace
+  added without the tag follows `main`: remove it first (`claude plugin marketplace remove
+  impeccable`). A newer release is a supply-chain check and an owner decision first.
+  - Its settings are `.claude/settings.json`'s `env`, so every session gets them: its design hook
+    off (`IMPECCABLE_HOOK_DISABLED`), telemetry and update checks off, live mode's copy-edit
+    agent off. Its engine cache is its default, `~/.impeccable` (DL-389): the launcher starts on
+    every edit even with the hook off, and a relative cache path put a copy of the engine in
+    whichever directory the shell was in. Live mode isn't used, and the CSP doesn't change for it.
+  - `.impeccable/` and `DESIGN.md` are ignored by git (`DESIGN.md` isn't kept); `PRODUCT.md`, the
+    product context it reads, is committed at the root and defers to `docs/ui-design-guide.md`.
+    `vue-screen` keeps it current.
+  - The engine is a native binary it downloads on first use. The launcher checks the SHA-256 the
+    plugin ships only on that download and its version's cache; it runs any other copy it finds
+    first without that check: `$IMPECCABLE_BIN`, a binary beside the launcher, or an
+    `impeccable` on your `PATH`. So at install, check `IMPECCABLE_BIN` is unset, there's no
+    `~/.impeccable/bin/impeccable`, and `command -v impeccable` prints nothing. The engine runs
+    unsandboxed, with your session's environment, and the launcher starts on every edit even
+    with the hook off (its engine, not the launcher, honors `IMPECCABLE_HOOK_DISABLED`).
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 

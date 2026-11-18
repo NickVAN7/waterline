@@ -33,7 +33,7 @@ export function stubDialog(): void {
 
 /**
  * For specs that mount the side panel (`ItemPanel`): jsdom has no `matchMedia`. `wide` is the
- * answer to its 64rem query: the split pane when true, the overlay when false. Set it before
+ * answer to its 80rem query: the split pane when true, the overlay when false. Set it before
  * mounting; `resize(wide)` crosses the breakpoint afterwards.
  */
 export function stubWidth(wide: boolean): { resize: (wide: boolean) => void } {

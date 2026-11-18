@@ -45,26 +45,29 @@ describe('MarkdownView', () => {
 
   it.each([
     ['# One', 'h2'],
-    ['## Two', 'h3'],
-    ['##### Five', 'h6'],
-    ['###### Six', 'h6'],
-  ])('shifts %s down a level, to %s, so content never adds an h1', (source, tag) => {
-    const view = render(source)
+    ['## Two', 'h2'],
+    ['##### Five', 'h2'],
+  ])(
+    'makes the top heading, %s, an h2 under the page (`level` 1), so content never adds an h1 (DL-382)',
+    (source, tag) => {
+      const view = render(source)
 
-    expect(view.find('h1').exists()).toBe(false)
-    expect(view.find(tag).exists()).toBe(true)
-  })
+      expect(view.find('h1').exists()).toBe(false)
+      expect(view.find(tag).exists()).toBe(true)
+    },
+  )
 
   it.each([
-    ['# One', 'h4'],
-    ['### Three', 'h6'],
+    ['## A\n### B', 2, ['H3', 'H4']],
+    ['# A\n### B', 1, ['H2', 'H4']],
+    ['## A\n###### B', 3, ['H4', 'H6']],
+    ['### A\n## B', 3, ['H5', 'H4']],
   ])(
-    "under an h3 (`level` 3), shifts %s to %s, keeping the page's heading order",
-    (source, tag) => {
-      const view = mount(MarkdownView, { props: { source, level: 3 } })
+    "shifts %j at `level` %i to %j: the rest keep their distance from the top heading, an author's skip kept, capped at h6 (DL-382)",
+    (source, level, tags) => {
+      const view = mount(MarkdownView, { props: { source, level } })
 
-      expect(view.find(tag).exists()).toBe(true)
-      expect(view.findAll('h2, h3')).toHaveLength(0)
+      expect(view.findAll('h1, h2, h3, h4, h5, h6').map((h) => h.element.tagName)).toEqual(tags)
     },
   )
 

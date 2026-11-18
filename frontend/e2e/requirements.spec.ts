@@ -366,6 +366,13 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
     }
   })
   expect(placed).toEqual({ top: 0, bottom: 0, right: 0, mainEnd: 0 })
+  // The pane scrolls its own content: nothing in it, a visually hidden note included, makes the
+  // page taller than the window and scroll into blank space below the layout (S3-C0n trial).
+  const fits = await page.evaluate(() => ({
+    height: document.documentElement.scrollHeight,
+    window: window.innerHeight,
+  }))
+  expect(fits.height).toBe(fits.window)
   const create = (await page.getByRole('button', { name: 'New requirement' }).boundingBox())!
   const panelBox = (await panel.boundingBox())!
   expect(create.x + create.width).toBeLessThan(panelBox.x)
@@ -393,17 +400,51 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   expect(edge.width).toBeGreaterThanOrEqual(1)
   expect(edge.height).toBeGreaterThan(panelBox.height / 2)
   await page.emulateMedia({ forcedColors: 'none' })
-  // At 64rem the pane leaves the page little room: the trail wraps, nothing cut off inside its
-  // nav (UI-SHL-14). The nav is measured, not the document: PrimeVue scrolls it on its own.
-  await page.setViewportSize({ width: 1024, height: 720 })
+  // At 80rem, the narrowest window the pane is beside the page in (DL-383), the page has the least
+  // room: the trail wraps, nothing cut off inside its nav (UI-SHL-14). The nav is measured, not
+  // the document: PrimeVue scrolls it on its own. The list keeps 30rem beside the pane's default
+  // width (DL-385).
+  await page.setViewportSize({ width: 1280, height: 720 })
   const listTrail = page.getByRole('navigation', { name: 'Breadcrumb' })
   await expect(listTrail.locator('[aria-current=page]')).toBeInViewport()
   expect(await listTrail.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
-  await page.setViewportSize({ width: 1280, height: 720 })
+  expect(
+    await page.evaluate(() => {
+      const main = document.getElementById('main')!
+      const style = getComputedStyle(main)
+      return main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    }),
+  ).toBeGreaterThanOrEqual(480)
   expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
   // Its row is marked by more than color (DL-324).
   const openRow = page.getByRole('row', { name: /Stored payload/ })
   await expect(openRow).toContainText('Open')
+  // Beside the pane a badge stays whole, never broken over lines, and a tree wider than its room
+  // scrolls in a named region the keyboard reaches (S3-C0n trial).
+  expect(
+    await openRow
+      .getByText('Draft', { exact: true })
+      .evaluate((el) => getComputedStyle(el).whiteSpace),
+  ).toBe('nowrap')
+  // Only the tree's: any other badge wraps, or a long one (a restriction with every category)
+  // would push a 320px page sideways.
+  expect(
+    await panel
+      .getByText('Status: Draft', { exact: true })
+      .evaluate((el) => getComputedStyle(el).whiteSpace),
+  ).toBe('normal')
+  await expect(page.getByRole('region', { name: 'Requirements' })).toHaveAttribute('tabindex', '0')
+  // The panel's tabs and the tree sit on the pane and the page, not raised above them: no fill
+  // of their own (S3-C0n trial). PrimeVue paints a tab list's fill and a tab panel's on the
+  // element around each.
+  const fills = await Promise.all(
+    [
+      panel.getByRole('tablist').locator('..'),
+      panel.getByRole('tabpanel').locator('..'),
+      page.getByRole('columnheader', { name: 'Title' }),
+    ].map((part) => part.evaluate((el) => getComputedStyle(el).backgroundColor)),
+  )
+  expect(fills).toEqual(['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'])
   await expectNoA11yViolations(page)
   await expectOnlyTokenColors(page, 'aside')
 
@@ -487,11 +528,12 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(page.getByRole('row', { name: /Another requirement/ })).toContainText('Open')
   await expect(openRow).not.toContainText('Open')
 
-  // The separator resizes it from the keyboard (DL-322), and the width is kept.
+  // The separator resizes it from the keyboard (DL-322), and the width is kept. At 1280 it opened
+  // at 512, not 560, so the list keeps 30rem (DL-385).
   const separator = page.getByRole('separator', { name: 'Resize the panel' })
   await separator.focus()
   await page.keyboard.press('ArrowLeft')
-  await expect(separator).toHaveAttribute('aria-valuenow', '576')
+  await expect(separator).toHaveAttribute('aria-valuenow', '528')
   await expectFocusNotObscured(page)
 
   // Esc closes it as Back would: focus back on the ID that opened it, no history entry left.
@@ -509,7 +551,7 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await title.fill('Typed before narrowing')
   await title.focus()
   await page.setViewportSize({ width: 900, height: 900 })
-  // Below 64rem it's a modal overlay: a dialog over an inert page, with no separator.
+  // Below 80rem it's a modal overlay: a dialog over an inert page, with no separator.
   const overlay = page.getByRole('dialog', { name: 'Stored payload' })
   await expect(overlay).toBeVisible()
   const overlayTitle = overlay.getByRole('textbox', { name: 'Title', exact: true })
@@ -573,6 +615,38 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expectNoA11yViolations(page)
 })
 
+test("a fast drag of the panel's edge beside a link resizes it", async ({ page }, testInfo) => {
+  const { user, key } = runFor(testInfo)
+  await signIn(page, user)
+  const parent = await createRequirement(page, key, 'Flick parent')
+  const child = await createRequirement(page, key, 'Flick child', parent.id)
+  await page.goto(`/acme/projects/${key}/requirements?open=RQ-${child.number}`)
+  const panel = page.getByRole('complementary', { name: `Requirement ${key}-RQ-${child.number}` })
+  await expect(panel.getByRole('heading', { name: 'Flick child' })).toBeFocused()
+
+  // Pressed level with the Parent link just right of it, then moved in two quick steps: the press's
+  // default (a text selection) made Chromium drag that link and cancel the pointer, the width
+  // left as it was (S3-C0n trial). The real pointer, since jsdom has no default to prevent.
+  const separator = page.getByRole('separator', { name: 'Resize the panel' })
+  const edge = (await separator.boundingBox())!
+  const link = (await panel
+    .getByRole('link', { name: `${key}-RQ-${parent.number}` })
+    .boundingBox())!
+  const x = edge.x + edge.width / 2
+  const y = link.y + link.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x - 50, y)
+  await page.mouse.move(x - 100, y)
+  await page.mouse.up()
+
+  // From the default at 1280: 560, or narrower so the list keeps 30rem, 512 here (DL-385); then
+  // 100 wider.
+  await expect(separator).toHaveAttribute('aria-valuenow', '612')
+  await expect(separator).toBeFocused()
+  expect(await page.evaluate(() => getSelection()!.toString())).toBe('')
+})
+
 // At 320 CSS px the tree reflows (WCAG 1.4.10, UI-SHL-7): the IDs don't wrap and a row can hold
 // two badges ("Awaiting approval", S3-C0l), yet nothing scrolls the page sideways. The demo's
 // PORTAL has a requirement awaiting approval; a nested branch adds the indent.
@@ -591,4 +665,11 @@ test('the requirement tree reflows at 320 px', async ({ page }, testInfo) => {
   await expect(page.getByRole('row', { name: /Reflow grandchild/ })).toBeVisible()
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+  // A branch's toggle keeps its 24px beside a long title in the narrow cell (UI-TOK-6, S3-C0n
+  // trial).
+  const toggle = await page
+    .getByRole('row', { name: /Reflow parent/ })
+    .locator('[data-pc-section="nodetogglebutton"]')
+    .boundingBox()
+  expect({ width: toggle!.width, height: toggle!.height }).toEqual({ width: 24, height: 24 })
 })

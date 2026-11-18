@@ -34,6 +34,7 @@ import { useLoad } from '@/composables/useLoad'
 
 import DecidePanel from './DecidePanel.vue'
 import RequestApprovalDialog, { type Earlier } from './RequestApprovalDialog.vue'
+import { hasAcceptanceCriteria, noCriteriaWarning } from './templates'
 
 type Requirement = components['schemas']['RequirementRead']
 type Request = components['schemas']['ApprovalRequestRead']
@@ -255,6 +256,9 @@ async function approveByHand() {
       isPending.value ? ' The pending request is cancelled.' : ''
     }`,
     button: 'Approve',
+    warning: hasAcceptanceCriteria(props.requirement.description_md)
+      ? undefined
+      : noCriteriaWarning(props.requirement.description_md),
   })
   if (!confirmed) return
   acting.value = 'approve'
@@ -325,9 +329,11 @@ async function dismiss() {
           This requirement has changed since approval was requested. Approvers decide on revision
           {{ request.revision_number }}; cancel and request again to have them review the latest.
         </Alert>
-        <dl class="m-0 flex flex-col gap-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <dt class="font-medium">Latest request:</dt>
+        <!-- Terms and values as the requirement's details list above (DL-325): one way to read a
+             label and its value in the panel and on the page. -->
+        <dl class="m-0 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <div class="flex flex-col items-start gap-1">
+            <dt class="text-sm font-medium text-text-muted">Latest request</dt>
             <dd class="m-0">
               <Badge
                 :tone="APPROVAL_REQUEST_STATUS[request.status].tone"
@@ -336,12 +342,12 @@ async function dismiss() {
               >
             </dd>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <dt class="font-medium">Revision:</dt>
+          <div class="flex flex-col gap-1">
+            <dt class="text-sm font-medium text-text-muted">Revision</dt>
             <dd class="m-0">{{ request.revision_number }}</dd>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <dt class="font-medium">Requested by:</dt>
+          <div class="flex flex-col gap-1 sm:col-span-2">
+            <dt class="text-sm font-medium text-text-muted">Requested by</dt>
             <dd class="m-0 flex flex-wrap items-center gap-2">
               {{ request.requested_by_name }}
               <Badge
@@ -353,8 +359,8 @@ async function dismiss() {
               <span class="text-text-muted">{{ when(request.created_at) }}</span>
             </dd>
           </div>
-          <div v-if="request.note" class="flex flex-wrap gap-2">
-            <dt class="font-medium">Note:</dt>
+          <div v-if="request.note" class="flex flex-col gap-1 sm:col-span-2">
+            <dt class="text-sm font-medium text-text-muted">Note</dt>
             <dd class="m-0">{{ request.note }}</dd>
           </div>
         </dl>

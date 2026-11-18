@@ -72,7 +72,23 @@ Mount through the shared helpers (`mountWorkspaceView`, `mountOrgView`, `mountOr
 Playwright test only for a flow in the slice's "Done when" list, in both themes, with axe and the
 focus checks (`e2e/support/a11y.ts`).
 
-## 6. Docs
+## 6. Impeccable's critique and audit
+
+On every new or reshaped screen or dialog, after its tests pass and before `ui-reviewer`
+(DL-381; setup in the developer guide, section 11):
+
+1. Check `PRODUCT.md` against `docs/ui-design-guide.md`: where a rule or section it names in
+   "Design rules it names" has changed (or a decision changed one), refresh that line in the same
+   change.
+2. From the repository root, run `/impeccable critique <screen>` and `/impeccable audit <screen>`.
+   Never its other commands, live mode, or `hooks on`.
+3. Treat each finding like a review's: accept it (fix it in this change), reject it with the
+   reason, or match it to a UI rule. A finding that would change a recorded rule or decision is a
+   proposal for the owner, never a fix. Record them in the checkpoint's review record.
+4. Afterwards, `git status --ignored` shows nothing new outside `.impeccable/`; anything else
+   goes to the owner.
+
+## 7. Docs
 
 - `docs/behavior-reference.md`: what the screen does, in the words on the screen
   (`user-guide-verifier` follows it literally at the slice's end); the guide's page under

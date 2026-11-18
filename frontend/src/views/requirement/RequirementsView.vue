@@ -4,7 +4,7 @@
 // at first (DL-175), the move menu for those who may move requirements (`requirement.update`,
 // DL-243), and New requirement for those who may create them (`requirement.create`), whose
 // dialog lands on the new requirement's page (DL-250). A requirement's ID opens it in the side
-// panel (`?open=RQ-7`, UI-SHL-11, DL-262): beside the tree at 64rem and wider, over it below
+// panel (`?open=RQ-7`, UI-SHL-11, DL-262): beside the tree at 80rem and wider (DL-383), over it below
 // (DL-321); another ID swaps it (DL-323). Back closes it and the tree keeps its place, its open
 // row marked; a change made there shows in its row. Unsaved edits in the panel ask Discard your
 // changes? before any of those navigations drops them (DL-323, TD-92). For those who may read the project's content (`requirement.view`); anyone else who sees
@@ -231,7 +231,7 @@ async function panelDeleted(id: string) {
             >Open Trash</RouterLink
           >
         </SuccessStatus>
-        <!-- At 64rem and wider the panel is a split pane beside the tree (DL-321). -->
+        <!-- At 80rem and wider the panel is a split pane beside the tree (DL-321, DL-383). -->
         <div class="flex items-start">
           <section
             aria-labelledby="requirements-heading"

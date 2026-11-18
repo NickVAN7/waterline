@@ -57,6 +57,7 @@ import RequirementHistory from './RequirementHistory.vue'
 import RequirementRevisions from './RequirementRevisions.vue'
 import RestrictionDialog from './RestrictionDialog.vue'
 import StatusMenu from './StatusMenu.vue'
+import { hasAcceptanceCriteria } from './templates'
 
 type Status = components['schemas']['RequirementStatus']
 type Requirement = components['schemas']['RequirementRead']
@@ -160,11 +161,7 @@ const parent = computed(() => requirement.value?.ancestors.at(-1))
 const statusBadge = computed(() =>
   requirement.value ? requirementStatusBadge(requirement.value) : REQUIREMENT_STATUS.draft,
 )
-// An "Acceptance Criteria" heading at any level, ignoring case (DL-149): an ATX one (`## …`) or
-// an underlined one (`===` or `---`), with CRLF line ends too.
-const CRITERIA =
-  /^ {0,3}#{1,6}[ \t]+acceptance criteria[ \t]*#*[ \t]*\r?$|^ {0,3}acceptance criteria[ \t]*\r?\n {0,3}(=+|-+)[ \t]*\r?$/im
-const hasCriteria = computed(() => CRITERIA.test(requirement.value?.description_md ?? ''))
+const hasCriteria = computed(() => hasAcceptanceCriteria(requirement.value?.description_md ?? ''))
 const canRestrict = computed(
   () =>
     allows(requirement.value, 'requirement.raise_restriction') ||
@@ -452,15 +449,17 @@ function restrictionSaved(saved: Requirement) {
         <!-- An h2 in the panel too, beside its title: the description's own headings start at h3
              (`level` 2, UI-MD-1), so they stay under it. -->
         <h2 :id="descriptionId" class="m-0 text-lg font-semibold">Description</h2>
-        <Alert v-if="!hasCriteria" tone="info"
-          >No acceptance criteria: the description has no "Acceptance Criteria" heading.</Alert
-        >
+        <!-- One note, never two: an empty description has no criteria either (S3-C0n, F11). -->
+        <Alert v-if="!hasCriteria" tone="info">{{
+          requirement.description_md.trim()
+            ? 'No acceptance criteria: the description has no "Acceptance Criteria" heading.'
+            : 'No description: the requirement has no acceptance criteria.'
+        }}</Alert>
         <MarkdownView
           v-if="requirement.description_md.trim()"
           :source="requirement.description_md"
           :level="2"
         />
-        <p v-else class="m-0 text-text-muted">No description.</p>
       </section>
       <!-- The requester's side of approvals (S2-C20); it waits while the edit form is open, as the
            status menu does: its approval would make the form's save a 409. -->

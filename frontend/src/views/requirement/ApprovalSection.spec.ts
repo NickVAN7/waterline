@@ -203,12 +203,12 @@ describe('ApprovalSection', () => {
     mountSection(requirement(), latest)
     await flushPromises()
 
-    expect(details()).toContain('Latest request: Rejected')
-    expect(details()).toContain('Revision: 2')
-    expect(details().find((d) => d.startsWith('Requested by:'))).toMatch(
-      /^Requested by: Ada Admin .+/,
+    expect(details()).toContain('Latest request Rejected')
+    expect(details()).toContain('Revision 2')
+    expect(details().find((d) => d.startsWith('Requested by '))).toMatch(
+      /^Requested by Ada Admin .+/,
     )
-    expect(details()).toContain('Note: Before the October release')
+    expect(details()).toContain('Note Before the October release')
     const approvers = [...document.querySelectorAll('li')].map((li) =>
       li.textContent!.replace(/\s+/g, ' ').trim(),
     )
@@ -303,7 +303,7 @@ describe('ApprovalSection', () => {
       body: { approver_ids: ['u-max'], note: 'Please check totals' },
     })
     expect(dialogOpen()).toBeNull()
-    expect(details()).toContain('Latest request: Pending')
+    expect(details()).toContain('Latest request Pending')
   })
 
   it('asks for an approver before sending, at the list', async () => {
@@ -319,9 +319,13 @@ describe('ApprovalSection', () => {
     const group = document.getElementById('request-approval-approver_ids')!
     expect(document.activeElement).toBe(group)
     expect(group.getAttribute('aria-invalid')).toBe('true')
-    expect(document.getElementById(group.getAttribute('aria-describedby')!)!.textContent).toContain(
-      'Choose at least one approver.',
-    )
+    // The error is one of what the group says (the no-criteria warning may be another, DL-384).
+    const said = group
+      .getAttribute('aria-describedby')!
+      .split(' ')
+      .map((id) => document.getElementById(id)!.textContent)
+    // The error first, before any note (UI-FRM-6). Bug: "You can still go ahead" read first.
+    expect(said[0]).toContain('Choose at least one approver.')
   })
 
   it('shows a refused approver under the list (422 on approver_ids)', async () => {
@@ -409,7 +413,7 @@ describe('ApprovalSection', () => {
     expect(post).toHaveBeenCalledWith('/api/approval-requests/{request_id}/cancel', {
       params: { path: { request_id: 'req-1' } },
     })
-    expect(details()).toContain('Latest request: Cancelled')
+    expect(details()).toContain('Latest request Cancelled')
     expect(text()).toContain('Request cancelled.')
     expect(button('Cancel request')).toBeUndefined()
     // Cancel request went with its own action: the section's heading takes focus.
@@ -442,7 +446,7 @@ describe('ApprovalSection', () => {
     expect(document.querySelector('[role=alert]')!.textContent).toContain(
       "This request isn't pending any more.",
     )
-    expect(details()).toContain('Latest request: Approved')
+    expect(details()).toContain('Latest request Approved')
   })
 
   it('shows a flagged request with Re-request, which cancels and opens the dialog pre-filled (DL-281)', async () => {
@@ -495,6 +499,100 @@ describe('ApprovalSection', () => {
       body: { version: 4 },
     })
     expect(wrapper.emitted('changed')).toEqual([[saved]])
+  })
+
+  // DL-384: a warning, never a block. Bug: no word of the missing criteria, or a block.
+  // Worded for an empty description as the page's note is (F11).
+  const EMPTY = 'This requirement has no description, so it has no acceptance criteria.'
+  const NO_HEADING = 'This requirement has no acceptance criteria: its description has no'
+  const CRITERIA = '## Acceptance Criteria\n\n1. Refunds by card'
+  // The warning in the open dialog: the only Alert there.
+  const warningIn = (dialog: Element) => dialog.querySelectorAll('div[tabindex="-1"].border')
+  const describedBy = (element: Element) =>
+    (element.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)!.textContent!.trim())
+
+  async function openApproveByHand(md: string) {
+    const { post } = mountSection(requirement({ description_md: md }), null)
+    await flushPromises()
+    post.mockResolvedValue(ok(requirement({ status: 'approved' })))
+    press('Approve by hand')
+    await flushPromises()
+    return { post, shown: dialogOpen()! }
+  }
+
+  it.each([
+    ['', EMPTY],
+    ['## Context\n\nRefunds by card.', NO_HEADING],
+  ])('Approve by hand on %j warns %j, after what it does, and still approves', async (md, said) => {
+    const { post, shown } = await openApproveByHand(md)
+
+    const [warning] = warningIn(shown)
+    expect(warningIn(shown)).toHaveLength(1)
+    expect(warning!.textContent).toContain(said)
+    // Read as focus lands on Cancel: what the action does, then the warning. Bug: only the
+    // warning read, never the consequence.
+    const read = describedBy(document.activeElement!)
+    expect(read).toHaveLength(2)
+    expect(read[0]).toContain('This records you')
+    expect(read[1]).toBe(warning!.textContent!.trim())
+    // On the screen too, the consequence comes first.
+    expect(warning!.previousElementSibling!.textContent).toContain('This records you')
+    await expectNoA11yViolations(document.body)
+    await confirmIt('Approve')
+
+    expect(post).toHaveBeenCalledOnce()
+  })
+
+  it('Approve by hand with acceptance criteria shows no warning, and Cancel reads only what it does', async () => {
+    const { post, shown } = await openApproveByHand(CRITERIA)
+
+    expect(warningIn(shown)).toHaveLength(0)
+    const read = describedBy(document.activeElement!)
+    expect(read).toHaveLength(1)
+    expect(read[0]).toContain('This records you')
+    await confirmIt('Approve')
+
+    expect(post).toHaveBeenCalledOnce()
+  })
+
+  async function openRequest(md: string) {
+    mountSection(requirement({ description_md: md }), null)
+    await flushPromises()
+    button('Request approval')!.click()
+    await flushPromises()
+    return dialogOpen()!
+  }
+  const approverList = () => document.getElementById('request-approval-approver_ids')!
+  const sendButton = (dialog: Element) =>
+    [...dialog.querySelectorAll('button')].find(
+      (b) => b.textContent!.trim() === 'Request approval',
+    )!
+
+  it.each([
+    ['', EMPTY],
+    ['## Context\n\nRefunds by card.', NO_HEADING],
+  ])(
+    'Request approval on %j warns %j, read as focus enters the list, never blocking',
+    async (md, said) => {
+      const shown = await openRequest(md)
+
+      const [warning] = warningIn(shown)
+      expect(warningIn(shown)).toHaveLength(1)
+      expect(warning!.textContent).toContain(said)
+      expect(describedBy(approverList())).toEqual([warning!.textContent!.trim()])
+      expect(sendButton(shown).getAttribute('aria-disabled')).not.toBe('true')
+    },
+  )
+
+  it('Request approval with acceptance criteria shows no warning', async () => {
+    const shown = await openRequest(CRITERIA)
+
+    expect(warningIn(shown)).toHaveLength(0)
+    expect(approverList().getAttribute('aria-describedby')).toBeNull()
+    expect(sendButton(shown).getAttribute('aria-disabled')).not.toBe('true')
   })
 
   it('a 409 on Approve by hand waits for the requirement to reload, then says so', async () => {
@@ -567,7 +665,7 @@ describe('ApprovalSection', () => {
     await wrapper.setProps({ requirement: { ...r, version: r.version + 1 } })
     await flushPromises()
 
-    expect(details()).toContain('Latest request: Cancelled')
+    expect(details()).toContain('Latest request Cancelled')
     expect(button('Cancel request')).toBeUndefined()
   })
 
@@ -636,7 +734,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
 
     expect(dialogOpen()!.textContent).toContain('This item already has a pending approval request.')
-    expect(details()).toContain('Latest request: Pending')
+    expect(details()).toContain('Latest request Pending')
   })
 
   it('reloads the list when someone picked can no longer be named (a 404), saying so', async () => {

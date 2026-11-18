@@ -49,5 +49,10 @@ means the guard stopped something it should have.
 | 40 | S3-C0n outcome (reading the trial's results) | `ls`, then a `find` excluding `*/.git/*` paths | text mentioning git in a command | `ls` alone | legit (as #13) |
 | 41 | S3-C0n outcome (reading the trial's results) | `cd <clone> && ls … ; find … \| grep -v '/\.git/'` | a compound command with git in it | `ls` alone | legit; my slip (as #15) |
 | 42 | S3-C0n outcome (saving the trial's diff) | `git -C <clone> diff --output=<spike folder>/results/trial.diff` | `--output` isn't an allowed `git diff` option | the owner runs it | legit (allow-list) |
+| 43 | S3-C0o (outlining the row) | `cd … && grep -rln acceptance …; ls …; git log --oneline -1 -- <trial.diff>` in one call | a compound command with git in it | separate calls, without the `git log` | legit; my slip (as #15) |
+| 44 | S3-C0o (listing the trial diff's files) | `wc -l … && grep -n "^diff --git" results/trial.diff` (read-only) | text mentioning git in a command | `grep -n "^+++ "` instead | legit (as #13) |
+| 45 | S3-C0o (comparing a regenerated screenshot) | `S=<scratchpad> && git -C … show HEAD:<image> > $S/<file>; ls …` | a redirect to a file named only at run time | `git -C … show HEAD:<image> > <literal scratchpad path>` alone | legit; my slip (as #15) |
+| 46 | S3-C0o (removing a leftover settings block) | a `python3 -` heredoc editing `.claude/settings.json`, then `git -C … diff --stat`, in one call | a compound command with git in it | the Edit tool | legit; my slip (as #15) |
+| 47 | S3-C0o review (the fix diff) | `D=… && uv run wl review-copy $D/… ; diff -ruN -x .git … > $D/fix.diff` in one call | a redirect to a file named only at run time | a scratchpad script (`fixdiff.sh`) | legit (as #33) |
 
 None of the blocks so far stopped anything the rules forbid.

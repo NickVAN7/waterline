@@ -155,6 +155,16 @@ describe('RequirementsTree', () => {
     await expectNoA11yViolations(document.body)
   })
 
+  it('scrolls a tree wider than its room in a named region in the Tab order (UI-TBL-1)', async () => {
+    mountTree()
+    await flushPromises()
+
+    const region = document.querySelector('[role=region]')!
+    expect(region.getAttribute('aria-label')).toBe('Requirements')
+    expect(region.getAttribute('tabindex')).toBe('0')
+    expect(region.contains(document.querySelector('table'))).toBe(true)
+  })
+
   it('links each ID to its requirement, open in the side panel (DL-264, UI-SHL-11)', async () => {
     mountTree()
     await flushPromises()

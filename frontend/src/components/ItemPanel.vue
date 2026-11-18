@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// An item opened from a list (UI-SHL-11; DL-262, DL-321 to DL-325): at 64rem and wider a split
-// pane beside the list, which stays usable, a complementary region named by `label` ("Requirement
-// PORTAL-RQ-3"), resizable by its separator (560px by default, 400 to 800px, remembered per viewer
-// in `localStorage`; dragged, stepped by a click without a drag, or moved by the arrow keys,
-// DL-355); below 64rem a modal overlay (a `showModal()` dialog: the page inert, focus
+// An item opened from a list (UI-SHL-11; DL-262, DL-321 to DL-325): at 80rem and wider (DL-383) a
+// split pane beside the list, which stays usable, a complementary region named by `label`
+// ("Requirement PORTAL-RQ-3"), resizable by its separator (560px by default, or narrower so the
+// list keeps 30rem, DL-385; 400 to 800px, remembered per viewer in `localStorage`; dragged,
+// stepped by a click without a drag, or moved by the arrow keys, DL-355); below 80rem a modal
+// overlay (a `showModal()` dialog: the page inert, focus
 // kept in it). The content is one teleport that moves between the two, so crossing the width
 // keeps what it holds (an open edit included). Its header: the item's ID and status (`meta`),
 // Open full page, Copy link, and Close as icon buttons, then the title, the panel's heading,
@@ -34,8 +35,8 @@ const router = useRouter()
 // without the layout (a spec), it stays in place.
 const sidePane = inject<string | null>('sidePane', null)
 
-// The split pane's width: 64rem, the layout's wide breakpoint (DL-321).
-const query = window.matchMedia('(min-width: 64rem)')
+// Where the split pane starts: 80rem (DL-383; at 64rem the list kept about 176px, TD-108).
+const query = window.matchMedia('(min-width: 80rem)')
 const wide = ref(query.matches)
 const onWidth = () => (wide.value = query.matches)
 onMounted(() => query.addEventListener('change', onWidth))
@@ -45,15 +46,36 @@ onBeforeUnmount(() => query.removeEventListener('change', onWidth))
 const WIDTH = { initial: 560, min: 400, max: 800, step: 16 }
 const STORED = 'waterline.itemPanelWidth'
 const clamp = (value: number) => Math.min(WIDTH.max, Math.max(WIDTH.min, Math.round(value)))
-function storedWidth(): number {
+// The viewer's own width, or null when they haven't chosen one.
+function storedWidth(): number | null {
   try {
     const value = Number(window.localStorage.getItem(STORED))
-    return value ? clamp(value) : WIDTH.initial
+    return value ? clamp(value) : null
   } catch {
-    return WIDTH.initial
+    return null
   }
 }
-const width = ref(storedWidth())
+// With no width of the viewer's own, 560px, or narrower so the list in `main` keeps this much of
+// its content box, never below the minimum (DL-385).
+const LIST_ROOM = 480
+function fittingWidth(): number {
+  const main = document.getElementById('main')
+  if (!main) return WIDTH.initial
+  const style = getComputedStyle(main)
+  // The width is drawn in rem (`width / 16`): measured the same way, a larger text size keeps
+  // the list its 30rem too.
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) / 16 || 1
+  const room =
+    // The page's width without its scrollbar.
+    (document.documentElement.clientWidth -
+      main.getBoundingClientRect().left -
+      parseFloat(style.paddingLeft) -
+      parseFloat(style.paddingRight)) /
+      rem -
+    LIST_ROOM
+  return clamp(Math.min(WIDTH.initial, room))
+}
+const width = ref(storedWidth() ?? WIDTH.initial)
 function keepWidth() {
   try {
     window.localStorage.setItem(STORED, String(width.value))
@@ -73,27 +95,37 @@ function resizeKey(event: KeyboardEvent) {
 const STEPS = [WIDTH.min, WIDTH.initial, WIDTH.max]
 // Less movement than this between press and release is a click, not a drag.
 const CLICK_SLOP = 4
-let dragFrom: { x: number; width: number; moved: boolean } | null = null
+// The pointer that started the drag owns it: a second finger or pen on the separator meanwhile is
+// ignored, never a new start or a second hand on the width.
+let dragFrom: { pointer: number; x: number; width: number; moved: boolean } | null = null
+const owns = (event: PointerEvent) => dragFrom?.pointer === event.pointerId
 function dragStart(event: PointerEvent) {
   // The primary button only: a right-click opens the browser's menu, and isn't a click here.
-  if (event.button !== 0) return
-  dragFrom = { x: event.clientX, width: width.value, moved: false }
-  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  if (event.button !== 0 || dragFrom) return
+  // A fast mouse drag would start a text selection, then the browser's own drag of whatever link
+  // it reached, which cancels the pointer. Preventing that also skips the press's focus: give it.
+  event.preventDefault()
+  const separator = event.currentTarget as HTMLElement
+  separator.focus()
+  dragFrom = { pointer: event.pointerId, x: event.clientX, width: width.value, moved: false }
+  separator.setPointerCapture(event.pointerId)
 }
 function dragMove(event: PointerEvent) {
-  if (!dragFrom) return
+  if (!dragFrom || !owns(event)) return
   if (Math.abs(event.clientX - dragFrom.x) >= CLICK_SLOP) dragFrom.moved = true
   if (dragFrom.moved) width.value = clamp(dragFrom.width + dragFrom.x - event.clientX)
 }
-function dragEnd() {
-  if (!dragFrom) return
+function dragEnd(event: PointerEvent) {
+  if (!dragFrom || !owns(event)) return
   if (!dragFrom.moved) width.value = STEPS.find((step) => step > width.value) ?? WIDTH.min
   dragFrom = null
   keepWidth()
 }
-// A press the browser cancels (a system gesture) is neither a click nor a finished drag.
-function dragCancel() {
-  if (!dragFrom) return
+// A press the browser cancels (a system gesture), or one whose capture is lost before it's
+// released (the separator moved or gone), is neither a click nor a finished drag. After a
+// release the capture goes too, with nothing left to undo.
+function dragCancel(event: PointerEvent) {
+  if (!dragFrom || !owns(event)) return
   width.value = dragFrom.width
   dragFrom = null
 }
@@ -117,6 +149,7 @@ function rememberOpener() {
 
 async function open(): Promise<void> {
   rememberOpener()
+  if (storedWidth() === null) width.value = fittingWidth()
   isOpen.value = true
   await nextTick()
   if (!wide.value) dialog.value?.showModal()
@@ -158,6 +191,8 @@ function finish(): void {
 // back where it was, or on the title.
 watch(wide, async (isWide) => {
   if (!isOpen.value) return
+  // Opened as the overlay, it fits the room it has now (DL-385), unless the viewer chose a width.
+  if (isWide && storedWidth() === null) width.value = fittingWidth()
   const active = document.activeElement
   const focused = active instanceof HTMLElement && heading.value?.parentElement?.contains(active)
   await nextTick()
@@ -228,15 +263,18 @@ defineExpose({ open, close, swapped, focusTitle: () => heading.value?.focus() })
         @pointermove="dragMove"
         @pointerup="dragEnd"
         @pointercancel="dragCancel"
+        @lostpointercapture="dragCancel"
       >
         <span
           class="border-l border-border group-hover:border-accent group-focus-visible:border-accent"
         />
       </div>
-      <div :id="wideId" class="min-w-0 flex-1 overflow-y-auto bg-surface" />
+      <!-- `relative`, as every scroll container is: a visually hidden note inside is absolutely
+           positioned, and escapes a static one to make the page taller than the layout. -->
+      <div :id="wideId" class="relative min-w-0 flex-1 overflow-y-auto bg-surface" />
     </aside>
   </Teleport>
-  <!-- The overlay below 64rem, docked at the right at full height. -->
+  <!-- The overlay below 80rem, docked at the right at full height. -->
   <dialog
     ref="dialog"
     :aria-labelledby="titleId"

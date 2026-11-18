@@ -120,6 +120,14 @@ function create(docs: boolean): MarkdownIt {
   md.core.ruler.push('waterline', (state) => {
     const tokens = state.tokens
     const env = state.env as RenderEnv
+    // Headings shift below the heading the content sits under (`level`, an h1 by default): the
+    // content's highest heading becomes h(level + 1) and the rest keep their distance from it,
+    // capped at h6, an author's own skips kept (DL-382). So content never adds a second h1 nor
+    // breaks the page's heading order (UI-SHL-8). Docs mode's level 0 keeps them as written.
+    const levels = tokens
+      .filter((t) => t.type === 'heading_open')
+      .map((t) => Number(t.tag.slice(1)))
+    const shift = env.level && levels.length ? env.level + 1 - Math.min(...levels) : 0
     tokens.forEach((token, i) => {
       // A table's one header row names its columns (DL-366, UI-MD-1).
       if (token.type === 'th_open') token.attrSet('scope', 'col')
@@ -128,10 +136,8 @@ function create(docs: boolean): MarkdownIt {
       }
       if (env.docs && token.type === 'blockquote_open') callout(tokens, i, state)
       if (env.docs && token.type === 'inline') keys(token, state, md)
-      // Headings shift below the heading the content sits under (`level`, an h1 by default), so
-      // content never adds a second h1 nor breaks the page's heading order (UI-SHL-8).
       if (token.type === 'heading_open' || token.type === 'heading_close') {
-        token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + env.level)}`
+        token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + shift)}`
       }
       // Task lists: "[ ]" or "[x]" opening a list item becomes a box drawn in our tokens, named
       // "Done" or "Not done": a disabled checkbox wears the browser's grey, under 3:1 (TD-88).

@@ -424,30 +424,17 @@ Entry format:
 - **Fix by:** S3-C33 (the tech-debt review: build the hint then, or before the first new icon button)
 - **Status:** open
 
-### TD-108: Just above 64rem, the split pane leaves the list little room
-- **Added:** S3-C0d
-- **What:** the split pane starts at 64rem and is 400 to 800px wide (DL-321, DL-322), so at
-  1024px (or 1280px at 125% zoom), with the sidebar and padding, a 560px panel leaves the tree
-  about 150px, and a stored 800px leaves none, the row then scrolling sideways. Since DL-356 the
-  panel is beside `main` itself, so the page header (the `h1` and **New requirement**) and its
-  alerts narrow with the tree.
-- **Why:** kept as decided by the owner (2026-11-11, S3-C0d review, ui-reviewer finding 2):
-  judged at slice verification, where the manual pass checks the requirements page at 1024 to
-  1280px and zoomed, before a cap or a later breakpoint is chosen.
-- **Fix by:** S3-C0o (the split pane from 80rem, DL-383, and a default width that leaves the
-  list 30rem, DL-385; owner, S3-C0n trial)
-- **Status:** open
-
-### TD-109: A dialog opened from the panel may stop being modal when the window crosses 64rem
+### TD-109: A dialog opened from the panel may stop being modal when the window crosses 80rem
 - **Added:** S3-C0d
 - **What:** Change restriction…, Delete…, and Request approval are `<dialog>`s inside the side
-  panel's teleported content. If one is open when the window crosses 64rem, the move takes it
+  panel's teleported content. If one is open when the window crosses 80rem (64rem until
+  S3-C0o, DL-383), the move takes it
   out of the top layer: by the HTML spec it stays open but isn't modal any more, so the page
   behind isn't inert and its Esc may reach the panel instead (ui-reviewer, S3-C0d pass 2).
 - **Why:** unconfirmed: it needs a real browser to see what happens, and crossing the width with
   a dialog open (a tablet turned, a zoom) is rare; the fix, if needed, is to close or reopen the
   nested dialog on the breakpoint change.
-- **Fix by:** S3-C33 (the manual pass checks it at 1024px; fixed in the slice if it shows)
+- **Fix by:** S3-C33 (the manual pass checks it at 1280px; fixed in the slice if it shows)
 - **Status:** open
 
 ### TD-110: Focus on the trail's "…" or a middle crumb drops when the window crosses 40rem
@@ -507,6 +494,34 @@ Entry format:
   patterns from the repository's own build, test and lint configuration, never untrusted input,
   and never ships in the app.
 - **Fix by:** Slice 3 (its tech-debt review), or sooner when `wl audit` shows a fixed release
+- **Status:** open
+
+### TD-117: A shared `?open=` link leaves the open item's row hidden in a collapsed tree
+- **Added:** S3-C0o (Impeccable's critique, P2)
+- **What:** the tree loads with only the top level open, so a requirement under collapsed parents,
+  opened by its `?open=RQ-<n>` link, has no visible row: none of its marks (Open, bold, the bar)
+  show, and nothing places it in the tree.
+- **Why:** expanding the item's ancestors on load (the read's `ancestors` has them) is new tree
+  behavior, outside S3-C0o's scope (owner, Nov 18).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
+### TD-118: The requirement's full page has no line-length cap at wide widths
+- **Added:** S3-C0o (Impeccable's critique, P2)
+- **What:** `main` has no width cap (DL-360), so at 1920px the details list's two columns sit
+  about 830px apart and the description runs about 1630px wide.
+- **Why:** a cap (`--content-prose`, now only for guide articles, DL-373) on a content page is a
+  design change (owner, Nov 18).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
+### TD-119: The side panel's focused title shows a focus ring like a text field's
+- **Added:** S3-C0o (Impeccable's critique, P3)
+- **What:** opening the panel focuses its title (DL-324), and the base `:focus-visible` ring
+  (ui-design-guide 3.3) draws round the `h2`, so beside Edit it reads as an editable field.
+- **Why:** changing the ring on programmatically focused headings changes the guide's base rule and
+  UI-TOK-5's reach, a design change (owner, Nov 18).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
 - **Status:** open
 
 ---
@@ -885,6 +900,12 @@ Entry format:
 - **Added:** S3-C0d
 - **Status:** resolved in S3-C0e: Parent (its ID linked, then its title; None at the top level),
   from the read's `ancestors` (DL-357)
+
+### TD-108: Just above 64rem, the split pane leaves the list little room
+- **Added:** S3-C0d
+- **Status:** resolved in S3-C0o: the pane starts at 80rem (DL-383), and with no stored width it
+  opens narrower than 560px where the list would keep less than 30rem, never below 400px
+  (DL-385). A stored 800px still leaves the list less, as the viewer chose.
 
 ### TD-111: No test loads a bundled guide image under the CSP
 - **Added:** S3-C0g

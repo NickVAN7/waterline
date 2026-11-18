@@ -287,8 +287,9 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   syntax, strikethrough, and autolinks. **No remote images**: image syntax renders as a link,
   since a remote image tracks who opens the page and leaks that a Confidential item was opened
   (uploads are v2). Links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`.
-  Headings in stored content shift down one level, so a description never adds a second `h1`
-  (the bundled guide's pages on `/docs/<page>` are rendered at their own levels, DL-310; only they get
+  Headings in stored content shift below the heading they sit under: the content's highest
+  heading becomes the next level down and the rest keep their distance from it, capped at `h6`,
+  so a description never adds a second `h1` nor skips a level under its section (DL-382; the bundled guide's pages on `/docs/<page>` are rendered at their own levels, DL-310; only they get
   docs mode's callouts, keys, heading anchors, links to our own pages, and bundled images, DL-341). Code blocks are
   monospace, with no syntax highlighting. A server-side renderer (`markdown-it-py` and `nh3`)
   is added only when something server-side shows content (v1.5 notifications, exports). A
@@ -930,7 +931,9 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   ticking one would edit the description, create a revision, and flag "Approved · modified".
   Templates hold no placeholder comments (raw HTML is off, so they'd show); hints sit beside the
   editor. A requirement with no "Acceptance Criteria" heading (any level, ignoring case) shows a
-  "No acceptance criteria" note on its detail page; nothing blocks it.
+  "No acceptance criteria" note on its detail page (one note, "No description: …", when the
+  description is empty), and Request approval and Approve by hand warn of it (DL-384); nothing
+  blocks it.
 - Revision history and approval tracking — see §6.1 and §6.2.
 - **Traceability in v1** is coverage columns on the requirement tree: task count and progress,
   test-case count, latest result, and approval state, filled in as Slices 3 and 5 ship. There is

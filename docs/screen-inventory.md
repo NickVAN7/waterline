@@ -616,8 +616,8 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
   a **side panel** over the list, so the list keeps its place, with **Open full page**. The
   panel has its own URL (the list's route with the item open, e.g. `?open=TA-45`), so Back
   closes it and the address can be shared. A direct link to an item, and **Copy link**, use
-  the **full-page** route. At 64rem and wider it's a split pane beside the list, below that an
-  overlay (DL-321 to DL-326; UI-SHL-11).
+  the **full-page** route. At 80rem and wider it's a split pane beside the list, below that an
+  overlay (DL-321 to DL-326, DL-383, DL-385; UI-SHL-11).
 - **Creating an item:** a **dialog** with the essential fields, which the user can **expand
   into a full page** (typed values kept). After creating, the user lands on the new item to
   fill in the rest.

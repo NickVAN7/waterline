@@ -18,6 +18,9 @@ Project admins request approval from a requirement's **Approval** section:
 2. Pick the approvers from the project's members, and add a **Note** if it helps them.
 3. Select **Request approval**.
 
+If the description has no **Acceptance Criteria** heading, Waterline warns you before you request
+approval or approve by hand. You can still go ahead.
+
 Only one request can be pending at a time. If the requirement changes while it's pending, the
 approvers still decide on the revision you asked about: cancel and request again to have them
 review the latest.

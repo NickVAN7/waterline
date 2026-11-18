@@ -544,14 +544,17 @@ render inside the full shell when signed in.
   `/{org_slug}/settings`.
 - **UI-SHL-11** **Opening an item** (a requirement, task, test case, or test run) from a list or
   the board opens it in the shared **side panel** (`ItemPanel`; DL-202, DL-321 to DL-326):
-  - **Where:** at 64rem and wider, a split pane right of the page, from under the app header to
-    the window's foot, the page (its header too) narrowing beside it (DL-356); the list stays
-    usable (scroll, select, expand, open another item); below 64rem, a modal overlay (the page inert, focus kept
+  - **Where:** at 80rem and wider (DL-383), a split pane right of the page, from under the app
+    header to the window's foot, the page (its header too) narrowing beside it (DL-356); the list
+    stays usable (scroll, select, expand, open another item); below 80rem, a modal overlay (the page inert, focus kept
     in it, Esc closes). Crossing the width keeps what the panel holds, and the focus in it.
-  - **Size:** 560px by default, 400 to 800px, by a vertical separator that drags, steps through
+  - **Size:** 560px by default, or narrower so the list keeps 30rem (480px) of `main`'s content
+    box, never below 400px (DL-385); 400 to 800px, by a vertical separator that drags, steps through
     400, 560, and 800 on a click without a drag (WCAG 2.5.7, DL-355), and works from the keyboard
     (`role="separator"`, named, `aria-valuenow/min/max` and a value text, Left and Right
-    arrows); the width is kept per viewer in `localStorage`, in try/catch.
+    arrows); the width is kept per viewer in `localStorage`, in try/catch, and a kept width is
+    used as it is. Beside the pane the tree's status badges stay whole, the tree scrolling
+    sideways in its own named region in the Tab order (UI-TBL-1).
   - **Address:** the list's route with the item open (e.g. `?open=TA-45`), so Back closes it and
     the address can be shared; another item's ID swaps it and updates `?open`. A direct link to
     an item, and **Copy link**, use the full-page route. For requirements, the tree's ID opens it
@@ -1125,9 +1128,10 @@ the revision compare in S2-C19a (DL-267).
 - **UI-MD-1** **One renderer, `MarkdownView`:** `markdown-it` with raw HTML off, then DOMPurify
   on its output; never `v-html` on anything else. No remote images (image syntax renders as a
   link); links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`; headings
-  shifted below the heading the content sits under (`level`, an `h1` by default), so a
-  description never adds a second `h1` nor breaks the page's heading order (UI-SHL-8); `level`
-  0 only on a guide page, for the bundled guide, never for stored content (DL-310); code blocks in
+  shifted below the heading the content sits under (`level`, an `h1` by default): the content's
+  highest heading becomes h(`level`+1) and deeper ones keep their distance from it, capped at
+  `h6`, an author's own skips kept (DL-382), so a description never adds a second `h1` nor breaks
+  the page's heading order (UI-SHL-8); `level` 0 (headings as written) only on a guide page, for the bundled guide, never for stored content (DL-310); code blocks in
   the monospace font, with no syntax highlighting. Headings get ids only in docs mode: the
   text's words joined by hyphens, `-2` on a repeat, so user content never sets an id (DL-311,
   DL-338). A task-list item's `[ ]` or `[x]` is a mark

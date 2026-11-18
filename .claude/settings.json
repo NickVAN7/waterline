@@ -1,4 +1,12 @@
 {
+  "env": {
+    "IMPECCABLE_HOOK_DISABLED": "1",
+    "IMPECCABLE_NO_TELEMETRY": "1",
+    "DO_NOT_TRACK": "1",
+    "IMPECCABLE_NO_UPDATE_CHECK": "1",
+    "IMPECCABLE_NO_STALENESS_CHECK": "1",
+    "IMPECCABLE_LIVE_COPY_AGENT": "off"
+  },
   "hooks": {
     "PreToolUse": [
       {

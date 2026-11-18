@@ -85,14 +85,23 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
 - A click handler that routes a container's links in the app (the guide article's `follow`)
   leaves to the browser a link with a `target` and a modified or middle click: routing it opens
   the URL as an app page, a 404 (owner, S3-C0j). Its spec and e2e click such a link.
-- A table's scroll region (`role="region"`, `overflow-x-auto`) is also `relative`: a visually
-  hidden label inside is absolutely positioned, and escapes a static scroll container, widening
-  the page at 320 px (UI-SHL-7; S3-C0k review). A table with a fixed layout sets a minimum width
+- Every scroll container that isn't already positioned is also `relative`: a table's scroll
+  region (`role="region"`, `overflow-x-auto`), and a pane that scrolls its own content (the split
+  pane's `overflow-y-auto`). A visually hidden label inside is absolutely positioned, and escapes
+  a static scroll container: it widened the page at 320 px (UI-SHL-7; S3-C0k review), and made
+  the page scroll into blank space below an open split pane (S3-C0n trial). A table with a fixed layout sets a minimum width
   (`min-w-(--content-narrow)`), so below it the region scrolls instead of the columns crushing,
   and a column that holds a badge or a button gets a `rem` width that fits it, never a fraction.
 - A sidebar section's visible caption names its landmark (`aria-labelledby`), or is
   `aria-hidden` when the landmark or its control already says it: never a caption and a
   matching `aria-label`, read twice (UI-SHL-5; S3-C0j review).
+- A style added to a shared component (`Badge`'s no-wrap) is checked against that component's
+  longest real content at 320 px and at the split pane's narrowest (a restriction badge with
+  every category), or goes only where it's needed (the tree's status cell; S3-C0n trial).
+- A fix for a browser default action (a text selection, a native drag, the focus a press gives)
+  is proven by an e2e that drives the real pointer (`page.mouse`, a few quick steps) where the
+  default did harm, and asserts the outcome: a jsdom check of `defaultPrevented` passes whether or
+  not the browser honors it (the separator's press beside a link; S3-C0n trial).
 - A style that only a class turns on (a callout's tone) is checked in an e2e by its computed value
   against the token: a spec of the class passes with the style missing (owner, S3-C0j).
 - Tokens only: colors, type sizes, radii, and sizes come from `src/app/styles/tokens.css`,
@@ -251,9 +260,10 @@ overflow-y-auto`): axe's `scrollable-region-focusable` excuses only that, not Pr
   (`RequestApprovalDialog`'s `focusList`), and marks the loading group `data-autofocus`, so the
   first focus doesn't pass through a later field: ModalDialog picks before the load (S2-C20
   review).
-- `MarkdownView` under a heading gets that heading's `level` (`:level="2"` under an `h2`): its
-  default shift only keeps content off `h1`, and a `#` under an `h3` would read as the page's
-  next section (UI-MD-1, UI-SHL-8; S2-C20a review). `:level="0"` is only for a guide page's
+- `MarkdownView` under a heading gets that heading's `level` (`:level="2"` under an `h2`): the
+  content's top heading becomes the next level down, the rest keeping their distance (DL-382),
+  and at the default `level` a `#` under an `h3` would read as the page's next section (UI-MD-1,
+  UI-SHL-8; S2-C20a review). `:level="0"` is only for a guide page's
   bundled body, never stored content (DL-310).
 - A required checkbox group can't take `aria-required`: its legend carries a visually hidden
   "(required)" beside the hidden asterisk (UI-FRM-2; S2-C20 review).

@@ -404,8 +404,16 @@ function onKeydown(event: KeyboardEvent) {
 
 // The table's name lands on the outer `div` unless set on the table itself, and the expand
 // button (`tabindex="-1"`; the row carries `aria-expanded`) leaves the accessibility tree.
-const tablePt = { table: { 'aria-label': 'Requirements' } }
-const columnPt = { nodeToggleButton: { 'aria-hidden': 'true' } }
+// TreeTable's own container scrolls a tree wider than its room (beside the split pane, its
+// badges kept whole): a named region in the Tab order, so the keyboard can scroll it, and
+// `relative` as every table's scroll region is (UI-TBL-1, UI-SHL-7).
+const tablePt = {
+  table: { 'aria-label': 'Requirements' },
+  tableContainer: { role: 'region', 'aria-label': 'Requirements', tabindex: 0, class: 'relative' },
+}
+// It keeps its 24px (UI-TOK-6): a long title in a narrow cell would otherwise shrink it, and
+// shift that row's title out of line with the rest.
+const columnPt = { nodeToggleButton: { 'aria-hidden': 'true', class: 'shrink-0' } }
 // A selected row also gets the leading bar, not color alone (UI-TOK-9), on its first cell: the
 // table's borders are separate, where a `tr`'s border isn't drawn. Only the selected row has one,
 // since forced colors would draw a transparent border. The row open in the side panel has the
@@ -487,7 +495,7 @@ const headerPt = { headerCell: { scope: 'col' } }
                component with slot content would re-render each time (DL-253's pass mark). -->
           <span
             v-memo="[node.data.number, focusedKey === node.key, node.data.number === openNumber]"
-            class="inline-flex items-center gap-2"
+            class="inline-flex flex-wrap items-center gap-x-2"
           >
             <RouterLink
               :to="{ query: { open: `RQ-${node.data.number}` } }"
@@ -508,7 +516,9 @@ const headerPt = { headerCell: { scope: 'col' } }
       <Column header="Status" :pt="headerPt">
         <template #body="{ node }">
           <!-- The status badge (DL-148, DL-252), and "Awaiting approval" beside it while a request
-               is pending (Q12b), memoized as the ID cell is. -->
+               is pending (Q12b), memoized as the ID cell is. Each badge stays whole, never broken
+               over lines beside the pane: the tree scrolls instead. Only here: a badge elsewhere
+               (a long restriction) has to wrap to fit 320px. -->
           <span
             v-memo="[
               node.data.status,
@@ -519,12 +529,14 @@ const headerPt = { headerCell: { scope: 'col' } }
             class="inline-flex flex-wrap items-center gap-2"
           >
             <Badge
+              class="whitespace-nowrap"
               :tone="requirementStatusBadge(node.data).tone"
               :icon="requirementStatusBadge(node.data).icon"
               >{{ requirementStatusBadge(node.data).label }}</Badge
             >
             <Badge
               v-if="node.data.awaiting_approval"
+              class="whitespace-nowrap"
               :tone="AWAITING_APPROVAL.tone"
               :icon="AWAITING_APPROVAL.icon"
               >{{ AWAITING_APPROVAL.label }}</Badge
