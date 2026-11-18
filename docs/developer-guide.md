@@ -116,13 +116,15 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl docs-screenshots` | Regenerate the guide's screenshots (DL-343): the `wl e2e` stack, seeded with `seed --manual-pass` (DL-361), then Playwright through `playwright.screenshots.config.ts`, which saves each shot in `frontend/e2e/screenshots/guide.shot.ts` as light and dark WebP (1440 by 900) in `docs/user-guide/images/`, and always tears the stack down. Run it at slice verification and whenever a UI change affects a shot; a shot removed from the list leaves its files, which `guide.spec.ts` refuses as unused once no page shows them |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
-| `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
+| `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`, which also gives the copy a test database of its own (`WATERLINE_TEST_DATABASE=waterline_test_<8 hex>`, DL-392). The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
+| `wl discard-copy <dir>` | Drops a `--with-env` copy's test databases (its own and its workers') and deletes the copy (DL-392); refuses any other directory |
 | `wl test` | All tests with coverage gates |
 | `wl fmt` | ruff format and safe ruff fixes (backend, CLI, and `.claude/hooks/`); Prettier and safe ESLint fixes |
 | `wl backend check\|lint\|test\|fmt` | The same, backend only |
 | `wl backend mutate` | Mutation testing (mutmut) over `app/rules/` and `app/authz/`, from a clean slate; fails on any mutant not killed (section 9) |
 | `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate, and runs in one process (`-n 0`), so `breakpoint()` works; pass `-n auto` to spread it over workers |
 | `wl frontend check\|lint\|test\|fmt` | The same, frontend only (the npm scripts in `frontend/package.json`) |
+| `wl cli check` | The same, the developer CLI and the hooks only, after the repository-state step; CI's `cli` job (DL-392) |
 | `wl frontend test <args>` | `vitest run <args>`, e.g. `wl frontend test src/api -t network`, without the coverage gate |
 | `wl gen-client` | Export `backend/openapi.json` from the code, then generate `frontend/src/api/schema.d.ts` from it. Run after any API change and commit both files |
 | `wl up [args]` | `docker compose up --detach --wait --build --renew-anon-volumes`: build the images, start the stack (migrations first), and wait until it's up. Extra args go to compose (e.g. `wl up postgres`) |
@@ -1090,15 +1092,19 @@ Strategy, layers, and gates: `testing-strategy.md`. Layout in `backend/tests/`:
 - Tests use pytest's `importlib` import mode, so test folders have no `__init__.py` (only the
   importable helper packages `factories/` and `support/` do).
 - **Postgres must be running** (`wl up`). Each worker migrates its own test database to head
-  once per session (`waterline_test` itself under `-n 0`); tests never touch the dev database.
+  once per session (`waterline_test` itself under `-n 0`, or the name in
+  `WATERLINE_TEST_DATABASE`, which a `wl review-copy --with-env` copy sets, DL-392); tests never
+  touch the dev database.
 - **Tests run in parallel** (pytest-xdist, DL-100): `pytest` alone spreads the suite over one
   worker per core, at most 8 (`addopts` in `pyproject.toml`). Each worker drops, recreates, and
   migrates its own database, `waterline_test_gw<n>`, at its start; they stay until the next run
   (`wl down -v` clears them). `-n 0` runs in one process on `waterline_test` (filtered runs do,
   and so does mutmut). Coverage is combined across workers, so the gates are unchanged. A test
   that passes alone but fails in the full run depends on another test's state or order: fix
-  the test, never the worker count. Run one full `pytest` at a time against a stack: a second
-  run drops the first run's worker databases.
+  the test, never the worker count. Run one full `pytest` at a time per test database: a second
+  run on the same one drops the first's worker databases. A review copy's runs use its own
+  (`<name>`, and every database named after it: `<name>_gw<n>`, a killed run's scratch ones),
+  which `wl discard-copy` drops with the copy (DL-392).
 - **Async tests** run on the anyio plugin: mark the module `pytestmark = pytest.mark.anyio`.
   A synchronous test must not use async fixtures.
 
@@ -1308,12 +1314,15 @@ message saying so).
   history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
   branch, no force-push or deletion; on `main`, changes only through a pull request with the
   `wl check` status check green, merged with a merge commit.
-- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check --full` on every push
-  to `main` and every pull request (its job is still named `wl check`, the status check the
-  ruleset requires), so a green `wl check --full` locally means a green run there. It
-  checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the
-  dependencies from the lockfiles (`uv sync --locked`, `npm ci`), and runs the tests against a
-  `postgres:18` service container; the test database is created by the same init script as in
+- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `wl check --full`'s parts as parallel
+  jobs on every push to `main` and every pull request (DL-392): `wl backend check`, `wl frontend
+  check`, `wl cli check`, `wl audit`, and `wl e2e`, then a last job named `wl check`, the status
+  check the ruleset requires, which passes only when all five did. A CLI test keeps the jobs'
+  commands equal to `wl check --full`'s, so a green `wl check --full` locally means a green run
+  there. Each job installs only what it needs from the lockfiles (`uv sync --locked`, `npm ci`);
+  the backend, CLI, and audit jobs check out the full history (`fetch-depth: 0`, for the docs
+  consistency tests and gitleaks). The backend's tests run against a `postgres:18` service
+  container; the test database is created by the same init script as in
   Compose (`docker/postgres/initdb/`). There's no `.env` in CI: the workflow sets the
   `POSTGRES_*` variables. A new tool the checks need goes into the workflow's setup steps and
   the developer guide's prerequisites together. `wl check --full` includes `wl audit`, so CI also
@@ -1340,22 +1349,23 @@ its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when t
   `fresh-clone-verifier`, `user-guide-verifier`, `docs-consistency`, `spec-test-writer`,
   `repo-auditor`, `ui-reviewer`, `simplicity-auditor`.
 - **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
-  changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
-  at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
+  changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and in
+  parallel (DL-392), `security-reviewer` when the build plan names the checkpoint for it or it touches
   security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
   two or three behaviors in a temporary copy, and reviews a design change's tooling code under
   a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
   `frontend/e2e/` (read-only: accessibility and frontend conventions against
-  `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`,
-  `user-guide-verifier` (the behavior reference followed in a browser and the guide checked
-  against it, DL-124, DL-336), `docs-consistency`, and
-  `repo-auditor` (a whole-repository audit for bugs, security, scale, untested risk, and
-  slowness, which runs no tests, DL-41; waste is `simplicity-auditor`'s alone, DL-318), then
-  `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored
-  in `.claude/audit/`, whose findings go to the owner, DL-138) at the last checkpoint of a
-  slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
-  concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same
-  time: they share the test database. `docs-consistency` also runs in every design change, before
+  `docs/ui-design-guide.md`, by rule ID; DL-62), and, at the last checkpoint of a slice,
+  `docs-consistency`, `repo-auditor` (a whole-repository audit for bugs, security, scale,
+  untested risk, and slowness, which runs no tests, DL-41; waste is `simplicity-auditor`'s
+  alone, DL-318), and `simplicity-auditor` (a whole-repository audit for overengineering, from
+  the prompts vendored in `.claude/audit/`, whose findings go to the owner, DL-138); then, with
+  the dev stack down, `fresh-clone-verifier` and `user-guide-verifier` (the behavior reference
+  followed in a browser and the guide checked against it, DL-124, DL-336). `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
+  concrete case and are written in plain English (DL-39, DL-41, DL-42). A reviewer runs tests only in its own copy
+  (`wl review-copy --with-env`), on a test database of the copy's own, so reviewers and the
+  author run tests at the same time (DL-392); `fresh-clone-verifier` and `user-guide-verifier`
+  come after them, with the dev stack down, as they start their own. `docs-consistency` also runs in every design change, before
   committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
   decisions for the owner, which are never decided for them.
 - **Design changes** outside a checkpoint's scope (decisions from a chat session, or code that

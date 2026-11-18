@@ -194,8 +194,8 @@ Calls flow **routers → services → repositories → models**. Services also u
   tests (S1-C11 review; TD-30). A test of lock *order* takes the first transaction's steps by
   hand and pauses between them: `race()` runs the first to its end, so a lock taken late passes
   as one taken early (S2-C13 review). Tests only
-  ever use the test database (`waterline_test`, a pytest-xdist worker's copy of it, DL-100, or a
-  `scratch_database` created from it for one test); never point a test at the dev database.
+  ever use the test database (`waterline_test`, or the name in `WATERLINE_TEST_DATABASE`, DL-392;
+  a pytest-xdist worker's copy of it, DL-100; or a `scratch_database` created from it for one test); never point a test at the dev database.
   Tests run in parallel, in any order: no test may depend on another's state.
 - Every test that calls `create_app` passes `sessionmaker=` (the test transaction), or points
   `postgres_db` at `TEST_DATABASE_NAME` when it tests the app's own engine. Never override the

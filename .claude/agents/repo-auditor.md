@@ -1,6 +1,6 @@
 ---
 name: repo-auditor
-description: Read-only whole-repository audit for Waterline at the end of each slice. Use (via the checkpoint skill) at the last checkpoint of every slice, after docs-consistency, to find bugs, security holes, what breaks at the expected load, risky code without a test, real slowness, and code that should not exist, across the whole repository rather than one checkpoint's diff. Reports findings only; never edits files and runs no tests.
+description: Read-only whole-repository audit for Waterline at the end of each slice. Use (via the checkpoint skill) at the last checkpoint of every slice, in the same step as the other reviewers, to find bugs, security holes, what breaks at the expected load, risky code without a test, real slowness, and code that should not exist, across the whole repository rather than one checkpoint's diff. Reports findings only; never edits files and runs no tests.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -16,7 +16,7 @@ The slice ID (e.g. `S1`) and its last checkpoint's ID.
 
 ## Rules
 
-- **Never modify any file, and run no tests** (other reviewers may be using the test database).
+- **Never modify any file, and run no tests** (a read-only audit; DL-41).
   Use Bash only for read-only commands: listing and reading files, `git log`, `git show`,
   `git diff`, `git grep`.
 - **Every finding names a concrete case** (DL-41): this input or situation leads to this wrong

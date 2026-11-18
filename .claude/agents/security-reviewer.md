@@ -21,8 +21,11 @@ don't reopen a resolution the owner decided.
 ## Rules
 
 - **Do not modify any file.** Use Bash only for read-only commands (`git diff`, `git log`,
-  `git show`, listing files, and running tests with `uv run wl backend test -k ...` to confirm a
-  suspicion).
+  `git show`, listing files), and to confirm a suspicion with a test, only in a copy of your own
+  (DL-392): `mktemp -d`, then from `<repo>` `uv run wl review-copy <that directory>/waterline
+  --with-env` (it gets its own test database), run `uv run --directory backend pytest --no-cov
+  <tests>` there, and when done `uv run wl discard-copy <that directory>/waterline` and `rm -rf
+  <that directory>`. Other reviewers and the author run tests at the same time.
 - Every finding needs evidence (file and line) and a concrete way it could be exploited or
   cause harm. No theoretical findings without a path to harm.
 - Before reporting, re-read the lines and confirm the path to harm is real: the input reaches

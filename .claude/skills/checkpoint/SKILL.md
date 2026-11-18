@@ -78,13 +78,11 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
     store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
 - Also invoke the `ui-reviewer` agent, with the same inputs, whenever the diff touches
   `frontend/src/` or `frontend/e2e/` (DL-62). It is read-only and runs no tests.
-- **One reviewer at a time:** when both run, invoke `security-reviewer` first and
-  `checkpoint-reviewer` once it has finished, never in parallel (then `ui-reviewer`, when it
-  runs). Both can run tests against the shared test databases (`waterline_test` and the per-worker
-  copies, DL-100), and two runs at once collide: each run drops and recreates the workers'
-  databases at its start, and the concurrency tests truncate tables and then require every table
-  to be empty. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests yourself
-  while a reviewer is running.
+- **In parallel, in one step** (DL-392): invoke every reviewer that applies at once. A
+  reviewer that runs tests does so only inside its own review copy (`wl review-copy <dir>
+  --with-env`, which gives the copy a test database of its own), and discards it with `wl
+  discard-copy <dir>` (its databases dropped too); so you may run tests in the working tree
+  while they run.
 - Do not pass any reviewer your reasoning or a summary of the work; they review from the docs
   and the diff (a re-review also gets the previous pass's record, step 5; DL-105).
 - **Before the first reviewer** (DL-106): review your own diff against the `CLAUDE.md` files'
@@ -104,13 +102,14 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   list to walk (DL-124). Its findings are fixed in `docs/behavior-reference.md` or the guide under
   `docs/user-guide/`, or in the app when the
   app is what's wrong, like any other finding. Run `uv run wl up` again afterwards.
-- **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
+- **Last checkpoint of a slice:** in the parallel step with the reviewers (not after the two
+  verifiers above, which follow it), invoke the `docs-consistency`
   agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
   (the root commit for Slice 0). It reports **Fixes** and **Decisions**.
-- **Last checkpoint of a slice:** after `docs-consistency`, invoke the `repo-auditor` agent with
+- **Last checkpoint of a slice:** in the same step, invoke the `repo-auditor` agent with
   the slice ID and the checkpoint ID (DL-41). It audits the whole repository, not this diff, and
   runs no tests.
-- **Last checkpoint of a slice** (from S2-C0a, which builds it, DL-138): after `repo-auditor`,
+- **Last checkpoint of a slice** (from S2-C0a, which builds it, DL-138): in the same step,
   invoke the `simplicity-auditor` agent. It audits the whole repository for overengineering,
   reports only, and its findings feed the retro; the next slice's C0 applies those the owner
   accepts. The review record gets its own `## simplicity-auditor` section (a docs consistency

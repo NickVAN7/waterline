@@ -57,13 +57,14 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
      settings from): run `mktemp -d`, then, from `<repo>`,
      `uv run wl review-copy <that directory>/waterline --with-env` (DL-29; the git guard
      allows only one plain git command per call, so the clone-and-apply steps live in `wl`).
-     The copy's tests use the running stack's Postgres and the test database; the
-     `checkpoint` skill runs you only when no other reviewer is running tests.
+     The copy's tests use the running stack's Postgres and a test database of the copy's
+     own (DL-392), so other reviewers and the author may run tests at the same time.
    - Make the smallest change in the copy that should break the behavior, run the related tests
      there (`uv run --directory backend pytest --no-cov <tests>`), and record which test
      failed. If none fails, that's a **major** finding (a **blocker** in `app/rules/` or
      `app/authz/`).
-   - Delete the copy (`rm -rf <that directory>`), even if you stop early.
+   - Discard the copy (`uv run wl discard-copy <that directory>/waterline`, which drops its
+     test databases, then `rm -rf <that directory>`), even if you stop early.
    If the checkpoint added no behavior a test could catch (docs or configuration only), say so
    instead.
 

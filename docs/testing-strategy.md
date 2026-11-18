@@ -63,6 +63,12 @@ tested, what each kind of test is for, and the gates every change passes.
   workers), each worker on its own database, `waterline_test_gw<n>`, dropped, recreated, and
   migrated at its start. A run with `-n 0` (a filtered `wl backend test`, mutmut) uses
   `waterline_test` itself. No test depends on another's order or state.
+- **A review copy's own** (DL-392): `WATERLINE_TEST_DATABASE` (in the env or `.env`; `wl
+  review-copy --with-env` writes `waterline_test_<8 hex>`) names the test database instead, its
+  workers' copies `<name>_gw<n>`; the conftest refuses any name but `waterline_test` or
+  `waterline_test_<suffix>`. Two copies' runs never touch each other's databases.
+- **A test that hangs fails** after 120 seconds (`pytest-timeout`, `timeout` in
+  `backend/pyproject.toml`): a planted bug once made a test run 20 minutes.
 - **Exception — concurrency tests** need separate connections and real commits (parallel
   transactions, or a background worker processing a job); they use the `concurrency` fixture,
   whose sessions really commit, and are marked `@pytest.mark.concurrency("<table>", ...)`;
@@ -304,7 +310,8 @@ saying why.
 - **`wl check`** (the developer CLI; `waterline check` in full) is the gate before every commit:
   everything CI runs except the supply-chain audit and the end-to-end tests, and mutation testing
   only when something it depends on changed (DL-99). **`wl check --full`** runs everything; CI
-  calls it, so local and CI can't diverge. A new gate joins `wl check` unless it needs the
+  runs its parts as parallel jobs through the CLI, which a CLI test keeps equal to it (DL-392), so
+  local and CI can't diverge. A new gate joins `wl check` unless it needs the
   network or a running stack, which put it in `--full` only (DL-101).
   While fixing review findings, run only the affected tests (`wl frontend test <spec>`,
   `wl backend test -k …`), and `wl check` once the batch of fixes is done (DL-106).

@@ -108,8 +108,8 @@ each verification claim with who verified it (e.g. "sabotage-checked by checkpoi
    convention conformance, bugs, tests that couldn't fail, and whether the docs match what was
    built. It also sabotage-checks two or three of the checkpoint's riskiest behaviors in a
    temporary copy of the repository. Checkpoints touching authentication, authorization,
-   routers, rendered markdown, or GitHub code also get a security-focused reviewer, which runs
-   first (the two never run tests at the same time). Tests for `app/rules/` and `app/authz/`
+   routers, rendered markdown, or GitHub code also get a security-focused reviewer, beside it
+   (each runs tests only in its own copy, on its own test database, DL-392). Tests for `app/rules/` and `app/authz/`
    are written from the docs by `spec-test-writer`, before the implementation, and protected
    by recorded hashes. Every finding is fixed or logged in the tech-debt log with a reason.
 3. **Owner approval:** the review note, the reviewer's findings, and their resolution go to
@@ -125,11 +125,13 @@ for approval.
 by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
 the guide. The `user-guide-verifier` agent then follows `docs/behavior-reference.md` literally in a
 browser against a seeded copy of the stack, checks the guide under `docs/user-guide/` against it
-(DL-336), and walks the slice's "Done when" list (DL-124). After `checkpoint-reviewer`, the `docs-consistency` agent reviews every doc,
-`CLAUDE.md` file, and `.claude/` file against the others, and then the `repo-auditor` agent
+(DL-336), and walks the slice's "Done when" list (DL-124); both start stacks of their own, so they
+follow the other reviewers with the dev stack down (DL-392). In parallel with the checkpoint's
+reviewers, the `docs-consistency` agent reviews every doc, `CLAUDE.md` file, and `.claude/` file
+against the others, and the `repo-auditor` agent
 audits the whole repository, not one diff: bugs, security, scale against the expected load,
 risky code without a test, and slowness (DL-41; waste is `simplicity-auditor`'s, DL-318). From S2-C0a, the `simplicity-auditor`
-agent follows `repo-auditor`, auditing the whole repository for overengineering, so its
+agent joins them, auditing the whole repository for overengineering, so its
 findings feed the retro; the next slice's C0 applies the ones the owner accepts (DL-138). The
 slice's last checkpoint ends with
 a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
@@ -173,13 +175,14 @@ them; the root one also holds the project's one-line Status (DL-315). When a rev
 mistake a rule would have prevented, the fix adds that rule.
 
 **The order the reviewers run in** (the `checkpoint` skill): `spec-test-writer` at the start of a
-checkpoint that adds or changes `app/rules/` or `app/authz/`; at its close, one at a time,
+checkpoint that adds or changes `app/rules/` or `app/authz/`; at its close, in parallel (DL-392),
 `security-reviewer` (when the slice's section names the checkpoint, or the diff touches
 security-relevant code), `checkpoint-reviewer` (every time), and `ui-reviewer` (when the diff
-touches `frontend/src/` or `frontend/e2e/`, DL-62); at a slice's last checkpoint,
-`fresh-clone-verifier`, `user-guide-verifier`, `docs-consistency`, `repo-auditor`, then
-`simplicity-auditor` (DL-138). `docs-consistency` also runs in every design change, after
-`checkpoint-reviewer` on any tooling code (DL-18).
+touches `frontend/src/` or `frontend/e2e/`, DL-62), and at a slice's last checkpoint
+`docs-consistency`, `repo-auditor`, and `simplicity-auditor` (DL-138); then, with the dev stack
+down, `fresh-clone-verifier` and `user-guide-verifier`, which start stacks of their own.
+`docs-consistency` also runs in every design change, beside `checkpoint-reviewer` on any tooling
+code (DL-18).
 
 ### Workflow items scheduled
 Workflow items decided but not built yet, each built through the `design-change` skill or the
@@ -379,9 +382,9 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
   | Group | Commands | Runs |
   |---|---|---|
   | Whole repo | `wl check`, `wl test`, `wl lint`, `wl fmt` | both halves in sequence; stops at the first failure |
-  | Scoped | `wl backend <cmd>`, `wl frontend <cmd>` (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
+  | Scoped | `wl backend <cmd>`, `wl frontend <cmd>`, `wl cli check` (DL-392) (e.g. `wl backend test -k approval`, `wl backend migration "add phase"`, `wl backend mutate`) | one half; extra arguments pass straight through |
   | Stack | `wl up`, `wl down`, `wl logs [service]`, `wl migrate`, `wl seed`, `wl seed --demo` (from S1-C13a, DL-83), `wl admin <command>` (from Slice 1; e.g. `wl admin grant-system-admin <email>`) | `docker compose`, including commands in the backend image's containers (`wl migrate` runs the migrate service) |
-  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>`, `wl e2e` (from S1-C14, DL-65), `wl docs-screenshots` (from S3-C0h, DL-343) | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29); Playwright against an isolated, seeded stack it starts and always tears down; the guide's screenshots, on that stack |
+  | Cross-cutting | `wl gen-client`, `wl doctor`, `wl audit`, `wl review-copy <dir>`, `wl discard-copy <dir>` (DL-392), `wl e2e` (from S1-C14, DL-65), `wl docs-screenshots` (from S3-C0h, DL-343) | OpenAPI export → frontend types; toolchain check (Git, Docker, uv, Node 22, Python version); supply-chain gates (`uv audit` on both lockfiles, `npm audit`, gitleaks over the git history); the reviewers' throwaway copy of the repository as about to be committed (DL-29), and its test databases dropped with it; Playwright against an isolated, seeded stack it starts and always tears down; the guide's screenshots, on that stack |
 
   `wl backend mutate` (added in Slice 1) runs mutmut over `app/rules/` and `app/authz/` and fails
   on any surviving mutant; `wl check --full` always includes it, and `wl check` when anything it
@@ -401,7 +404,8 @@ halves of the repo. It replaces a `justfile`/Makefile and needs nothing beyond u
      alembic) as subprocesses in the right folder. No application logic.
   2. `package.json` scripts and the backend's tool configuration remain the real definitions;
      running `npm run test` or `uv run pytest` directly gives the same result.
-  3. **CI calls the CLI** (`wl check --full`), so local runs and CI can't diverge.
+  3. **CI calls the CLI**: `wl check --full`'s parts as parallel jobs, which a CLI test keeps
+     equal to it (DL-392), so local runs and CI can't diverge.
   4. **`--dry-run`** on every command prints the underlying commands instead of running them.
   5. **Light tests:** every command's `--help` works, and dry-run output matches the expected
      commands.
@@ -580,7 +584,8 @@ ERP modules (Slices 8+) get their own entries when they're designed.
 
 ### Docker Compose
 - `postgres` (current major version, with a named volume), added in Checkpoint 2 because the
-  test harness needs a real database. Nothing is installed on the workstation:
+  test harness needs a real database; it allows 300 connections (the default is 100), room for
+  reviewers' full test runs at once (DL-392). Nothing is installed on the workstation:
   - the official image creates the dev database and user on first start from `.env`
     (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`; `.env.example` is committed, `.env` is
     not);
@@ -761,7 +766,11 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
 - **Migration checks:** `alembic upgrade head` on an empty database, then autogenerate reports
   no drift.
 - GitHub Actions: lint, type check, API tests, web tests, migration checks, generated-client
-  freshness, and the supply-chain audit (`wl audit`: dependency advisories and secrets).
+  freshness, and the supply-chain audit (`wl audit`: dependency advisories and secrets), as
+  parallel jobs (DL-392): `wl backend check` (mutation testing whatever changed), `wl frontend
+  check`, `wl cli check`, `wl audit`, and `wl e2e`, with a last job named `wl check` that passes
+  only when they all did (the ruleset's required check, DL-27). Together they are `wl check
+  --full`, which a CLI test keeps true (DL-99).
 - **Supply-chain policy** (DL-13): any known vulnerability fails. An advisory is ignored only
   through an entry in `audit-allowlist.toml` naming it and the reason, with a matching open
   tech-debt entry whose Fix by is the deadline (the docs consistency tests check both). A red

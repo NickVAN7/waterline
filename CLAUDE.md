@@ -8,9 +8,9 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 ## Status
 
 S3-C0o (The design trial's outcome) done; the outside review's handoff
-(`docs/reviews/design-changes/2026-11-18-outside-review-handoff.md`, DL-390): Package 1 (the git
-guard, DL-391) applied; next: Package 2, then Package 3, then S3-C0p, each after the owner's
-approval.
+(`docs/reviews/design-changes/2026-11-18-outside-review-handoff.md`, DL-390): Packages 1 (the git
+guard, DL-391) and 2 (parallel reviewers and CI, DL-392) applied; next: Package 3, then S3-C0p,
+each after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
@@ -126,12 +126,12 @@ Work proceeds one checkpoint at a time, as listed in `docs/build-plan.md`.
 - `migration` — for every schema change.
 - `new-area` — for a new aggregate, or a new endpoint or action in an existing one.
 - `vue-screen` — for every new or reshaped screen or dialog in `frontend/src/views/`.
-- `checkpoint` — to close every checkpoint; it runs `security-reviewer` (when the build plan
-  names the checkpoint for it, or the diff touches security-relevant code), then
-  `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a temporary copy), then
-  `ui-reviewer` (when the diff touches `frontend/src/` or `frontend/e2e/`), then
-  `fresh-clone-verifier`, `user-guide-verifier`, `docs-consistency`, and `repo-auditor` (last
-  checkpoint of a slice), then `simplicity-auditor` (DL-138).
+- `checkpoint` — to close every checkpoint; it runs, in parallel in one step (DL-392),
+  `security-reviewer` (when the build plan names the checkpoint for it, or the diff touches
+  security-relevant code), `checkpoint-reviewer` (which also sabotage-checks a few behaviors in a
+  temporary copy), `ui-reviewer` (when the diff touches `frontend/src/` or `frontend/e2e/`), and
+  at the last checkpoint of a slice `docs-consistency`, `repo-auditor`, and `simplicity-auditor`
+  (DL-138); then, with the dev stack down, `fresh-clone-verifier` and `user-guide-verifier`.
 - `design-change` — for any design change outside the current checkpoint's scope (decisions
   from a chat session, or code that must differ from the docs); it records each decision in
   `docs/decision-log.md` and runs `docs-consistency` (trigger `design-change`).

@@ -88,9 +88,9 @@ history in the docs; the log holds it.
 - **Reviewers, on one snapshot** (DL-105): take the review snapshot as the `checkpoint` skill's
   step 4 says (`wl review-copy`). For **tooling code** (step 4), invoke `checkpoint-reviewer`
   with the review ID `DC-<YYYY-MM-DD>` (add a letter for a second one that day:
-  `DC-2026-10-08b`), the base (the commit before this change), and the files in scope; don't
-  run tests while it runs. Then invoke the `docs-consistency` agent with trigger
-  `design-change` and, as the base, the commit before this change.
+  `DC-2026-10-08b`), the base (the commit before this change), and the files in scope; in the
+  same step, invoke the `docs-consistency` agent with trigger `design-change` and, as the base,
+  the commit before this change (in parallel, DL-392).
 - **Then fix, in one batch,** as the `checkpoint` skill's step 5 says (only `checkpoint-reviewer`
   is re-reviewed, DL-108): every tooling finding, and `docs-consistency`'s clear-cut **Fixes**.
   Its **Decisions** go to the owner undecided; if one blocks the change, stop. Every design

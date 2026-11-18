@@ -1327,7 +1327,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `waterline_test`. pytest-cov combines the workers' coverage on the controller, where the 100%
   gate on `app/authz` and `app/rules` checks the total.
 - **Supersedes:** none
-- **Superseded by:** none
+- **Superseded by:** DL-392 (in part: the test database's name)
 - **Applies to:** `backend/pyproject.toml` (`addopts`, `[tool.mutmut]`); `backend/tests/conftest.py`;
   `tools/cli/` (`wl backend test`); testing strategy ("Database isolation", "Coverage gates");
   build plan ("Docker Compose"); developer guide sections 3 and 9; `backend/CLAUDE.md`; the
@@ -4905,3 +4905,35 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   ("Pull requests"); `checkpoint` and `design-change` skills; TD-20; the guard trial's README and
   friction log
 - **Source:** owner, Nov 18, 2026 (the outside review's handoff, Package 1; the forms kept, Nov 18)
+
+### DL-392: Reviewers run at once, each on its own test database; CI runs as parallel jobs
+- **Date:** 2026-11-18
+- **Decision:** The outside review's Package 2. (a) A test run's database comes from
+  `WATERLINE_TEST_DATABASE` (the env or `.env`), defaulting to `waterline_test`, read by the
+  tests' own settings (`backend/tests/conftest.py`), so no app code changes (owner, Nov 18); the
+  conftest refuses any name but `waterline_test` or `waterline_test_<suffix>`, and creates a
+  non-default one under `-n 0`, as it does the workers' copies. `wl review-copy --with-env`
+  writes `waterline_test_<8 hex>` into the copy's `.env`, and `wl discard-copy` drops the copy's
+  databases (its own and its workers') and deletes it. Every reviewer that applies is invoked
+  in one step, in parallel, running tests only in its own copy, and the author may run tests
+  meanwhile; the slice-end agents that start no stack join that step, while
+  `fresh-clone-verifier` and `user-guide-verifier` still follow with the dev stack down. (b) CI
+  runs `wl backend check`, `wl frontend check`, `wl cli check` (new), `wl audit`, and `wl e2e`
+  as parallel jobs, each setting up only what it needs, and a last job named `wl check`, which
+  passes only when they all did; a CLI test checks that the jobs' commands are exactly `wl
+  check --full`'s steps, and another that the last job waits for all five and runs whatever they
+  did. (c) A backend test that runs longer than 120 seconds fails (`pytest-timeout`, MIT). Beyond
+  the handoff: Postgres in Compose allows 300 connections (the default is 100), as two full runs
+  at once ran out.
+- **Supersedes:** DL-100 in part (the test database's name); the `checkpoint` skill's "one
+  reviewer at a time" and its order for the slice-end agents (rules of that skill, no entry)
+- **Superseded by:** none
+- **Applies to:** `backend/tests/conftest.py`, `backend/tests/support/review_databases.py`;
+  `wl review-copy`, `wl discard-copy`, `wl cli check`; `.github/workflows/ci.yml`;
+  `backend/pyproject.toml`; `docker-compose.yml`; the `checkpoint` and `design-change` skills;
+  `checkpoint-reviewer`, `security-reviewer`, `repo-auditor`, `simplicity-auditor`; root and
+  backend `CLAUDE.md`; build plan ("Development process", "Verification", "Tests & CI", "Docker
+  Compose", "Developer CLI"); developer guide sections 3, 9, 10, and 11; testing strategy
+  ("Database isolation", "Workflow and gates")
+- **Source:** owner, Nov 18, 2026 (the outside review's handoff, Package 2; the tests read the
+  name, Nov 18)
