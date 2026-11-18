@@ -4862,3 +4862,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** build plan (S3-C0o); `.claude/settings.json`, developer guide section 11
 - **Source:** owner, Nov 18, 2026 (S3-C0o, Impeccable's first run)
+
+### DL-390: The outside review's handoff, and the guard's decision in its Package 1
+- **Date:** 2026-11-18
+- **Decision:** The owner's decisions after an outside review of `s3` at `d2a5e32` are kept as
+  written in `docs/reviews/design-changes/2026-11-18-outside-review-handoff.md` and applied one
+  package at a time, each stopping for the owner and recording its own decision-log entry:
+  Packages 1 to 3 (design changes) before S3-C0p, Packages 4 and 5 (code) as rows after it, from
+  S3-C0q, before S3-C1. The git guard's trial (S3-C0b) is decided in Package 1, not at the end of
+  the polish group; until then every block is logged as before.
+- **Supersedes:** the trial's outcome, held to the end of Slice 3's pre-work checkpoints (owner,
+  Nov 10, recorded in `docs/spikes/S3-C0b-guard-trial/README.md`; no entry of its own)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 3's "Checkpoints" note); root `CLAUDE.md` (Status, the
+  guard's logging rule); the guard trial's README and friction log
+- **Source:** owner, Nov 18, 2026 (after S3-C0o)

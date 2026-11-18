@@ -121,5 +121,6 @@ Weigh those against the guard's cost: one git command per Bash call, no `cd` or 
 
 ## Outcome: held (owner, 2026-11-10)
 
-The decision waits for the end of Slice 3's pre-work checkpoints (S3-C0x). Until then, every
+The decision waits for the end of Slice 3's pre-work checkpoints, now the outside review
+handoff's Package 1 (DL-390). Until then, every
 time the guard gets in the way of work is recorded in `friction-log.md`, as evidence for it.

@@ -1,7 +1,7 @@
 # The git guard's friction log
 
 Every time the git guard (DL-26) blocked or bent work, kept until the guard's decision at the
-end of Slice 3's pre-work checkpoints (S3-C0x; owner, 2026-11-10). Each checkpoint's commit adds
+end of Slice 3's pre-work checkpoints, now the outside review handoff's Package 1 (DL-390). Each checkpoint's commit adds
 its own entries. "Legit" means the blocked command was safe and within the rules; "caught"
 means the guard stopped something it should have.
 
@@ -54,5 +54,9 @@ means the guard stopped something it should have.
 | 45 | S3-C0o (comparing a regenerated screenshot) | `S=<scratchpad> && git -C … show HEAD:<image> > $S/<file>; ls …` | a redirect to a file named only at run time | `git -C … show HEAD:<image> > <literal scratchpad path>` alone | legit; my slip (as #15) |
 | 46 | S3-C0o (removing a leftover settings block) | a `python3 -` heredoc editing `.claude/settings.json`, then `git -C … diff --stat`, in one call | a compound command with git in it | the Edit tool | legit; my slip (as #15) |
 | 47 | S3-C0o review (the fix diff) | `D=… && uv run wl review-copy $D/… ; diff -ruN -x .git … > $D/fix.diff` in one call | a redirect to a file named only at run time | a scratchpad script (`fixdiff.sh`) | legit (as #33) |
+| 48 | after the S3-C0o commit (reading CI's result) | `tail <CI output>; gh pr view --json …` in one call | a compound command with gh in it | separate calls | legit; my slip (as #15) |
+| 49 | DC-2026-11-18 (applying it) | a `python3 -` heredoc whose text names git and gh, with a `grep` after it | text mentioning git in a command | a scratchpad script (`dc_small.py`) | legit (as #36) |
+| 50 | DC-2026-11-18 (docs-consistency, read-only) | a compound command with `git status` in it | a compound command with git in it | separate calls | legit (as #15) |
+| 51 | DC-2026-11-18 (docs-consistency, read-only) | a `grep` chained with `git rev-parse` | a compound command with git in it | separate calls | legit (as #15) |
 
 None of the blocks so far stopped anything the rules forbid.
