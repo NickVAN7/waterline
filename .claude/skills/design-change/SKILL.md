@@ -59,7 +59,8 @@ stays valid.
 Add a `DL-<n>` entry to `docs/decision-log.md` (format at the top of that file) for each
 decision that changes or supersedes a written rule, or sets a process (DL-7). A decision that
 only adds detail to an unbuilt checkpoint goes into that doc directly; the design change's
-review record names it, with its source and reasons (DL-312). When an entry supersedes an
+commit message (and its review record, when it has one) names it, with its source and reasons
+(DL-312). When an entry supersedes an
 earlier one, fill in that entry's "Superseded by".
 
 ## 6. Update every affected doc
@@ -81,10 +82,19 @@ Work through this list for each decision, and change everything that states the 
 Replace the superseded text with the current rule and a `DL-<n>` reference. Don't narrate the
 history in the docs; the log holds it.
 
+**Visual tuning is not a decision** (DL-393): spacing, alignment, width, and similar
+look-and-feel adjustments are edited directly in `docs/ui-design-guide.md`, and get a
+decision-log entry only when the owner says the look is settled.
+
 ## 7. Check
 
 - `uv run wl check` green (and, for tooling code that changes what CI runs,
   `uv run wl check --full`).
+- **A docs-only change** (no tooling code, and not a slice's plan, whose readiness review keeps
+  its record, DL-353) needs only its decision-log entry, green docs
+  consistency tests (part of `wl check`), and its commit: no review record and no
+  `docs-consistency` agent run (DL-393). Go to step 8. The rest of this step is for tooling
+  changes.
 - **Reviewers, on one snapshot** (DL-105): take the review snapshot as the `checkpoint` skill's
   step 4 says (`wl review-copy`). For **tooling code** (step 4), invoke `checkpoint-reviewer`
   with the review ID `DC-<YYYY-MM-DD>` (add a letter for a second one that day:
@@ -93,16 +103,16 @@ history in the docs; the log holds it.
   the commit before this change (in parallel, DL-392).
 - **Then fix, in one batch,** as the `checkpoint` skill's step 5 says (only `checkpoint-reviewer`
   is re-reviewed, DL-108): every tooling finding, and `docs-consistency`'s clear-cut **Fixes**.
-  Its **Decisions** go to the owner undecided; if one blocks the change, stop. Every design
-  change, docs-only or tooling, gets a record (DL-126): record every pass in `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming
+  Its **Decisions** go to the owner undecided; if one blocks the change, stop. A tooling change
+  gets a record (DL-126, DL-393): record every pass in `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md`, the slug a few words naming
   what the change covers (`DC-2026-10-08b-git-guard-allow-list.md`; format:
   `docs/reviews/s0/S0-C1.md`), with, for tooling code, `checkpoint-reviewer`'s "Sabotage
   checks" table.
 
 ## 8. Commit and push
 
-One `docs:` commit per logical change set (tooling code in `chore:` or `ci:` commits), each
-with its review record, docs-only or tooling (DL-126), on the current slice branch (`docs/build-plan.md`, "Pull requests"). Push
+One `docs:` commit per logical change set (tooling code in `chore:` or `ci:` commits), a
+tooling change's with its review record (DL-126, DL-393), on the current slice branch (`docs/build-plan.md`, "Pull requests"). Push
 (`git push -u origin s<n>` at the branch's first push, `git push` after; each git or gh
 command its own Bash call, DL-391). If the slice branch has no pull request yet, open it as a
 draft at this push (`gh pr create --draft`, as in the `checkpoint` skill, step 6): CI runs
@@ -114,7 +124,7 @@ Send the owner:
 - each decision applied, with its `DL-<n>`;
 - the files changed;
 - any checkpoints inserted;
-- the `docs-consistency` results, with its Decisions unresolved;
+- for tooling code, the `docs-consistency` results, with its Decisions unresolved;
 - for tooling code, the `checkpoint-reviewer` findings and their resolutions (the review
   record);
 - the CI result.

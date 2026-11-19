@@ -411,7 +411,7 @@ already exists; everything else is still to build.
 - See **No access** when I'm signed in but belong to nothing; Account settings and Sign out
   still work. *Built.*
 - **See my active sessions and sign out of the others** (v1), in Account settings.
-- Sign in with GitHub, and link or unlink my GitHub account (Slice 7).
+- Sign in with GitHub, and link or unlink my GitHub account (Slice 8).
 
 **Getting around**
 - The header (org switcher), the sidebar (My work, the project selector with a filter past
@@ -461,11 +461,11 @@ journeys, the design doc's delete and restore rules (design-doc §9), and the sc
 |---|---|---|---|---|---|---|---|
 | Workspace | — | B settings | — (CLI) | B | — | — | |
 | Staff (workspace member) | B | — | B | B role | B | — | |
-| Organization | B | B overview | B | B | later (archive) | — | GitHub installations ✓ (S7) |
+| Organization | B | B overview | B | B | later (archive) | — | GitHub installations ✓ (S8) |
 | Org member | B | — | B | B role | B | — | |
 | User | B | B access review | B | B admin; B own profile | B deactivate | B reactivate | admin email edit B |
 | Session (own) | ✓ | — | B sign-in | — | ✓ sign out others | — | admin "sign out everywhere" B |
-| GitHub identity (S7) | — | — | ✓ link | — | ✓ unlink | — | |
+| GitHub identity (S8) | — | — | ✓ link | — | ✓ unlink | — | |
 | Project | B | B home | B | B settings | B archive | B unarchive | favorite ✓ |
 | Project member | B | B access | B | B role | B | — | |
 | Audit event | ✓ | — | — | — | — | — | screen before the first non-local deployment |
@@ -500,8 +500,8 @@ journeys, the design doc's delete and restore rules (design-doc §9), and the sc
 | Link attachment | ✓ | — | ✓ | — (remove and re-add) | ✓ | — | |
 | Activity log | ✓ project feed (S3); item history | — | automatic | — | — | — | |
 | Saved filter | ✓ | — | ✓ | ✓ rename | ✓ | — | personal only |
-| Repository mapping (S7) | ✓ | ✓ webhook health | ✓ | — | ✓ disconnect | — | |
-| Task GitHub link (S7) | ✓ on the task | ✓ PR status | ✓ automatic or pasted | — | ✓ | — | |
+| Repository mapping (S8) | ✓ | ✓ webhook health | ✓ | — | ✓ disconnect | — | |
+| Task GitHub link (S8) | ✓ on the task | ✓ PR status | ✓ automatic or pasted | — | ✓ | — | |
 
 **Stories added to the journeys by this step**
 - Piece 2 (structure): delete a phase or milestone while nothing references it; cancel a gate
@@ -543,7 +543,7 @@ panel vs. dialog.
 | **Trash** | deleted requirements, tasks, and test cases | 2 (tasks 3, test cases 5) |
 | **Access review** | per project and per person | Built (S1) |
 | **Audit log** | admin and security events | Before the first non-local deployment |
-| **Operations screen** | failed background jobs and webhook deliveries | 7 |
+| **Operations screen** | failed background jobs and webhook deliveries | 8 |
 | **Status report** | a finished period's summary | v1.5 |
 
 No other regularly used views are needed in v1. Per-person workload and sprint load views are
@@ -637,7 +637,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 | Account settings (profile, appearance) | page | `/account` | 1 | Built |
 | Change password | page | `/account/password` | 1 | Built |
 | Active sessions, sign out others | section of Account settings | `/account` | 2 (S2-C21b, DL-238) | Built |
-| GitHub account link / unlink | section of Account settings | `/account` | 7 | — |
+| GitHub account link / unlink | section of Account settings | `/account` | 8 | — |
 | Saved filters (rename, delete) | section of Account settings, plus the filter bar's menu | `/account` | 3 (S3-C32, DL-239) | — |
 | No access | page | `/account/no-access` | 1 | Built |
 | My work | page | `/` | 1, sections in 2, 3, 5 | Projects and approvals built; grouped by organization (each org's first 5, DL-368, hidden ones behind a toggle), approvals below the projects, past decisions removed, in S3-C0f (DL-329 to DL-334, DL-349, DL-359); summary tiles and the task sections in S3-C29 (DL-349) |
@@ -658,7 +658,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 | Per-person access review | page | `/workspace/users/:userId/access` | 1 | Built |
 | Workspace settings | page | `/workspace/settings` | 1 | Built |
 | Audit log | page | `/workspace/audit` | 7, before the first non-local deployment (DL-239) | — |
-| Operations (failed jobs, webhook deliveries) + indicator | page; indicator in the header | `/workspace/operations` | 7 | — |
+| Operations (failed jobs, webhook deliveries) + indicator | page; indicator in the header | `/workspace/operations` | 8 | — |
 
 ### Organization
 
@@ -666,7 +666,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 |---|---|---|---|---|
 | Org overview (projects, archived below) | page | `/:orgSlug/overview` | 1 | Built |
 | Org members ("Show deactivated" for admins) | page + dialogs | `/:orgSlug/members` | 1 | Built (deactivated filter in S2-C21a, DL-238, DL-293 to DL-295) |
-| Org settings (details, tag vocabulary, GitHub installations) | page | `/:orgSlug/settings` | 1; tags 6; GitHub 7 | Details built |
+| Org settings (details, tag vocabulary, GitHub installations) | page | `/:orgSlug/settings` | 1; tags 6; GitHub 8 | Details built |
 | Org projects list; create project | page + dialog | `/:orgSlug/projects` | 1 | Built |
 
 ### Project
@@ -679,7 +679,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 | Project settings (details, modules, restriction, archive) | page | `…/:key/settings` | 1 | Built |
 | Workstreams | page, after Timeline in the project nav (DL-348) | `…/:key/workstreams` | 3 | — |
 | Phases; milestones, gates, releases | section of Timeline | `…/:key/timeline` | 3 (phases), 4 | — |
-| Repositories (connect, webhook health, disconnect) | section of Settings | `…/:key/settings` | 7 | — |
+| Repositories (connect, webhook health, disconnect) | section of Settings | `…/:key/settings` | 8 | — |
 | Activity feed | page | `…/:key/activity` | 3 | — |
 | Trash | page (linked from each list page's header, filtered to its type, DL-350) | `…/:key/trash` | 2 (tasks 3) | Built (S2-C21; the header link S3-C0l) |
 
@@ -702,7 +702,7 @@ checkpoint. Routes for screens not yet built are proposals that each slice's pla
 |---|---|---|---|---|
 | Board | page (tab of Tasks) | `…/:key/tasks/board` | 3 | — |
 | Backlog | page (tab of Tasks) | `…/:key/tasks/backlog` | 3 | — |
-| Task detail (subtasks, dependencies, links, PRs, comments, history) | side panel / full page | `…/:key/tasks/:number` | 3 (comments 6, PRs 7) | — |
+| Task detail (subtasks, dependencies, links, PRs, comments, history) | side panel / full page | `…/:key/tasks/:number` | 3 (comments 6, PRs 8) | — |
 | Create task | dialog, expandable to full page | `…/:key/tasks/new` | 3 | — |
 | Send back from review (optional comment) | dialog | — | 3 (prompt 6) | — |
 | Sprints page and sprint summary | page | `…/:key/sprints`, `…/:key/sprints/:id` | 4 | — |

@@ -18,7 +18,7 @@ Every schema-doc column marked `Added in Slice <n>.` is built during slice `<n>`
 its checkpoints (usually with the table it references): once the slice's last checkpoint is
 committed, the docs consistency tests require it (schema-doc conventions). The tests can't see
 a miss before that commit, so the slice's last checkpoint confirms by hand that every column
-marked for the slice is in the model (the `checkpoint` skill, step 2).
+marked for the slice is in the model (the `slice-end` skill, "With step 2").
 
 ### Slice overview
 
@@ -31,10 +31,11 @@ marked for the slice is in the model (the `checkpoint` skill, step 2).
 | 4 | Sprints (module), including completing a sprint with unfinished tasks; milestones/gates. |
 | 5 | Test cases, runs, results (with assignees), ad-hoc runs, re-running failed cases; My work's test-case section. |
 | 6 | Comments, tags (with the built-in per-type defaults, copied into new orgs and backfilled into existing ones), dependencies, links, search; the comment prompt when a task is sent back from review. |
-| 7 | GitHub (module): App, repo mapping, webhooks, auto-linking; the system-admin operations screen (failed jobs and webhook deliveries). |
-| 8+ | v2, ERP implementations (design-doc §16): RAID & change requests → status reports → budget → data migration → cutover; PMO dashboard, steering committee page, resourcing, workstream members. |
+| 7 | Pre-deployment hardening: TD-12, the items of TD-14, TD-17, TD-83, and the nightly session cleanup as the job queue's first real job, with the other entries due before the first non-local deployment (TD-13, TD-28, TD-29, TD-63, TD-87) and the workspace audit log page (DL-393). Its checkpoints aren't defined yet. |
+| 8 | GitHub (module): App, repo mapping, webhooks, auto-linking; the system-admin operations screen (failed jobs and webhook deliveries). |
+| 9+ | v2, ERP implementations (design-doc §16): RAID & change requests → status reports → budget → data migration → cutover; PMO dashboard, steering committee page, resourcing, workstream members. |
 
-After Slice 3 the tool is usable for tracking its own build. Slices 0–7 are v1, built for
+After Slice 3 the tool is usable for tracking its own build. Slices 0–8 are v1, built for
 software projects (design-doc §1).
 
 ---
@@ -42,26 +43,12 @@ software projects (design-doc §1).
 ## Development process
 
 Slices are built in **checkpoints**. A checkpoint is one independently verifiable concern: it
-includes its own tests, can't be left half-working, and can be reviewed in roughly 15–30
-minutes. The next checkpoint starts only after the current one is approved.
-
-### What every checkpoint delivers
-1. **One commit** containing exactly that checkpoint's work.
-2. **Tests** for everything it adds, per `testing-strategy.md`, all passing.
-3. **Review note** (in the commit message and the checkpoint summary): what was built, tests
-   added, decisions or deviations from the docs, and what's next.
-4. **Updated documentation**, in the same commit as the code it describes:
-   - `docs/developer-guide.md` — workstation setup, developer CLI commands, architecture and
-     conventions, how to add a feature through each layer, how to write each kind of test,
-     troubleshooting.
-   - `docs/behavior-reference.md` — everything each feature does, screen by screen, in the
-     words on the screen (from S3-C0g; before it, `docs/user-guide.md`); the reader's guide
-     under `docs/user-guide/` only when what a user does or sees changes (DL-335).
-   - Design, schema, and build-plan docs, if anything drifted.
-5. **Tech-debt log** (`docs/tech-debt.md`): any shortcut is recorded with its reason and the
-   checkpoint or slice that will fix it. The goal is an empty log; nothing is left unrecorded.
-6. **Review record** (`docs/reviews/s<n>/<ID>.md`, e.g. `s0/S0-C1.md`): every reviewer pass
-   with its verdict, findings, and the resolution of each, plus open questions and owner decisions.
+includes its own tests, can't be left half-working, and is small enough to review in one
+sitting. It is one commit with its tests, docs, tech-debt entries, and review record
+(`docs/reviews/s<n>/<ID>.md`), and it stops for the owner's approval, unless its row is marked
+**auto-continue** (DL-393; a trial for the rest of Slice 3; a group's last row always
+stops). The steps are the `checkpoint` skill's, and `slice-end`'s at a
+slice's last checkpoint.
 
 ### Pull requests
 Each slice works on **one branch and one draft pull request** (DL-9). Slice 0's checkpoints
@@ -74,7 +61,7 @@ with the workflow changes of DL-7 to DL-14).
   push. The branch is pushed after every checkpoint commit, and CI must be green before the
   checkpoint goes to the owner. Only finished commits are pushed, never work in progress.
 - **Groups** (each slice's section lists them) are review points and the boundaries where
-  design changes apply ("Design changes outside a checkpoint" below). They don't get their own
+  design changes apply (the `design-change` skill). They don't get their own
   branch or PR.
 - **Design changes** from chat are `docs:` commits on the slice branch, in the slice's PR (the
   `design-change` skill); tooling code in them is in `chore:` or `ci:` commits (DL-18).
@@ -97,68 +84,11 @@ with the workflow changes of DL-7 to DL-14).
   the hooks and the branch (DL-391; developer guide section 11).
 
 ### Verification (three layers)
-**Nothing counts as verified because the session that did the work says so** (DL-11). A claim is
-verified only by a gate (`wl check`, CI), an independent agent, or the owner, and reports label
-each verification claim with who verified it (e.g. "sabotage-checked by checkpoint-reviewer").
-
-1. **Automated gates:** lint, types, all tests, coverage thresholds, import-linter contracts,
-   migration checks. A checkpoint doesn't go to review until these pass.
-2. **Independent review:** a separate reviewer agent that did not write the code, with fresh
-   context, reads the design docs and the checkpoint's changes and reports on design and
-   convention conformance, bugs, tests that couldn't fail, and whether the docs match what was
-   built. It also sabotage-checks two or three of the checkpoint's riskiest behaviors in a
-   temporary copy of the repository. Checkpoints touching authentication, authorization,
-   routers, rendered markdown, or GitHub code also get a security-focused reviewer, beside it
-   (each runs tests only in its own copy, on its own test database, DL-392). Tests for `app/rules/` and `app/authz/`
-   are written from the docs by `spec-test-writer`, before the implementation, and protected
-   by recorded hashes. Every finding is fixed or logged in the tech-debt log with a reason.
-3. **Owner approval:** the review note, the reviewer's findings, and their resolution go to
-   the project owner, who signs off before the next checkpoint. For a checkpoint with behavior
-   visible through the API or the UI, the report includes a short try-it-yourself script
-   against the running dev stack, with at least one step that should be denied; the owner's
-   run is the check.
-
-**Review-tier trial** (S1-C8 to S1-C10, DL-10): not exercised (DL-125). Every checkpoint stops
-for approval.
-
-**End of each slice:** the `fresh-clone-verifier` agent sets up a fresh copy of the repository
-by following `docs/developer-guide.md` exactly as written; any wrong or missing step is fixed in
-the guide. The `user-guide-verifier` agent then follows `docs/behavior-reference.md` literally in a
-browser against a seeded copy of the stack, checks the guide under `docs/user-guide/` against it
-(DL-336), and walks the slice's "Done when" list (DL-124); both start stacks of their own, so they
-follow the other reviewers with the dev stack down (DL-392). In parallel with the checkpoint's
-reviewers, the `docs-consistency` agent reviews every doc, `CLAUDE.md` file, and `.claude/` file
-against the others, and the `repo-auditor` agent
-audits the whole repository, not one diff: bugs, security, scale against the expected load,
-risky code without a test, and slowness (DL-41; waste is `simplicity-auditor`'s, DL-318). From S2-C0a, the `simplicity-auditor`
-agent joins them, auditing the whole repository for overengineering, so its
-findings feed the retro; the next slice's C0 applies the ones the owner accepts (DL-138). The
-slice's last checkpoint ends with
-a **slice retro** in its report: what each reviewer caught, what escaped to the owner, which
-skills and agents never triggered, the verdict of any process trial, and the auditor's findings
-left for the owner. The owner decides what
-changes; each change that changes or supersedes a written rule, or sets a process, gets a
-decision-log entry (DL-312), and each is applied as a design change on the slice
-branch before the slice's PR is merged (DL-19).
-
-**Design changes outside a checkpoint** (decisions from a chat session, or code that must differ
-from the docs) go through the `design-change` skill (DL-8). They apply at group boundaries
-(mid-group only when the owner says one blocks the group), never in a commit with checkpoint
-work. Each decision that changes or supersedes a written rule, or sets a process, gets a
-decision-log entry (`docs/decision-log.md`), while one that only adds detail to an unbuilt
-checkpoint goes into that doc and is named in the change's review record (DL-312); every doc
-stating the old rule is updated, and `docs-consistency` runs (trigger `design-change`) before committing;
-its decisions go to the owner. A change to code already built becomes a new checkpoint,
-inserted with a letter suffix where it runs (`S1-C13a` between `S1-C13` and `S1-C14`);
-existing checkpoints are never renumbered. Review answers that change built code are bundled:
-into the next planned checkpoint, or one follow-up checkpoint per group (DL-131). Developer-tooling and process code (hooks, the `wl`
-CLI, CI, the docs consistency tests) is built in the design change itself, as `chore:` or `ci:`
-commits, after a `checkpoint-reviewer` pass recorded in
-`docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). Every design change,
-docs-only or tooling, gets a record there, holding its `docs-consistency` pass (and, for
-tooling, `checkpoint-reviewer`'s passes) (DL-126). A checkpoint in progress is parked with `git stash` while a design change is applied,
-and its review base becomes the design change's last commit (DL-20). Each checkpoint's review
-diffs from the last commit before its work started, so design changes stay out of it (DL-17).
+**Nothing counts as verified because the session that did the work says so** (DL-11): only a
+gate (`wl check`, CI), an independent agent, or the owner verifies a claim. The three layers are
+the automated gates, independent review by agents with fresh context, and the owner's approval;
+design changes go through the `design-change` skill (DL-8). The steps, and which reviewer runs
+when, are in the `checkpoint`, `slice-end`, and `design-change` skills.
 
 **Docs consistency tests** (`backend/tests/unit/docs/`, part of `wl check`) check the mechanical
 part on every run: models vs. schema doc (tables, columns, enum values), one feature-map owner
@@ -172,17 +102,8 @@ list of agents, skills, and hooks, with what each does, is developer guide secti
 each agent's and skill's own file in `.claude/` holds its procedure. The `CLAUDE.md` files (root,
 `backend/`, `frontend/`) are short and rule-focused, pointing to the docs rather than copying
 them; the root one also holds the project's one-line Status (DL-315). When a review catches a
-mistake a rule would have prevented, the fix adds that rule.
-
-**The order the reviewers run in** (the `checkpoint` skill): `spec-test-writer` at the start of a
-checkpoint that adds or changes `app/rules/` or `app/authz/`; at its close, in parallel (DL-392),
-`security-reviewer` (when the slice's section names the checkpoint, or the diff touches
-security-relevant code), `checkpoint-reviewer` (every time), and `ui-reviewer` (when the diff
-touches `frontend/src/` or `frontend/e2e/`, DL-62), and at a slice's last checkpoint
-`docs-consistency`, `repo-auditor`, and `simplicity-auditor` (DL-138); then, with the dev stack
-down, `fresh-clone-verifier` and `user-guide-verifier`, which start stacks of their own.
-`docs-consistency` also runs in every design change, beside `checkpoint-reviewer` on any tooling
-code (DL-18).
+mistake a rule would have prevented, the fix adds a lint rule or a test if one can enforce it,
+and prose only if not; a prose rule goes once a check enforces it (DL-393).
 
 ### Workflow items scheduled
 Workflow items decided but not built yet, each built through the `design-change` skill or the
@@ -334,8 +255,8 @@ The sections below describe the content; the table above is the order of work.
 │   │                                   fresh-clone-verifier.md, docs-consistency.md,
 │   │                                   spec-test-writer.md, repo-auditor.md, ui-reviewer.md,
 │   │                                   simplicity-auditor.md, user-guide-verifier.md
-│   └── skills/                         checkpoint/, test-writer/, migration/, new-area/,
-│                                       design-change/, vue-screen/
+│   └── skills/                         checkpoint/, slice-end/, test-writer/, migration/,
+│                                       new-area/, design-change/, vue-screen/ (with traps.md)
 ├── docs/                         design-doc.md, schema-doc.md, build-plan.md,
 │                                 testing-strategy.md, developer-guide.md, user-guide/,
 │                                 behavior-reference.md,
@@ -343,7 +264,7 @@ The sections below describe the content; the table above is the order of work.
 │                                 ui-design-guide.md, ui/ (reference copies of the token file,
 │                                 its contrast check, and the SVAR theme mapping), reviews/
 │                                 (s<n>/: one record per checkpoint; design-changes/: one
-│                                 per design change, DL-126), spikes/ (spike code kept as evidence);
+│                                 per tooling design change, DL-126, DL-393), spikes/ (spike code kept as evidence);
 │                                 the source of truth (DL-14)
 ├── .github/workflows/            CI: lint, type check, tests, migration check, client freshness
 ├── docker-compose.yml            postgres, migrate, api, worker, web
@@ -470,7 +391,7 @@ when the owning service calls it (DL-70).
 | File name | Owns (tables) | Slice | Calls into (services) |
 |---|---|---|---|
 | `user` | user | 1 | auth (only through its registered `on_email_changed` handler) |
-| `auth` | session; user_identity (added in Slice 7) | 1 | user (registers `on_email_changed` with it); approval (approver replacement, from Slice 2) |
+| `auth` | session; user_identity (added in Slice 8) | 1 | user (registers `on_email_changed` with it); approval (approver replacement, from Slice 2) |
 | `workspace` | workspace, workspace_membership | 1 | user; roster (its staff rules); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
 | `org` | organization, membership | 1 | user; roster (its member rules); tag (copies the default tags into a new org, from Slice 6); project (only through its registered `on_member_removed` handler); approval (approver replacement, from Slice 2) |
 | `project` | project (incl. modules and module guidance), project_membership, project_favorite (from S2-C21c, DL-307) | 1 | org, workspace; roster (its member rules: the email-first add and create, the lock order, and registering `on_member_removed`, DL-71); user (creating a user for the project goes through the org service); approval (approver replacement, from Slice 2); requirement (only through its registered `on_restriction_changed` handler, from S2-C6, DL-208) |
@@ -511,7 +432,7 @@ Oct 7, 2026). `auth` also runs granting and revoking the system-admin flag (the 
 call it), so Slice 2 can add approver replacement to a revoke from layer 2 (owner decision, Oct 6,
 2026).
 
-ERP modules (Slices 8+) get their own entries when they're designed.
+ERP modules (Slices 9+) get their own entries when they're designed.
 
 **Cross-area rules**
 - **Reads:** any service may read through any repository.
@@ -884,7 +805,7 @@ Tables: `user`, `session`, `workspace`, `workspace_membership`, `organization`, 
   attributes, fresh token at sign-in, `Origin` check on mutating requests (host and port
   against the request's `Host`, a missing port being the default for the `Origin`'s scheme;
   missing or `null` rejected, as are a non-`http(s)` or unparseable `Origin` and a missing
-  `Host`; hostnames compared ignoring case; an exemption list, empty until the Slice 7
+  `Host`; hostnames compared ignoring case; an exemption list, empty until the Slice 8
   webhook; the API test client sends a matching `Origin` by default; checked first, before
   authentication; 403 `origin_rejected`), JSON-only bodies (checked next, only when there
   is a body; 415 `unsupported_media_type`), configurable idle/absolute expiry, throttled
@@ -1738,7 +1659,7 @@ S3-C0d, A2 and A3 as TD-100 and TD-101; Y1, Y2, Y3, Y5 were applied by the retro
 | TD-38, TD-41, TD-96 | S3-C13 (server search) and S3-C17 (the pickers) |
 | TD-97, TD-102 | S3-C16 (the filter bar) |
 | TD-37 | S3-C29 (My work's "see all" for approvals: its route exists, so frontend only) |
-| TD-19, TD-31, TD-42, TD-64, TD-68, TD-86, TD-100 | S3-C33 (the tech-debt review; TD-64 is 387 of 600 lines, and Slice 3's ~16 actions shouldn't cross it; TD-100 only if no row touches approval reads first) |
+| TD-19, TD-42, TD-64, TD-68, TD-86, TD-100 | S3-C33 (the tech-debt review; TD-64 is 387 of 600 lines, and Slice 3's ~16 actions shouldn't cross it; TD-100 only if no row touches approval reads first) |
 | TD-73 | S3-C7 (DL-345 decided: the one-statement rewrite, shared with the tree; it was due Slice 7) |
 
 ### Checkpoints
@@ -1751,7 +1672,11 @@ with its row, as Slice 2 did, DL-137, DL-158). S3-C0n is the design skill's tria
 applies its outcome (DL-381 to DL-385), and S3-C0p fixes its open findings. The outside review's
 handoff (`docs/reviews/design-changes/2026-11-18-outside-review-handoff.md`, DL-390) comes
 around S3-C0p: its Packages 1 to 3 (design changes) before it, Packages 4 and 5 (code) as rows
-after it, from S3-C0q, before S3-C1; one package at a time. Each polish row but 0b (a tooling trial whose
+after it, from S3-C0q, before S3-C1; one package at a time. A row the owner marks
+*(auto-continue)* after its name goes on to the next row after its report when every gate is
+green, every finding is fixed, and nothing is open for the owner; a group's last row always
+stops (DL-393; a trial for the rest of Slice 3, its verdict at the Slice 3 retro). No row is
+marked yet (owner, Nov 19, 2026). Each polish row but 0b (a tooling trial whose
 outcome goes through `design-change`, DL-316), 0i, and 0n (spikes, no product code) changes built
 code, so each is a checkpoint with its tests and full review (`ui-reviewer` when the diff touches
 the frontend, DL-62), and each updates the rules it changes (ui-design-guide, design-doc §11,
@@ -1808,7 +1733,7 @@ screen inventory, user guide) when it's built.
 | 30 | Project home *(provisional)* | The Get started checklist (ticks, links, hide); the current phase (screen inventory, "Project home"); the headline numbers per Q11; the status control per Q12f |
 | 31 | Item-ID auto-links *(provisional)* | `{KEY}-RQ-n`, `{KEY}-TA-n(.m)` (and `TC` from Slice 5) linked in `MarkdownView` (DL-144), routed by key; never inside code spans or existing links; XSS-corpus cases added |
 | 32 | Saved filters *(nice-to-have; last feature row; the web half provisional)* | Backend: the `saved_filter` table (Q8: per list, per project; `UNIQUE(user_id, project_id, list, name)`), its migration and constraint tests; `GET/POST /api/me/saved-filters`, `PATCH/DELETE …/{id}` (the user's own only); a saved query validated against its list's spec when applied, not when saved. Web: the filter bar's saved-filter menu (save, apply, rename, delete) and Account settings' Saved filters section; saved filters only on project lists (the menu isn't shown on the org and workspace people lists). If the slice runs long, it moves to a later slice through `design-change` rather than being split |
-| 33 | Slice verification | As S2-C22, with the `checkpoint` skill's slice-end reviewers (`fresh-clone-verifier`, `user-guide-verifier` in both parts, DL-336, `docs-consistency`, `repo-auditor`, then `simplicity-auditor`); `wl docs-screenshots` (DL-343); "Done when" walked through; the owner's manual pass on the DL-320 sheet; the tech-debt review (TD-19, TD-31, TD-42, TD-64, TD-68, TD-86, TD-100); every `S2-ui-feedback.md` item done or logged; the retro |
+| 33 | Slice verification | As S2-C22, with the `slice-end` skill's reviewers (`fresh-clone-verifier`, `user-guide-verifier` in both parts, DL-336, `docs-consistency`, `repo-auditor`, then `simplicity-auditor`); `wl docs-screenshots` (DL-343); "Done when" walked through; the owner's manual pass on the DL-320 sheet; the tech-debt review (TD-19, TD-42, TD-64, TD-68, TD-86, TD-100); every `S2-ui-feedback.md` item done or logged; the behavior reference pruned to what no test asserts (DL-393); the retro |
 
 **Groups** ("Pull requests"), on `s3` with one PR:
 
@@ -1844,7 +1769,7 @@ actions, threat-model pass, and the owner's answers are in `docs/reviews/s3/S3-p
 - [ ] My work lists Favorites, then each organization's first 5 projects you can open (DL-368), with
       hidden projects behind each org's toggle, then approvals; past decisions are gone (DL-349).
 - [ ] `/docs` is a landing page and articles for readers, generated screenshots in both themes;
-      `docs/behavior-reference.md` holds the exact behavior, and `user-guide-verifier` checks both.
+      `docs/behavior-reference.md` holds what no test asserts (DL-393), and `user-guide-verifier` checks both.
 - [ ] Pages span the width beside the sidebar (DL-360); a form or settings page is one centered
       column at `--content-narrow`, header included, and a guide article is centered, its text
       up to 80ch (DL-367).
@@ -1891,7 +1816,7 @@ notes for each slice's planning, not plans.
   `in_progress`; a `released` milestone can't be re-opened).
 - **Slice 4** (DL-239): the turned-off module page (design-doc §1.1, UI-SHL-13), with Sprints,
   the first module that can be turned off.
-- **Slices 4 and 7** (DL-155): when `sprints` (Slice 4) or `github` (Slice 7) ships, whether
+- **Slices 4 and 8** (DL-155): when `sprints` (Slice 4) or `github` (Slice 8) ships, whether
   existing software projects get it turned on (DL-136).
 - **Slice 4:** completing a sprint with unfinished tasks moves them to the next planned sprint
   (earliest `start_date`) or the backlog, in one request, each `sprint_id` change logged (design-doc
@@ -1912,10 +1837,10 @@ notes for each slice's planning, not plans.
 - **Slice 6** (DL-197): comment edit and delete by their authors, with the "edited" marker
   (`comment.edited_at`), and project admins deleting any; the header search bar and its results
   page; the approver's review panel gains the item's comments (DL-196).
-- **Slice 7** (DL-239): the workspace audit log page (`/workspace/audit`; an actorless event's
+- **Slice 7** (DL-239; pre-deployment hardening, DL-393): the workspace audit log page (`/workspace/audit`; an actorless event's
   actor shown as "System", DL-275), before the first
   non-local deployment.
-- **Slice 7:** the system-admin operations screen: a failure indicator and a read-only list of
+- **Slice 8** (DL-393): the system-admin operations screen: a failure indicator and a read-only list of
   failed jobs and webhook deliveries, failed jobs read through a wrapped helper in
   `app/jobs/`, and a `wl admin` command to retry a failed job (design-doc §13, "Operations
   screen").

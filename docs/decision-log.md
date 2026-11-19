@@ -1644,7 +1644,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   S1-C9 exception is removed from `CLAUDE.md` and the `checkpoint` skill; the build plan keeps
   the trial's description, with its verdict. Every checkpoint stops for approval.
 - **Supersedes:** none (DL-10's trial ends with this verdict)
-- **Superseded by:** DL-172, in part (the build plan's description)
+- **Superseded by:** DL-172, in part (the build plan's description); DL-393, in part (auto-continue rows revived)
 - **Applies to:** `CLAUDE.md` ("How work is done: checkpoints"); `checkpoint` skill ("Report
   and stop"); build plan ("Verification")
 - **Source:** Slice 1 retro (`docs/reviews/s1/S1-retro.md`; owner, Oct 21, 2026)
@@ -1655,7 +1655,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   `docs/reviews/design-changes/`, holding its `docs-consistency` pass (and, for tooling,
   `checkpoint-reviewer`'s passes) with every finding's resolution.
 - **Supersedes:** DL-43's "design-change tooling reviews" as the only design changes with a record
-- **Superseded by:** none
+- **Superseded by:** DL-393, in part (docs-only design changes have no record)
 - **Applies to:** `design-change` skill (steps 7 and 8); `CLAUDE.md` (the docs table); build
   plan ("Design changes outside a checkpoint", the repository layout); developer guide (section
   11, the repository layout)
@@ -3033,7 +3033,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   workspace audit log page (`/workspace/audit`) in Slice 7, the last v1 slice, so before the
   first non-local deployment.
 - **Supersedes:** none (places the items DL-197, DL-200, and DL-201 left to the owner)
-- **Superseded by:** none
+- **Superseded by:** DL-393, in part (Slice 7, pre-deployment hardening, is no longer the last v1 slice)
 - **Applies to:** build plan ("Later slices — placements decided so far"); design-doc §1.1,
   §11; screen-inventory step 6; tech debt (TD-62)
 - **Source:** owner, Oct 31, 2026 (chat session, S2-C15 start: TD-62's check)
@@ -4937,3 +4937,48 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   ("Database isolation", "Workflow and gates")
 - **Source:** owner, Nov 18, 2026 (the outside review's handoff, Package 2; the tests read the
   name, Nov 18)
+
+### DL-393: Process rules from the outside review
+- **Date:** 2026-11-19
+- **Decision:** The outside review's Package 3 (DL-390). (1) A concurrency policy in
+  `backend/CLAUDE.md`: locks guard data invariants only, authorization uses the context loaded at
+  the request's start, and no lock or hold closes an authorization-freshness window; reviewers
+  don't raise such a race. (2) Every protective mechanism states its scope in one line, and
+  reviewers judge it against that line. (3) A trial for the rest of Slice 3: a row the owner marks
+  *(auto-continue)* goes on to the next after its report when everything is green and nothing is
+  open for the owner; a group's last row always stops; no row is marked yet (owner, Nov 19); the
+  verdict at the Slice 3 retro. (4) The checkpoint steps live only in the skills; the build plan,
+  testing strategy, developer guide, and root `CLAUDE.md` point to them. (5) A docs-only design
+  change needs only its decision-log entry, green docs consistency tests, and its commit (a
+  slice's plan keeps its record, DL-353). (6) Visual tuning is edited in `docs/ui-design-guide.md`
+  and logged only when the owner says the look is settled. (7) The `CLAUDE.md` files are pruned
+  from about 52 KB to about 20 KB: rules a check enforces or a skill or doc already states are
+  removed, and `frontend/CLAUDE.md`'s review lessons move unchanged to
+  `.claude/skills/vue-screen/traps.md`; a rule a review finds becomes a lint rule or a test when
+  one can enforce it, prose only if not (owner approved the list, Nov 19). (8) A new `slice-end`
+  skill holds the slice-end steps. (9) The security reviewer's triggers drop "any router" and the
+  `user`, `workspace`, `org`, and `project` areas, and its checklist cites design-doc §4's values
+  instead of copying them. (10) `docs/behavior-reference.md` holds only behaviour no test asserts
+  (its prune at the Slice 3 slice-end). (11) A shared convention, framework or piece of
+  infrastructure is built with its first real consumer. (12) "Proof it fails" is required only
+  for `rules/` and `authz/` tests. (13) No new workspace-level screens, roles or actions until a
+  second workspace exists. (14) A new Slice 7, pre-deployment hardening, holds the entries due
+  before the first non-local deployment, the workspace audit log page, and the nightly session
+  cleanup as the job queue's first real job; GitHub moves to Slice 8 and ERP to 9+, and the
+  entries due at v1's end or the operations screen are re-targeted to Slice 8 (owner, Nov 19: by
+  meaning, where the handoff's wording contradicted itself). (15) Stale statements fixed (the
+  README's `wl check`, the checkpoint size); `.pre-commit-config.yaml`'s line 3 is the owner's to
+  change (DL-30), pending.
+- **Supersedes:** DL-125 in part (every checkpoint stops; DL-10's trial revived); DL-126 in part
+  (docs-only design changes have no record); DL-239 in part (GitHub's slice number); TD-31,
+  resolved as accepted by the concurrency policy
+- **Superseded by:** none
+- **Applies to:** root, backend, and frontend `CLAUDE.md`; the `checkpoint`, `slice-end` (new),
+  `design-change`, `test-writer`, `vue-screen` (and its `traps.md`), and `new-area` skills;
+  `checkpoint-reviewer`, `security-reviewer`, `user-guide-verifier`, `ui-reviewer`,
+  `docs-consistency`, `repo-auditor`, `fresh-clone-verifier`; build plan ("Development process",
+  "Verification", "Claude configuration", the slice overview, Slice 3's checkpoints and carry-in,
+  later placements); testing strategy; developer guide sections 7, 10, and 11; design-doc §1.1,
+  §4, §12, §13; screen inventory; README; TD-31, TD-70, TD-76, TD-79, TD-84, TD-89, TD-98, TD-120
+- **Source:** owner, Nov 19, 2026 (the outside review's handoff, Package 3; the auto-continue rows
+  and item 14's reading, Nov 19)

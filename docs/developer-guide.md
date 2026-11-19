@@ -81,15 +81,15 @@ docs/           design, schema, build plan, testing strategy, screen inventory, 
                 behavior reference, the reader's guide (user-guide/: a page per topic,
                 images/),
                 tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
-                design-changes/: one per design change), spikes/
+                design-changes/: one per tooling design change, DL-393), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
 .github/workflows/ci.yml   CI: `wl check --full` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
-.claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
-                design-change, vue-screen), agents (checkpoint-reviewer,
+.claude/        Claude Code setup: skills (checkpoint, slice-end, test-writer, migration,
+                new-area, design-change, vue-screen), agents (checkpoint-reviewer,
                 security-reviewer, fresh-clone-verifier, user-guide-verifier,
                 docs-consistency, spec-test-writer, repo-auditor, ui-reviewer,
                 simplicity-auditor),
@@ -989,8 +989,8 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `docs/user-guide/images/`: a screenshot `wl docs-screenshots` takes, named in
   `frontend/e2e/screenshots/guide.shot.ts` (add a shot there: a name, a demo user, a path), with
   alt text saying what it shows. Leave out route paths, exact messages, and numeric limits: those
-  belong in `docs/behavior-reference.md`, which changes with every behavior change, while the
-  guide changes only when what a user does or sees changes. `guide.spec.ts` checks every page's
+  belong in the tests, or in `docs/behavior-reference.md` when no test asserts them (DL-393),
+  while the guide changes only when what a user does or sees changes. `guide.spec.ts` checks every page's
   front matter, headings, links, and images (each in light and dark, and none unused).
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
   menu button with a popover of links that the org menu and project selector share; opening
@@ -1297,23 +1297,11 @@ message saying so).
 
 - Work proceeds one **checkpoint** at a time (`build-plan.md`), one commit per checkpoint,
   closed out with the `checkpoint` skill.
-- **Pull requests:** each slice works on one branch, `s<n>` (e.g. `s1`), with one draft PR
-  opened at the branch's first push (build plan, "Pull requests"). Push after every checkpoint
-  commit, so CI runs on each; only finished commits are pushed. Groups (each slice's section
-  lists them) are review points, not branches. Design changes from chat are `docs:` commits on
-  the slice branch (tooling code in `chore:` or `ci:` commits, reviewed by `checkpoint-reviewer`;
-  DL-18). Pushed commits are never rewritten (no amend, rebase, or force-push): red
-  CI on a pushed checkpoint is fixed with a `fix(<ID>): …` commit. At the end of the slice,
-  once the owner approves its last checkpoint, the slice retro's changes are applied on the
-  branch with green CI (DL-19), and the owner says so, mark the PR ready and merge it with
-  a **merge commit**: `gh pr merge --merge`, never squash or rebase (the branch stays: no
-  branch can be deleted). Claude first checks the merge state and that every commit is linked
-  to a GitHub account: a commit GitHub can't attribute needs an extra approval, which you can't
-  give on your own PR (DL-33). A merge commit keeps every commit's hash (so review records' base
-  commits stay valid), and `main` keeps one `checkpoint(<ID>):` commit per checkpoint in its
-  history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
-  branch, no force-push or deletion; on `main`, changes only through a pull request with the
-  `wl check` status check green, merged with a merge commit.
+- **Pull requests:** one branch, `s<n>`, and one draft PR per slice; push after every
+  checkpoint commit; pushed commits are never rewritten (red CI gets a `fix(<ID>):` commit); the
+  PR merges at the slice's end with a merge commit, on the owner's say-so. The rules: build plan,
+  "Pull requests"; the steps: the `checkpoint` and `slice-end` skills. GitHub enforces them
+  (DL-27).
 - **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `wl check --full`'s parts as parallel
   jobs on every push to `main` and every pull request (DL-392): `wl backend check`, `wl frontend
   check`, `wl cli check`, `wl audit`, and `wl e2e`, then a last job named `wl check`, the status
@@ -1343,45 +1331,21 @@ message saying so).
 The repository's Claude Code setup lives in `.claude/` and is version-controlled. This section is
 its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when to use each.
 
-- **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
+- **Skills** (`.claude/skills/`): `checkpoint`, `slice-end` (a slice's last checkpoint: the
+  slice-end reviewers, the retro, the merge; DL-393), `test-writer`, `migration`, `new-area`,
   `design-change`, `vue-screen` (the recipe for a screen or dialog).
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
   `fresh-clone-verifier`, `user-guide-verifier`, `docs-consistency`, `spec-test-writer`,
   `repo-auditor`, `ui-reviewer`, `simplicity-auditor`.
-- **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
-  changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and in
-  parallel (DL-392), `security-reviewer` when the build plan names the checkpoint for it or it touches
-  security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
-  two or three behaviors in a temporary copy, and reviews a design change's tooling code under
-  a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
-  `frontend/e2e/` (read-only: accessibility and frontend conventions against
-  `docs/ui-design-guide.md`, by rule ID; DL-62), and, at the last checkpoint of a slice,
-  `docs-consistency`, `repo-auditor` (a whole-repository audit for bugs, security, scale,
-  untested risk, and slowness, which runs no tests, DL-41; waste is `simplicity-auditor`'s
-  alone, DL-318), and `simplicity-auditor` (a whole-repository audit for overengineering, from
-  the prompts vendored in `.claude/audit/`, whose findings go to the owner, DL-138); then, with
-  the dev stack down, `fresh-clone-verifier` and `user-guide-verifier` (the behavior reference
-  followed in a browser and the guide checked against it, DL-124, DL-336). `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
-  concrete case and are written in plain English (DL-39, DL-41, DL-42). A reviewer runs tests only in its own copy
-  (`wl review-copy --with-env`), on a test database of the copy's own, so reviewers and the
-  author run tests at the same time (DL-392); `fresh-clone-verifier` and `user-guide-verifier`
-  come after them, with the dev stack down, as they start their own. `docs-consistency` also runs in every design change, before
-  committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
-  decisions for the owner, which are never decided for them.
-- **Design changes** outside a checkpoint's scope (decisions from a chat session, or code that
-  must differ from the docs) use the `design-change` skill: a decision-log entry (`docs/decision-log.md`) for each
-  decision that changes or supersedes a written rule or sets a process, while one that only adds
-  detail to an unbuilt checkpoint goes into that doc and is named in the change's review record
-  (DL-312); every affected doc updated, `docs-consistency`, then a `docs:`
-  commit. A change to code already built becomes a new checkpoint with a letter suffix
-  (`S1-C13a`); checkpoints are never renumbered. Review answers that change built code are
-  bundled into the next planned checkpoint, or one follow-up per group (DL-131). Developer-tooling and process code (hooks, the
-  `wl` CLI, CI, the docs consistency tests) is built in the change itself, in `chore:` or `ci:`
-  commits, after a `checkpoint-reviewer` pass recorded in
-  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). Every design change,
-  docs-only or tooling, gets a record there, holding its `docs-consistency` pass (and, for
-  tooling, `checkpoint-reviewer`'s passes) (DL-126). A checkpoint in progress is parked with `git stash` while a design change is applied,
-  and its review base becomes the design change's last commit (DL-20).
+- **When the agents run:** `spec-test-writer` at the start of a checkpoint that adds or changes
+  `app/rules/` or `app/authz/`; the reviewers at its close, in parallel, each running tests only
+  in its own copy (`wl review-copy --with-env`, DL-392); the slice-end agents at a slice's last
+  checkpoint; `docs-consistency` in every design change with tooling code or a slice's plan. Which agent runs when,
+  and with what inputs: the `checkpoint`, `slice-end`, and `design-change` skills.
+- **Design changes** outside a checkpoint's scope go through the `design-change` skill: a
+  decision-log entry per decision, every affected doc updated, `docs:` commits (tooling code in
+  `chore:`/`ci:` commits, reviewed by `checkpoint-reviewer`); a change to built code becomes a
+  new checkpoint with a letter suffix (`S1-C13a`).
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
   - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or

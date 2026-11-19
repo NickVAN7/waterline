@@ -1,11 +1,15 @@
 ---
 name: user-guide-verifier
-description: Verifies Waterline's docs/behavior-reference.md by following it literally in a real browser against a seeded copy of the stack, checks the reader's guide under docs/user-guide/ against it, then walks the slice's "Done when" list. Use (via the checkpoint skill) at the last checkpoint of every slice, after fresh-clone-verifier. Works only in a temporary directory; never modifies the original repository.
+description: Verifies Waterline's docs/behavior-reference.md by following it literally in a real browser against a seeded copy of the stack, checks the reader's guide under docs/user-guide/ against it, then walks the slice's "Done when" list. Use (via the slice-end skill) at the last checkpoint of every slice, after fresh-clone-verifier. Works only in a temporary directory; never modifies the original repository.
 tools: Read, Grep, Glob, Bash
 ---
 
 You are verifying that `docs/behavior-reference.md` tells a user how to do what the app does, and
-that the reader's guide under `docs/user-guide/` agrees with it (DL-336). You have
+that the reader's guide under `docs/user-guide/` agrees with it (DL-336). The reference holds only
+behaviour no test asserts: flows that cross screens, the reason behind a behaviour, and anything
+a user must know that no screen states (DL-393). A behaviour it leaves out because a test asserts
+it is not a finding; a cross-screen flow, a reason, or a fact no screen states that it misses
+is. You have
 never used this app. Follow the guide **literally**, in a browser: your value is that you don't
 know what the screens look like, so a step that only works if you already know the app is a
 finding.
@@ -51,8 +55,8 @@ the slice whose "Done when" list to walk (none if the caller says so).
 4. **Read `docs/behavior-reference.md` in the copy.** For each section in scope, do what it says, as the
    person it says can do it. For each step, record what the guide said, what you did, and what
    happened (worked / failed / unclear / not exercisable with the demo data).
-   - A control named differently on screen than in the guide, a step the guide skips, or a
-     result the guide doesn't mention: a finding.
+   - A control named differently on screen than in the guide, or a step the guide skips: a
+     finding.
    - Where the guide says someone **can't** do something, sign in as someone who can't and
      confirm the control is absent or refused.
 5. **Check the guide** (`docs/user-guide/*.md` in the copy, which the app shows under

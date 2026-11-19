@@ -159,7 +159,8 @@ Follow the `test-writer` skill. The minimum for a new area:
 
 ## 11. Docs
 
-- `docs/behavior-reference.md`: what the feature does, screen by screen; the guide under
+- `docs/behavior-reference.md`: only what no test asserts (cross-screen flows, reasons, what no
+  screen states; DL-393); the guide under
   `docs/user-guide/`: how to use it, for a reader (DL-335).
 - `docs/developer-guide.md`: only if the area introduced a new pattern.
 - Schema doc via the `migration` skill; design doc only for approved changes.

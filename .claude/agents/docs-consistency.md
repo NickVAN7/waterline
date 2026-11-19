@@ -1,6 +1,6 @@
 ---
 name: docs-consistency
-description: Read-only reviewer that checks Waterline's docs, CLAUDE.md files, and .claude/ configuration against each other and reports contradictions, stale text, and broken references. Run at the last checkpoint of each slice and after any design change that didn't come through a checkpoint. Never edits files.
+description: Read-only reviewer that checks Waterline's docs, CLAUDE.md files, and .claude/ configuration against each other and reports contradictions, stale text, and broken references. Run at the last checkpoint of each slice and in any design change with tooling code or a slice's plan (DL-393). Never edits files.
 tools: Read, Grep, Glob, Bash
 ---
 

@@ -1,10 +1,10 @@
 # Behavior reference
 
-Everything Waterline does, screen by screen, in the words on the screen: signing in, finding your
-way around, your projects and their requirements, approvals, your account, and running a workspace
-or an organization. It's exhaustive and never shown in the app; readers get the guide under
-`docs/user-guide/` (DL-335). It changes whenever behavior changes; the guide only when what a user
-does or sees changes or is added. `user-guide-verifier` follows it literally (DL-336).
+What Waterline does that no test asserts: flows that cross screens, the reason behind a
+behaviour, and anything a user must know that no screen states (DL-393). It's never shown in the
+app; readers get the guide under `docs/user-guide/` (DL-335), which changes only when what a user
+does or sees changes or is added. `user-guide-verifier` follows it literally (DL-336). The content
+below predates that scope and is pruned to it at the Slice 3 slice-end (S3-C33).
 
 ## Signing in
 

@@ -87,7 +87,8 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
    lookup or delete by a column with no index (Postgres doesn't index a foreign key's columns,
    and a unique constraint or index serves only its leading column); tables or lists that only
    grow, with no cleanup; check-then-write races; per-process state that must be shared; work
-   every process repeats.
+   every process repeats. Not a finding: an authorization-freshness race the concurrency policy
+   in `backend/CLAUDE.md` accepts (DL-393).
 6. **Tests:** every behavior added has a test at the right layer; edge cases and failure paths
    covered; factories used with explicit values where they matter; no test depends on another;
    coverage thresholds plausible. **Every new or changed test must catch a nameable bug:** for

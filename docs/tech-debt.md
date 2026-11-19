@@ -42,7 +42,7 @@ Entry format:
   mkcert with Vite's `https` option) and end-to-end runs on Firefox and WebKit.
 - **Status:** open
 
-### TD-14: The pre-deployment items in design-doc §4 have no slice
+### TD-14: The pre-deployment items in design-doc §4 wait for Slice 7
 - **Added:** S1 planning (Sept 30, 2026)
 - **What:** Design-doc §4, "Before the first non-local deployment", lists work with no slice
   of its own: sign-in throttling (`login_attempt`), password re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
@@ -54,7 +54,8 @@ Entry format:
   styles have their own entries, TD-12, TD-13, and TD-87.)
 - **Why:** v1 runs locally for a few users; none of these matter until the app is deployed.
 - **Fix by:** Slice 7 (before the first non-local deployment, and by the end of v1 at the
-  latest; re-target if deployment moves later): build each item, or give it its own slice.
+  latest; re-target if deployment moves later): build each item in Slice 7, pre-deployment
+  hardening (DL-393).
 - **Status:** open
 
 ### TD-17: The app connects as the owner of its tables
@@ -112,20 +113,6 @@ Entry format:
   design across the roster and the account actions.
 - **Fix by:** Slice 7 (before the first non-local deployment, with "password re-entry for
   sensitive actions")
-- **Status:** open
-
-### TD-31: Other locked mutations check rights against the role loaded before the lock
-- **Added:** S1-C13
-- **What:** the `AuthzContext` is loaded at the start of a request. The restriction change
-  re-reads the caller's own project role after taking the project's lock (`with_current_role`,
-  owner decision in the S1-C13 security review), so a role removed while it waits is seen. The
-  other mutations that wait on a lock (project update, archive, member adds, role changes and
-  removals, and the workspace and org rosters) still check rights against the context as loaded:
-  a caller whose role is removed while their request waits can still finish it. The window is
-  milliseconds and needs a request already in flight.
-- **Why:** the owner decided the restriction change in S1-C13 and chose to revisit the rest
-  later.
-- **Fix by:** Slice 3 (its tech-debt review re-checks it); accepted again (owner, S2-C22 tech-debt review, Nov 8, 2026); fix it when a checkpoint adds a locked mutation where the race would matter
 - **Status:** open
 
 ### TD-37: My work has no "see all" for its sections
@@ -228,7 +215,7 @@ Entry format:
 - **Why:** the tree is a ranked view, returned whole for drag-and-drop (build plan, "API
   conventions"); the owner judged 2,000 more than enough for v1 (DL-159), and accepted the moved
   row's case (DL-256).
-- **Fix by:** Slice 7 (the end of v1), or sooner when a project nears 2,000 requirements: then paged (DL-159); reviewed (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner when a project nears 2,000 requirements: then paged (DL-159); reviewed (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-73: The rank rewrite sends one UPDATE per sibling
@@ -250,7 +237,7 @@ Entry format:
   `UNIQUE(requirement_id, revision_number)` index and sorts the requirement's revisions by `id`.
 - **Why:** a requirement has tens of revisions, not thousands, so the sort is cheap; an index is
   a migration for no measured gain.
-- **Fix by:** Slice 7 (the end of v1), or sooner if a requirement's revisions number in the thousands: the index (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner if a requirement's revisions number in the thousands: the index (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-79: Each approver costs about eight queries
@@ -261,7 +248,7 @@ Entry format:
 - **Why:** bounded by the 50-approver cap (DL-226), and a request names a handful in practice; a
   batched version needs `hold_access` and `authz_context` for many users at once, which nothing
   else needs yet.
-- **Fix by:** Slice 7 (the end of v1), or sooner if requests name many approvers: batch the holds and the contexts (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner if requests name many approvers: batch the holds and the contexts (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-83: A request created while someone loses access can deadlock with the change
@@ -287,7 +274,7 @@ Entry format:
   table only grows: requests are cancelled, never deleted.
 - **Why:** negligible at the expected volumes (one firm's requests); an index is a schema change,
   which goes through a design change (schema-doc).
-- **Fix by:** Slice 7 (the end of v1), or sooner if `approval_request` grows large: an index on `(requested_by, status)`, through a design change (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner if `approval_request` grows large: an index on `(requested_by, status)`, through a design change (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-86: npm overrides pin `minimatch` and `glob`
@@ -321,7 +308,7 @@ Entry format:
   cap.
 - **Why:** v1 projects are far below the cap; a fix (virtual scrolling, or a widget that draws
   only the rows in view) is a widget change.
-- **Fix by:** Slice 7 (the end of v1), or sooner if a project nears 1,000 requirements:
+- **Fix by:** Slice 8 (the end of v1), or sooner if a project nears 1,000 requirements:
   measure again with the largest real project, and change the tree's rendering only if one
   nears the cap
 - **Status:** open
@@ -352,7 +339,7 @@ Entry format:
   be among them. Sign out other sessions still ends all of them.
 - **Why:** a user has a handful of live sessions (each ends after 7 idle days); paging a list
   nobody fills is code with no use yet.
-- **Fix by:** Slice 7 (the operations screen), or sooner when someone has more than 200 live
+- **Fix by:** Slice 8 (the operations screen), or sooner when someone has more than 200 live
   sessions: page the list (`Pagination`, `useListQuery`)
 - **Status:** open
 
@@ -441,7 +428,7 @@ Entry format:
 - **Added:** S3-C0j
 - **What:** the project selector and org menu show a **Filter** button past eight links
   (UI-SHL-6). Its spec opens one, runs axe, and checks focus; no e2e opens one from the keyboard,
-  as `frontend/CLAUDE.md`'s overlay rule asks, because the e2e stack's demo data has no org with
+  as the overlay trap (`.claude/skills/vue-screen/traps.md`) asks, because the e2e stack's demo data has no org with
   more than eight projects (`--manual-pass`'s `acme` has eleven).
 - **Why:** the e2e stack counts what `--demo` builds; growing it means reworking its counts
   (ui-reviewer, S3-C0j, a coverage gap).
@@ -499,6 +486,18 @@ Entry format:
 - **Why:** changing the ring on programmatically focused headings changes the guide's base rule and
   UI-TOK-5's reach, a design change (owner, Nov 18).
 - **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
+### TD-120: Three code comments still put GitHub in Slice 7
+- **Added:** DC-2026-11-19 (DL-393 moved GitHub to Slice 8)
+- **What:** `backend/app/core/request_guard.py` (the exemption comment),
+  `backend/tests/unit/core/test_request_guard.py` (a docstring), and
+  `backend/tests/unit/rules/test_modules.py` (a docstring and a comment, a spec test) say Slice 7
+  for GitHub.
+- **Why:** comments only, in built code and a spec test, which a design change doesn't touch; the
+  spec test's change needs the owner's approval.
+- **Fix by:** Slice 3 (the first Package 4 row, S3-C0q, with the owner's approval for the spec
+  test's comment)
 - **Status:** open
 
 ---
@@ -632,6 +631,12 @@ Entry format:
   `tests/support/concurrency.py` record a task's refusal as a value; the account, workspace, and
   auth race tests use them, and the versioning race test records its outcome with `suppress`; each
   asserts after its task group closes)
+
+### TD-31: Other locked mutations check rights against the role loaded before the lock
+- **Added:** S1-C13
+- **Status:** resolved in DC-2026-11-19, accepted by the concurrency policy (`backend/CLAUDE.md`,
+  DL-393): authorization uses the context loaded at the start of the request, and no lock or hold
+  is added to close an authorization-freshness window
 
 ### TD-32: No page handles a 404 yet
 - **Added:** S1-C14

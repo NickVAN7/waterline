@@ -15,7 +15,7 @@ uv run wl doctor            # check your toolchain
 npm ci --prefix frontend    # frontend tools
 cp .env.example .env
 uv run wl up                # the stack: http://localhost:5173
-uv run wl check             # everything CI runs
+uv run wl check             # the pre-commit gate; CI runs wl check --full
 ```
 
 Full setup, commands, and conventions: [docs/developer-guide.md](docs/developer-guide.md).
@@ -30,6 +30,6 @@ Full setup, commands, and conventions: [docs/developer-guide.md](docs/developer-
 | [testing-strategy.md](docs/testing-strategy.md) | Test layers and gates |
 | [developer-guide.md](docs/developer-guide.md) | Setup, commands, how-tos |
 | [user-guide/](docs/user-guide/) | Using the app: the guide shown in the app's Documentation |
-| [behavior-reference.md](docs/behavior-reference.md) | Everything the app does, screen by screen |
+| [behavior-reference.md](docs/behavior-reference.md) | What the app does that no test asserts: cross-screen flows, reasons, what no screen states |
 | [tech-debt.md](docs/tech-debt.md) | Known shortcuts and when they get fixed |
 | [reviews/](docs/reviews/) | Review records: `s<n>/` per slice, `design-changes/` for design-change tooling reviews |

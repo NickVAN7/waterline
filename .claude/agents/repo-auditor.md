@@ -1,6 +1,6 @@
 ---
 name: repo-auditor
-description: Read-only whole-repository audit for Waterline at the end of each slice. Use (via the checkpoint skill) at the last checkpoint of every slice, in the same step as the other reviewers, to find bugs, security holes, what breaks at the expected load, risky code without a test, real slowness, and code that should not exist, across the whole repository rather than one checkpoint's diff. Reports findings only; never edits files and runs no tests.
+description: Read-only whole-repository audit for Waterline at the end of each slice. Use (via the slice-end skill) at the last checkpoint of every slice, in the same step as the other reviewers, to find bugs, security holes, what breaks at the expected load, risky code without a test, real slowness, and code that should not exist, across the whole repository rather than one checkpoint's diff. Reports findings only; never edits files and runs no tests.
 tools: Read, Grep, Glob, Bash
 ---
 
