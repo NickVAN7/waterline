@@ -1739,7 +1739,7 @@ screen inventory, user guide) when it's built.
 
 | Group | Name | Checkpoints |
 |---|---|---|
-| 1 | `s3-polish` | 0a–0p (Slice 2 polish, the retro's changes, the spike, the rest of the feedback) |
+| 1 | `s3-polish` | 0a–0p, then the outside review's Package 4 and 5 rows from 0q (DL-394) (Slice 2 polish, the retro's changes, the spike, the rest of the feedback, the review's fixes); its last row is the review point |
 | 2 | `s3-foundations` | 1–4 (models, rules and actions, phases, workstreams) |
 | 3 | `s3-tasks` | 5–10 (tasks, order, subtasks, delete and trash, requirement links) |
 | 4 | `s3-views` | 11–15 (My work, activity, pickers, CSV, project home) |

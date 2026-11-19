@@ -64,12 +64,14 @@ feature map, and async rules: `docs/build-plan.md`; conventions: `docs/design-do
 
 ## Concurrency policy
 
-Locks are for data invariants only: numbering, rank, revision numbers, tree cycles, the last
-owner of a roster, and one pending approval request per item. Authorization uses the context
-loaded at the start of the request. A permission that changes while a request is in flight does
-not stop that request; the next request is denied. Do not add a lock or a hold to close an
-authorization-freshness window. Existing holds stay until a checkpoint touches that code
-(DL-393).
+Locks are for data and security invariants, for example: numbering, rank, revision numbers,
+tree cycles, the last owner of a roster, one pending approval request per item, the existence
+holds and session lock above, and a check of the **target's** rank (TD-29). Authorization of the
+**caller** uses the context loaded at the start of the request: a permission of theirs that
+changes while a request is in flight does not stop that request; the next request is denied. Do
+not add a lock or a hold to close that window. The existing holds that do (the restriction
+change's `with_current_role`, an approval decision's reloaded context) stay; one is removed only
+when a checkpoint row says so, never as cleanup (DL-393, DL-394).
 
 ## Models and async
 

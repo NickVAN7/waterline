@@ -4972,7 +4972,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Supersedes:** DL-125 in part (every checkpoint stops; DL-10's trial revived); DL-126 in part
   (docs-only design changes have no record); DL-239 in part (GitHub's slice number); TD-31,
   resolved as accepted by the concurrency policy
-- **Superseded by:** none
+- **Superseded by:** DL-394, in part (the freeze's scope, the policy's wording)
 - **Applies to:** root, backend, and frontend `CLAUDE.md`; the `checkpoint`, `slice-end` (new),
   `design-change`, `test-writer`, `vue-screen` (and its `traps.md`), and `new-area` skills;
   `checkpoint-reviewer`, `security-reviewer`, `user-guide-verifier`, `ui-reviewer`,
@@ -4982,3 +4982,21 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   §4, §12, §13; screen inventory; README; TD-31, TD-70, TD-76, TD-79, TD-84, TD-89, TD-98, TD-120
 - **Source:** owner, Nov 19, 2026 (the outside review's handoff, Package 3; the auto-continue rows
   and item 14's reading, Nov 19)
+
+### DL-394: DL-393's four open decisions
+- **Date:** 2026-11-19
+- **Decision:** The owner's answers to DC-2026-11-19's docs-consistency decisions. (1) The
+  workspace freeze's named exceptions are the two workspace screens already planned: the audit log
+  page (Slice 7) and the operations screen (Slice 8). (2) The concurrency policy governs only the
+  caller's own permission going stale. A check of the target's rank is an invariant, so TD-29's
+  fix stays as planned. The policy's list of invariants is examples; the existence holds, the
+  session lock, and the lock order stay. The two existing freshness holds (`with_current_role`,
+  an approval decision's reloaded context) stay until a checkpoint row says to remove one. (3) A
+  docs-only design change is cited by its entry, "design change DL-<n>". (4) Group 1
+  (`s3-polish`) extends through the Package 4 and 5 rows from S3-C0q; its last row is the review
+  point.
+- **Supersedes:** DL-393 in part (the freeze's scope, the policy's wording)
+- **Superseded by:** none
+- **Applies to:** root and backend `CLAUDE.md`; design-doc §4; `design-change` skill (step 7);
+  build plan (Slice 3 groups)
+- **Source:** owner, Nov 19, 2026 (answers to DC-2026-11-19's decisions 1 to 4)

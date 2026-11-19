@@ -451,8 +451,9 @@ Workspace (the firm: tenant boundary)
 - **One workspace for the foreseeable future.** It exists mainly to roll up dashboards and
   statistics across clients. Rules that only matter with several workspaces (e.g. users in more
   than one) are decided if a second workspace is ever needed. No new workspace-level screens,
-  roles or actions until a second workspace exists. New item types still carry `workspace_id`
-  and use the existing list scoping (DL-393).
+  roles or actions until a second workspace exists, except the two already planned: the audit
+  log page (Slice 7) and the operations screen (Slice 8) (DL-394). New item types still carry
+  `workspace_id` and use the existing list scoping (DL-393).
 - **Staff may also hold org memberships**, e.g. a workspace member who is an admin of a client
   org to manage that client's users.
 

@@ -76,8 +76,9 @@ owner's approval, except after one the owner marked auto-continue (DL-393; the s
 - Every protective mechanism (a hook, a guard, a lock, a validation layer) states in one line
   what it defends against and what is out of scope. Reviewers judge it against that line and do
   not raise out-of-scope holes (DL-393).
-- No new workspace-level screens, roles or actions until a second workspace exists. New item
-  types still carry `workspace_id` and use the existing list scoping (design-doc §4, DL-393).
+- No new workspace-level screens, roles or actions until a second workspace exists, except the
+  audit log page (Slice 7) and the operations screen (Slice 8), already planned. New item types
+  still carry `workspace_id` and use the existing list scoping (design-doc §4, DL-393, DL-394).
 - **A new dependency names its license** (DL-129) in the commit that adds it (or upgrades it
   across a major version); anything not permissive, or that needs a key, goes to the owner first.
 - A shortcut is allowed only if it's logged in `docs/tech-debt.md` with its reason and target.

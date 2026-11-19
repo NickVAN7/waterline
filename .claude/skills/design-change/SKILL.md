@@ -93,7 +93,8 @@ decision-log entry only when the owner says the look is settled.
 - **A docs-only change** (no tooling code, and not a slice's plan, whose readiness review keeps
   its record, DL-353) needs only its decision-log entry, green docs
   consistency tests (part of `wl check`), and its commit: no review record and no
-  `docs-consistency` agent run (DL-393). Go to step 8. The rest of this step is for tooling
+  `docs-consistency` agent run (DL-393). Other docs cite it by its entry: "design change
+  DL-<n>" (DL-394). Go to step 8. The rest of this step is for tooling
   changes.
 - **Reviewers, on one snapshot** (DL-105): take the review snapshot as the `checkpoint` skill's
   step 4 says (`wl review-copy`). For **tooling code** (step 4), invoke `checkpoint-reviewer`
