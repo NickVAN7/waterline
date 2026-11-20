@@ -500,6 +500,44 @@ Entry format:
   test's comment)
 - **Status:** open
 
+### TD-121: The panel's two-column grids follow the window's width, not the panel's
+- **Added:** S3-C0p (Impeccable critique, P2)
+- **What:** the details, the Approval section's list, and edit mode's grid switch to two columns
+  at `sm:` (the window), so a 400px split pane gets two columns of about 160px: a parent's ID and
+  title, a requester with a badge and a date, and the Priority field are squeezed.
+- **Why:** a container-query layout reaches every item that opens in the panel; S3-C0p kept to its
+  findings (owner, Nov 19).
+- **Fix by:** S3-C23 (the task panel reuses this layout): container queries on the panel's body
+- **Status:** open
+
+### TD-122: Heading sizes don't follow the type-scale tokens' roles
+- **Added:** S3-C0p (Impeccable critique, P2)
+- **What:** `tokens.css` names `text-lg`, `text-xl`, and `text-2xl` as the h3, h2, and h1 sizes;
+  the requirement's section `h2`s are `text-lg`, its `h3`s (Approvers, the decide panel's) the
+  body size, set apart by weight alone.
+- **Why:** aligning them changes every page's headings and the token comments, wider than S3-C0p
+  (owner, Nov 19).
+- **Fix by:** S3-C23 (with TD-121): align the headings or the token comments
+- **Status:** open
+
+### TD-123: One conflict message says "approve it again" for every Approval action
+- **Added:** S3-C0p (Impeccable critique, minor)
+- **What:** `ApprovalSection`'s `fail()` gives every 409 the same text, "approve it again if you
+  still need to"; only Approve by hand can get a 409 today, but the copy would be wrong for any
+  other action that could.
+- **Why:** built before S3-C0p and not one of its findings; no action shows the wrong text today.
+- **Fix by:** S3-C33 (the slice's tech-debt review): pass the action's verb in
+- **Status:** open
+
+### TD-124: Approve by hand's confirmation names the bypassed approvers without their email
+- **Added:** S3-C0p (ui-reviewer finding 4)
+- **What:** the confirmation names the approvers still to decide, marking a deactivated one, but
+  not by email, which a confirmation that names people shows (traps: names aren't unique).
+  `ApprovalRead` carries no email.
+- **Why:** the email needs an API change, and S3-C0p is frontend only (DL-395).
+- **Fix by:** S3-C0q (its History read changes the same API): add the approver's email and show it
+- **Status:** open
+
 ---
 
 ## Resolved

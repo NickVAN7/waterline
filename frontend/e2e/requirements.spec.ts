@@ -551,13 +551,15 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await title.fill('Typed before narrowing')
   await title.focus()
   await page.setViewportSize({ width: 900, height: 900 })
-  // Below 80rem it's a modal overlay: a dialog over an inert page, with no separator.
-  const overlay = page.getByRole('dialog', { name: 'Stored payload' })
-  await expect(overlay).toBeVisible()
-  const overlayTitle = overlay.getByRole('textbox', { name: 'Title', exact: true })
+  // Below 80rem it's a modal overlay: a dialog over an inert page, with no separator. While
+  // editing, its title (and so its name) reads "Editing <ID>" (F17).
+  const editingOverlay = page.getByRole('dialog', { name: `Editing ${key}-RQ-${created.number}` })
+  await expect(editingOverlay).toBeVisible()
+  const overlayTitle = editingOverlay.getByRole('textbox', { name: 'Title', exact: true })
   await expect(overlayTitle).toBeFocused()
   await expect(overlayTitle).toHaveValue('Typed before narrowing')
-  await overlay.getByRole('button', { name: 'Cancel' }).click()
+  await editingOverlay.getByRole('button', { name: 'Cancel' }).click()
+  const overlay = page.getByRole('dialog', { name: 'Stored payload' })
   await overlay.getByRole('heading', { name: 'Stored payload' }).focus()
   await expect(page.getByRole('separator')).toBeHidden()
   await expectNoA11yViolations(page)
@@ -577,6 +579,10 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(panel).toBeHidden()
   await expect(page).toHaveURL(listUrl)
   await idLink.click()
+  // Tab from the focused title reaches its icon buttons, after it on its row (DL-387, F16).
+  await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(panel.getByRole('link', { name: 'Open full page' })).toBeFocused()
   await panel.getByRole('link', { name: 'Open full page' }).click()
 
   await expect(page).toHaveURL(new RegExp(`/requirements/${created.number}$`))

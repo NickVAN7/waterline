@@ -50,7 +50,7 @@ test('an admin requests approval, and the approver reviews and decides', async (
   await dialog.getByRole('textbox', { name: 'Note' }).fill('Before the release')
   await dialog.getByRole('button', { name: 'Request approval' }).click()
   await expect(dialog).toBeHidden()
-  await expect(section).toContainText(/Latest request\s*Pending/)
+  await expect(section).toContainText(/Latest request\s*Awaiting approval/)
   await signOut(page)
 
   // The approver's side: on My work, then the revision under approval, then the decision.

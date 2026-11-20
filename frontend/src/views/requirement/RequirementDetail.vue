@@ -3,13 +3,15 @@
 // on its page or in the list's side panel (`inPanel`, UI-SHL-11, S2-C18b): its title, ID, status
 // (DL-148; "Approved · modified" when edited since its approval, design-doc §6.1), restriction,
 // priority, reporter, and its description through `MarkdownView` (the one sanitizing renderer,
-// UI-MD-1), with a note when it has no "Acceptance Criteria" heading (DL-149). Its header (DL-325,
-// DL-326): Edit, the status menu (`requirement.update`), and ⋯ More actions (Change restriction…
-// for `requirement.raise_restriction` or `.lower_restriction`, DL-251; Delete…), then Priority,
-// Reporter, and Restriction as a definition list; on the page the ID and status go under the
-// `h1`, in the panel in its top row. The server decides each change. Edit
-// (`requirement.update`) turns the title, description, and priority into a form in place
-// (DL-263); the status menu waits while it's open, since its change would make the form's save a
+// UI-MD-1), with a quiet note under it when it has no "Acceptance Criteria" heading (DL-149, F15).
+// Its header (DL-325, DL-326): Edit, the status menu (`requirement.update`), and ⋯ More actions
+// (Change restriction… for `requirement.raise_restriction` or `.lower_restriction`, DL-251;
+// Delete…), then Priority, Reporter, Parent, and Restriction as a definition list; on the page the
+// ID and status (with Awaiting approval while a request is pending, DL-386) go under the `h1`, in
+// the panel in its top row. The server decides each change. Edit (`requirement.update`) turns the
+// title, description, and priority into a form in place (DL-263): the actions go, the heading
+// reads "Editing <ID>", and the Priority field takes its value's place in the details grid (F17,
+// DL-395); the status menu waits while it's open, since its change would make the form's save a
 // 409. What it shows is told to its host (`changed`), so the list's row follows a change made in
 // the panel. A refused change asks the host to reload what the user may do (`reloadProject`,
 // false when the user may no longer read it); `focusHeading` is where focus goes when the control
@@ -29,8 +31,7 @@ import { projectCrumbs } from '@/app/crumbs'
 import {
   APPROVED_MODIFIED,
   ARCHIVED_BANNER,
-  DEACTIVATED,
-  NO_RESTRICTION,
+  AWAITING_APPROVAL,
   PRIORITY,
   REQUIREMENT_STATUS,
   requirementStatusBadge,
@@ -48,11 +49,11 @@ import { allows } from '@/composables/allowedActions'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
-import RestrictionBadge from '@/views/project/RestrictionBadge.vue'
 
 import ApprovalSection from './ApprovalSection.vue'
 import DeleteRequirementDialog from './DeleteRequirementDialog.vue'
 import EditRequirementForm from './EditRequirementForm.vue'
+import RequirementFacts from './RequirementFacts.vue'
 import RequirementHistory from './RequirementHistory.vue'
 import RequirementRevisions from './RequirementRevisions.vue'
 import RestrictionDialog from './RestrictionDialog.vue'
@@ -157,7 +158,6 @@ const crumbs = computed(() =>
     { label: id.value, mono: true },
   ]),
 )
-const parent = computed(() => requirement.value?.ancestors.at(-1))
 const statusBadge = computed(() =>
   requirement.value ? requirementStatusBadge(requirement.value) : REQUIREMENT_STATUS.draft,
 )
@@ -236,6 +236,14 @@ function dismiss() {
 }
 
 const editing = ref(false)
+// Edit mode's heading, in place of the title the form holds (F17, DL-395).
+const editingTitle = computed(() => `Editing ${id.value}`)
+// A request pending on it (ApprovalSection's `awaiting`), for the header's badge (DL-386).
+const awaiting = ref(false)
+function awaitingChanged(pending: boolean) {
+  awaiting.value = pending
+  emit('awaiting', pending)
+}
 const editButton = ref<InstanceType<typeof Button>>()
 const editForm = ref<InstanceType<typeof EditRequirementForm>>()
 async function edit() {
@@ -293,14 +301,19 @@ const moreActions = computed<MoreAction[]>(() => {
     ...(canRestrict.value
       ? [{ label: 'Change restriction…', run: () => restricting.value?.open(shown) }]
       : []),
-    ...(!editing.value && allows(shown, 'requirement.delete')
+    ...(allows(shown, 'requirement.delete')
       ? [{ label: 'Delete…', danger: true, run: () => deleting.value?.open(shown) }]
       : []),
   ]
 })
 
 // Typed in the edit form and not saved: the side panel asks before it drops it (DL-323).
-defineExpose({ dirty: computed(() => editing.value && !!editForm.value?.dirty) })
+// `editing`: for the panel's title, which reads "Editing <ID>" meanwhile (F17).
+defineExpose({
+  dirty: computed(() => editing.value && !!editForm.value?.dirty),
+  editing,
+  awaiting,
+})
 
 function restrictionSaved(saved: Requirement) {
   item.data.value = saved
@@ -336,15 +349,18 @@ function restrictionSaved(saved: Requirement) {
     <template v-else>
       <!-- In the panel too: the list's banner is behind it, inert. -->
       <Alert v-if="project.archived" tone="info">{{ ARCHIVED_BANNER }}</Alert>
-      <header class="flex flex-col gap-2">
+      <!-- In the panel while editing, nothing's left in it: no empty gap above the form. -->
+      <header v-if="!inPanel || !editing" class="flex flex-col gap-2">
         <!-- The page's h1 with its actions beside it (DL-326); in the panel, whose title is the
              requirement's and whose top row holds its ID and status (DL-325), the actions alone. -->
+        <!-- In edit mode the actions go (F17): the form's Save and Cancel are the way out. -->
         <component
           :is="inPanel ? 'div' : PageHeader"
+          v-if="!inPanel || !editing"
           v-bind="
             inPanel
               ? { class: 'flex flex-wrap items-center gap-3' }
-              : { title: requirement.title, crumbs, tabTitle: id }
+              : { title: editing ? editingTitle : requirement.title, crumbs, tabTitle: id }
           "
         >
           <Button
@@ -362,13 +378,16 @@ function restrictionSaved(saved: Requirement) {
             :pending="changing"
             @change="changeStatus"
           />
-          <MoreActionsMenu ref="moreMenu" :name="id" :actions="moreActions" />
+          <MoreActionsMenu v-if="!editing" ref="moreMenu" :name="id" :actions="moreActions" />
         </component>
         <div v-if="!inPanel" class="flex flex-wrap items-center gap-3">
           <span class="font-mono text-text-muted">{{ id }}</span>
           <Badge :tone="statusBadge.tone" :icon="statusBadge.icon"
             ><span class="sr-only">Status: </span>{{ statusBadge.label }}</Badge
           >
+          <Badge v-if="awaiting" :tone="AWAITING_APPROVAL.tone" :icon="AWAITING_APPROVAL.icon">{{
+            AWAITING_APPROVAL.label
+          }}</Badge>
         </div>
       </header>
       <Alert
@@ -392,52 +411,29 @@ function restrictionSaved(saved: Requirement) {
         @cancel="closeEdit"
         @refused="editRefused"
         @gone="editGone"
-      />
-      <!-- Two columns of term and value (DL-325, DL-326); the parent comes with S3-C0e (TD-106). -->
-      <dl class="m-0 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-        <div v-if="!editing" class="flex flex-col gap-1">
+      >
+        <template #details>
+          <!-- Its groups join the form's grid, beside the Priority field (F17). -->
+          <dl class="contents">
+            <RequirementFacts
+              :project-key="project.key"
+              :requirement="requirement"
+              :ancestor-link="ancestorLink"
+            />
+          </dl>
+        </template>
+      </EditRequirementForm>
+      <!-- Two columns of term and value (DL-325, DL-326). -->
+      <dl v-else class="m-0 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div class="flex flex-col gap-1">
           <dt class="text-sm font-medium text-text-muted">Priority</dt>
           <dd class="m-0">{{ PRIORITY[requirement.priority] }}</dd>
         </div>
-        <div class="flex flex-col gap-1">
-          <dt class="text-sm font-medium text-text-muted">Reporter</dt>
-          <dd class="m-0 flex flex-wrap items-center gap-2">
-            {{ requirement.reporter_name }}
-            <Badge
-              v-if="!requirement.reporter_is_active"
-              :tone="DEACTIVATED.tone"
-              :icon="DEACTIVATED.icon"
-              >{{ DEACTIVATED.label }}</Badge
-            >
-          </dd>
-        </div>
-        <div class="flex flex-col gap-1">
-          <dt class="text-sm font-medium text-text-muted">Parent</dt>
-          <dd v-if="parent" class="m-0">
-            <RouterLink :to="ancestorLink(parent.number)" class="font-mono">{{
-              requirementId(parent.number)
-            }}</RouterLink>
-            {{ parent.title }}
-          </dd>
-          <dd v-else class="m-0">None</dd>
-        </div>
-        <div class="flex flex-col gap-1">
-          <dt class="text-sm font-medium text-text-muted">Restriction</dt>
-          <!-- The restriction that applies, its own with the project's (DL-265). -->
-          <dd class="m-0">
-            <RestrictionBadge
-              v-if="
-                requirement.effective_restriction_level ||
-                requirement.effective_restriction_categories.length
-              "
-              :project="{
-                restriction_level: requirement.effective_restriction_level,
-                restriction_categories: requirement.effective_restriction_categories,
-              }"
-            />
-            <template v-else>{{ NO_RESTRICTION.label }}</template>
-          </dd>
-        </div>
+        <RequirementFacts
+          :project-key="project.key"
+          :requirement="requirement"
+          :ancestor-link="ancestorLink"
+        />
       </dl>
       <!-- Each part below the details starts at a rule, with room above it, so the page doesn't
            read as one block of text (S3-C0l). -->
@@ -449,17 +445,20 @@ function restrictionSaved(saved: Requirement) {
         <!-- An h2 in the panel too, beside its title: the description's own headings start at h3
              (`level` 2, UI-MD-1), so they stay under it. -->
         <h2 :id="descriptionId" class="m-0 text-lg font-semibold">Description</h2>
-        <!-- One note, never two: an empty description has no criteria either (S3-C0n, F11). -->
-        <Alert v-if="!hasCriteria" tone="info">{{
-          requirement.description_md.trim()
-            ? 'No acceptance criteria: the description has no "Acceptance Criteria" heading.'
-            : 'No description: the requirement has no acceptance criteria.'
-        }}</Alert>
         <MarkdownView
           v-if="requirement.description_md.trim()"
           :source="requirement.description_md"
           :level="2"
         />
+        <!-- One note, never two: an empty description has no criteria either (S3-C0n, F11). Quiet,
+             under the description: the warning is at approval (DL-384, F15). -->
+        <p v-if="!hasCriteria" class="m-0 text-sm text-text-muted">
+          {{
+            requirement.description_md.trim()
+              ? 'No acceptance criteria: the description has no "Acceptance Criteria" heading.'
+              : 'No description: the requirement has no acceptance criteria.'
+          }}
+        </p>
       </section>
       <!-- The requester's side of approvals (S2-C20); it waits while the edit form is open, as the
            status menu does: its approval would make the form's save a 409. -->
@@ -471,7 +470,7 @@ function restrictionSaved(saved: Requirement) {
         :reload-requirement="item.run"
         class="border-t border-border-subtle pt-6"
         @changed="approvalChanged"
-        @awaiting="(pending: boolean) => emit('awaiting', pending)"
+        @awaiting="awaitingChanged"
       />
       <!-- Below the details and description, on the page and in the panel, opening on History; the
            tab isn't in the URL (DL-268, DL-269). -->

@@ -32,6 +32,22 @@ const REFUNDS: Requirement = {
   reporter_name: 'Ben Ortiz',
   allowed_actions: ['requirement.view'],
 }
+const PENDING: components['schemas']['ApprovalRequestRead'] = {
+  id: 'req-1',
+  status: 'pending',
+  requirement_revision_id: 'rev-1',
+  revision_number: 1,
+  note: null,
+  requested_by_id: 'u-ada',
+  requested_by_name: 'Ada Admin',
+  requested_by_is_active: true,
+  created_at: '2026-11-03T14:30:00Z',
+  completed_at: null,
+  newer_revision_exists: false,
+  flagged: false,
+  approvals: [],
+  allowed_actions: [],
+}
 const withActions = (...actions: Action[]): Requirement => ({
   ...REFUNDS,
   allowed_actions: ['requirement.view', ...actions],
@@ -43,7 +59,8 @@ async function mountAt(
   items: unknown[],
   path = '/acme/projects/ERP/requirements/7',
   // The visit's first page, opened from a link: focus moves only when the page says so.
-  { direct = false } = {},
+  // `pending`: the latest approval request is pending (the header's badge, DL-386).
+  { direct = false, pending = false } = {},
 ) {
   useCurrentUserStore().me = me()
   const answers = { project: projects.map((p) => ok(p)), item: [...items] }
@@ -53,13 +70,15 @@ async function mountAt(
     .mockImplementation(((path: string) =>
       Promise.resolve(
         path === '/api/projects/{key}/requirements/{number}/approval-requests'
-          ? ok({ items: [], total: 0, limit: 1, offset: 0 })
-          : path === '/api/projects/{key}/requirements/{number}/activity' ||
-              path === '/api/projects/{key}/requirements/{number}/revisions'
-            ? ok({ items: [], next_cursor: null })
-            : path === '/api/projects/{key}/requirements/{number}'
-              ? next(answers.item)
-              : next(answers.project),
+          ? ok({ items: pending ? [PENDING] : [], total: pending ? 1 : 0, limit: 1, offset: 0 })
+          : path === '/api/approval-requests/{request_id}'
+            ? ok(PENDING)
+            : path === '/api/projects/{key}/requirements/{number}/activity' ||
+                path === '/api/projects/{key}/requirements/{number}/revisions'
+              ? ok({ items: [], next_cursor: null })
+              : path === '/api/projects/{key}/requirements/{number}'
+                ? next(answers.item)
+                : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
@@ -332,6 +351,39 @@ describe('RequirementView', () => {
       const { wrapper } = await mountAt([READER], [ok({ ...REFUNDS, description_md: md })])
 
       expect(wrapper.text().includes('No acceptance criteria')).toBe(noted)
+    },
+  )
+
+  // F15: quiet, under the description; the warning is at approval (DL-384). Bug: a warning or
+  // info alert above the description, the loudest thing on the page.
+  it('notes missing criteria as quiet text under the description, not an alert', async () => {
+    await mountAt([READER], [ok({ ...REFUNDS, description_md: 'Just text.' })])
+
+    const notes = [...document.querySelectorAll('main p')].filter((p) =>
+      p.textContent!.includes('No acceptance criteria'),
+    )
+    expect(notes).toHaveLength(1)
+    expect(notes[0]!.closest('[role=alert], [role=status], .border')).toBeNull()
+    expect(notes[0]!.className).toContain('text-text-muted')
+    const markdown = [...document.querySelectorAll('main p')].find(
+      (p) => p.textContent === 'Just text.',
+    )!
+    expect(
+      markdown.compareDocumentPosition(notes[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  // DL-386 (F13). Bug: the header says only "Draft" while the tree says it's awaiting approval.
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'shows Awaiting approval beside the status while a request is pending: %s',
+    async (pending, shown) => {
+      await mountAt([READER], [ok(REFUNDS)], undefined, { pending })
+
+      const header = document.querySelector('main header')!
+      expect(header.textContent!.includes('Awaiting approval')).toBe(shown)
     },
   )
 
@@ -751,6 +803,34 @@ describe('RequirementView', () => {
       expect(button('Edit')).toBeDefined()
     })
 
+    // F17 (DL-395). Bug: the actions left in edit mode, the heading repeating the title field,
+    // or the details reshuffled below the form.
+    it('hides the actions, heads the page "Editing <ID>", and keeps the details grid in place', async () => {
+      await mountAt([READER], [ok(withActions('requirement.update', 'requirement.delete'))])
+      const order = () =>
+        [...document.querySelectorAll('main dt, main legend')].map((t) =>
+          t.textContent!.replace(/\s+/g, ' ').replace('*', '').trim(),
+        )
+      const before = order()
+      const statusMenu = () => document.querySelector('[aria-label="Change status of ERP-RQ-7"]')
+      expect(statusMenu()).not.toBeNull()
+      expect(moreButton()).not.toBeNull()
+
+      await edit()
+
+      expect(document.querySelector('h1')!.textContent!.trim()).toBe('Editing ERP-RQ-7')
+      expect(button('Edit')).toBeUndefined()
+      expect(moreButton()).toBeNull()
+      expect(statusMenu()).toBeNull()
+      // Priority, now a field, in its cell, then the same values in the same order.
+      expect(before.slice(0, 4)).toEqual(['Priority', 'Reporter', 'Parent', 'Restriction'])
+      expect(order().slice(0, 4)).toEqual(['Priority', 'Reporter', 'Parent', 'Restriction'])
+      const grid = document.querySelector('form fieldset')!.parentElement!
+      expect(grid.className).toContain('grid')
+      expect(grid.querySelector('dl')!.textContent).toContain('Ben Ortiz')
+      expect(definition('Reporter')).toBe('Ben Ortiz')
+    })
+
     it('turns the title, description, and priority into a form, focus on the title', async () => {
       const { wrapper } = await mountAt([READER], [ok(EDITOR)])
 
@@ -900,6 +980,33 @@ describe('RequirementView', () => {
 
       expect(note().getAttribute('aria-invalid')).toBe('true')
       expect(document.activeElement).toBe(note())
+    })
+
+    // F17 put Priority above the description: a 422 on both focuses the one first on screen
+    // (UI-FRM-6). Bug: the old order, focus skipping past Priority to the description.
+    it('a 422 on the description and the priority focuses the priority, first on screen', async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        failed(422, {
+          code: 'validation_error',
+          message: 'The request is invalid.',
+          details: {
+            fields: [
+              { loc: ['body', 'description_md'], message: 'Too long.', type: 'string_too_long' },
+              { loc: ['body', 'priority'], message: 'Not a priority.', type: 'enum' },
+            ],
+          },
+        }),
+      )
+      await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await choosePriority('low')
+      await type(description(), 'Changed')
+
+      await save()
+
+      expect(
+        document.activeElement!.closest('fieldset')!.querySelector('legend')!.textContent,
+      ).toContain('Priority')
     })
 
     it('a 409 says someone else changed it, with Reload, and keeps what was typed (UI-FRM-7)', async () => {

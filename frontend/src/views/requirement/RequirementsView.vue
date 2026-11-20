@@ -27,7 +27,7 @@ import {
 
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
-import { requirementStatusBadge } from '@/app/labels'
+import { AWAITING_APPROVAL, requirementStatusBadge } from '@/app/labels'
 import { focusHeading } from '@/app/routeFocus'
 import Alert from '@/components/Alert.vue'
 import Badge from '@/components/Badge.vue'
@@ -277,7 +277,11 @@ async function panelDeleted(id: string) {
           <ItemPanel
             v-if="panelNumber"
             ref="panel"
-            :title="shown?.title ?? `${loaded.key}-RQ-${panelNumber}`"
+            :title="
+              detail?.editing
+                ? `Editing ${loaded.key}-RQ-${panelNumber}`
+                : (shown?.title ?? `${loaded.key}-RQ-${panelNumber}`)
+            "
             :label="`Requirement ${loaded.key}-RQ-${panelNumber}`"
             :full-page="{
               name: 'project-requirement',
@@ -295,6 +299,13 @@ async function panelDeleted(id: string) {
                 :icon="requirementStatusBadge(shown).icon"
                 ><span class="sr-only">Status: </span
                 >{{ requirementStatusBadge(shown).label }}</Badge
+              >
+              <!-- While a request is pending, as on its row (DL-386). -->
+              <Badge
+                v-if="detail?.awaiting"
+                :tone="AWAITING_APPROVAL.tone"
+                :icon="AWAITING_APPROVAL.icon"
+                >{{ AWAITING_APPROVAL.label }}</Badge
               >
             </template>
             <RequirementDetail

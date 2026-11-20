@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { VARIANTS } from '@/components/Button.vue'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok, validationFailed } from '@/test/api'
@@ -138,6 +139,8 @@ const answering = (latest: Request | null) =>
           : ok({ items: MEMBERS_LIST, total: 2, limit: 200, offset: 0 }),
     )) as never
 
+const confirmButton = (name: string) =>
+  [...dialogOpen()!.querySelectorAll('button')].find((b) => b.textContent!.trim() === name)!
 async function confirmIt(name: string) {
   const dialog = dialogOpen()!
   ;[...dialog.querySelectorAll('button')].find((b) => b.textContent!.trim() === name)!.click()
@@ -303,7 +306,26 @@ describe('ApprovalSection', () => {
       body: { approver_ids: ['u-max'], note: 'Please check totals' },
     })
     expect(dialogOpen()).toBeNull()
-    expect(details()).toContain('Latest request Pending')
+    expect(details()).toContain('Latest request Awaiting approval')
+  })
+
+  // The button that opened the dialog goes as the request is made: focus lands on the blocked
+  // Request approval, whose reason is read with it. Bug: focus left on the heading, or on <body>.
+  it('moves focus to the blocked Request approval once a request is made', async () => {
+    const { post } = mountSection(requirement(), null)
+    await flushPromises()
+    press('Request approval')
+    await flushPromises()
+    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-vera"]')!.click()
+    post.mockResolvedValue(ok(request(), 201))
+    dialogOpen()!.querySelector('form')!.requestSubmit()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve))
+    await flushPromises()
+
+    const blocked = button('Request approval')!
+    expect(blocked.getAttribute('aria-disabled')).toBe('true')
+    expect(document.activeElement).toBe(blocked)
   })
 
   it('asks for an approver before sending, at the list', async () => {
@@ -483,6 +505,94 @@ describe('ApprovalSection', () => {
     ).toContain(note.id)
   })
 
+  // F14 (DL-377): the next step is the one primary; Approve by hand a quiet action after a
+  // divider; a blocked Request approval after what can be done. Bug: two primaries, Approve by
+  // hand as loud as the normal flow, or the blocked button leading the row.
+  const variantOf = (name: string) =>
+    (Object.keys(VARIANTS) as (keyof typeof VARIANTS)[]).find((v) =>
+      button(name)!.className.includes(VARIANTS[v]),
+    )
+  const order = () =>
+    buttons()
+      .map((b) => b.textContent!.trim())
+      .filter((t) =>
+        ['Request approval', 'Re-request', 'Cancel request', 'Approve by hand'].includes(t),
+      )
+  const divider = () => document.querySelector('span[aria-hidden="true"].border-l')
+
+  it('makes Request approval the primary, with Approve by hand quiet after a divider', async () => {
+    mountSection(requirement(), null)
+    await flushPromises()
+
+    expect(order()).toEqual(['Request approval', 'Approve by hand'])
+    expect(variantOf('Request approval')).toBe('primary')
+    expect(variantOf('Approve by hand')).toBe('ghost')
+    expect(divider()).not.toBeNull()
+  })
+
+  it('puts the blocked Request approval last while a request is pending, its reason beside it', async () => {
+    mountSection(requirement(), request())
+    await flushPromises()
+
+    expect(order()).toEqual(['Cancel request', 'Approve by hand', 'Request approval'])
+    expect(variantOf('Cancel request')).toBe('secondary')
+    expect(button('Request approval')!.nextElementSibling!.textContent).toContain(
+      'A request is pending',
+    )
+  })
+
+  it('makes Re-request the primary on a flagged request', async () => {
+    mountSection(requirement(), request({ flagged: true }))
+    await flushPromises()
+
+    expect(order()).toEqual(['Re-request', 'Cancel request', 'Approve by hand'])
+    expect(variantOf('Re-request')).toBe('primary')
+  })
+
+  it("leaves the primary to the approver's decision, Re-request secondary", async () => {
+    mountSection(
+      requirement(),
+      request({ flagged: true, allowed_actions: ['approval_request.cancel', 'approval.decide'] }),
+    )
+    await flushPromises()
+
+    expect(variantOf('Re-request')).toBe('secondary')
+    expect(button('Approve')!.className).toContain(VARIANTS.primary)
+  })
+
+  // Names aren't unique, and a deactivated approver is marked (traps: a confirmation that names
+  // people). Bug: a deactivated approver named as if active.
+  it('marks a deactivated approver among those Approve by hand goes past', async () => {
+    mountSection(
+      requirement(),
+      request({
+        approvals: [
+          row('u-vera', 'Vera Viewer'),
+          row('u-dee', 'Dee Gone', { approver_is_active: false }),
+          row('u-max', 'Max Member', { decision: 'approved' }),
+        ],
+      }),
+    )
+    await flushPromises()
+
+    press('Approve by hand')
+    await flushPromises()
+
+    expect(dialogOpen()!.textContent).toContain(
+      'without a decision from Vera Viewer, Dee Gone (deactivated).',
+    )
+  })
+
+  it('confirms Approve by hand in the primary tone when no request is pending', async () => {
+    mountSection(requirement(), null)
+    await flushPromises()
+
+    press('Approve by hand')
+    await flushPromises()
+    expect(dialogOpen()!.textContent).not.toContain('The pending request is cancelled')
+    expect(confirmButton('Approve').className).toContain(VARIANTS.primary)
+  })
+
   it('approves by hand once confirmed, with the version, saying a pending request is cancelled', async () => {
     const { wrapper, post } = mountSection(requirement({ version: 4 }), request())
     await flushPromises()
@@ -491,7 +601,11 @@ describe('ApprovalSection', () => {
 
     press('Approve by hand')
     await flushPromises()
-    expect(dialogOpen()!.textContent).toContain('The pending request is cancelled.')
+    // Bug: the approvers it goes past unnamed, or the risky path in the everyday tone (1b).
+    expect(dialogOpen()!.textContent).toContain(
+      'The pending request is cancelled, without a decision from Vera Viewer.',
+    )
+    expect(confirmButton('Approve').className).toContain(VARIANTS.danger)
     await confirmIt('Approve')
 
     expect(post).toHaveBeenCalledWith('/api/projects/{key}/requirements/{number}/approve', {
@@ -734,7 +848,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
 
     expect(dialogOpen()!.textContent).toContain('This item already has a pending approval request.')
-    expect(details()).toContain('Latest request Pending')
+    expect(details()).toContain('Latest request Awaiting approval')
   })
 
   it('reloads the list when someone picked can no longer be named (a 404), saying so', async () => {

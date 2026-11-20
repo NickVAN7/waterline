@@ -559,12 +559,18 @@ render inside the full shell when signed in.
     the address can be shared; another item's ID swaps it and updates `?open`. A direct link to
     an item, and **Copy link**, use the full-page route. For requirements, the tree's ID opens it
     at `…/requirements?open=RQ-<n>` (DL-262).
-  - **Header:** the item's ID (mono) and status badge, with **Open full page**, **Copy link**,
-    and **Close** as icon buttons (each with an accessible name and a tooltip); the title, the
-    panel's heading; then **Edit**, **Change status**, and **⋯ More actions** (its danger items
+  - **Header:** the item's ID (mono) and status badge, with **Awaiting approval** beside it
+    while a request is pending (DL-386); then the title, the panel's heading, a type size above
+    its sections (`text-xl` in the panel, `text-2xl` on the page; F15, DL-396), described by the
+    ID and status so they're read as it takes focus, with **Open full page**, **Copy link**, and **Close** after it
+    on its row, in reading and Tab order (icon buttons, each with an accessible name and a
+    tooltip; DL-387); then **Edit**, **Change status**, and **⋯ More actions** (its danger items
     after a separator, the menu hidden when empty), and the item's fields as a two-column
     definition list. The item's full page has the same actions beside its `h1`, the ID and
-    status under it.
+    status under it. An empty live region takes no space (F18).
+  - **Edit mode** (F17, DL-395): the actions go; the heading (the panel's title, the page's `h1`)
+    reads **Editing <ID>**, the title being in its field; each field takes its value's place,
+    the details keeping their grid (Priority's field in its cell).
   - **Focus and landmarks:** opening or swapping focuses the title; at wide widths focus isn't
     trapped and the panel is a complementary region named for the item ("Requirement
     PORTAL-RQ-3"); Esc closes it when focus is inside and nothing there used the key (an edit
@@ -741,7 +747,11 @@ render inside the full shell when signed in.
   Unarchive stays there, the one button changing in place so focus stays on it (DL-186).
 - **UI-FRM-15** **Buttons:** one primary button per form or dialog: a page with several forms
   that each save on their own (project settings' **Save settings** and **Save restriction**)
-  gives each form's submit the primary tone (DL-377). A submit button is
+  gives each form's submit the primary tone (DL-377). A section's actions follow the same rule:
+  its next step is its one primary (the Approval section's Request approval, Re-request, or an
+  approver's Approve), an exceptional path is a quiet `ghost` button after a divider (Approve by
+  hand), and a blocked action comes after the ones that can be taken, its reason beside it (F14).
+  A submit button is
   `type="submit"` and Enter submits; every other button is `type="button"`. Navigation is a
   link, an action is a button. Don't disable a submit button because the form is invalid: users
   can't tell why, so let them submit and show the errors. **Exception:** an export-control
@@ -831,7 +841,7 @@ render inside the full shell when signed in.
 
   | Value | Tone | Label |
   |---|---|---|
-  | request `pending` | info | Pending |
+  | request `pending` | info | Awaiting approval (as the requirement's own badge while it waits, DL-386) |
   | request `approved` | success | Approved |
   | request `rejected` | danger | Rejected |
   | request `cancelled` | neutral, with an x icon | Cancelled |

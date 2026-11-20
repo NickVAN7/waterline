@@ -55,6 +55,10 @@ const MOVER = project({
 
 /** Mounts the page at `at`; `trees`, `projects`, and `requirements` (one's read) answer the GETs
  * in turn, the last one repeating. */
+// The panel's title: just before its icon buttons, on their row (DL-387).
+const panelTitle = () =>
+  document.querySelector('button[aria-label="Close"]')!.parentElement!.previousElementSibling!
+
 async function mountAt(
   projects: Project[],
   trees: unknown[] = [ok(TREE)],
@@ -672,6 +676,9 @@ describe('RequirementsView', () => {
 
       expect(idLink(2).closest('tr')!.textContent).toContain('Awaiting approval')
       expect(idLink(1).closest('tr')!.textContent).not.toContain('Awaiting approval')
+      // And in the panel's header, beside its status (DL-386, F13).
+      const panelTop = panelTitle().parentElement!.previousElementSibling!
+      expect(panelTop.textContent).toContain('Awaiting approval')
     })
 
     it("a Try again that loads it sends focus to the panel's title, not the page behind (UI-FBK-15)", async () => {
@@ -951,6 +958,29 @@ describe('RequirementsView: the split pane, swapping, and unsaved edits (DL-321 
     await flushPromises()
 
     expect(confirmation()).toBeDefined()
+  })
+
+  // F17: the title is in its field, so the panel's heading doesn't repeat it (DL-395).
+  it('heads the panel "Editing <ID>" while editing, its title again afterwards', async () => {
+    await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    const heading = () => panelTitle().textContent!.trim()
+    const title = heading()
+
+    named('Edit').click()
+    await flushPromises()
+    expect(heading()).toBe('Editing ERP-RQ-2')
+    ;[
+      ...document.querySelectorAll<HTMLButtonElement>(
+        'form[aria-label="Edit the requirement"] button',
+      ),
+    ]
+      .find((b) => b.textContent!.trim() === 'Cancel')!
+      .click()
+    await flushPromises()
+
+    expect(heading()).toBe(title)
+    expect(title).not.toBe('Editing ERP-RQ-2')
   })
 
   it('Keep editing keeps the panel and what was typed', async () => {

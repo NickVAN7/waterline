@@ -6,9 +6,10 @@
 // stepped by a click without a drag, or moved by the arrow keys, DL-355); below 80rem a modal
 // overlay (a `showModal()` dialog: the page inert, focus
 // kept in it). The content is one teleport that moves between the two, so crossing the width
-// keeps what it holds (an open edit included). Its header: the item's ID and status (`meta`),
-// Open full page, Copy link, and Close as icon buttons, then the title, the panel's heading,
-// which takes focus when it opens or swaps to another item; the item itself follows (`default`).
+// keeps what it holds (an open edit included). Its header: the item's ID and status (`meta`), then
+// the title, the panel's heading, which takes focus when it opens or swaps to another item, with
+// Open full page, Copy link, and Close as icon buttons after it on its row (DL-387); the item
+// itself follows (`default`).
 // The list's URL holds the open item (`?open=RQ-7`): Close and Esc ask the page to take it away
 // (`dismiss`), so the page can first ask about unsaved edits (DL-323), and Back works the same;
 // the page then calls `close()`, which returns focus to the ID that opened the panel, or to
@@ -131,10 +132,13 @@ function dragCancel(event: PointerEvent) {
 }
 
 const titleId = useId()
+const metaId = useId()
 const wideId = useId()
 const narrowId = useId()
 const dialog = ref<HTMLDialogElement>()
 const heading = ref<HTMLElement>()
+// The panel's content, all of it: what may hold focus as it moves across the breakpoint.
+const content = ref<HTMLElement>()
 const isOpen = ref(false)
 let opener: HTMLElement | null = null
 let returnFocus = true
@@ -159,6 +163,9 @@ async function open(): Promise<void> {
 // Another item in the open panel (DL-323): its ID, now focused, is where Close returns.
 async function swapped(): Promise<void> {
   rememberOpener()
+  // The last item's "Link copied." isn't this one's.
+  clearTimeout(announcing)
+  said.value = ''
   await nextTick()
   heading.value?.focus()
 }
@@ -194,7 +201,7 @@ watch(wide, async (isWide) => {
   // Opened as the overlay, it fits the room it has now (DL-385), unless the viewer chose a width.
   if (isWide && storedWidth() === null) width.value = fittingWidth()
   const active = document.activeElement
-  const focused = active instanceof HTMLElement && heading.value?.parentElement?.contains(active)
+  const focused = active instanceof HTMLElement && content.value?.contains(active)
   await nextTick()
   if (isWide && dialog.value?.open) {
     moving = true
@@ -285,10 +292,22 @@ defineExpose({ open, close, swapped, focusTitle: () => heading.value?.focus() })
     <div :id="narrowId" />
   </dialog>
   <Teleport defer :to="`#${wide ? wideId : narrowId}`">
-    <div v-if="isOpen" class="flex flex-col gap-4 p-6">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-3"><slot name="meta" /></div>
-        <div class="flex items-center gap-1">
+    <div v-if="isOpen" ref="content" class="flex flex-col gap-4 p-6">
+      <!-- Read with the title as it takes focus (its description): it comes before it. -->
+      <div :id="metaId" class="flex flex-wrap items-center gap-3"><slot name="meta" /></div>
+      <!-- The title, then its icon buttons, in reading and Tab order: Tab from the focused title
+           reaches them (DL-387). -->
+      <div class="flex items-start justify-between gap-3">
+        <h2
+          :id="titleId"
+          ref="heading"
+          tabindex="-1"
+          :aria-describedby="metaId"
+          class="m-0 min-w-0 text-xl leading-tight font-semibold break-words"
+        >
+          {{ title }}
+        </h2>
+        <div class="flex shrink-0 items-center gap-1">
           <RouterLink
             :to="fullPage"
             aria-label="Open full page"
@@ -316,10 +335,9 @@ defineExpose({ open, close, swapped, focusTitle: () => heading.value?.focus() })
           </button>
         </div>
       </div>
-      <h2 :id="titleId" ref="heading" tabindex="-1" class="m-0 text-xl font-semibold">
-        {{ title }}
-      </h2>
-      <p class="m-0 text-sm" aria-live="polite">{{ said }}</p>
+      <!-- Visually hidden while empty, so it takes no space (F18), but always there: a live region
+           that appears with its words isn't read. -->
+      <p class="m-0 text-sm" :class="{ 'sr-only': !said }" aria-live="polite">{{ said }}</p>
       <slot />
     </div>
   </Teleport>

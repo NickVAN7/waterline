@@ -5012,7 +5012,19 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the wording in S3-C0q's row. The status menu marks the current status with a check icon,
   `aria-disabled`, and "(current)", above the line "Approved is set by an approval."
 - **Supersedes:** DL-390 and DL-394 in part (the Package rows from S3-C0q now start at S3-C0r)
-- **Superseded by:** none
+- **Superseded by:** DL-396, in part (the panel's title size)
 - **Applies to:** build plan (Slice 3's overview, checkpoints S3-C0p and S3-C0q, groups, the
   security-reviewer list); root `CLAUDE.md` Status; TD-120
 - **Source:** owner, Nov 19, 2026 (S3-C0p's definition reviewed before it started)
+
+### DL-396: The panel's title stays text-xl
+- **Date:** 2026-11-19
+- **Decision:** The side panel's title is `text-xl`, a size above its `text-lg` sections; the
+  full page's `h1` keeps `text-2xl`. At `text-2xl` a long title wrapped to four or five lines in a
+  400 to 560px pane (S3-C0p's Impeccable critique, P1). The critique's other rule changes are
+  declined or deferred: an approver who is also an admin keeps all five actions (F14 stands), and
+  the panel's grids and heading sizes are tech debt (TD-121, TD-122).
+- **Supersedes:** DL-395 in part (F15's `text-2xl` panel title)
+- **Superseded by:** none
+- **Applies to:** S3-C0p; ui-design-guide UI-SHL-11; build plan (S3-C0p)
+- **Source:** owner, Nov 19, 2026 (S3-C0p's Impeccable critique)

@@ -5,7 +5,8 @@
 // between is a 409, whose alert's Reload shows the latest (UI-FRM-7); a changed title or
 // description makes the next revision, with the note. Nothing changed, Save closes the form as
 // Cancel does. A 403 tells the page (`refused`), which reloads what the user may do; a 404 means
-// the requirement is gone (`gone`).
+// the requirement is gone (`gone`). The host's `details` (the values that stay as they are) go in
+// the details grid beside the Priority field (F17).
 import { computed, nextTick, ref } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
@@ -39,10 +40,12 @@ const values = ref({
 })
 const pending = ref(false)
 const status = ref('')
+// In the order on screen: Priority comes after the title, in the details grid (F17), so a 422's
+// focus and announcement follow it (UI-FRM-6).
 const errors = useFormErrors({
   title: 'Title',
-  description_md: 'Description',
   priority: 'Priority',
+  description_md: 'Description',
   change_note: 'Change note',
 })
 
@@ -136,7 +139,10 @@ defineExpose({ focus: () => focus('title'), dirty })
       :prefix="PREFIX"
       :errors="errors.fieldErrors.value"
       @edit="errors.clearField"
-    />
+    >
+      <!-- The details grid, kept in place in edit mode (F17): the host's other values. -->
+      <template #details><slot name="details" /></template>
+    </RequirementFields>
     <TextField
       :id="`${PREFIX}-change-note`"
       ref="noteField"

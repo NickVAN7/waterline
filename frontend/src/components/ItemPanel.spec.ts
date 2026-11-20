@@ -76,6 +76,38 @@ describe('ItemPanel below 80rem', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  // DL-387 (F16): Tab from the focused title reaches the buttons. Bug: the buttons before the
+  // title in the DOM, reachable only with Shift+Tab.
+  it('puts the icon buttons after the title, in reading and Tab order', async () => {
+    await mountPanel()
+
+    const follows = (a: Node, b: Node) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    for (const name of ['Open full page', 'Copy link', 'Close'])
+      expect(follows(heading(), button(name))).toBe(true)
+    expect(follows(document.querySelector('dialog span')!, heading())).toBe(true)
+  })
+
+  // The ID and status come before the focused title. Bug: a screen reader opening the panel
+  // never hears the status (S3-C0p critique, P1).
+  it('describes its title by the ID and status, read as it takes focus', async () => {
+    await mountPanel()
+
+    const describedBy = heading().getAttribute('aria-describedby')!
+    expect(document.getElementById(describedBy)!.textContent).toContain('ERP-RQ-7')
+  })
+
+  // F15 (owner, Nov 19: text-xl in the pane), F18. Bug: the title no bigger than its sections
+  // (text-lg), or an empty region taking a line.
+  it('sets the title a size above its sections, and hides the empty live region', async () => {
+    await mountPanel()
+
+    expect(heading().className).toContain('text-xl')
+    const live = document.querySelector('dialog [aria-live=polite]')!
+    expect(live.textContent).toBe('')
+    expect(live.className).toContain('sr-only')
+  })
+
   it('asks its page to close it on Esc, without closing itself (the page may ask first)', async () => {
     const { wrapper } = await mountPanel()
     const dialog = document.querySelector('dialog')!
@@ -492,6 +524,22 @@ describe("ItemPanel's Copy link", () => {
 
     expect(writeText).toHaveBeenCalledWith('http://localhost:3000/acme/projects/ERP/requirements/7')
     expect(said()).toBe('Link copied.')
+    // Shown once it has words: a success with no other visible trace.
+    expect(document.querySelector('[aria-live=polite]')!.className).not.toContain('sr-only')
+  })
+
+  // Bug: the last item's "Link copied." left under the next one's title (S3-C0p critique).
+  it('clears what it said when it swaps to another item', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    const { wrapper } = await mountPanel()
+    button('Copy link').click()
+    await vi.advanceTimersByTimeAsync(ANNOUNCE_DELAY_MS)
+    expect(said()).toBe('Link copied.')
+
+    await wrapper.vm.swapped()
+
+    expect(said()).toBe('')
   })
 
   it('says plainly when the clipboard is blocked, never a false success', async () => {

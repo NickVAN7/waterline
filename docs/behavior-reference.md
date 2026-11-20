@@ -159,16 +159,17 @@ Right arrow; the width is kept for next time. Until you choose one, the panel op
 wide, or narrower (down to 400) so the tree keeps room beside it. Another
 requirement's ID shows that one in the panel instead. The panel has its own address
 (`…/requirements?open=RQ-<n>`), so the browser's Back closes it, as do **Close** (the ✕ at its top)
-and Esc; a change you make there shows in the tree. At the top of the panel, beside the ID and
-status, **Open full page** goes to the requirement's page (`…/requirements/<n>`) and **Copy link**
-copies that page's address, for sharing. Under the title are **Edit**, **Change status**, and
+and Esc; a change you make there shows in the tree. At the top of the panel are the ID and
+status, with **Awaiting approval** beside them while an approval request is pending. On the
+title's row, after the title, **Open full page** goes to the requirement's page
+(`…/requirements/<n>`) and **Copy link** copies that page's address, for sharing. Under the title are **Edit**, **Change status**, and
 **⋯ More actions**, which holds **Change restriction…** and **Delete…**, as far as you may use them;
 then the requirement's priority, reporter (with "Deactivated" after a deactivated reporter's name),
 parent (its ID, a link, then its title; **None** at the top level; in the panel the link opens
 the parent there), and restriction, and its description. The page shows the same, with the actions beside its title
-and the ID and status under it. A status reads
+and the ID and status (and Awaiting approval) under it. A status reads
 **Approved · modified** when the requirement is Approved and has changed since its approved revision. If the
-description has no "Acceptance Criteria" heading, a note says so: "No acceptance criteria: the
+description has no "Acceptance Criteria" heading, a quiet note under it says so: "No acceptance criteria: the
 description has no "Acceptance Criteria" heading.", or, with no description at all, "No
 description: the requirement has no acceptance criteria." **Change status** (members and
 admins) sets any status but its own and Approved, which comes only from an approval. If someone
@@ -181,7 +182,8 @@ with both sets of categories, so a requirement on a Confidential project reads C
 without one of its own; **None** in Change restriction means "same as the project".
 
 **Edit** (members and admins) turns the requirement's title, description, and priority into a
-form in place, with a **Change note**. **Save** keeps your changes; a changed title or
+form in place, with a **Change note**: the actions go, the heading reads **Editing <ID>**, and
+the priority's field takes its place among the details. **Save** keeps your changes; a changed title or
 description is saved as a new version, with the note, while a priority change alone isn't (and
 keeps no note). **Cancel** drops them. If someone else saved the requirement while you were
 editing, Save is refused: **Reload** shows the latest, and your changes are lost once you press
@@ -192,8 +194,8 @@ your changes?**: **Keep editing** returns you to the form with what you typed, a
 changes** drops it and goes on.
 
 Below the description, the **Approval** section shows the revision last approved ("Last approved:
-revision 3") and the latest approval request: its status (Pending, Approved, Rejected, or
-Cancelled), the revision it's for, who requested it and when, its note, and each approver with
+revision 3") and the latest approval request: its status (Awaiting approval, Approved, Rejected,
+or Cancelled), the revision it's for, who requested it and when, its note, and each approver with
 their decision (**Not decided**, **Approved**, **Rejected**, or **Replaced**, for an approver who
 lost access and whose place the requester took) and comment. With no request yet it says "No
 approval has been requested." A project admin can:
@@ -201,7 +203,8 @@ approval has been requested." A project admin can:
 - **Request approval:** pick the approvers from the project's members (deactivated people aren't
   listed; every one of them must approve), add an optional **Note**, and press **Request
   approval**. The request is for the current revision. Only one request can be pending at a
-  time: while one is, Request approval is unavailable and says why. After a rejection, the dialog
+  time: while one is, Request approval is unavailable, after the actions you can take, and says
+  why. After a rejection, the dialog
   opens with the same approvers ticked; anyone who can no longer be named is left out, and the
   dialog says who. On a requirement without an "Acceptance Criteria" heading, the dialog warns
   that it has no acceptance criteria; you can still send the request.
@@ -212,7 +215,8 @@ approval has been requested." A project admin can:
   already made stay on record. **Keep request** leaves it as it is.
 - **Approve by hand:** after you confirm, the requirement is approved at its current revision
   without a request, with you as the approver (to record a sign-off made outside Waterline). A
-  pending request is cancelled. On a requirement without an "Acceptance Criteria" heading, the
+  pending request is cancelled: the confirmation says so, names the approvers who haven't
+  decided, and asks in the danger tone. On a requirement without an "Acceptance Criteria" heading, the
   confirmation warns that it has no acceptance criteria; you can still approve.
 
 If the requirement changed after approval was requested, a warning says approvers still decide
