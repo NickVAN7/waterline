@@ -129,12 +129,13 @@ async function showMore() {
       <EmptyState v-else-if="!entries.length" :heading="emptyHeading" :level="emptyLevel">{{
         emptyText
       }}</EmptyState>
-      <ol v-else ref="list" class="m-0 flex list-none flex-col gap-3 p-0">
+      <!-- A line between entries, and room either side of it (S3-C0l). -->
+      <ol v-else ref="list" class="m-0 flex list-none flex-col divide-y divide-border-subtle p-0">
         <li
           v-for="entry in entries"
           :key="entry.id"
           tabindex="-1"
-          class="flex flex-col gap-1 rounded-md"
+          class="flex flex-col gap-2 rounded-md py-4 first:pt-0"
         >
           <slot name="item" :item="entry" />
         </li>

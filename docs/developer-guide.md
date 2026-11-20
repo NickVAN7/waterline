@@ -68,7 +68,8 @@ images (`HOST_UID`, `HOST_GID`), so anything they write into the mounted source 
 `wl up` creates `frontend/node_modules` before Docker would make that mount point as root.
 
 `wl doctor` exits non-zero if any required tool is missing or too old, and warns (without
-failing) if the pre-commit hooks aren't installed.
+failing) if the pre-commit hooks aren't installed; `wl check` fails without them, or on `main`
+(its repository-state step, section 11).
 
 ## 2. Repository layout
 
@@ -76,17 +77,19 @@ failing) if the pre-commit hooks aren't installed.
 backend/        FastAPI app (its own uv project: backend/pyproject.toml, backend/uv.lock)
 frontend/       Vue 3 + TypeScript (Vite); its own npm project (package.json, package-lock.json)
 docs/           design, schema, build plan, testing strategy, screen inventory, UI design
-                guide (ui-design-guide.md, with reference copies in ui/), these guides,
+                guide (ui-design-guide.md, with reference copies in ui/), this guide, the
+                behavior reference, the reader's guide (user-guide/: a page per topic,
+                images/),
                 tech-debt log, decision log, reviews/ (s<n>/: one record per checkpoint;
-                design-changes/: one per design change), spikes/
+                design-changes/: one per tooling design change, DL-393), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
 docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
 .github/workflows/ci.yml   CI: `wl check --full` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
-.claude/        Claude Code setup: skills (checkpoint, test-writer, migration, new-area,
-                design-change, vue-screen), agents (checkpoint-reviewer,
+.claude/        Claude Code setup: skills (checkpoint, slice-end, test-writer, migration,
+                new-area, design-change, vue-screen), agents (checkpoint-reviewer,
                 security-reviewer, fresh-clone-verifier, user-guide-verifier,
                 docs-consistency, spec-test-writer, repo-auditor, ui-reviewer,
                 simplicity-auditor),
@@ -107,18 +110,21 @@ underlying commands instead of running them, and stops at the first failing step
 
 | Command | Does |
 |---|---|
-| `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees and `core.hooksPath` work) |
-| `wl check` | The gate before every commit (DL-99): lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates — backend, then frontend, then CLI — and mutation testing when anything it depends on changed since its last green run (the backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`; the hash is kept in `backend/mutants/inputs.sha256`), saying so when it skips it. `--full` is everything CI runs: mutation testing whatever changed, then `wl audit`, then `wl e2e` |
+| `wl doctor` | Toolchain check: Git, Docker (daemon, Compose), uv, Python 3.14, Node 22, npm, pre-commit hooks (found via `git rev-parse`, so worktrees work; `wl check` fails when `core.hooksPath` is set) |
+| `wl check` | The gate before every commit (DL-99): the repository's state (DL-391: `core.hooksPath` unset, pre-commit's hook installed, not on `main`), lockfiles up to date, generated client fresh, lint, format check, types, import rules, tests, coverage gates — backend, then frontend, then CLI — and mutation testing when anything it depends on changed since its last green run (the backend's `app/`, `tests/`, `pyproject.toml`, or `uv.lock`; the hash is kept in `backend/mutants/inputs.sha256`), saying so when it skips it. `--full` is everything CI runs: mutation testing whatever changed, then `wl audit`, then `wl e2e` |
 | `wl e2e [args]` | The Playwright end-to-end tests on their own stack: the Compose project `waterline-e2e` (`docker-compose.e2e.yml`: no published database or API port, the web server on `127.0.0.1:5174`, `DEMO_SEED_ENABLED=true`), cleared of anything an earlier run left, built, seeded with `seed --demo`, tested in the `light` and `dark` projects, and always torn down with its volume. Runs beside the dev stack, but only one `wl e2e` at a time: a second run shares the project, and its first step clears the first run's stack. Extra args go to `playwright test` (e.g. `wl e2e sign-in --project light`) |
+| `wl docs-screenshots` | Regenerate the guide's screenshots (DL-343): the `wl e2e` stack, seeded with `seed --manual-pass` (DL-361), then Playwright through `playwright.screenshots.config.ts`, which saves each shot in `frontend/e2e/screenshots/guide.shot.ts` as light and dark WebP (1440 by 900) in `docs/user-guide/images/`, and always tears the stack down. Run it at slice verification and whenever a UI change affects a shot; a shot removed from the list leaves its files, which `guide.spec.ts` refuses as unused once no page shows them |
 | `wl audit` | Supply-chain gates (needs the network): `uv audit` on `uv.lock` and `backend/uv.lock`, `npm audit` on `frontend/package-lock.json` (both include dev dependencies), and gitleaks over the whole git history. Fails on any known vulnerability not in `audit-allowlist.toml`, or any secret. See "Supply-chain audit" below |
 | `wl lint` | Backend: ruff check, ruff format --check, pyright, import-linter. Frontend: ESLint, Prettier --check, vue-tsc. CLI and `.claude/hooks/`: ruff check, ruff format --check, pyright |
-| `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`. The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
+| `wl review-copy <dir> [--with-env]` | A throwaway copy of the repository as it is about to be committed: a clone, the uncommitted changes (`git diff HEAD --binary`) applied, and the untracked, non-ignored files; `.env` only with `--with-env`, which also gives the copy a test database of its own (`WATERLINE_TEST_DATABASE=waterline_test_<8 hex>`, DL-392). The reviewers' sabotage copy and `fresh-clone-verifier`'s copy (DL-29). Never changes the repository |
+| `wl discard-copy <dir>` | Drops a `--with-env` copy's test databases (its own and its workers') and deletes the copy (DL-392); refuses any other directory |
 | `wl test` | All tests with coverage gates |
 | `wl fmt` | ruff format and safe ruff fixes (backend, CLI, and `.claude/hooks/`); Prettier and safe ESLint fixes |
 | `wl backend check\|lint\|test\|fmt` | The same, backend only |
 | `wl backend mutate` | Mutation testing (mutmut) over `app/rules/` and `app/authz/`, from a clean slate; fails on any mutant not killed (section 9) |
 | `wl backend test <args>` | pytest with `<args>` passed through, e.g. `wl backend test -k health -x`. A filtered run skips coverage (`--no-cov`), since a subset can't meet the gate, and runs in one process (`-n 0`), so `breakpoint()` works; pass `-n auto` to spread it over workers |
 | `wl frontend check\|lint\|test\|fmt` | The same, frontend only (the npm scripts in `frontend/package.json`) |
+| `wl cli check` | The same, the developer CLI and the hooks only, after the repository-state step; CI's `cli` job (DL-392) |
 | `wl frontend test <args>` | `vitest run <args>`, e.g. `wl frontend test src/api -t network`, without the coverage gate |
 | `wl gen-client` | Export `backend/openapi.json` from the code, then generate `frontend/src/api/schema.d.ts` from it. Run after any API change and commit both files |
 | `wl up [args]` | `docker compose up --detach --wait --build --renew-anon-volumes`: build the images, start the stack (migrations first), and wait until it's up. Extra args go to compose (e.g. `wl up postgres`) |
@@ -135,6 +141,7 @@ container from the api service's image: `docker compose run --rm api ...`, after
 |---|---|
 | `wl seed [flags]` | Create the workspace and its first system admin, who is its owner (refused once a workspace exists). Each value comes from its flag, else its environment variable, else a prompt (the password twice); with no terminal, a missing value is an error. Flags and variables: `--workspace-name` (`SEED_WORKSPACE_NAME`), `--workspace-slug` (`SEED_WORKSPACE_SLUG`), `--email` (`SEED_EMAIL`), `--username` (`SEED_USERNAME`), `--name` (`SEED_NAME`); the password has no flag, only `SEED_PASSWORD` or the prompt, since `wl` prints the command it runs. Every value is checked first (slug, username, email, and the password policy), all problems at once |
 | `wl seed --demo` | Build the demo dataset instead, workspace and system admin included ("Demo data" in section 5): refused once a workspace exists, and unless `DEMO_SEED_ENABLED=true` (the `.env.example` default; off otherwise, and never on in production, since every demo account has the same public password). Takes no other values |
+| `wl seed --manual-pass` | The demo dataset plus every state the slice's manual pass needs ("Demo data" in section 5), refused as `--demo` is. Not for `wl e2e`, whose tests count what `--demo` builds; `wl docs-screenshots` seeds its own run of that stack with it (DL-361) |
 | `wl admin grant-system-admin <email>` | Give the account the system-admin flag (the only way to; design-doc §4) |
 | `wl admin revoke-system-admin <email>` | Take it away, handing over their undecided approvals where the flag was their only access (logged with no actor); refused for the last active system admin |
 
@@ -476,7 +483,7 @@ case there — including an indirect path (A → B → forbidden) wherever indir
 | `migrate` | `alembic upgrade head` once, then exits | — |
 | `api` | uvicorn with `--reload`, `backend/` mounted | `API_PORT` (8000) |
 | `worker` | the procrastinate worker, `backend/` mounted | — |
-| `web` | the Vite dev server, `frontend/` mounted, and `docs/user-guide.md` read-only for the Documentation page (DL-308); proxies `/api` to `api` | `WEB_PORT` (5173) |
+| `web` | the Vite dev server, `frontend/` mounted, and `docs/user-guide/` read-only for the Documentation pages (DL-308, DL-335); proxies `/api` to `api` | `WEB_PORT` (5173) |
 
 - `api`, `worker`, and `migrate` share the backend image; `migrate` runs first, and `api` and
   `worker` start only once it has succeeded (the worker can't run without procrastinate's
@@ -527,6 +534,21 @@ permission its endpoint checks, so a step the app would refuse fails the seed.
 | `dev`, `hana`, `kira`, `quinn` | Viewers of `ERP`, `PORTAL`, `INV`, `FIN` |
 | `fiona`, `felix` | Members of `ERP` who must change their password at sign-in (one per theme run of the end-to-end flow) |
 | `nora` | No memberships: the no-access page |
+
+**For the manual pass**, `uv run wl seed --manual-pass` (instead of `--demo`, on an empty
+database) builds the same data plus every state the slice's manual keyboard and screen-reader
+pass needs (DL-320), each step again by the person who would take it:
+
+| State | Where |
+|---|---|
+| Eleven projects in one org | `acme` gains `CRM`, `WMS`, `HRS`, `BIR`, `EDI`, `MOB`, `SRV` (lead `lena`, member `sam`) and `RADAR`: sign in as `olivia` (the owner) to see all eleven, or `sam` for nine |
+| An export-controlled project | `RADAR` (lead `liam`, member `ben`) |
+| Nested requirements | `PORTAL`'s `RQ-1` › `RQ-2` › `RQ-3`, reported by `finn` |
+| Headings, a list, and a long URL in a description, three revisions | `RQ-2`, Sign-in |
+| Approval requests: pending, approved, "Approved · modified" | `RQ-4`, `RQ-5`, `RQ-6`, asked by `lena`, approver `ella` (sign in as `ella` for one waiting) |
+| Trash items | `RQ-7` deleted alone by `finn`; `RQ-8` with its child `RQ-9` by `lena` |
+| A deactivated member | `hana` (a viewer of `PORTAL`), deactivated by `wendy` |
+| A second session | `admin` has one from Firefox on Windows, beside the one you sign in with; it ends after 7 idle days, so seed shortly before the pass |
 
 ### Local Postgres
 
@@ -819,7 +841,8 @@ frontend/src/
                      SelectField, PasswordField, PasswordRequirements, TemporaryPasswordField,
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
                      Pagination, SuccessStatus, PageHeader, ModalDialog, ItemPanel,
-                     ConfirmDialog, GroupError, RowActions, Icon, NameSlugSettings,
+                     ConfirmDialog, GroupError, RowActions, MoreActionsMenu, Icon,
+                     NameSlugSettings,
                      CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9)
   composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
                      useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
@@ -837,7 +860,8 @@ frontend/src/
                      person, change role, and remove dialogs); plus status/ and errors/ (404,
                      403, no access)
   test/              helpers for the specs: a11y.ts, api.ts (typed responses), projects.ts,
-                     overlay.ts (`stubResizeObserver`, `stubDialog`), router.ts, workspace.ts
+                     overlay.ts (`stubResizeObserver`, `stubDialog`, `stubWidth`), router.ts,
+                     workspace.ts
                      (`mountWorkspaceView`, `mountSignedIn`), org.ts (`mountOrgView`,
                      `mountOrgPages`)
 frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
@@ -939,11 +963,35 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   hides an action the user may never take; the server still checks.
 - **Markdown** (UI-MD-1, UI-MD-2): show stored markdown only with `<MarkdownView :source>`,
   the one place `v-html` is allowed (markdown-it with raw HTML off, then DOMPurify; links only
-  `http`, `https`, and `mailto`; images as links; headings one level down, except `/docs`'s bundled
-  guide at level 0 with opt-in `docs-` heading ids, DL-310, DL-311; `- [ ]` task lists as
-  marks drawn in tokens, named "Done" or "Not done"). Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
+  `http`, `https`, and `mailto`; images as links; headings one level down; `- [ ]` task lists as
+  marks drawn in tokens, named "Done" or "Not done"). A guide page's body renders at level 0 in
+  docs mode (`docs`, `images`; DL-341), never stored content. Edit it with `MarkdownEditor` (`v-model`, `id`, `label`, `error`; Write
   and Preview tabs; `focus()` returns to Write). A new XSS vector goes in
   `MarkdownView.xss-corpus.ts`, which its spec runs through the renderer.
+- **The guide** (DL-335 to DL-342): a page is `docs/user-guide/<slug>.md` (the slug is its
+  address, `/docs/<slug>`), starting with front matter:
+
+  ```
+  ---
+  title: Trash
+  group: Using Waterline
+  order: 6
+  description: Delete a requirement, and bring a deleted one back.
+  ---
+  ```
+
+  `group` is one of Get started, Using Waterline, Administration, or Reference
+  (`views/docs/guide.ts`'s `GROUPS`); `order` places it in its group; `description` is its card's
+  line and its lead. The body starts at `##`: one section per task, named for it. In the body,
+  `> [!TIP]`, `> [!NOTE]`, and `> [!WARNING]` are callouts, `++Esc++` a key, `[Trash](/docs/trash)`
+  a link to another page (or `/docs/trash#restore-a-requirement`, a section: its words in
+  lowercase, joined by hyphens), and `![What it shows](images/<file>)` an image from
+  `docs/user-guide/images/`: a screenshot `wl docs-screenshots` takes, named in
+  `frontend/e2e/screenshots/guide.shot.ts` (add a shot there: a name, a demo user, a path), with
+  alt text saying what it shows. Leave out route paths, exact messages, and numeric limits: those
+  belong in the tests, or in `docs/behavior-reference.md` when no test asserts them (DL-393),
+  while the guide changes only when what a user does or sees changes. `guide.spec.ts` checks every page's
+  front matter, headings, links, and images (each in light and dark, and none unused).
 - **Menus and popovers** come from PrimeVue (`Menu`, `Popover`; UI-STY-3). `LinkPopover` is the
   menu button with a popover of links that the org menu and project selector share; opening
   it moves focus inside (the popover sits at the end of `<body>`, out of the Tab order). A spec
@@ -952,19 +1000,44 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   fire), waits a tick after mounting before opening it, and unmounts its wrappers
   (`enableAutoUnmount(afterEach)`) before the body is cleared.
 - **Dialogs:** `ModalDialog` is the native `<dialog>` (UI-FRM-14): `open()` puts focus on the
-  element marked `data-autofocus` (a confirmation's Cancel) or the first field, and closing
+  element marked `data-autofocus` (a confirmation's Cancel) or the first field (its title with
+  `startOnTitle`, for a first field that opens a list on focus, DL-378), and closing
   returns focus to whatever had it, or to `fallbackFocus` when that's gone (a removed row).
   `RowActions` puts focus back on its own button before an action runs, so a dialog it opens
-  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A form
+  returns there. Specs call `stubDialog()` (`@/test/overlay`): jsdom has no `showModal()`. A
+  confirmation whose action moves focus itself (a navigation) passes `navigates`, so it doesn't
+  return focus to its opener a task later (`ConfirmDialog`). A form
   alert's Retry goes through `retryFromSubmit(form, submit)`, which focuses the submit button
   before repeating the action (UI-FRM-7).
-- **Side panels** (UI-SHL-11): `ItemPanel` is `ModalDialog` with `panel` (docked at the right,
-  opening on its title), Open full page, Copy link, and Close. The list page owns it from its URL
-  (`?open=RQ-7`): it opens the panel when the query names an item and closes it when the query
-  goes; the panel's `close` (Esc, Close) goes Back when the entry before is the list without it,
-  else replaces the URL. The item's view is shared with its full page (`RequirementDetail`, with
-  `inPanel`), and tells the list what it shows (`changed`), so the list updates its row in place
-  (`RequirementsTree`'s `update()`; the tree's data is a shallow ref).
+- **Breadcrumbs** (UI-SHL-14, DL-327): `Breadcrumbs` takes `crumbs` (`{ label, to?, mono?, icon? }`,
+  the last the page itself); `PageHeader` and `RosterPage` take `crumbs`, `ProjectHeader` takes
+  `trail` (the crumbs after the project's). A project page's trail starts from `projectCrumbs`
+  (`@/app/crumbs`, with `orgCrumb` and `WORKSPACE_CRUMB`). The fold under 40rem is CSS
+  (`sm:hidden` on the "…", `max-sm:hidden` on the middle crumbs), so jsdom shows both; its menu
+  mounts on first use. A spec's own router needs the routes the crumbs link to, or the crumb's
+  `RouterLink` throws: wrap its routes in `withTrailRoutes` (`@/test/router`), which adds a
+  placeholder for each one it leaves out; `trail()` (`@/test/trail`) reads the trail back as its
+  links and current crumb. A crumb the viewer may never open is left out (DL-358).
+- **Side panels** (UI-SHL-11, DL-321 to DL-326, DL-355, DL-356): `ItemPanel` holds its own `<aside>` (the
+  split pane at 80rem and wider, DL-383, named by `label`, with the resizing separator; its
+  default width leaves `main`'s list 30rem, DL-385, and a drag belongs to the pointer that
+  started it, a lost capture reverting it) and `<dialog>`
+  (the overlay below), and one teleport that moves the content, its `meta` slot (ID and status)
+  and default slot (the item) under its header, between them. The list page owns it from its URL
+  (`?open=RQ-7`): it calls `open()` when the query names an item, `swapped()` when it names
+  another, and `close()` when it goes. Close and Esc only emit `dismiss`, and the page changes
+  the URL (Back when the entry before is the list without it, else a replace); `closed` comes
+  once it has closed. So every way out goes through the page's `onBeforeRouteUpdate` and
+  `onBeforeRouteLeave`, which ask **Discard your changes?** (`ConfirmDialog` with `navigates`)
+  while the item's `dirty` is true. The item's view is shared with its full page
+  (`RequirementDetail`, with `inPanel`; its ⋯ menu is `MoreActionsMenu`, its fields in the forms
+  `RequirementFields`), and tells the list what it shows (`changed`), so the list updates its row
+  in place (`RequirementsTree`'s `update()`; the tree's data is a shallow ref) and marks the open
+  row (`openNumber`). Specs set the width with `stubWidth(wide)` (`@/test/overlay`; jsdom has no
+  `matchMedia`), whose `resize()` crosses the breakpoint. The `<aside>` is teleported to
+  `AppLayout`'s column after `main` (`#side-pane`, provided as `sidePane`; in place when mounted
+  without the layout), so it runs from under the header to the window's foot and the whole page
+  narrows beside it (DL-356); `main` has no width cap on any page (DL-360).
 - **Live availability** (UI-FRM-9): `useAvailability(value, noun, check, skip)` debounces, keeps
   only the latest answer, and gives the message for a polite live region under the field; `skip`
   leaves out a value that needs no check (the person's own username).
@@ -981,7 +1054,9 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   `expectNoA11yViolations()` (`@/test/a11y`). Give the page one `h1`, in `PageHeader` with the
   page's primary actions (UI-SHL-8; the auth card's pages use a plain, smaller `h1`, and `/docs`
   the guide's own): navigation sets the title
-  to `<h1> · Waterline` and moves focus to it. A page whose `h1` comes from its data sets
+  to `<short title> · Waterline` (the `h1`'s `data-tab-title`, through `PageHeader`'s `tabTitle` or
+  `ProjectHeader`'s `page`, else its text; UI-SHL-9) and moves focus to it. A form page caps its
+  form at `--content-narrow` itself: `main` has no cap (UI-SHL-7). A page whose `h1` comes from its data sets
   `meta: { settlesItself: true }` and calls `settlePage()` once it has loaded (see
   `src/views/project/ProjectHomeView.vue`); a reload after a user's action that replaces the page
   (now the not-found or 403 page) calls `replacedPage()` instead, which focuses the new `h1` on a
@@ -1017,15 +1092,19 @@ Strategy, layers, and gates: `testing-strategy.md`. Layout in `backend/tests/`:
 - Tests use pytest's `importlib` import mode, so test folders have no `__init__.py` (only the
   importable helper packages `factories/` and `support/` do).
 - **Postgres must be running** (`wl up`). Each worker migrates its own test database to head
-  once per session (`waterline_test` itself under `-n 0`); tests never touch the dev database.
+  once per session (`waterline_test` itself under `-n 0`, or the name in
+  `WATERLINE_TEST_DATABASE`, which a `wl review-copy --with-env` copy sets, DL-392); tests never
+  touch the dev database.
 - **Tests run in parallel** (pytest-xdist, DL-100): `pytest` alone spreads the suite over one
   worker per core, at most 8 (`addopts` in `pyproject.toml`). Each worker drops, recreates, and
   migrates its own database, `waterline_test_gw<n>`, at its start; they stay until the next run
   (`wl down -v` clears them). `-n 0` runs in one process on `waterline_test` (filtered runs do,
   and so does mutmut). Coverage is combined across workers, so the gates are unchanged. A test
   that passes alone but fails in the full run depends on another test's state or order: fix
-  the test, never the worker count. Run one full `pytest` at a time against a stack: a second
-  run drops the first run's worker databases.
+  the test, never the worker count. Run one full `pytest` at a time per test database: a second
+  run on the same one drops the first's worker databases. A review copy's runs use its own
+  (`<name>`, and every database named after it: `<name>_gw<n>`, a killed run's scratch ones),
+  which `wl discard-copy` drops with the copy (DL-392).
 - **Async tests** run on the anyio plugin: mark the module `pytestmark = pytest.mark.anyio`.
   A synchronous test must not use async fixtures.
 
@@ -1218,29 +1297,20 @@ message saying so).
 
 - Work proceeds one **checkpoint** at a time (`build-plan.md`), one commit per checkpoint,
   closed out with the `checkpoint` skill.
-- **Pull requests:** each slice works on one branch, `s<n>` (e.g. `s1`), with one draft PR
-  opened at the branch's first push (build plan, "Pull requests"). Push after every checkpoint
-  commit, so CI runs on each; only finished commits are pushed. Groups (each slice's section
-  lists them) are review points, not branches. Design changes from chat are `docs:` commits on
-  the slice branch (tooling code in `chore:` or `ci:` commits, reviewed by `checkpoint-reviewer`;
-  DL-18). Pushed commits are never rewritten (no amend, rebase, or force-push): red
-  CI on a pushed checkpoint is fixed with a `fix(<ID>): …` commit. At the end of the slice,
-  once the owner approves its last checkpoint, the slice retro's changes are applied on the
-  branch with green CI (DL-19), and the owner says so, mark the PR ready and merge it with
-  a **merge commit**: `gh pr merge --merge`, never squash or rebase (the branch stays: no
-  branch can be deleted). Claude first checks the merge state and that every commit is linked
-  to a GitHub account: a commit GitHub can't attribute needs an extra approval, which you can't
-  give on your own PR (DL-33). A merge commit keeps every commit's hash (so review records' base
-  commits stay valid), and `main` keeps one `checkpoint(<ID>):` commit per checkpoint in its
-  history, which the docs consistency tests read. GitHub enforces the rules (DL-27): on every
-  branch, no force-push or deletion; on `main`, changes only through a pull request with the
-  `wl check` status check green, merged with a merge commit.
-- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `uv run wl check --full` on every push
-  to `main` and every pull request (its job is still named `wl check`, the status check the
-  ruleset requires), so a green `wl check --full` locally means a green run there. It
-  checks out the full history (`fetch-depth: 0`, for the docs consistency tests), installs the
-  dependencies from the lockfiles (`uv sync --locked`, `npm ci`), and runs the tests against a
-  `postgres:18` service container; the test database is created by the same init script as in
+- **Pull requests:** one branch, `s<n>`, and one draft PR per slice; push after every
+  checkpoint commit; pushed commits are never rewritten (red CI gets a `fix(<ID>):` commit); the
+  PR merges at the slice's end with a merge commit, on the owner's say-so. The rules: build plan,
+  "Pull requests"; the steps: the `checkpoint` and `slice-end` skills. GitHub enforces them
+  (DL-27).
+- **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `wl check --full`'s parts as parallel
+  jobs on every push to `main` and every pull request (DL-392): `wl backend check`, `wl frontend
+  check`, `wl cli check`, `wl audit`, and `wl e2e`, then a last job named `wl check`, the status
+  check the ruleset requires, which passes only when all five did. A CLI test keeps the jobs'
+  commands equal to `wl check --full`'s, so a green `wl check --full` locally means a green run
+  there. Each job installs only what it needs from the lockfiles (`uv sync --locked`, `npm ci`);
+  the backend, CLI, and audit jobs check out the full history (`fetch-depth: 0`, for the docs
+  consistency tests and gitleaks). The backend's tests run against a `postgres:18` service
+  container; the test database is created by the same init script as in
   Compose (`docker/postgres/initdb/`). There's no `.env` in CI: the workflow sets the
   `POSTGRES_*` variables. A new tool the checks need goes into the workflow's setup steps and
   the developer guide's prerequisites together. `wl check --full` includes `wl audit`, so CI also
@@ -1261,111 +1331,106 @@ message saying so).
 The repository's Claude Code setup lives in `.claude/` and is version-controlled. This section is
 its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when to use each.
 
-- **Skills** (`.claude/skills/`): `checkpoint`, `test-writer`, `migration`, `new-area`,
+- **Skills** (`.claude/skills/`): `checkpoint`, `slice-end` (a slice's last checkpoint: the
+  slice-end reviewers, the retro, the merge; DL-393), `test-writer`, `migration`, `new-area`,
   `design-change`, `vue-screen` (the recipe for a screen or dialog).
 - **Agents** (`.claude/agents/`): `checkpoint-reviewer`, `security-reviewer`,
   `fresh-clone-verifier`, `user-guide-verifier`, `docs-consistency`, `spec-test-writer`,
   `repo-auditor`, `ui-reviewer`, `simplicity-auditor`.
-- **When the agents run:** `spec-test-writer` at the start of every checkpoint that adds or
-  changes `app/rules/` or `app/authz/` (section 9); then, through the `checkpoint` skill and one
-  at a time, `security-reviewer` when the build plan names the checkpoint for it or it touches
-  security-relevant code, `checkpoint-reviewer` at every checkpoint (it also sabotage-checks
-  two or three behaviors in a temporary copy, and reviews a design change's tooling code under
-  a `DC-<YYYY-MM-DD>` review ID), `ui-reviewer` when the diff touches `frontend/src/` or
-  `frontend/e2e/` (read-only: accessibility and frontend conventions against
-  `docs/ui-design-guide.md`, by rule ID; DL-62), and `fresh-clone-verifier`,
-  `user-guide-verifier` (the user guide followed in a browser, DL-124), `docs-consistency`, and
-  `repo-auditor` (a whole-repository audit for bugs, security, scale, untested risk, and
-  slowness, which runs no tests, DL-41; waste is `simplicity-auditor`'s alone, DL-318), then
-  `simplicity-auditor` (a whole-repository audit for overengineering, from the prompts vendored
-  in `.claude/audit/`, whose findings go to the owner, DL-138) at the last checkpoint of a
-  slice. `checkpoint-reviewer`, `security-reviewer`, and `repo-auditor` findings each name a
-  concrete case and are written in plain English (DL-39, DL-41, DL-42). Reviewers never run tests at the same
-  time: they share the test database. `docs-consistency` also runs in every design change, before
-  committing. It is read-only: it reports clear-cut fixes (citing the recorded decision) and
-  decisions for the owner, which are never decided for them.
-- **Design changes** outside a checkpoint's scope (decisions from a chat session, or code that
-  must differ from the docs) use the `design-change` skill: a decision-log entry (`docs/decision-log.md`) for each
-  decision that changes or supersedes a written rule or sets a process, while one that only adds
-  detail to an unbuilt checkpoint goes into that doc and is named in the change's review record
-  (DL-312); every affected doc updated, `docs-consistency`, then a `docs:`
-  commit. A change to code already built becomes a new checkpoint with a letter suffix
-  (`S1-C13a`); checkpoints are never renumbered. Review answers that change built code are
-  bundled into the next planned checkpoint, or one follow-up per group (DL-131). Developer-tooling and process code (hooks, the
-  `wl` CLI, CI, the docs consistency tests) is built in the change itself, in `chore:` or `ci:`
-  commits, after a `checkpoint-reviewer` pass recorded in
-  `docs/reviews/design-changes/DC-<YYYY-MM-DD>-<slug>.md` (DL-18, DL-43). Every design change,
-  docs-only or tooling, gets a record there, holding its `docs-consistency` pass (and, for
-  tooling, `checkpoint-reviewer`'s passes) (DL-126). A checkpoint in progress is parked with `git stash` while a design change is applied,
-  and its review base becomes the design change's last commit (DL-20).
+- **When the agents run:** `spec-test-writer` at the start of a checkpoint that adds or changes
+  `app/rules/` or `app/authz/`; the reviewers at its close, in parallel, each running tests only
+  in its own copy (`wl review-copy --with-env`, DL-392); the slice-end agents at a slice's last
+  checkpoint; `docs-consistency` in every design change with tooling code or a slice's plan. Which agent runs when,
+  and with what inputs: the `checkpoint`, `slice-end`, and `design-change` skills.
+- **Design changes** outside a checkpoint's scope go through the `design-change` skill: a
+  decision-log entry per decision, every affected doc updated, `docs:` commits (tooling code in
+  `chore:`/`ci:` commits, reviewed by `checkpoint-reviewer`); a change to built code becomes a
+  new checkpoint with a letter suffix (`S1-C13a`).
 - **Hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`), run with `uv`, which must be
   on your `PATH`:
   - Claude's edit tools can't change `backend/openapi.json`, `frontend/src/api/schema.d.ts`, or
     a committed migration. Regenerate the client with `uv run wl gen-client`; fix a
     committed migration with a new one. They also can't change `.pre-commit-config.yaml`, which
-    is yours to edit (DL-30; the git guard blocks any redirect naming it too), or git's own files:
+    is yours to edit (DL-30), or git's own files:
     anything in `.git/`, `~/.gitconfig`, or `.config/git/` (DL-31).
   - After Claude edits a file, it is formatted with the backend's ruff (backend), the developer
     CLI's ruff (`tools/cli/` and `.claude/hooks/`, as `wl lint` checks them), or Prettier
     (frontend).
-  - The **git guard** (`guard_git.py`) is an allow-list (DL-26). A Bash call that involves git or gh
-    must be **one command in a listed form, and nothing else**: no `&&`, `;`, `|`, `cd`, variables,
-    `$(...)`, `bash -c`, or environment prefixes. Use `git -C <path>` for another directory, and
-    `git commit -F - <<'EOF'` for a commit message: the delimiter must be quoted, since an unquoted
-    heredoc runs the `$(...)` and backticks in its body. Anything else that mentions git or gh is
-    blocked; ask the owner to run it (`! <command>` in the prompt). Git or gh appearing only as data
-    is fine, in a command that only reads and prints (`grep`, `cat`, `ls`, `head`, `tail`, `wc`,
-    `echo`, `diff`, `jq`, …; not `sort -o`, `uniq`, `rg --pre`, a pager, or
-    `test`/`[`/`[[`/`printf`, which can evaluate a `$(...)` in an array subscript) and with no
-    expansion anywhere (`$VAR`, `${…}`, `$(...)`, backticks), since an expansion can hide a command
-    (`${x:-$(cmd)}`). A call that mentions git may not redirect into `.git/` (its config or hooks),
-    into a git config file (`~/.gitconfig`, `~/.config/git/`), or to a file named only at run time
-    (DL-24); no call, git or not, may redirect to a target with an unquoted glob (`*`, `?`, `[`),
-    which bash expands to an existing file such as `.git/config`, or naming
-    `.pre-commit-config.yaml`, an input redirect too (DL-30). A call that doesn't mention git may
-    still build a target with an expansion (TD-20). Aliases aren't followed: only the listed
-    subcommands run. Allowed:
-    - Reads, each with only its listed options (`tools/cli`'s tests and `READ_ONLY` in the hook
-      list them; e.g. `log --oneline -5 --format=… --since=…`, `diff --stat --cached -U3`,
-      `grep -n -i -A3`): `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `ls-tree`,
-      `blame`, `grep`, `merge-base`, `rev-list`, `cat-file`, `describe`, `shortlog`, and
-      `hash-object <file>` with no options (DL-29; `-w` would write an object). An option
-      that runs a program or writes a file (`grep -O<cmd>`, `--output=<file>`, `--ext-diff`,
-      `--textconv`) isn't listed. Also `branch` (`--show-current`, or `-a`/`-r`/`-v`/`-vv` with
-      `--list <pattern>`), `remote [-v]`, and `config --get <key>`, `config get <key>`,
-      `config --list`/`-l`/`list`.
-    - Local changes: `add` (`-A`, `-u`, `-N`, paths), `rm` (`-r`, `--cached`, paths), `mv`,
-      `restore` (`--staged`, `--worktree`, paths), `checkout -- <paths>`, `stash`
-      (`push [-u] [-m <message>]`, `pop`, `drop`, `apply`, `list`, `show`), `fetch [--prune]
-      [<remote> [<branch>]]`.
-    - Branches: `switch <branch>`, `switch -c <new branch>` (not `main`).
-    - `commit` with `-m <message>`, `-F <file>`, `-F -` (a heredoc), `-a`, `-q`, `--allow-empty`,
-      `--no-edit`, `--amend`: off `main` only (DL-21); `--amend` only while HEAD is unpushed
-      (DL-23).
-    - `push [-u] <remote> <branch>` with a literal branch other than `main`, or a bare `push` off
-      `main` whose push destination (`@{push}`) isn't `main` (DL-22). No other push option, so
-      nothing forces, deletes, or skips hooks (DL-23, DL-24). Configuration that redirects a push
-      isn't checked: GitHub refuses any push to `main`, force-push, or deletion it could cause
-      (DL-27, DL-28).
-    - `reset`: paths (`[HEAD] -- <paths>`), or `[--soft|--mixed|--hard] [<commit>]` that drops
-      no pushed commit (DL-23) and, on `main`, only to `main` itself: a target that git resolves
-      to `refs/heads/main` or a remote's `main` (DL-21).
-    - `pull --ff-only [<remote> <branch>]`; on `main`, only from a configured remote's `main` (a
-      path to another repository isn't a remote; a bare pull needs `main`'s upstream to be a
-      remote's `main`) (DL-21).
-    - `merge`, `rebase`, `cherry-pick`, `revert`, `am`: `--abort` only.
+  - The **git guard** (`guard_git.py`, DL-391) stops the direct form of a forbidden git or gh
+    command and keeps git usage to one plain command per call. It looks only at a call whose
+    program is git or gh (first, or after `&&`, `||`, `;`, `|`, `$(`, a backtick, `bash -c`,
+    `sh -c`, `eval`, `xargs`, or `env`); text that only mentions git (a path, a heredoc's body,
+    `diff -x .git`) isn't checked. That call must be **one git or gh command and nothing else**:
+    no operator, substitution, or redirect, and the one heredoc allowed is a quoted one for `git
+    commit -F - <<'EOF'` (an unquoted heredoc runs the `$(...)` in its body). Use `git -C <path>`
+    for another directory. Evasion (a script, `bash -c` text built at run time, a redirect) is out
+    of its scope, and so is a variable prefix (`SKIP=<hook> git commit`): GitHub's rulesets
+    (DL-27), CI, and `wl check`'s repository-state step (below) cover it. It allows by subcommand, not by flag:
+    - Any flags: `status`, `log`, `diff`, `show`, `blame`, `reflog`, `ls-files`, `ls-tree`,
+      `rev-parse`, `rev-list`, `describe`, `grep`, `cat-file`, `shortlog`, `merge-base`,
+      `for-each-ref`, `show-ref`, `check-ignore`, `fetch`, `add`, `rm`, `mv`, `restore`.
+    - `switch`, but not `-C`/`--force-create` (it moves a branch; `--force` reads as its prefix,
+      so use `-f`); `hash-object <file>` with no
+      options (DL-29; `-w` would write an object), for the spec-test hashes.
+    - `remote [-v]`; `branch` listing (`-a`, `-r`, `-v`, `-vv`, `--list`, `--show-current`) or
+      creating one (`git branch <name>`); `stash` (`push`, `pop`, `apply`, `drop`, `list`,
+      `show`); `config --get <key>`, `config get <key>`, `config --list`/`list`; `checkout
+      <branch>` with no flags; `pull` and `pull --ff-only`; `merge`, `rebase`, `cherry-pick`,
+      `revert`, `am` with `--abort` only.
+    - `commit`, except `--no-verify` or `-n`, on `main`, or `--amend` once HEAD is on the remote.
+      A refused long option is refused abbreviated too, as git accepts it (`--no-verif`).
+    - `push`, except with `--force`, `-f`, `--force-with-lease`, `--force-if-includes`,
+      `--delete`, `-d`, `--mirror`, or `--no-verify` (with `=<value>`, abbreviated, or among
+      short flags: `-uf`), a refspec with `:` or `+`, or `main` as its target (`refs/heads/main`,
+      a bare push or `HEAD` from `main`, or a push destination that is `main`).
+    - Everything else, `reset` and `clean` included, is blocked: ask the owner to run it (`!
+      <command>` in the prompt).
     - gh: `pr create`/`view`/`list`/`checks`/`diff`/`status`/`ready`/`edit`, `run
-      list`/`view`/`watch`, `auth status` (no options: `--show-token` prints the token), `repo
-      view`, `issue list`/`view`, and `gh api` reads. `gh pr merge`, and any other `gh api` call (a
-      method, a field, an input file, GraphQL), asks you first (DL-25).
-  - Every allowed git form, reads included, is run against real git by its tests: each runs in a
-    throwaway clone with a bare remote, and the test asserts exactly which refs and config lines it
-    changes. (The gh forms are tested against the guard only.) What it can't see is logged in TD-20:
-    a script or program that runs git itself, a write to a shell startup file, and a non-git
-    redirect target built by an expansion. Its tests,
-    and the other hooks', are in `tools/cli/tests/hooks/`. All three hooks, and the
+      list`/`view`/`watch`/`rerun`, `auth status` (no options: `--show-token` prints the token),
+      `repo view`, `issue list`/`view`, and `gh api` reads. `gh pr merge`, and any other `gh api`
+      call (a method, a field, an input file, GraphQL), asks you first (DL-25).
+  - **`wl check`'s repository-state step** (`waterline_cli.doctor repo-state`, first in the
+    developer CLI's checks): it fails when `core.hooksPath` is set, when the pre-commit hook is
+    missing or isn't pre-commit's, or when the branch is `main`. In CI (`CI` set) only the first:
+    CI installs no hooks and checks out no branch.
+  - The guard's tests are a table of commands and verdicts, with every command shape the guard
+    trial's friction log recorded, and real git for the three rules that read the repository
+    (a commit on `main`, an amend of a pushed commit, a push to `main`). All three hooks, and the
     `hook_paths.py` helpers they share, are linted, formatted, type-checked, and tested with the
-    developer CLI (`wl lint`, `wl test`).
+    developer CLI (`wl lint`, `wl test`; tests in `tools/cli/tests/hooks/`).
+- **Impeccable** (DL-381), a third-party Claude Code plugin pinned to 4.8.0 (commit `414603b`,
+  Apache-2.0), used only for `/impeccable critique` and `/impeccable audit`, as `vue-screen`'s
+  step before `ui-reviewer`. Each developer installs it at local scope, from the repository root,
+  with the shell CLI (the `/plugin` command in a session ignored `--scope local` in S3-C0o).
+  Local, never project scope: a committed `enabledPlugins` names only the marketplace, not the
+  pinned commit, so a clone whose marketplace follows `main` would run an unreviewed release; it
+  would also enable a third-party plugin, its hooks, and its engine for everyone who clones,
+  where installing it yourself is the only consent they get.
+  ```
+  claude plugin marketplace add pbakaus/impeccable#skill-v4.8.0
+  claude plugin install impeccable@impeccable --scope local
+  ```
+  Then check it's the reviewed code, not only the tag (a tag can be moved): in
+  `~/.claude/plugins/installed_plugins.json`, `impeccable@impeccable`'s local entry for this
+  repository has `"gitCommitSha": "414603bf14c7a344edb466bb1f85690c77ce8b7d"`. If it doesn't,
+  `claude plugin uninstall impeccable@impeccable --scope local` and tell the owner. A marketplace
+  added without the tag follows `main`: remove it first (`claude plugin marketplace remove
+  impeccable`). A newer release is a supply-chain check and an owner decision first.
+  - Its settings are `.claude/settings.json`'s `env`, so every session gets them: its design hook
+    off (`IMPECCABLE_HOOK_DISABLED`), telemetry and update checks off, live mode's copy-edit
+    agent off. Its engine cache is its default, `~/.impeccable` (DL-389): the launcher starts on
+    every edit even with the hook off, and a relative cache path put a copy of the engine in
+    whichever directory the shell was in. Live mode isn't used, and the CSP doesn't change for it.
+  - `.impeccable/` and `DESIGN.md` are ignored by git (`DESIGN.md` isn't kept); `PRODUCT.md`, the
+    product context it reads, is committed at the root and defers to `docs/ui-design-guide.md`.
+    `vue-screen` keeps it current.
+  - The engine is a native binary it downloads on first use. The launcher checks the SHA-256 the
+    plugin ships only on that download and its version's cache; it runs any other copy it finds
+    first without that check: `$IMPECCABLE_BIN`, a binary beside the launcher, or an
+    `impeccable` on your `PATH`. So at install, check `IMPECCABLE_BIN` is unset, there's no
+    `~/.impeccable/bin/impeccable`, and `command -v impeccable` prints nothing. The engine runs
+    unsandboxed, with your session's environment, and the launcher starts on every edit even
+    with the hook off (its engine, not the launcher, honors `IMPECCABLE_HOOK_DISABLED`).
 - Type `/hooks` in Claude Code to see the active hooks. To turn hooks off temporarily on your
   own machine, set `"disableAllHooks": true` in `.claude/settings.local.json` (not committed).
 

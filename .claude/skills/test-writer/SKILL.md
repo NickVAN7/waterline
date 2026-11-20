@@ -19,6 +19,9 @@ Build this table first, from the docs, not from the code:
 |---|---|---|---|---|
 | Member can't delete an approved requirement | design §5 deletion table | unit + API | reporter check ignores `approved_revision_id` | spec test: fails against the always-allow stub |
 
+The "Proof it fails" column is required only for tests of `backend/app/rules/` and
+`backend/app/authz/`; `checkpoint-reviewer`'s sabotage check covers the rest (DL-393).
+
 Where behaviors come from:
 - every row of every table in the relevant design-doc section (roles, transitions, deletion);
 - every constraint and index in the schema-doc tables you touch (unique, CHECK, partial index);
@@ -106,11 +109,12 @@ showing the real endpoint or service denies the forbidden case.
   responses): stub that route too (its schemas, calling the authorization stub) and list it. For
   an endpoint the docs don't specify, write its denial test yourself once it's built, under the
   sabotage check (DL-32). Tests you add on top for other code follow the rest of this skill.
-- **Everything else: sabotage check.** For each behavior in the table, make the smallest change to
+- **Everything else: sabotage check where in doubt** (no "Proof it fails" entry needed, DL-393).
+  For a behavior whose test might not catch its bug, make the smallest change to
   the code that breaks it (invert a condition, remove the `log_change()` call, drop the
   access-scoping filter, skip the version check, return early), run the related tests, and confirm
   at least one fails. Restore the code and confirm with `git diff` that no sabotage remains (a
-  leftover would also fail `wl check`). Record what you broke and which test caught it.
+  leftover would also fail `wl check`).
 - **If nothing fails, the test is shallow.** Fix the test; don't move on.
 - **Mutation testing** (`docs/testing-strategy.md`): no surviving mutants in
   `app/rules/` or `app/authz/`. Kill a survivor with a new or sharper test. Only a truly
@@ -202,11 +206,14 @@ field errors from a 422. Never assert on internal component state.
 
 **Playwright:** only the flows in the slice's "Done when" list, against the full stack.
 
+The frontend spec and e2e traps (overlays, timers, AutoComplete, jsdom's limits, reflow and
+forced-colors checks) are in `.claude/skills/vue-screen/traps.md`, "Specs and end-to-end tests".
+
 ## 6. Done checklist
 
 - [ ] Behavior table complete, with denied rows and a source for each behavior.
 - [ ] Each behavior tested at the cheapest layer that catches it, plus wiring tests for rules.
-- [ ] "Proof it fails" filled in for every row (spec test failing against the stub, sabotage,
-      or killed mutant).
+- [ ] "Proof it fails" filled in for every `rules/` and `authz/` row (spec test failing against
+      the stub, or killed mutant; DL-393).
 - [ ] No banned patterns.
 - [ ] `uv run wl check` green.

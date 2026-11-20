@@ -84,21 +84,3 @@ class ApprovalWorkItem(BaseModel):
     project_key: str
     project_name: str
     organization_slug: str
-
-
-class DecisionWorkItem(BaseModel):
-    """One of the caller's past decisions, in My work (design-doc §11; DL-286): `title` and
-    `revision_number` are the decided revision's, `request_status` the request's now."""
-
-    request_id: uuid.UUID
-    decision: ApprovalDecision
-    decided_at: datetime
-    comment: str | None
-    request_status: ApprovalRequestStatus
-    entity_type: ApprovalEntityType
-    entity_number: int
-    title: str
-    revision_number: int
-    project_key: str
-    project_name: str
-    organization_slug: str

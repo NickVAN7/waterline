@@ -50,5 +50,11 @@ export function myProjectItem(
   key: string,
   overrides: Partial<components['schemas']['MyProjectItem']> = {},
 ): components['schemas']['MyProjectItem'] {
-  return { ...projectItem(key), is_favorite: false, allowed_actions: [], ...overrides }
+  return {
+    ...projectItem(key),
+    is_favorite: false,
+    allowed_actions: [],
+    archived: false,
+    ...overrides,
+  }
 }

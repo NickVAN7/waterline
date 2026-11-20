@@ -6,7 +6,11 @@ description: Close out a Waterline checkpoint — run the gates, update docs and
 # Close out a checkpoint
 
 Run these steps in order at the end of every checkpoint. Do not skip steps, and do not start
-the next checkpoint: this skill ends by stopping for the owner's approval.
+the next checkpoint except as step 7 allows: this skill ends by stopping for the owner's approval,
+unless the checkpoint is marked auto-continue (DL-393).
+
+**Last checkpoint of a slice:** also follow the `slice-end` skill, whose steps join steps 2, 4,
+5, 6, and 7 here.
 
 ## 1. Confirm scope
 
@@ -22,10 +26,6 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   (when anything it depends on changed). The supply-chain audit and the end-to-end tests run in
   CI (`wl check --full`, DL-99), whose green run step 6 waits for.
 - Fix failures and rerun until green. Never lower a threshold or skip a test to get green.
-- **Last checkpoint of a slice:** search `docs/schema-doc.md` for `Added in Slice <n>.` (this
-  slice's number) and confirm each marked column is in its model. The docs consistency tests
-  require these columns only once this checkpoint is committed, so `wl check` can't catch a
-  miss yet.
 
 ## 3. Update the docs
 
@@ -33,7 +33,11 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
   goes in the commit and the review record, not there (DL-315).
 - `docs/developer-guide.md`: anything a developer now needs (setup steps, commands, conventions,
   how-tos, troubleshooting).
-- `docs/user-guide.md`: any user-visible behavior.
+- `docs/behavior-reference.md`: only behaviour no test asserts: flows that cross screens, the
+  reason behind a behaviour, and anything a user must know that no screen states (DL-393). The guide (`docs/user-guide/`, one page per topic) only when something a user does or sees
+  changes or is added: the reference changes with behavior; the guide only when what a user does
+  or sees changes (DL-335). The guide leaves out route paths, exact messages, and numeric limits
+  (DL-342).
 - `docs/design-doc.md`, `docs/schema-doc.md`, `docs/build-plan.md`: any drift between the docs
   and what was built (approved changes only; unapproved divergence goes back to the owner).
 - `docs/tech-debt.md`: add entries for any shortcut, using this format:
@@ -68,48 +72,27 @@ the next checkpoint: this skill ends by stopping for the owner's approval.
     (e.g. Slice 1: "every checkpoint from 1 to 16b"); or
   - the diff touches any of: `backend/app/authz/`; `backend/app/rules/account_rank.py`,
     `password_policy.py`, `identifiers.py`, or `restriction.py`; session, token, password,
-    or cookie code in `backend/app/core/`; the `auth`, `user`, `workspace`, `org`, or `project`
-    areas; any router; rendered markdown (`v-html` or a markdown renderer); CORS, CSRF, or
-    `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
+    or cookie code in `backend/app/core/`; the `auth` area; rendered markdown (`v-html` or a
+    markdown renderer); CORS, CSRF, or `Origin` handling; `github` or `webhook` code; on the frontend, the current-user (auth)
     store, route guards (`src/app/guards/`), or the API client (`src/api/client.ts`).
 - Also invoke the `ui-reviewer` agent, with the same inputs, whenever the diff touches
   `frontend/src/` or `frontend/e2e/` (DL-62). It is read-only and runs no tests.
-- **One reviewer at a time:** when both run, invoke `security-reviewer` first and
-  `checkpoint-reviewer` once it has finished, never in parallel (then `ui-reviewer`, when it
-  runs). Both can run tests against the shared test databases (`waterline_test` and the per-worker
-  copies, DL-100), and two runs at once collide: each run drops and recreates the workers'
-  databases at its start, and the concurrency tests truncate tables and then require every table
-  to be empty. `checkpoint-reviewer`'s sabotage checks run tests too. Don't run tests yourself
-  while a reviewer is running.
+- **In parallel, in one step** (DL-392): invoke every reviewer that applies at once. A
+  reviewer that runs tests does so only inside its own review copy (`wl review-copy <dir>
+  --with-env`, which gives the copy a test database of its own), and discards it with `wl
+  discard-copy <dir>` (its databases dropped too); so you may run tests in the working tree
+  while they run.
 - Do not pass any reviewer your reasoning or a summary of the work; they review from the docs
   and the diff (a re-review also gets the previous pass's record, step 5; DL-105).
 - **Before the first reviewer** (DL-106): review your own diff against the `CLAUDE.md` files'
-  rules (`backend/CLAUDE.md`'s "Rules that are easy to break silently", `frontend/CLAUDE.md`'s
-  "Rules" and "UI"); if that changes anything, rerun `uv run wl check`.
+  rules (`backend/CLAUDE.md`'s "Rules that are easy to break silently" and "Concurrency policy",
+  `frontend/CLAUDE.md`'s "Rules" and "UI", and `.claude/skills/vue-screen/traps.md` for a
+  frontend diff); if that changes anything, rerun `uv run wl check`.
 - **Every reviewer reviews the same snapshot** (DL-105): before invoking the first one, take
   `uv run wl review-copy <dir>/reviewed-1`, in a new directory (`mktemp -d` in your scratchpad;
   `review-copy` refuses one that isn't empty). Fix nothing until every reviewer that runs has
-  reported: at a slice's last checkpoint, the slice-end agents below included, so their
+  reported: at a slice's last checkpoint, the `slice-end` skill's agents included, so their
   findings join the one batch (DL-108).
-- **Last checkpoint of a slice:** once the reviewers above have finished, run `uv run wl down`
-  (so ports are free) and invoke the `fresh-clone-verifier` agent with the repository's
-  absolute path and the checkpoint ID. Its findings are fixed in `docs/developer-guide.md` like
-  any other finding.
-- **Last checkpoint of a slice:** with the dev stack still down, invoke the `user-guide-verifier`
-  agent with the repository's absolute path, the checkpoint ID, and the slice whose "Done when"
-  list to walk (DL-124). Its findings are fixed in `docs/user-guide.md`, or in the app when the
-  app is what's wrong, like any other finding. Run `uv run wl up` again afterwards.
-- **Last checkpoint of a slice:** after `checkpoint-reviewer`, invoke the `docs-consistency`
-  agent with trigger `slice-end` and, as the base, the previous slice's last checkpoint commit
-  (the root commit for Slice 0). It reports **Fixes** and **Decisions**.
-- **Last checkpoint of a slice:** after `docs-consistency`, invoke the `repo-auditor` agent with
-  the slice ID and the checkpoint ID (DL-41). It audits the whole repository, not this diff, and
-  runs no tests.
-- **Last checkpoint of a slice** (from S2-C0a, which builds it, DL-138): after `repo-auditor`,
-  invoke the `simplicity-auditor` agent. It audits the whole repository for overengineering,
-  reports only, and its findings feed the retro; the next slice's C0 applies those the owner
-  accepts. The review record gets its own `## simplicity-auditor` section (a docs consistency
-  test requires that heading in the slice's last record, DL-165).
 
 ## 5. Resolve every finding
 
@@ -121,16 +104,7 @@ For each finding from every reviewer that ran, exactly one of:
 - **Proposed to the owner:** (`repo-auditor` only) a major or blocker finding outside the
   slice's scope, put in the report as a proposed design change (DL-41).
 
-`docs-consistency` **Fixes** are resolved the same way. Its **Decisions** are not yours to
-resolve: leave them undecided and put them in the report (step 7) for the owner.
-
-`repo-auditor` findings are resolved the same way too, but many fall outside the slice's
-scope: fix one only when the fix is within it. Otherwise log it (minor), or put it in the report
-for the owner as a proposed design change (major or blocker). Its questions go to the owner,
-and its findings feed the slice retro.
-
-`simplicity-auditor` findings (from S2-C0a, DL-138) are never fixed in the checkpoint: each goes
-to the owner, who decides it, and feeds the retro; the next slice's C0 applies the accepted ones.
+The `slice-end` agents' findings are resolved as that skill says.
 
 **Fix in one batch** (DL-105, DL-106), once every reviewer has reported:
 - Fix every finding together. Before each fix, grep for the same pattern elsewhere in the diff
@@ -160,8 +134,8 @@ Two passes per reviewer at most. Findings from the second pass are fixed without
 pass, logged, or, when a fix would change behavior beyond the finding, put to the owner in the
 report.
 
-If a finding shows a rule that would have prevented the mistake, add it to the relevant
-`CLAUDE.md`.
+If a finding shows a rule that would have prevented the mistake, add a lint rule or a test if
+one can enforce it, and prose in the relevant `CLAUDE.md` only if not (DL-393).
 
 **Record every pass** of every reviewer that ran (checkpoint, security, UI, fresh-clone,
 docs-consistency, repo-auditor, simplicity-auditor) in `docs/reviews/s<n>/<ID>.md` (format: `docs/reviews/s0/S0-C1.md`).
@@ -208,7 +182,7 @@ Then:
 - Push the branch: `git push -u origin s<n>` at its first push, `git push` after. At the
   first push, open the slice's PR as a draft (`gh pr create --draft`, titled with the slice,
   listing its groups), with a literal `--title '…'` and `--body '…'` or `--body-file <file>`:
-  the git guard allows no heredoc or `$(...)` with gh (DL-26).
+  the git guard allows no heredoc or `$(...)` with gh (DL-391).
 - Push only the finished checkpoint commit, never work in progress. Wait for CI on it
   (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
@@ -216,18 +190,8 @@ Then:
   tree's timing test (`e2e/requirements.spec.ts`; DL-257, DL-271) gets no `fix(<ID>)` commit: rerun the
   job once, then stop and send both runs' numbers to the owner, whatever the rerun shows
   (DL-257).
-- Never merge. At the slice's last checkpoint, the owner's approval decides the merge. Any
-  changes the owner decides in the slice retro are applied first, on the slice branch, with the
-  `design-change` skill and green CI (DL-19). Before asking, check that every commit is linked
-  to a GitHub account (`gh api repos/<owner>/<repo>/pulls/<n>/commits --paginate --jq '.[] |
-  [.sha[0:7], .author.login] | @tsv'`: no empty login) and, once the PR is marked ready, its
-  merge state (`gh pr view <n> --json mergeStateStatus,reviewDecision`), and report a block or
-  an unlinked commit: the ruleset then requires an approval the owner can't give on their own
-  PR (DL-33). Then, on their say-so, mark the PR ready
-  (`gh pr ready`) and merge it with a merge commit (`gh pr merge --merge`; the branch stays,
-  since GitHub blocks deleting any branch, DL-27),
-  never squash or rebase. The git guard asks the owner to confirm the merge (DL-25).
-- Under the git guard (DL-26), run each git or gh command as its own Bash call: `git add …`,
+- Never merge: the PR is merged at the slice's end, as the `slice-end` skill says.
+- Under the git guard (DL-391), run each git or gh command as its own Bash call: `git add …`,
   then `git commit -F - <<'EOF'` with the message, then the push above. When it blocks a command,
   do what its message says.
 
@@ -259,13 +223,12 @@ Send the owner:
   tell them to hard-reload any open tab (DL-260). Run it once yourself to make sure the steps
   are right;
   the owner's run is the check. A checkpoint with no visible behavior says so instead;
-- **last checkpoint of a slice:** the slice retro: what each reviewer caught, what escaped to
-  the owner, which skills and agents never triggered, the verdict of any process trial, and the
-  `repo-auditor` findings left for the owner (with the design changes they propose), and every
-  `simplicity-auditor` finding for the owner to decide.
-  The owner decides what changes; each change that changes or supersedes a written rule, or
-  sets a process, gets a decision-log entry (DL-312), and each is applied on the slice branch
-  before the merge (DL-19);
+- **last checkpoint of a slice:** the slice retro (the `slice-end` skill);
 - what the next checkpoint will cover.
 
-Then **stop**. Do not begin the next checkpoint until the owner explicitly approves.
+Then **stop**. Do not begin the next checkpoint until the owner explicitly approves, with one
+exception (DL-393; trial for the rest of Slice 3, its verdict at the Slice 3 retro): a
+checkpoint the owner has marked **auto-continue** in its build-plan row goes on to the next
+checkpoint after its report when every gate is green, every reviewer finding is fixed, and there
+are no open questions, deviations, or decisions for the owner. The owner reviews the group at its
+last checkpoint, which always stops.

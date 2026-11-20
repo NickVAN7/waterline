@@ -1,7 +1,9 @@
 """Test harness (docs/testing-strategy.md, "Database isolation").
 
 The test database is migrated once per session with Alembic; under pytest-xdist each worker gets
-its own copy, `waterline_test_<worker>`, recreated empty at its start (DL-100). Each test that
+its own copy, `waterline_test_<worker>`, recreated empty at its start (DL-100). A review copy names
+its own, `WATERLINE_TEST_DATABASE=waterline_test_<8 hex>` in its `.env` (DL-392), so reviewers'
+runs and the author's never share a database. Each test that
 asks for a database gets one connection inside an outer transaction; the app's sessions join it with
 `join_transaction_mode="create_savepoint"`, so their commits only release savepoints and
 everything is rolled back when the test ends.
@@ -9,6 +11,7 @@ everything is rolled back when the test ends.
 
 import io
 import os
+import re
 import uuid
 from collections.abc import AsyncIterator, Generator
 from datetime import timedelta
@@ -21,7 +24,7 @@ from alembic.config import Config
 from hypothesis import settings as hypothesis_settings
 from sqlalchemy import URL, text
 from sqlalchemy import create_engine as create_sync_engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.db import SessionMaker, create_engine, create_sessionmaker
@@ -106,11 +109,26 @@ def _seed_factories() -> None:
     reset_factories()
 
 
+class HarnessSettings(Settings):
+    """The app's settings, plus the test database's name (DL-392): `waterline_test`, or a review
+    copy's own from `WATERLINE_TEST_DATABASE`, read like any setting (the env, or `.env`)."""
+
+    waterline_test_database: str = TEST_DATABASE_NAME
+
+    def test_database_url(self) -> URL:
+        if not re.fullmatch(r"waterline_test(_[a-z0-9]+)?", self.waterline_test_database):
+            raise pytest.UsageError(
+                f"WATERLINE_TEST_DATABASE={self.waterline_test_database!r}: tests only ever run "
+                "against a test database, `waterline_test` or `waterline_test_<suffix>`"
+            )
+        return self.database_url(database=self.waterline_test_database)
+
+
 @pytest.fixture(scope="session")
-def settings() -> Settings:
+def settings() -> HarnessSettings:
     # Session lengths pinned to their defaults, so a developer's .env can't change what the
     # tests expect.
-    return Settings(  # pyright: ignore[reportCallIssue]
+    return HarnessSettings(  # pyright: ignore[reportCallIssue]
         api_docs_enabled=True,
         session_idle_timeout=timedelta(days=7),
         session_lifetime=timedelta(days=30),
@@ -118,12 +136,11 @@ def settings() -> Settings:
 
 
 @pytest.fixture(scope="session")
-def test_database_url(settings: Settings, worker_id: str) -> URL:
+def test_database_url(settings: HarnessSettings, worker_id: str) -> URL:
     """The test database, or under xdist this worker's own copy of it (DL-100). `worker_id` is
     pytest-xdist's: "master" when tests aren't distributed."""
-    url = settings.test_database_url()
-    assert url.database == TEST_DATABASE_NAME, "tests only ever run against the test database"
-    return url if worker_id == "master" else url.set(database=f"{TEST_DATABASE_NAME}_{worker_id}")
+    url = settings.test_database_url()  # a test database, or it refuses to run
+    return url if worker_id == "master" else url.set(database=f"{url.database}_{worker_id}")
 
 
 def unreachable(url: URL, exc: OperationalError) -> str:
@@ -143,7 +160,9 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     config = session.config
     if config.option.dist == "no" or hasattr(config, "workerinput") or config.option.collectonly:
         return
-    url = Settings().test_database_url()  # pyright: ignore[reportCallIssue]
+    # The workers' copies are made from a connection to the standing test database.
+    base = HarnessSettings().test_database_url()  # pyright: ignore[reportCallIssue]
+    url = base.set(database=TEST_DATABASE_NAME)
     probe = create_sync_engine(url)
     try:
         with probe.connect():
@@ -152,10 +171,37 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         pytest.exit(unreachable(url, exc), returncode=1)
     finally:
         probe.dispose()
+    if base.database != TEST_DATABASE_NAME:
+        # A review copy's own, ready before the workers start: what reads the test database
+        # directly, and the runs some tests start (pytester), find it migrated.
+        create_database_if_missing(base)
+        migrate(base)
+
+
+def create_database_if_missing(url: URL) -> None:
+    """Create `url`'s database unless it exists; a run started at the same moment may create it
+    first (both runs then go on), from a connection to the standing test database."""
+    admin = create_sync_engine(url.set(database=TEST_DATABASE_NAME), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as connection:
+            connection.execute(text(f'CREATE DATABASE "{url.database}"'))
+    except (IntegrityError, ProgrammingError) as exc:  # it exists: duplicate, or the race's twin
+        if "already exists" not in str(exc.orig):
+            raise
+    finally:
+        admin.dispose()
+
+
+def migrate(url: URL) -> None:
+    config = Config(BACKEND / "alembic.ini")
+    config.attributes["url"] = url
+    config.attributes["configure_logger"] = False
+    command.upgrade(config, "head")
 
 
 def recreate_database(url: URL) -> None:
-    """Drop and create `url`'s database, from a connection to the test database."""
+    """Drop and create a worker's copy of the test database, from a connection to the standing
+    test database."""
     admin = create_sync_engine(url.set(database=TEST_DATABASE_NAME), isolation_level="AUTOCOMMIT")
     try:
         with admin.connect() as connection:
@@ -166,15 +212,15 @@ def recreate_database(url: URL) -> None:
 
 
 @pytest.fixture(scope="session")
-def migrated_database(test_database_url: URL) -> URL:
-    """Bring the test database to the latest migration (the real schema, never create_all)."""
-    config = Config(BACKEND / "alembic.ini")
-    config.attributes["url"] = test_database_url
-    config.attributes["configure_logger"] = False
+def migrated_database(test_database_url: URL, worker_id: str) -> URL:
+    """Bring the test database to the latest migration (the real schema, never create_all): a
+    worker's copy recreated first; a review copy's own made if missing (DL-392)."""
     try:
-        if test_database_url.database != TEST_DATABASE_NAME:
+        if worker_id != "master":
             recreate_database(test_database_url)
-        command.upgrade(config, "head")
+        elif test_database_url.database != TEST_DATABASE_NAME:
+            create_database_if_missing(test_database_url)
+        migrate(test_database_url)
     except OperationalError as exc:
         pytest.exit(unreachable(test_database_url, exc), returncode=1)
     return test_database_url

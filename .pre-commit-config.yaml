@@ -1,6 +1,6 @@
 # Local, fast checks on every commit (docs/testing-strategy.md, "Workflow and gates").
 # Install once per clone: uv run pre-commit install
-# The full gate is `uv run wl check`, which is also what CI runs.
+# The pre-commit gate is `uv run wl check`; CI runs `uv run wl check --full`.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

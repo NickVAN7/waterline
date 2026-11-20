@@ -435,8 +435,11 @@ export interface paths {
         put?: never;
         /**
          * Add Member
-         * @description Add an existing account by email. 422 on `email`: `already_member`, `no_account`, or
-         *     `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`.
+         * @description Add an existing account by email, and to `projects` too, all or nothing (DL-379; the
+         *     project service, which calls the org's). 422 on `email`: `already_member`, `no_account`, or
+         *     `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`. A
+         *     project entry: 422 `duplicate` or an export-control confirmation's on
+         *     `projects.<i>`, 404 for a project outside the org, 403 for one archived.
          */
         post: operations["add_member_api_orgs__org_id__members_post"];
         delete?: never;
@@ -456,8 +459,8 @@ export interface paths {
         put?: never;
         /**
          * Create Member
-         * @description Create the account and its membership in one step; the user must change the temporary
-         *     password at their first sign-in.
+         * @description Create the account and its membership in one step, and add it to `projects` too, as the
+         *     add does (DL-379); the user must change the temporary password at their first sign-in.
          */
         post: operations["create_member_api_orgs__org_id__members_new_post"];
         delete?: never;
@@ -842,6 +845,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/member-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Org Member Projects
+         * @description An org add's projects step (DL-379): the org's live projects, by name, with whether each
+         *     is export-controlled; for whoever may add org members.
+         */
+        get: operations["org_member_projects_api_orgs__org_id__member_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/member-candidates": {
         parameters: {
             query?: never;
@@ -967,46 +991,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/me/work/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Projects
-         * @description The projects the user can open, archived left out.
-         */
-        get: operations["my_projects_api_me_work_projects_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me/work/favorites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Favorites
-         * @description The projects the user starred and can open, archived left out, by name (DL-302).
-         */
-        get: operations["my_favorites_api_me_work_favorites_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/me/work/approvals": {
         parameters: {
             query?: never;
@@ -1019,26 +1003,6 @@ export interface paths {
          * @description The caller's pending approvals, oldest request first (DL-236).
          */
         get: operations["my_approvals_api_me_work_approvals_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me/work/decisions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Decisions
-         * @description The caller's past decisions, newest first (DL-286).
-         */
-        get: operations["my_decisions_api_me_work_decisions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1674,40 +1638,6 @@ export interface components {
             new_password: string;
         };
         /**
-         * DecisionWorkItem
-         * @description One of the caller's past decisions, in My work (design-doc §11; DL-286): `title` and
-         *     `revision_number` are the decided revision's, `request_status` the request's now.
-         */
-        DecisionWorkItem: {
-            /**
-             * Request Id
-             * Format: uuid
-             */
-            request_id: string;
-            decision: components["schemas"]["ApprovalDecision"];
-            /**
-             * Decided At
-             * Format: date-time
-             */
-            decided_at: string;
-            /** Comment */
-            comment: string | null;
-            request_status: components["schemas"]["ApprovalRequestStatus"];
-            entity_type: components["schemas"]["ApprovalEntityType"];
-            /** Entity Number */
-            entity_number: number;
-            /** Title */
-            title: string;
-            /** Revision Number */
-            revision_number: number;
-            /** Project Key */
-            project_key: string;
-            /** Project Name */
-            project_name: string;
-            /** Organization Slug */
-            organization_slug: string;
-        };
-        /**
          * DeletedChildren
          * @description What a requirement's delete does with its children (design-doc §9).
          * @enum {string}
@@ -1844,12 +1774,15 @@ export interface components {
         };
         /**
          * MemberAdd
-         * @description Add an existing account, found by email (design-doc §4: the email comes first).
+         * @description Add an existing account, found by email (design-doc §4: the email comes first), and to
+         *     `projects` too, all or nothing (DL-379).
          */
         MemberAdd: {
             /** Email */
             email: string;
             role: components["schemas"]["OrgRole"];
+            /** Projects */
+            projects?: components["schemas"]["MemberProjectAdd"][];
         };
         /**
          * MemberCandidate
@@ -1879,6 +1812,45 @@ export interface components {
             /** Password */
             password: string;
             role: components["schemas"]["OrgRole"];
+            /** Projects */
+            projects?: components["schemas"]["MemberProjectAdd"][];
+        };
+        /**
+         * MemberProject
+         * @description A project an org add can add the person to as well (Q12g, DL-379): the org's live
+         *     projects; whoever may add org members administers each.
+         */
+        MemberProject: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Export Controlled */
+            export_controlled: boolean;
+        };
+        /**
+         * MemberProjectAdd
+         * @description One of the org's projects to add the new member to as well (Q12g, DL-379).
+         *     `export_control_confirmed`: on an export-controlled project only, and required there (DL-81).
+         */
+        MemberProjectAdd: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** @default member */
+            role: components["schemas"]["ProjectRole"];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
         };
         /**
          * MemberRead
@@ -1967,6 +1939,8 @@ export interface components {
             is_favorite: boolean;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
+            /** Archived */
+            archived: boolean;
         };
         /**
          * MyWork
@@ -2004,7 +1978,10 @@ export interface components {
             owner_id?: string | null;
             new_owner?: components["schemas"]["NewUser"] | null;
         };
-        /** OrgListItem */
+        /**
+         * OrgListItem
+         * @description An org on the workspace's list, with its counts and owners (S3-C0k).
+         */
         OrgListItem: {
             /**
              * Id
@@ -2015,6 +1992,22 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+            /** Project Count */
+            project_count: number;
+            /** Member Count */
+            member_count: number;
+            /** Owners */
+            owners: components["schemas"]["OrgOwner"][];
+        };
+        /** OrgOwner */
+        OrgOwner: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** OrgReach */
         OrgReach: {
@@ -2065,6 +2058,34 @@ export interface components {
             slug?: string | null;
         };
         /**
+         * OrgWork
+         * @description One organization's section on My work (DL-329, DL-330, DL-349, DL-359): its first open
+         *     projects (Active, Planning, On hold, each by name) and how many there are, its first hidden
+         *     ones (Completed, Cancelled, then archived, each by name) and how many, and how many its org
+         *     list shows (all but the archived).
+         */
+        OrgWork: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Projects */
+            projects: components["schemas"]["MyProjectItem"][];
+            /** Total */
+            total: number;
+            /** Hidden */
+            hidden: components["schemas"]["MyProjectItem"][];
+            /** Hidden Total */
+            hidden_total: number;
+            /** Listed Total */
+            listed_total: number;
+        };
+        /**
          * OwnProfileUpdate
          * @description The signed-in user's change to their own profile: their email isn't theirs to change in v1
          *     (design-doc §4).
@@ -2097,17 +2118,6 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[DecisionWorkItem] */
-        Page_DecisionWorkItem_: {
-            /** Items */
-            items: components["schemas"]["DecisionWorkItem"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
         /** Page[MemberCandidate] */
         Page_MemberCandidate_: {
             /** Items */
@@ -2119,10 +2129,10 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[MemberRead] */
-        Page_MemberRead_: {
+        /** Page[MemberProject] */
+        Page_MemberProject_: {
             /** Items */
-            items: components["schemas"]["MemberRead"][];
+            items: components["schemas"]["MemberProject"][];
             /** Total */
             total: number;
             /** Limit */
@@ -2130,10 +2140,10 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[MyProjectItem] */
-        Page_MyProjectItem_: {
+        /** Page[MemberRead] */
+        Page_MemberRead_: {
             /** Items */
-            items: components["schemas"]["MyProjectItem"][];
+            items: components["schemas"]["MemberRead"][];
             /** Total */
             total: number;
             /** Limit */
@@ -2522,6 +2532,17 @@ export interface components {
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
         };
         /**
+         * RequirementAncestor
+         * @description One of a requirement's ancestors: its number, shown as its ID, and its title, for the
+         *     Parent row (DL-328, TD-106).
+         */
+        RequirementAncestor: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+        };
+        /**
          * RequirementApprove
          * @description Approve by hand the revision the admin saw: `version` the one they read (a stale one is a
          *     409, DL-169).
@@ -2581,6 +2602,8 @@ export interface components {
             current_revision_id: string | null;
             /** Approved Revision Id */
             approved_revision_id: string | null;
+            /** Awaiting Approval */
+            awaiting_approval: boolean;
         };
         /**
          * RequirementMove
@@ -2658,6 +2681,8 @@ export interface components {
             updated_at: string;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
+            /** Ancestors */
+            ancestors: components["schemas"]["RequirementAncestor"][];
         };
         /**
          * RequirementRestrictionUpdate
@@ -2940,6 +2965,25 @@ export interface components {
             recommended: string[];
         };
         /**
+         * UserOrgMembership
+         * @description One org in a user's row (S3-C0k): their org role, if they hold one, and how many of its
+         *     projects they're on.
+         */
+        UserOrgMembership: {
+            /**
+             * Org Id
+             * Format: uuid
+             */
+            org_id: string;
+            /** Org Name */
+            org_name: string;
+            /** Org Slug */
+            org_slug: string;
+            role: components["schemas"]["OrgRole"] | null;
+            /** Project Count */
+            project_count: number;
+        };
+        /**
          * UserRow
          * @description A user as the workspace users list shows them (DL-72), with the account actions the caller
          *     may take on them.
@@ -2961,6 +3005,8 @@ export interface components {
             /** Is System Admin */
             is_system_admin: boolean;
             workspace_role: components["schemas"]["WorkspaceRole"] | null;
+            /** Memberships */
+            memberships: components["schemas"]["UserOrgMembership"][];
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -3012,21 +3058,6 @@ export interface components {
              */
             total: number;
         };
-        /** WorkSection[DecisionWorkItem] */
-        WorkSection_DecisionWorkItem_: {
-            /** Available */
-            available: boolean;
-            /**
-             * Items
-             * @default []
-             */
-            items: components["schemas"]["DecisionWorkItem"][];
-            /**
-             * Total
-             * @default 0
-             */
-            total: number;
-        };
         /** WorkSection[MyProjectItem] */
         WorkSection_MyProjectItem_: {
             /** Available */
@@ -3042,12 +3073,26 @@ export interface components {
              */
             total: number;
         };
+        /** WorkSection[OrgWork] */
+        WorkSection_OrgWork_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["OrgWork"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** WorkSections */
         WorkSections: {
             favorites: components["schemas"]["WorkSection_MyProjectItem_"];
-            projects: components["schemas"]["WorkSection_MyProjectItem_"];
+            organizations: components["schemas"]["WorkSection_OrgWork_"];
             approvals: components["schemas"]["WorkSection_ApprovalWorkItem_"];
-            decisions: components["schemas"]["WorkSection_DecisionWorkItem_"];
         };
         /** WorkspaceRead */
         WorkspaceRead: {
@@ -5876,6 +5921,69 @@ export interface operations {
             };
         };
     };
+    org_member_projects_api_orgs__org_id__member_projects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberProject_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     project_member_candidates_api_projects__key__member_candidates_get: {
         parameters: {
             query?: {
@@ -6274,104 +6382,6 @@ export interface operations {
             };
         };
     };
-    my_projects_api_me_work_projects_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                /** @description Comma-separated, `-` for descending: key, name. Default: name */
-                sort?: string | null;
-                status?: components["schemas"]["ProjectStatus"][] | null;
-                status__not?: components["schemas"]["ProjectStatus"][] | null;
-                status__is_null?: boolean | null;
-                type?: components["schemas"]["ProjectType"][] | null;
-                type__not?: components["schemas"]["ProjectType"][] | null;
-                type__is_null?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Page_MyProjectItem_"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-        };
-    };
-    my_favorites_api_me_work_favorites_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                /** @description Comma-separated, `-` for descending: key, name. Default: name */
-                sort?: string | null;
-                status?: components["schemas"]["ProjectStatus"][] | null;
-                status__not?: components["schemas"]["ProjectStatus"][] | null;
-                status__is_null?: boolean | null;
-                type?: components["schemas"]["ProjectType"][] | null;
-                type__not?: components["schemas"]["ProjectType"][] | null;
-                type__is_null?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Page_MyProjectItem_"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-        };
-    };
     my_approvals_api_me_work_approvals_get: {
         parameters: {
             query?: {
@@ -6393,49 +6403,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ApprovalWorkItem_"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-        };
-    };
-    my_decisions_api_me_work_decisions_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                /** @description Comma-separated, `-` for descending: decided_at. Default: -decided_at */
-                sort?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Page_DecisionWorkItem_"];
                 };
             };
             /** @description Unauthorized */

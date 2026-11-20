@@ -137,7 +137,7 @@ the backend that is updated when a module's slice ships. Until then, seeding ski
 (every project created before Slice 4 starts with no modules), the API refuses enabling it (422
 `validation_error` on `enabled_modules`, as above), and the UI shows it as a
 disabled checkbox with "Not available yet", while module guidance still lists it as recommended,
-with `available` false. When `sprints` (Slice 4) and `github` (Slice 7) ship, that slice decides
+with `available` false. When `sprints` (Slice 4) and `github` (Slice 8) ship, that slice decides
 whether existing software projects get the module turned on.
 
 - **Disabling a module hides it; it never deletes data.** Re-enabling brings everything back.
@@ -280,15 +280,17 @@ cross-area rules are in `build-plan.md` ("Backend architecture", "Feature map").
   subtask; phases and workstreams use `rank` for display order. Moving an item rewrites only
   that row, except a drop past the length cap or between tied neighbors, which rewrites that
   gap's siblings (requirements, DL-204, DL-213, and a delete's promote or a restore at the top
-  level the same way, DL-218; tasks decided in Slice 3, DL-216). See §6.
+  level the same way, DL-218; for tasks, the project's whole task order, DL-345). See §6.
 - **Markdown** (DL-140): descriptions and comments are stored as markdown (`description_md`)
   and rendered in the browser, never on the server, with `markdown-it` (raw HTML off) and then
   DOMPurify on its output, so stored XSS can't run. Supported: CommonMark plus tables, task-list
   syntax, strikethrough, and autolinks. **No remote images**: image syntax renders as a link,
   since a remote image tracks who opens the page and leaks that a Confidential item was opened
   (uploads are v2). Links only `http`, `https`, and `mailto`, with `rel="noopener noreferrer"`.
-  Headings in stored content shift down one level, so a description never adds a second `h1`
-  (the bundled user guide on `/docs` is rendered at its own levels, DL-310). Code blocks are
+  Headings in stored content shift below the heading they sit under: the content's highest
+  heading becomes the next level down and the rest keep their distance from it, capped at `h6`,
+  so a description never adds a second `h1` nor skips a level under its section (DL-382; the bundled guide's pages on `/docs/<page>` are rendered at their own levels, DL-310; only they get
+  docs mode's callouts, keys, heading anchors, links to our own pages, and bundled images, DL-341). Code blocks are
   monospace, with no syntax highlighting. A server-side renderer (`markdown-it-py` and `nh3`)
   is added only when something server-side shows content (v1.5 notifications, exports). A
   Content-Security-Policy is the second layer (§4).
@@ -448,7 +450,10 @@ Workspace (the firm: tenant boundary)
 - **Client users normally belong to one org.** This is typical, not enforced.
 - **One workspace for the foreseeable future.** It exists mainly to roll up dashboards and
   statistics across clients. Rules that only matter with several workspaces (e.g. users in more
-  than one) are decided if a second workspace is ever needed.
+  than one) are decided if a second workspace is ever needed. No new workspace-level screens,
+  roles or actions until a second workspace exists, except the two already planned: the audit
+  log page (Slice 7) and the operations screen (Slice 8) (DL-394). New item types still carry
+  `workspace_id` and use the existing list scoping (DL-393).
 - **Staff may also hold org memberships**, e.g. a workspace member who is an admin of a client
   org to manage that client's users.
 
@@ -591,7 +596,9 @@ Workspace (the firm: tenant boundary)
   scripts only from our own origin, a second layer behind the markdown sanitizer (§3). Styles
   are `style-src 'self' 'unsafe-inline'` (DL-246): PrimeVue and the Vite dev server inject
   `<style>` tags, and a nonce needs a server that mints one per response, which comes with the
-  first deployment (TD-87).
+  first deployment (TD-87). The build never inlines an asset (`assetsInlineLimit: 0`), so a
+  bundled image stays a file on our own origin, not a `data:` URI the policy would block, and no
+  `img-src` widening is needed (DL-370).
 - **Slice 1 security checklist** (standard practice, built with auth):
   - Token: 32 random bytes (`secrets.token_urlsafe(32)`); only its SHA-256 hash is stored.
   - Cookie: `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
@@ -618,7 +625,7 @@ Workspace (the firm: tenant boundary)
     The `Origin` check:
     - applies to every `POST`, `PUT`, `PATCH`, and `DELETE`, except the endpoints on a short
       exemption list, each of which authenticates its caller another way and carries no
-      browser session. The list is only the GitHub webhook (Slice 7; its
+      browser session. The list is only the GitHub webhook (Slice 8; its
       `X-Hub-Signature-256`, §12). Adding an endpoint needs the owner's approval, recorded by
       adding it to this list; the security reviewer checks that it authenticates another way,
       carries no browser session, and has a test that its own authentication rejects an
@@ -797,6 +804,15 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   | Phase, milestone (hard delete) | any project member (member role or above), only while nothing references them |
 
   An approved requirement is a signed-off artifact, which is why it needs a project admin.
+- **Task assignee and reviewer** (DL-347): an active user who may update tasks in the project
+  (members and up with content access; inherited admins on a project that isn't
+  export-controlled), checked by the same person check as a requirement's reporter and an
+  approver (`docs/reviews/s3/S3-plan.md`, C5). A deactivated assignee or reviewer
+  stays on existing tasks, with the "Deactivated" badge, until someone reassigns the task (§4).
+- **The project activity feed is content** (from Slice 3; `docs/reviews/s3/S3-plan.md`, Q10):
+  the whole feed is read through one content action, `project.view_activity`, so on an
+  export-controlled project an inherited admin without an explicit membership doesn't see it
+  (§3.1), project entries included.
 - **Gate sign-off status:** only a project admin moves a gate into `approved` by hand or moves
   it out of `approved` to any other status; completing the gate's approval request sets it as
   a system effect. Members change other milestone statuses as usual. `approved` is refused on
@@ -918,7 +934,9 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   ticking one would edit the description, create a revision, and flag "Approved · modified".
   Templates hold no placeholder comments (raw HTML is off, so they'd show); hints sit beside the
   editor. A requirement with no "Acceptance Criteria" heading (any level, ignoring case) shows a
-  "No acceptance criteria" note on its detail page; nothing blocks it.
+  "No acceptance criteria" note on its detail page (one note, "No description: …", when the
+  description is empty), and Request approval and Approve by hand warn of it (DL-384); nothing
+  blocks it.
 - Revision history and approval tracking — see §6.1 and §6.2.
 - **Traceability in v1** is coverage columns on the requirement tree: task count and progress,
   test-case count, latest result, and approval state, filled in as Slices 3 and 5 ship. There is
@@ -1073,7 +1091,10 @@ requirement approval.
   chores, and spikes often have no parent requirement. Tasks without a requirement are flagged
   in the UI, not blocked.
 - `type`: feature / bug / chore / spike / config / data / training. (Displayed per project type,
-  e.g. `bug` → "Defect" on ERP projects.)
+  e.g. `bug` → "Defect" on ERP projects.) Software projects offer feature, bug, chore, and spike;
+  ERP and general projects offer all seven (DL-352: a rule in `rules/`, the project's allowed
+  types exposed by the API, the labels a frontend constant). An
+  existing task's type is always shown, even after its project's type changes.
 - `severity` (s1 / s2 / s3 / s4, nullable): defect severity, shown for bugs. Separate from
   priority — severity is the impact, priority is the order work is done in.
 - Title, markdown description, **manually set** `status` (not derived from subtasks; a
@@ -1163,6 +1184,10 @@ requirement approval.
 - One rank per task (not per view). The backlog shows tasks in rank order; a board column shows
   its status's tasks in the same relative order. Dragging within a column updates rank;
   dragging to another column changes status and places the card among that column's cards.
+- **The backlog and board before sprints** (DL-346): the backlog lists every task not `done` or
+  `cancelled` (the filter bar shows the rest); the board has five columns, To do, In progress,
+  Blocked, In review, and Done, with Cancelled left off (filterable in the backlog). Slice 4
+  narrows the backlog to tasks without a sprint (Sprint planning, below).
 - Rank is the default **manual** sort. Users can switch a view to sort by priority, due date,
   etc. (display-only); drag-to-reorder is available only in manual sort.
 - New items go to the bottom by default. Requirement and subtask ranks are meaningful among
@@ -1193,22 +1218,25 @@ requirement approval.
   - **Ties:** every ordered query sorts by `(rank, id)`, so two items that receive the same rank
     still order deterministically. No periodic rebalancing in v1: the only rewrites are a drop
     past the length cap and a drop between tied neighbors (above, DL-213), and the same for a
-    delete's promoted children and a restore at the top level (§9, DL-218). These rewrites and
-    the move lock below are the requirement tree's; which items a task rewrite covers, and
-    whether task moves run one at a time, is decided in Slice 3 planning (DL-216).
+    delete's promoted children and a restore at the top level (§9, DL-218). A task's rewrite
+    covers the project's whole task order, in one statement (DL-345; the tree's rewrite becomes
+    one statement too, TD-73).
   - **Requirement moves run one at a time per project** (DL-214; every requirement parent
     change, a delete's promote and a restore at the top level included, DL-215): a move takes
     the project's tree lock
     first (`FOR NO KEY UPDATE` on the project row, which doesn't block creates), so two moves
     at once can't make a parent cycle that neither saw. A reorder leaves `updated_at` alone; a
-    parent change is logged and moves it. Neither bumps `version`.
+    parent change is logged and moves it. Neither bumps `version`. **Task moves** take the same
+    lock, one at a time per project (DL-345).
   - **Cross-column drop** on a board changes status and rank in one request. The status change
     goes through the transition rules in `authorize()` (§5); if denied, the card snaps back with
     a short message and nothing is saved.
 - **Requirement tree:** no drag (PrimeVue TreeTable, DL-174): its menu (`MoveToMenu`) reorders
   among siblings with the non-drag set below (DL-243). Changing a requirement's parent uses a
   "Move to…" action, which runs the same-project and cycle checks and shows the result clearly.
-  Parent changes are logged (§10).
+  Parent changes are logged (§10). **Filtering the tree** (from Slice 3, DL-351): the tree takes
+  declared filters and returns the matches with their ancestors, marked as context; while it's
+  filtered, the move menu is off, with a polite note saying so.
 - **Sprint planning** (`sprints` module): the backlog shows sprint sections; dragging a task into
   a section sets its `sprint_id` and rank in one request.
 - **Non-drag alternatives:** every draggable list offers "Move to top" / "Move to bottom",
@@ -1306,7 +1334,7 @@ accurate PR status.
 **Deleting a test case:** its requirement links and recorded results remain for history; its
 `not_run` rows are removed from open runs.
 
-**Deleting a requirement** (the Delete button in its header, on the page and in the side panel,
+**Deleting a requirement** (Delete… in its header's ⋯ More actions, on the page and in the side panel,
 DL-287) opens a dialog listing what's affected, with a choice per category:
 - **Linked tasks and test cases:** *detach* them (they remain, now without a requirement, and
   are flagged in the UI) **or** soft-delete them too.
@@ -1341,11 +1369,15 @@ Restore in its `allowed_actions` only when the whole restore would pass (DL-222)
 see everything in the project. An archived project's trash lists the same items, with no Restore
 (DL-220).
 
-**Trash** (DL-146): a project Trash page, the last item of the project's navigation (DL-202),
-shown to those who read the project's content (`requirement.view`, DL-291), lists deleted items
-by type (requirements from Slice 2; tasks and test
-cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
-`allowed_actions` allows it. Nothing is purged automatically in v1. After a restore the list
+**Trash** (DL-146): a project Trash page, for those who read the project's content
+(`requirement.view`, DL-291), lists deleted items by type (requirements from Slice 2; tasks and
+test cases join in Slices 3 and 5): the item, who deleted it, when, and Restore where
+`allowed_actions` allows it. It isn't in the project's navigation (DL-350; it was last there from
+DL-202 until S3-C0l): every list page whose items can be deleted has a **Trash** link in its
+header (Requirements from S3-C0l, Tasks from S3-C20, Test cases in Slice 5), shown under the same
+check, opening this page filtered to
+that page's type (`?type=task`), the filter removable; the route `…/:key/trash` stays, and its
+breadcrumb leads back to the list. Nothing is purged automatically in v1. After a restore the list
 reloads, so the descendants restored with it leave too, with a status linking to the restored
 item and focus on the row now in its place (DL-290). **Restoring a tree:**
 restoring a requirement also restores the descendants deleted in the same action, identified by
@@ -1499,8 +1531,11 @@ table, `audit_event` (schema-doc, "Audit").
 ### Lists: saved filters and CSV export
 - **Saved filters** (DL-197): a user saves a filter-bar setup by name, per list, and reapplies,
   renames, or deletes it. Personal only in v1 (sharing is v2, §16). The filters also live in the
-  URL, so a filtered list can be bookmarked or shared. Slice 3 (DL-239); its table is designed
-  there.
+  URL, so a filtered list can be bookmarked or shared. Slice 3 (DL-239), last, as a nice-to-have
+  (S3-C32), on project lists only. A saved filter belongs to one list in one project (`docs/reviews/s3/S3-plan.md`, Q8;
+  the `saved_filter` table, schema-doc), so its project's values (a workstream, an assignee) keep
+  matching; its query is checked against the list's declared filters when it's applied, not when
+  it's saved.
 - **CSV export** (DL-197) of the current list, with its filters and columns as shown, for tasks,
   requirements, test cases, and test results: requirements and tasks in Slice 3, test cases and
   test results in Slice 5 (DL-239). Exporting a whole project stays v2 (§16).
@@ -1524,15 +1559,25 @@ Each project shows its org, status, lead, and the user's access (their explicit 
 or inherited admin; DL-153). It is scoped like every list endpoint (§5, "Reads are authorized
 too"), leaves out the
 content of export-controlled projects where the user has no explicit membership (§3.1), and
-leaves out archived projects and every item in them (tasks, reviews, test cases; archiving
-cancels their approval requests, §6.2; DL-200), which stay visible inside the project. Until
+leaves out every item in archived projects (tasks, reviews, test cases; archiving cancels their
+approval requests, §6.2; DL-200), which stay visible inside the project, and, until S3-C0f, the
+archived projects themselves (DL-330). Until
 notifications (v1.5), it's how people learn that something is waiting for them. **Favorite
 projects** (DL-197): a star on a My work project row keeps it at the top, per user: a Favorite
-projects section first, by name, archived ones left out (S2-C21c, DL-238, DL-302 to DL-305); favoriting items is v1.5 or later, and there's no "recently viewed".
-From S3-C0f (DL-329 to DL-334), My work opens with the approvals waiting for you, then
-Favorites, then a section per organization listing every project you can open (active first;
-completed, cancelled, and archived behind a toggle), in compact rows; the past-decisions
-section is removed (DL-333). This section is rewritten then.
+projects section first, by name, archived ones left out, every favorite shown (no cap, DL-369; S2-C21c, DL-238, DL-302 to DL-305); favoriting items is v1.5 or later, and there's no "recently viewed".
+From S3-C0f (DL-329, DL-330, DL-332 to DL-334, DL-349, DL-359), My work opens with Favorites,
+then a section per organization you can open a project in (by name; its heading left out when
+there's one), in compact rows: its first 5 open projects (Active, Planning, On hold, each by
+name; DL-368) with "Showing 5 of N" past 5, then **Show N hidden projects** revealing the first 5
+of the rest (Completed, Cancelled, each by name, then the archived by name alone), and **All N projects**, N being what
+the org's own list shows (all but the archived; no link when that's none); the heading's count is every project of it you
+can open. Archived projects are on these lists (no star: starring is a mutation), their items
+still left out. Then the approvals waiting for you; the past-decisions section is removed
+(DL-333). From
+S3-C11 and S3-C29 (DL-349), summary tiles open the page (Approvals waiting, Assigned to you,
+Waiting for your review, Overdue or due this week: the user's open assigned tasks due before
+today plus 7 days), each a link to its section, and the two task sections follow Approvals. This
+section is rewritten then.
 My work is the cross-project view in v1; a portfolio view comes when it outgrows the page
 (§16). It lives at the root route (`/`), so it adds nothing to the reserved-slug
 list (§3); a top-level route of its own would have to join it. Each section arrives with its
@@ -1548,28 +1593,38 @@ through the other areas' repositories and calls no service (build plan, "Feature
   section's query runs in a savepoint, so one that fails is returned as unavailable and the
   rest still show.
 - `GET /api/me/work/{section}`: one section as an ordinary offset-paged list (build plan,
-  "API conventions"), for "see all".
+  "API conventions"), for "see all": approvals only, since favorites are shown in full (DL-371)
+  and each organization links to its own list.
 
 ### Project home: Get started checklist
 DL-201. A new project's home page shows three items, each linking to where it's done and ticked
 automatically from the project's data: **Invite your team** (ticked once the project has a
 member besides its creator), **Compile your plan** (once it has a phase or milestone with a
-date; the item is hidden until phases and milestones ship), and **Start your project** (a
+date; shown from S3-C27, when phases ship, a dated milestone counting too from Slice 4, DL-354), and **Start your project** (a
 requirement, a test case, and a task, each part shown once its feature ships). The ticks are
 loose: a step started counts. It's shown only to the project's admins, disappears when all three
-are ticked, and a project admin can hide it sooner (a per-project flag, designed with it). It
+are ticked, and a project admin can hide it sooner (`project.get_started_hidden`, schema-doc). It
 ships in Slice 3 (DL-239).
 GitHub is not part of it.
 
+**The project home's numbers and status** (from Slice 3; `docs/reviews/s3/S3-plan.md`, Q11,
+Q12f): the home shows the project's current phase and two headline numbers, blocked tasks and
+pending approvals (untested requirements join in Slice 5); its admins change the project's status
+from a status menu there as well as in Settings.
+
 ### Documentation
-The user menu's **Documentation** item renders the user guide inside the app (DL-197), at
-`/docs` (S2-C21d, DL-238; `docs` joins the reserved slugs there, §3). The guide is bundled into
-the web app at build time, the same for every signed-in user, with no endpoint (DL-308); its own
-heading (**User guide**) is the page's, and a Contents list after it links to each section (DL-310, DL-311).
-From S3-C0g (DL-335 to DL-342), the guide is one page per topic under `docs/user-guide/`, with
-a landing page and article pages in its own sidebar nav, and today's file becomes
-`docs/behavior-reference.md`, which the app never shows; from S3-C0h its screenshots are
-generated (DL-343).
+The user menu's **Documentation** item opens the guide inside the app (DL-197; S2-C21d,
+DL-238; `docs` is a reserved slug, §3). The guide is one markdown page per topic under
+`docs/user-guide/`, with front matter (`title`, `group`, `order`, `description`), in four groups
+(DL-337), bundled into the web app at build time with its images, the same for every signed-in
+user, with no endpoint (DL-308, DL-335). `/docs` is a landing page (DL-339) and `/docs/<page>`
+an article, a section's anchor `/docs/<page>#<section>` (DL-338, DL-340); on a docs route the
+sidebar shows the guide's groups and pages. It's written for readers, task by task, leaving out
+what the screen already says (DL-342). What no test asserts (flows that cross screens, the
+reasons behind a behaviour, what no screen states) is in `docs/behavior-reference.md`, which the
+app never shows (DL-393): the reference changes with behavior; the
+guide only when what a user does or sees changes (DL-335). Docs-only search is deferred to Slice 6's
+site-wide search (TD-104). Its screenshots are generated by `wl docs-screenshots`, from the manual pass's demo data, in light and dark, each shown in its theme (DL-343, DL-361).
 
 ### Not in v1
 - Watchers/subscribers and notifications → notifications planned for **v1.5** (§16).
@@ -1584,7 +1639,7 @@ does not write code or push to repos.
    have several, e.g. a personal account and a company org), connected by org owners/admins
    (including inherited). API tokens are fetched short-lived per request from the installation
    ID. GitHub's setup redirect after installing lands on a frontend route, which `POST`s the
-   `installation_id` to the API (§4, CSRF). **Open, for the Slice 7 design pass:** how the
+   `installation_id` to the API (§4, CSRF). **Open, for the Slice 8 design pass:** how the
    API verifies that the posted `installation_id` belongs to the requesting user and org
    before storing it (anyone can put any ID in that URL); until then, never store an ID from
    the redirect unverified. A project needs no installation: it links to repos
@@ -1623,7 +1678,8 @@ attribution; a scoped "system actor" is the alternative. Left as a v2 design que
 ## 13. Background Jobs
 
 - **Library:** procrastinate, with jobs stored in Postgres. Runs as the `worker` service.
-- **v1 uses:** webhook processing, the webhook sweeper. **Later:** notifications (v1.5), nightly
+- **v1 uses:** the nightly expired-session cleanup (Slice 7, the first real job, DL-393), webhook
+  processing, the webhook sweeper. **Later:** notifications (v1.5), nightly
   sprint/burndown snapshots, CI result ingestion, ERP module jobs (e.g. cost imports), v2 AI
   jobs.
 - **Why not FastAPI `BackgroundTasks`:** in-process, no retries, lost on restart.
@@ -1645,8 +1701,8 @@ the queue's own tables) and deliveries whose processing recorded an `error`
 (`github_webhook_delivery`, §12). Retrying stays in the CLI (a `wl admin` command). Failed jobs
 are read through a wrapped helper in `app/jobs/` over procrastinate's tables (convention 5),
 with no ORM models for them (schema-doc, "Infrastructure tables"). If the screen gets a
-top-level route of its own, the path joins the reserved-slug list (§3). Built with the webhooks,
-the first v1 jobs (Slice 7). Email notification of failures waits for email sending (§16).
+top-level route of its own, the path joins the reserved-slug list (§3). Built with the webhooks
+(Slice 8); the job queue's first real job is the nightly session cleanup (Slice 7, DL-393). Email notification of failures waits for email sending (§16).
 
 ### Transactional enqueue (S0-C3 spike result)
 
@@ -1756,6 +1812,8 @@ corrected. *Decided Oct 6–7, 2026:* a planned case can
   stakeholder-ready summary of a view or period.
 - **Favoriting items** (requirements, tasks, test cases), beside v1's favorite projects
   (DL-197).
+- **My work as a fuller dashboard** (v1.5 or v2, DL-349): summarizing everything for the user
+  across Waterline, beyond v1's summary tiles.
 
 ### v2 — ERP implementations
 v1 is built for software projects (§1); v2 adds what ERP implementations need. Each item needs

@@ -32,6 +32,9 @@ x-backend: &backend
 services:
   postgres:
     image: postgres:18
+    # Room for reviewers' test runs at once, each with its own databases (DL-392): one full run
+    # takes up to 8 workers' connections and the concurrency tests' pools; the default is 100.
+    command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env (copy .env.example)}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env (copy .env.example)}
@@ -101,8 +104,9 @@ services:
       - "127.0.0.1:${WEB_PORT:-5173}:5173"
     volumes:
       - ./frontend:/app
-      # The user guide, which the Documentation page imports at its path beside `frontend/` (DL-308).
-      - ./docs/user-guide.md:/docs/user-guide.md:ro
+      # The guide's pages and images, which Documentation imports at their path beside `frontend/`
+      # (DL-308, DL-335).
+      - ./docs/user-guide:/docs/user-guide:ro
       # node_modules from the image, not the host's; `wl up` renews it on every start.
       - /app/node_modules
     depends_on:

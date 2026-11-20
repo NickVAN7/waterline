@@ -7,6 +7,7 @@ import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { trail } from '@/test/trail'
 import {
   cleanUpAfterEach,
   emptyPastTheFirst,
@@ -68,8 +69,12 @@ describe('StaffView', () => {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Workspace staff')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({ links: [['Workspace', '/workspace/staff']], current: 'Staff' })
     // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
-    expect(wrapper.find('nav').exists()).toBe(false)
+    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
+    ])
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr
@@ -80,17 +85,20 @@ describe('StaffView', () => {
     ).toEqual([
       ['Olga Owner', 'olga-owner@harbor.example', 'Owner'],
       ['Mo Member', 'mo-member@harbor.example', 'Member'],
-      ['Dee Gone Deactivated', 'dee-gone@harbor.example', 'Member'],
+      ['Dee Gone · Deactivated', 'dee-gone@harbor.example', 'Member'],
     ])
     await expectNoA11yViolations(wrapper)
   })
 
-  it('marks a deactivated person with a badge (UI-FBK-6, DL-102)', async () => {
-    staffAnswers([DEE])
+  it('mutes a deactivated person\'s row, "· Deactivated" after the name (UI-FBK-6, S3-C0k)', async () => {
+    staffAnswers()
 
     const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff')
 
-    expect(wrapper.get('tbody td').text()).toContain('Deactivated')
+    const muted = wrapper.findAll('tbody tr').map((tr) => tr.classes().includes('text-text-muted'))
+    // Olga and Mo active, Dee deactivated.
+    expect(muted).toEqual([false, false, true])
+    expect(wrapper.findAll('tbody tr')[2]!.get('td').text()).toBe('Dee Gone · Deactivated')
   })
 
   it('offers Add person only to those who may manage the staff', async () => {

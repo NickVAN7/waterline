@@ -41,7 +41,7 @@ defineExpose({ focus: () => input.value?.focus() })
     :error="error"
     :described-by="describedBy"
   >
-    <template #default="{ describedBy, invalid }">
+    <template #default="{ describedBy: ids, invalid }">
       <input
         :id="id"
         ref="input"
@@ -51,7 +51,7 @@ defineExpose({ focus: () => input.value?.focus() })
         :autocomplete="autocomplete"
         :aria-required="required ? 'true' : undefined"
         :aria-invalid="invalid ? 'true' : undefined"
-        :aria-describedby="describedBy"
+        :aria-describedby="ids"
         :class="[
           'min-h-(--control-height) w-full rounded-md bg-bg px-3 text-text placeholder:text-placeholder',
           invalid ? 'border-2 border-tone-danger-edge' : 'border border-border',

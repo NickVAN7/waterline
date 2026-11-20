@@ -13,10 +13,14 @@ from app.cli import main, parser, run
 from app.core.db import SessionMaker
 from app.core.security import verify_password
 from app.core.settings import Settings
-from app.enums import AuditAction
+from app.enums import ActivityAction, AuditAction
+from app.models.approval import Approval, ApprovalRequest
+from app.models.audit import ActivityLog
 from app.models.audit_event import AuditEvent
+from app.models.auth import UserSession
 from app.models.org import Membership, Organization
 from app.models.project import Project, ProjectMembership
+from app.models.requirement import Requirement, RequirementRevision
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMembership
 from tests.factories.workspace import WorkspaceFactory
@@ -25,6 +29,8 @@ from tests.integration.test_cli import count
 pytestmark = [pytest.mark.anyio, pytest.mark.security]
 
 DEMO = ("seed", "--demo")
+MANUAL_PASS = ("seed", "--manual-pass")
+BOTH = pytest.mark.parametrize("argv", [DEMO, MANUAL_PASS], ids=["demo", "manual-pass"])
 
 
 def args(*argv: str) -> argparse.Namespace:
@@ -47,13 +53,15 @@ def test_the_demo_setting_is_off_by_default() -> None:
     assert Settings.model_fields["demo_seed_enabled"].default is False
 
 
+@BOTH
 async def test_the_demo_is_refused_while_the_setting_is_off(
     sessionmaker: SessionMaker,
     session: AsyncSession,
     settings: Settings,
     capsys: pytest.CaptureFixture[str],
+    argv: tuple[str, ...],
 ) -> None:
-    code = await run(args(*DEMO), sessionmaker, settings=enabled(settings, on=False))
+    code = await run(args(*argv), sessionmaker, settings=enabled(settings, on=False))
 
     assert code == 1
     assert "The demo seed is off here" in capsys.readouterr().err
@@ -76,8 +84,9 @@ async def test_the_demo_is_refused_when_a_workspace_exists(
     assert (await count(session, Workspace), await count(session, User)) == (1, 0)
 
 
+@BOTH
 def test_main_demo_asks_for_no_seed_values(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], argv: tuple[str, ...]
 ) -> None:
     """The plain seed fails without a terminal or values; the demo has its own."""
     for key in ("WORKSPACE_NAME", "WORKSPACE_SLUG", "EMAIL", "USERNAME", "NAME", "PASSWORD"):
@@ -90,8 +99,8 @@ def test_main_demo_asks_for_no_seed_values(
 
     monkeypatch.setattr(app.cli, "run", recorded)
 
-    assert main(list(DEMO)) == 0  # pytest's stdin isn't a terminal
-    assert [(parsed.demo, seed) for parsed, seed in calls] == [(True, {})]
+    assert main(list(argv)) == 0  # pytest's stdin isn't a terminal
+    assert [(parsed.command, seed) for parsed, seed in calls] == [("seed", {})]
     assert "Missing" not in capsys.readouterr().err
 
 
@@ -282,3 +291,191 @@ async def test_each_demo_step_is_recorded_with_the_person_who_would_take_it(
         ("project_archived", "olivia"),
     }
     assert no_actor_users == 27
+
+
+async def test_the_plain_demo_builds_none_of_the_manual_pass_states(
+    built: int, session: AsyncSession
+) -> None:
+    """The end-to-end tests count what `--demo` builds (S3-C0c)."""
+    inactive = await session.scalar(select(func.count()).where(User.is_active.is_(False)))
+
+    assert await count(session, Requirement) == 0
+    assert (await count(session, UserSession), inactive) == (0, 0)
+
+
+# --- the manual pass's states (S3-C0c, DL-320) ------------------------------------------------
+
+
+@pytest.fixture
+async def manual(sessionmaker: SessionMaker, settings: Settings) -> int:
+    return await run(args(*MANUAL_PASS), sessionmaker, settings=enabled(settings))
+
+
+async def test_the_manual_pass_prints_that_it_built_its_states(
+    sessionmaker: SessionMaker, settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert await run(args(*MANUAL_PASS), sessionmaker, settings=enabled(settings)) == 0
+    out = capsys.readouterr().out
+    assert "Created the demo workspace harbor with 29 users" in out
+    assert "With the manual pass's states" in out
+
+
+async def test_the_manual_pass_puts_eleven_projects_in_acme(
+    manual: int, session: AsyncSession
+) -> None:
+    lead = aliased(User)
+    rows = await session.execute(
+        select(Project.key, lead.username, Project.restriction_categories)
+        .join(Organization, Project.organization_id == Organization.id)
+        .join(lead, Project.lead_id == lead.id)
+        .where(Organization.slug == "acme")
+    )
+
+    assert {key: rest for key, *rest in rows} == {
+        "ERP": ["liam", []],
+        "PORTAL": ["lena", []],
+        "LEGACY": ["luke", []],
+        **{key: ["lena", []] for key in ("CRM", "WMS", "HRS", "BIR", "EDI", "MOB", "SRV")},
+        "RADAR": ["liam", ["export_controlled"]],
+    }
+
+
+async def test_the_export_controlled_project_has_its_lead_and_one_member(
+    manual: int, session: AsyncSession
+) -> None:
+    rows = await session.execute(
+        select(User.username, ProjectMembership.role)
+        .join(Project, ProjectMembership.project_id == Project.id)
+        .join(User, ProjectMembership.user_id == User.id)
+        .where(Project.key == "RADAR")
+    )
+
+    assert set(map(tuple, rows)) == {("liam", "admin"), ("ben", "member")}
+
+
+async def test_portal_requirements_are_nested_approved_and_in_the_trash(
+    manual: int, session: AsyncSession
+) -> None:
+    parent = aliased(Requirement)
+    rows = await session.execute(
+        select(
+            Requirement.number,
+            Requirement.title,
+            parent.number,
+            Requirement.status,
+            Requirement.deleted_at.is_not(None),
+        )
+        .outerjoin(parent, Requirement.parent_requirement_id == parent.id)
+        .execution_options(include_deleted=True)
+    )
+
+    assert {number: rest for number, *rest in rows} == {
+        1: ["Customer accounts", None, "draft", False],
+        2: ["Sign-in", 1, "draft", False],
+        3: ["Password reset", 2, "draft", False],
+        4: ["Order history", None, "draft", False],
+        5: ["Invoice download", None, "approved", False],
+        6: ["Saved addresses", None, "approved", False],
+        7: ["Gift cards", None, "draft", True],
+        8: ["Loyalty points", None, "draft", True],
+        9: ["Points balance", 8, "draft", True],
+    }
+
+
+async def test_sign_in_has_three_revisions_ending_with_headings_a_list_and_a_long_url(
+    manual: int, session: AsyncSession
+) -> None:
+    rows = await session.execute(
+        select(RequirementRevision.revision_number, RequirementRevision.change_note)
+        .join(Requirement, RequirementRevision.requirement_id == Requirement.id)
+        .where(Requirement.number == 2)
+        .order_by(RequirementRevision.revision_number)
+    )
+    description = await session.scalar(
+        select(Requirement.description_md).where(Requirement.number == 2)
+    )
+
+    assert list(map(tuple, rows)) == [
+        (1, None),
+        (2, "Split into goal and rules."),
+        (3, "Added the session rule and a reference."),
+    ]
+    assert "## Goal" in str(description)
+    assert "\n- Signing in again" in str(description)
+    assert "https://identity.example.com/guides/customer-sign-in/password-policies/" in str(
+        description
+    )
+
+
+async def test_the_approval_requests_are_pending_approved_and_approved_then_modified(
+    manual: int, session: AsyncSession
+) -> None:
+    approver = aliased(User)
+    rows = await session.execute(
+        select(
+            Requirement.number,
+            ApprovalRequest.status,
+            approver.username,
+            Requirement.approved_revision_id == Requirement.current_revision_id,
+        )
+        .join(ApprovalRequest, ApprovalRequest.entity_id == Requirement.id)
+        .join(Approval, Approval.approval_request_id == ApprovalRequest.id)
+        .join(approver, Approval.approver_id == approver.id)
+    )
+
+    # Approved and edited since: "Approved · modified" (design-doc §6.1).
+    assert {number: rest for number, *rest in rows} == {
+        4: ["pending", "ella", None],
+        5: ["approved", "ella", True],
+        6: ["approved", "ella", False],
+    }
+
+
+async def test_each_requirement_step_is_logged_as_the_person_who_would_take_it(
+    manual: int, session: AsyncSession
+) -> None:
+    rows = await session.execute(
+        select(Requirement.number, ActivityLog.action, User.username)
+        .join(Requirement, ActivityLog.entity_id == Requirement.id)
+        .join(User, ActivityLog.changed_by == User.id)
+        .where(ActivityLog.action.in_([ActivityAction.CREATED, ActivityAction.DELETED]))
+        .execution_options(include_deleted=True)
+    )
+
+    assert set(map(tuple, rows)) == {
+        *{(n, "created", "finn") for n in range(1, 10)},
+        (7, "deleted", "finn"),
+        (8, "deleted", "lena"),
+        (9, "deleted", "lena"),
+    }
+
+
+async def test_the_workspace_admin_deactivates_one_member(
+    manual: int, session: AsyncSession
+) -> None:
+    actor = aliased(User)
+    inactive = await session.execute(select(User.username).where(User.is_active.is_(False)))
+    events = await session.execute(
+        select(actor.username)
+        .select_from(AuditEvent)
+        .join(actor, AuditEvent.actor_id == actor.id)
+        .where(AuditEvent.action == AuditAction.USER_DEACTIVATED)
+    )
+
+    assert list(inactive.scalars()) == ["hana"]
+    assert list(events.scalars()) == ["wendy"]
+
+
+async def test_the_system_admin_has_one_session_from_another_browser(
+    manual: int, session: AsyncSession
+) -> None:
+    rows = await session.execute(
+        select(User.username, UserSession.user_agent).join(User, UserSession.user_id == User.id)
+    )
+
+    assert list(map(tuple, rows)) == [
+        (
+            "admin",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+        )
+    ]

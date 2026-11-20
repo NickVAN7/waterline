@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { VARIANTS } from '@/components/Button.vue'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok, validationFailed } from '@/test/api'
@@ -138,6 +139,8 @@ const answering = (latest: Request | null) =>
           : ok({ items: MEMBERS_LIST, total: 2, limit: 200, offset: 0 }),
     )) as never
 
+const confirmButton = (name: string) =>
+  [...dialogOpen()!.querySelectorAll('button')].find((b) => b.textContent!.trim() === name)!
 async function confirmIt(name: string) {
   const dialog = dialogOpen()!
   ;[...dialog.querySelectorAll('button')].find((b) => b.textContent!.trim() === name)!.click()
@@ -153,6 +156,20 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('ApprovalSection', () => {
+  it.each([
+    ['a pending request', request(), true],
+    ['a decided request', request({ status: 'approved', allowed_actions: [] }), false],
+    ['no request', null, false],
+  ] as const)(
+    'tells the tree whether it awaits approval, with %s (Q12b)',
+    async (_, latest, pending) => {
+      const { wrapper } = mountSection(requirement(), latest)
+      await flushPromises()
+
+      expect(wrapper.emitted('awaiting')).toEqual([[pending]])
+    },
+  )
+
   it('says no approval was requested, and offers Request approval to an admin', async () => {
     mountSection(requirement(), null)
     await flushPromises()
@@ -189,12 +206,12 @@ describe('ApprovalSection', () => {
     mountSection(requirement(), latest)
     await flushPromises()
 
-    expect(details()).toContain('Latest request: Rejected')
-    expect(details()).toContain('Revision: 2')
-    expect(details().find((d) => d.startsWith('Requested by:'))).toMatch(
-      /^Requested by: Ada Admin .+/,
+    expect(details()).toContain('Latest request Rejected')
+    expect(details()).toContain('Revision 2')
+    expect(details().find((d) => d.startsWith('Requested by '))).toMatch(
+      /^Requested by Ada Admin .+/,
     )
-    expect(details()).toContain('Note: Before the October release')
+    expect(details()).toContain('Note Before the October release')
     const approvers = [...document.querySelectorAll('li')].map((li) =>
       li.textContent!.replace(/\s+/g, ' ').trim(),
     )
@@ -289,7 +306,26 @@ describe('ApprovalSection', () => {
       body: { approver_ids: ['u-max'], note: 'Please check totals' },
     })
     expect(dialogOpen()).toBeNull()
-    expect(details()).toContain('Latest request: Pending')
+    expect(details()).toContain('Latest request Awaiting approval')
+  })
+
+  // The button that opened the dialog goes as the request is made: focus lands on the blocked
+  // Request approval, whose reason is read with it. Bug: focus left on the heading, or on <body>.
+  it('moves focus to the blocked Request approval once a request is made', async () => {
+    const { post } = mountSection(requirement(), null)
+    await flushPromises()
+    press('Request approval')
+    await flushPromises()
+    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-vera"]')!.click()
+    post.mockResolvedValue(ok(request(), 201))
+    dialogOpen()!.querySelector('form')!.requestSubmit()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve))
+    await flushPromises()
+
+    const blocked = button('Request approval')!
+    expect(blocked.getAttribute('aria-disabled')).toBe('true')
+    expect(document.activeElement).toBe(blocked)
   })
 
   it('asks for an approver before sending, at the list', async () => {
@@ -305,9 +341,13 @@ describe('ApprovalSection', () => {
     const group = document.getElementById('request-approval-approver_ids')!
     expect(document.activeElement).toBe(group)
     expect(group.getAttribute('aria-invalid')).toBe('true')
-    expect(document.getElementById(group.getAttribute('aria-describedby')!)!.textContent).toContain(
-      'Choose at least one approver.',
-    )
+    // The error is one of what the group says (the no-criteria warning may be another, DL-384).
+    const said = group
+      .getAttribute('aria-describedby')!
+      .split(' ')
+      .map((id) => document.getElementById(id)!.textContent)
+    // The error first, before any note (UI-FRM-6). Bug: "You can still go ahead" read first.
+    expect(said[0]).toContain('Choose at least one approver.')
   })
 
   it('shows a refused approver under the list (422 on approver_ids)', async () => {
@@ -395,7 +435,7 @@ describe('ApprovalSection', () => {
     expect(post).toHaveBeenCalledWith('/api/approval-requests/{request_id}/cancel', {
       params: { path: { request_id: 'req-1' } },
     })
-    expect(details()).toContain('Latest request: Cancelled')
+    expect(details()).toContain('Latest request Cancelled')
     expect(text()).toContain('Request cancelled.')
     expect(button('Cancel request')).toBeUndefined()
     // Cancel request went with its own action: the section's heading takes focus.
@@ -428,7 +468,7 @@ describe('ApprovalSection', () => {
     expect(document.querySelector('[role=alert]')!.textContent).toContain(
       "This request isn't pending any more.",
     )
-    expect(details()).toContain('Latest request: Approved')
+    expect(details()).toContain('Latest request Approved')
   })
 
   it('shows a flagged request with Re-request, which cancels and opens the dialog pre-filled (DL-281)', async () => {
@@ -465,6 +505,94 @@ describe('ApprovalSection', () => {
     ).toContain(note.id)
   })
 
+  // F14 (DL-377): the next step is the one primary; Approve by hand a quiet action after a
+  // divider; a blocked Request approval after what can be done. Bug: two primaries, Approve by
+  // hand as loud as the normal flow, or the blocked button leading the row.
+  const variantOf = (name: string) =>
+    (Object.keys(VARIANTS) as (keyof typeof VARIANTS)[]).find((v) =>
+      button(name)!.className.includes(VARIANTS[v]),
+    )
+  const order = () =>
+    buttons()
+      .map((b) => b.textContent!.trim())
+      .filter((t) =>
+        ['Request approval', 'Re-request', 'Cancel request', 'Approve by hand'].includes(t),
+      )
+  const divider = () => document.querySelector('span[aria-hidden="true"].border-l')
+
+  it('makes Request approval the primary, with Approve by hand quiet after a divider', async () => {
+    mountSection(requirement(), null)
+    await flushPromises()
+
+    expect(order()).toEqual(['Request approval', 'Approve by hand'])
+    expect(variantOf('Request approval')).toBe('primary')
+    expect(variantOf('Approve by hand')).toBe('ghost')
+    expect(divider()).not.toBeNull()
+  })
+
+  it('puts the blocked Request approval last while a request is pending, its reason beside it', async () => {
+    mountSection(requirement(), request())
+    await flushPromises()
+
+    expect(order()).toEqual(['Cancel request', 'Approve by hand', 'Request approval'])
+    expect(variantOf('Cancel request')).toBe('secondary')
+    expect(button('Request approval')!.nextElementSibling!.textContent).toContain(
+      'A request is pending',
+    )
+  })
+
+  it('makes Re-request the primary on a flagged request', async () => {
+    mountSection(requirement(), request({ flagged: true }))
+    await flushPromises()
+
+    expect(order()).toEqual(['Re-request', 'Cancel request', 'Approve by hand'])
+    expect(variantOf('Re-request')).toBe('primary')
+  })
+
+  it("leaves the primary to the approver's decision, Re-request secondary", async () => {
+    mountSection(
+      requirement(),
+      request({ flagged: true, allowed_actions: ['approval_request.cancel', 'approval.decide'] }),
+    )
+    await flushPromises()
+
+    expect(variantOf('Re-request')).toBe('secondary')
+    expect(button('Approve')!.className).toContain(VARIANTS.primary)
+  })
+
+  // Names aren't unique, and a deactivated approver is marked (traps: a confirmation that names
+  // people). Bug: a deactivated approver named as if active.
+  it('marks a deactivated approver among those Approve by hand goes past', async () => {
+    mountSection(
+      requirement(),
+      request({
+        approvals: [
+          row('u-vera', 'Vera Viewer'),
+          row('u-dee', 'Dee Gone', { approver_is_active: false }),
+          row('u-max', 'Max Member', { decision: 'approved' }),
+        ],
+      }),
+    )
+    await flushPromises()
+
+    press('Approve by hand')
+    await flushPromises()
+
+    expect(dialogOpen()!.textContent).toContain(
+      'without a decision from Vera Viewer, Dee Gone (deactivated).',
+    )
+  })
+
+  it('confirms Approve by hand in the primary tone when no request is pending', async () => {
+    mountSection(requirement(), null)
+    await flushPromises()
+
+    press('Approve by hand')
+    await flushPromises()
+    expect(dialogOpen()!.textContent).not.toContain('The pending request is cancelled')
+    expect(confirmButton('Approve').className).toContain(VARIANTS.primary)
+  })
+
   it('approves by hand once confirmed, with the version, saying a pending request is cancelled', async () => {
     const { wrapper, post } = mountSection(requirement({ version: 4 }), request())
     await flushPromises()
@@ -473,7 +601,11 @@ describe('ApprovalSection', () => {
 
     press('Approve by hand')
     await flushPromises()
-    expect(dialogOpen()!.textContent).toContain('The pending request is cancelled.')
+    // Bug: the approvers it goes past unnamed, or the risky path in the everyday tone (1b).
+    expect(dialogOpen()!.textContent).toContain(
+      'The pending request is cancelled, without a decision from Vera Viewer.',
+    )
+    expect(confirmButton('Approve').className).toContain(VARIANTS.danger)
     await confirmIt('Approve')
 
     expect(post).toHaveBeenCalledWith('/api/projects/{key}/requirements/{number}/approve', {
@@ -481,6 +613,100 @@ describe('ApprovalSection', () => {
       body: { version: 4 },
     })
     expect(wrapper.emitted('changed')).toEqual([[saved]])
+  })
+
+  // DL-384: a warning, never a block. Bug: no word of the missing criteria, or a block.
+  // Worded for an empty description as the page's note is (F11).
+  const EMPTY = 'This requirement has no description, so it has no acceptance criteria.'
+  const NO_HEADING = 'This requirement has no acceptance criteria: its description has no'
+  const CRITERIA = '## Acceptance Criteria\n\n1. Refunds by card'
+  // The warning in the open dialog: the only Alert there.
+  const warningIn = (dialog: Element) => dialog.querySelectorAll('div[tabindex="-1"].border')
+  const describedBy = (element: Element) =>
+    (element.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)!.textContent!.trim())
+
+  async function openApproveByHand(md: string) {
+    const { post } = mountSection(requirement({ description_md: md }), null)
+    await flushPromises()
+    post.mockResolvedValue(ok(requirement({ status: 'approved' })))
+    press('Approve by hand')
+    await flushPromises()
+    return { post, shown: dialogOpen()! }
+  }
+
+  it.each([
+    ['', EMPTY],
+    ['## Context\n\nRefunds by card.', NO_HEADING],
+  ])('Approve by hand on %j warns %j, after what it does, and still approves', async (md, said) => {
+    const { post, shown } = await openApproveByHand(md)
+
+    const [warning] = warningIn(shown)
+    expect(warningIn(shown)).toHaveLength(1)
+    expect(warning!.textContent).toContain(said)
+    // Read as focus lands on Cancel: what the action does, then the warning. Bug: only the
+    // warning read, never the consequence.
+    const read = describedBy(document.activeElement!)
+    expect(read).toHaveLength(2)
+    expect(read[0]).toContain('This records you')
+    expect(read[1]).toBe(warning!.textContent!.trim())
+    // On the screen too, the consequence comes first.
+    expect(warning!.previousElementSibling!.textContent).toContain('This records you')
+    await expectNoA11yViolations(document.body)
+    await confirmIt('Approve')
+
+    expect(post).toHaveBeenCalledOnce()
+  })
+
+  it('Approve by hand with acceptance criteria shows no warning, and Cancel reads only what it does', async () => {
+    const { post, shown } = await openApproveByHand(CRITERIA)
+
+    expect(warningIn(shown)).toHaveLength(0)
+    const read = describedBy(document.activeElement!)
+    expect(read).toHaveLength(1)
+    expect(read[0]).toContain('This records you')
+    await confirmIt('Approve')
+
+    expect(post).toHaveBeenCalledOnce()
+  })
+
+  async function openRequest(md: string) {
+    mountSection(requirement({ description_md: md }), null)
+    await flushPromises()
+    button('Request approval')!.click()
+    await flushPromises()
+    return dialogOpen()!
+  }
+  const approverList = () => document.getElementById('request-approval-approver_ids')!
+  const sendButton = (dialog: Element) =>
+    [...dialog.querySelectorAll('button')].find(
+      (b) => b.textContent!.trim() === 'Request approval',
+    )!
+
+  it.each([
+    ['', EMPTY],
+    ['## Context\n\nRefunds by card.', NO_HEADING],
+  ])(
+    'Request approval on %j warns %j, read as focus enters the list, never blocking',
+    async (md, said) => {
+      const shown = await openRequest(md)
+
+      const [warning] = warningIn(shown)
+      expect(warningIn(shown)).toHaveLength(1)
+      expect(warning!.textContent).toContain(said)
+      expect(describedBy(approverList())).toEqual([warning!.textContent!.trim()])
+      expect(sendButton(shown).getAttribute('aria-disabled')).not.toBe('true')
+    },
+  )
+
+  it('Request approval with acceptance criteria shows no warning', async () => {
+    const shown = await openRequest(CRITERIA)
+
+    expect(warningIn(shown)).toHaveLength(0)
+    expect(approverList().getAttribute('aria-describedby')).toBeNull()
+    expect(sendButton(shown).getAttribute('aria-disabled')).not.toBe('true')
   })
 
   it('a 409 on Approve by hand waits for the requirement to reload, then says so', async () => {
@@ -553,7 +779,7 @@ describe('ApprovalSection', () => {
     await wrapper.setProps({ requirement: { ...r, version: r.version + 1 } })
     await flushPromises()
 
-    expect(details()).toContain('Latest request: Cancelled')
+    expect(details()).toContain('Latest request Cancelled')
     expect(button('Cancel request')).toBeUndefined()
   })
 
@@ -622,7 +848,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
 
     expect(dialogOpen()!.textContent).toContain('This item already has a pending approval request.')
-    expect(details()).toContain('Latest request: Pending')
+    expect(details()).toContain('Latest request Awaiting approval')
   })
 
   it('reloads the list when someone picked can no longer be named (a 404), saying so', async () => {

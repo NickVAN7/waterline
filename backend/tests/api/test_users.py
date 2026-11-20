@@ -112,6 +112,38 @@ async def test_the_users_list_holds_the_workspaces_people_and_accounts_with_no_m
     ]
 
 
+async def test_each_users_row_lists_their_orgs_with_role_and_projects(
+    client: AsyncClient, t: Tenancy
+) -> None:
+    """S3-C0k: each org in this workspace a user belongs to, by name, their org role (or none,
+    on projects alone) and how many of its projects they're on. Bug: another workspace's org
+    listed, or a project counted under the wrong org."""
+    await signed_in(client, await staff(t, WorkspaceRole.ADMIN, name="Ada Admin"))
+    olga = await org_member(t, OrgRole.ADMIN, name="Olga Member")
+    await ProjectMembershipFactory.create_async(project=t.project, user=olga)
+    other = await OrganizationFactory.create_async(workspace=t.workspace, name="Aardvark Co")
+    await ProjectMembershipFactory.create_async(
+        project=await ProjectFactory.create_async(organization=other), user=olga
+    )
+    await ProjectMembershipFactory.create_async(
+        project=await ProjectFactory.create_async(organization=other), user=olga
+    )
+    elsewhere = await OrganizationFactory.create_async(name="Far Away")  # another workspace
+    await MembershipFactory.create_async(organization=elsewhere, user=olga)
+
+    rows = (await client.get(f"/api/workspaces/{t.workspace.id}/users")).json()["items"]
+
+    by_name = {row["name"]: row["memberships"] for row in rows}
+    assert by_name["Ada Admin"] == []
+    assert [
+        (m["org_name"], m["org_slug"], m["role"], m["project_count"])
+        for m in by_name["Olga Member"]
+    ] == [
+        ("Aardvark Co", other.slug, None, 2),
+        (t.org.name, t.org.slug, "admin", 1),
+    ]
+
+
 async def test_the_users_list_shows_who_holds_system_admin_and_hides_deactivated_unless_asked(
     client: AsyncClient, t: Tenancy
 ) -> None:

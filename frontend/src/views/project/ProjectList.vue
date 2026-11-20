@@ -1,19 +1,17 @@
 <script setup lang="ts" generic="T extends components['schemas']['ProjectItem']">
-// A list of projects, each a link to its home with its key and, right-aligned, its status (My
-// work, an org's list). My work adds each project's org and the user's access (`withAccess`);
-// an org's list, each project's type (`withType`) (DL-137, DL-153). The `actions` slot ends a row
-// (My work's star, DL-305).
+// A list of projects, each a link to its home with its key and, right-aligned, its status (an
+// org's list), with each project's type (`withType`, DL-137). My work has its own compact rows
+// (`MyProjectRows`, DL-334).
 import type { components } from '@/api/schema'
-import { MY_ACCESS, PROJECT_STATUS, PROJECT_TYPE } from '@/app/labels'
+import { PROJECT_STATUS, PROJECT_TYPE } from '@/app/labels'
 import Badge from '@/components/Badge.vue'
 
 withDefaults(
   defineProps<{
     projects: T[]
-    withAccess?: boolean
     withType?: boolean
   }>(),
-  { withAccess: false, withType: false },
+  { withType: false },
 )
 </script>
 
@@ -35,12 +33,6 @@ withDefaults(
       </RouterLink>
       <span class="font-mono text-sm text-text-muted">{{ project.key }}</span>
       <span v-if="withType" class="text-sm text-text-muted">{{ PROJECT_TYPE[project.type] }}</span>
-      <template v-if="withAccess">
-        <span class="text-sm text-text-muted"
-          ><span class="sr-only">Organization: </span>{{ project.organization_name }}</span
-        >
-        <span class="text-sm text-text-muted">Your access: {{ MY_ACCESS[project.my_access] }}</span>
-      </template>
       <Badge
         class="ml-auto"
         :tone="PROJECT_STATUS[project.status].tone"
@@ -48,7 +40,6 @@ withDefaults(
       >
         {{ PROJECT_STATUS[project.status].label }}
       </Badge>
-      <slot name="actions" :project="project" />
     </li>
   </ul>
 </template>

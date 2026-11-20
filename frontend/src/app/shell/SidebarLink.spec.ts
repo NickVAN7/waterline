@@ -33,10 +33,12 @@ describe('SidebarLink', () => {
     await expectNoA11yViolations(document.body)
   })
 
-  it('is a plain link elsewhere, with a transparent bar so nothing shifts', async () => {
+  it('is a plain link elsewhere, with no bar, which forced colors would draw (TD-112)', async () => {
     const link = (await mountLink('/status')).get('a')
 
     expect(link.attributes('aria-current')).toBeUndefined()
-    expect(link.classes()).toEqual(expect.arrayContaining(['border-l-3', 'border-transparent']))
+    // The bar's width as padding instead, so nothing shifts.
+    expect(link.classes()).not.toContain('border-l-3')
+    expect(link.classes()).toContain('pl-3')
   })
 })

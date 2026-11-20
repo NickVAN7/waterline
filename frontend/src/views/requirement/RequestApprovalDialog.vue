@@ -13,6 +13,7 @@ import { computed, nextTick, ref } from 'vue'
 
 import { api, ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import Alert from '@/components/Alert.vue'
 import Button from '@/components/Button.vue'
 import Icon from '@/components/Icon.vue'
 import FormAlert from '@/components/FormAlert.vue'
@@ -21,6 +22,8 @@ import ModalDialog from '@/components/ModalDialog.vue'
 import TextField from '@/components/TextField.vue'
 import { dismissToSubmit, retryFromSubmit, useFormErrors } from '@/composables/useFormErrors'
 import { allMembers } from '@/views/project/members'
+
+import { hasAcceptanceCriteria, noCriteriaWarning } from './templates'
 
 type Member = components['schemas']['ProjectMemberRead']
 type Request = components['schemas']['ApprovalRequestRead']
@@ -36,6 +39,8 @@ const members = ref<Member[]>([])
 const loadFailed = ref(false)
 const loadFailures = ref(0)
 const wasCancelled = ref(false)
+// No acceptance criteria: a warning, never a block (DL-384); empty when they're there.
+const noCriteria = ref('')
 const loadingMembers = ref(false)
 const chosen = ref<string[]>([])
 const note = ref('')
@@ -81,12 +86,15 @@ async function focusList() {
 }
 
 async function open(
-  requirement: { number: number },
+  requirement: { number: number; description_md: string },
   options: { reopen?: boolean; approvers?: Earlier[]; cancelled?: boolean } = {},
 ): Promise<void> {
   number.value = requirement.number
   reopening.value = options.reopen ?? false
   wasCancelled.value = options.cancelled ?? false
+  noCriteria.value = hasAcceptanceCriteria(requirement.description_md)
+    ? ''
+    : noCriteriaWarning(requirement.description_md)
   keep = options.approvers ?? []
   loadingMembers.value = true
   members.value = []
@@ -200,6 +208,7 @@ defineExpose({ open })
           Approvers decide on the current revision. Every approver must approve.
         </template>
       </p>
+      <Alert v-if="noCriteria" :id="`${PREFIX}-no-criteria`" tone="warning">{{ noCriteria }}</Alert>
       <p v-if="wasCancelled" :id="`${PREFIX}-cancelled`" class="m-0 text-sm">
         The earlier request is cancelled.
       </p>
@@ -214,8 +223,10 @@ defineExpose({ open })
         data-autofocus
         :aria-describedby="
           [
-            wasCancelled ? `${PREFIX}-cancelled` : '',
+            // The error that stopped the submit first, before the notes (UI-FRM-6).
             errors.fieldErrors.value.approver_ids ? `${PREFIX}-approver_ids-error` : '',
+            noCriteria ? `${PREFIX}-no-criteria` : '',
+            wasCancelled ? `${PREFIX}-cancelled` : '',
           ]
             .filter(Boolean)
             .join(' ') || undefined

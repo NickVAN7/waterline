@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // An org's overview (`/{org_slug}/overview`; UI-SHL-10, DL-137): org administration's landing
 // page, with the org's details, its projects (name, key, type, status, and lead), each linking
-// to its settings, and below them its archived projects, headed "Archived" (DL-180, from
+// to its settings, and below them its archived projects, headed "Archived projects" (DL-180, from
 // `archived_only`, DL-181), where each is unarchived. Each list is a page at a time from the URL
 // (`useListQuery`). For whoever may manage the org (`org_member.manage`, DL-163), who holds
 // inherited project admin on each (design-doc §5).
 import { computed, watch } from 'vue'
 
 import { api, client } from '@/api/client'
+import { orgCrumb } from '@/app/crumbs'
 import { settlePage } from '@/app/routeFocus'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
@@ -64,7 +65,7 @@ const SECTIONS = [
   },
   {
     id: 'overview-archived-heading',
-    heading: 'Archived',
+    heading: 'Archived projects',
     emptyHeading: 'No archived projects',
     thing: 'the archived projects',
     empty: 'Archived projects will appear here.',
@@ -96,17 +97,14 @@ const announcement = computed(() => {
   <!-- For whoever may manage the org: the user sees the org, so may know it's here. -->
   <ForbiddenView v-else-if="!allowed || status === 403" :who-to-ask="WHO_TO_ASK" />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader :title="`${org.name} overview`" />
-    <dl class="m-0 flex flex-col gap-1">
-      <div class="flex flex-wrap gap-2">
-        <dt class="font-medium">Name</dt>
-        <dd class="m-0">{{ org.name }}</dd>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <dt class="font-medium">Slug</dt>
-        <dd class="m-0 font-mono">{{ org.slug }}</dd>
-      </div>
-    </dl>
+    <div class="flex flex-col gap-1">
+      <PageHeader
+        :title="`${org.name} overview`"
+        :crumbs="[orgCrumb(org), { label: 'Overview' }]"
+      />
+      <!-- The slug under the title, as a project's key is (owner, S3-C0k); the name is the title. -->
+      <p class="m-0 font-mono text-text-muted"><span class="sr-only">Slug: </span>{{ org.slug }}</p>
+    </div>
     <section
       v-for="section in SECTIONS"
       :key="section.id"
@@ -129,6 +127,7 @@ const announcement = computed(() => {
       </EmptyState>
       <template v-else>
         <OverviewProjectTable
+          :archived="section.id === 'overview-archived-heading'"
           :projects="section.page.data.value.items"
           :org-slug="org.slug"
           :labelled-by="section.id"

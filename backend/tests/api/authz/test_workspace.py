@@ -231,7 +231,14 @@ async def test_the_org_list_is_for_workspace_owners_admins_and_system_admins(
 
     assert response.status_code == 200
     assert response.json()["items"] == [
-        {"id": str(t.org.id), "name": "Bolt Foods", "slug": "bolt-foods"}
+        {
+            "id": str(t.org.id),
+            "name": "Bolt Foods",
+            "slug": "bolt-foods",
+            "project_count": 1,
+            "member_count": 0,
+            "owners": [],
+        }
     ]
 
 

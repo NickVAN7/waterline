@@ -10,6 +10,8 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok } from '@/test/api'
 import { project } from '@/test/projects'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import ProjectAccessView from './ProjectAccessView.vue'
 
@@ -67,7 +69,7 @@ async function mountAt(shown: Project, review: unknown = ok(REVIEW)) {
       Promise.resolve(path === '/api/projects/{key}/access' ? review : ok(shown))) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -76,7 +78,7 @@ async function mountAt(shown: Project, review: unknown = ok(REVIEW)) {
         component: ProjectAccessView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(`/acme/projects/${shown.key}/access`)
@@ -104,7 +106,16 @@ describe('ProjectAccessView', () => {
     )
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout project access review')
-    expect(document.title).toBe('ERP rollout project access review · Waterline')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+        ['Members', '/acme/projects/ERP/members'],
+      ],
+      current: 'Access review',
+    })
+    expect(document.title).toBe('ERP project access review · Waterline')
     // What the page is for, said under its title (DL-137).
     expect(wrapper.get('header + p').text()).toBe(
       'Everyone who can open this project, and why: their own role on it, or an admin role they inherit from the organization or the workspace.',
@@ -113,7 +124,7 @@ describe('ProjectAccessView', () => {
       'Name',
       'Email',
       'Project role',
-      'Why they reach it',
+      'Access through',
       'Access',
     ])
     expect(
@@ -121,14 +132,24 @@ describe('ProjectAccessView', () => {
     ).toEqual([
       ['Ann Lee', 'ann@acme.example', 'Admin', 'Project admin', 'Content and management'],
       [
-        'Dee Gone Deactivated',
+        'Dee Gone · Deactivated',
         'dee@acme.example',
         'Viewer',
         'Project viewer',
         'Content and management',
       ],
-      ['Wes Admin', 'wes@harbor.example', 'None', 'Workspace admin, Org owner', 'Management only'],
+      [
+        'Wes Admin',
+        'wes@harbor.example',
+        'Admin (inherited)',
+        'Workspace admin, Org owner',
+        'Management only',
+      ],
     ])
+    // The deactivated person's row muted, the others not (UI-FBK-6, S3-C0k).
+    expect(
+      wrapper.findAll('tbody tr').map((tr) => tr.classes().includes('text-text-muted')),
+    ).toEqual([false, true, false])
     await expectNoA11yViolations(wrapper)
   })
 
@@ -144,14 +165,19 @@ describe('ProjectAccessView', () => {
       'Name',
       'Email',
       'Project role',
-      'Why they reach it',
+      'Access through',
     ])
     expect(
       wrapper
         .findAll('tbody tr')[2]!
         .findAll('td')
         .map((c) => c.text().trim()),
-    ).toEqual(['Wes Admin', 'wes@harbor.example', 'None', 'Workspace admin, Org owner'])
+    ).toEqual([
+      'Wes Admin',
+      'wes@harbor.example',
+      'Admin (inherited)',
+      'Workspace admin, Org owner',
+    ])
     await expectNoA11yViolations(wrapper)
   })
 

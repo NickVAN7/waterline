@@ -53,6 +53,7 @@ from app.schemas.approval import (
     ApprovalRequestRead,
 )
 from app.schemas.requirement import (
+    RequirementAncestor,
     RequirementApprove,
     RequirementCreate,
     RequirementItem,
@@ -720,6 +721,9 @@ class RequirementService:
     async def tree(self, project: Project) -> RequirementTree:
         """The project's requirements for the tree, up to the cap (DL-159)."""
         rows = await self.repository.ranked(project.id, TREE_CAP + 1)
+        awaiting = await ApprovalRepository(self.session).pending_entity_ids(
+            project.id, ApprovalEntityType.REQUIREMENT
+        )
         return RequirementTree(
             items=[
                 RequirementItem(
@@ -733,6 +737,7 @@ class RequirementService:
                     restriction_categories=_categories(r),
                     current_revision_id=r.current_revision_id,
                     approved_revision_id=r.approved_revision_id,
+                    awaiting_approval=r.id in awaiting,
                 )
                 for r in rows[:TREE_CAP]
             ],
@@ -808,6 +813,10 @@ class RequirementService:
             created_at=requirement.created_at,
             updated_at=requirement.updated_at,
             allowed_actions=allowed_actions(ctx, project_target(project, requirement)),
+            ancestors=[
+                RequirementAncestor(number=number, title=title)
+                for number, title in await self.repository.ancestors(requirement)
+            ],
         )
 
     async def _revision_number(self, revision_id: uuid.UUID | None) -> int | None:

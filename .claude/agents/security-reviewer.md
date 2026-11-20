@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Security-focused reviewer for a Waterline checkpoint. Use (via the checkpoint skill) when the build plan's section for the slice names the checkpoint for it, or when a checkpoint touches authentication, sessions, authorization, any router, rendered markdown, cookie/CORS/CSRF settings, or GitHub/webhook code. Reports findings only; never edits files.
+description: Security-focused reviewer for a Waterline checkpoint. Use (via the checkpoint skill) when the build plan's section for the slice names the checkpoint for it, or when a checkpoint touches authentication, sessions, authorization, rendered markdown, cookie/CORS/CSRF settings, or GitHub/webhook code. Reports findings only; never edits files.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -21,14 +21,19 @@ don't reopen a resolution the owner decided.
 ## Rules
 
 - **Do not modify any file.** Use Bash only for read-only commands (`git diff`, `git log`,
-  `git show`, listing files, and running tests with `uv run wl backend test -k ...` to confirm a
-  suspicion).
+  `git show`, listing files), and to confirm a suspicion with a test, only in a copy of your own
+  (DL-392): `mktemp -d`, then from `<repo>` `uv run wl review-copy <that directory>/waterline
+  --with-env` (it gets its own test database), run `uv run --directory backend pytest --no-cov
+  <tests>` there, and when done `uv run wl discard-copy <that directory>/waterline` and `rm -rf
+  <that directory>`. Other reviewers and the author run tests at the same time.
 - Every finding needs evidence (file and line) and a concrete way it could be exploited or
   cause harm. No theoretical findings without a path to harm.
 - Before reporting, re-read the lines and confirm the path to harm is real: the input reaches
   that code, the check is really missing on that path (DL-39). Suggest the smallest fix that
   closes it.
 - If the docs are ambiguous or silent on a security question, report it as a question.
+- Not a finding: an authorization-freshness race the concurrency policy in `backend/CLAUDE.md`
+  accepts (DL-393).
 
 ## Procedure
 
@@ -43,8 +48,9 @@ don't reopen a resolution the owner decided.
 ## What to check
 
 1. **Authentication and sessions** (§4):
-   - token is 32 random bytes; only its SHA-256 hash is stored; never logged or returned;
-   - cookie is `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`;
+   - the session token and its stored hash, as specified in design-doc §4; never logged or
+     returned;
+   - the session cookie's name and attributes, as specified in design-doc §4;
    - a fresh token at every sign-in; password change replaces the current token and deletes the
      user's other sessions; deactivation, admin password reset, and "sign out everywhere" delete
      all the user's sessions (all run in the `auth` area); so does an admin changing the user's
@@ -57,8 +63,8 @@ don't reopen a resolution the owner decided.
      `password_change_required`;
    - Argon2id, run off the event loop; sign-in doesn't reveal whether an email exists (same
      error; the unknown-user path still does comparable hashing work); `account_inactive` is
-     returned only after the password is verified; a password over 256 characters is refused
-     with 422 before any lookup or hash (DL-49).
+     returned only after the password is verified; the password length limits, as specified in
+     design-doc §4 (DL-49).
 2. **CSRF:** every mutating method (`POST`, `PUT`, `PATCH`, `DELETE`) checks `Origin`: its
    host and port must equal the request's `Host` (a missing port is the default for the
    `Origin`'s scheme; the request's own scheme is never used; hostnames compared ignoring

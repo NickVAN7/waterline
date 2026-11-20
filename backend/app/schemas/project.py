@@ -13,7 +13,7 @@ from app.enums import (
     RestrictionCategory,
     RestrictionLevel,
 )
-from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
+from app.schemas.approval import ApprovalWorkItem
 from app.schemas.limits import NAME_MAX, PROJECT_DESCRIPTION_MAX
 from app.schemas.user import AccessReason
 from app.schemas.workspace import NewUser
@@ -99,6 +99,16 @@ class ProjectItem(BaseModel):
     my_access: ProjectRole | Literal["inherited_admin"]
 
 
+class MemberProject(BaseModel):
+    """A project an org add can add the person to as well (Q12g, DL-379): the org's live
+    projects; whoever may add org members administers each."""
+
+    id: uuid.UUID
+    key: str
+    name: str
+    export_controlled: bool
+
+
 class ModuleNote(BaseModel):
     module: str
     note: str
@@ -131,13 +141,31 @@ class MyProjectItem(ProjectItem):
 
     is_favorite: bool
     allowed_actions: list[Action]
+    # Archived projects are on My work's organization lists, behind the toggle (DL-330).
+    archived: bool
+
+
+class OrgWork(BaseModel):
+    """One organization's section on My work (DL-329, DL-330, DL-349, DL-359): its first open
+    projects (Active, Planning, On hold, each by name) and how many there are, its first hidden
+    ones (Completed, Cancelled, then archived, each by name) and how many, and how many its org
+    list shows (all but the archived)."""
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    projects: list[MyProjectItem]
+    total: int
+    hidden: list[MyProjectItem]
+    hidden_total: int
+    listed_total: int
 
 
 class WorkSections(BaseModel):
     favorites: WorkSection[MyProjectItem]
-    projects: WorkSection[MyProjectItem]
+    # One item per organization the user can open a project in, by name (DL-359).
+    organizations: WorkSection[OrgWork]
     approvals: WorkSection[ApprovalWorkItem]
-    decisions: WorkSection[DecisionWorkItem]
 
 
 class MyWork(BaseModel):

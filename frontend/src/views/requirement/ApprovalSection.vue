@@ -6,7 +6,11 @@
 // Its actions, each only as the server allows: Request approval, or Re-open approval on an
 // approved requirement (DL-195), pre-filled after a rejection; Cancel request; Re-request on a
 // flagged one, which cancels and opens the dialog pre-filled (DL-281); and Approve by hand
-// (DL-148), whose change it tells the host (`changed`). A 403 waits for the host's reload of what
+// (DL-148), whose change it tells the host (`changed`). The section's next step (Request approval,
+// Re-request, or an approver's decision) is its one primary button; Approve by hand is a quiet
+// action after a divider, its confirmation in the danger tone, naming the approvers it bypasses,
+// while a request is pending; a blocked Request approval comes after what can be done, its reason
+// beside it (F14, DL-377). A 403 waits for the host's reload of what
 // the user may do (`reloadPage`) and reloads the request's own; a 409 waits for the requirement's
 // (`reloadRequirement`); only then does it look where focus is (UI-FRM-7). A named approver whose
 // row is pending decides in the decide panel (S2-C20a, DL-284); a decision that ends the request
@@ -34,6 +38,7 @@ import { useLoad } from '@/composables/useLoad'
 
 import DecidePanel from './DecidePanel.vue'
 import RequestApprovalDialog, { type Earlier } from './RequestApprovalDialog.vue'
+import { hasAcceptanceCriteria, noCriteriaWarning } from './templates'
 
 type Requirement = components['schemas']['RequirementRead']
 type Request = components['schemas']['ApprovalRequestRead']
@@ -45,7 +50,8 @@ const props = defineProps<{
   // True when the requirement loaded.
   reloadRequirement: () => Promise<boolean>
 }>()
-const emit = defineEmits<{ changed: [requirement: Requirement] }>()
+// `awaiting`: whether a request is pending, each time the latest loads, for the tree's row (Q12b).
+const emit = defineEmits<{ changed: [requirement: Requirement]; awaiting: [pending: boolean] }>()
 
 // The latest request, with the actions the caller may take on it; null when there's none.
 const latest = useLoad(async (): Promise<Request | null> => {
@@ -73,6 +79,7 @@ watch(
 )
 const request = computed(() => latest.data.value ?? null)
 const isPending = computed(() => request.value?.status === 'pending')
+watch(latest.data, (loaded) => loaded !== undefined && emit('awaiting', isPending.value))
 
 const headingId = useId()
 const blockedId = useId()
@@ -91,6 +98,28 @@ const canRequest = computed(() => allows(props.requirement, 'approval_request.cr
 const canCancel = computed(() => allows(request.value, 'approval_request.cancel'))
 const canApprove = computed(() => allows(props.requirement, 'requirement.approve_manually'))
 const canDecide = computed(() => allows(request.value, 'approval.decide'))
+// Request approval as the next step, or blocked by a pending request (its reason beside it).
+const showRequest = computed(
+  () => canRequest.value && latest.data.value !== undefined && !request.value?.flagged,
+)
+const requestBlocked = computed(() => showRequest.value && isPending.value)
+const showReRequest = computed(
+  () =>
+    canRequest.value &&
+    latest.data.value !== undefined &&
+    !!request.value?.flagged &&
+    canCancel.value,
+)
+// One primary per section: the decide panel's Approve, when the viewer is an approver.
+const requestVariant = computed(() => (canDecide.value ? 'secondary' : 'primary'))
+// The approvers a by-hand approval goes past: those still to decide on the pending request.
+const undecided = computed(() =>
+  (request.value?.approvals ?? [])
+    .filter((row) => row.decision === 'pending')
+    .map((row) =>
+      row.approver_is_active ? row.approver_name : `${row.approver_name} (deactivated)`,
+    ),
+)
 
 // The approvers still counted on a request: a replaced row's person left it (design-doc §6.2).
 const approversOf = (shown: Request): Earlier[] =>
@@ -119,10 +148,16 @@ const cancelButton = ref<InstanceType<typeof Button>>()
 const reRequestButton = ref<InstanceType<typeof Button>>()
 const approveButton = ref<InstanceType<typeof Button>>()
 
-// The control that held focus may be gone with what it did: the section's heading takes it.
+// The control that held focus may be gone with what it did: the blocked Request approval takes
+// it when it's there (a request just made: its reason is read with it), else the heading.
+const blockedButton = ref<InstanceType<typeof Button>>()
+function focusAfter() {
+  if (blockedButton.value) blockedButton.value.focus()
+  else heading.value?.focus()
+}
 async function keepFocus() {
   await nextTick()
-  if (document.activeElement === document.body) heading.value?.focus()
+  if (document.activeElement === document.body) focusAfter()
 }
 
 async function fail(error: unknown, retryText: string) {
@@ -250,9 +285,18 @@ async function approveByHand() {
   const confirmed = await confirm.value?.open({
     title: `Approve ${id.value} by hand?`,
     text: `This records you as approving its current revision, without an approval request.${
-      isPending.value ? ' The pending request is cancelled.' : ''
+      isPending.value
+        ? ` The pending request is cancelled${
+            undecided.value.length ? `, without a decision from ${undecided.value.join(', ')}` : ''
+          }.`
+        : ''
     }`,
     button: 'Approve',
+    // Going past the named approvers is the risky path (S3-C0o's critique, 1b).
+    variant: isPending.value ? 'danger' : 'primary',
+    warning: hasAcceptanceCriteria(props.requirement.description_md)
+      ? undefined
+      : noCriteriaWarning(props.requirement.description_md),
   })
   if (!confirmed) return
   acting.value = 'approve'
@@ -323,9 +367,11 @@ async function dismiss() {
           This requirement has changed since approval was requested. Approvers decide on revision
           {{ request.revision_number }}; cancel and request again to have them review the latest.
         </Alert>
-        <dl class="m-0 flex flex-col gap-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <dt class="font-medium">Latest request:</dt>
+        <!-- Terms and values as the requirement's details list above (DL-325): one way to read a
+             label and its value in the panel and on the page. -->
+        <dl class="m-0 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <div class="flex flex-col items-start gap-1">
+            <dt class="text-sm font-medium text-text-muted">Latest request</dt>
             <dd class="m-0">
               <Badge
                 :tone="APPROVAL_REQUEST_STATUS[request.status].tone"
@@ -334,12 +380,12 @@ async function dismiss() {
               >
             </dd>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <dt class="font-medium">Revision:</dt>
+          <div class="flex flex-col gap-1">
+            <dt class="text-sm font-medium text-text-muted">Revision</dt>
             <dd class="m-0">{{ request.revision_number }}</dd>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <dt class="font-medium">Requested by:</dt>
+          <div class="flex flex-col gap-1 sm:col-span-2">
+            <dt class="text-sm font-medium text-text-muted">Requested by</dt>
             <dd class="m-0 flex flex-wrap items-center gap-2">
               {{ request.requested_by_name }}
               <Badge
@@ -351,8 +397,8 @@ async function dismiss() {
               <span class="text-text-muted">{{ when(request.created_at) }}</span>
             </dd>
           </div>
-          <div v-if="request.note" class="flex flex-wrap gap-2">
-            <dt class="font-medium">Note:</dt>
+          <div v-if="request.note" class="flex flex-col gap-1 sm:col-span-2">
+            <dt class="text-sm font-medium text-text-muted">Note</dt>
             <dd class="m-0">{{ request.note }}</dd>
           </div>
         </dl>
@@ -391,25 +437,21 @@ async function dismiss() {
       </template>
     </div>
     <div v-if="canRequest || canCancel || canApprove" class="flex flex-wrap items-center gap-3">
-      <template v-if="canRequest && latest.data.value !== undefined">
-        <Button
-          v-if="!request?.flagged"
-          variant="secondary"
-          :blocked="isPending"
-          :aria-describedby="isPending ? blockedId : undefined"
-          @click="openRequest"
-          >{{ reopens ? 'Re-open approval' : 'Request approval' }}</Button
-        >
-        <Button
-          v-else-if="canCancel"
-          ref="reRequestButton"
-          variant="secondary"
-          :pending="acting === 'rerequest'"
-          pending-label="Cancelling…"
-          @click="reRequest"
-          >Re-request</Button
-        >
-      </template>
+      <Button
+        v-if="showRequest && !requestBlocked"
+        :variant="requestVariant"
+        @click="openRequest"
+        >{{ reopens ? 'Re-open approval' : 'Request approval' }}</Button
+      >
+      <Button
+        v-else-if="showReRequest"
+        ref="reRequestButton"
+        :variant="requestVariant"
+        :pending="acting === 'rerequest'"
+        pending-label="Cancelling…"
+        @click="reRequest"
+        >Re-request</Button
+      >
       <Button
         v-if="canCancel"
         ref="cancelButton"
@@ -419,23 +461,36 @@ async function dismiss() {
         @click="cancel"
         >Cancel request</Button
       >
-      <Button
-        v-if="canApprove"
-        ref="approveButton"
-        variant="secondary"
-        :pending="acting === 'approve'"
-        pending-label="Approving…"
-        @click="approveByHand"
-        >Approve by hand</Button
-      >
-      <p v-if="canRequest && isPending && !request?.flagged" :id="blockedId" class="m-0 text-sm">
-        A request is pending: cancel it to request approval again.
-      </p>
+      <template v-if="canApprove">
+        <!-- A divider, drawn as a border (it stays in forced colors), before the quiet action. -->
+        <span
+          v-if="(showRequest && !requestBlocked) || showReRequest || canCancel"
+          aria-hidden="true"
+          class="h-(--control-height-sm) border-l border-border"
+        />
+        <Button
+          ref="approveButton"
+          variant="ghost"
+          :pending="acting === 'approve'"
+          pending-label="Approving…"
+          @click="approveByHand"
+          >Approve by hand</Button
+        >
+      </template>
+      <!-- Blocked: after what can be done, with its reason beside it (S3-C0o's critique, 4). -->
+      <template v-if="requestBlocked">
+        <Button ref="blockedButton" variant="secondary" blocked :aria-describedby="blockedId">{{
+          reopens ? 'Re-open approval' : 'Request approval'
+        }}</Button>
+        <p :id="blockedId" class="m-0 text-sm">
+          A request is pending: cancel it to request approval again.
+        </p>
+      </template>
     </div>
     <RequestApprovalDialog
       ref="dialog"
       :project-key="projectKey"
-      :fallback-focus="() => heading?.focus()"
+      :fallback-focus="focusAfter"
       @requested="requested"
       @refused="refused"
       @outdated="outdated"

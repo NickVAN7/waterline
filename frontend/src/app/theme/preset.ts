@@ -140,11 +140,30 @@ export const overrides = {
   // tokens are still Aura's: map them here before using `dropdown` or `multiple` (UI-STY-6).
   components: {
     // The requirement tree (S2-C15): Aura's border is `{surface.800}` in dark, off our tokens.
-    treetable: { root: { borderColor: token('border-subtle') } },
+    // Tabs and the tree sit on the page or the side pane, never above it: Aura fills them with
+    // `content.background` (`surface-raised`, which only floating layers use, as the popup menu
+    // still does), so they'd read as raised cards in dark and as white blocks on the pane in
+    // light. They take the surface they sit on (S3-C0n trial). Neither scrolls under a sticky
+    // part, so nothing shows through.
+    treetable: {
+      root: { borderColor: token('border-subtle') },
+      header: { background: 'transparent' },
+      headerCell: { background: 'transparent' },
+      row: { background: 'transparent' },
+      footer: { background: 'transparent' },
+      footerCell: { background: 'transparent' },
+    },
     // MarkdownEditor's Write and Preview (S2-C16): Aura marks the selected tab with accent text
     // and a 1 px bar; 3 px makes the bar a cue of its own (base.css keeps it in forced colors).
     // The tab's focus ring stays inset, as the menu item's does: the tab list clips overflow.
-    tabs: { activeBar: { height: '3px' } },
+    tabs: {
+      tablist: { background: 'transparent' },
+      tabpanel: { background: 'transparent' },
+      activeBar: { height: '3px' },
+    },
+    // The breadcrumb trail (S3-C0e, DL-327): flush with the h1 below it, on the page's own
+    // background; its crumbs' colors are `Breadcrumbs`' (muted links, the current one in text).
+    breadcrumb: { root: { padding: '0', background: 'transparent' } },
     button: {
       root: {
         primary: buttonSeverity('accent', 'accent-hover', 'on-accent'),

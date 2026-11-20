@@ -109,12 +109,23 @@ describe('OrgMenu', () => {
     expect(links.map((a) => a.textContent?.trim())).toEqual(['Org 1', 'Org 2'])
   })
 
-  it('adds a filter field past eight orgs', async () => {
+  it('past eight orgs, a Filter button shows a filter field and moves focus to it', async () => {
     const wrapper = await mountMenu(Array.from({ length: 9 }, (_, i) => org(i + 1)))
     await wrapper.get('button').trigger('click')
     await flushPromises()
+    // Hidden at first: focus goes to a link, as with fewer orgs.
+    expect(document.querySelector('[role=dialog] input')).toBeNull()
+    expect(document.activeElement?.tagName).toBe('A')
+    const show = [...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')].find(
+      (b) => b.textContent?.trim() === 'Filter organizations',
+    )!
+    // With the Filter button showing, then the field.
+    await expectNoA11yViolations(document.querySelector('[role=dialog]')!)
+    show.click()
+    await flushPromises()
     const filter = document.querySelector<HTMLInputElement>('[role=dialog] input')!
     expect(document.activeElement).toBe(filter)
+    await expectNoA11yViolations(document.querySelector('[role=dialog]')!)
     expect(document.querySelector(`label[for="${filter.id}"]`)?.textContent).toBe(
       'Filter organizations',
     )

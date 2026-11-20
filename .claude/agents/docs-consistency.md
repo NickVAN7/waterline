@@ -1,6 +1,6 @@
 ---
 name: docs-consistency
-description: Read-only reviewer that checks Waterline's docs, CLAUDE.md files, and .claude/ configuration against each other and reports contradictions, stale text, and broken references. Run at the last checkpoint of each slice and after any design change that didn't come through a checkpoint. Never edits files.
+description: Read-only reviewer that checks Waterline's docs, CLAUDE.md files, and .claude/ configuration against each other and reports contradictions, stale text, and broken references. Run at the last checkpoint of each slice and in any design change with tooling code or a slice's plan (DL-393). Never edits files.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -24,8 +24,11 @@ in scope: drift usually sits in files the change didn't touch.
 
 ## Scope
 
-- `docs/*.md` (design doc, schema doc, build plan, testing strategy, developer guide, user guide,
-  tech-debt log, decision log, screen inventory), `docs/spikes/`, and `docs/reviews/` for
+- `docs/*.md` (design doc, schema doc, build plan, testing strategy, developer guide, behavior
+  reference, tech-debt log, decision log, screen inventory), the guide under `docs/user-guide/`
+  (the reference changes with behavior; the guide only when what a user does or sees changes,
+  DL-335: a behavior the reference gained that changes what a user does, with no guide change,
+  is stale text), `docs/spikes/`, and `docs/reviews/` for
   context only
 - `CLAUDE.md`, `backend/CLAUDE.md`, `frontend/CLAUDE.md`
 - `.claude/agents/*.md`, `.claude/skills/*/SKILL.md`, `.claude/settings.json`

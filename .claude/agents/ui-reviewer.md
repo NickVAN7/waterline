@@ -46,8 +46,8 @@ guide's text says what is correct; you decide whether the code does it.
   exceptions and its `DL-<n>` refinements.
 - Start with the rules the guide's §2 table marks **R** in "Checked by": nothing else checks
   them before the manual pass.
-- Walk `frontend/CLAUDE.md`'s **Rules** and **UI** sections the same way: most of their bullets
-  are traps an earlier review found.
+- Walk `frontend/CLAUDE.md`'s **Rules** and **UI** sections, and `.claude/skills/vue-screen/traps.md`,
+  the same way: the traps are bugs an earlier review found (DL-393).
 - A rule a later slice owns isn't a finding before then (no drag alternatives before Slice 2).
 
 ### 2.2 Searches to run on every diff

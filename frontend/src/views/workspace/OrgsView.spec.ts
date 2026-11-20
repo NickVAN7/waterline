@@ -6,6 +6,7 @@ import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, workspaceEntry } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { trail } from '@/test/trail'
 import {
   cleanUpAfterEach,
   emptyPastTheFirst,
@@ -17,8 +18,25 @@ import {
 import OrgsView from './OrgsView.vue'
 
 const ORGS = [
-  { id: 'o-acme', name: 'Acme Manufacturing', slug: 'acme' },
-  { id: 'o-globex', name: 'Globex Retail', slug: 'globex' },
+  {
+    id: 'o-acme',
+    name: 'Acme Manufacturing',
+    slug: 'acme',
+    project_count: 2,
+    member_count: 12,
+    owners: [
+      { id: 'u-olivia', name: 'Olivia Ortiz' },
+      { id: 'u-omar', name: 'Omar Owens' },
+    ],
+  },
+  {
+    id: 'o-globex',
+    name: 'Globex Retail',
+    slug: 'globex',
+    project_count: 0,
+    member_count: 0,
+    owners: [],
+  },
 ]
 
 beforeEach(() => {
@@ -46,11 +64,30 @@ describe('OrgsView', () => {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Organizations')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [['Workspace', '/workspace/staff']],
+      current: 'Organizations',
+    })
     expect(
       wrapper.findAll('tbody tr').map((tr) => [tr.get('a').text(), tr.get('a').attributes('href')]),
     ).toEqual([
       ['Acme Manufacturing', '/acme/projects'],
       ['Globex Retail', '/globex/projects'],
+    ])
+    // Each org's projects, members, and owners (S3-C0k); "None" with no owner.
+    expect(wrapper.findAll('th').map((th) => th.text())).toEqual([
+      'Name',
+      'Slug',
+      'Projects',
+      'Members',
+      'Owners',
+    ])
+    expect(
+      wrapper.findAll('tbody tr').map((tr) => tr.findAll('td').map((td) => td.text().trim())),
+    ).toEqual([
+      ['Acme Manufacturing', 'acme', '2', '12', 'Olivia Ortiz, Omar Owens'],
+      ['Globex Retail', 'globex', '0', '0', 'None'],
     ])
     await expectNoA11yViolations(wrapper)
   })

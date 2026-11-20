@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // The project selector (UI-SHL-6): a menu button showing the selected project, opening a popover
-// headed by the current org's name, of links to that org's projects, then "All projects" (styled
-// as a link, apart from the project rows) and "New project" for those who may create one
+// headed by the current org's name, of links to that org's projects, then "All projects" (a menu
+// row with an arrow, set apart from the projects by a rule) and "New project" for those who may create one
 // (`project.create`), lined up with the rows, which opens the create dialog (DL-137).
 import { computed, ref } from 'vue'
 
 import { api, client } from '@/api/client'
 import Button from '@/components/Button.vue'
+import Icon from '@/components/Icon.vue'
 import { allows } from '@/composables/allowedActions'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
@@ -73,6 +74,7 @@ const links = computed(() =>
     v-if="nav.org"
     ref="popover"
     name="Projects"
+    wide
     :links="links"
     :current-id="nav.project?.id"
     :busy="page.loading.value"
@@ -111,10 +113,10 @@ const links = computed(() =>
       <div class="flex flex-col border-t border-border-subtle pt-2">
         <RouterLink
           :to="{ name: 'org-projects', params: { orgSlug: nav.org.slug } }"
-          class="flex min-h-(--control-height) items-center rounded-md px-2 font-medium text-link underline hover:bg-hover"
+          class="flex min-h-(--control-height) items-center justify-between gap-2 rounded-md px-2 font-medium text-text no-underline hover:bg-hover"
           @click="close"
         >
-          All projects
+          All projects<Icon name="chevron-right" />
         </RouterLink>
         <button
           v-if="allows(nav.org, 'project.create')"

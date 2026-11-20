@@ -23,13 +23,10 @@ test('a project is created from the project selector, and opens', async ({ page 
   await page.keyboard.press('Enter')
   const selector = page.getByRole('dialog', { name: 'Projects' })
   await expect(selector).toHaveAccessibleDescription('Acme Manufacturing')
-  // All projects reads as a link apart from the rows; New project lines up with them (DL-137).
+  // All projects is a menu row set apart below the projects, not underlined like a link in text
+  // (owner, S2 feedback); New project lines up with it (DL-137).
   const allProjects = selector.getByRole('link', { name: 'All projects' })
-  await expect(allProjects).toHaveCSS('text-decoration-line', 'underline')
-  await expect(selector.getByRole('link', { name: /^ERP Rollout/ })).not.toHaveCSS(
-    'text-decoration-line',
-    'underline',
-  )
+  await expect(allProjects).not.toHaveCSS('text-decoration-line', 'underline')
   const newProject = selector.getByRole('button', { name: 'New project' })
   // Measured once the popover's opening animation has finished: it scales in.
   await page.waitForFunction(() =>

@@ -1,6 +1,6 @@
 ---
 name: simplicity-auditor
-description: Read-only whole-repository audit of Waterline for overengineering, at the end of each slice after repo-auditor (and once in S2-C0a). Finds code, config, and process that should be deleted, simplified, or merged, from vendored audit prompts in .claude/audit/. Bugs, security, and scale are repo-auditor's. Reports findings only; never edits files and runs no tests.
+description: Read-only whole-repository audit of Waterline for overengineering, at the end of each slice, in the same step as the other slice-end reviewers (and once in S2-C0a). Finds code, config, and process that should be deleted, simplified, or merged, from vendored audit prompts in .claude/audit/. Bugs, security, and scale are repo-auditor's. Reports findings only; never edits files and runs no tests.
 tools: Read, Grep, Glob, Bash
 ---
 

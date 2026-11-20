@@ -11,18 +11,16 @@ import { computed, ref } from 'vue'
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { PROJECT_ROLE } from '@/app/labels'
-import { focusHeading, replacedPage } from '@/app/routeFocus'
+import { focusHeading } from '@/app/routeFocus'
 import Button from '@/components/Button.vue'
-import ErrorState from '@/components/ErrorState.vue'
-import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
-import { useCurrentOrgStore } from '@/stores/currentOrg'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RosterPage from '@/views/roster/RosterPage.vue'
 import type { AddOptions, Roster } from '@/views/roster/roster'
 
 import AddMemberDialog from './AddMemberDialog.vue'
 import ProjectHeader from './ProjectHeader.vue'
+import ProjectPageLoading from './ProjectPageLoading.vue'
 import { useProjectPage } from './useProjectPage'
 
 type Role = components['schemas']['ProjectRole']
@@ -30,8 +28,8 @@ type Role = components['schemas']['ProjectRole']
 // Only if the list itself is refused; a project the user can't see is the not-found page.
 const WHO_TO_ASK = "Ask one of the project's admins if you need to see its members."
 
-const { key, project, notFound, retry } = useProjectPage('project-members')
-const nav = useCurrentOrgStore()
+const { key, project, notFound, retry, reload, exportControlled } =
+  useProjectPage('project-members')
 const loaded = computed(() => project.data.value)
 const canManage = computed(() => allows(loaded.value, 'project_member.manage'))
 // The project's workspace, for the add-person form's user check (DL-66); the project read has
@@ -52,7 +50,7 @@ const roster = computed<Roster>(() => ({
     value,
     label: PROJECT_ROLE[value],
   })),
-  exportControlled: !!loaded.value?.restriction_categories.includes('export_controlled'),
+  exportControlled: exportControlled.value,
   workspaceId: workspaceId.value,
   add: (email, role, options) =>
     api(
@@ -109,33 +107,19 @@ async function list(query: { limit: number; offset: number; include_deactivated?
 // A 403 in a dialog: the project's actions changed too (its buttons, the export-control flag). If
 // the project is gone with them, focus moves to the new page's h1, on a visit's first page too
 // (UI-SHL-9, TD-90).
-async function refused() {
-  await project.run()
-  if (project.data.value) nav.select(project.data.value)
-  if (notFound.value) await replacedPage()
-}
+const refused = () => reload()
 </script>
 
 <template>
   <NotFoundView v-if="notFound" />
   <div v-else class="flex flex-col gap-6">
-    <div
+    <ProjectPageLoading
       v-if="!loaded"
-      class="flex flex-col gap-6"
-      :aria-busy="project.loading.value ? 'true' : 'false'"
-    >
-      <template v-if="project.error.value">
-        <h1 class="m-0 text-2xl leading-tight font-semibold font-mono">{{ key.toUpperCase() }}</h1>
-        <ErrorState
-          :key="project.failures.value"
-          :live="project.failures.value > 1"
-          thing="this project"
-          :pending="project.loading.value"
-          @retry="retry"
-        />
-      </template>
-      <Skeleton v-else :rows="4" />
-    </div>
+      :project="project"
+      :title="key.toUpperCase()"
+      :rows="4"
+      @retry="retry"
+    />
     <RosterPage
       v-else
       :key="loaded.id"
@@ -154,7 +138,7 @@ async function refused() {
       @refused="refused"
     >
       <template #header="{ add }">
-        <ProjectHeader :project="loaded" :title="`${loaded.name} members`">
+        <ProjectHeader :project="loaded" page="members" :trail="[{ label: 'Members' }]">
           <Button v-if="canManage" @click="picker?.open()">Add member</Button>
           <Button v-if="canManage && workspaceId" variant="secondary" @click="add()"
             >Add by email</Button
@@ -169,7 +153,7 @@ async function refused() {
           >
         </ProjectHeader>
       </template>
-      <template #dialogs="{ done, refused: reload }">
+      <template #dialogs="{ done, refused: rosterRefused }">
         <!-- Mounted whatever the actions: a 403 reload mustn't take it away while it's open. -->
         <AddMemberDialog
           ref="picker"
@@ -178,7 +162,7 @@ async function refused() {
           :roles="roster.roles"
           :export-controlled="!!roster.exportControlled"
           @done="done"
-          @refused="reload"
+          @refused="rosterRefused"
         />
       </template>
     </RosterPage>

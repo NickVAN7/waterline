@@ -1,7 +1,10 @@
 # CI: `wl check --full`, on every push to main and every pull request (build-plan.md,
-# "Tests & CI"; testing-strategy.md, "Workflow and gates"; DL-99). CI calls the developer CLI, so
-# a green `uv run wl check --full` locally means a green run here. The job keeps the name
-# "wl check": the main branch's ruleset requires that status check.
+# "Tests & CI"; testing-strategy.md, "Workflow and gates"; DL-99), split into parallel jobs, one
+# per step group of `wl check --full` (DL-392): backend, frontend, the developer CLI, the
+# supply-chain audit, and the end-to-end tests. Each calls the developer CLI, so a green
+# `uv run wl check --full` locally means a green run here; a CLI test checks that the jobs' `wl`
+# commands cover exactly its steps. The last job keeps the name "wl check": the main branch's
+# ruleset requires that status check, and it passes only when every job did.
 name: CI
 
 on:
@@ -18,20 +21,21 @@ concurrency:
 permissions:
   contents: read
 
+# The same Postgres settings as docker-compose.yml, for every job: the backend tests read them
+# through app/core/settings.py (there is no .env in CI) and only ever use the test database,
+# waterline_test; `wl e2e`'s Compose stack refuses to start without them.
+env:
+  POSTGRES_DB: waterline
+  POSTGRES_USER: waterline
+  POSTGRES_PASSWORD: waterline-ci-password
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: 5432
+
 jobs:
-  check:
-    name: wl check
+  backend:
+    name: backend
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-
-    # The same Postgres as docker-compose.yml. The tests read these through app/core/settings.py
-    # (there is no .env in CI) and only ever use the test database, waterline_test.
-    env:
-      POSTGRES_DB: waterline
-      POSTGRES_USER: waterline
-      POSTGRES_PASSWORD: waterline-ci-password
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
 
     services:
       postgres:
@@ -63,36 +67,129 @@ jobs:
             uv.lock
             backend/uv.lock
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: frontend/package.json
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
       # A service container can't mount the repo, so the Compose init script that creates the
       # test database runs inside it instead (it reads POSTGRES_USER and POSTGRES_DB there).
       - name: Create the test database
         run: docker exec -i "${{ job.services.postgres.id }}" bash < docker/postgres/initdb/01-create-test-database.sh
 
-      # The developer guide's first-time setup, minus the parts CI doesn't need (doctor,
-      # pre-commit hooks, .env, the Compose stack).
       - name: Install dependencies
         run: |
           uv sync --all-packages --locked
           uv sync --directory backend --locked
-          npm ci --prefix frontend
 
+      # Mutation testing whatever changed, as `wl check --full` does (DL-99).
+      - name: wl backend check
+        run: uv run wl backend check
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/package.json
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: |
+          uv sync --all-packages --locked
+          npm ci --prefix frontend
+      - name: wl frontend check
+        run: uv run wl frontend check
+
+  cli:
+    name: developer CLI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Full history: the hooks' tests read the repository's docs and run real git.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install dependencies
+        run: uv sync --all-packages --locked
+      # Its repository-state step checks only `core.hooksPath` here (CI is set): CI installs no
+      # pre-commit hook and checks out no branch.
+      - name: wl cli check
+        run: uv run wl cli check
+
+  audit:
+    name: supply-chain audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Full history: gitleaks scans every commit.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            backend/uv.lock
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/package.json
+      # uv audit on both lockfiles, npm audit (it reads the lockfile), and gitleaks over the full
+      # history, the version pinned in .pre-commit-config.yaml; it needs the network.
+      - name: Install dependencies
+        run: uv sync --all-packages --locked
+      - name: wl audit
+        run: uv run wl audit
+
+  e2e:
+    name: end-to-end tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/package.json
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: |
+          uv sync --all-packages --locked
+          npm ci --prefix frontend
       # The browser `wl e2e` drives (Chromium only in v1), with the system libraries it needs.
       # Docker, which the end-to-end stack runs in, is already on the runner.
       - name: Install Playwright's Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
-
-      # --full (DL-99): mutation testing whatever changed, `wl audit` (uv audit on both
-      # lockfiles, npm audit, and gitleaks over the full history, the version pinned in
-      # .pre-commit-config.yaml; it needs the network), and `wl e2e`.
-      - name: wl check
-        run: uv run wl check --full
+      - name: wl e2e
+        run: uv run wl e2e
         # The end-to-end stack's web app builds the PrimeUI license key in (DL-135).
         env:
           VITE_PRIMEUI_LICENSE: ${{ secrets.VITE_PRIMEUI_LICENSE }}
+
+  # The status check the main branch's ruleset requires (DL-27): it runs whatever the others did,
+  # and passes only when every one succeeded (a failed, cancelled, or skipped job fails it).
+  check:
+    name: wl check
+    needs: [backend, frontend, cli, audit, e2e]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Jobs: $RESULTS"
+          test "$RESULTS" = "success success success success success"

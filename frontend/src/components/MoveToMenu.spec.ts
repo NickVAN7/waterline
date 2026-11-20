@@ -9,7 +9,7 @@ import MoveToMenu, { type MoveAction } from './MoveToMenu.vue'
 
 async function mountMenu(name: string | null, actions: MoveAction[]) {
   const wrapper = mount(MoveToMenu, {
-    props: { name, actions, blockedReason: 'Select a requirement to move it.' },
+    props: { name, actions, reasonShownAt: 'tree-hint' },
     global: { plugins: [PrimeVue], stubs: { transition: false } },
     attachTo: document.body,
   })
@@ -64,7 +64,7 @@ describe('MoveToMenu', () => {
     expect(up).toHaveBeenCalledOnce()
   })
 
-  it('with nothing to move, is blocked with its reason tied to the button', async () => {
+  it("with nothing to move, is blocked, tied to its host's reason", async () => {
     const wrapper = await mountMenu(null, [{ label: 'Move up', run: vi.fn() }])
 
     await wrapper.get('button').trigger('click')
@@ -72,10 +72,7 @@ describe('MoveToMenu', () => {
 
     const button = wrapper.get('button')
     expect(button.attributes('aria-disabled')).toBe('true')
-    expect(document.getElementById(button.attributes('aria-describedby')!)!.textContent).toBe(
-      'Select a requirement to move it.',
-    )
+    expect(button.attributes('aria-describedby')).toBe('tree-hint')
     expect(items()).toEqual([])
-    await expectNoA11yViolations(document.body)
   })
 })

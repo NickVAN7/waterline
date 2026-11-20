@@ -6,6 +6,7 @@ rights under that lock too, against the project and the caller's own role as the
 waiting on a marking, an archive, or the caller's removal is refused. Each sabotage-checked (see
 the S1-C13 review record)."""
 
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import cast
 
@@ -18,7 +19,9 @@ from app.authz.context import AuthzContext, ProjectAccess
 from app.core.db import SessionMaker
 from app.core.errors import AppError, ValidationFailedError
 from app.enums import OrgRole, ProjectRole, RestrictionCategory, RestrictionLevel
+from app.models.org import Membership, Organization
 from app.models.project import Project, ProjectMembership
+from app.schemas.org import MemberAdd, MemberProjectAdd
 from app.schemas.project import ProjectMemberAdd, RestrictionUpdate
 from app.services.project import ProjectService
 from tests.factories.org import MembershipFactory, OrganizationFactory
@@ -299,4 +302,89 @@ async def test_an_explicit_admin_demoted_while_their_change_waits_cannot_remove_
     assert (refused, await state(concurrency, project)) == (
         ["ForbiddenError"],
         (["export_controlled"], 1),
+    )
+
+
+@pytest.fixture
+async def org_setup(concurrency: SessionMaker) -> tuple[Project, Change, Change, uuid.UUID]:
+    """As `setup`, but the add is an org add of Carol, not yet in the org, with the project as
+    its projects step (DL-379), without a confirmation."""
+    async with committing_factories(concurrency):
+        org = await OrganizationFactory.create_async()
+        project = await ProjectFactory.create_async(organization=org)
+        admin = await UserFactory.create_async(is_system_admin=True)
+        ann = await UserFactory.create_async()
+        await ProjectMembershipFactory.create_async(
+            project=project, user=ann, role=ProjectRole.ADMIN
+        )
+        carol = await UserFactory.create_async(email="carol@acme.example")
+    ctx = AuthzContext(user_id=admin.id, is_system_admin=True)
+    mark_ec = RestrictionUpdate(
+        level=None, categories=[EC], export_control_confirmed=True, confirmed_member_ids=[ann.id]
+    )
+
+    async def mark(session: AsyncSession) -> object:
+        loaded = await session.get_one(Project, project.id)
+        return await ProjectService(session).set_restriction(ctx, loaded, mark_ec)
+
+    async def org_add(session: AsyncSession) -> object:
+        loaded = await session.get_one(Organization, org.id)
+        return await ProjectService(session).add_org_member(
+            ctx,
+            loaded,
+            MemberAdd(
+                email="carol@acme.example",
+                role=OrgRole.MEMBER,
+                projects=[MemberProjectAdd(project_id=project.id)],
+            ),
+        )
+
+    return project, mark, org_add, carol.id
+
+
+async def in_org(concurrency: SessionMaker, user_id: uuid.UUID) -> bool:
+    async with concurrency() as check:
+        return bool(
+            await check.scalar(
+                select(func.count()).select_from(Membership).where(Membership.user_id == user_id)
+            )
+        )
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_an_org_add_with_projects_waiting_on_marking_export_controlled_adds_nothing(
+    concurrency: SessionMaker,
+    concurrency_engine: AsyncEngine,
+    org_setup: tuple[Project, Change, Change, uuid.UUID],
+) -> None:
+    """Bug: the projects step's confirmation checked before the project's lock, so the add
+    passes against the project as it was; or the org membership kept when the project part is
+    refused (all or nothing, DL-379)."""
+    project, mark, org_add, carol = org_setup
+
+    refused = await race(concurrency, concurrency_engine, first=mark, second=org_add)
+
+    assert (refused, await state(concurrency, project), await in_org(concurrency, carol)) == (
+        ["confirmation_required"],
+        (["export_controlled"], 1),
+        False,
+    )
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_marking_export_controlled_waiting_on_an_org_add_with_projects_sees_the_member(
+    concurrency: SessionMaker,
+    concurrency_engine: AsyncEngine,
+    org_setup: tuple[Project, Change, Change, uuid.UUID],
+) -> None:
+    """Bug: the org add's project membership taken without the project's lock, so a marking
+    confirms a member list that no longer holds."""
+    project, mark, org_add, carol = org_setup
+
+    refused = await race(concurrency, concurrency_engine, first=org_add, second=mark)
+
+    assert (refused, await state(concurrency, project), await in_org(concurrency, carol)) == (
+        ["members_changed"],
+        ([], 2),
+        True,
     )
