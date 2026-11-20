@@ -10,7 +10,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 S3-C0o (The design trial's outcome) done; the outside review's handoff
 (`docs/reviews/design-changes/2026-11-18-outside-review-handoff.md`, DL-390): Packages 1 (the git
 guard, DL-391), 2 (parallel reviewers and CI, DL-392), and 3 (process rules, DL-393) applied;
-next: S3-C0p, then Packages 4 and 5 as rows from S3-C0q, each after the owner's approval.
+next: S3-C0p and S3-C0q (the trial's open findings, DL-395), then Packages 4 and 5 as rows from
+S3-C0r, each after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

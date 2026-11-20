@@ -496,7 +496,7 @@ Entry format:
   for GitHub.
 - **Why:** comments only, in built code and a spec test, which a design change doesn't touch; the
   spec test's change needs the owner's approval.
-- **Fix by:** Slice 3 (the first Package 4 row, S3-C0q, with the owner's approval for the spec
+- **Fix by:** Slice 3 (the first Package 4 row, S3-C0r, with the owner's approval for the spec
   test's comment)
 - **Status:** open
 

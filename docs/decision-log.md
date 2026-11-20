@@ -4874,7 +4874,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the polish group; until then every block is logged as before.
 - **Supersedes:** the trial's outcome, held to the end of Slice 3's pre-work checkpoints (owner,
   Nov 10, recorded in `docs/spikes/S3-C0b-guard-trial/README.md`; no entry of its own)
-- **Superseded by:** none
+- **Superseded by:** DL-395, in part (the Package rows start at S3-C0r)
 - **Applies to:** build plan (Slice 3's "Checkpoints" note); root `CLAUDE.md` (Status, the
   guard's logging rule); the guard trial's README and friction log
 - **Source:** owner, Nov 18, 2026 (after S3-C0o)
@@ -4996,7 +4996,23 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   (`s3-polish`) extends through the Package 4 and 5 rows from S3-C0q; its last row is the review
   point.
 - **Supersedes:** DL-393 in part (the freeze's scope, the policy's wording)
-- **Superseded by:** none
+- **Superseded by:** DL-395, in part (the Package rows start at S3-C0r)
 - **Applies to:** root and backend `CLAUDE.md`; design-doc §4; `design-change` skill (step 7);
   build plan (Slice 3 groups)
 - **Source:** owner, Nov 19, 2026 (answers to DC-2026-11-19's decisions 1 to 4)
+
+### DL-395: The trial's open findings in two rows, their details settled
+- **Date:** 2026-11-19
+- **Decision:** S3-C0p splits in two. S3-C0p keeps the panel's frontend findings (F13 to F18). A
+  new S3-C0q takes F21, the History read with the approval requests' rows and the status menu,
+  with the security reviewer. The outside review's Package 4 and 5 rows start at S3-C0r, and
+  group 1 runs through them. The details: F15, the title `text-2xl` and the acceptance-criteria
+  note as muted helper text, not an `Alert`. F17, edit mode's heading reads "Editing <ID>", and
+  the details keep view mode's grid. F21, each History entry carries its `entity_type`, and gets
+  the wording in S3-C0q's row. The status menu marks the current status with a check icon,
+  `aria-disabled`, and "(current)", above the line "Approved is set by an approval."
+- **Supersedes:** DL-390 and DL-394 in part (the Package rows from S3-C0q now start at S3-C0r)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 3's overview, checkpoints S3-C0p and S3-C0q, groups, the
+  security-reviewer list); root `CLAUDE.md` Status; TD-120
+- **Source:** owner, Nov 19, 2026 (S3-C0p's definition reviewed before it started)
