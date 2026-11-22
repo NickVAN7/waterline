@@ -459,6 +459,18 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   expect(Math.abs(opened.y - (button.y + button.height))).toBeLessThan(12)
   expect(Math.abs(opened.x - button.x)).toBeLessThan(12)
   await expectNoA11yViolations(page)
+  // The current status is listed, unavailable but in the text color, and so is the note under
+  // the list: both in tokens (DL-395).
+  const currentItem = panel.getByRole('menuitem', { name: /\(current\)$/ })
+  await expect(currentItem).toHaveAttribute('aria-disabled', 'true')
+  await expect(panel.getByText('Approved is set by an approval.')).toBeVisible()
+  await expectOnlyTokenColors(page, '.p-menu')
+  // In the text color, not the disabled tokens (a token too, so the check above can't tell),
+  // read where a blocked item's color goes: PrimeVue's item content, over the item's own.
+  const content = '.p-menu-item-content'
+  const otherItem = panel.getByRole('menuitem', { name: 'Deferred' }).locator(content)
+  const textColor = await otherItem.evaluate((el) => getComputedStyle(el).color)
+  await expect(currentItem.locator(content)).toHaveCSS('color', textColor)
   // Esc closes the menu alone, not the panel around it.
   await page.keyboard.press('Escape')
   await expect(panel.getByRole('menu')).toBeHidden()

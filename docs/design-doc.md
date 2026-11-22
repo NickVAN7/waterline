@@ -822,8 +822,9 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   New requirements always start as `draft`. There are no parent/child status rules.
 - **Requirement approval by hand:** only a project admin (including inherited) moves a
   requirement into `approved` by hand, through its own action, `requirement.approve_manually`,
-  which `allowed_actions` carries so the status menu offers Approved only to those who may use it
-  (DL-148); members get 403 for that transition. Doing so sets
+  which `allowed_actions` carries so the Approval section offers **Approve by hand** only to
+  those who may use it (DL-148); the status menu never offers Approved, and says it's set by an
+  approval (DL-388); members get 403 for that transition. Doing so sets
   `approved_revision_id` to the current revision, `approved_by` to that admin, and
   `approved_at` to now, and cancels any pending approval request on the requirement (§6.2).
   That action is the only path: a `PATCH` setting `status` to `approved` answers admins 422
@@ -972,7 +973,10 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
   members' included, with the "Deactivated" badge where it applies, DL-160; "System" for a change
   an app CLI command made, DL-274; a moved requirement's parent by its ID, with a "Deleted"
   badge while it's deleted, and no parent as "the top level"; an approval's revision by its
-  number, DL-276) beside a Revisions
+  number, DL-276; and, from S3-C0q, its approval requests' entries, each with its
+  `entity_type`: requested, approved, rejected, cancelled, and an approver replaced, the
+  request's approval kept since a re-open round's logs nothing on the requirement, DL-388,
+  DL-395, DL-397) beside a Revisions
   tab (the list and the compare above). The tabs sit below the requirement's details and
   description, on its page and in its side panel (DL-268), and open on History; the selected tab
   isn't in the URL (DL-269).
@@ -1437,7 +1441,8 @@ what was deleted, by whom, and when, and restoring the item brings its history b
   hold the other entity's ID.
 - `project_id` on every row makes the project activity feed a single indexed query. The feed's
   API and page arrive in Slice 3, with the filter bar; Slice 2 logs to the table and shows each
-  requirement's own entries on its History tab (§6.1; DL-147).
+  requirement's own entries on its History tab (§6.1; DL-147), with its approval requests'
+  entries from S3-C0q (DL-388).
 - **Implementation rules:**
   - Only the shared helper `log_change(...)` writes to `activity_log` — never an endpoint
     directly. Endpoints pass enum members; the helper serializes them.

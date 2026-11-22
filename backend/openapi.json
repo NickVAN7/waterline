@@ -6900,12 +6900,29 @@
         ],
         "title": "ActivityAction"
       },
+      "ActivityEntityType": {
+        "type": "string",
+        "enum": [
+          "requirement",
+          "task",
+          "testcase",
+          "phase",
+          "milestone",
+          "approval_request",
+          "test_result",
+          "project"
+        ],
+        "title": "ActivityEntityType"
+      },
       "ActivityEntry": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/ActivityEntityType"
           },
           "action": {
             "$ref": "#/components/schemas/ActivityAction"
@@ -7029,6 +7046,7 @@
         "type": "object",
         "required": [
           "id",
+          "entity_type",
           "action",
           "field_changed",
           "old_value",
@@ -7043,7 +7061,7 @@
           "new_value_is_active"
         ],
         "title": "ActivityEntry",
-        "description": "One change, newest first in its feed. Names are resolved by the server at read time, so a\nformer member's name stays; `*_is_active` false shows the \"Deactivated\" badge. `changed_by_*`\nis null when an app CLI command made the change. `old_value_*` and `new_value_*` name the\nuser in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);\nin `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while\nit's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).\nThey are null for any other field, and for a value that's empty (no parent)."
+        "description": "One change, newest first in its feed. Names are resolved by the server at read time, so a\nformer member's name stays; `*_is_active` false shows the \"Deactivated\" badge. `changed_by_*`\nis null when an app CLI command made the change. `old_value_*` and `new_value_*` name the\nuser in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);\nin `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while\nit's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).\nThey are null for any other field, and for a value that's empty (no parent). `entity_type`\nsays whose entry it is: the requirement's own, or one of its approval requests' (requested,\napproved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397)."
       },
       "ActivityField": {
         "type": "string",

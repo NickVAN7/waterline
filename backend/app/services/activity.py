@@ -8,11 +8,12 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.lists import Feed, ListSpec
-from app.enums import ActivityEntityType, ActivityField, NumberPrefix
+from app.enums import ActivityEntityType, ActivityField, ApprovalEntityType, NumberPrefix
 from app.models.audit import ActivityLog
 from app.models.project import Project
 from app.models.requirement import Requirement
 from app.repositories.activity import ActivityRepository
+from app.repositories.approval import ApprovalRepository
 from app.repositories.requirement import RequirementRepository
 from app.repositories.user import UserRepository
 from app.schemas.activity import ActivityEntry
@@ -60,10 +61,13 @@ class ActivityService:
     async def requirement_history(
         self, requirement: Requirement, query: BaseModel
     ) -> Feed[ActivityEntry]:
-        """The requirement's entries, newest first, cursor-paged, with every name resolved now,
-        so a former member's name stays (DL-160)."""
+        """The requirement's entries and its approval requests' (DL-388), newest first,
+        cursor-paged, with every name resolved now, so a former member's name stays (DL-160)."""
+        requests = ApprovalRepository(self.session).ids_for_entity(
+            ApprovalEntityType.REQUIREMENT, requirement.id
+        )
         page = await ActivityRepository(self.session).history(
-            ActivityEntityType.REQUIREMENT, requirement.id, ITEM_HISTORY, query
+            ActivityEntityType.REQUIREMENT, requirement.id, ITEM_HISTORY, query, requests=requests
         )
         entries = page.items
         user_ids = {entry.changed_by for entry in entries if entry.changed_by is not None}
@@ -109,6 +113,7 @@ def _entry(entry: ActivityLog, named: dict[uuid.UUID, _Named]) -> ActivityEntry:
     new = look_up(entry.new_value) if names_values else None
     return ActivityEntry(
         id=entry.id,
+        entity_type=entry.entity_type,
         action=entry.action,
         field_changed=entry.field_changed,
         old_value=entry.old_value,

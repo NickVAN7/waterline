@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.enums import ActivityAction, ActivityField
+from app.enums import ActivityAction, ActivityEntityType, ActivityField
 
 
 class ActivityEntry(BaseModel):
@@ -15,9 +15,12 @@ class ActivityEntry(BaseModel):
     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);
     in `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while
     it's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).
-    They are null for any other field, and for a value that's empty (no parent)."""
+    They are null for any other field, and for a value that's empty (no parent). `entity_type`
+    says whose entry it is: the requirement's own, or one of its approval requests' (requested,
+    approved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397)."""
 
     id: uuid.UUID
+    entity_type: ActivityEntityType
     action: ActivityAction
     field_changed: ActivityField | None
     old_value: str | None

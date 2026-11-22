@@ -41,6 +41,14 @@ class ApprovalRepository:
             .options(*_FOR_READ)
         )
 
+    def ids_for_entity(
+        self, entity_type: ApprovalEntityType, entity_id: uuid.UUID
+    ) -> Select[uuid.UUID]:
+        """The entity's request IDs, every status, as a subquery (its History, DL-388)."""
+        return select(ApprovalRequest.id).where(
+            ApprovalRequest.entity_type == entity_type, ApprovalRequest.entity_id == entity_id
+        )
+
     async def get(self, request_id: uuid.UUID) -> ApprovalRequest | None:
         """The request, loaded for a read, read again if the session holds it (after a change)."""
         return await self.session.scalar(

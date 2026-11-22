@@ -1391,6 +1391,11 @@ export interface components {
          */
         ActivityAction: "created" | "updated" | "deleted" | "restored" | "linked" | "unlinked";
         /**
+         * ActivityEntityType
+         * @enum {string}
+         */
+        ActivityEntityType: "requirement" | "task" | "testcase" | "phase" | "milestone" | "approval_request" | "test_result" | "project";
+        /**
          * ActivityEntry
          * @description One change, newest first in its feed. Names are resolved by the server at read time, so a
          *     former member's name stays; `*_is_active` false shows the "Deactivated" badge. `changed_by_*`
@@ -1398,7 +1403,9 @@ export interface components {
          *     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);
          *     in `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while
          *     it's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).
-         *     They are null for any other field, and for a value that's empty (no parent).
+         *     They are null for any other field, and for a value that's empty (no parent). `entity_type`
+         *     says whose entry it is: the requirement's own, or one of its approval requests' (requested,
+         *     approved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397).
          */
         ActivityEntry: {
             /**
@@ -1406,6 +1413,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            entity_type: components["schemas"]["ActivityEntityType"];
             action: components["schemas"]["ActivityAction"];
             field_changed: components["schemas"]["ActivityField"] | null;
             /** Old Value */

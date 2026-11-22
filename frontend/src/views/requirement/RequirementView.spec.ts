@@ -503,19 +503,61 @@ describe('RequirementView', () => {
       expect(menuButton()).toBeNull()
     })
 
-    it('offers every status but its own and Approved', async () => {
+    it('offers every status but Approved, the current one marked, and says why (DL-388)', async () => {
       await mountAt([READER], [ok(withActions('requirement.update'))])
 
       menuButton()!.click()
       await flushPromises()
 
       expect(items().map((li) => li.textContent!.trim())).toEqual([
+        'Draft (current)',
         'In progress',
         'Done',
         'Rejected',
         'Deferred',
       ])
+      // Marked three ways (DL-395): the check, "(current)", and `aria-disabled`; the rest plain.
+      expect(items().map((li) => li.getAttribute('aria-disabled'))).toEqual([
+        'true',
+        null,
+        null,
+        null,
+        null,
+      ])
+      // Each item holds the check, so the labels line up; only the current one's shows.
+      expect(items().map((li) => li.querySelector('svg')!.classList.contains('invisible'))).toEqual(
+        [false, true, true, true, true],
+      )
+      const list = document.querySelector('[role=menu]')!
+      const note = document.getElementById(list.getAttribute('aria-describedby')!)
+      expect(note?.textContent?.trim()).toBe('Approved is set by an approval.')
       await expectNoA11yViolations(document.body)
+    })
+
+    it('lists Approved only as the current status, never as a choice', async () => {
+      await mountAt([READER], [ok({ ...withActions('requirement.update'), status: 'approved' })])
+
+      menuButton()!.click()
+      await flushPromises()
+
+      expect(items().map((li) => li.textContent!.trim())).toEqual([
+        'Draft',
+        'Approved (current)',
+        'In progress',
+        'Done',
+        'Rejected',
+        'Deferred',
+      ])
+    })
+
+    it('sends nothing when the current status is chosen, and keeps the menu button focused', async () => {
+      const patch = vi.spyOn(client, 'PATCH')
+      await mountAt([READER], [ok(withActions('requirement.update'))])
+
+      await choose('Draft (current)')
+
+      expect(patch).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(menuButton())
     })
 
     it('sends the status with the version read, and shows what the server answers', async () => {

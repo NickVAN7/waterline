@@ -4847,7 +4847,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   logged. **Change status** shows the current status, marked and disabled, and a line saying
   Approved comes only from an approval. Trial finding F21.
 - **Supersedes:** DL-147 (in part: the requirement's own entries only)
-- **Superseded by:** none
+- **Superseded by:** DL-397 (in part: a request's approved entry shows too)
 - **Applies to:** build plan (S3-C0p, the "Change log (§10)" note); design-doc §6 ("History"),
   §10; behavior reference, user guide (from S3-C0p)
 - **Source:** owner, Nov 17, 2026 (S3-C0n trial findings)
@@ -5028,3 +5028,17 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C0p; ui-design-guide UI-SHL-11; build plan (S3-C0p)
 - **Source:** owner, Nov 19, 2026 (S3-C0p's Impeccable critique)
+
+### DL-397: History shows a request's approval too
+- **Date:** 2026-11-22
+- **Decision:** A requirement's History lists its approval requests' approved entries as well,
+  worded "approved the approval request". S3-C0q first left them out as the requirement's own
+  entry shows the approval, but an approved re-open round (§6.2) changes neither the status nor
+  the approved revision, so the requirement logs nothing and the request's entry is the only
+  record (S3-C0q's checkpoint review, finding 1). A normal approval therefore shows twice: the
+  request's entry and the requirement's "approved revision" entry.
+- **Supersedes:** DL-388 in part (its list of request entries: approved added)
+- **Superseded by:** none
+- **Applies to:** S3-C0q; design-doc §6 ("History"); build plan (S3-C0q); behavior reference;
+  user guide (requirements)
+- **Source:** owner, Nov 22, 2026 (S3-C0q's checkpoint review)

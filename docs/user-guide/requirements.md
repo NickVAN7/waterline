@@ -47,8 +47,9 @@ if it helps, and select **Save**. A changed title or description is saved as a n
 
 ## Change its status or restriction
 
-**Change status** sets where the requirement stands, such as **In progress** or **Deferred**. It becomes
-**Approved** only through an approval.
+**Change status** sets where the requirement stands, such as **In progress** or **Deferred**. Its
+current status is marked **(current)**. It becomes **Approved** only through an approval, as the
+menu says.
 
 A requirement can be restricted more tightly than its project: under **More actions**, choose
 **Change restriction…** and pick its level and categories. Anyone who edits requirements can
@@ -61,7 +62,8 @@ See [Approvals](/docs/approvals) for how a request works and how to decide on on
 
 ## See what changed
 
-**History** lists every change, who made it, and when. **Revisions** lists the saved versions of
+**History** lists every change, who made it, and when, including each approval request: when
+approval was requested, approved, rejected, or cancelled, and when an approver was replaced. **Revisions** lists the saved versions of
 the title and description; **Compare revisions** shows what changed between any two.
 
 ## Move or delete a requirement

@@ -535,7 +535,28 @@ Entry format:
   not by email, which a confirmation that names people shows (traps: names aren't unique).
   `ApprovalRead` carries no email.
 - **Why:** the email needs an API change, and S3-C0p is frontend only (DL-395).
-- **Fix by:** S3-C0q (its History read changes the same API): add the approver's email and show it
+- **Fix by:** S3-C0r, first (moved from S3-C0q by the owner, to keep S3-C0q to History and the
+  status menu): add the approver's email to `ApprovalRead` and show it
+- **Status:** open
+
+### TD-125: Tests that time out on the owner's machine, not on CI
+- **Added:** S3-C0q
+- **What:** on the owner's WSL machine (4 cores, 5.7 GiB):
+  - `RequirementsTree.spec.ts`'s "opens the first level even when it is over 500 rows" takes
+    14.7 s on CI's runner but 36.6 s alone and about 65 s in the full suite, past its 60 s
+    limit, so the local frontend gate is red on it every full run.
+  - The e2e "a requirement's side panel and page" (`e2e/requirements.spec.ts`) takes about 33 s
+    alone, past Playwright's 30 s default, with or without S3-C0q's added status-menu checks.
+  - In the full suite only (they pass alone, the two files' 76 tests in about 30 s), past
+    Vitest's 5 s default: `RequirementsView.spec.ts`'s "shows the project's requirement tree,
+    with the move menu for those who may move" (5.7 s) and `ProjectMembersView.spec.ts`'s "lists
+    the members with their roles, a deactivated one marked, under the project header" (5.2 s).
+
+  S3-C0q's frontend and e2e were verified by CI's `wl check --full`, not locally.
+- **Why:** the tests and their limits are outside S3-C0q's scope; the owner chose to log them
+  (the two 5 s ones added on Nov 22, after the gate's run at close).
+- **Fix by:** S3-C33 (the slice's tech-debt review): make them cheaper (fewer rows drawn in
+  jsdom; the e2e split in two) or tie their limits to the runner, so they pass locally
 - **Status:** open
 
 ---

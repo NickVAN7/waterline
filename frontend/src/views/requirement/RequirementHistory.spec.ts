@@ -15,6 +15,7 @@ const BEN = { changed_by_id: 'u-ben', changed_by_name: 'Ben Ortiz', changed_by_i
 function entry(id: string, fields: Partial<Entry> = {}): Entry {
   return {
     id,
+    entity_type: 'requirement',
     action: 'updated',
     field_changed: null,
     old_value: null,
@@ -123,6 +124,65 @@ describe('RequirementHistory', () => {
     await flushPromises()
 
     expect(lines()).toEqual(['Ben Ortiz changed the reporter from Ann Lee to Cal Moss Deactivated'])
+  })
+
+  it("says its approval requests' steps in their own words (DL-388, DL-395)", async () => {
+    const request = { entity_type: 'approval_request' } as const
+    const status = (new_value: string) =>
+      ({ ...request, field_changed: 'status', old_value: 'pending', new_value }) as const
+    mountHistory(
+      feed([
+        entry('5', {
+          ...request,
+          field_changed: 'approver_id',
+          old_value: 'u-ann',
+          old_value_name: 'Ann Lee',
+          old_value_is_active: false,
+          new_value: 'u-ben',
+          new_value_name: 'Ben Ortiz',
+          new_value_is_active: true,
+        }),
+        entry('5b', status('approved')),
+        entry('4', status('cancelled')),
+        entry('3', status('rejected')),
+        entry('2', { ...request, action: 'created' }),
+        entry('1', { action: 'created' }),
+      ]),
+    )
+    await flushPromises()
+
+    expect(lines()).toEqual([
+      'Ben Ortiz replaced approver Ann Lee Deactivated with Ben Ortiz',
+      'Ben Ortiz approved the approval request',
+      'Ben Ortiz cancelled the approval request',
+      'Ben Ortiz rejected the approval request',
+      'Ben Ortiz requested approval',
+      'Ben Ortiz created the requirement',
+    ])
+    await expectNoA11yViolations(document.body)
+  })
+
+  it("words any other request entry as a change to the request, never as the requirement's", async () => {
+    // Were the server to log another field, or a status the words above don't cover, it mustn't
+    // read "changed the status from … to …" as though the requirement's, nor as a rejection
+    // because its value is one.
+    const request = { entity_type: 'approval_request' } as const
+    mountHistory(
+      feed([
+        entry('4', { ...request, field_changed: 'priority', new_value: 'approved' }),
+        entry('3', { ...request, field_changed: 'priority', new_value: 'rejected' }),
+        entry('2', { ...request, field_changed: 'priority', new_value: 'cancelled' }),
+        entry('1', { ...request, field_changed: 'status', new_value: 'pending' }),
+      ]),
+    )
+    await flushPromises()
+
+    expect(lines()).toEqual([
+      'Ben Ortiz made a change to the approval request',
+      'Ben Ortiz made a change to the approval request',
+      'Ben Ortiz made a change to the approval request',
+      'Ben Ortiz made a change to the approval request',
+    ])
   })
 
   it('names a parent by its ID, "Deleted" while it is in the trash, and no parent as the top level (DL-276)', async () => {

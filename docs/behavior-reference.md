@@ -172,7 +172,8 @@ and the ID and status (and Awaiting approval) under it. A status reads
 description has no "Acceptance Criteria" heading, a quiet note under it says so: "No acceptance criteria: the
 description has no "Acceptance Criteria" heading.", or, with no description at all, "No
 description: the requirement has no acceptance criteria." **Change status** (members and
-admins) sets any status but its own and Approved, which comes only from an approval. If someone
+admins) lists every status but Approved, its current one marked "(current)" with a check and
+unavailable, and says under the list "Approved is set by an approval." If someone
 changed the requirement since you opened it, the change is refused and the page shows the latest.
 **Change restriction…** sets the requirement's restriction level and categories: members can raise
 it, only the project's admins can lower it (None and Internal count as the same level, so a member
@@ -253,7 +254,13 @@ with who made it and when: "Ben Ortiz changed the status from Draft to In progre
 since deactivated keeps their name, with "Deactivated" after it, and a change made by an app
 command reads **System**. A move names the old and the new parent by their IDs ("changed the
 parent from ERP-RQ-3 to the top level"), with "Deleted" after a parent that's in the Trash, and
-an approval names the version approved ("approved revision 3"). Saved edits to the title or
+an approval names the version approved ("approved revision 3"). The requirement's approval
+requests show there too: "requested approval", "approved the approval request", "rejected the
+approval request", "cancelled the approval request" (by its requester, or by approving by hand or
+archiving the project), and "replaced approver Ann Lee with Ben Ortiz" when an approver lost
+access. An approval that moves the requirement also shows as its own "approved revision" entry,
+so it reads twice; a re-open round's approval, which changes nothing on the requirement, shows
+only as the request's. Saved edits to the title or
 description are versions, not History entries. History shows the latest entries first; **Show
 more** adds the next ones. A move made in the tree while a requirement's side panel is open shows
 in its History the next time you open it.

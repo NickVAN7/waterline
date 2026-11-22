@@ -170,6 +170,10 @@ base`: PrimeVue's layer comes later and wins over `base`, and `!important` isn't
   `pt.itemContent` (which sets its own color over the item's), and
   stays focusable, its command doing nothing: a `disabled` item is skipped by the arrow keys and
   faded with opacity, so the keyboard never reaches its reason (UI-TOK-10; S2-C15 review).
+- A menu that sets a value lists the current value too: a check icon and "(current)" in its name,
+  `aria-disabled` and focusable, its command doing nothing, but in the **text** color, not the
+  disabled tokens: it's where the item is, not a blocked choice (`StatusMenu`, DL-395). A choice
+  blocked by state is the item above (`MoveToMenu`) (S3-C0q review).
 
 ## Specs and end-to-end tests
 

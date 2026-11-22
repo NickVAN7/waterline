@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Collection
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,10 +24,19 @@ class ActivityRepository:
         entity_id: uuid.UUID,
         spec: ListSpec,
         query: BaseModel,
+        *,
+        requests: Select[uuid.UUID],
     ) -> FeedResult[ActivityLog]:
-        """One item's entries, newest first (the `(entity_type, entity_id, id)` index)."""
+        """One item's entries and every entry of its approval `requests`, newest first (the
+        `(entity_type, entity_id, id)` index; DL-388, DL-397)."""
         statement = select(ActivityLog).where(
-            ActivityLog.entity_type == entity_type, ActivityLog.entity_id == entity_id
+            or_(
+                and_(ActivityLog.entity_type == entity_type, ActivityLog.entity_id == entity_id),
+                and_(
+                    ActivityLog.entity_type == ActivityEntityType.APPROVAL_REQUEST,
+                    ActivityLog.entity_id.in_(requests),
+                ),
+            )
         )
         return await fetch_feed(self.session, statement, spec, query)
 
