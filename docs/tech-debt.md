@@ -552,11 +552,15 @@ Entry format:
     with the move menu for those who may move" (5.7 s) and `ProjectMembersView.spec.ts`'s "lists
     the members with their roles, a deactivated one marked, under the project header" (5.2 s).
 
-  S3-C0q's frontend and e2e were verified by CI's `wl check --full`, not locally.
+  S3-C0q's frontend and e2e were verified by CI's `wl check --full`, not locally. On an
+  8-core, 15 GiB machine all four pass well within their limits, so the cause is the machine
+  (DL-398).
 - **Why:** the tests and their limits are outside S3-C0q's scope; the owner chose to log them
   (the two 5 s ones added on Nov 22, after the gate's run at close).
-- **Fix by:** S3-C33 (the slice's tech-debt review): make them cheaper (fewer rows drawn in
-  jsdom; the e2e split in two) or tie their limits to the runner, so they pass locally
+- **Fix by:** S3-C0r, with TD-124 (DL-398): give the four tests explicit, longer limits, each
+  with a one-line reason, so the local gate goes green on the slower machine. Then, with no
+  slice set yet (the owner's, for later): make them cheaper there (fewer rows drawn in jsdom;
+  the e2e split in two)
 - **Status:** open
 
 ---

@@ -5042,3 +5042,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** S3-C0q; design-doc §6 ("History"); build plan (S3-C0q); behavior reference;
   user guide (requirements)
 - **Source:** owner, Nov 22, 2026 (S3-C0q's checkpoint review)
+
+### DL-398: TD-125's timeouts are the machine's; the four tests get longer limits in S3-C0r
+- **Date:** 2026-11-23
+- **Decision:** TD-125's four timeouts come from the owner's 4-core, 5.7 GiB machine, not the
+  tests: on an 8-core, 15 GiB machine all four pass well within their limits (the 500-row tree
+  14.3 s of 60 s, the two 5 s tests 0.7 s and 0.6 s, the e2e 8.4 s of 30 s; the full frontend
+  suite, 1500 tests, in 22 s). S3-C0r, with TD-124, gives those four tests explicit, longer
+  limits so the local gate goes green on the slower machine; making them cheaper there stays
+  open for later.
+- **Supersedes:** TD-125's fix (make them cheaper, or tie their limits to the runner, by S3-C33)
+- **Superseded by:** none
+- **Applies to:** `docs/tech-debt.md` (TD-125); S3-C0r
+- **Source:** owner, Nov 23, 2026 (chat, after the four tests were run on the second machine)
