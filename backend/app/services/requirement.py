@@ -16,7 +16,7 @@ from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
 from app.core.base_model import check_version
-from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.errors import AppError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Feed, Filter, FilterType, ListSpec, Page, fetch_feed, fetch_page
 from app.enums import (
     CONTENT_ITEM_CATEGORIES,
@@ -44,7 +44,7 @@ from app.repositories.requirement import RequirementRepository
 from app.repositories.user import UserRepository
 from app.rules.approval_policy import status_after_rejection
 from app.rules.rank import rank_between
-from app.rules.restriction import Restriction, change, effective, levels_below
+from app.rules.restriction import Restriction, change, effective, levels_below, needed_rights
 from app.schemas.approval import (
     ApprovalDecisionCreate,
     ApprovalRead,
@@ -297,7 +297,17 @@ class RequirementService:
         reporter_id = values.reporter_id
         if reporter_id is not None and reporter_id != requirement.reporter_id:
             ensure(ctx, Action.REQUIREMENT_REASSIGN_REPORTER, target)
-            await self._check_reporter(target, reporter_id)
+            await self._check_person(
+                target,
+                reporter_id,
+                Action.REQUIREMENT_CREATE,
+                "reporter_id",
+                ValidationFailedError.on(
+                    ("body", "reporter_id"),
+                    "The reporter must be able to create requirements in this project.",
+                    "not_member",
+                ),
+            )
         else:
             reporter_id = None
         if values.title is not None and (problems := required_error(values.title, field="title")):
@@ -338,23 +348,21 @@ class RequirementService:
             self._log(requirement, ctx.user_id, ActivityAction.UPDATED, field, old, new)
         return await self.read(ctx, requirement)
 
-    async def _check_reporter(self, target: Target, user_id: uuid.UUID) -> None:
-        """The new reporter may create requirements in the project (DL-211)."""
+    async def _check_person(
+        self, target: Target, user_id: uuid.UUID, action: Action, field: str, refused: AppError
+    ) -> None:
+        """A person named on the requirement (reporter, approver; DL-211, design-doc §6.2): they
+        may take `action` in the project, else `refused` (an approver's a 404, as the member
+        picker), and are active, else 422 `account_inactive` on `field` (DL-226; TD-101)."""
         users = UserRepository(self.session)
         # Held, so a removal or deactivation committing meanwhile waits for this one (TD-72).
         await users.hold_access(user_id)
         user = await users.get(user_id)
-        if user is None or not authorize(
-            await users.authz_context(user), Action.REQUIREMENT_CREATE, target
-        ):
-            raise ValidationFailedError.on(
-                ("body", "reporter_id"),
-                "The reporter must be able to create requirements in this project.",
-                "not_member",
-            )
+        if user is None or not authorize(await users.authz_context(user), action, target):
+            raise refused
         if not user.is_active:
             raise ValidationFailedError.on(
-                ("body", "reporter_id"), "This account is deactivated.", "account_inactive"
+                ("body", field), "This account is deactivated.", "account_inactive"
             )
 
     async def set_restriction(
@@ -375,9 +383,7 @@ class RequirementService:
         new = Restriction(values.level, frozenset(values.categories))
         kind = change(old, new)
         raise_, lower = Action.REQUIREMENT_RAISE_RESTRICTION, Action.REQUIREMENT_LOWER_RESTRICTION
-        needed = [a for a, does in ((raise_, kind.raises), (lower, kind.lowers)) if does]
-        # Neither: either action will do, and lower is never granted without raise.
-        for action in needed or [raise_]:
+        for action in needed_rights(kind, raise_, lower):
             ensure(ctx, action, target)
         _check_restriction(
             project, new.level, new.categories, level_field="level", categories_field="categories"
@@ -977,7 +983,9 @@ class RequirementService:
         target = project_target(project, requirement)
         ensure(ctx, Action.APPROVAL_REQUEST_CREATE, target)
         for approver_id in body.approver_ids:
-            await self._check_approver(target, approver_id)
+            await self._check_person(
+                target, approver_id, Action.REQUIREMENT_VIEW, "approver_ids", NotFoundError()
+            )
         request = await ApprovalService(self.session).create(
             project_id=project.id,
             entity_type=ApprovalEntityType.REQUIREMENT,
@@ -988,22 +996,6 @@ class RequirementService:
             actor_id=ctx.user_id,
         )
         return await self._read_approval_request(ctx, request.id, target)
-
-    async def _check_approver(self, target: Target, user_id: uuid.UUID) -> None:
-        """The approver has content access to the project (404 otherwise, as the member picker,
-        design-doc §6.2) and is active (422 `account_inactive`, DL-226)."""
-        users = UserRepository(self.session)
-        # Held, so a removal or deactivation committing meanwhile waits for this one (TD-72).
-        await users.hold_access(user_id)
-        user = await users.get(user_id)
-        if user is None or not authorize(
-            await users.authz_context(user), Action.REQUIREMENT_VIEW, target
-        ):
-            raise NotFoundError
-        if not user.is_active:
-            raise ValidationFailedError.on(
-                ("body", "approver_ids"), "This account is deactivated.", "account_inactive"
-            )
 
     async def approval_requests(
         self, requirement: Requirement, query: BaseModel

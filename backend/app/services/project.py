@@ -39,7 +39,7 @@ from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
 from app.rules.identifiers import normalize_project_key, project_key_problem
 from app.rules.modules import ALL_MODULES, is_available, recommended_modules, seed_modules
-from app.rules.restriction import Restriction, change
+from app.rules.restriction import Restriction, change, needed_rights
 from app.schemas.org import MemberAdd, MemberCreate, MemberProjectAdd, MemberRead
 from app.schemas.project import (
     MemberCandidate,
@@ -523,9 +523,7 @@ class ProjectService:
         new = Restriction(values.level, frozenset(values.categories))
         kind = change(old, new)
         raise_, lower = Action.PROJECT_RAISE_RESTRICTION, Action.PROJECT_LOWER_RESTRICTION
-        needed = [a for a, does in ((raise_, kind.raises), (lower, kind.lowers)) if does]
-        # Neither: either action will do, and lower is never granted without raise (DL-82).
-        for action in needed or [raise_]:
+        for action in needed_rights(kind, raise_, lower):
             ensure(ctx, action, target)
         adds_export_control = RestrictionCategory.EXPORT_CONTROLLED in (
             new.categories - old.categories

@@ -353,16 +353,6 @@ Entry format:
 - **Fix by:** Slice 3 (its tech-debt review, S3-C33: no Slice 3 row touches approval reads)
 - **Status:** open
 
-### TD-101: The reporter and approver checks are near-copies
-- **Added:** S2-C22 (repo-auditor finding 3)
-- **What:** `RequirementService._check_reporter` and `_check_approver` take the same four steps
-  (hold the access, get the user, load their context and authorize, check `is_active`); only the
-  action and the error differ, so a change to one (TD-79's batching) has to be made in both.
-- **Why:** S2-C11 and S2-C10 code, fixed only when needed (DL-106).
-- **Fix by:** S3-C0v (the handoff's Package 5 item 2, pulled ahead of S3-C6, DL-406): one helper for
-  reporter and approver; S3-C6's assignee and reviewer use it
-- **Status:** open
-
 ### TD-102: A members list with no row actions still shows an Actions column
 - **Added:** S2-C22 (user-guide-verifier finding 9)
 - **What:** for someone who may change nobody (a project member), the roster's table keeps its
@@ -949,6 +939,12 @@ Entry format:
 - **Added:** S2-C21c
 - **Status:** resolved in DC-2026-11-09-s2-retro-and-ui-polish (UI-FRM-7: a row or inline
   action's control is its own retry, DL-319)
+
+### TD-101: The reporter and approver checks are near-copies
+- **Added:** S2-C22 (repo-auditor finding 3)
+- **Status:** resolved in S3-C0v: `RequirementService._check_person`, one helper taking the
+  action, the field, and the refusal (a 404 for an approver, a 422 for a reporter), its hold
+  kept; S3-C6's assignee and reviewer use it (DL-406)
 
 ### TD-103: TextField's slot shadows its `describedBy` prop
 - **Added:** S2-C22 (CI lint warning, Slice 2 retro)
