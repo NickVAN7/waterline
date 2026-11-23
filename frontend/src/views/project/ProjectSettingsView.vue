@@ -2,8 +2,8 @@
 // A project's settings (`/{org_slug}/projects/{key}/settings`; build plan, "Web screens"; design-doc
 // §1.1, §3.1), each part shown only when `allowed_actions` allows it:
 // - details and modules (`project.update`): name, description, type, status, the lead (the
-//   project's active members, and a deactivated current lead marked, DL-296; no lead flagged), and the modules,
-//   with a warning when a recommended module, or one holding data, is turned off;
+//   project's active members, and a deactivated current lead marked, DL-296; no lead flagged), and the modules
+//   once one has shipped (DL-402), with a warning when a recommended module, or one holding data, is turned off;
 // - restriction (`project.raise_restriction`): the level and the categories, without export
 //   control (DL-133), which a project made export-controlled through the API keeps;
 // - archive and unarchive (`project.archive`, `project.unarchive`), archiving confirmed first.
@@ -33,7 +33,7 @@ import NotFoundView from '@/views/errors/NotFoundView.vue'
 
 import { allMembers } from './members'
 import ModuleFields from './ModuleFields.vue'
-import { recommendedFor } from './modules'
+import { offersModules, recommendedFor } from './modules'
 import ProjectHeader from './ProjectHeader.vue'
 import ProjectPageLoading from './ProjectPageLoading.vue'
 import RestrictionFields from './RestrictionFields.vue'
@@ -470,7 +470,11 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
                   label: PROJECT_TYPE[value],
                 }))
               "
-              help="Changes the labels and the recommended modules, never the data or the modules turned on."
+              :help="
+                offersModules(guidance)
+                  ? 'Changes the labels and the recommended modules, never the data or the modules turned on.'
+                  : 'Changes the labels and the template new requirements start from, never the data.'
+              "
               :error="detailsErrors.fieldErrors.value.type"
               @update:model-value="details.edited('type')"
             />
@@ -498,7 +502,7 @@ const dismissArchiveAlert = () => dismissToSubmit(archiveErrors, archiveForm)
               @update:model-value="details.edited('lead_id')"
             />
             <details
-              v-if="guidance"
+              v-if="guidance && offersModules(guidance)"
               :open="modulesOpen"
               class="flex flex-col gap-3"
               @toggle="modulesOpen = ($event.target as HTMLDetailsElement).open"

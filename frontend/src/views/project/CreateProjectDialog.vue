@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Creating a project in an org (build plan, "The projects API"; design-doc §1.1, §3.1, §5): a
-// name, a key checked live (UI-FRM-9), the type, a description, the modules (the type's
-// recommendations and each module's note, from module guidance), a first admin when the org's
+// name, a key checked live (UI-FRM-9), the type, a description, the modules once one has shipped
+// (the type's recommendations and each module's note, from module guidance; DL-402), a first admin when the org's
 // entry in `/me` allows naming one (the org's active members and the workspace's active staff,
 // DL-152), and the restriction, without export control (DL-133). Created, the dialog opens the
 // project.
@@ -24,7 +24,7 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 
 import RestrictionFields from './RestrictionFields.vue'
 import ModuleFields from './ModuleFields.vue'
-import { recommendedFor } from './modules'
+import { offersModules, recommendedFor } from './modules'
 
 type Org = components['schemas']['MeOrg']
 type ProjectType = components['schemas']['ProjectType']
@@ -247,7 +247,11 @@ defineExpose({ open })
             label: PROJECT_TYPE[value],
           }))
         "
-        help="Picks the labels and the recommended modules; it can be changed later."
+        :help="
+          offersModules(guidance)
+            ? 'Picks the labels and the recommended modules; it can be changed later.'
+            : 'Picks the labels and the template new requirements start from; it can be changed later.'
+        "
         :error="errors.fieldErrors.value.type"
         @update:model-value="errors.clearField('type')"
       />
@@ -272,7 +276,7 @@ defineExpose({ open })
         </template>
       </FormField>
       <ModuleFields
-        v-if="guidance"
+        v-if="guidance && offersModules(guidance)"
         v-model="modules"
         prefix="create-project"
         :guidance="guidance"

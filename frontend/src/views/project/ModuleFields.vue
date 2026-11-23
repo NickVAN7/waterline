@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// A project's module choice (design-doc §1.1), in the create dialog and in settings: each module
+// A project's module choice (design-doc §1.1), in the create dialog and in settings, once a module
+// has shipped (`offersModules`, DL-402): each module
 // with its note from module guidance and whether it's recommended for the type; a module that
 // hasn't shipped is a disabled checkbox with "Not available yet" (DL-136; `available`): a native
 // `disabled`, as its own label, which names it, says why (UI-TOK-10). `warning(module)` is the text shown under a module

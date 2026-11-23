@@ -135,9 +135,9 @@ know until its slice adds it, a 422 `enum` (DL-178). The
 API's module guidance tells the UI which modules are **available** (shipped), from one place in
 the backend that is updated when a module's slice ships. Until then, seeding skips the module
 (every project created before Slice 4 starts with no modules), the API refuses enabling it (422
-`validation_error` on `enabled_modules`, as above), and the UI shows it as a
-disabled checkbox with "Not available yet", while module guidance still lists it as recommended,
-with `available` false. When `sprints` (Slice 4) and `github` (Slice 8) ship, that slice decides
+`validation_error` on `enabled_modules`, as above), and module guidance still lists it as
+recommended, with `available` false. The UI offers no module choice until a module has shipped
+(DL-402); from then, an unshipped one is a disabled checkbox with "Not available yet". When `sprints` (Slice 4) and `github` (Slice 8) ship, that slice decides
 whether existing software projects get the module turned on.
 
 - **Disabling a module hides it; it never deletes data.** Re-enabling brings everything back.

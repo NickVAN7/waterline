@@ -172,7 +172,8 @@ Every entity that can be created can also be updated: workspace, organization, u
 
 **Create and find**
 - Create a project: name, key (with the "can't change later" warning), type, modules with
-  recommendations (**modules whose features haven't shipped can't be selected**, Oct 21, 2026),
+  recommendations (**modules whose features haven't shipped can't be selected**, Oct 21, 2026;
+  no module choice at all until one has, DL-402),
   and optionally its **restriction** level (None / Internal / Confidential) and categories.
   *(Hidden for now: marking it export-controlled, which asks for a confirmation; design-doc
   §3.1.)* **Any org member can create a project and becomes its admin.**
@@ -183,7 +184,7 @@ Every entity that can be created can also be updated: workspace, organization, u
 - Update project details: name, description, type, **status**, **lead**. The key shows as
   fixed, with the reason.
 - Turn modules on or off, with the "this hides data" warning. Unshipped modules can't be
-  turned on.
+  turned on; the section is left out until one has shipped (DL-402).
 - Set restriction level and categories.
 - *(Hidden for now.)* Mark a project export-controlled (inherited admins keep management access
   but lose content access unless they are explicit members); remove the mark (explicit project

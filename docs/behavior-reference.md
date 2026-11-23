@@ -95,9 +95,10 @@ filters are in the address, so a link or a reload opens the same list.
 **New project**, in the project selector, is there if you may create projects in the organization
 (any member may). Give it a name and a key: 3 to 6 letters or digits, starting with a letter,
 that starts every item's number (`PMT-TA-45`) and can't be changed later; you're told as you type
-if it's taken. Pick its type (Software, ERP implementation, or General), which suggests its
-modules: each is described, and a module that isn't built yet can't be turned on: its box is
-greyed out, with "Not available yet". You become its first admin and lead, unless you're an
+if it's taken. Pick its type (Software, ERP implementation, or General). Once a module is built,
+the type also suggests its modules: each is described, and a module that isn't built yet can't
+be turned on: its box is greyed out, with "Not available yet"; until then there's no module
+choice (DL-402). You become its first admin and lead, unless you're an
 organization owner or admin, who may name someone else instead: any active member of the
 organization, or of the workspace's staff. You can also set its restriction: a level (None,
 Internal, or Confidential, each described) and its **Categories**, why it's sensitive (Financial,
@@ -343,9 +344,9 @@ admins) can also:
   modules, never data or the modules on), status (for information only), lead, and modules,
   then **Save settings**. The lead is one of the project's active members, or **No lead**, which
   is flagged. A deactivated lead stays the lead, marked "Deactivated", until you name someone
-  else. **Modules** is one line, the modules turned on ("None turned on" if none) and **Edit**,
-  until you open it (it opens by itself to show an error); a module that isn't built yet is greyed
-  out, with "Not available yet". Turning off
+  else. **Modules**, shown once a module is built (DL-402), is one line, the modules turned on
+  ("None turned on" if none) and **Edit**, until you open it (it opens by itself to show an
+  error); a module that isn't built yet is greyed out, with "Not available yet". Turning off
   a module that holds data, or one recommended for the type, warns you what will be hidden;
   nothing is deleted, and turning it back on brings everything back.
 - **Restriction** (project admins): the level and categories, then **Save restriction** (a

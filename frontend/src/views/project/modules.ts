@@ -10,6 +10,12 @@ const ENABLEABLE: Record<ProjectModule, true> = { sprints: true, github: true }
 
 export const enableable = (module: string): module is ProjectModule => module in ENABLEABLE
 
+/** Whether module choice is offered at all: only once a module has shipped, as a list of
+ * modules none of which can be turned on asks nothing (the handoff's Package 4 item 5, DL-136
+ * in part). The server still refuses an unshipped one. */
+export const offersModules = (guidance: components['schemas']['ModuleGuidance'] | null) =>
+  guidance?.modules.some((m) => m.available) ?? false
+
 /** The type's recommended modules that may be enabled and have shipped: what the server would
  * seed (DL-136). */
 export function recommendedFor(

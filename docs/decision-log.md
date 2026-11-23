@@ -1779,7 +1779,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   yet". A migration removes `sprints` and `github` from every project. Slices 4 and 7 each decide
   whether existing software projects get their module turned on when it ships.
 - **Supersedes:** design-doc §1.1, "The v1 modules can be enabled from the start (Slice 1)"
-- **Superseded by:** DL-178, in part (a v2 module is a 422 `enum`)
+- **Superseded by:** DL-178, in part (a v2 module is a 422 `enum`); DL-402, in part (no module
+  choice until one ships)
 - **Applies to:** design-doc §1.1; build plan (the projects API, S2-C0d, "Later slices");
   ui-design-guide UI-SHL-6; user guide
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
@@ -5092,3 +5093,17 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** design-doc §6.2 ("Who can be an approver")
 - **Source:** owner, Nov 23, 2026 (chat, S3-C0r's open question 2)
+
+### DL-402: No module choice until a module ships
+- **Date:** 2026-11-23
+- **Decision:** The create-project dialog and project settings leave module choice out while no
+  module is available (module guidance's `available`); once one has shipped, the list is shown
+  as before, an unshipped module a disabled checkbox with "Not available yet". The server's
+  gate is unchanged: enabling an unshipped module is still a 422 `module_unavailable`.
+- **Supersedes:** DL-136 in part (the UI showing every module, an unshipped one disabled, from
+  the start)
+- **Superseded by:** none
+- **Applies to:** S3-C0t; design-doc §1.1; screen inventory (Create and find, Configure); the
+  behavior reference; user guide (projects) and its settings screenshot
+- **Source:** the outside review's handoff, Package 4 item 5 (DL-390), approved by the owner for
+  S3-C0t (DL-400)

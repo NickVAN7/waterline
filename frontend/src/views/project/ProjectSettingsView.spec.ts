@@ -64,16 +64,22 @@ const MEMBERS = [
   member('Casey Cole', { user_id: ME.id, role: 'admin' }),
 ]
 
+// As shipped today: no module has.
+const NONE_SHIPPED: typeof GUIDANCE = {
+  ...GUIDANCE,
+  modules: GUIDANCE.modules.map((m) => ({ ...m, available: false })),
+}
+
 /** Mounts the page for `shown`; each later GET of the project answers with `next` if given. The
  * members come `pageSize` at a time. */
-async function mountAt(shown: Project, next: Project[] = [], pageSize = 200) {
+async function mountAt(shown: Project, next: Project[] = [], pageSize = 200, guidance = GUIDANCE) {
   useCurrentUserStore().me = me()
   const answers = [shown, ...next]
   const get = vi.spyOn(client, 'GET').mockImplementation(((
     path: string,
     init?: { params?: { query?: { offset?: number } } },
   ) => {
-    if (path === '/api/module-guidance') return Promise.resolve(ok(GUIDANCE))
+    if (path === '/api/module-guidance') return Promise.resolve(ok(guidance))
     if (path === '/api/projects/{key}/members') {
       const offset = init?.params?.query?.offset ?? 0
       return Promise.resolve(
@@ -238,6 +244,22 @@ describe('ProjectSettingsView', () => {
   describe('Modules, collapsed to one line (Q12c)', () => {
     const modules = () => document.querySelector<HTMLDetailsElement>('details')!
 
+    // The handoff's Package 4 item 5. Bug: the section shown with nothing it can turn on.
+    it('is left out until a module has shipped, the rest of the form kept', async () => {
+      const { wrapper } = await mountAt(
+        project({ enabled_modules: [], allowed_actions: ADMIN }),
+        [],
+        200,
+        NONE_SHIPPED,
+      )
+
+      expect(document.querySelector('details')).toBeNull()
+      expect(wrapper.text()).not.toContain('Modules')
+      expect(wrapper.text()).not.toContain('modules')
+      expect(wrapper.text()).toContain('Save settings')
+      await expectNoA11yViolations(wrapper.element)
+    })
+
     it('shows the modules turned on, and opens on demand', async () => {
       const { wrapper } = await mountAt(
         project({ enabled_modules: ['sprints', 'github'], allowed_actions: ADMIN }),
@@ -245,6 +267,10 @@ describe('ProjectSettingsView', () => {
 
       expect(modules().open).toBe(false)
       expect(wrapper.get('summary').text()).toBe('Modules Sprints, GitHub Edit')
+      // With a module shipped, the type's help speaks of its modules (DL-402).
+      expect(wrapper.text()).toContain(
+        'Changes the labels and the recommended modules, never the data or the modules turned on.',
+      )
       modules().open = true
       modules().dispatchEvent(new Event('toggle'))
       await flushPromises()

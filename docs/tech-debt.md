@@ -552,6 +552,17 @@ Entry format:
 - **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
 - **Status:** open
 
+### TD-127: A spec test's docstring still says every module shows as a disabled checkbox
+- **Added:** S3-C0t (checkpoint-reviewer finding 1)
+- **What:** `backend/tests/unit/rules/test_modules.py`, `test_no_module_is_available_yet`: its
+  docstring says the UI shows every module as a disabled checkbox with "Not available yet";
+  since DL-402 the UI offers no module choice until one has shipped.
+- **Why:** a comment in a spec test, which changes only with the owner's approval; behavior is
+  unaffected.
+- **Fix by:** S3-C33 (the slice's tech-debt review), or earlier with the owner's approval of the
+  one-line comment change
+- **Status:** open
+
 ---
 
 ## Resolved

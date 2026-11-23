@@ -47,10 +47,16 @@ function candidate(
   }
 }
 
-async function openDialog(allowed: Action[] = ['project.create']) {
+// As shipped today: no module has.
+const NONE_SHIPPED: typeof GUIDANCE = {
+  ...GUIDANCE,
+  modules: GUIDANCE.modules.map((m) => ({ ...m, available: false })),
+}
+
+async function openDialog(allowed: Action[] = ['project.create'], guidance = GUIDANCE) {
   useCurrentUserStore().me = me()
   const get = vi.spyOn(client, 'GET').mockImplementation(((path: string) => {
-    if (path === '/api/module-guidance') return Promise.resolve(ok(GUIDANCE))
+    if (path === '/api/module-guidance') return Promise.resolve(ok(guidance))
     // The org's active members and the workspace's active staff (DL-152): the server filters.
     if (path === '/api/orgs/{org_id}/first-admin-candidates')
       return Promise.resolve(
@@ -127,9 +133,29 @@ describe('CreateProjectDialog', () => {
     expect(router.currentRoute.value.fullPath).toBe('/acme/projects/INV')
   })
 
+  // The handoff's Package 4 item 5: a list of modules none can turn on asks nothing. Bug: the
+  // disabled list shown anyway, or modules sent that the server would refuse.
+  it('offers no module choice until a module has shipped, and creates with none', async () => {
+    const { wrapper, post } = await openDialog(['project.create'], NONE_SHIPPED)
+    await fill(wrapper)
+
+    expect(wrapper.findAll('legend').map((l) => l.text())).not.toContain('Modules')
+    expect(wrapper.text()).not.toContain('Not available yet')
+    expect(wrapper.text()).toContain(
+      'Picks the labels and the template new requirements start from; it can be changed later.',
+    )
+    await submit(wrapper)
+    expect(sent(post)).toMatchObject({ type: 'software', enabled_modules: [] })
+    await expectNoA11yViolations(document.body)
+  })
+
   it("lists the modules with their notes; one that hasn't shipped is a disabled checkbox, not available yet (DL-136)", async () => {
     const { wrapper } = await openDialog()
 
+    // With a module shipped, the type's help speaks of its modules (DL-402).
+    expect(wrapper.text()).toContain(
+      'Picks the labels and the recommended modules; it can be changed later.',
+    )
     const legend = wrapper.findAll('legend').find((l) => l.text() === 'Modules')!
     const modules = legend.element.parentElement!
     expect(modules.querySelectorAll('input[type=checkbox]')).toHaveLength(3)
