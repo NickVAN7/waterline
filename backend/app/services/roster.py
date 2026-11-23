@@ -304,9 +304,9 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
     async def _guard_last_owner(self, membership: M, loc: tuple[str, ...]) -> None:
         """Refuse to leave the roster with no active owner: a 422 of type `last_owner` (DL-55,
         DL-74). A deactivated owner doesn't count."""
-        # Locked again, not the list `_member` locked: a handover that committed while this
-        # request waited may have made someone an owner that the first list couldn't include.
-        await self._owners.lock_owners(self.scope_id)
+        # Not locked again: `_member`'s lock already queues every owner change behind this one
+        # (Postgres keeps a lock on a row that stopped matching), and a second lock deadlocks
+        # with a new owner's own step-down (the handoff's Package 4 item 3).
         if await self._owners.active_owners(self.scope_id) == [membership.user_id]:
             raise ValidationFailedError.on(loc, self.spec.needs_owner, "last_owner")
 

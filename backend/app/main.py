@@ -26,6 +26,9 @@ from app.routers import (
     workspace,
 )
 from app.rules.identifiers import RESERVED_SLUGS
+from app.services import (
+    wiring,  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every handler
+)
 
 API_PREFIX = "/api"
 

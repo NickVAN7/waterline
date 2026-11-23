@@ -260,7 +260,8 @@ Entry format:
   projects (the add committed while the removal waited on their org or staff row). Those are
   the two places a project is locked after a person's rows. A request naming them in such a
   project, holding it and waiting on their rows, can deadlock with the change. Postgres aborts
-  one of the two: a 500, and nothing it did is kept.
+  one of the two, and nothing it did is kept: since S3-C0s a 503 with `Retry-After: 1`, which
+  the client may retry, not yet retried by the server.
 - **Why:** the window is a request created in the same moments as the person's removal,
   deactivation, or role change; the owner accepted it rather than a retry (DL-235).
 - **Fix by:** Slice 7 (before the first non-local deployment): retry once on a deadlock, or confirm the window is still rare (owner, S2-C22 tech-debt review, Nov 8, 2026)

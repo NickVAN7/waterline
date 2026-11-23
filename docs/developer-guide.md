@@ -240,7 +240,9 @@ Every error response has one body: `{"code": ..., "message": ..., "details": {..
   of error is a new subclass with its own status and code.
 - **Handled for you:** request validation is 422 `validation_error` with
   `details.fields = [{"loc": [...], "message": ..., "type": ...}]`; an unknown route is 404
-  `not_found`; a wrong method is 405 `method_not_allowed`.
+  `not_found`; a wrong method is 405 `method_not_allowed`; a deadlock Postgres broke (SQLSTATE
+  `40P01`) is 503 `service_unavailable` with `Retry-After: 1`, as the request's transaction was
+  rolled back (`operational_error_handler`; interim for TD-83). Any other database error is a 500.
 - **Constraint violations** (`app/core/constraint_errors.py`): every unique constraint
   declares, in its `info`, either the field error a user gets when they trigger it,
   `info=user_error("email", "taken", "This email is already in use.")`, or `internal_only()`
@@ -327,6 +329,11 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
   project service changes roles and removes members itself. Two adds of one person racing: the
   roster turns the loser's unique violation into `already_member` on the field it used (`loc`,
   DL-80). Project member changes lock the project row first, then the membership.
+- **Registered handlers** (below) register when their area's module is imported, at module
+  level; `app/services/wiring.py` imports every service module, and `app/main.py`, `app/cli.py`,
+  and `app/jobs/worker.py` import it, so no process runs without them. A new service module is
+  added there (`tests/unit/services/test_wiring.py` checks the registries from a fresh
+  interpreter).
 - **Removing a member "with their projects"** calls the handlers registered with
   `register_on_member_removed()` (`app/services/roster.py`), each given a `MemberRemoval`
   (`organization_id` is None for staff). The project area registers one
@@ -365,8 +372,10 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
   (`OrgProjectQuery`), since FastAPI reads a query model only as the sole query parameter.
 - **My work** (`app/services/my_work.py`): each section's query runs in a savepoint and a
   database error marks it `available: false` (the one sanctioned savepoint-and-continue).
-- **Last-owner guards** count active owners (DL-74): lock the owners with `lock_owners`, then
-  compare `active_owners` (both on the workspace and org repositories). A deactivation locks the
+- **Last-owner guards** count active owners (DL-74): lock the owners with `lock_owners` once,
+  before the target's row, then compare `active_owners` (both on the workspace and org
+  repositories). Postgres keeps the lock on a row that stopped matching, so every owner change
+  queues behind the first; locking them again deadlocks with a new owner's own step-down (S3-C0s). A deactivation locks the
   owners of every workspace and org the user belongs to first, so it queues behind a handover
   (TD-27).
 - **Updates** of an entity without `version` go through `apply_changes(session, entity,

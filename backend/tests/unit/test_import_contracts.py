@@ -157,6 +157,11 @@ def test_current_app_keeps_every_contract(tmp_path: Path) -> None:
             "Service layers: services call lower layers only",
             id="lower-service-reaches-higher-through-jobs",
         ),
+        pytest.param(
+            {"app/services/requirement.py": "import app.services.wiring\n"},
+            "Service layers: services call lower layers only",
+            id="service-imports-the-wiring",
+        ),
     ],
 )
 def test_violation_breaks_contract(

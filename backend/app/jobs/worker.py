@@ -12,6 +12,9 @@ from sqlalchemy import URL
 
 from app.core.settings import get_settings
 from app.jobs.app import jobs_app
+from app.services import (
+    wiring,  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every handler
+)
 
 
 def conninfo(url: URL) -> str:

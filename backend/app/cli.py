@@ -28,6 +28,9 @@ from app.core.db import SessionMaker, create_engine, create_sessionmaker
 from app.core.errors import AppError, ForbiddenError
 from app.core.settings import Settings, get_settings
 from app.demo import build_demo
+from app.services import (
+    wiring,  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every handler
+)
 from app.services.auth import AuthService
 from app.services.workspace import WorkspaceService
 

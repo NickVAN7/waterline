@@ -7,9 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0r (The approver's email, the session time zone, and the stale comments) done; next: S3-C0s
-(Backend robustness), then S3-C0t and S3-C0u (Package 4) and Package 5's rows after (DL-400),
-each after the owner's approval.
+S3-C0s (Backend robustness) done; next: S3-C0t (Module choice hidden until a module ships),
+then S3-C0u (Package 4) and Package 5's rows after (DL-400), each after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

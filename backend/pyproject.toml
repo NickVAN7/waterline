@@ -176,6 +176,7 @@ name = "Service layers: services call lower layers only"
 type = "layers"
 containers = ["app.services"]
 layers = [
+    "(wiring)",
     "(requirement) | (webhook)",
     "(sprint) | (testcase) | (test_run) | (github)",
     "(task)",
