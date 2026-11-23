@@ -5150,3 +5150,19 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** S3-C0u; `.claude/agents/simplicity-auditor.md`; `.claude/audit/SOURCES.md`
 - **Source:** the outside review's handoff, Package 4 item 8 (DL-390), approved by the owner for
   S3-C0u (DL-400)
+
+### DL-406: Package 5, narrowed, in three rows
+- **Date:** 2026-11-23
+- **Decision:** The outside review's Package 5 runs as S3-C0v (items 1 and 2), S3-C0w (item 4),
+  and S3-C0x (item 3), each narrowed by the owner after checking it against the code: item 1 as
+  written; item 2 merges only the reporter and approver checks (TD-101), the lead's check staying
+  its own, as it needs an explicit membership and takes no hold; item 4 does the two service
+  splits only, `services/user.py`'s validators and message tables staying outside `rules/` (its
+  spec-test and mutation gate for what is mostly text); item 3 builds the composable with its two
+  reference views, each other view converted when a later row touches it. S3-C0v and S3-C0w are
+  on the security reviewer's list.
+- **Supersedes:** DL-390 in part (the handoff's Package 5 items 2, 3, and 4 as written)
+- **Superseded by:** none
+- **Applies to:** build plan (rows 0v to 0x, S3-C6, the security reviewer's list); tech debt
+  (TD-101's Fix by); root `CLAUDE.md` (Status)
+- **Source:** owner, Nov 23, 2026 (chat, each item confirmed in turn)

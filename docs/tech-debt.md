@@ -359,7 +359,8 @@ Entry format:
   (hold the access, get the user, load their context and authorize, check `is_active`); only the
   action and the error differ, so a change to one (TD-79's batching) has to be made in both.
 - **Why:** S2-C11 and S2-C10 code, fixed only when needed (DL-106).
-- **Fix by:** S3-C6 (one shared person check for reporter, approver, assignee, and reviewer)
+- **Fix by:** S3-C0v (the handoff's Package 5 item 2, pulled ahead of S3-C6, DL-406): one helper for
+  reporter and approver; S3-C6's assignee and reviewer use it
 - **Status:** open
 
 ### TD-102: A members list with no row actions still shows an Actions column

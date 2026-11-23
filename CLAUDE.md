@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0u (Tooling) done, the last of Package 4; next: the outside review's Package 5 as rows,
-written into the build plan by a design change, each after the owner's approval.
+S3-C0u (Tooling) done, the last of Package 4; next: S3-C0v (One restriction rule, one person
+check), then S3-C0w and S3-C0x (Package 5, DL-406), each after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
