@@ -13,7 +13,7 @@ Where the project stands is the root `CLAUDE.md`'s **Status** (DL-315).
 | Tool | Version | Why |
 |---|---|---|
 | Git | ≥ 2.31 | Source control |
-| Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.24.4 (`wl e2e`'s override uses `!reset` and `!override`), daemon running | The local stack: Postgres, the API, the worker, and the web dev server |
+| Docker + Compose v2 | Docker ≥ 20.10, Compose ≥ 2.24.4 (`wl e2e`'s override uses `!reset` and `!override`), daemon running | The local stack: Postgres, the API, the web dev server, and, with the `jobs` profile, the worker |
 | uv | ≥ 0.12 | Python versions, dependencies, and running everything; `uv audit` (`wl audit`) |
 | Python | 3.14 | The backend (`uv` installs it: `uv python install 3.14`) |
 | Node | 22.x, ≥ 22.18 (with npm) | The frontend's tools (tests, lint, types, client generation) run on the host |
@@ -84,7 +84,7 @@ docs/           design, schema, build plan, testing strategy, screen inventory, 
                 design-changes/: one per tooling design change, DL-393), spikes/
 tools/cli/      the developer CLI (`waterline` / `wl`), a member of the root uv workspace
 pyproject.toml  root uv workspace: makes `wl` and pre-commit runnable from the repo root
-docker-compose.yml   the local stack: postgres, migrate, api, worker, web (section 5)
+docker-compose.yml   the local stack: postgres, migrate, api, web, and worker (`jobs` profile; section 5)
 .github/workflows/ci.yml   CI: `wl check --full` on every push to main and every pull request (section 10)
 docker/postgres/initdb/   first-start scripts for the postgres container (test database)
 .env.example    local settings template; copy to .env (gitignored)
@@ -128,7 +128,7 @@ underlying commands instead of running them, and stops at the first failing step
 | `wl frontend test <args>` | `vitest run <args>`, e.g. `wl frontend test src/api -t network`, without the coverage gate |
 | `wl gen-client` | Export `backend/openapi.json` from the code, then generate `frontend/src/api/schema.d.ts` from it. Run after any API change and commit both files |
 | `wl up [args]` | `docker compose up --detach --wait --build --renew-anon-volumes`: build the images, start the stack (migrations first), and wait until it's up. Extra args go to compose (e.g. `wl up postgres`) |
-| `wl down [args]` | `docker compose down`. Data survives in the named volume; `wl down -v` deletes it |
+| `wl down [args]` | `docker compose --profile '*' down`, so the `jobs` worker stops too. Data survives in the named volume; `wl down -v` deletes it |
 | `wl logs [service]` | `docker compose logs --follow`, for one service when named (e.g. `wl logs api`) |
 | `wl migrate` | `docker compose run --rm --build migrate`: `alembic upgrade head` against the dev database, in the Compose `migrate` service (its image rebuilt first if dependencies changed) |
 | `wl backend migration "<message>"` | `alembic revision --autogenerate -m "<message>"` on the host; review the generated file by hand |
@@ -502,6 +502,8 @@ case there — including an indirect path (A → B → forbidden) wherever indir
   change (`uv add`, `npm install`) takes effect on the next `wl up`. It also renews the web
   container's `node_modules` volume from the image; the host's `frontend/node_modules` is a
   separate install, used by the host tools.
+- The `worker` starts only with the `jobs` profile: `COMPOSE_PROFILES=jobs uv run wl up` (off
+  by default until the job queue's first real job, Slice 7); `wl down` stops it either way.
 - The `api` reloads on code changes. The `worker` doesn't: after changing a job or a service it
   calls, restart it (`docker compose restart worker`).
 - `wl logs` follows every service's logs; `wl logs api` just one.
@@ -777,9 +779,10 @@ S0-C3 spike (design-doc §13, "Transactional enqueue").
 uv run --directory backend python -m app.jobs.worker
 ```
 
-It processes jobs until stopped (Ctrl+C or SIGTERM finish the current job first). `wl up` runs
-it as the Compose `worker` service (it doesn't reload: `docker compose restart worker` after
-changing a job); run it on the host as above only with that service stopped. The API never opens
+It processes jobs until stopped (Ctrl+C or SIGTERM finish the current job first).
+`COMPOSE_PROFILES=jobs uv run wl up` runs it as the Compose `worker` service (it doesn't reload:
+`docker compose restart worker` after changing a job); run it on the host as above only with
+that service stopped. Plain `wl up` doesn't start it: a job enqueued then waits in the queue. The API never opens
 a procrastinate connection; only the worker does.
 
 ### Enqueueing
@@ -1258,7 +1261,9 @@ afterwards (see `tests/integration/test_migrations.py`).
   spec runs axe (`expectNoA11yViolations`, WCAG 2.2 AA tags plus `target-size`; contrast is
   left to the browser runs, since jsdom can't compute it).
 - **End-to-end tests** (`frontend/e2e/`, Playwright, Chromium) run through `wl e2e` against
-  the demo data, each spec in the `light` and `dark` projects. Each page is checked with axe
+  the demo data, each spec in the `light` and `dark` projects. A test tagged `@timing` (the
+  tree's, DL-403) is left out unless `WL_TIMING_TEST` is set: `WL_TIMING_TEST=1 uv run wl e2e
+  --grep @timing` runs it alone. Each page is checked with axe
   (`expectNoA11yViolations(page)`, contrast included, once running animations have finished,
   so an overlay mid-fade isn't read as low contrast) and, on the shell's pages,
   `expectFocusNotObscured(page)` (`e2e/support/a11y.ts`). `signIn(page, username)`
@@ -1314,9 +1319,11 @@ message saying so).
 - **CI** (`.github/workflows/ci.yml`, GitHub Actions) runs `wl check --full`'s parts as parallel
   jobs on every push to `main` and every pull request (DL-392): `wl backend check`, `wl frontend
   check`, `wl cli check`, `wl audit`, and `wl e2e`, then a last job named `wl check`, the status
-  check the ruleset requires, which passes only when all five did. A CLI test keeps the jobs'
-  commands equal to `wl check --full`'s, so a green `wl check --full` locally means a green run
-  there. Each job installs only what it needs from the lockfiles (`uv sync --locked`, `npm ci`);
+  check the ruleset requires, which passes only when all five did. A sixth job, `timing test (not
+  gating)`, runs only the tree's `@timing` test (DL-403) with `continue-on-error`, outside
+  `check`'s needs: its numbers are in its log, and it never fails the run. A CLI test keeps the
+  gating jobs' commands equal to `wl check --full`'s, so a green `wl check --full` locally means
+  a green run there. Each job installs only what it needs from the lockfiles (`uv sync --locked`, `npm ci`);
   the backend, CLI, and audit jobs check out the full history (`fetch-depth: 0`, for the docs
   consistency tests and gitleaks). The backend's tests run against a `postgres:18` service
   container; the test database is created by the same init script as in
@@ -1460,7 +1467,7 @@ its one full list (DL-317); the root `CLAUDE.md` keeps only the rules for when t
 | `npm ci` on the host fails with `EACCES` in `frontend/node_modules` | The folder was created as root by a `wl up` from before the dev containers ran as you (TD-11): `sudo rm -rf frontend/node_modules && npm ci --prefix frontend`. |
 | `wl check` fails at `openapi_export --check` or `check:client` | The API changed without regenerating the client: `uv run wl gen-client` and commit `backend/openapi.json` and `frontend/src/api/schema.d.ts`. |
 | The status page (`/status`) says "Could not reach the server" | The API isn't running or reachable from Vite: `wl logs api`; for a host-run Vite, check `API_PROXY_TARGET`. |
-| A job change has no effect | The `worker` doesn't reload: `docker compose restart worker`. |
+| A job change has no effect | The `worker` doesn't reload: `docker compose restart worker`. Plain `wl up` doesn't start it at all: `COMPOSE_PROFILES=jobs uv run wl up`. |
 | `wl up`: `set POSTGRES_DB in .env` | No `.env` yet: `cp .env.example .env`. |
 | The API fails at startup with a validation error for `postgres_user` | No `.env` (or the variables aren't set): `cp .env.example .env`. |
 | `MissingGreenlet` when reading `created_at`/`updated_at` | The model replaced `__mapper_args__` without keeping `eager_defaults`; merge `TimestampMixin.__mapper_args__` (see "Models"). The convention checks catch this. |

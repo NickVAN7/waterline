@@ -1,6 +1,7 @@
 # Local development stack (build-plan.md, "Docker Compose"). Start with `uv run wl up`, which
 # builds the images, applies migrations (the one-shot migrate service), and waits until every
-# service is up: postgres, api (http://localhost:8000/api), worker, and web (http://localhost:5173).
+# service is up: postgres, api (http://localhost:8000/api), and web (http://localhost:5173). The
+# worker starts only with the `jobs` profile (`COMPOSE_PROFILES=jobs uv run wl up`).
 name: waterline
 
 # api, worker, and migrate run the backend image with the source mounted, against the postgres
@@ -84,8 +85,11 @@ services:
       timeout: 5s
       retries: 20
 
+  # Off by default until the job queue has its first real job (Slice 7): it has only `ping`, and
+  # the job tests run their worker in-process, not here (the outside review's Package 4 item 6).
   worker:
     <<: *backend
+    profiles: [jobs]
     command: ["python", "-m", "app.jobs.worker"]
     depends_on:
       migrate:

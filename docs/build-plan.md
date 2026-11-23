@@ -31,7 +31,7 @@ marked for the slice is in the model (the `slice-end` skill, "With step 2").
 | 4 | Sprints (module), including completing a sprint with unfinished tasks; milestones/gates. |
 | 5 | Test cases, runs, results (with assignees), ad-hoc runs, re-running failed cases; My work's test-case section. |
 | 6 | Comments, tags (with the built-in per-type defaults, copied into new orgs and backfilled into existing ones), dependencies, links, search; the comment prompt when a task is sent back from review. |
-| 7 | Pre-deployment hardening: TD-12, the items of TD-14, TD-17, TD-83, and the nightly session cleanup as the job queue's first real job, with the other entries due before the first non-local deployment (TD-13, TD-28, TD-29, TD-63, TD-87) and the workspace audit log page (DL-393). Its checkpoints aren't defined yet. |
+| 7 | Pre-deployment hardening: TD-12, the items of TD-14, TD-17, TD-83, and the nightly session cleanup as the job queue's first real job (with the worker back in the default stack, DL-404), with the other entries due before the first non-local deployment (TD-13, TD-28, TD-29, TD-63, TD-87) and the workspace audit log page (DL-393). Its checkpoints aren't defined yet. |
 | 8 | GitHub (module): App, repo mapping, webhooks, auto-linking; the system-admin operations screen (failed jobs and webhook deliveries). |
 | 9+ | v2, ERP implementations (design-doc §16): RAID & change requests → status reports → budget → data migration → cutover; PMO dashboard, steering committee page, resourcing, workstream members. |
 
@@ -521,7 +521,9 @@ ERP modules (Slices 9+) get their own entries when they're designed.
   procrastinate's schema. So `wl up` always leaves a migrated stack; `wl migrate` runs it again
   to apply a new migration while the stack is up (owner decision, S0-C7).
 - `api` — built from `backend/`; uvicorn with reload, mounted source.
-- `worker` — same image as `api`, runs the procrastinate worker.
+- `worker` — same image as `api`, runs the procrastinate worker; behind the `jobs` Compose
+  profile, so `wl up` doesn't start it, until the job queue's first real job (Slice 7; the
+  outside review's Package 4 item 6, S3-C0u): `COMPOSE_PROFILES=jobs uv run wl up` starts it.
 - `web` — built from `frontend/`; Vite dev server (in Compose or run locally); from S2-C21d it also
   mounts `docs/user-guide/` read-only for the Documentation pages (DL-308, DL-335).
 - **Vite proxies `/api` to the API**, so the browser sees one origin. This matters for Slice 1:
@@ -1708,7 +1710,7 @@ screen inventory, user guide) when it's built.
 | 0r | The approver's email, the session time zone, and the stale comments | DL-399: TD-124 (`ApprovalRead` gains the approver's `email`, `wl gen-client`; Approve by hand's confirmation names each bypassed approver with it); the handoff's Package 4 item 1 (the application's database connections set `timezone=UTC` in `connect_args`' `options`, with a test that a connection reports `UTC` for `SHOW timezone`); TD-125 (the four tests it names get explicit, longer limits, each with a one-line reason, DL-398); TD-120 (the three comments say Slice 8 for GitHub, the spec test's with the owner's approval, Nov 23) |
 | 0s | Backend robustness | The handoff's Package 4 items 2, 3 and 4 (DL-400): explicit handler registration (`services/wiring.py`); the untested lock (a concurrency test that fails without it, or the line removed); a deadlock (SQLSTATE `40P01`) a 503 with `Retry-After: 1`, TD-83 kept open for Slice 7 (the handoff said Slice 6a, which doesn't exist) |
 | 0t | Module choice hidden until a module ships | The handoff's Package 4 item 5 (DL-400); superseding DL-136 in part, recorded in its commit |
-| 0u | Tooling | The handoff's Package 4 items 6, 7 and 8 (DL-400): the worker off by default (a Compose profile); the timing test out of the gate (its own CI job, `continue-on-error`), superseding DL-257 and the gating parts of DL-253 and DL-254, recorded in its commit; the audit lens inlined |
+| 0u | Tooling | The handoff's Package 4 items 6, 7 and 8 (DL-400): the worker off by default (a Compose profile, back in Slice 7; the handoff said Slice 6a, which doesn't exist; DL-404); the timing test out of the gate (its own CI job, `continue-on-error`), superseding DL-257 and the gating parts of DL-253 and DL-254 (DL-403); the audit lens inlined (DL-405) |
 | 1 | Models & migration | `phase`, `workstream`, `task`, `subtask` (schema-doc), one migration; `requirement.workstream_id` (marked Slice 3); `task`'s `(project_id, status, rank)`, `ix_task_assignee_id_status`, `ix_task_reviewer_id_status`; `RestrictionMixin` on `task`; not built: `task.sprint_id`, `milestone_id` (Slice 4), `search_vector` (Slice 6), `task_dependency` (Slice 6, F1); constraint tests; factories |
 | 2 | Task rules & actions | `rules/task_transitions.py` (design-doc §5's table: who may make each transition, `allowed_transitions` computed from it), `rules/branch_name.py` (the lowercase ID plus a title slug, design-doc §6; non-ASCII and length handled), the task types allowed per project type (DL-352), all test-first by `spec-test-writer` and mutation-tested; the `task.*`, `subtask.*`, `phase.*`, `workstream.*` actions in the registry, each marked content or management; their matrix rows (export control included) |
 | 3 | Phases | `GET/POST /api/projects/{key}/phases`, `GET/PATCH/DELETE …/phases/{id}`, `POST …/phases/{id}/move` (rank among the project's phases); hard delete only while no task references it (422 `in_use`); `status`, dates, and baselines logged (`entity_type = phase`); members and up |

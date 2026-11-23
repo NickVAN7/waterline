@@ -563,6 +563,17 @@ Entry format:
   one-line comment change
 - **Status:** open
 
+### TD-128: No gated browser check of the tree's stopped "Expand requirement" state
+- **Added:** S3-C0u (checkpoint-reviewer finding 3, ui-reviewer note)
+- **What:** the `@timing` test was the only end-to-end test that reaches the stopped state (its
+  note, "Deeper rows under … stay closed") and runs axe on it in both themes; since DL-403 it runs
+  only in CI's non-gating job. The stop itself is still gated (`RequirementsTree.spec.ts`), but
+  jsdom checks no rendered contrast.
+- **Why:** the handoff moved the timing test whole; a gated test of the stopped state (a tree
+  just over 500 rows, Expand requirement, the note, axe) is new scope, for the owner.
+- **Fix by:** S3-C33 (the slice's tech-debt review), or a later row the owner picks
+- **Status:** open
+
 ---
 
 ## Resolved

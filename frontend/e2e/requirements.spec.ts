@@ -119,7 +119,8 @@ function treeAtCap() {
   return { items, truncated: false }
 }
 
-test('Expand requirement stops at 500 rows without freezing the page', async ({
+// Tagged @timing: outside `wl e2e` and the gate, in CI's own `timing` job (DL-403).
+test('Expand requirement stops at 500 rows without freezing the page @timing', async ({
   page,
 }, testInfo) => {
   const { user, key } = runFor(testInfo)

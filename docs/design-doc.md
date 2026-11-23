@@ -168,7 +168,7 @@ whether existing software projects get the module turned on.
 | Database | PostgreSQL | Also hosts the job queue and full-text search — no extra services in v1 |
 | Background jobs | procrastinate (Postgres-backed queue) | No new infrastructure; jobs enqueue in the same transaction as the data they act on |
 | Frontend | Vue 3 + TypeScript; PrimeVue 5 (PrimeUI License, the owner's Community License key, DL-135) + Tailwind v4 on one token set; SVAR Vue Kanban and DataGrid for the board and editable grids, SVAR Gantt planned for v2 | Existing familiarity; accessible widgets we don't hand-build, one palette (`docs/ui-design-guide.md`) |
-| Local dev | Docker Compose: `api`, `worker`, `web`, `postgres`, plus a one-shot `migrate` | Worker and migrate run the same image as `api` with a different command; `migrate` applies migrations before `api` and `worker` start; `web` is the Vite dev server |
+| Local dev | Docker Compose: `api`, `worker` (behind the `jobs` profile until Slice 7, DL-404), `web`, `postgres`, plus a one-shot `migrate` | Worker and migrate run the same image as `api` with a different command; `migrate` applies migrations before `api` and `worker` start; `web` is the Vite dev server |
 | Deployment | Self-hosted/local initially | Stateless API + externalized DB keeps it cloud-portable |
 
 **Backend language decision:** a Node/TypeScript backend was considered for shared types with

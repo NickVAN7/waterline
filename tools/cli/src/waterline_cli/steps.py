@@ -123,8 +123,9 @@ def up(extra: Sequence[str] = ()) -> list[Step]:
 
 
 def down(extra: Sequence[str] = ()) -> list[Step]:
-    """Stop the stack. Data survives in the named volume unless `-v` is passed."""
-    return [step("docker", "compose", "down", *extra)]
+    """Stop the stack. Data survives in the named volume unless `-v` is passed. Every profile is
+    on, so a worker started with `jobs` stops too (Compose's `down` skips an inactive one)."""
+    return [step("docker", "compose", "--profile", "*", "down", *extra)]
 
 
 def logs(extra: Sequence[str] = ()) -> list[Step]:

@@ -184,12 +184,10 @@ Then:
   listing its groups), with a literal `--title '…'` and `--body '…'` or `--body-file <file>`:
   the git guard allows no heredoc or `$(...)` with gh (DL-391).
 - Push only the finished checkpoint commit, never work in progress. Wait for CI on it
-  (`gh pr checks --watch`). Never amend, rebase, or force-push a pushed commit: a red CI is
+  (`gh pr checks --watch --required`: the `wl check` job; the `timing test (not gating)` job's
+  result is read from its log, never fixed to get a green run, DL-403). Never amend, rebase, or force-push a pushed commit: a red CI is
   fixed with a follow-up commit, `fix(<ID>): <what>` (rerun `wl check`, push), before the
-  report. Never report a checkpoint whose CI isn't green. The one exception: CI red from the
-  tree's timing test (`e2e/requirements.spec.ts`; DL-257, DL-271) gets no `fix(<ID>)` commit: rerun the
-  job once, then stop and send both runs' numbers to the owner, whatever the rerun shows
-  (DL-257).
+  report. Never report a checkpoint whose CI isn't green.
 - Never merge: the PR is merged at the slice's end, as the `slice-end` skill says.
 - Under the git guard (DL-391), run each git or gh command as its own Bash call: `git add …`,
   then `git commit -F - <<'EOF'` with the message, then the push above. When it blocks a command,

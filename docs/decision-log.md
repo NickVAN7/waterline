@@ -1820,7 +1820,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   but no C0a record, or a slice-end record lacks its section. Updating the vendored prompts is a
   design change. Built in S2-C0a, which also runs it first on `main` at `e999564`.
 - **Supersedes:** none
-- **Superseded by:** DL-165, in part (a C0 record also satisfies the test)
+- **Superseded by:** DL-165, in part (a C0 record also satisfies the test); DL-405, in part (the lens inlined in the agent)
 - **Applies to:** build plan ("Workflow items scheduled", S2-C0a, S2-C22); `CLAUDE.md`
   ("Skills, agents, and hooks"); `checkpoint` skill (the slice-end list)
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
@@ -3202,7 +3202,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   nearing the cap revisits it (TD-89).
 - **Supersedes:** DL-175 in part ("so the page never freezes"); answers DC-2026-10-22f's
   decision 1 (the pass mark)
-- **Superseded by:** DL-254 (in part: the guard's limit in CI); DL-271 (in part: "Expand requirement" replaces "Expand all")
+- **Superseded by:** DL-254 (in part: the guard's limit in CI); DL-271 (in part: "Expand requirement" replaces "Expand all"); DL-403 (in part: the guard as a gate)
 - **Applies to:** build plan (S2-C17); tech debt (TD-89)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17's measurement)
 
@@ -3214,7 +3214,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   light and 2.4 s in dark). DL-253's pass mark, 1 s, is the workstation's.
 - **Supersedes:** DL-253 in part (the guard's limit in CI; owner, DC-2026-11-02h); answers
   DC-2026-11-02f's decision 2
-- **Superseded by:** none
+- **Superseded by:** DL-403 (in part: the guard as a gate)
 - **Applies to:** `frontend/e2e/requirements.spec.ts`; build plan (S2-C17); testing strategy
   ("Flaky tests are bugs", DC-2026-11-02h)
 - **Source:** owner, Nov 2, 2026 (chat session, S2-C17's red CI)
@@ -3248,7 +3248,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   the checkpoint waits for the owner. If it keeps failing in CI, the owner revisits the test.
   The owner accepts the risk.
 - **Supersedes:** none (an exception to the testing strategy's quarantine rule for this test)
-- **Superseded by:** none
+- **Superseded by:** DL-403
 - **Applies to:** testing strategy ("Flaky tests are bugs"); checkpoint skill (step 6)
 - **Source:** owner, Nov 2, 2026 (DC-2026-11-02h, docs-consistency decision 3, a variant of (b))
 
@@ -3412,7 +3412,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   under one top-level requirement; DL-257 still holds for it. Built in S2-C18c, before S2-C19
   (DL-131).
 - **Supersedes:** DL-270 (before it was built); DL-175 and DL-253 in part ("Expand all")
-- **Superseded by:** DL-272 (in part: the first level always opens, even over 500)
+- **Superseded by:** DL-272 (in part: the first level always opens, even over 500); DL-403 (in part: DL-257 no longer holds)
 - **Applies to:** build plan (S2-C17, S2-C18c); testing strategy ("Flaky tests are bugs"); user
   guide (Requirements); tech debt (TD-89, TD-93); developer guide (Status);
   `RequirementsTree`; `e2e/requirements.spec.ts`
@@ -5107,3 +5107,46 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   behavior reference; user guide (projects) and its settings screenshot
 - **Source:** the outside review's handoff, Package 4 item 5 (DL-390), approved by the owner for
   S3-C0t (DL-400)
+
+### DL-403: The timing test is out of the gate
+- **Date:** 2026-11-23
+- **Decision:** The tree's timing test ("Expand requirement" at 2,000 rows) is tagged `@timing`:
+  `wl e2e`, and so `wl check --full` and CI's gating jobs, leave it out, and CI runs it alone in
+  its own job with `continue-on-error`, outside the required check's needs. Its limits (1 s on
+  the workstation, 3 s in CI) and its 500-row assertion are unchanged; a run over them shows in
+  that job's log and fails nothing, so the checkpoint skill's rerun-and-report exception is
+  gone. `WL_TIMING_TEST=1 uv run wl e2e --grep @timing` runs it locally.
+- **Supersedes:** DL-257; DL-253 and DL-254 in part (the guard as a gate); DL-271 in part ("DL-257
+  still holds for it")
+- **Superseded by:** none
+- **Applies to:** S3-C0u; `frontend/e2e/requirements.spec.ts`, `frontend/playwright.config.ts`,
+  `.github/workflows/ci.yml`, `tools/cli/tests/test_commands.py`; testing strategy ("Flaky tests
+  are bugs"); the `checkpoint` skill (step 6); developer guide (end-to-end tests, CI)
+- **Source:** the outside review's handoff, Package 4 item 7 (DL-390), approved by the owner for
+  S3-C0u (DL-400)
+
+### DL-404: The worker is off by default until Slice 7
+- **Date:** 2026-11-23
+- **Decision:** The Compose `worker` service is behind the `jobs` profile, so `wl up` starts
+  postgres, migrate, api, and web only; `COMPOSE_PROFILES=jobs uv run wl up` starts it too, and
+  `wl down` stops every profile's services (`--profile '*'`). The queue has only `ping`, and the
+  job tests run their worker in-process. It returns to the default with the queue's first real
+  job, the nightly session cleanup (Slice 7; the handoff said Slice 6a, which doesn't exist).
+- **Supersedes:** the build plan's "Docker Compose" (the worker in the default stack, S0-C7)
+- **Superseded by:** none
+- **Applies to:** S3-C0u; `docker-compose.yml`; `wl down` (`tools/cli/src/waterline_cli/steps.py`);
+  build plan ("Docker Compose"); developer guide (setup, the stack, the worker, troubleshooting)
+- **Source:** the outside review's handoff, Package 4 item 6 (DL-390), approved by the owner for
+  S3-C0u (DL-400)
+
+### DL-405: The simplicity audit's lens lives in its agent
+- **Date:** 2026-11-23
+- **Decision:** The sections `simplicity-auditor` uses from the vendored prompts are copied
+  verbatim into its agent file ("The lens"), with attribution; `.claude/audit/` keeps only
+  `SOURCES.md`, with each section's source, commit, and both MIT licenses; the rest of the
+  vendored files are deleted. Updating the lens is still a design change that bumps the commit.
+- **Supersedes:** DL-138 in part (the prompts read as plain files from `.claude/audit/`)
+- **Superseded by:** none
+- **Applies to:** S3-C0u; `.claude/agents/simplicity-auditor.md`; `.claude/audit/SOURCES.md`
+- **Source:** the outside review's handoff, Package 4 item 8 (DL-390), approved by the owner for
+  S3-C0u (DL-400)

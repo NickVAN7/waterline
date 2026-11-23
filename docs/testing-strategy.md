@@ -336,9 +336,10 @@ saying why.
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
   tech-debt entry the same day, never retried until green. The one deliberate timing test,
   "Expand requirement" on a 2,000-row tree under one top-level requirement, which stops on exactly
-  500 rows, asserted (`e2e/requirements.spec.ts`, DL-271, DL-272), fails on a task over 1 s on the workstation and over 3 s in CI (DL-253, DL-254). It is never quarantined or changed to get a
-  green run: when it fails in CI, the job is rerun once and both runs' numbers go to the owner,
-  who revisits the test if it keeps failing (DL-257).
+  500 rows, asserted (`e2e/requirements.spec.ts`, DL-271, DL-272), fails on a task over 1 s on
+  the workstation and over 3 s in CI (DL-253, DL-254), and is outside the gate: tagged `@timing`,
+  `wl e2e` leaves it out and CI runs it in its own job that never fails the run (DL-403). A run
+  over its limit is read from that job's log, not fixed to get a green run.
 
 ## Test naming and structure
 
