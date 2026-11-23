@@ -1009,7 +1009,9 @@ requirement approval.
   inherited project admin (on an export-controlled project, only an explicit membership,
   §3.1). Naming anyone else is rejected the same way the project-member picker rejects a user
   outside its scope (404, §4); a deactivated user is a 422 `account_inactive`. A request names
-  1 to 50 distinct approvers (a repeat is a 422 `duplicate`; DL-226).
+  1 to 50 distinct approvers (a repeat is a 422 `duplicate`; DL-226). Each approver's name and
+  email show to everyone who can see the requirement, an inherited admin's included: being named
+  on the sign-off makes them one of its people (DL-401).
 - **Replacing an approver who loses access.** When an approver loses the access needed to
   decide (content access to the project: any `project_membership` or inherited project admin;
   on an export-controlled project, an explicit membership, §3.1), each of their pending

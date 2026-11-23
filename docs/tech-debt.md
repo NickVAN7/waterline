@@ -541,6 +541,16 @@ Entry format:
   60 s for the e2e
 - **Status:** open
 
+### TD-126: Request approval's note names left-out approvers without their email
+- **Added:** S3-C0r (ui-reviewer note 3)
+- **What:** `RequestApprovalDialog.vue`'s "Left out, as they can no longer be named" lists the
+  earlier request's approvers by name alone, and names aren't unique (traps). `ApprovalRead`
+  carries `approver_email` since S3-C0r, so its `Earlier` type could carry it.
+- **Why:** existing code outside S3-C0r's row, and a note rather than a confirmation; the owner
+  chose to log it (Nov 23).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
 ---
 
 ## Resolved

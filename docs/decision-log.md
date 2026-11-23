@@ -5070,3 +5070,25 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (Slice 3's checkpoints, rows 0r to 0y; the security reviewer's
   list); `docs/tech-debt.md` (TD-120, TD-124, TD-125 targets unchanged)
 - **Source:** owner, Nov 23, 2026 (chat)
+
+### DL-400: Package 4's last seven items in three rows
+- **Date:** 2026-11-23
+- **Decision:** The handoff's Package 4 items 2 to 8 run as three rows, by kind: S3-C0s, backend
+  robustness (items 2, 3, 4); S3-C0t, module choice hidden (item 5); S3-C0u, tooling (items 6,
+  7, 8). S3-C0s is on the security reviewer's list, for the error handlers' new 503.
+- **Supersedes:** DL-399 in part (its rows S3-C0s to S3-C0y, one item each)
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 3's rows 0s to 0u; the security reviewer's list); root
+  `CLAUDE.md` (Status)
+- **Source:** owner, Nov 23, 2026 (chat, after S3-C0r's report)
+
+### DL-401: An approver's email shows to the requirement's viewers
+- **Date:** 2026-11-23
+- **Decision:** The approval read shows each approver's email to everyone who can see the
+  requirement, including an inherited admin named through the API who isn't a listed member:
+  being named on the sign-off makes them one of its people, and the picker offers only listed
+  members (S3-C0r's security review, question 2).
+- **Supersedes:** none (the docs didn't say)
+- **Superseded by:** none
+- **Applies to:** design-doc §6.2 ("Who can be an approver")
+- **Source:** owner, Nov 23, 2026 (chat, S3-C0r's open question 2)

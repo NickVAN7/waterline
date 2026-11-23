@@ -93,3 +93,9 @@ confirmation (as before this row).
    with the sign-off, and the picker offers only listed members.
 3. **`RequestApprovalDialog`'s names without email.** Options: carry the email there too (a
    tech-debt entry or a later row), or leave it. Recommendation: log it for S3-C33.
+
+## Owner answers (Nov 23, after the report)
+
+1. TD-125 stays at S3-C33.
+2. Left as is, recorded as a rule: DL-401 (design-doc §6.2).
+3. Logged: TD-126, for S3-C33.
