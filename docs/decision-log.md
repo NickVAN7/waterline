@@ -5055,3 +5055,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** `docs/tech-debt.md` (TD-125); S3-C0r
 - **Source:** owner, Nov 23, 2026 (chat, after the four tests were run on the second machine)
+
+### DL-399: Package 4's rows, S3-C0r to S3-C0y
+- **Date:** 2026-11-23
+- **Decision:** The outside review's Package 4 runs as eight rows. S3-C0r holds TD-124 (the
+  approver's email on `ApprovalRead`, shown in Approve by hand's confirmation), the handoff's
+  item 1 (the database session's time zone set to UTC), TD-125's longer limits (DL-398), and
+  TD-120 (the comments say Slice 8 for GitHub; the owner approves the change to the spec test
+  `tests/unit/rules/test_modules.py`, comments only). Items 2 to 8 are one row each, S3-C0s to
+  S3-C0y, in the handoff's order. S3-C0r is on the security reviewer's list. Package 5's rows
+  are written after Package 4's last.
+- **Supersedes:** none
+- **Superseded by:** none
+- **Applies to:** build plan (Slice 3's checkpoints, rows 0r to 0y; the security reviewer's
+  list); `docs/tech-debt.md` (TD-120, TD-124, TD-125 targets unchanged)
+- **Source:** owner, Nov 23, 2026 (chat)

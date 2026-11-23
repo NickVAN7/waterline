@@ -7,8 +7,9 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0q (The design trial's open findings: History and the status menu) done; next: the outside
-review's Packages 4 and 5 as rows from S3-C0r, each after the owner's approval.
+S3-C0q (The design trial's open findings: History and the status menu) done; next: S3-C0r (The
+approver's email, the session time zone, and the stale comments), then Package 4's rows to
+S3-C0y and Package 5's after (DL-399), each after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
