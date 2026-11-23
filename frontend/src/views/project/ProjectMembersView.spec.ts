@@ -123,30 +123,35 @@ afterEach(() => {
 })
 
 describe('ProjectMembersView', () => {
-  it('lists the members with their roles, a deactivated one marked, under the project header', async () => {
-    const { wrapper } = await mountAt(project({ allowed_actions: ['project.view'] }), [
-      member('Ann Lee', { role: 'admin' }),
-      member('Dee Gone', { role: 'viewer', is_active: false }),
-    ])
+  // 15 s: past the 5 s default in a 4-core machine's full suite, under 1 s alone (TD-125).
+  it(
+    'lists the members with their roles, a deactivated one marked, under the project header',
+    { timeout: 15_000 },
+    async () => {
+      const { wrapper } = await mountAt(project({ allowed_actions: ['project.view'] }), [
+        member('Ann Lee', { role: 'admin' }),
+        member('Dee Gone', { role: 'viewer', is_active: false }),
+      ])
 
-    expect(wrapper.get('h1').text()).toBe('ERP rollout members')
-    // Its trail (DL-327, UI-SHL-14).
-    expect(trail()).toEqual({
-      links: [
-        ['Acme Manufacturing', '/acme/projects'],
-        ['ERP rollout', '/acme/projects/ERP'],
-      ],
-      current: 'Members',
-    })
-    expect(document.title).toBe('ERP members · Waterline')
-    expect(
-      wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
-    ).toEqual([
-      ['Ann Lee', 'ann@acme.example', 'Admin', ''],
-      ['Dee Gone · Deactivated', 'dee@acme.example', 'Viewer', ''],
-    ])
-    await expectNoA11yViolations(wrapper)
-  })
+      expect(wrapper.get('h1').text()).toBe('ERP rollout members')
+      // Its trail (DL-327, UI-SHL-14).
+      expect(trail()).toEqual({
+        links: [
+          ['Acme Manufacturing', '/acme/projects'],
+          ['ERP rollout', '/acme/projects/ERP'],
+        ],
+        current: 'Members',
+      })
+      expect(document.title).toBe('ERP members · Waterline')
+      expect(
+        wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
+      ).toEqual([
+        ['Ann Lee', 'ann@acme.example', 'Admin', ''],
+        ['Dee Gone · Deactivated', 'dee@acme.example', 'Viewer', ''],
+      ])
+      await expectNoA11yViolations(wrapper)
+    },
+  )
 
   it('offers no adding, row actions, or access review to someone who only sees the project', async () => {
     const { wrapper, get } = await mountAt(project({ allowed_actions: ['project.view'] }), [

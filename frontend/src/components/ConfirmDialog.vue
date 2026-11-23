@@ -52,7 +52,7 @@ defineExpose({ open })
     <form novalidate class="flex flex-col gap-4" @submit.prevent="confirm">
       <!-- What the action does first, the warning after it: the warning never outranks the
            consequence (Impeccable's critique, S3-C0o). -->
-      <p :id="textId" class="m-0">{{ shown.text }}</p>
+      <p :id="textId" class="m-0 break-words">{{ shown.text }}</p>
       <Alert v-if="shown.warning" :id="warningId" tone="warning">{{ shown.warning }}</Alert>
       <div class="flex flex-wrap gap-3">
         <Button type="submit" :variant="shown.variant ?? 'primary'">{{ shown.button }}</Button>

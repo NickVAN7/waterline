@@ -1105,6 +1105,7 @@ def _approval_request(
                 id=row.id,
                 approver_id=row.approver_id,
                 approver_name=row.approver.name,
+                approver_email=row.approver.email,
                 approver_is_active=row.approver.is_active,
                 decision=row.decision,
                 comment=row.comment,

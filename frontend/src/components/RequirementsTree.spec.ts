@@ -1039,12 +1039,12 @@ describe('RequirementsTree', () => {
 
       expandButton().click()
       // The only spec that must draw over 500 rows, which jsdom does slowly: 14.7 s on CI's
-      // runner, so a 60 s limit (S2-C18c's CI).
-      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 55_000 })
+      // runner and about 65 s in a 4-core machine's full suite, so a 120 s limit (TD-125).
+      await vi.waitFor(() => expect(note()).not.toBe(''), { timeout: 115_000 })
 
       expect(rows()).toHaveLength(502)
       expect(shown()).not.toContain('Grandchild')
-    }, 60_000)
+    }, 120_000)
 
     it('is there for someone who may not move requirements', async () => {
       mountTree(DEEP, false)

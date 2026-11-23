@@ -162,27 +162,32 @@ afterEach(() => {
 })
 
 describe('RequirementsView', () => {
-  it("shows the project's requirement tree, with the move menu for those who may move", async () => {
-    const { wrapper } = await mountAt([MOVER])
+  // 15 s: past the 5 s default in a 4-core machine's full suite, under 1 s alone (TD-125).
+  it(
+    "shows the project's requirement tree, with the move menu for those who may move",
+    { timeout: 15_000 },
+    async () => {
+      const { wrapper } = await mountAt([MOVER])
 
-    expect(wrapper.get('h1').text()).toBe('ERP rollout requirements')
-    // Its trail (DL-327, UI-SHL-14).
-    expect(trail()).toEqual({
-      links: [
-        ['Acme Manufacturing', '/acme/projects'],
-        ['ERP rollout', '/acme/projects/ERP'],
-      ],
-      current: 'Requirements',
-    })
-    expect(document.title).toBe('ERP requirements · Waterline')
-    expect(wrapper.findAll('tbody tr').map((r) => r.find('td').text().trim())).toEqual([
-      'Invoicing',
-      'Payments',
-    ])
-    expect(moveButton()!.textContent!.trim()).toBe('Move')
-    expect(wrapper.find('[role=alert]').exists()).toBe(false)
-    await expectNoA11yViolations(wrapper)
-  })
+      expect(wrapper.get('h1').text()).toBe('ERP rollout requirements')
+      // Its trail (DL-327, UI-SHL-14).
+      expect(trail()).toEqual({
+        links: [
+          ['Acme Manufacturing', '/acme/projects'],
+          ['ERP rollout', '/acme/projects/ERP'],
+        ],
+        current: 'Requirements',
+      })
+      expect(document.title).toBe('ERP requirements · Waterline')
+      expect(wrapper.findAll('tbody tr').map((r) => r.find('td').text().trim())).toEqual([
+        'Invoicing',
+        'Payments',
+      ])
+      expect(moveButton()!.textContent!.trim()).toBe('Move')
+      expect(wrapper.find('[role=alert]').exists()).toBe(false)
+      await expectNoA11yViolations(wrapper)
+    },
+  )
 
   it('has no move menu for someone who may only read, but still Expand requirement', async () => {
     const { wrapper } = await mountAt([READER])

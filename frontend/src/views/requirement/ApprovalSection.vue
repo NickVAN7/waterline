@@ -116,8 +116,9 @@ const requestVariant = computed(() => (canDecide.value ? 'secondary' : 'primary'
 const undecided = computed(() =>
   (request.value?.approvals ?? [])
     .filter((row) => row.decision === 'pending')
-    .map((row) =>
-      row.approver_is_active ? row.approver_name : `${row.approver_name} (deactivated)`,
+    .map(
+      (row) =>
+        `${row.approver_name} (${row.approver_email}${row.approver_is_active ? '' : ', deactivated'})`,
     ),
 )
 

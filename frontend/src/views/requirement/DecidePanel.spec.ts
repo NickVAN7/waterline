@@ -45,6 +45,7 @@ function request(overrides: Partial<Request> = {}): Request {
         id: 'row-vera',
         approver_id: 'u-vera',
         approver_name: 'Vera Viewer',
+        approver_email: 'vera@example.test',
         approver_is_active: true,
         decision: 'pending',
         comment: null,

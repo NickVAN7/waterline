@@ -28,9 +28,13 @@ def create_engine(url: URL) -> AsyncEngine:
     # hide_parameters: SQLAlchemy leaves a statement's bound values (a password hash, a session
     # token's hash) out of its error text, and so out of logged tracebacks. Postgres's own
     # message can still quote a value (a type error on it, a CHECK's "Failing row contains"),
-    # which is why the constraint handler logs only the primary message.
+    # which is why the constraint handler logs only the primary message. timezone=UTC: a server
+    # set to another zone would return timestamps in it.
     return create_async_engine(
-        url, pool_pre_ping=True, hide_parameters=True, connect_args={"connect_timeout": 5}
+        url,
+        pool_pre_ping=True,
+        hide_parameters=True,
+        connect_args={"connect_timeout": 5, "options": "-c timezone=UTC"},
     )
 
 

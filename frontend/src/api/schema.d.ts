@@ -1486,6 +1486,8 @@ export interface components {
             approver_id: string;
             /** Approver Name */
             approver_name: string;
+            /** Approver Email */
+            approver_email: string;
             /** Approver Is Active */
             approver_is_active: boolean;
             decision: components["schemas"]["ApprovalDecision"];

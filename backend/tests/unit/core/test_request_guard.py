@@ -155,7 +155,7 @@ async def test_an_exempt_path_needs_no_origin() -> None:
 
 
 async def test_the_exemption_list_is_empty_until_the_github_webhook() -> None:
-    """design-doc §4: an exempt endpoint needs the owner's approval; none exists before Slice 7."""
+    """design-doc §4: an exempt endpoint needs the owner's approval; none exists before Slice 8."""
     status, _, reached = await call("POST", [("host", "x")], path="/api/github/webhook")
 
     assert (status, reached) == (403, False)

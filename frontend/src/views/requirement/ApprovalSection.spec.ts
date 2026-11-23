@@ -38,6 +38,7 @@ function row(id: string, name: string, overrides: Partial<Row> = {}): Row {
     id: `row-${id}`,
     approver_id: id,
     approver_name: name,
+    approver_email: `${id.slice(2)}@example.test`,
     approver_is_active: true,
     decision: 'pending',
     comment: null,
@@ -560,9 +561,10 @@ describe('ApprovalSection', () => {
     expect(button('Approve')!.className).toContain(VARIANTS.primary)
   })
 
-  // Names aren't unique, and a deactivated approver is marked (traps: a confirmation that names
-  // people). Bug: a deactivated approver named as if active.
-  it('marks a deactivated approver among those Approve by hand goes past', async () => {
+  // Names aren't unique, so each comes with their email, and a deactivated approver is marked
+  // (traps: a confirmation that names people; TD-124). Bug: a name alone, or a deactivated
+  // approver named as if active.
+  it('names those Approve by hand goes past with their email, a deactivated one marked', async () => {
     mountSection(
       requirement(),
       request({
@@ -579,7 +581,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
 
     expect(dialogOpen()!.textContent).toContain(
-      'without a decision from Vera Viewer, Dee Gone (deactivated).',
+      'without a decision from Vera Viewer (vera@example.test), Dee Gone (dee@example.test, deactivated).',
     )
   })
 
@@ -603,7 +605,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
     // Bug: the approvers it goes past unnamed, or the risky path in the everyday tone (1b).
     expect(dialogOpen()!.textContent).toContain(
-      'The pending request is cancelled, without a decision from Vera Viewer.',
+      'The pending request is cancelled, without a decision from Vera Viewer (vera@example.test).',
     )
     expect(confirmButton('Approve').className).toContain(VARIANTS.danger)
     await confirmIt('Approve')

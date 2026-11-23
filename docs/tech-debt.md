@@ -488,18 +488,6 @@ Entry format:
 - **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
 - **Status:** open
 
-### TD-120: Three code comments still put GitHub in Slice 7
-- **Added:** DC-2026-11-19 (DL-393 moved GitHub to Slice 8)
-- **What:** `backend/app/core/request_guard.py` (the exemption comment),
-  `backend/tests/unit/core/test_request_guard.py` (a docstring), and
-  `backend/tests/unit/rules/test_modules.py` (a docstring and a comment, a spec test) say Slice 7
-  for GitHub.
-- **Why:** comments only, in built code and a spec test, which a design change doesn't touch; the
-  spec test's change needs the owner's approval.
-- **Fix by:** Slice 3 (the first Package 4 row, S3-C0r, with the owner's approval for the spec
-  test's comment)
-- **Status:** open
-
 ### TD-121: The panel's two-column grids follow the window's width, not the panel's
 - **Added:** S3-C0p (Impeccable critique, P2)
 - **What:** the details, the Approval section's list, and edit mode's grid switch to two columns
@@ -529,16 +517,6 @@ Entry format:
 - **Fix by:** S3-C33 (the slice's tech-debt review): pass the action's verb in
 - **Status:** open
 
-### TD-124: Approve by hand's confirmation names the bypassed approvers without their email
-- **Added:** S3-C0p (ui-reviewer finding 4)
-- **What:** the confirmation names the approvers still to decide, marking a deactivated one, but
-  not by email, which a confirmation that names people shows (traps: names aren't unique).
-  `ApprovalRead` carries no email.
-- **Why:** the email needs an API change, and S3-C0p is frontend only (DL-395).
-- **Fix by:** S3-C0r, first (moved from S3-C0q by the owner, to keep S3-C0q to History and the
-  status menu): add the approver's email to `ApprovalRead` and show it
-- **Status:** open
-
 ### TD-125: Tests that time out on the owner's machine, not on CI
 - **Added:** S3-C0q
 - **What:** on the owner's WSL machine (4 cores, 5.7 GiB):
@@ -557,10 +535,10 @@ Entry format:
   (DL-398).
 - **Why:** the tests and their limits are outside S3-C0q's scope; the owner chose to log them
   (the two 5 s ones added on Nov 22, after the gate's run at close).
-- **Fix by:** S3-C0r, with TD-124 (DL-398): give the four tests explicit, longer limits, each
-  with a one-line reason, so the local gate goes green on the slower machine. Then, with no
-  slice set yet (the owner's, for later): make them cheaper there (fewer rows drawn in jsdom;
-  the e2e split in two)
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks when): make them cheaper on
+  that machine (fewer rows drawn in jsdom; the e2e split in two). S3-C0r gave the four explicit,
+  longer limits, each with its reason (DL-398): 120 s for the tree's, 15 s for the two 5 s ones,
+  60 s for the e2e
 - **Status:** open
 
 ---
@@ -967,3 +945,14 @@ Entry format:
 - **Added:** S3-C0g
 - **Status:** resolved in S3-C0j: the bar only on the current link, the others padded by its
   width; `shell.spec.ts` checks under forced colors that only the current link has it
+
+### TD-120: Three code comments still put GitHub in Slice 7
+- **Added:** DC-2026-11-19 (DL-393 moved GitHub to Slice 8)
+- **Status:** resolved in S3-C0r: the three say Slice 8, the spec test's comment with the
+  owner's approval (DL-399)
+
+### TD-124: Approve by hand's confirmation names the bypassed approvers without their email
+- **Added:** S3-C0p (ui-reviewer finding 4)
+- **Status:** resolved in S3-C0r: `ApprovalRead` carries `approver_email`, and the confirmation
+  names each approver still to decide as "Name (email)", a deactivated one "Name (email,
+  deactivated)"

@@ -5,10 +5,10 @@ from collections.abc import AsyncIterator
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import URL, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import SessionDep, SessionMaker
+from app.core.db import SessionDep, SessionMaker, create_engine
 from tests.support.models import Widget
 
 pytestmark = [pytest.mark.anyio, pytest.mark.usefixtures("support_tables")]
@@ -86,3 +86,25 @@ async def test_each_request_gets_its_own_transaction(
     await client.post("/widgets/third")
 
     assert await widget_names(session) == ["first", "third"]
+
+
+async def test_a_connection_works_in_utc_whatever_the_servers_zone(test_database_url: URL) -> None:
+    """Bug: the session takes the server's zone, so timestamps come back in it (the outside
+    review's Package 4 item 1). The database's default stands in for the server's: a client
+    setting overrides both. This worker's own database, and its tests run one at a time."""
+    engine = create_engine(test_database_url)
+    alter = f'ALTER DATABASE "{test_database_url.database}"'
+    try:
+        async with engine.connect() as admin:
+            await admin.execution_options(isolation_level="AUTOCOMMIT")
+            await admin.execute(text(f"{alter} SET timezone = 'America/New_York'"))
+        await engine.dispose()  # the next connection is new, so it reads the default
+        async with engine.connect() as connection:
+            zone = await connection.scalar(text("SHOW timezone"))
+    finally:
+        async with engine.connect() as admin:
+            await admin.execution_options(isolation_level="AUTOCOMMIT")
+            await admin.execute(text(f"{alter} RESET timezone"))
+        await engine.dispose()
+
+    assert zone == "UTC"

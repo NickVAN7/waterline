@@ -34,6 +34,8 @@ class ApprovalRead(BaseModel):
     id: uuid.UUID
     approver_id: uuid.UUID
     approver_name: str
+    # Names aren't unique: a confirmation that names approvers shows each with this (TD-124).
+    approver_email: str
     approver_is_active: bool
     decision: ApprovalDecision
     comment: str | None

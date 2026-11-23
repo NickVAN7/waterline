@@ -57,8 +57,11 @@ async def admin(client: AsyncClient, t: Tenancy) -> User:
     return user
 
 
-async def member(t: Tenancy, name: str, role: ProjectRole = ProjectRole.VIEWER) -> User:
-    user = await UserFactory.create_async(name=name, is_system_admin=False, is_active=True)
+async def member(
+    t: Tenancy, name: str, role: ProjectRole = ProjectRole.VIEWER, *, email: str | None = None
+) -> User:
+    named = {"email": email} if email else {}
+    user = await UserFactory.create_async(name=name, is_system_admin=False, is_active=True, **named)
     await ProjectMembershipFactory.create_async(project=t.project, user=user, role=role)
     return user
 
@@ -320,6 +323,24 @@ async def test_a_deactivated_approver_with_access_is_a_422(
 
     assert field_error(response) == (422, ["body", "approver_ids"], "account_inactive")
     assert (await session.scalars(select(ApprovalRequest.id))).all() == []
+
+
+async def test_each_approver_comes_with_their_own_email(
+    client: AsyncClient, t: Tenancy, admin: User
+) -> None:
+    """Bug: a confirmation names approvers by name alone, and names aren't unique (TD-124), or an
+    approver shown with another's email."""
+    await requirement(t)
+    vera = await member(t, "Vera Viewer", email="vera@example.test")
+    max_ = await member(t, "Max Member", ProjectRole.MEMBER, email="max@example.test")
+
+    response = await client.post(REQUESTS, json=ask(vera, max_))
+
+    assert response.status_code == 201
+    assert [(a["approver_name"], a["approver_email"]) for a in response.json()["approvals"]] == [
+        ("Vera Viewer", "vera@example.test"),
+        ("Max Member", "max@example.test"),
+    ]
 
 
 async def test_an_approver_named_twice_is_a_422(

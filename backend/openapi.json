@@ -7160,6 +7160,10 @@
             "type": "string",
             "title": "Approver Name"
           },
+          "approver_email": {
+            "type": "string",
+            "title": "Approver Email"
+          },
           "approver_is_active": {
             "type": "boolean",
             "title": "Approver Is Active"
@@ -7196,6 +7200,7 @@
           "id",
           "approver_id",
           "approver_name",
+          "approver_email",
           "approver_is_active",
           "decision",
           "comment",

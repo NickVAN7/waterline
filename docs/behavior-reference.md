@@ -217,8 +217,9 @@ approval has been requested." A project admin can:
 - **Approve by hand:** after you confirm, the requirement is approved at its current revision
   without a request, with you as the approver (to record a sign-off made outside Waterline). A
   pending request is cancelled: the confirmation says so, names the approvers who haven't
-  decided, and asks in the danger tone. On a requirement without an "Acceptance Criteria" heading, the
-  confirmation warns that it has no acceptance criteria; you can still approve.
+  decided, each with their email, and asks in the danger tone. On a requirement without an
+  "Acceptance Criteria" heading, the confirmation warns that it has no acceptance criteria; you
+  can still approve.
 
 If the requirement changed after approval was requested, a warning says approvers still decide
 on the requested revision; cancel and request again to have them review the latest. If an

@@ -314,6 +314,8 @@ test('creating a requirement: the editor and its Preview, its full page, then ed
 test("a requirement's side panel and page: a stored payload doesn't run, and its status changes", async ({
   page,
 }, testInfo) => {
+  // 60 s: about 33 s on a 4-core machine, past the 30 s default; 8 s on CI (TD-125).
+  test.setTimeout(60_000)
   const { user, key } = runFor(testInfo)
   await signIn(page, user)
   const payload = [

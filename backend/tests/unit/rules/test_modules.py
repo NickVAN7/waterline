@@ -8,7 +8,7 @@
 - Recommended: the type's defaults from the table, v2 modules included, still listed while not
   available.
 - Available: whether the module's slice has shipped; none has yet (`sprints` ships in Slice 4,
-  `github` in Slice 7).
+  `github` in Slice 8).
 """
 
 import pytest
@@ -21,7 +21,7 @@ from app.rules.modules import is_available, recommended_modules, seed_modules
 @pytest.mark.parametrize(
     ("project_type", "expected"),
     [
-        # `sprints` and `github` haven't shipped (Slices 4 and 7): seeding skips them (DL-136).
+        # `sprints` and `github` haven't shipped (Slices 4 and 8): seeding skips them (DL-136).
         (ProjectType.SOFTWARE, []),
         # The erp defaults are all v2: seeding skips them (design-doc §1.1).
         (ProjectType.ERP, []),
