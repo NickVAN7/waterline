@@ -7174,7 +7174,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PhaseMove"
+                "$ref": "#/components/schemas/ItemMove"
               }
             }
           }
@@ -7605,7 +7605,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WorkstreamMove"
+                "$ref": "#/components/schemas/ItemMove"
               }
             }
           }
@@ -8755,6 +8755,98 @@
           }
         }
       }
+    },
+    "/api/projects/{key}/tasks/{number}/move": {
+      "post": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Move Task",
+        "description": "Put the task just after `after_id` or just before `before_id` in the project's order, or\nat the bottom; with `status`, into that board column too, the transition checked first (403,\nnothing saved). 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`).",
+        "operationId": "move_task_api_projects__key__tasks__number__move_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskMove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9721,6 +9813,37 @@
         ],
         "title": "HealthRead",
         "description": "A healthy response. When the database is unreachable the endpoint returns 503 with the\nstandard error body instead (`service_unavailable`)."
+      },
+      "ItemMove": {
+        "properties": {
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          }
+        },
+        "type": "object",
+        "title": "ItemMove",
+        "description": "`POST …/{id}/move`: just after `after_id` or just before `before_id`, or with neither at\nthe bottom."
       },
       "MeOrg": {
         "properties": {
@@ -11227,37 +11350,6 @@
         ],
         "title": "PhaseList",
         "description": "The project's phases in `(rank, id)` order: complete up to 2,000, with `truncated`\nabove it (DL-159)."
-      },
-      "PhaseMove": {
-        "properties": {
-          "after_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "After Id"
-          },
-          "before_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Before Id"
-          }
-        },
-        "type": "object",
-        "title": "PhaseMove",
-        "description": "`POST …/phases/{id}/move`: just after `after_id` or just before `before_id`, or with\nneither at the bottom (design-doc §6, \"Manual ordering\")."
       },
       "PhaseRead": {
         "properties": {
@@ -13519,6 +13611,47 @@
         "title": "TaskList",
         "description": "The project's tasks, the matches of the declared filters in the requested display order\n(rank by default): complete up to 2,000, with `truncated` above it (DL-159, DL-351)."
       },
+      "TaskMove": {
+        "properties": {
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "TaskMove",
+        "description": "`POST …/tasks/{number}/move`: the place in the project's one order (DL-345), and for a\ncross-column drop on the board the new `status`, both in one request: the transition is\nchecked first, and nothing is saved if it's denied (design-doc §6, \"Manual ordering\")."
+      },
       "TaskRead": {
         "properties": {
           "id": {
@@ -14709,37 +14842,6 @@
         ],
         "title": "WorkstreamList",
         "description": "The project's workstreams in `(rank, id)` order: complete up to 2,000, with `truncated`\nabove it (DL-159)."
-      },
-      "WorkstreamMove": {
-        "properties": {
-          "after_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "After Id"
-          },
-          "before_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Before Id"
-          }
-        },
-        "type": "object",
-        "title": "WorkstreamMove",
-        "description": "`POST …/workstreams/{id}/move`: just after `after_id` or just before `before_id`, or with\nneither at the bottom (design-doc §6, \"Manual ordering\")."
       },
       "WorkstreamRead": {
         "properties": {

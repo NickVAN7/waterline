@@ -26,14 +26,6 @@ class WorkstreamUpdate(BaseModel):
     lead_id: uuid.UUID | None = None
 
 
-class WorkstreamMove(BaseModel):
-    """`POST …/workstreams/{id}/move`: just after `after_id` or just before `before_id`, or with
-    neither at the bottom (design-doc §6, "Manual ordering")."""
-
-    after_id: uuid.UUID | None = None
-    before_id: uuid.UUID | None = None
-
-
 class WorkstreamListQuery(BaseModel):
     """Archived workstreams are hidden unless `include_archived` (build plan, "API
     conventions"); any other parameter is a 422."""

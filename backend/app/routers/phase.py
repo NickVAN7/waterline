@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, Response, status
 from app.authz.actions import Action
 from app.core.db import SessionDep
 from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_phase, load_project
-from app.schemas.phase import PhaseCreate, PhaseList, PhaseMove, PhaseRead, PhaseUpdate
+from app.schemas.move import ItemMove
+from app.schemas.phase import PhaseCreate, PhaseList, PhaseRead, PhaseUpdate
 from app.services.phase import PhaseEntity, PhaseService
 from app.services.project import ProjectEntity
 
@@ -62,7 +63,7 @@ async def delete_phase(phase: Managed, ctx: AuthzContextDep, session: SessionDep
 
 @router.post("/projects/{key}/phases/{phase_id}/move", responses=ERRORS)
 async def move_phase(
-    phase: Managed, body: PhaseMove, ctx: AuthzContextDep, session: SessionDep
+    phase: Managed, body: ItemMove, ctx: AuthzContextDep, session: SessionDep
 ) -> PhaseRead:
     """Put the phase just after `after_id` or just before `before_id`, or at the bottom. 422
     on `after_id` or `before_id` (`not_found`) and on both (`conflict`)."""

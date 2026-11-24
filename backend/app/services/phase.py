@@ -14,11 +14,13 @@ from app.core.errors import NotFoundError, ValidationFailedError
 from app.enums import ActivityAction, ActivityEntityType, ActivityField
 from app.models.phase import Phase
 from app.models.project import Project
-from app.repositories.base import direct_update
+from app.repositories.base import write_ranks
 from app.repositories.phase import PhaseRepository
 from app.repositories.project import ProjectRepository
 from app.rules.rank import place, rank_between
-from app.schemas.phase import PhaseCreate, PhaseItem, PhaseList, PhaseMove, PhaseRead, PhaseUpdate
+from app.schemas.move import ItemMove
+from app.schemas.phase import PhaseCreate, PhaseItem, PhaseList, PhaseRead, PhaseUpdate
+from app.services.ordering import anchor_position
 from app.services.user import required_error
 
 type PhaseEntity = Phase
@@ -166,34 +168,17 @@ class PhaseService:
         await self.session.delete(phase)
         await self.session.flush()
 
-    async def move(self, ctx: AuthzContext, phase: Phase, values: PhaseMove) -> PhaseRead:
+    async def move(self, ctx: AuthzContext, phase: Phase, values: ItemMove) -> PhaseRead:
         """Put the phase just after `after_id` or just before `before_id`, or at the bottom.
         422 on `after_id` or `before_id` (`not_found`: not another phase of the project) and on
         `before_id` with both (`conflict`). A drop with no rank between its neighbors (a tie, or
         past 255 characters) rewrites the project's phase order. Not logged (design-doc §10)."""
-        if values.after_id is not None and values.before_id is not None:
-            raise ValidationFailedError.on(
-                ("body", "before_id"), "Give after_id or before_id, not both.", "conflict"
-            )
         project = await self._project(phase)
         # Moves in a project run one at a time, so two can't compute ranks from the same order.
         await ProjectRepository(self.session).lock_order(project)
         if not await self.repository.lock(phase):
             raise NotFoundError
         others = await self.repository.others(project.id, excluding=phase.id)
-        ids = [id_ for id_, _ in others]
-        position = len(ids)
-        for field, anchor, offset in (
-            ("after_id", values.after_id, 1),
-            ("before_id", values.before_id, 0),
-        ):
-            if anchor is None:
-                continue
-            if anchor not in ids:
-                raise ValidationFailedError.on(
-                    ("body", field), "That isn't another phase of this project.", "not_found"
-                )
-            position = ids.index(anchor) + offset
-        for id_, rank in place(others, [phase.id], position):
-            await direct_update(self.session, Phase, id_, {"rank": rank}, touch_updated_at=False)
+        position = anchor_position([id_ for id_, _ in others], values, noun="phase")
+        await write_ranks(self.session, Phase, place(others, [phase.id], position))
         return await self.read(ctx, phase)

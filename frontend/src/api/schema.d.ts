@@ -1595,6 +1595,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/tasks/{number}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Task
+         * @description Put the task just after `after_id` or just before `before_id` in the project's order, or
+         *     at the bottom; with `status`, into that board column too, the transition checked first (403,
+         *     nothing saved). 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`).
+         */
+        post: operations["move_task_api_projects__key__tasks__number__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1977,6 +1999,17 @@ export interface components {
              * @constant
              */
             database: "ok";
+        };
+        /**
+         * ItemMove
+         * @description `POST …/{id}/move`: just after `after_id` or just before `before_id`, or with neither at
+         *     the bottom.
+         */
+        ItemMove: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
         };
         /**
          * MeOrg
@@ -2591,17 +2624,6 @@ export interface components {
             items: components["schemas"]["PhaseItem"][];
             /** Truncated */
             truncated: boolean;
-        };
-        /**
-         * PhaseMove
-         * @description `POST …/phases/{id}/move`: just after `after_id` or just before `before_id`, or with
-         *     neither at the bottom (design-doc §6, "Manual ordering").
-         */
-        PhaseMove: {
-            /** After Id */
-            after_id?: string | null;
-            /** Before Id */
-            before_id?: string | null;
         };
         /**
          * PhaseRead
@@ -3424,6 +3446,19 @@ export interface components {
             truncated: boolean;
         };
         /**
+         * TaskMove
+         * @description `POST …/tasks/{number}/move`: the place in the project's one order (DL-345), and for a
+         *     cross-column drop on the board the new `status`, both in one request: the transition is
+         *     checked first, and nothing is saved if it's denied (design-doc §6, "Manual ordering").
+         */
+        TaskMove: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            status?: components["schemas"]["TaskStatus"] | null;
+        };
+        /**
          * TaskRead
          * @description One task, with what the caller may do to it: `allowed_actions`, and `allowed_transitions`,
          *     the statuses design-doc §5's table lets them move it to (a hint; the update checks).
@@ -3810,17 +3845,6 @@ export interface components {
             items: components["schemas"]["WorkstreamItem"][];
             /** Truncated */
             truncated: boolean;
-        };
-        /**
-         * WorkstreamMove
-         * @description `POST …/workstreams/{id}/move`: just after `after_id` or just before `before_id`, or with
-         *     neither at the bottom (design-doc §6, "Manual ordering").
-         */
-        WorkstreamMove: {
-            /** After Id */
-            after_id?: string | null;
-            /** Before Id */
-            before_id?: string | null;
         };
         /**
          * WorkstreamRead
@@ -8589,7 +8613,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PhaseMove"];
+                "application/json": components["schemas"]["ItemMove"];
             };
         };
         responses: {
@@ -8896,7 +8920,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["WorkstreamMove"];
+                "application/json": components["schemas"]["ItemMove"];
             };
         };
         responses: {
@@ -9347,6 +9371,69 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TaskRestrictionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_task_api_projects__key__tasks__number__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskMove"];
             };
         };
         responses: {

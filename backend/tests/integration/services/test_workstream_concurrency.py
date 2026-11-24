@@ -17,8 +17,9 @@ from app.models.project import Project
 from app.models.requirement import Requirement
 from app.models.user import User
 from app.models.workstream import Workstream
+from app.schemas.move import ItemMove
 from app.schemas.requirement import RequirementUpdate
-from app.schemas.workstream import WorkstreamCreate, WorkstreamMove, WorkstreamUpdate
+from app.schemas.workstream import WorkstreamCreate, WorkstreamUpdate
 from app.services.project_members import ProjectMemberService
 from app.services.requirement import RequirementService
 from app.services.workstream import WorkstreamService
@@ -149,7 +150,7 @@ async def test_two_moves_into_one_gap_get_different_ranks(concurrency: SessionMa
 
     async def move(session: AsyncSession, index: int) -> str:
         loaded = await session.get_one(Workstream, moved[index])
-        body = WorkstreamMove(after_id=a.id)
+        body = ItemMove(after_id=a.id)
         return await outcome(WorkstreamService(session).move(ctx, loaded, body))
 
     outcomes = await run_in_parallel(concurrency, 2, move)

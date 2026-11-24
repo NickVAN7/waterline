@@ -29,12 +29,13 @@ from app.enums import (
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
+from app.repositories.base import write_ranks
 from app.repositories.project import ProjectRepository
 from app.repositories.requirement import RequirementRepository
 from app.repositories.task import TaskRepository
 from app.repositories.user import UserRepository
 from app.rules.branch_name import branch_name
-from app.rules.rank import rank_between
+from app.rules.rank import place, rank_between
 from app.rules.restriction import Restriction, effective
 from app.rules.task_transitions import TaskPeople, allowed_transitions, may_transition
 from app.rules.task_types import task_types
@@ -42,11 +43,13 @@ from app.schemas.task import (
     TaskCreate,
     TaskItem,
     TaskList,
+    TaskMove,
     TaskRead,
     TaskRestrictionUpdate,
     TaskUpdate,
 )
 from app.services.numbering import NumberingService
+from app.services.ordering import anchor_position
 from app.services.phase import PhaseService
 from app.services.project import (
     check_item_restriction,
@@ -366,6 +369,50 @@ class TaskService:
                 field=field,
                 old=old,
                 new=new,
+            )
+        return await self.read(ctx, task)
+
+    async def move(self, ctx: AuthzContext, task: Task, values: TaskMove) -> TaskRead:
+        """Put the task just after `after_id` or just before `before_id` in the project's one
+        order, or at the bottom, and with `status` move it to that column too (design-doc §6).
+        The transition is checked first (403, nothing saved); 422 on `after_id` or `before_id`
+        (`not_found`) and on both (`conflict`). A drop with no rank between its neighbors (a
+        tie, or past 255 characters) rewrites the project's whole task order in one statement
+        (DL-345). The rank write bumps no `version`; a status change is an edit (logged)."""
+        project = await self._project(task)
+        # Moves in a project run one at a time, under the tree's lock (DL-345), then the row.
+        await ProjectRepository(self.session).lock_order(project)
+        await self._lock_live(task)
+        target = project_target(project, task)
+        # Checked again under the lock, which reads the project again (TD-80).
+        ensure(ctx, Action.TASK_UPDATE, target)
+        old_status = task.status
+        # Staying in the same column is no transition.
+        new_status = values.status if values.status is not old_status else None
+        if new_status is not None and not may_transition(
+            old_status,
+            new_status,
+            actor_id=ctx.user_id,
+            people=TaskPeople(task.assignee_id, task.reviewer_id),
+            is_project_admin=authorize(ctx, Action.TASK_REASSIGN_REPORTER, target),
+        ):
+            raise ForbiddenError
+        others = await self.repository.others(project.id, excluding=task.id)
+        position = anchor_position([id_ for id_, _ in others], values, noun="task")
+        await write_ranks(self.session, Task, place(others, [task.id], position))
+        if new_status is not None:
+            task.status = new_status
+            await self.session.flush()
+            log_change(
+                self.session,
+                project_id=project.id,
+                entity_type=ActivityEntityType.TASK,
+                entity_id=task.id,
+                action=ActivityAction.UPDATED,
+                changed_by=ctx.user_id,
+                field=ActivityField.STATUS,
+                old=old_status,
+                new=new_status,
             )
         return await self.read(ctx, task)
 

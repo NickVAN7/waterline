@@ -7,7 +7,14 @@ from fastapi import APIRouter, Depends, Query, status
 from app.authz.actions import Action
 from app.core.db import SessionDep
 from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_project, load_task
-from app.schemas.task import TaskCreate, TaskList, TaskRead, TaskRestrictionUpdate, TaskUpdate
+from app.schemas.task import (
+    TaskCreate,
+    TaskList,
+    TaskMove,
+    TaskRead,
+    TaskRestrictionUpdate,
+    TaskUpdate,
+)
 from app.services.project import ProjectEntity
 from app.services.task import TASKS, TaskEntity, TaskService
 
@@ -65,3 +72,13 @@ async def set_task_restriction(
     `task.raise_restriction`, a lower `task.lower_restriction` (403); 422 on `level`
     (`below_project`) and `categories` (`project_only`)."""
     return await TaskService(session).set_restriction(ctx, task, body)
+
+
+@router.post("/projects/{key}/tasks/{number}/move", responses=ERRORS)
+async def move_task(
+    task: Updated, body: TaskMove, ctx: AuthzContextDep, session: SessionDep
+) -> TaskRead:
+    """Put the task just after `after_id` or just before `before_id` in the project's order, or
+    at the bottom; with `status`, into that board column too, the transition checked first (403,
+    nothing saved). 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`)."""
+    return await TaskService(session).move(ctx, task, body)

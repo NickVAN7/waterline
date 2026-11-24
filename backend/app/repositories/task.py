@@ -41,3 +41,15 @@ class TaskRepository:
             .with_for_update()
             .execution_options(populate_existing=True, **{INCLUDE_DELETED: True})
         )
+
+    async def others(
+        self, project_id: uuid.UUID, *, excluding: uuid.UUID
+    ) -> list[tuple[uuid.UUID, str]]:
+        """The project's other live tasks, `(id, rank)` in `(rank, id)` order: the one order
+        the backlog and every board column share (DL-345)."""
+        rows = await self.session.execute(
+            select(Task.id, Task.rank)
+            .where(Task.project_id == project_id, Task.id != excluding)
+            .order_by(Task.rank, Task.id)
+        )
+        return [(id_, rank) for id_, rank in rows]

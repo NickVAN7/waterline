@@ -13,7 +13,8 @@ from app.authz.context import AuthzContext
 from app.core.db import SessionMaker
 from app.core.errors import NotFoundError
 from app.models.phase import Phase
-from app.schemas.phase import PhaseMove, PhaseUpdate
+from app.schemas.move import ItemMove
+from app.schemas.phase import PhaseUpdate
 from app.services.phase import PhaseService
 from tests.factories.org import OrganizationFactory
 from tests.factories.phase import PhaseFactory
@@ -49,7 +50,7 @@ async def test_two_moves_into_one_gap_get_different_ranks(concurrency: SessionMa
 
     async def move(session: AsyncSession, index: int) -> str:
         loaded = await session.get_one(Phase, moved[index])
-        return await outcome(PhaseService(session).move(ctx, loaded, PhaseMove(after_id=a.id)))
+        return await outcome(PhaseService(session).move(ctx, loaded, ItemMove(after_id=a.id)))
 
     outcomes = await run_in_parallel(concurrency, 2, move)
 
@@ -103,7 +104,7 @@ async def rename(service: PhaseService, ctx: AuthzContext, phase: Phase) -> obje
 
 
 async def move_last(service: PhaseService, ctx: AuthzContext, phase: Phase) -> object:
-    return await service.move(ctx, phase, PhaseMove())
+    return await service.move(ctx, phase, ItemMove())
 
 
 @pytest.mark.concurrency(*TABLES)

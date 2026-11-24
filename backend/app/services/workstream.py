@@ -15,19 +15,20 @@ from app.core.errors import NotFoundError, ValidationFailedError
 from app.models.project import Project
 from app.models.user import User
 from app.models.workstream import Workstream
-from app.repositories.base import direct_update
+from app.repositories.base import write_ranks
 from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
 from app.repositories.workstream import WorkstreamRepository
 from app.rules.rank import place, rank_between
+from app.schemas.move import ItemMove
 from app.schemas.workstream import (
     WorkstreamCreate,
     WorkstreamItem,
     WorkstreamList,
-    WorkstreamMove,
     WorkstreamRead,
     WorkstreamUpdate,
 )
+from app.services.ordering import anchor_position
 from app.services.roster import check_lead
 from app.services.user import required_error
 
@@ -174,35 +175,16 @@ class WorkstreamService:
         return await self.read(ctx, workstream)
 
     async def move(
-        self, ctx: AuthzContext, workstream: Workstream, values: WorkstreamMove
+        self, ctx: AuthzContext, workstream: Workstream, values: ItemMove
     ) -> WorkstreamRead:
         """Put the workstream just after `after_id` or just before `before_id`, or at the bottom,
         among all of the project's, archived included. 422 on `after_id` or `before_id`
         (`not_found`: not another of the project's) and on `before_id` with both
         (`conflict`)."""
-        if values.after_id is not None and values.before_id is not None:
-            raise ValidationFailedError.on(
-                ("body", "before_id"), "Give after_id or before_id, not both.", "conflict"
-            )
         project = await self._project(workstream)
         # Moves in a project run one at a time, so two can't compute ranks from the same order.
         await ProjectRepository(self.session).lock_order(project)
         others = await self.repository.others(project.id, excluding=workstream.id)
-        ids = [id_ for id_, _ in others]
-        position = len(ids)
-        for field, anchor, offset in (
-            ("after_id", values.after_id, 1),
-            ("before_id", values.before_id, 0),
-        ):
-            if anchor is None:
-                continue
-            if anchor not in ids:
-                raise ValidationFailedError.on(
-                    ("body", field), "That isn't another workstream of this project.", "not_found"
-                )
-            position = ids.index(anchor) + offset
-        for id_, rank in place(others, [workstream.id], position):
-            await direct_update(
-                self.session, Workstream, id_, {"rank": rank}, touch_updated_at=False
-            )
+        position = anchor_position([id_ for id_, _ in others], values, noun="workstream")
+        await write_ranks(self.session, Workstream, place(others, [workstream.id], position))
         return await self.read(ctx, workstream)

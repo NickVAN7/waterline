@@ -669,7 +669,11 @@ Every call says whether `updated_at` moves, with the required `touch_updated_at`
 revision pointer and items lifted by a project raise (nobody edited them); a counter write such
 as adding a subtask, an item's own restriction change, and a parent change pass `True`. It returns the new values (so `{"next_subtask_number": Task.next_subtask_number + 1}`
 works as a counter), or `None` if no row has that id, and writes every changed column onto the
-object if the session has it loaded, so it stays readable without a lazy load.
+object if the session has it loaded, so it stays readable without a lazy load. A move's rank
+writes go through `write_ranks(session, Model, writes)` instead: every row's new rank in one
+`UPDATE … FROM (VALUES …)`, `updated_at` held, however many rows a rewrite takes (DL-345, TD-73);
+a flat list's move resolves its `after_id`/`before_id` with `anchor_position(...)`
+(`app/services/ordering.py`) on the shared `ItemMove` schema (`app/schemas/move.py`).
 
 **List endpoints** (`app/core/lists.py`; build plan, "API conventions", "Lists"). Declare a
 `ListSpec` per list: sortable fields (an allowlist; `id` is always the last tiebreaker), the

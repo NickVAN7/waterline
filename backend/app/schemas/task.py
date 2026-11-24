@@ -21,6 +21,7 @@ from app.schemas.limits import (
     TIME_DECIMAL_PLACES,
     TIME_MAX_DIGITS,
 )
+from app.schemas.move import ItemMove
 
 
 class TaskCreate(BaseModel):
@@ -70,6 +71,14 @@ class TaskUpdate(BaseModel):
     requirement_id: uuid.UUID | None = None
     phase_id: uuid.UUID | None = None
     workstream_id: uuid.UUID | None = None
+
+
+class TaskMove(ItemMove):
+    """`POST …/tasks/{number}/move`: the place in the project's one order (DL-345), and for a
+    cross-column drop on the board the new `status`, both in one request: the transition is
+    checked first, and nothing is saved if it's denied (design-doc §6, "Manual ordering")."""
+
+    status: TaskStatus | None = None
 
 
 class TaskRestrictionUpdate(BaseModel):

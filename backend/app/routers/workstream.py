@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, Query, status
 from app.authz.actions import Action
 from app.core.db import SessionDep
 from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_project, load_workstream
+from app.schemas.move import ItemMove
 from app.schemas.workstream import (
     WorkstreamCreate,
     WorkstreamList,
     WorkstreamListQuery,
-    WorkstreamMove,
     WorkstreamRead,
     WorkstreamUpdate,
 )
@@ -65,7 +65,7 @@ async def update_workstream(
 
 @router.post("/projects/{key}/workstreams/{workstream_id}/move", responses=ERRORS)
 async def move_workstream(
-    workstream: Managed, body: WorkstreamMove, ctx: AuthzContextDep, session: SessionDep
+    workstream: Managed, body: ItemMove, ctx: AuthzContextDep, session: SessionDep
 ) -> WorkstreamRead:
     """Put the workstream just after `after_id` or just before `before_id`, or at the bottom.
     422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`)."""

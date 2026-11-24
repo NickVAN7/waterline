@@ -13,7 +13,7 @@ from app.models.phase import Phase
 from app.models.project import Project
 from app.models.requirement import Requirement
 from app.models.task import Task
-from app.schemas.task import TaskCreate, TaskRestrictionUpdate
+from app.schemas.task import TaskCreate, TaskMove, TaskRestrictionUpdate
 from app.services.phase import PhaseService
 from app.services.project import ProjectService
 from app.services.requirement import RequirementService
@@ -24,10 +24,11 @@ from tests.factories.project import ProjectFactory
 from tests.factories.requirement import RequirementFactory
 from tests.factories.task import TaskFactory
 from tests.factories.user import UserFactory
+from tests.integration.services.test_requirement_concurrency import outcome
 from tests.integration.services.test_requirement_delete_concurrency import raise_project
 from tests.integration.services.test_restriction_concurrency import Change, race
 from tests.integration.services.test_workstream_concurrency import blocked_then_released
-from tests.support.concurrency import committing_factories
+from tests.support.concurrency import committing_factories, run_in_parallel
 
 pytestmark = pytest.mark.anyio
 
@@ -184,3 +185,61 @@ async def test_a_restriction_change_waiting_on_a_project_raise_checks_the_new_le
     )
 
     assert refused == ["below_project"]
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_two_moves_into_one_gap_get_different_ranks(concurrency: SessionMaker) -> None:
+    """C and D both after A at once: without the order lock each computes the rank between A
+    and B from the same order, and they tie (DL-345: task moves one at a time per project)."""
+    ctx, project = await a_project(concurrency)
+    async with committing_factories(concurrency):
+        a, _b, c, d = [
+            await TaskFactory.create_async(
+                project=project, number=n, rank=rank, reporter_id=ctx.user_id
+            )
+            for n, rank in ((1, "i0"), (2, "i1"), (3, "i2"), (4, "i3"))
+        ]
+    moved = [c.id, d.id]
+
+    async def move(session: AsyncSession, index: int) -> str:
+        loaded = await session.get_one(Task, moved[index])
+        body = TaskMove(after_id=a.id)
+        return await outcome(TaskService(session).move(ctx, loaded, body))
+
+    outcomes = await run_in_parallel(concurrency, 2, move)
+
+    async with concurrency() as check:
+        distinct_ranks = await check.scalar(select(func.count(func.distinct(Task.rank))))
+    assert (outcomes, distinct_ranks) == (["ok", "ok"], 4)
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_a_move_waiting_on_an_archive_is_refused(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """The move is checked again under the order lock, which reads the project again (TD-80):
+    an archive that committed while it waited takes the right away. The router's check, made
+    before the wait, can't see it."""
+    ctx, project = await a_project(concurrency)
+    async with committing_factories(concurrency):
+        one, two = [
+            await TaskFactory.create_async(
+                project=project, number=n, rank=rank, reporter_id=ctx.user_id
+            )
+            for n, rank in ((1, "i0"), (2, "i1"))
+        ]
+
+    async def archive(session: AsyncSession) -> object:
+        return await ProjectService(session).archive(
+            ctx, await session.get_one(Project, project.id)
+        )
+
+    async def move(session: AsyncSession) -> object:
+        loaded = await session.get_one(Task, one.id)
+        return await TaskService(session).move(ctx, loaded, TaskMove(after_id=two.id))
+
+    refused = await race(concurrency, concurrency_engine, first=archive, second=move)
+
+    async with concurrency() as check:
+        rank = await check.scalar(select(Task.rank).where(Task.id == one.id))
+    assert (refused, rank) == (["ForbiddenError"], "i0")

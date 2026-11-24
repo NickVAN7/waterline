@@ -35,7 +35,7 @@ from app.models.requirement import Requirement, RequirementRevision
 from app.models.user import User
 from app.repositories.activity import ActivityRepository
 from app.repositories.approval import ApprovalRepository
-from app.repositories.base import direct_update
+from app.repositories.base import direct_update, write_ranks
 from app.repositories.project import ProjectRepository
 from app.repositories.requirement import RequirementRepository
 from app.repositories.user import UserRepository
@@ -416,15 +416,21 @@ class RequirementService:
         in order). With no room between the neighbors (a tie, or past 255 characters), the
         parent's children are rewritten in order (DL-204, DL-213, DL-218). No `version` bump; a
         placed item's `updated_at` moves when `reparented`."""
-        for id_, rank in place(siblings, placed, position):
-            moved = id_ in placed
-            await direct_update(
-                self.session,
-                Requirement,
-                id_,
-                {"rank": rank, "parent_requirement_id": parent_id} if moved else {"rank": rank},
-                touch_updated_at=moved and reparented,
-            )
+        writes = place(siblings, placed, position)
+        moved = set(placed)
+        for id_, rank in writes:
+            if id_ in moved:
+                await direct_update(
+                    self.session,
+                    Requirement,
+                    id_,
+                    {"rank": rank, "parent_requirement_id": parent_id},
+                    touch_updated_at=reparented,
+                )
+        # The rest of a rewrite in one statement (DL-345, TD-73).
+        await write_ranks(
+            self.session, Requirement, [(id_, rank) for id_, rank in writes if id_ not in moved]
+        )
 
     async def _subtree(
         self, requirement: Requirement, *, deleted_at: datetime | None = None

@@ -36,14 +36,6 @@ class PhaseUpdate(BaseModel):
     status: PhaseStatus | None = None
 
 
-class PhaseMove(BaseModel):
-    """`POST …/phases/{id}/move`: just after `after_id` or just before `before_id`, or with
-    neither at the bottom (design-doc §6, "Manual ordering")."""
-
-    after_id: uuid.UUID | None = None
-    before_id: uuid.UUID | None = None
-
-
 class PhaseItem(BaseModel):
     """A row of the project's phases."""
 

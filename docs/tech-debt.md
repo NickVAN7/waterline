@@ -218,19 +218,6 @@ Entry format:
 - **Fix by:** Slice 8 (the end of v1), or sooner when a project nears 2,000 requirements: then paged (DL-159); reviewed (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
-### TD-73: The rank rewrite sends one UPDATE per sibling
-- **Added:** S2-C7 (checkpoint-reviewer finding 4)
-- **What:** a move with no rank between its neighbors (a tie or the 255-character cap, DL-204,
-  DL-213) rewrites the parent's children with one `direct_update` each, so a rewrite among the
-  tree's cap of 2,000 top-level requirements is about 2,000 round trips under the project's
-  tree lock (DL-214), holding up other moves in that project for a second or two. The phase
-  order's rewrite (S3-C3, `PhaseService.move`) is the same, one `direct_update` per phase.
-- **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
-  statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
-  helper that does it now.
-- **Fix by:** S3-C7 (one statement, shared with the task order's rewrite, DL-345)
-- **Status:** open
-
 ### TD-76: The revision feed has no `(requirement_id, id)` index
 - **Added:** S2-C9
 - **What:** the build plan's feeds have `(scope, id)` indexes ("API conventions"); the revision
@@ -581,16 +568,6 @@ Entry format:
 
 ---
 
-### TD-131: The phase and workstream moves resolve their anchors in two copies
-- **Added:** S3-C4 (checkpoint-reviewer finding 6)
-- **What:** both moves refuse `after_id` with `before_id` (`conflict`) and turn the anchor into a
-  position or a 422 `not_found` in the same 20 lines; `PhaseMove` and `WorkstreamMove` are the
-  same schema. `place()` (TD-130) shares only the rank writes.
-- **Why:** two short copies that agree; the task move is the third user, and its anchors
-  (a board column's cards) may differ, so the shared shape is clearer there.
-- **Fix by:** S3-C7 (the task move takes one shared helper and schema, the two moves with it)
-- **Status:** open
-
 ### TD-132: History names a requirement's workstream change only as "made a change"
 - **Added:** S3-C4 (ui-reviewer note; checkpoint-reviewer question)
 - **What:** a requirement's `workstream_id` change is logged (§10), but the activity service's
@@ -886,6 +863,12 @@ Entry format:
   a move's tree lock, against DL-214; a raise's `FOR UPDATE` still conflicts with it; the
   export-control marking is TD-74)
 
+### TD-73: The rank rewrite sends one UPDATE per sibling
+- **Added:** S2-C7 (checkpoint-reviewer finding 4)
+- **Status:** resolved in S3-C7: `write_ranks()` in `app/repositories/base.py`, one
+  `UPDATE … FROM (VALUES …)` with `updated_at` held, for the tree's, phases', workstreams', and
+  the task order's rewrites (DL-345)
+
 ### TD-74: A new reporter's inherited admin isn't held against marking the project export-controlled
 - **Added:** S2-C8
 - **Status:** resolved in S2-C12 (checkpoint-reviewer pass 2): the edit holds the project, then
@@ -1024,3 +1007,8 @@ Entry format:
 ### TD-130: The phase move copies the requirement move's placement
 - **Added:** S3-C3 (checkpoint-reviewer finding 3)
 - **Status:** resolved in S3-C4: `place()` in `app/rules/rank.py` (test-first, `spec-test-writer`), used by the requirement, phase, and workstream moves
+
+### TD-131: The phase and workstream moves resolve their anchors in two copies
+- **Added:** S3-C4 (checkpoint-reviewer finding 6)
+- **Status:** resolved in S3-C7: `anchor_position()` in `app/services/ordering.py` and the
+  `ItemMove` schema, used by the phase, workstream, and task moves
