@@ -1835,7 +1835,7 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   screen inventory covers their screens, and are re-cut before they start (not a split); a shared
   piece used for the first time gets its own row. The plan's readiness review checks every row.
 - **Supersedes:** none (resolves the "Start of Slice 2 planning" workflow item)
-- **Superseded by:** none
+- **Superseded by:** DL-410, in part (a shared piece is built with its first real consumer)
 - **Applies to:** build plan ("Planning a slice", "Workflow items scheduled")
 - **Source:** chat session (owner, Oct 21, 2026, Slice 2 planning)
 
@@ -5202,3 +5202,17 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C4; design-doc §6 (Workstream); build plan ("The project members API")
 - **Source:** owner, Nov 24, 2026 (chat, S3-C4's questions)
+
+### DL-410: A shared piece is built with its first real consumer; the readiness review is a design-change step
+- **Date:** 2026-11-24
+- **Decision:** The build plan's sizing rule "a shared piece used for the first time gets its own
+  row" gives way to DL-393's "built in the checkpoint of its first real consumer": the
+  requirement picker (S3-C22), the date field (S3-C23), and the Export CSV control (S3-C20) stay
+  in their rows. A slice plan's readiness review (DL-353) is a step in the `design-change` skill,
+  a read-only agent run beside `docs-consistency` on the same snapshot, with no agent file of
+  its own.
+- **Supersedes:** DL-139 in part (the shared piece's own row)
+- **Superseded by:** none
+- **Applies to:** build plan ("Planning a slice", sizing rule 3); `.claude/skills/design-change/SKILL.md`
+  (step 7)
+- **Source:** owner, Nov 24, 2026 (chat, the Slice 3 plan's R4 and docs-consistency decision 5)

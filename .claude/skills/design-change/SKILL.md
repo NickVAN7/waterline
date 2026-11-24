@@ -88,6 +88,13 @@ decision-log entry only when the owner says the look is settled.
 
 ## 7. Check
 
+- **A slice's plan: its readiness review first** (DL-353, DL-410). Take the review snapshot,
+  then invoke a read-only agent (`general-purpose`, told it may not edit) with the plan's rows
+  and the build plan's "Planning a slice" rules, on the snapshot `docs-consistency` reviews,
+  in parallel with it. It returns one finding per row and rule (the rule's number, the row,
+  what's missing or too big); the record lists every finding with its fix, or with "open" and a
+  decision `R<n>` for the owner.
+
 - `uv run wl check` green (and, for tooling code that changes what CI runs,
   `uv run wl check --full`).
 - **A docs-only change** (no tooling code, and not a slice's plan, whose readiness review keeps

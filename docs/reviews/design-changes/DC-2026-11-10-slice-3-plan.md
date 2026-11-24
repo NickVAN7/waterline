@@ -164,3 +164,20 @@ docs state the refined rules.
   design-skill trial), S3-C0k (the backend fields), S3-C0l.
 - **R4.** Shared pieces' first use: a requirement picker (S3-C22), a date field (S3-C23), the
   Export CSV control (S3-C20): into S3-C16 or S3-C17, or rows of their own.
+
+## Owner answers (Nov 24, 2026, chat), applied in design change DL-410
+
+- **R1:** S3-C5, C6, C8, and C9 join the `spec-test-writer` list for their targeted rules; S3-C3
+  and C4 stay on it.
+- **R2:** S3-C5's task list declares `status`, `type`, `priority`, `assignee` (`me`, `none`),
+  `reviewer` (`me`), `workstream`, `phase`, `requirement`, sorts `rank`, `number`, `priority`,
+  `due_date`, `updated_at`; S3-C10's tree declares `status`, `priority`, `workstream`, `reporter`
+  (`me`), approval state, and `has_tasks`, no sorts; S3-C13 adds `task-person-candidates` and
+  `approver-candidates`, and `?q=` with paging on the existing sources. The S3-C0e and S3-C0m
+  parts were decided before (DL-357, DL-379).
+- **R3:** only S3-C9 splits: S3-C9a takes the requirement delete's linked tasks. S3-C10 stays one
+  row; S3-C27 and S3-C29 are re-cut when they start; S3-C0g, C0j, C0k, and C0l were built.
+- **R4:** each shared piece is built in its first consumer's row (DL-393), so the build plan's
+  sizing rule 3 changes (DL-410, superseding DL-139 in part).
+- **docs-consistency 5:** the readiness review is a step in the `design-change` skill (DL-410).
+- **docs-consistency 7:** moot: S3-C0m was built.
