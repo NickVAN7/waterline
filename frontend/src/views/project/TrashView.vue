@@ -29,6 +29,7 @@ import SelectField from '@/components/SelectField.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows } from '@/composables/allowedActions'
+import { messageFor, useActionFailure } from '@/composables/useActionFailure'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useListQuery } from '@/composables/useListQuery'
 import { useLoad } from '@/composables/useLoad'
@@ -94,9 +95,12 @@ const idOf = (row: Item) => `${loaded.value!.key}-RQ-${row.number}`
 // The restored item, linked from the success (DL-290).
 const restored = ref<{ id: string; number: number } | null>(null)
 const done = ref('')
-const failure = ref('')
-const failures = ref(0)
-const failureAlert = ref<InstanceType<typeof Alert>>()
+const {
+  message: failure,
+  count: failures,
+  alert: failureAlert,
+  show: showFailure,
+} = useActionFailure()
 const restoring = ref<string | null>(null)
 // The row whose Restore failed, for the alert's dismiss.
 const failedRow = ref<string | null>(null)
@@ -137,20 +141,18 @@ async function restore(row: Item, index: number) {
     else await focusHeading()
   } catch (error) {
     if (!(error instanceof ApiError)) throw error
-    failures.value += 1
     failedRow.value = row.id
-    failure.value =
-      error.status === 403
-        ? `You don't have permission to restore ${id}.`
-        : error.status === 404
-          ? `${id} isn't in the Trash any more.`
-          : `Couldn't restore ${id}. Try again in a moment.`
     // The content closed to the user: the 403 page has replaced this one, so no list to read.
     if (error.status === 403 && !(await reload(() => allowed.value))) return
     if (error.status === 403 || error.status === 404) await page.run()
     // Its button may be gone with the row or the permission: then the alert takes focus.
-    await nextTick()
-    if (document.activeElement === document.body) failureAlert.value?.focus()
+    await showFailure(
+      messageFor(error.status, {
+        403: `You don't have permission to restore ${id}.`,
+        404: `${id} isn't in the Trash any more.`,
+        other: `Couldn't restore ${id}. Try again in a moment.`,
+      }),
+    )
   } finally {
     restoring.value = null
   }

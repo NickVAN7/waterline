@@ -859,8 +859,9 @@ frontend/src/
                      ConfirmDialog, GroupError, RowActions, MoreActionsMenu, Icon,
                      NameSlugSettings,
                      CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9)
-  composables/       shared logic: useFormErrors, useLoad, useListQuery, usePasswordPolicy,
-                     useAvailability, useRouteOrg, useSettingsSave, useSignOut, useTheme,
+  composables/       shared logic: useFormErrors, useActionFailure, useLoad, useListQuery,
+                     usePasswordPolicy, useAvailability, useRouteOrg, useSettingsSave,
+                     useSignOut, useTheme,
                      useUsernameSuggestion, useWorkspace,
                      temporaryPassword,
                      allowedActions (`allows()`)
@@ -951,6 +952,11 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   part of `loc`), moves the rest into the form's alert, and builds the screen-reader
   announcement; other failures get our own wording (`FORM_MESSAGES`: retry for a network error,
   reload for a 409). See `src/views/auth/SignInView.vue`.
+- **Row and menu actions:** `useActionFailure()` holds the action's alert (its `message`, a
+  `count` that re-keys it so the same words are read again, its `alert` ref); the caller reloads
+  what the failure changed (permissions, the list, the item), then `show(messageFor(status,
+  {403, 404, 409, other}))`, which moves focus to the alert when the control that had it has gone.
+  See `src/views/project/TrashView.vue` (S3-C0x).
 - **Styles:** Tailwind v4 utilities from the tokens (`src/app/styles/tokens.css`, a copy of
   `docs/ui/tokens.css`; a new color pair goes in `docs/ui/check_contrast.py`, which `wl check`
   runs against it through a docs consistency test; by hand,

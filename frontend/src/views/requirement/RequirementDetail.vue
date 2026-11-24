@@ -46,6 +46,7 @@ import MoreActionsMenu, { type MoreAction } from '@/components/MoreActionsMenu.v
 import PageHeader from '@/components/PageHeader.vue'
 import Skeleton from '@/components/Skeleton.vue'
 import { allows } from '@/composables/allowedActions'
+import { messageFor, useActionFailure } from '@/composables/useActionFailure'
 import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { useLoad } from '@/composables/useLoad'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
@@ -173,9 +174,12 @@ async function reload() {
   if (await props.reloadProject()) await item.run()
 }
 
-const failure = ref('')
-const failures = ref(0)
-const failureAlert = ref<InstanceType<typeof Alert>>()
+const {
+  message: failure,
+  count: failures,
+  alert: failureAlert,
+  show: showFailure,
+} = useActionFailure()
 const changing = ref(false)
 const statusMenu = ref<InstanceType<typeof StatusMenu>>()
 
@@ -208,22 +212,21 @@ async function changeStatus(status: Status) {
     announce(`Status: ${statusBadge.value.label}`)
   } catch (error) {
     if (!(error instanceof ApiError)) throw error
-    failures.value += 1
     // "Changing…" may still be on its timer: a fast failure would bring it back after the alert.
     clearTimeout(announcing)
     said.value = ''
-    if (error.status === 409) {
-      // A reload that fails leaves the old data showing: then it isn't the latest.
-      failure.value = (await item.run()) ? CONFLICT : RETRY
-    } else if (error.status === 403) {
-      failure.value = "You don't have permission to change this requirement's status."
-      await reload()
-      // The menu that held focus is gone with the permission: the alert takes it (UI-FRM-7).
-      await nextTick()
-      if (document.activeElement === document.body) failureAlert.value?.focus()
-    } else {
-      failure.value = RETRY
-    }
+    // A 403 reloads what the user may do; a 409 reloads the requirement. If that reload fails,
+    // the old data is still showing, so the message mustn't say it's the latest. The menu that
+    // held focus may be gone with the permission: the alert takes it (UI-FRM-7).
+    if (error.status === 403) await reload()
+    const reloaded = error.status === 409 && (await item.run())
+    await showFailure(
+      messageFor(error.status, {
+        403: "You don't have permission to change this requirement's status.",
+        409: reloaded ? CONFLICT : RETRY,
+        other: RETRY,
+      }),
+    )
   } finally {
     changing.value = false
   }
@@ -270,10 +273,7 @@ async function editRefused() {
   await reload()
   if (allows(requirement.value, 'requirement.update')) return
   editing.value = false
-  failures.value += 1
-  failure.value = "You don't have permission to edit this requirement."
-  await nextTick()
-  if (document.activeElement === document.body) failureAlert.value?.focus()
+  await showFailure("You don't have permission to edit this requirement.")
 }
 // Gone since it loaded (an edit's save or a delete found it gone): the reload brings the
 // not-found page, whose h1 takes focus on a visit's first page too (UI-SHL-9, TD-90), or the

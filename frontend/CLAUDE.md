@@ -13,7 +13,8 @@ what it holds (DL-317).
   permissions or duplicates business rules (send neighbor IDs, not rank values). Two exceptions:
   `PasswordRequirements` (DL-91) and the add-person flow's email-shape check (UI-FRM-4, UI-FRM-13).
 - **Errors** (`{code, message, details}`): 409 → prompt to reload; 404 → `NotFoundView` in
-  place; 422 → field errors from `details.fields`; forms use `useFormErrors`. A 401 and a 403
+  place; 422 → field errors from `details.fields`; forms use `useFormErrors`, a row or menu
+  action's failure `useActionFailure` (TD-129 lists the surfaces not yet on it). A 401 and a 403
   `password_change_required` are the session hook's (`src/app/session.ts`), never a view's.
 - **Rendered markdown** only through `MarkdownView` (markdown-it, raw HTML off, then DOMPurify);
   never `v-html` on anything else; edited only in `MarkdownEditor` (design-doc §3, DL-140,

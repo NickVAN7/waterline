@@ -565,6 +565,19 @@ Entry format:
 - **Fix by:** S3-C33 (the slice's tech-debt review), or a later row the owner picks
 - **Status:** open
 
+### TD-129: Three action surfaces still hand-roll their failure alert
+- **Added:** S3-C0x (DL-406)
+- **What:** `components/RequirementsTree.vue` (the move menu), `views/requirement/ApprovalSection.vue`
+  (the request, cancel, and approve-by-hand actions), and `views/user/SessionsSection.vue` (sign
+  out a session) keep their own failure message, count, alert ref, and focus-if-lost, the
+  pattern `composables/useActionFailure.ts` now holds; `TrashView.vue` and
+  `RequirementDetail.vue` use it.
+- **Why:** DL-406 converts only the two reference views; each other surface changes with the
+  row that next touches it.
+- **Fix by:** S3-C33 (the slice's tech-debt review), or earlier, the row that next touches each
+  surface
+- **Status:** open
+
 ---
 
 ## Resolved
