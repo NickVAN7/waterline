@@ -326,7 +326,8 @@ Sign-in, sign-out, and `/me` are in the `auth` area (`routers/auth.py`, `service
   (`owner=None`, `manage_admins=None`; DL-71): it uses the list, the email-first add (whose
   `admit` hook adds the project's `outside_org` and `join_org` step, DL-78, and returns any details
 for the added event, such as the export-control confirmation, DL-81), and `add_user`; the
-  project service changes roles and removes members itself. Two adds of one person racing: the
+  project members service (`ProjectMemberService`, `app/services/project_members.py`, a
+  subclass of `ProjectService`, S3-C0w) changes roles and removes members itself. Two adds of one person racing: the
   roster turns the loser's unique violation into `already_member` on the field it used (`loc`,
   DL-80). Project member changes lock the project row first, then the membership.
 - **Registered handlers** (below) register when their area's module is imported, at module
@@ -337,7 +338,7 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
 - **Removing a member "with their projects"** calls the handlers registered with
   `register_on_member_removed()` (`app/services/roster.py`), each given a `MemberRemoval`
   (`organization_id` is None for staff). The project area registers one
-  (`ProjectService.remove_with_projects`): it removes the person's memberships on the org's (or
+  (`ProjectMemberService.remove_with_projects`, `app/services/project_members.py`): it removes the person's memberships on the org's (or
   workspace's) projects, archived ones included, clearing a lead, with `via` in each event. Tests
   of what the roster passes stand in for it with the `removals` fixture (`tests/api/conftest.py`).
 - **Changing a project's restriction** calls the handlers registered with
@@ -348,9 +349,10 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
 - **An approval request completing or rejected** calls the handlers registered for its entity
   type with `register_on_approved()` and `register_on_rejected()` (`app/services/approval.py`),
   each given the request and the deciding user. An approvable area registers both (the
-  requirement area: `RequirementService.complete_approval`, which records the approval, and
-  `reject_approval`, which moves a rejected re-open round back to `draft`, DL-195); the decision
-  holds the entity's lock.
+  requirement area: `RequirementApprovalService.complete_approval`
+  (`app/services/requirement_approvals.py`, a subclass of `RequirementService`, S3-C0w), which
+  records the approval, and `reject_approval`, which moves a rejected re-open round back to
+  `draft`, DL-195); the decision holds the entity's lock.
 - **The user check** (`GET /api/workspaces/{id}/user-check`, DL-66) answers one of `email`,
   `username`, or `name`; `suggest_username()` (`app/rules/identifiers.py`) builds the name's
   username, and `UserService.check` adds `-2`, `-3`, … while it's taken.
@@ -726,7 +728,8 @@ adds `restriction_level` (enum `internal` or `confidential`, nullable: null is t
 (`export_controlled` is project-only in v1). `app/rules/restriction.py` has the effective
 restriction (`effective(item, project)`) and whether a change raises or lowers it
 (`change(old, new)`; None ranks as Internal). The project service checks an export-control
-confirmation with `_confirmation(values, needed=..., members=...)`: the 422s
+confirmation with `export_control_confirmation(values, needed=..., members=...)`
+(`app/services/project.py`, used by `project_members.py` too): the 422s
 `confirmation_required`, `members_changed`, and `confirmation_not_needed`, under the project's row
 lock, with the confirmation returned for the audit event (DL-81). `set_restriction` checks its
 rights after taking the project's lock, against the project and the caller's own project role

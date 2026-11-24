@@ -16,7 +16,7 @@ from app.enums import OrgRole, ProjectRole, WorkspaceRole
 from app.models.project import Project, ProjectMembership
 from app.models.workspace import Workspace, WorkspaceMembership
 from app.schemas.project import ProjectMemberAdd
-from app.services.project import ProjectService
+from app.services.project_members import ProjectMemberService
 from app.services.workspace import WorkspaceService
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory
@@ -87,7 +87,7 @@ async def test_two_project_adds_by_user_id_at_once_leave_one_and_report_on_user_
 
     async def add(session: AsyncSession, _index: int) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).add_member(
+        return await ProjectMemberService(session).add_member(
             ctx, loaded, ProjectMemberAdd(user_id=bob.id, role=ProjectRole.MEMBER)
         )
 

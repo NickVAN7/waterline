@@ -22,6 +22,7 @@ from app.services.requirement import (
     RequirementEntity,
     RequirementService,
 )
+from app.services.requirement_approvals import RequirementApprovalService
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
 
@@ -157,13 +158,13 @@ async def load_requirement(
 async def load_approval_request(
     request_id: uuid.UUID, session: SessionDep
 ) -> tuple[ApprovalRequestEntity, Target] | None:
-    return await RequirementService(session).load_approval_request(request_id)
+    return await RequirementApprovalService(session).load_approval_request(request_id)
 
 
 async def load_approval_request_to_decide(
     request_id: uuid.UUID, session: SessionDep
 ) -> tuple[ApprovalRequestEntity, Target] | None:
-    return await RequirementService(session).load_approval_request_to_decide(request_id)
+    return await RequirementApprovalService(session).load_approval_request_to_decide(request_id)
 
 
 async def load_deleted_requirement(

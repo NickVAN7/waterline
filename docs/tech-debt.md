@@ -346,8 +346,8 @@ Entry format:
 
 ### TD-100: The approval-request list builds its page by hand
 - **Added:** S2-C22 (repo-auditor finding 2)
-- **What:** `RequirementService.approval_requests` builds `Page[ApprovalRequestItem](items=…,
-  total=…, limit=…, offset=…)` itself rather than `page.with_items(rows)`, the helper TD-54
+- **What:** `RequirementApprovalService.approval_requests` (`app/services/requirement_approvals.py`)
+  builds `Page[ApprovalRequestItem](items=…, total=…, limit=…, offset=…)` itself rather than `page.with_items(rows)`, the helper TD-54
   added for every list.
 - **Why:** S2-C20 code, fixed only when needed (DL-106); it behaves the same.
 - **Fix by:** Slice 3 (its tech-debt review, S3-C33: no Slice 3 row touches approval reads)

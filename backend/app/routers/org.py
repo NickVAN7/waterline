@@ -21,7 +21,7 @@ from app.schemas.org import (
 )
 from app.schemas.workspace import SlugAvailability
 from app.services.org import MEMBERS, OrgEntity, OrgService
-from app.services.project import ProjectService
+from app.services.project_members import ProjectMemberService
 from app.services.workspace import WorkspaceEntity
 
 router = APIRouter(tags=["org"])
@@ -89,7 +89,7 @@ async def add_member(
     `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`. A
     project entry: 422 `duplicate` or an export-control confirmation's on
     `projects.<i>`, 404 for a project outside the org, 403 for one archived."""
-    return await ProjectService(session).add_org_member(ctx, org, body)
+    return await ProjectMemberService(session).add_org_member(ctx, org, body)
 
 
 @router.post("/orgs/{org_id}/members/new", status_code=status.HTTP_201_CREATED, responses=ERRORS)
@@ -98,7 +98,7 @@ async def create_member(
 ) -> MemberRead:
     """Create the account and its membership in one step, and add it to `projects` too, as the
     add does (DL-379); the user must change the temporary password at their first sign-in."""
-    return await ProjectService(session).create_org_member(ctx, org, body)
+    return await ProjectMemberService(session).create_org_member(ctx, org, body)
 
 
 @router.patch("/orgs/{org_id}/members/{user_id}", responses=ERRORS)

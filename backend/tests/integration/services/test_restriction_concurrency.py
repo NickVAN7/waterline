@@ -24,6 +24,7 @@ from app.models.project import Project, ProjectMembership
 from app.schemas.org import MemberAdd, MemberProjectAdd
 from app.schemas.project import ProjectMemberAdd, RestrictionUpdate
 from app.services.project import ProjectService
+from app.services.project_members import ProjectMemberService
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
@@ -112,7 +113,7 @@ async def setup(concurrency: SessionMaker) -> tuple[Project, Change, Change]:
 
     async def add(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).add_member(
+        return await ProjectMemberService(session).add_member(
             ctx, loaded, ProjectMemberAdd(user_id=bob.id, role=ProjectRole.VIEWER)
         )
 
@@ -254,7 +255,7 @@ async def test_an_explicit_admin_removed_while_their_change_waits_cannot_remove_
 
     async def remove_ann(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).remove_member(remover, loaded, ann.id)
+        return await ProjectMemberService(session).remove_member(remover, loaded, ann.id)
 
     refused = await race(
         concurrency, concurrency_engine, first=remove_ann, second=lower_all(ann_ctx, project)
@@ -291,7 +292,7 @@ async def test_an_explicit_admin_demoted_while_their_change_waits_cannot_remove_
 
     async def demote_ann(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).change_member_role(
+        return await ProjectMemberService(session).change_member_role(
             demoter, loaded, ann.id, ProjectRole.MEMBER
         )
 
@@ -329,7 +330,7 @@ async def org_setup(concurrency: SessionMaker) -> tuple[Project, Change, Change,
 
     async def org_add(session: AsyncSession) -> object:
         loaded = await session.get_one(Organization, org.id)
-        return await ProjectService(session).add_org_member(
+        return await ProjectMemberService(session).add_org_member(
             ctx,
             loaded,
             MemberAdd(
@@ -367,6 +368,34 @@ async def test_an_org_add_with_projects_waiting_on_marking_export_controlled_add
     assert (refused, await state(concurrency, project), await in_org(concurrency, carol)) == (
         ["confirmation_required"],
         (["export_controlled"], 1),
+        False,
+    )
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_an_org_add_with_projects_waiting_on_an_archive_adds_nothing(
+    concurrency: SessionMaker,
+    concurrency_engine: AsyncEngine,
+    org_setup: tuple[Project, Change, Change, uuid.UUID],
+) -> None:
+    """Bug: the projects step's archived check made only before the project's lock, so an add
+    waiting on an archive joins a read-only project (design-doc §5); or the org membership kept
+    when the project part is refused (all or nothing, DL-379). S3-C0w review, finding 1."""
+    project, _, org_add, carol = org_setup
+    async with committing_factories(concurrency):
+        admin = await UserFactory.create_async(is_system_admin=True)
+    ctx = AuthzContext(user_id=admin.id, is_system_admin=True)
+
+    async def archive(session: AsyncSession) -> object:
+        return await ProjectService(session).archive(
+            ctx, await session.get_one(Project, project.id)
+        )
+
+    refused = await race(concurrency, concurrency_engine, first=archive, second=org_add)
+
+    assert (refused, await state(concurrency, project), await in_org(concurrency, carol)) == (
+        ["ForbiddenError"],
+        ([], 1),
         False,
     )
 

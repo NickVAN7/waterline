@@ -33,14 +33,12 @@ from app.schemas.project import (
 )
 from app.schemas.workspace import SlugAvailability
 from app.services.org import OrgEntity
-from app.services.project import (
+from app.services.project import ORG_PROJECTS, ProjectEntity, ProjectService, module_guidance
+from app.services.project_members import (
     MEMBER_CANDIDATES,
     MEMBER_PROJECTS,
-    ORG_PROJECTS,
     PROJECT_MEMBERS,
-    ProjectEntity,
-    ProjectService,
-    module_guidance,
+    ProjectMemberService,
 )
 
 router = APIRouter(tags=["project"])
@@ -85,7 +83,7 @@ async def first_admin_candidates(
 ) -> Page[MemberCandidate]:
     """The create dialog's picker: the org's active members and the workspace's active staff,
     offset-paged with `?q=` (DL-152). Needs `project.assign_first_admin`."""
-    return await ProjectService(session).first_admin_candidates(org, query)
+    return await ProjectMemberService(session).first_admin_candidates(org, query)
 
 
 @router.get("/orgs/{org_id}/projects", responses=ERRORS)
@@ -162,7 +160,7 @@ async def list_project_members(
     project: Viewed, query: MemberQuery, ctx: AuthzContextDep, session: SessionDep
 ) -> Page[ProjectMemberRead]:
     """The project's explicit memberships, each row with the actions the caller may take on it."""
-    return await ProjectService(session).list_members(ctx, project, query)
+    return await ProjectMemberService(session).list_members(ctx, project, query)
 
 
 @router.get("/orgs/{org_id}/member-projects", responses=ERRORS)
@@ -171,7 +169,7 @@ async def org_member_projects(
 ) -> Page[MemberProject]:
     """An org add's projects step (DL-379): the org's live projects, by name, with whether each
     is export-controlled; for whoever may add org members."""
-    return await ProjectService(session).member_projects(org, query)
+    return await ProjectMemberService(session).member_projects(org, query)
 
 
 @router.get("/projects/{key}/member-candidates", responses=ERRORS)
@@ -179,7 +177,7 @@ async def project_member_candidates(
     project: MembersManaged, query: CandidateQuery, session: SessionDep
 ) -> Page[MemberCandidate]:
     """The picker: the org's members and the workspace's staff not yet on the project."""
-    return await ProjectService(session).member_candidates(project, query)
+    return await ProjectMemberService(session).member_candidates(project, query)
 
 
 @router.post("/projects/{key}/members", status_code=status.HTTP_201_CREATED, responses=ERRORS)
@@ -188,7 +186,7 @@ async def add_project_member(
 ) -> ProjectMemberRead:
     """Add someone by `user_id` (the picker; anyone else is a 404) or by `email` (422 on `email`:
     `already_member`, `no_account`, `account_inactive`, or `outside_org` unless `join_org`)."""
-    return await ProjectService(session).add_member(ctx, project, body)
+    return await ProjectMemberService(session).add_member(ctx, project, body)
 
 
 @router.post("/projects/{key}/members/new", status_code=status.HTTP_201_CREATED, responses=ERRORS)
@@ -197,7 +195,7 @@ async def create_project_member(
 ) -> ProjectMemberRead:
     """Create the account, its org membership, and the project membership in one step; the
     user must change the temporary password at their first sign-in."""
-    return await ProjectService(session).create_member(ctx, project, body)
+    return await ProjectMemberService(session).create_member(ctx, project, body)
 
 
 @router.patch("/projects/{key}/members/{user_id}", responses=ERRORS)
@@ -209,7 +207,7 @@ async def change_project_member_role(
     session: SessionDep,
 ) -> ProjectMemberRead:
     """Change a member's role."""
-    return await ProjectService(session).change_member_role(ctx, project, user_id, body.role)
+    return await ProjectMemberService(session).change_member_role(ctx, project, user_id, body.role)
 
 
 @router.delete(
@@ -221,7 +219,7 @@ async def remove_project_member(
     project: MembersManaged, user_id: uuid.UUID, ctx: AuthzContextDep, session: SessionDep
 ) -> None:
     """Remove a member; removing the lead clears the project's lead."""
-    await ProjectService(session).remove_member(ctx, project, user_id)
+    await ProjectMemberService(session).remove_member(ctx, project, user_id)
 
 
 @router.get("/projects/{key}/access", responses=ERRORS)

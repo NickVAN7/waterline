@@ -40,7 +40,9 @@ from app.schemas.requirement import RequirementUpdate
 from app.services.auth import AuthService
 from app.services.org import OrgService
 from app.services.project import ProjectService
+from app.services.project_members import ProjectMemberService
 from app.services.requirement import RequirementService
+from app.services.requirement_approvals import RequirementApprovalService
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectMembershipFactory
 from tests.factories.user import UserFactory
@@ -74,7 +76,7 @@ def ask(ctx: AuthzContext, requirement: Requirement, approver: User) -> Change:
     async def change(session: AsyncSession) -> object:
         loaded = await session.get_one(Requirement, requirement.id)
         body = ApprovalRequestCreate(approver_ids=[approver.id])
-        return await RequirementService(session).request_approval(ctx, loaded, body)
+        return await RequirementApprovalService(session).request_approval(ctx, loaded, body)
 
     return change
 
@@ -170,7 +172,9 @@ async def test_two_cancels_at_once_are_one_cancel_and_one_not_pending(
 
     async def cancel(session: AsyncSession, _index: int) -> str:
         loaded = await session.get_one(ApprovalRequest, request_id)
-        return await outcome(RequirementService(session).cancel_approval_request(ctx, loaded))
+        return await outcome(
+            RequirementApprovalService(session).cancel_approval_request(ctx, loaded)
+        )
 
     outcomes = await run_in_parallel(concurrency, 2, cancel)
 
@@ -206,7 +210,7 @@ async def test_a_cancel_waiting_on_marking_export_controlled_is_a_404_to_an_inhe
 
     async def cancel(session: AsyncSession) -> object:
         loaded = await session.get_one(ApprovalRequest, request_id)
-        return await RequirementService(session).cancel_approval_request(ctx, loaded)
+        return await RequirementApprovalService(session).cancel_approval_request(ctx, loaded)
 
     refused = await race(concurrency, concurrency_engine, first=mark, second=cancel)
 
@@ -227,14 +231,16 @@ async def test_the_last_two_approvals_at_once_complete_the_request_once(
     async with concurrency() as session:
         loaded = await session.get_one(Requirement, requirement.id)
         body = ApprovalRequestCreate(approver_ids=[a.id for a in approvers])
-        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        request_id = (
+            await RequirementApprovalService(session).request_approval(ctx, loaded, body)
+        ).id
         await session.commit()
 
     async def approve(session: AsyncSession, index: int) -> str:
         approver = AuthzContext(user_id=approvers[index].id, is_system_admin=True)
         loaded = await session.get_one(ApprovalRequest, request_id)
         decision = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        return await outcome(RequirementService(session).decide(approver, loaded, decision))
+        return await outcome(RequirementApprovalService(session).decide(approver, loaded, decision))
 
     outcomes = await run_in_parallel(concurrency, 2, approve)
 
@@ -272,7 +278,7 @@ async def test_a_decision_waiting_on_its_requirements_delete_is_a_404(
     async def decide(session: AsyncSession) -> object:
         loaded = await session.get_one(ApprovalRequest, request_id)
         body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        return await RequirementService(session).decide(vera_ctx, loaded, body)
+        return await RequirementApprovalService(session).decide(vera_ctx, loaded, body)
 
     refused = await race(concurrency, concurrency_engine, first=delete, second=decide)
 
@@ -292,7 +298,9 @@ async def test_one_approvers_two_decisions_at_once_keep_the_first(
     async with concurrency() as session:
         loaded = await session.get_one(Requirement, requirement.id)
         body = ApprovalRequestCreate(approver_ids=[vera.id, other.id])
-        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        request_id = (
+            await RequirementApprovalService(session).request_approval(ctx, loaded, body)
+        ).id
         await session.commit()
         vera_ctx = await UserRepository(session).authz_context(await session.get_one(User, vera.id))
     decisions: list[Literal[ApprovalDecision.APPROVED, ApprovalDecision.REJECTED]] = [
@@ -303,7 +311,7 @@ async def test_one_approvers_two_decisions_at_once_keep_the_first(
     async def decide(session: AsyncSession, index: int) -> str:
         loaded = await session.get_one(ApprovalRequest, request_id)
         body = ApprovalDecisionCreate(decision=decisions[index])
-        return await outcome(RequirementService(session).decide(vera_ctx, loaded, body))
+        return await outcome(RequirementApprovalService(session).decide(vera_ctx, loaded, body))
 
     outcomes = await run_in_parallel(concurrency, 2, decide)
 
@@ -329,18 +337,20 @@ async def test_a_removal_waiting_on_its_approvers_decision_leaves_the_decision_s
     async with concurrency() as session:
         loaded = await session.get_one(Requirement, requirement.id)
         body = ApprovalRequestCreate(approver_ids=[vera.id, other.id])
-        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        request_id = (
+            await RequirementApprovalService(session).request_approval(ctx, loaded, body)
+        ).id
         await session.commit()
         vera_ctx = await UserRepository(session).authz_context(await session.get_one(User, vera.id))
 
     async def decide(session: AsyncSession) -> object:
         loaded = await session.get_one(ApprovalRequest, request_id)
         body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        return await RequirementService(session).decide(vera_ctx, loaded, body)
+        return await RequirementApprovalService(session).decide(vera_ctx, loaded, body)
 
     async def remove(session: AsyncSession) -> object:
         project = await session.get_one(Project, requirement.project_id)
-        return await ProjectService(session).remove_member(ctx, project, vera.id)
+        return await ProjectMemberService(session).remove_member(ctx, project, vera.id)
 
     refused = await race(concurrency, concurrency_engine, first=decide, second=remove)
 
@@ -365,12 +375,14 @@ async def test_a_completing_removal_waiting_on_an_edit_still_completes_the_reque
     async with concurrency() as session:
         loaded = await session.get_one(Requirement, requirement.id)
         body = ApprovalRequestCreate(approver_ids=[vera.id, ctx.user_id])
-        request_id = (await RequirementService(session).request_approval(ctx, loaded, body)).id
+        request_id = (
+            await RequirementApprovalService(session).request_approval(ctx, loaded, body)
+        ).id
         await session.commit()
     async with concurrency() as session:
         loaded = await session.get_one(ApprovalRequest, request_id)
         decision = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        await RequirementService(session).decide(ctx, loaded, decision)
+        await RequirementApprovalService(session).decide(ctx, loaded, decision)
         await session.commit()
 
     async def edit(session: AsyncSession) -> object:
@@ -380,7 +392,7 @@ async def test_a_completing_removal_waiting_on_an_edit_still_completes_the_reque
 
     async def remove(session: AsyncSession) -> object:
         project = await session.get_one(Project, requirement.project_id)
-        return await ProjectService(session).remove_member(ctx, project, vera.id)
+        return await ProjectMemberService(session).remove_member(ctx, project, vera.id)
 
     refused = await race(concurrency, concurrency_engine, first=edit, second=remove)
 
@@ -440,7 +452,7 @@ async def test_an_approvers_removal_waiting_on_the_requesters_org_removal_reads_
 
     async def remove_vera(session: AsyncSession) -> object:
         project = await session.get_one(Project, requirement.project_id)
-        return await ProjectService(session).remove_member(ctx, project, vera.id)
+        return await ProjectMemberService(session).remove_member(ctx, project, vera.id)
 
     refused = await race(
         concurrency,
@@ -474,12 +486,12 @@ async def test_a_decision_waiting_on_the_approvers_removal_is_a_404(
 
     async def remove_vera(session: AsyncSession) -> object:
         project = await session.get_one(Project, requirement.project_id)
-        return await ProjectService(session).remove_member(ctx, project, vera.id)
+        return await ProjectMemberService(session).remove_member(ctx, project, vera.id)
 
     async def decide(session: AsyncSession) -> object:
         loaded = await session.get_one(ApprovalRequest, request_id)
         body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        return await RequirementService(session).decide(vera_ctx, loaded, body)
+        return await RequirementApprovalService(session).decide(vera_ctx, loaded, body)
 
     refused = await race(concurrency, concurrency_engine, first=remove_vera, second=decide)
 
@@ -519,7 +531,7 @@ async def test_a_decision_waiting_on_the_approvers_org_role_change_is_a_404(
     async def decide(session: AsyncSession) -> object:
         loaded = await session.get_one(ApprovalRequest, request_id)
         body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        return await RequirementService(session).decide(olga_ctx, loaded, body)
+        return await RequirementApprovalService(session).decide(olga_ctx, loaded, body)
 
     refused = await race(concurrency, concurrency_engine, first=lower_olga, second=decide)
 
@@ -577,7 +589,7 @@ async def test_a_decision_waiting_on_the_approvers_deactivation_is_a_404(
     async def decide(session: AsyncSession) -> object:
         loaded = await session.get_one(ApprovalRequest, request_id)
         body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        return await RequirementService(session).decide(vera_ctx, loaded, body)
+        return await RequirementApprovalService(session).decide(vera_ctx, loaded, body)
 
     refused = await race(concurrency, concurrency_engine, first=deactivate, second=decide)
 
@@ -608,7 +620,7 @@ async def test_a_decision_waiting_on_revoking_the_approvers_system_admin_is_a_40
         await session.get_one(User, sam.id)  # loaded before the wait, as at sign-in
         loaded = await session.get_one(ApprovalRequest, request_id)
         body = ApprovalDecisionCreate(decision=ApprovalDecision.APPROVED)
-        return await RequirementService(session).decide(sam_ctx, loaded, body)
+        return await RequirementApprovalService(session).decide(sam_ctx, loaded, body)
 
     refused = await race(concurrency, concurrency_engine, first=revoke, second=decide)
 
@@ -683,7 +695,9 @@ async def test_a_member_add_waits_on_the_project_before_the_persons_org_row(
             add_connected.set()
             project = await session.get_one(Project, requirement.project_id)
             body = ProjectMemberAdd(user_id=vera.id, role=ProjectRole.MEMBER)
-            outcomes.append(await outcome(ProjectService(session).add_member(ctx, project, body)))
+            outcomes.append(
+                await outcome(ProjectMemberService(session).add_member(ctx, project, body))
+            )
             await session.commit()
 
     async with concurrency() as removal:

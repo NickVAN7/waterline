@@ -177,9 +177,10 @@ type = "layers"
 containers = ["app.services"]
 layers = [
     "(wiring)",
+    "(requirement_approvals)",
     "(requirement) | (webhook)",
     "(sprint) | (testcase) | (test_run) | (github)",
-    "(task)",
+    "(task) | (project_members)",
     "(project) | (phase) | (workstream) | (milestone)",
     "(auth) | (workspace) | (org)",
     "(roster)",

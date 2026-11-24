@@ -45,7 +45,8 @@ from app.schemas.requirement import RequirementCreate, RequirementUpdate
 from app.services.auth import AuthService
 from app.services.org import OrgService
 from app.services.project import ProjectService
-from app.services.requirement import RequirementService
+from app.services.project_members import ProjectMemberService
+from app.services.requirement_approvals import RequirementApprovalService
 from app.services.user import AccountSubject, UserService
 from app.services.workspace import WorkspaceService
 
@@ -268,7 +269,7 @@ async def build_demo(
             await orgs.add_member(owner_ctx, org, email(username), OrgRole.MEMBER)
         org_of[slug] = (org, owner_ctx)
 
-    projects = ProjectService(session)
+    projects = ProjectMemberService(session)
     for spec in all_projects:
         org, owner_ctx = org_of[spec.org]
         ensure(owner_ctx, Action.PROJECT_CREATE, org_target(org))
@@ -345,7 +346,7 @@ async def _requirements(
     (an admin) to approve three; `ella` approves two, and `finn` edits one of those after
     (Approved · modified); `finn` deletes one of his, and `lena` deletes another with its
     child."""
-    service = RequirementService(session)
+    service = RequirementApprovalService(session)
     finn, ella, lena = await acting("finn"), await acting("ella"), await acting("lena")
     project = cast(tuple[Project, object], await ProjectService(session).load(REQUIREMENTS_PROJECT))
 

@@ -34,6 +34,7 @@ from app.schemas.requirement import (
     RequirementUpdate,
 )
 from app.services.project import ProjectService
+from app.services.project_members import ProjectMemberService
 from app.services.requirement import RequirementService
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
@@ -163,7 +164,7 @@ async def test_a_reporter_change_waiting_on_their_removal_sees_them_gone(
 
     async def remove(session: AsyncSession) -> object:
         loaded = await session.get_one(Project, project.id)
-        return await ProjectService(session).remove_member(ctx, loaded, member.id)
+        return await ProjectMemberService(session).remove_member(ctx, loaded, member.id)
 
     async def reassign(session: AsyncSession) -> object:
         loaded = await session.get_one(Requirement, requirement.id)

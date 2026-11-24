@@ -39,13 +39,13 @@ from app.schemas.requirement import (
 )
 from app.services.project import ProjectEntity
 from app.services.requirement import (
-    APPROVAL_REQUESTS,
     REVISIONS,
     TRASH,
     ApprovalRequestEntity,
     RequirementEntity,
     RequirementService,
 )
+from app.services.requirement_approvals import APPROVAL_REQUESTS, RequirementApprovalService
 
 router = APIRouter(tags=["requirement"])
 
@@ -212,7 +212,7 @@ async def request_approval(
     """Request approval of the requirement's current revision from the named approvers. 404 for
     an approver without access to the project; 422 on `approver_ids` (`duplicate`,
     `account_inactive`) and on the body (`pending_exists`: one pending request at a time)."""
-    return await RequirementService(session).request_approval(ctx, requirement, body)
+    return await RequirementApprovalService(session).request_approval(ctx, requirement, body)
 
 
 @router.get("/projects/{key}/requirements/{number}/approval-requests", responses=ERRORS)
@@ -220,7 +220,7 @@ async def requirement_approval_requests(
     requirement: Viewed, query: ApprovalRequestsQuery, session: SessionDep
 ) -> Page[ApprovalRequestItem]:
     """The requirement's approval requests, newest first, with their approvers."""
-    return await RequirementService(session).approval_requests(requirement, query)
+    return await RequirementApprovalService(session).approval_requests(requirement, query)
 
 
 @router.get("/approval-requests/{request_id}", responses=ERRORS)
@@ -229,7 +229,7 @@ async def get_approval_request(
 ) -> ApprovalRequestRead:
     """The approval request, with the actions the caller may take on it; 404 for a deleted
     requirement's."""
-    return await RequirementService(session).read_approval_request(ctx, request)
+    return await RequirementApprovalService(session).read_approval_request(ctx, request)
 
 
 @router.post("/approval-requests/{request_id}/cancel", responses=ERRORS)
@@ -238,7 +238,7 @@ async def cancel_approval_request(
 ) -> ApprovalRequestRead:
     """Cancel the pending request; 422 on `id` (`not_pending`) for one already decided or
     cancelled."""
-    return await RequirementService(session).cancel_approval_request(ctx, request)
+    return await RequirementApprovalService(session).cancel_approval_request(ctx, request)
 
 
 @router.post("/approval-requests/{request_id}/decision", responses=ERRORS)
@@ -248,7 +248,7 @@ async def decide_approval_request(
     """Approve or reject on your own row, finally (403 once it's decided); 422 on `id`
     (`not_pending`) for a request already completed or cancelled. The last approval completes
     the request; any rejection rejects it."""
-    return await RequirementService(session).decide(ctx, request, body)
+    return await RequirementApprovalService(session).decide(ctx, request, body)
 
 
 @router.post("/projects/{key}/requirements/{number}/approve", responses=ERRORS)
@@ -257,4 +257,4 @@ async def approve_requirement(
 ) -> RequirementRead:
     """Approve the requirement's current revision by hand; a pending approval request on it is
     cancelled. 409 on a stale `version`."""
-    return await RequirementService(session).approve(ctx, requirement, body)
+    return await RequirementApprovalService(session).approve(ctx, requirement, body)
