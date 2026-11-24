@@ -1563,6 +1563,35 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /**
+         * Update Task
+         * @description Change the fields sent. 409 on a stale `version`; 403 for a status move design-doc §5's
+         *     table denies, or a reporter change without `task.reassign_reporter`; 404 for a requirement,
+         *     phase, or workstream outside the project; 422 on `title`, `type`, `assignee_id`,
+         *     `reviewer_id`, `reporter_id`, and `workstream_id`.
+         */
+        patch: operations["update_task_api_projects__key__tasks__number__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/restriction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Task Restriction
+         * @description Replace the task's restriction, without `version` (DL-162): a raise needs
+         *     `task.raise_restriction`, a lower `task.lower_restriction` (403); 422 on `level`
+         *     (`below_project`) and `categories` (`project_only`).
+         */
+        put: operations["set_task_restriction_api_projects__key__tasks__number__restriction_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -3476,6 +3505,16 @@ export interface components {
             allowed_transitions: components["schemas"]["TaskStatus"][];
         };
         /**
+         * TaskRestrictionUpdate
+         * @description `PUT …/tasks/{number}/restriction` (DL-162): `level` (null: inherit the project's) and
+         *     `categories` replace the current ones. No `version` (DL-168).
+         */
+        TaskRestrictionUpdate: {
+            level: components["schemas"]["RestrictionLevel"] | null;
+            /** Categories */
+            categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
          * TaskStatus
          * @enum {string}
          */
@@ -3485,6 +3524,47 @@ export interface components {
          * @enum {string}
          */
         TaskType: "feature" | "bug" | "chore" | "spike" | "config" | "data" | "training";
+        /**
+         * TaskUpdate
+         * @description Only the fields sent change; null clears a nullable one. `version` is the one the caller
+         *     read (a stale one is a 409). `status` through design-doc §5's table, judged on the people
+         *     stored before this request (a denied move a 403); a newly named assignee or reviewer may
+         *     update tasks here and is active (DL-347); `reporter_id` needs `task.reassign_reporter`
+         *     (DL-211); a changed `type` is one the project offers (DL-352); a newly set requirement,
+         *     phase, or workstream is the project's (404), the workstream live (DL-409).
+         */
+        TaskUpdate: {
+            /** Version */
+            version: number;
+            /** Title */
+            title?: string | null;
+            /** Description Md */
+            description_md?: string | null;
+            type?: components["schemas"]["TaskType"] | null;
+            status?: components["schemas"]["TaskStatus"] | null;
+            priority?: components["schemas"]["Priority"] | null;
+            severity?: components["schemas"]["Severity"] | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Time Estimate */
+            time_estimate?: number | string | null;
+            /** Time Taken */
+            time_taken?: number | string | null;
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /** Reviewer Id */
+            reviewer_id?: string | null;
+            /** Reporter Id */
+            reporter_id?: string | null;
+            /** Requirement Id */
+            requirement_id?: string | null;
+            /** Phase Id */
+            phase_id?: string | null;
+            /** Workstream Id */
+            workstream_id?: string | null;
+        };
         /**
          * TrashItem
          * @description A row of the project's trash: the item, who deleted it, and when (design-doc §9).
@@ -9143,6 +9223,132 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_task_api_projects__key__tasks__number__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    set_task_restriction_api_projects__key__tasks__number__restriction_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRestrictionUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

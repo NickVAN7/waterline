@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.base_model import INCLUDE_DELETED
 from app.models.task import Task
 
 
@@ -29,4 +30,14 @@ class TaskRepository:
             .where(Task.project_id == project_id)
             .order_by(Task.rank.desc())
             .limit(1)
+        )
+
+    async def lock(self, task: Task) -> None:
+        """Re-read the task's row, in the trash or not, and hold it until the transaction ends;
+        the caller checks `deleted_at`, which a delete or restore may have changed."""
+        await self.session.execute(
+            select(Task)
+            .where(Task.id == task.id)
+            .with_for_update()
+            .execution_options(populate_existing=True, **{INCLUDE_DELETED: True})
         )

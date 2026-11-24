@@ -786,8 +786,8 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | sprint_id | UUID (FK → sprint), nullable | Added in Slice 4. Same project |
 | milestone_id | UUID (FK → milestone), nullable | Added in Slice 4. Same project |
 | workstream_id | UUID (FK → workstream), nullable | same project |
-| time_estimate | numeric, nullable | unit-agnostic |
-| time_taken | numeric, nullable | unit-agnostic |
+| time_estimate | numeric, nullable | unit-agnostic; 0 to 9,999,999.99 (DL-411) |
+| time_taken | numeric, nullable | unit-agnostic; 0 to 9,999,999.99 (DL-411) |
 | restriction_level | enum: internal / confidential, nullable | `RestrictionMixin` (design-doc §3.1) |
 | restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | next_subtask_number | integer, default 1 | subtask counter; incremented by a direct `UPDATE … RETURNING` outside the ORM so it doesn't bump `version` |

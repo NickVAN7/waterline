@@ -16,7 +16,7 @@ from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
 from app.core.base_model import check_version
-from app.core.errors import AppError, ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Feed, Filter, FilterType, ListSpec, Page, fetch_feed, fetch_page
 from app.enums import (
     ActivityAction,
@@ -40,7 +40,7 @@ from app.repositories.project import ProjectRepository
 from app.repositories.requirement import RequirementRepository
 from app.repositories.user import UserRepository
 from app.rules.rank import place, rank_between
-from app.rules.restriction import Restriction, change, effective, levels_below, needed_rights
+from app.rules.restriction import Restriction, effective, levels_below
 from app.schemas.requirement import (
     RequirementAncestor,
     RequirementCreate,
@@ -60,8 +60,9 @@ from app.services.project import (
     check_item_restriction,
     lift_items,
     register_on_restriction_changed,
+    set_item_restriction,
 )
-from app.services.user import required_error
+from app.services.user import check_person, required_error
 from app.services.workstream import WorkstreamService
 
 type RequirementEntity = Requirement
@@ -258,7 +259,8 @@ class RequirementService:
         reporter_id = values.reporter_id
         if reporter_id is not None and reporter_id != requirement.reporter_id:
             ensure(ctx, Action.REQUIREMENT_REASSIGN_REPORTER, target)
-            await self._check_person(
+            await check_person(
+                self.session,
                 target,
                 reporter_id,
                 Action.REQUIREMENT_CREATE,
@@ -316,23 +318,6 @@ class RequirementService:
             self._log(requirement, ctx.user_id, ActivityAction.UPDATED, field, old, new)
         return await self.read(ctx, requirement)
 
-    async def _check_person(
-        self, target: Target, user_id: uuid.UUID, action: Action, field: str, refused: AppError
-    ) -> None:
-        """A person named on the requirement (reporter, approver; DL-211, design-doc §6.2): they
-        may take `action` in the project, else `refused` (an approver's a 404, as the member
-        picker), and are active, else 422 `account_inactive` on `field` (DL-226; TD-101)."""
-        users = UserRepository(self.session)
-        # Held, so a removal or deactivation committing meanwhile waits for this one (TD-72).
-        await users.hold_access(user_id)
-        user = await users.get(user_id)
-        if user is None or not authorize(await users.authz_context(user), action, target):
-            raise refused
-        if not user.is_active:
-            raise ValidationFailedError.on(
-                ("body", field), "This account is deactivated.", "account_inactive"
-            )
-
     async def set_restriction(
         self, ctx: AuthzContext, requirement: Requirement, values: RequirementRestrictionUpdate
     ) -> RequirementRead:
@@ -346,40 +331,17 @@ class RequirementService:
         await ProjectRepository(self.session).hold(project)
         await self._lock_live(requirement)
         # Built on the held rows: an archive or export-control change meanwhile is seen (TD-80).
-        target = project_target(project, requirement)
-        old = Restriction(requirement.restriction_level, frozenset(_categories(requirement)))
-        new = Restriction(values.level, frozenset(values.categories))
-        kind = change(old, new)
-        raise_, lower = Action.REQUIREMENT_RAISE_RESTRICTION, Action.REQUIREMENT_LOWER_RESTRICTION
-        for action in needed_rights(kind, raise_, lower):
-            ensure(ctx, action, target)
-        check_item_restriction(
+        await set_item_restriction(
+            self.session,
+            ctx,
             project,
-            new.level,
-            new.categories,
+            requirement,
+            Restriction(values.level, frozenset(values.categories)),
+            entity_type=ActivityEntityType.REQUIREMENT,
+            raise_action=Action.REQUIREMENT_RAISE_RESTRICTION,
+            lower_action=Action.REQUIREMENT_LOWER_RESTRICTION,
             noun="requirement",
-            level_field="level",
-            categories_field="categories",
         )
-        stored = sorted(new.categories)
-        logged = [
-            (field, before, after)
-            for field, before, after in (
-                (ActivityField.RESTRICTION_LEVEL, old.level, new.level),
-                (ActivityField.RESTRICTION_CATEGORIES, _categories(requirement), stored),
-            )
-            if before != after
-        ]
-        if logged:
-            await direct_update(
-                self.session,
-                Requirement,
-                requirement.id,
-                {"restriction_level": new.level, "restriction_categories": stored},
-                touch_updated_at=True,
-            )
-        for field, before, after in logged:
-            self._log(requirement, ctx.user_id, ActivityAction.UPDATED, field, before, after)
         return await self.read(ctx, requirement)
 
     async def move(

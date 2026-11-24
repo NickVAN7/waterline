@@ -13,7 +13,7 @@ from app.models.phase import Phase
 from app.models.project import Project
 from app.models.requirement import Requirement
 from app.models.task import Task
-from app.schemas.task import TaskCreate
+from app.schemas.task import TaskCreate, TaskRestrictionUpdate
 from app.services.phase import PhaseService
 from app.services.project import ProjectService
 from app.services.requirement import RequirementService
@@ -22,6 +22,7 @@ from tests.factories.org import OrganizationFactory
 from tests.factories.phase import PhaseFactory
 from tests.factories.project import ProjectFactory
 from tests.factories.requirement import RequirementFactory
+from tests.factories.task import TaskFactory
 from tests.factories.user import UserFactory
 from tests.integration.services.test_requirement_delete_concurrency import raise_project
 from tests.integration.services.test_restriction_concurrency import Change, race
@@ -161,3 +162,25 @@ async def test_a_create_waiting_on_an_archive_is_refused(
     async with concurrency() as check:
         tasks = await check.scalar(select(func.count()).select_from(Task))
     assert (refused, tasks) == (["ForbiddenError"], 0)
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_a_restriction_change_waiting_on_a_project_raise_checks_the_new_level(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """As the create, for a task's own restriction PUT: without holding the project it checks
+    the old level, and the task is stored Internal under a Confidential project (TD-72)."""
+    ctx, project = await a_project(concurrency)
+    async with committing_factories(concurrency):
+        task = await TaskFactory.create_async(project=project, number=1, reporter_id=ctx.user_id)
+
+    async def put(session: AsyncSession) -> object:
+        loaded = await session.get_one(Task, task.id)
+        body = TaskRestrictionUpdate(level=RestrictionLevel.INTERNAL, categories=[])
+        return await TaskService(session).set_restriction(ctx, loaded, body)
+
+    refused = await race(
+        concurrency, concurrency_engine, first=raise_project(ctx, project), second=put
+    )
+
+    assert refused == ["below_project"]

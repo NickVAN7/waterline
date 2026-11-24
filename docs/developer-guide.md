@@ -344,8 +344,11 @@ for the added event, such as the export-control confirmation, DL-81), and `add_u
 - **Changing a project's restriction** calls the handlers registered with
   `register_on_restriction_changed()` (`app/services/project.py`), each given the project (its
   new level already set) and the actor. Each item area registers one that lifts its live rows
-  stored below the project's level (`RequirementService.lift_to_project`, DL-208 to DL-210), so a
-  lower lifts nothing.
+  stored below the project's level, a call to `lift_items(...)` with its model (requirements and
+  tasks, DL-208 to DL-210), so a lower lifts nothing. A content item area also shares
+  `check_item_restriction` (the level and categories at creation) and `set_item_restriction`
+  (the restriction `PUT`) from `app/services/project.py`, and `check_person` (a person newly
+  named on an item) from `app/services/user.py`.
 - **An approval request completing or rejected** calls the handlers registered for its entity
   type with `register_on_approved()` and `register_on_rejected()` (`app/services/approval.py`),
   each given the request and the deciding user. An approvable area registers both (the

@@ -19,7 +19,7 @@ from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, authorize
 from app.authz.context import AuthzContext, rank_account
 from app.authz.target import Target, user_target, workspace_target
-from app.core.errors import FieldError, ValidationFailedError
+from app.core.errors import AppError, FieldError, ValidationFailedError
 from app.core.lists import INCLUDE_DEACTIVATED, ListSpec, Page, fetch_page
 from app.core.security import hash_password
 from app.enums import (
@@ -130,6 +130,29 @@ def identifier_error(
     if problem is None:
         return []
     return [FieldError((*under, field), messages[problem], problem.value)]
+
+
+async def check_person(
+    session: AsyncSession,
+    target: Target,
+    user_id: uuid.UUID,
+    action: Action,
+    field: str,
+    refused: AppError,
+) -> None:
+    """A person newly named on an item (a requirement's reporter, an approver, a task's assignee
+    or reviewer; DL-211, DL-347, design-doc §6.2): they may take `action` on `target`, else
+    `refused`, and are active, else a 422 `account_inactive` on `field` (DL-226; TD-101)."""
+    users = UserRepository(session)
+    # Held, so a removal or deactivation committing meanwhile waits for this one (TD-72).
+    await users.hold_access(user_id)
+    user = await users.get(user_id)
+    if user is None or not authorize(await users.authz_context(user), action, target):
+        raise refused
+    if not user.is_active:
+        raise ValidationFailedError.on(
+            ("body", field), "This account is deactivated.", "account_inactive"
+        )
 
 
 def required_error(value: str, *, field: str, under: Under = BODY) -> list[FieldError]:

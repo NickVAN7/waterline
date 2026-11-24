@@ -15,7 +15,12 @@ from app.enums import (
     TaskStatus,
     TaskType,
 )
-from app.schemas.limits import TASK_DESCRIPTION_MAX, TASK_TITLE_MAX
+from app.schemas.limits import (
+    TASK_DESCRIPTION_MAX,
+    TASK_TITLE_MAX,
+    TIME_DECIMAL_PLACES,
+    TIME_MAX_DIGITS,
+)
 
 
 class TaskCreate(BaseModel):
@@ -34,6 +39,45 @@ class TaskCreate(BaseModel):
     workstream_id: uuid.UUID | None = None
     restriction_level: RestrictionLevel | None = None
     restriction_categories: list[RestrictionCategory] = []
+
+
+class TaskUpdate(BaseModel):
+    """Only the fields sent change; null clears a nullable one. `version` is the one the caller
+    read (a stale one is a 409). `status` through design-doc §5's table, judged on the people
+    stored before this request (a denied move a 403); a newly named assignee or reviewer may
+    update tasks here and is active (DL-347); `reporter_id` needs `task.reassign_reporter`
+    (DL-211); a changed `type` is one the project offers (DL-352); a newly set requirement,
+    phase, or workstream is the project's (404), the workstream live (DL-409)."""
+
+    version: int
+    title: str | None = Field(default=None, max_length=TASK_TITLE_MAX)
+    description_md: str | None = Field(default=None, max_length=TASK_DESCRIPTION_MAX)
+    type: TaskType | None = None
+    status: TaskStatus | None = None
+    priority: Priority | None = None
+    severity: Severity | None = None
+    start_date: date | None = None
+    due_date: date | None = None
+    time_estimate: Decimal | None = Field(
+        default=None, ge=0, max_digits=TIME_MAX_DIGITS, decimal_places=TIME_DECIMAL_PLACES
+    )
+    time_taken: Decimal | None = Field(
+        default=None, ge=0, max_digits=TIME_MAX_DIGITS, decimal_places=TIME_DECIMAL_PLACES
+    )
+    assignee_id: uuid.UUID | None = None
+    reviewer_id: uuid.UUID | None = None
+    reporter_id: uuid.UUID | None = None
+    requirement_id: uuid.UUID | None = None
+    phase_id: uuid.UUID | None = None
+    workstream_id: uuid.UUID | None = None
+
+
+class TaskRestrictionUpdate(BaseModel):
+    """`PUT …/tasks/{number}/restriction` (DL-162): `level` (null: inherit the project's) and
+    `categories` replace the current ones. No `version` (DL-168)."""
+
+    level: RestrictionLevel | None
+    categories: list[RestrictionCategory]
 
 
 class TaskItem(BaseModel):

@@ -45,6 +45,7 @@ from app.schemas.requirement import (
 )
 from app.services.approval import ApprovalService, register_on_approved, register_on_rejected
 from app.services.requirement import RequirementService
+from app.services.user import check_person
 
 # A requirement's approval requests: newest first, offset-paged (DL-227).
 APPROVAL_REQUESTS = ListSpec(
@@ -203,8 +204,13 @@ class RequirementApprovalService(RequirementService):
         target = project_target(project, requirement)
         ensure(ctx, Action.APPROVAL_REQUEST_CREATE, target)
         for approver_id in body.approver_ids:
-            await self._check_person(
-                target, approver_id, Action.REQUIREMENT_VIEW, "approver_ids", NotFoundError()
+            await check_person(
+                self.session,
+                target,
+                approver_id,
+                Action.REQUIREMENT_VIEW,
+                "approver_ids",
+                NotFoundError(),
             )
         request = await ApprovalService(self.session).create(
             project_id=project.id,

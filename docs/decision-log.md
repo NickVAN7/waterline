@@ -5216,3 +5216,15 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan ("Planning a slice", sizing rule 3); `.claude/skills/design-change/SKILL.md`
   (step 7)
 - **Source:** owner, Nov 24, 2026 (chat, the Slice 3 plan's R4 and docs-consistency decision 5)
+
+### DL-411: A task's time fields are bounded; null on a field that can't be empty is no change
+- **Date:** 2026-11-24
+- **Decision:** A task's `time_estimate` and `time_taken` take 0 to 9,999,999.99 (two decimal
+  places); outside it is a 422 on the field. In a task's `PATCH`, null sent for a field that
+  can't be empty (title, description, type, status, priority, reporter) is no change, as a
+  requirement's `PATCH`. A task's `start_date` after its `due_date` stays allowed (no rule yet).
+- **Supersedes:** none (the schema doc said only "numeric, unit-agnostic")
+- **Superseded by:** none
+- **Applies to:** S3-C6; schema-doc (`task`); `backend/tests/api/authz/test_task_update.py`
+  (`test_a_null_reporter_is_ignored`, changed with the owner's approval)
+- **Source:** owner, Nov 24, 2026 (chat, S3-C6's review questions)

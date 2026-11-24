@@ -5,7 +5,7 @@ import dataclasses
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.authz.authorize import allowed_actions, ensure
 from app.authz.context import AuthzContext, ProjectAccess
 from app.authz.scoping import project_scope
 from app.authz.target import Target, org_target, project_target
+from app.core.base_model import IdMixin
 from app.core.errors import FieldError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Page, fetch_page
 from app.enums import (
@@ -221,6 +222,67 @@ def check_item_restriction(
             ("body", categories_field),
             f"Export control is set on the project, not on a {noun}.",
             "project_only",
+        )
+
+
+async def set_item_restriction(
+    session: AsyncSession,
+    ctx: AuthzContext,
+    project: Project,
+    item: Any,
+    new: Restriction,
+    *,
+    entity_type: ActivityEntityType,
+    raise_action: Action,
+    lower_action: Action,
+    noun: str,
+) -> None:
+    """Replace a content item's level and categories, without a version bump (DL-162, DL-168):
+    a raise needs `raise_action`, a lower `lower_action`, a change that does neither either one
+    (403). 422 on `level` (`below_project`) and `categories` (`project_only`). Logs each field
+    that changed and moves `updated_at` (DL-210). The caller has held the project and locked
+    the item, so the rights and the old values logged see what committed meanwhile (TD-72)."""
+    target = project_target(project, item)
+    old_categories = [RestrictionCategory(c) for c in item.restriction_categories]
+    old = Restriction(item.restriction_level, frozenset(old_categories))
+    for action in needed_rights(change(old, new), raise_action, lower_action):
+        ensure(ctx, action, target)
+    check_item_restriction(
+        project,
+        new.level,
+        new.categories,
+        noun=noun,
+        level_field="level",
+        categories_field="categories",
+    )
+    stored = sorted(new.categories)
+    logged = [
+        (field, before, after)
+        for field, before, after in (
+            (ActivityField.RESTRICTION_LEVEL, old.level, new.level),
+            (ActivityField.RESTRICTION_CATEGORIES, old_categories, stored),
+        )
+        if before != after
+    ]
+    if logged:
+        await direct_update(
+            session,
+            cast(type[IdMixin], type(item)),
+            item.id,
+            {"restriction_level": new.level, "restriction_categories": stored},
+            touch_updated_at=True,
+        )
+    for field, before, after in logged:
+        log_change(
+            session,
+            project_id=project.id,
+            entity_type=entity_type,
+            entity_id=item.id,
+            action=ActivityAction.UPDATED,
+            changed_by=ctx.user_id,
+            field=field,
+            old=before,
+            new=after,
         )
 
 

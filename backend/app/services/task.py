@@ -13,11 +13,13 @@ from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
-from app.core.errors import NotFoundError, ValidationFailedError
+from app.core.base_model import check_version
+from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Filter, FilterType, ListSpec, fetch_ranked
 from app.enums import (
     ActivityAction,
     ActivityEntityType,
+    ActivityField,
     NumberPrefix,
     Priority,
     RestrictionCategory,
@@ -34,17 +36,25 @@ from app.repositories.user import UserRepository
 from app.rules.branch_name import branch_name
 from app.rules.rank import rank_between
 from app.rules.restriction import Restriction, effective
-from app.rules.task_transitions import TaskPeople, allowed_transitions
+from app.rules.task_transitions import TaskPeople, allowed_transitions, may_transition
 from app.rules.task_types import task_types
-from app.schemas.task import TaskCreate, TaskItem, TaskList, TaskRead
+from app.schemas.task import (
+    TaskCreate,
+    TaskItem,
+    TaskList,
+    TaskRead,
+    TaskRestrictionUpdate,
+    TaskUpdate,
+)
 from app.services.numbering import NumberingService
 from app.services.phase import PhaseService
 from app.services.project import (
     check_item_restriction,
     lift_items,
     register_on_restriction_changed,
+    set_item_restriction,
 )
-from app.services.user import required_error
+from app.services.user import check_person, required_error
 from app.services.workstream import WorkstreamService
 
 type TaskEntity = Task
@@ -79,6 +89,30 @@ TASKS = ListSpec(
     ),
     paging="ranked",
 )
+
+
+# Design-doc §10's logged task fields; title, description, type, and time taken aren't.
+LOGGED = frozenset(
+    {
+        "status",
+        "assignee_id",
+        "reporter_id",
+        "reviewer_id",
+        "phase_id",
+        "workstream_id",
+        "priority",
+        "severity",
+        "start_date",
+        "due_date",
+        "requirement_id",
+        "time_estimate",
+    }
+)
+
+
+def _not_member(field: str, what: str) -> ValidationFailedError:
+    noun = field.removesuffix("_id")
+    return ValidationFailedError.on(("body", field), f"The {noun} {what}.", "not_member")
 
 
 def _categories(task: Task) -> list[RestrictionCategory]:
@@ -209,6 +243,153 @@ class TaskService:
             entity_id=task.id,
             action=ActivityAction.CREATED,
             changed_by=ctx.user_id,
+        )
+        return await self.read(ctx, task)
+
+    async def _lock_live(self, task: Task) -> None:
+        """Lock the row and read it again; one deleted meanwhile is a 404."""
+        await self.repository.lock(task)
+        if task.deleted_at is not None:
+            raise NotFoundError
+
+    async def update(self, ctx: AuthzContext, task: Task, values: TaskUpdate) -> TaskRead:
+        """Change the fields sent (design-doc §5, §6). 409 on a stale `version`; 403 for a
+        status move the table denies (judged on the people stored before), or a reporter change
+        without `task.reassign_reporter`; 404 for a requirement, phase, or workstream outside
+        the project; 422 on `title` (`missing`), `type` (`not_offered`), `assignee_id`,
+        `reviewer_id`, `reporter_id` (`not_member`, `account_inactive`), `time_estimate` and
+        `time_taken` (0 to 9,999,999.99, DL-411), and `workstream_id` (`archived`). Logs
+        design-doc §10's fields."""
+        project = await self._project(task)
+        # Held, then read: the target sees what a restriction or archive committed meanwhile,
+        # project then task, as a requirement's edit (TD-74).
+        await ProjectRepository(self.session).hold(project)
+        target = project_target(project, task)
+        ensure(ctx, Action.TASK_UPDATE, target)
+        # Locked and read again, so the version check, the transition, and the old values logged
+        # see what a concurrent edit committed.
+        await self._lock_live(task)
+        check_version(task, values.version)
+        sent = values.model_fields_set
+        changes: dict[str, object] = {}
+
+        def changed(field: str) -> bool:
+            return field in sent and getattr(values, field) != getattr(task, field)
+
+        if values.title is not None:
+            if problems := required_error(values.title, field="title"):
+                raise ValidationFailedError(problems)
+            changes["title"] = values.title.strip()
+        if values.description_md is not None:
+            changes["description_md"] = values.description_md
+        if values.type is not None and values.type != task.type:
+            if values.type not in task_types(project.type):
+                raise ValidationFailedError.on(
+                    ("body", "type"), "This project doesn't offer that task type.", "not_offered"
+                )
+            changes["type"] = values.type
+        if values.status is not None and values.status != task.status:
+            if not may_transition(
+                task.status,
+                values.status,
+                actor_id=ctx.user_id,
+                people=TaskPeople(task.assignee_id, task.reviewer_id),
+                is_project_admin=authorize(ctx, Action.TASK_REASSIGN_REPORTER, target),
+            ):
+                raise ForbiddenError
+            changes["status"] = values.status
+        if values.priority is not None:
+            changes["priority"] = values.priority
+        # Nullable: null clears them.
+        for field in ("severity", "start_date", "due_date", "time_estimate", "time_taken"):
+            if field in sent:
+                changes[field] = getattr(values, field)
+        for field in ("assignee_id", "reviewer_id"):
+            new = getattr(values, field)
+            if changed(field):
+                if new is not None:
+                    await check_person(
+                        self.session,
+                        target,
+                        new,
+                        Action.TASK_UPDATE,
+                        field,
+                        _not_member(field, "must be able to update tasks in this project"),
+                    )
+                changes[field] = new
+        # Null on a field that can't be empty is no change, as a requirement's (DL-411).
+        if values.reporter_id is not None and values.reporter_id != task.reporter_id:
+            ensure(ctx, Action.TASK_REASSIGN_REPORTER, target)
+            await check_person(
+                self.session,
+                target,
+                values.reporter_id,
+                Action.TASK_CREATE,
+                "reporter_id",
+                _not_member("reporter_id", "must be able to create tasks in this project"),
+            )
+            changes["reporter_id"] = values.reporter_id
+        if changed("requirement_id"):
+            if values.requirement_id is not None and (
+                await RequirementRepository(self.session).get_in_project(
+                    project.id, values.requirement_id, hold=True
+                )
+                is None
+            ):
+                raise NotFoundError
+            changes["requirement_id"] = values.requirement_id
+        if changed("phase_id"):
+            if values.phase_id is not None:
+                await PhaseService(self.session).assignable(project.id, values.phase_id)
+            changes["phase_id"] = values.phase_id
+        if changed("workstream_id"):
+            if values.workstream_id is not None:
+                await WorkstreamService(self.session).assignable(project.id, values.workstream_id)
+            changes["workstream_id"] = values.workstream_id
+        logged: list[tuple[ActivityField, object, object]] = []
+        for field, new in changes.items():
+            old = getattr(task, field)
+            if new == old:
+                continue
+            setattr(task, field, new)
+            if field in LOGGED:
+                logged.append((ActivityField(field), old, new))
+        await self.session.flush()
+        for field, old, new in logged:
+            log_change(
+                self.session,
+                project_id=project.id,
+                entity_type=ActivityEntityType.TASK,
+                entity_id=task.id,
+                action=ActivityAction.UPDATED,
+                changed_by=ctx.user_id,
+                field=field,
+                old=old,
+                new=new,
+            )
+        return await self.read(ctx, task)
+
+    async def set_restriction(
+        self, ctx: AuthzContext, task: Task, values: TaskRestrictionUpdate
+    ) -> TaskRead:
+        """Replace the level and categories, without a version bump (DL-162, DL-168): a raise
+        needs `task.raise_restriction`, a lower `task.lower_restriction` (403). 422 on `level`
+        (`below_project`) and `categories` (`project_only`). Logs each field that changed."""
+        project = await self._project(task)
+        # The project first, as a raise does, so the level checked stays true until commit
+        # (TD-72); then the row, so the rights and the old values logged see a concurrent change.
+        await ProjectRepository(self.session).hold(project)
+        await self._lock_live(task)
+        await set_item_restriction(
+            self.session,
+            ctx,
+            project,
+            task,
+            Restriction(values.level, frozenset(values.categories)),
+            entity_type=ActivityEntityType.TASK,
+            raise_action=Action.TASK_RAISE_RESTRICTION,
+            lower_action=Action.TASK_LOWER_RESTRICTION,
+            noun="task",
         )
         return await self.read(ctx, task)
 
