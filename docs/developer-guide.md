@@ -1188,7 +1188,9 @@ usernames; each check returns an `IdentifierProblem` for the field error), `pass
 `account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships),
 `modules.py` (each type's recommended modules, and the shipped ones it seeds, DL-136),
 `restriction.py` (the effective restriction, the raise and lower rules, and the rights a change
-needs, `needed_rights`), `rank.py` (`rank_between`, the fractional keys items are ordered by),
+needs, `needed_rights`), `rank.py` (`rank_between`, the fractional keys items are ordered by;
+`place`, the rank writes for a drop, rewriting the order on a tie or past `RANK_MAX`, which every
+move uses),
 `approval_policy.py` (a request's outcome from its rows, the status after a rejection, an
 approver's replacement, and the approver who completed it), `task_transitions.py` (who
 may move a task between statuses, `may_transition` and the read's `allowed_transitions`, DL-408),

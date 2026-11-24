@@ -26,10 +26,12 @@ from app.models.audit_event import AuditEvent
 from app.models.org import Membership
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
+from app.models.workstream import Workstream
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
+from tests.factories.workstream import WorkstreamFactory
 from tests.support.activity import activity
 from tests.support.authz import Tenancy, persona_user, sign_in_as, tenancy
 
@@ -420,6 +422,49 @@ async def test_removing_the_lead_clears_the_lead_and_records_it(
         )
     ]
     assert await activity(session) == [lead_cleared(t.project.id, bob.id, admin.id)]
+
+
+async def test_removing_a_workstream_lead_clears_their_workstreams_on_that_project_only(
+    client: AsyncClient, session: AsyncSession, t: Tenancy, admin: User
+) -> None:
+    """The project lead's rule for workstream leads (S3-C4, owner, Nov 24, 2026): archived
+    workstreams too; their workstream on another project stays, as does someone else's."""
+    bob, cleo = await org_member(t), await org_member(t)
+    ledger = await ProjectFactory.create_async(organization=t.org, key="LDG")
+    for project, person in ((t.project, bob), (t.project, cleo), (ledger, bob)):
+        await ProjectMembershipFactory.create_async(
+            project=project, user=person, role=ProjectRole.MEMBER
+        )
+    finance = await WorkstreamFactory.create_async(project=t.project, lead_id=bob.id)
+    legacy = await WorkstreamFactory.create_async(
+        project=t.project, lead_id=bob.id, archived_at=datetime(2026, 10, 1, tzinfo=UTC)
+    )
+    data = await WorkstreamFactory.create_async(project=t.project, lead_id=cleo.id)
+    elsewhere = await WorkstreamFactory.create_async(project=ledger, lead_id=bob.id)
+
+    response = await client.delete(f"{MEMBERS}/{bob.id}")
+
+    assert response.status_code == 204
+    leads = dict(
+        (
+            await session.execute(
+                select(Workstream.id, Workstream.lead_id).execution_options(populate_existing=True)
+            )
+        ).all()
+    )
+    assert leads == {finance.id: None, legacy.id: None, data.id: cleo.id, elsewhere.id: bob.id}
+    assert await events(session) == [
+        (
+            AuditAction.PROJECT_MEMBER_REMOVED,
+            admin.id,
+            t.project.id,
+            bob.id,
+            {
+                "role": "member",
+                "workstream_leads_cleared": sorted([str(finance.id), str(legacy.id)]),
+            },
+        )
+    ]
 
 
 async def test_removing_someone_else_leaves_the_lead(

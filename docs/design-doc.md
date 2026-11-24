@@ -1160,6 +1160,10 @@ requirement approval.
 - Requirements, tasks, and test cases carry a nullable `workstream_id` (one per item); ERP
   module entities will too. Items without one appear as "Unassigned" in rollups.
 - `lead_id` (nullable user), `rank` for display order, and `archived_at` instead of deletion.
+- **The lead follows the project lead's rule** (DL-409): newly named, an active project member;
+  removing that member from the project clears every workstream they lead on it.
+- **Archived workstreams** are hidden from pickers and can't be newly given to an item (a 422
+  `archived`); an item keeps one it already has (DL-409).
 
 ### Sprint
 - Part of the `sprints` module (on by default for software projects).

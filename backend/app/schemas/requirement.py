@@ -38,7 +38,8 @@ class RequirementUpdate(BaseModel):
     """Only the fields sent change. `version` is the one the caller read (a stale one is a
     409). A new revision, with `change_note`, only when `title` or `description_md` changes
     (design-doc §6.1). `status` may not be `approved` (DL-161); `reporter_id` needs
-    `requirement.reassign_reporter` (DL-211)."""
+    `requirement.reassign_reporter` (DL-211). A newly set `workstream_id` is one of the
+    project's live workstreams (404 outside it, 422 `archived`)."""
 
     version: int
     title: str | None = Field(default=None, max_length=REQUIREMENT_TITLE_MAX)
@@ -47,6 +48,8 @@ class RequirementUpdate(BaseModel):
     status: RequirementStatus | None = None
     priority: Priority | None = None
     reporter_id: uuid.UUID | None = None
+    # Null clears it; a newly set one is a live workstream of the project.
+    workstream_id: uuid.UUID | None = None
 
 
 class RequirementRestrictionUpdate(BaseModel):
@@ -93,6 +96,7 @@ class RequirementRead(BaseModel):
     description_md: str
     status: RequirementStatus
     priority: Priority
+    workstream_id: uuid.UUID | None
     reporter_id: uuid.UUID
     reporter_name: str
     # False shows the "Deactivated" badge after the reporter's name (TD-77).

@@ -685,9 +685,9 @@ logged.
 |---|---|---|
 | id | UUID (PK) | |
 | project_id | UUID (FK → project) | |
-| name | varchar | e.g. Finance, Procure-to-Pay, Data Migration; components on software projects |
-| description | text, nullable | plain text |
-| lead_id | UUID (FK → user), nullable | |
+| name | varchar | e.g. Finance, Procure-to-Pay, Data Migration; components on software projects; at most 100 characters (DL-143) |
+| description | text, nullable | plain text; at most 2,000 characters (DL-143) |
+| lead_id | UUID (FK → user), nullable | an active project member when named; cleared when they leave the project (DL-409) |
 | rank | varchar | display order |
 | archived_at | timestamptz, nullable | hidden from pickers; still shown on existing items |
 | created_at / updated_at | timestamptz | |
@@ -1032,7 +1032,7 @@ does (below), with the same limits.
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_restriction_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, the removed `role`, `lead_cleared` when it cleared the project's lead, and `via` (`org_member_removed` or `workspace_member_removed`) when an org or staff removal "with their projects" removed it, DL-78); never passwords, hashes, or tokens |
+| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_restriction_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, the removed `role`, `lead_cleared` when it cleared the project's lead, `workstream_leads_cleared` (the workstream IDs) when it cleared workstream leads (DL-409), and `via` (`org_member_removed` or `workspace_member_removed`) when an org or staff removal "with their projects" removed it, DL-78); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 

@@ -5188,3 +5188,17 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C2; design-doc §5 ("Targeted rules — Task status transitions"), §6 (Task)
 - **Source:** owner, Nov 23, 2026 (chat, S3-C2's questions)
+
+### DL-409: A workstream's lead follows the project lead's rule; an archived one isn't newly given
+- **Date:** 2026-11-24
+- **Decision:** A workstream's lead, when newly named, is an active project member (422
+  `not_member` or `account_inactive` on `lead_id`), and removing that member from the project
+  clears every workstream they lead on it, archived ones included, recorded on the removal's
+  audit event as `workstream_leads_cleared` (the workstream IDs). A requirement (and from S3-C5
+  a task) may not be newly given an archived workstream (422 `archived` on `workstream_id`); one
+  it already has stays, and resending it is no change.
+- **Supersedes:** none (design-doc §6 said "hidden from pickers" and the build plan "the project
+  lead's rule" without saying what removal or the API does)
+- **Superseded by:** none
+- **Applies to:** S3-C4; design-doc §6 (Workstream); build plan ("The project members API")
+- **Source:** owner, Nov 24, 2026 (chat, S3-C4's questions)

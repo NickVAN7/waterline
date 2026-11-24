@@ -25,6 +25,7 @@ from app.routers import (
     requirement,
     user,
     workspace,
+    workstream,
 )
 from app.rules.identifiers import RESERVED_SLUGS
 from app.services import (
@@ -79,6 +80,7 @@ def create_app(
     app.include_router(activity.router, prefix=API_PREFIX)
     app.include_router(requirement.router, prefix=API_PREFIX)
     app.include_router(phase.router, prefix=API_PREFIX)
+    app.include_router(workstream.router, prefix=API_PREFIX)
     _add_schema_components(app)
     return app
 

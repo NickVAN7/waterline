@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base_model import INCLUDE_DELETED
 from app.models.phase import Phase
-from app.models.project import Project
 from app.models.task import Task
 
 
@@ -49,11 +48,6 @@ class PhaseRepository:
             .order_by(Phase.rank, Phase.id)
         )
         return [(id_, rank) for id_, rank in rows]
-
-    async def lock_order(self, project: Project) -> None:
-        """Hold the project's orders until the transaction ends: the requirement tree's lock
-        (`FOR NO KEY UPDATE` on the project row, DL-214), which task moves share too (DL-345)."""
-        await self.session.refresh(project, with_for_update={"key_share": True})
 
     async def lock(self, phase: Phase) -> bool:
         """Lock the phase's row until the transaction ends (`FOR UPDATE`: a task insert naming

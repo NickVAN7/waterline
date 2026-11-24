@@ -26,6 +26,7 @@ from app.services.requirement import (
 from app.services.requirement_approvals import RequirementApprovalService
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
+from app.services.workstream import WorkstreamEntity, WorkstreamService
 
 # `__Host-`: the browser only accepts it with `Secure`, `Path=/`, and no `Domain` (design-doc
 # §4, "Slice 1 security checklist").
@@ -154,6 +155,12 @@ async def load_phase(
     key: str, phase_id: uuid.UUID, session: SessionDep
 ) -> tuple[PhaseEntity, Target] | None:
     return await PhaseService(session).load(key, phase_id)
+
+
+async def load_workstream(
+    key: str, workstream_id: uuid.UUID, session: SessionDep
+) -> tuple[WorkstreamEntity, Target] | None:
+    return await WorkstreamService(session).load(key, workstream_id)
 
 
 async def load_requirement(

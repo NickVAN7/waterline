@@ -54,6 +54,7 @@ from app.schemas.user import AccessReason
 from app.schemas.workspace import SlugAvailability
 from app.services.approval import ApprovalService
 from app.services.my_work import PROJECTS, page_of
+from app.services.roster import check_lead
 from app.services.user import (
     ORG_REASONS,
     PROJECT_KEY_MESSAGES,
@@ -392,7 +393,7 @@ class ProjectService:
             changes["enabled_modules"] = _enabled(values.enabled_modules)
         if "lead_id" in sent and values.lead_id != project.lead_id:
             if values.lead_id is not None:
-                await self._check_lead(project, values.lead_id)
+                await check_lead(self.session, project.id, values.lead_id)
             changes["lead_id"] = values.lead_id
         # apply_changes re-reads under its own lock; the one above covers the checks before it.
         if changed := await apply_changes(self.session, project, changes):
@@ -494,17 +495,6 @@ class ProjectService:
                 },
             )
         return await self.read(ctx, project)
-
-    async def _check_lead(self, project: Project, lead_id: uuid.UUID) -> None:
-        if not await self.repository.is_member(project.id, lead_id):
-            raise ValidationFailedError.on(
-                ("body", "lead_id"), "The lead must be a member of the project.", "not_member"
-            )
-        user = await UserRepository(self.session).get(lead_id)
-        if user is None or not user.is_active:
-            raise ValidationFailedError.on(
-                ("body", "lead_id"), "This account is deactivated.", "account_inactive"
-            )
 
     async def archive(self, ctx: AuthzContext, project: Project) -> None:
         """Read-only until unarchived (`project_archived`); its pending approval requests are

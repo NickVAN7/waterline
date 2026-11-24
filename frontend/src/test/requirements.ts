@@ -28,6 +28,7 @@ export function requirementRead(number: number, title: string): Requirement {
   return {
     ...requirementItem(number, title),
     description_md: '',
+    workstream_id: null,
     reporter_id: 'u-ben',
     reporter_name: 'Ben',
     reporter_is_active: true,

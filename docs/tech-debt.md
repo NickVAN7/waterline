@@ -581,16 +581,24 @@ Entry format:
 
 ---
 
-### TD-130: The phase move copies the requirement move's placement
-- **Added:** S3-C3 (checkpoint-reviewer finding 3)
-- **What:** `PhaseService.move` resolves `after_id`/`before_id` to a position, takes the rank
-  between the neighbors, and rewrites the order on a tie or past 255 characters, as
-  `RequirementService.move` and `_place` do; `LIST_CAP` and `RANK_MAX` repeat the requirement
-  service's constants.
-- **Why:** the second copy, in a layer-3 service that can't import the layer-6 requirement
-  service; one shared pure function belongs in `app/rules/rank.py`, test-first, before a third.
-- **Fix by:** S3-C4 (the workstream move would be the third copy; it takes the shared function,
-  `spec-test-writer` first)
+### TD-131: The phase and workstream moves resolve their anchors in two copies
+- **Added:** S3-C4 (checkpoint-reviewer finding 6)
+- **What:** both moves refuse `after_id` with `before_id` (`conflict`) and turn the anchor into a
+  position or a 422 `not_found` in the same 20 lines; `PhaseMove` and `WorkstreamMove` are the
+  same schema. `place()` (TD-130) shares only the rank writes.
+- **Why:** two short copies that agree; the task move is the third user, and its anchors
+  (a board column's cards) may differ, so the shared shape is clearer there.
+- **Fix by:** S3-C7 (the task move takes one shared helper and schema, the two moves with it)
+- **Status:** open
+
+### TD-132: History names a requirement's workstream change only as "made a change"
+- **Added:** S3-C4 (ui-reviewer note; checkpoint-reviewer question)
+- **What:** a requirement's `workstream_id` change is logged (§10), but the activity service's
+  `NAMED_FIELDS` and the frontend's `HISTORY_FIELD` have no workstream, so History shows the
+  generic entry. No screen sets a requirement's workstream yet; only the API does.
+- **Why:** naming it needs the workstream's name resolved on the read, which is S3-C12's work
+  (names resolved server-side for the feed and History).
+- **Fix by:** S3-C12 (the workstream named in History and the feed, with a History spec case)
 - **Status:** open
 
 ## Resolved
@@ -1012,3 +1020,7 @@ Entry format:
 - **Status:** resolved in S3-C0r: `ApprovalRead` carries `approver_email`, and the confirmation
   names each approver still to decide as "Name (email)", a deactivated one "Name (email,
   deactivated)"
+
+### TD-130: The phase move copies the requirement move's placement
+- **Added:** S3-C3 (checkpoint-reviewer finding 3)
+- **Status:** resolved in S3-C4: `place()` in `app/rules/rank.py` (test-first, `spec-test-writer`), used by the requirement, phase, and workstream moves

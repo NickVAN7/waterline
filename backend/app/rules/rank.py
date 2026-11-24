@@ -7,6 +7,8 @@ ranks stay short; inserting between two neighbors extends the fraction. The same
 rocicorp's fractional-indexing, in base 36 lowercase so the database sorts it the same way.
 """
 
+from collections.abc import Sequence
+
 # Only these: the database's en_US.utf8 collation sorts them as Python does (design-doc §6).
 DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
 _VALUE = {digit: value for value, digit in enumerate(DIGITS)}
@@ -15,6 +17,33 @@ _ZERO = "i0"
 _SMALLEST = "0" + "0" * 18
 _LARGEST = "z" + "z" * 18
 _MIDDLE = DIGITS[len(DIGITS) // 2]  # a fraction with nothing on either side
+# The rank length cap: a drop past it rewrites the order (design-doc §6; DL-204).
+RANK_MAX = 255
+
+
+def place[K](
+    others: Sequence[tuple[K, str]], placed: Sequence[K], position: int
+) -> list[tuple[K, str]]:
+    """The rank writes that put `placed`, in order, at `position` among `others` (`(key, rank)`
+    in `(rank, id)` order, the placed items not among them): only the placed items', each
+    between its neighbors, when there's room; otherwise, between tied neighbors or past
+    `RANK_MAX`, every item's, fresh and short, in the new order (DL-204, DL-213, DL-218)."""
+    before = others[position - 1][1] if position > 0 else None
+    after = others[position][1] if position < len(others) else None
+    ranks: list[str] = []
+    if before is None or before != after:
+        for _ in placed:
+            ranks.append(rank_between(ranks[-1] if ranks else before, after))
+    if ranks and all(len(rank) <= RANK_MAX for rank in ranks):
+        # Equivalent mutants: `ranks` has one rank per placed item, so `strict` can't matter.
+        return list(zip(placed, ranks, strict=True))  # pragma: no mutate
+    keys = [key for key, _ in others]
+    fresh: str | None = None
+    rewrite: list[tuple[K, str]] = []
+    for key in [*keys[:position], *placed, *keys[position:]]:
+        fresh = rank_between(fresh, None)
+        rewrite.append((key, fresh))
+    return rewrite
 
 
 def rank_between(before: str | None, after: str | None) -> str:

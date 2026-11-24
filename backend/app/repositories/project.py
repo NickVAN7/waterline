@@ -178,6 +178,12 @@ class ProjectRepository:
         """Re-read the project's row and hold it until the transaction ends."""
         await self.session.refresh(project, with_for_update=True)
 
+    async def lock_order(self, project: Project) -> None:
+        """Hold the project's phase and workstream orders until the transaction ends, so moves
+        in them run one at a time: the requirement tree's lock (`FOR NO KEY UPDATE` on the
+        project row, DL-214), which task moves share too (DL-345)."""
+        await self.session.refresh(project, with_for_update={"key_share": True})
+
     async def hold(self, project: Project) -> None:
         """Re-read the project's row and hold it `FOR KEY SHARE` until the transaction ends: a
         project edit (its restriction raise included) waits, or is waited for, so a check

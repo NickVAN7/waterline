@@ -41,7 +41,7 @@ from app.repositories.base import direct_update
 from app.repositories.project import ProjectRepository
 from app.repositories.requirement import RequirementRepository
 from app.repositories.user import UserRepository
-from app.rules.rank import rank_between
+from app.rules.rank import place, rank_between
 from app.rules.restriction import Restriction, change, effective, levels_below, needed_rights
 from app.schemas.requirement import (
     RequirementAncestor,
@@ -60,14 +60,13 @@ from app.services.approval import ApprovalService
 from app.services.numbering import NumberingService
 from app.services.project import register_on_restriction_changed
 from app.services.user import required_error
+from app.services.workstream import WorkstreamService
 
 type RequirementEntity = Requirement
 type ApprovalRequestEntity = ApprovalRequest
 
 # The ranked-view cap (DL-159; build plan, "API conventions").
 TREE_CAP = 2_000
-# The rank length cap: a drop past it rewrites the gap's siblings (design-doc §6; DL-204).
-RANK_MAX = 255
 
 # The project's trash (design-doc §9): newest first; tasks and test cases join in Slices 3 and 5.
 TRASH = ListSpec(
@@ -256,8 +255,9 @@ class RequirementService:
         title or description makes the next revision, with `change_note`. `status` `approved`:
         403 without `requirement.approve_manually`, else 422 `use_approve` (DL-161). A changed
         `reporter_id` needs `requirement.reassign_reporter`, and someone who may create
-        requirements here (422 `not_member` or `account_inactive`, DL-211). Logs `status`,
-        `priority`, and `reporter_id`."""
+        requirements here (422 `not_member` or `account_inactive`, DL-211). A newly set
+        `workstream_id` is a live workstream of the project (404 outside it, 422 `archived`).
+        Logs `status`, `priority`, `reporter_id`, and `workstream_id`."""
         project = await self._project(requirement)
         # Held, then read: the target sees what a restriction change committed meanwhile
         # (TD-74). Project, then requirement, as every requirement path takes them, so a member
@@ -325,6 +325,13 @@ class RequirementService:
             if new is not None and new != old:
                 setattr(requirement, field.value, new)
                 logged.append((field, old, new))
+        # Nullable: null clears it.
+        old_workstream = requirement.workstream_id
+        if "workstream_id" in values.model_fields_set and values.workstream_id != old_workstream:
+            if values.workstream_id is not None:
+                await WorkstreamService(self.session).assignable(project.id, values.workstream_id)
+            requirement.workstream_id = values.workstream_id
+            logged.append((ActivityField.WORKSTREAM_ID, old_workstream, values.workstream_id))
         await self.session.flush()
         for field, old, new in logged:
             self._log(requirement, ctx.user_id, ActivityAction.UPDATED, field, old, new)
@@ -463,23 +470,7 @@ class RequirementService:
         in order). With no room between the neighbors (a tie, or past 255 characters), the
         parent's children are rewritten in order (DL-204, DL-213, DL-218). No `version` bump; a
         placed item's `updated_at` moves when `reparented`."""
-        before = siblings[position - 1][1] if position > 0 else None
-        after = siblings[position][1] if position < len(siblings) else None
-        ranks: list[str] = []
-        if before is None or before != after:
-            for _ in placed:
-                ranks.append(rank_between(ranks[-1] if ranks else before, after))
-        if ranks and len(ranks[-1]) <= RANK_MAX:
-            updates = list(zip(placed, ranks, strict=True))
-        else:
-            # Fresh ranks in the same order: short again, and ties broken.
-            ids = [id_ for id_, _ in siblings]
-            fresh: str | None = None
-            updates: list[tuple[uuid.UUID, str]] = []
-            for id_ in [*ids[:position], *placed, *ids[position:]]:
-                fresh = rank_between(fresh, None)
-                updates.append((id_, fresh))
-        for id_, rank in updates:
+        for id_, rank in place(siblings, placed, position):
             moved = id_ in placed
             await direct_update(
                 self.session,
@@ -784,6 +775,7 @@ class RequirementService:
             description_md=requirement.description_md,
             status=requirement.status,
             priority=requirement.priority,
+            workstream_id=requirement.workstream_id,
             reporter_id=requirement.reporter_id,
             reporter_name=reporter.name,
             reporter_is_active=reporter.is_active,

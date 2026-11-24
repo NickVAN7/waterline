@@ -423,6 +423,20 @@ class Roster[M: Member[Any], R: StrEnum, Row]:
         await approvals.replace_for(user_id, ctx.user_id)
 
 
+async def check_lead(session: AsyncSession, project_id: uuid.UUID, lead_id: uuid.UUID) -> None:
+    """A newly named lead (the project's, a workstream's) is an active member of the project:
+    else a 422 on `lead_id`, `not_member` or `account_inactive`."""
+    if not await ProjectRepository(session).is_member(project_id, lead_id):
+        raise ValidationFailedError.on(
+            ("body", "lead_id"), "The lead must be a member of the project.", "not_member"
+        )
+    user = await UserRepository(session).get(lead_id)
+    if user is None or not user.is_active:
+        raise ValidationFailedError.on(
+            ("body", "lead_id"), "This account is deactivated.", "account_inactive"
+        )
+
+
 def _already_member(exc: IntegrityError) -> bool:
     """Whether `exc` violates a constraint declared as `already_member` (each roster's
     one-membership-per-person constraint)."""

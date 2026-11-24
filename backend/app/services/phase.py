@@ -17,15 +17,14 @@ from app.models.project import Project
 from app.repositories.base import direct_update
 from app.repositories.phase import PhaseRepository
 from app.repositories.project import ProjectRepository
-from app.rules.rank import rank_between
+from app.rules.rank import place, rank_between
 from app.schemas.phase import PhaseCreate, PhaseItem, PhaseList, PhaseMove, PhaseRead, PhaseUpdate
 from app.services.user import required_error
 
 type PhaseEntity = Phase
 
-# The ranked-view cap (DL-159) and the rank length cap (DL-204), as the requirement tree's.
+# The ranked-view cap (DL-159), as the requirement tree's.
 LIST_CAP = 2_000
-RANK_MAX = 255
 # The fields design-doc §10 logs for a phase; name and description aren't.
 LOGGED = (
     ActivityField.STATUS,
@@ -170,7 +169,7 @@ class PhaseService:
             )
         project = await self._project(phase)
         # Moves in a project run one at a time, so two can't compute ranks from the same order.
-        await self.repository.lock_order(project)
+        await ProjectRepository(self.session).lock_order(project)
         if not await self.repository.lock(phase):
             raise NotFoundError
         others = await self.repository.others(project.id, excluding=phase.id)
@@ -187,19 +186,6 @@ class PhaseService:
                     ("body", field), "That isn't another phase of this project.", "not_found"
                 )
             position = ids.index(anchor) + offset
-        before = others[position - 1][1] if position > 0 else None
-        after = others[position][1] if position < len(others) else None
-        rank = rank_between(before, after) if before is None or before != after else None
-        updates: list[tuple[uuid.UUID, str]] = []
-        if rank is not None and len(rank) <= RANK_MAX:
-            updates.append((phase.id, rank))
-        else:
-            fresh: str | None = None
-            for id_ in [*ids[:position], phase.id, *ids[position:]]:
-                fresh = rank_between(fresh, None)
-                updates.append((id_, fresh))
-        for id_, new_rank in updates:
-            await direct_update(
-                self.session, Phase, id_, {"rank": new_rank}, touch_updated_at=False
-            )
+        for id_, rank in place(others, [phase.id], position):
+            await direct_update(self.session, Phase, id_, {"rank": rank}, touch_updated_at=False)
         return await self.read(ctx, phase)

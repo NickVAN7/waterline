@@ -44,6 +44,7 @@ from app.services.project import (
     export_control_confirmation,
 )
 from app.services.roster import MemberRemoval, Roster, RosterSpec, register_on_member_removed
+from app.services.workstream import WorkstreamService
 
 PROJECT_MEMBERS = ListSpec(
     name="ProjectMember",
@@ -370,13 +371,19 @@ class ProjectMemberService(ProjectService):
         via: AuditAction | None = None,
     ) -> None:
         """Delete the membership and, if it was the lead's, clear `lead_id` in the same
-        transaction (`lead_cleared`); `via`, the org or staff removal that removed it."""
+        transaction (`lead_cleared`), and the workstream leads it held
+        (`workstream_leads_cleared`); `via`, the org or staff removal that removed it."""
         details: dict[str, JsonValue] = {"role": membership.role.value}
         await self.session.delete(membership)
         if project.lead_id == membership.user_id:
             project.lead_id = None
             details["lead_cleared"] = True
             self._log_change(project, ActivityField.LEAD_ID, actor_id, membership.user_id, None)
+        # The project lead's rule holds for workstream leads too (S3-C4).
+        if cleared := await WorkstreamService(self.session).clear_lead(
+            project.id, membership.user_id
+        ):
+            details["workstream_leads_cleared"] = [str(id_) for id_ in cleared]
         if via is not None:
             details["via"] = via.value
         await self.session.flush()
