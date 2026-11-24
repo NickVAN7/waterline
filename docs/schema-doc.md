@@ -673,11 +673,11 @@ helper touches this table. Subtasks are numbered by `task.next_subtask_number` i
 | rank | varchar | display order |
 | start_date / end_date | date, nullable | current plan |
 | baseline_start / baseline_end | date, nullable | approved plan, for slippage |
-| status | enum: planned / active / completed | several phases may be active at once |
+| status | enum: planned / active / completed | default planned; several phases may be active at once |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(project_id, name)`; `CHECK (end_date >= start_date)` when both are set. Phases may
-overlap. Hard delete only while unreferenced (service-layer check). Date and status changes are
+`UNIQUE(project_id, name)` (a 422 `taken` on `name`); `CHECK (end_date >= start_date)` when both
+are set (`ck_phase_dates`). Phases may overlap. Hard delete only while unreferenced (service-layer check). Date and status changes are
 logged.
 
 ### `workstream`
@@ -692,7 +692,7 @@ logged.
 | archived_at | timestamptz, nullable | hidden from pickers; still shown on existing items |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(project_id, name)`.
+`UNIQUE(project_id, name)` (a 422 `taken` on `name`).
 
 ---
 
@@ -773,7 +773,7 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | type | enum: feature / bug / chore / spike / config / data / training | labels mapped per project type |
 | title | varchar | |
 | description_md | text | markdown |
-| status | enum: todo / in_progress / blocked / in_review / done / cancelled | manually set |
+| status | enum: todo / in_progress / blocked / in_review / done / cancelled | default todo; manually set |
 | priority | enum: critical / high / medium / low | default medium |
 | severity | enum: s1 / s2 / s3 / s4, nullable | defect severity; shown for bugs |
 | start_date | date, nullable | |
@@ -799,7 +799,9 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 `UNIQUE(project_id, number)`; `project_id` is immutable. Index on `(project_id, status, rank)`
 for board and backlog views. For My work (design-doc §11): `ix_task_assignee_id_status` on
 `(assignee_id, status)` (tasks assigned to the user) and `ix_task_reviewer_id_status` on
-`(reviewer_id, status)` (tasks in review with the user as reviewer).
+`(reviewer_id, status)` (tasks in review with the user as reviewer). `ix_task_requirement_id` (a
+requirement's tasks: its page, its coverage counts, the delete's linked-tasks choice) and
+`ix_task_phase_id` (a phase's hard delete only while unreferenced) (DL-407).
 `CHECK (restriction_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
 
 ### `subtask`
@@ -810,7 +812,7 @@ for board and backlog views. For My work (design-doc §11): `ix_task_assignee_id
 | number | integer | number within its task; displayed `{KEY}-TA-{task number}.{number}` (e.g. `PMT-TA-45.2`); never reused |
 | title | varchar | |
 | description | text | plain text |
-| is_done | boolean | |
+| is_done | boolean | default false |
 | rank | varchar | order within its task |
 | created_at / updated_at | timestamptz | |
 

@@ -5166,3 +5166,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** build plan (rows 0v to 0x, S3-C6, the security reviewer's list); tech debt
   (TD-101's Fix by); root `CLAUDE.md` (Status)
 - **Source:** owner, Nov 23, 2026 (chat, each item confirmed in turn)
+
+### DL-407: Two task indexes beyond the schema doc's
+- **Date:** 2026-11-23
+- **Decision:** S3-C1's migration also creates `ix_task_requirement_id` and `ix_task_phase_id`:
+  Postgres doesn't index a foreign key (DL-37), and the slice's rows look tasks up by them (a
+  requirement's tasks, its coverage counts, and the delete's linked-tasks choice, S3-C9, S3-C10;
+  a phase's hard delete only while unreferenced, S3-C3). No other new foreign key gets one.
+- **Supersedes:** none (the schema doc listed neither)
+- **Superseded by:** none
+- **Applies to:** S3-C1; schema-doc (`task`)
+- **Source:** owner, Nov 23, 2026 (chat, S3-C1's DL-37 question)

@@ -62,10 +62,13 @@ from tests.factories import (  # noqa: E402
     auth,
     numbering,
     org,
+    phase,
     project,
     requirement,
+    task,
     user,
     workspace,
+    workstream,
 )
 
 __all__ = [
@@ -78,9 +81,12 @@ __all__ = [
     "fake_slug",
     "numbering",
     "org",
+    "phase",
     "project",
     "requirement",
     "reset_factories",
+    "task",
     "user",
     "workspace",
+    "workstream",
 ]

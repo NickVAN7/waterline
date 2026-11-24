@@ -7,8 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C0x (One composable for failed actions) done, the last of the polish group (its review point);
-next: S3-C1 (Models & migration), after the owner's approval.
+S3-C1 (Models & migration) done; next: S3-C2 (Task rules & actions), after the owner's
+approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

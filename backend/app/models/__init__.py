@@ -11,10 +11,13 @@ from app.models import (
     auth,
     numbering,
     org,
+    phase,
     project,
     requirement,
+    task,
     user,
     workspace,
+    workstream,
 )
 
 __all__ = [
@@ -24,8 +27,11 @@ __all__ = [
     "auth",
     "numbering",
     "org",
+    "phase",
     "project",
     "requirement",
+    "task",
     "user",
     "workspace",
+    "workstream",
 ]

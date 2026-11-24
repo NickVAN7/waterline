@@ -155,6 +155,41 @@ class Priority(StrEnum):
     LOW = "low"
 
 
+# --- Planning and work items (schema-doc "Planning Structure", "Work Items") -----------------
+
+
+class PhaseStatus(StrEnum):
+    PLANNED = "planned"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+
+
+class TaskType(StrEnum):
+    FEATURE = "feature"
+    BUG = "bug"
+    CHORE = "chore"
+    SPIKE = "spike"
+    CONFIG = "config"
+    DATA = "data"
+    TRAINING = "training"
+
+
+class TaskStatus(StrEnum):
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    BLOCKED = "blocked"
+    IN_REVIEW = "in_review"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class Severity(StrEnum):
+    S1 = "s1"
+    S2 = "s2"
+    S3 = "s3"
+    S4 = "s4"
+
+
 # --- Approvals (design-doc §6.2; schema-doc "Approvals") --------------------------------------
 
 

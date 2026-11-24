@@ -18,6 +18,7 @@ from app.core.enums import enum_type
 from app.enums import CONTENT_ITEM_CATEGORIES, Priority, RequirementStatus
 from app.models.project import Project
 from app.models.user import User
+from app.models.workstream import Workstream
 
 
 class Requirement(VersionMixin, SoftDeleteMixin, RestrictionMixin, BaseModel):
@@ -33,6 +34,7 @@ class Requirement(VersionMixin, SoftDeleteMixin, RestrictionMixin, BaseModel):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(Project.id))
     number: Mapped[int]
     parent_requirement_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("requirement.id"))
+    workstream_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(Workstream.id))
     reporter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(User.id))
     title: Mapped[str]
     description_md: Mapped[str] = mapped_column(Text)
