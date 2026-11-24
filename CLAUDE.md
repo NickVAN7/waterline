@@ -7,7 +7,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C2 (Task rules & actions) done; next: S3-C3 (Phases), after the owner's approval.
+S3-C3 (Phases) done; next: S3-C4 (Workstreams), after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

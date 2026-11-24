@@ -23,7 +23,11 @@ class Phase(BaseModel):
             info=user_error("name", "taken", "The project already has a phase with this name."),
         ),
         # Only when both are set (a NULL makes the check pass).
-        CheckConstraint("end_date >= start_date", name="dates"),
+        CheckConstraint(
+            "end_date >= start_date",
+            name="dates",
+            info=user_error("end_date", "before_start", "The end date can't be before the start."),
+        ),
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(Project.id))

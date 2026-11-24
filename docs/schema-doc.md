@@ -668,8 +668,8 @@ helper touches this table. Subtasks are numbered by `task.next_subtask_number` i
 |---|---|---|
 | id | UUID (PK) | |
 | project_id | UUID (FK → project) | |
-| name | varchar | e.g. Discover, Design, Build, Test, Deploy, Hypercare |
-| description | text, nullable | plain text |
+| name | varchar | e.g. Discover, Design, Build, Test, Deploy, Hypercare; at most 100 characters (DL-143) |
+| description | text, nullable | plain text; at most 2,000 characters (DL-143) |
 | rank | varchar | display order |
 | start_date / end_date | date, nullable | current plan |
 | baseline_start / baseline_end | date, nullable | approved plan, for slippage |
@@ -677,7 +677,7 @@ helper touches this table. Subtasks are numbered by `task.next_subtask_number` i
 | created_at / updated_at | timestamptz | |
 
 `UNIQUE(project_id, name)` (a 422 `taken` on `name`); `CHECK (end_date >= start_date)` when both
-are set (`ck_phase_dates`). Phases may overlap. Hard delete only while unreferenced (service-layer check). Date and status changes are
+are set (`ck_phase_dates`, a 422 `before_start` on `end_date`). Phases may overlap. Hard delete only while unreferenced (service-layer check). Date and status changes are
 logged.
 
 ### `workstream`

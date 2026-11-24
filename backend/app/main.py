@@ -20,6 +20,7 @@ from app.routers import (
     health,
     my_work,
     org,
+    phase,
     project,
     requirement,
     user,
@@ -77,6 +78,7 @@ def create_app(
     app.include_router(my_work.router, prefix=API_PREFIX)
     app.include_router(activity.router, prefix=API_PREFIX)
     app.include_router(requirement.router, prefix=API_PREFIX)
+    app.include_router(phase.router, prefix=API_PREFIX)
     _add_schema_components(app)
     return app
 

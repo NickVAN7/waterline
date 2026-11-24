@@ -223,7 +223,8 @@ Entry format:
 - **What:** a move with no rank between its neighbors (a tie or the 255-character cap, DL-204,
   DL-213) rewrites the parent's children with one `direct_update` each, so a rewrite among the
   tree's cap of 2,000 top-level requirements is about 2,000 round trips under the project's
-  tree lock (DL-214), holding up other moves in that project for a second or two.
+  tree lock (DL-214), holding up other moves in that project for a second or two. The phase
+  order's rewrite (S3-C3, `PhaseService.move`) is the same, one `direct_update` per phase.
 - **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
   statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
   helper that does it now.
@@ -579,6 +580,18 @@ Entry format:
 - **Status:** open
 
 ---
+
+### TD-130: The phase move copies the requirement move's placement
+- **Added:** S3-C3 (checkpoint-reviewer finding 3)
+- **What:** `PhaseService.move` resolves `after_id`/`before_id` to a position, takes the rank
+  between the neighbors, and rewrites the order on a tie or past 255 characters, as
+  `RequirementService.move` and `_place` do; `LIST_CAP` and `RANK_MAX` repeat the requirement
+  service's constants.
+- **Why:** the second copy, in a layer-3 service that can't import the layer-6 requirement
+  service; one shared pure function belongs in `app/rules/rank.py`, test-first, before a third.
+- **Fix by:** S3-C4 (the workstream move would be the third copy; it takes the shared function,
+  `spec-test-writer` first)
+- **Status:** open
 
 ## Resolved
 

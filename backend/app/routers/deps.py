@@ -16,6 +16,7 @@ from app.core.settings import Settings
 from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
 from app.services.org import OrgEntity, OrgService
+from app.services.phase import PhaseEntity, PhaseService
 from app.services.project import ProjectEntity, ProjectService
 from app.services.requirement import (
     ApprovalRequestEntity,
@@ -147,6 +148,12 @@ async def load_user(user_id: uuid.UUID, session: SessionDep) -> tuple[UserEntity
 
 async def load_project(key: str, session: SessionDep) -> tuple[ProjectEntity, Target] | None:
     return await ProjectService(session).load(key)
+
+
+async def load_phase(
+    key: str, phase_id: uuid.UUID, session: SessionDep
+) -> tuple[PhaseEntity, Target] | None:
+    return await PhaseService(session).load(key, phase_id)
 
 
 async def load_requirement(
