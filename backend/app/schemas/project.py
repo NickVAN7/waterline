@@ -12,6 +12,7 @@ from app.enums import (
     ProjectType,
     RestrictionCategory,
     RestrictionLevel,
+    TaskType,
 )
 from app.schemas.approval import ApprovalWorkItem
 from app.schemas.limits import NAME_MAX, PROJECT_DESCRIPTION_MAX
@@ -63,6 +64,8 @@ class ProjectRead(BaseModel):
     restriction_level: RestrictionLevel | None
     restriction_categories: list[RestrictionCategory]
     modules_holding_data: list[ProjectModule]
+    # The task types this project offers, in `TaskType` order (DL-352).
+    task_types: list[TaskType]
     allowed_actions: list[Action]
 
 

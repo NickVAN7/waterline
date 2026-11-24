@@ -40,6 +40,7 @@ export function project(overrides: Partial<Project> = {}): Project {
     restriction_level: null,
     restriction_categories: [],
     modules_holding_data: [],
+    task_types: ['feature', 'bug', 'chore', 'spike', 'config', 'data', 'training'],
     allowed_actions: [],
     ...overrides,
   }

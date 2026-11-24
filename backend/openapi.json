@@ -7829,6 +7829,750 @@
           }
         }
       }
+    },
+    "/api/projects/{key}/tasks": {
+      "post": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Create Task",
+        "description": "Create a task: the next `TA` number, `todo`, at the bottom of the project's order. 404\nfor a requirement, phase, or workstream outside the project; 422 on `title` (`missing`),\n`type` (`not_offered`), `workstream_id` (`archived`), `restriction_level`\n(`below_project`), and `restriction_categories` (`project_only`).",
+        "operationId": "create_task_api_projects__key__tasks_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "List Tasks",
+        "description": "The project's tasks matching the filters, in rank order unless `sort` says otherwise:\ncomplete up to 2,000, with `truncated` above it (the backlog and the board).",
+        "operationId": "list_tasks_api_projects__key__tasks_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: due_date, number, priority, rank, updated_at. Default: rank",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: due_date, number, priority, rank, updated_at. Default: rank"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskStatus"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "status__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskStatus"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status  Not"
+            }
+          },
+          {
+            "name": "status__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status  Is Null"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "type__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type  Not"
+            }
+          },
+          {
+            "name": "type__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type  Is Null"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Priority"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "name": "priority__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Priority"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority  Not"
+            }
+          },
+          {
+            "name": "priority__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority  Is Null"
+            }
+          },
+          {
+            "name": "assignee",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assignee"
+            }
+          },
+          {
+            "name": "assignee__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assignee  Not"
+            }
+          },
+          {
+            "name": "assignee__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assignee  Is Null"
+            }
+          },
+          {
+            "name": "reviewer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reviewer"
+            }
+          },
+          {
+            "name": "reviewer__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reviewer  Not"
+            }
+          },
+          {
+            "name": "reviewer__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reviewer  Is Null"
+            }
+          },
+          {
+            "name": "workstream",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workstream"
+            }
+          },
+          {
+            "name": "workstream__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workstream  Not"
+            }
+          },
+          {
+            "name": "workstream__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workstream  Is Null"
+            }
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Phase"
+            }
+          },
+          {
+            "name": "phase__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Phase  Not"
+            }
+          },
+          {
+            "name": "phase__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Phase  Is Null"
+            }
+          },
+          {
+            "name": "requirement",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requirement"
+            }
+          },
+          {
+            "name": "requirement__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requirement  Not"
+            }
+          },
+          {
+            "name": "requirement__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requirement  Is Null"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/tasks/{number}": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Get Task",
+        "description": "The task, with the actions and status moves the caller may make.",
+        "operationId": "get_task_api_projects__key__tasks__number__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11133,6 +11877,13 @@
             "type": "array",
             "title": "Modules Holding Data"
           },
+          "task_types": {
+            "items": {
+              "$ref": "#/components/schemas/TaskType"
+            },
+            "type": "array",
+            "title": "Task Types"
+          },
           "allowed_actions": {
             "items": {
               "$ref": "#/components/schemas/Action"
@@ -11158,6 +11909,7 @@
           "restriction_level",
           "restriction_categories",
           "modules_holding_data",
+          "task_types",
           "allowed_actions"
         ],
         "title": "ProjectRead"
@@ -12099,6 +12851,16 @@
         "title": "SessionRead",
         "description": "One of the user's live sessions (DL-298): `user_agent` as stored at sign-in, for the\nbrowser's device label (DL-299); `is_current` for the session making the request."
       },
+      "Severity": {
+        "type": "string",
+        "enum": [
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "title": "Severity"
+      },
       "SignInRequest": {
         "properties": {
           "email": {
@@ -12266,6 +13028,649 @@
         ],
         "title": "StaffRoleUpdate",
         "description": "`new_owner_id`: when an owner steps down, current staff to make owner in the same change\n(the last owner needs one; DL-59)."
+      },
+      "TaskCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title"
+          },
+          "description_md": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Description Md",
+            "default": ""
+          },
+          "type": {
+            "$ref": "#/components/schemas/TaskType",
+            "default": "feature"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority",
+            "default": "medium"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requirement_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement Id"
+          },
+          "phase_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Id"
+          },
+          "workstream_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstream Id"
+          },
+          "restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Restriction Categories",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "TaskCreate",
+        "description": "A new task: `todo`, reported by the caller, at the bottom of the project's order. `type`\none the project's type offers (DL-352); `requirement_id`, `phase_id`, and `workstream_id` in\nthe same project (anything else a 404; an archived workstream a 422, DL-409); the\nrestriction may raise the item's level and add categories (design-doc §3.1)."
+      },
+      "TaskItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "assignee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Name"
+          },
+          "assignee_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Is Active"
+          },
+          "reviewer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
+          },
+          "reviewer_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Is Active"
+          },
+          "requirement_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement Id"
+          },
+          "phase_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Id"
+          },
+          "workstream_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstream Id"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Restriction Categories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "title",
+          "type",
+          "status",
+          "priority",
+          "severity",
+          "assignee_id",
+          "assignee_name",
+          "assignee_is_active",
+          "reviewer_id",
+          "reviewer_name",
+          "reviewer_is_active",
+          "requirement_id",
+          "phase_id",
+          "workstream_id",
+          "due_date",
+          "restriction_level",
+          "restriction_categories"
+        ],
+        "title": "TaskItem",
+        "description": "A row of the project's task list (the backlog and the board)."
+      },
+      "TaskList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "TaskList",
+        "description": "The project's tasks, the matches of the declared filters in the requested display order\n(rank by default): complete up to 2,000, with `truncated` above it (DL-159, DL-351)."
+      },
+      "TaskRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "assignee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Name"
+          },
+          "assignee_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Is Active"
+          },
+          "reviewer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
+          },
+          "reviewer_is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Is Active"
+          },
+          "requirement_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement Id"
+          },
+          "phase_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Id"
+          },
+          "workstream_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workstream Id"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Restriction Categories"
+          },
+          "description_md": {
+            "type": "string",
+            "title": "Description Md"
+          },
+          "reporter_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reporter Id"
+          },
+          "reporter_name": {
+            "type": "string",
+            "title": "Reporter Name"
+          },
+          "reporter_is_active": {
+            "type": "boolean",
+            "title": "Reporter Is Active"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "time_estimate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Estimate"
+          },
+          "time_taken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Taken"
+          },
+          "effective_restriction_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestrictionLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_restriction_categories": {
+            "items": {
+              "$ref": "#/components/schemas/RestrictionCategory"
+            },
+            "type": "array",
+            "title": "Effective Restriction Categories"
+          },
+          "branch_name": {
+            "type": "string",
+            "title": "Branch Name"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          },
+          "allowed_transitions": {
+            "items": {
+              "$ref": "#/components/schemas/TaskStatus"
+            },
+            "type": "array",
+            "title": "Allowed Transitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "title",
+          "type",
+          "status",
+          "priority",
+          "severity",
+          "assignee_id",
+          "assignee_name",
+          "assignee_is_active",
+          "reviewer_id",
+          "reviewer_name",
+          "reviewer_is_active",
+          "requirement_id",
+          "phase_id",
+          "workstream_id",
+          "due_date",
+          "restriction_level",
+          "restriction_categories",
+          "description_md",
+          "reporter_id",
+          "reporter_name",
+          "reporter_is_active",
+          "start_date",
+          "time_estimate",
+          "time_taken",
+          "effective_restriction_level",
+          "effective_restriction_categories",
+          "branch_name",
+          "version",
+          "created_at",
+          "updated_at",
+          "allowed_actions",
+          "allowed_transitions"
+        ],
+        "title": "TaskRead",
+        "description": "One task, with what the caller may do to it: `allowed_actions`, and `allowed_transitions`,\nthe statuses design-doc §5's table lets them move it to (a hint; the update checks)."
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "todo",
+          "in_progress",
+          "blocked",
+          "in_review",
+          "done",
+          "cancelled"
+        ],
+        "title": "TaskStatus"
+      },
+      "TaskType": {
+        "type": "string",
+        "enum": [
+          "feature",
+          "bug",
+          "chore",
+          "spike",
+          "config",
+          "data",
+          "training"
+        ],
+        "title": "TaskType"
       },
       "TrashItem": {
         "properties": {

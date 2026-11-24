@@ -19,7 +19,6 @@ from app.core.base_model import check_version
 from app.core.errors import AppError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Feed, Filter, FilterType, ListSpec, Page, fetch_feed, fetch_page
 from app.enums import (
-    CONTENT_ITEM_CATEGORIES,
     ActivityAction,
     ActivityEntityType,
     ActivityField,
@@ -28,7 +27,6 @@ from app.enums import (
     NumberPrefix,
     RequirementStatus,
     RestrictionCategory,
-    RestrictionLevel,
     TrashItemType,
 )
 from app.models.approval import ApprovalRequest
@@ -58,7 +56,11 @@ from app.schemas.requirement import (
 )
 from app.services.approval import ApprovalService
 from app.services.numbering import NumberingService
-from app.services.project import register_on_restriction_changed
+from app.services.project import (
+    check_item_restriction,
+    lift_items,
+    register_on_restriction_changed,
+)
 from app.services.user import required_error
 from app.services.workstream import WorkstreamService
 
@@ -90,30 +92,6 @@ REVISIONS = ListSpec(
 
 def _categories(requirement: Requirement) -> list[RestrictionCategory]:
     return [RestrictionCategory(c) for c in requirement.restriction_categories]
-
-
-def _check_restriction(
-    project: Project,
-    level: RestrictionLevel | None,
-    categories: frozenset[RestrictionCategory],
-    *,
-    level_field: str,
-    categories_field: str,
-) -> None:
-    """422 for a level below the project's (`below_project`, DL-208) or `export_controlled`
-    (`project_only`: it's set on the project)."""
-    if level in levels_below(project.restriction_level):
-        raise ValidationFailedError.on(
-            ("body", level_field),
-            "A requirement can't be restricted below its project.",
-            "below_project",
-        )
-    if not categories <= set(CONTENT_ITEM_CATEGORIES):
-        raise ValidationFailedError.on(
-            ("body", categories_field),
-            "Export control is set on the project, not on a requirement.",
-            "project_only",
-        )
 
 
 class RequirementService:
@@ -194,10 +172,11 @@ class RequirementService:
         # Checked again on the held row: an archive or export-control change that committed
         # while this waited takes the right away.
         ensure(ctx, Action.REQUIREMENT_CREATE, project_target(project))
-        _check_restriction(
+        check_item_restriction(
             project,
             values.restriction_level,
             categories,
+            noun="requirement",
             level_field="restriction_level",
             categories_field="restriction_categories",
         )
@@ -374,8 +353,13 @@ class RequirementService:
         raise_, lower = Action.REQUIREMENT_RAISE_RESTRICTION, Action.REQUIREMENT_LOWER_RESTRICTION
         for action in needed_rights(kind, raise_, lower):
             ensure(ctx, action, target)
-        _check_restriction(
-            project, new.level, new.categories, level_field="level", categories_field="categories"
+        check_item_restriction(
+            project,
+            new.level,
+            new.categories,
+            noun="requirement",
+            level_field="level",
+            categories_field="categories",
         )
         stored = sorted(new.categories)
         logged = [
@@ -671,32 +655,6 @@ class RequirementService:
             ]
         )
 
-    async def lift_to_project(self, project: Project, actor_id: uuid.UUID) -> None:
-        """A raised project lifts its live requirements stored below its new level to it, each
-        logged as the raiser's change, without moving `updated_at` (DL-208 to DL-210)."""
-        level = project.restriction_level
-        for requirement_id, old in await self.repository.lock_stored_at(
-            project.id, levels_below(level)
-        ):
-            await direct_update(
-                self.session,
-                Requirement,
-                requirement_id,
-                {"restriction_level": level},
-                touch_updated_at=False,
-            )
-            log_change(
-                self.session,
-                project_id=project.id,
-                entity_type=ActivityEntityType.REQUIREMENT,
-                entity_id=requirement_id,
-                action=ActivityAction.UPDATED,
-                changed_by=actor_id,
-                field=ActivityField.RESTRICTION_LEVEL,
-                old=old,
-                new=level,
-            )
-
     async def tree(self, project: Project) -> RequirementTree:
         """The project's requirements for the tree, up to the cap (DL-159)."""
         rows = await self.repository.ranked(project.id, TREE_CAP + 1)
@@ -823,7 +781,7 @@ def _revision(row: RequirementRevision) -> RevisionItem:
 
 
 async def _lift_requirements(session: AsyncSession, project: Project, actor_id: uuid.UUID) -> None:
-    await RequirementService(session).lift_to_project(project, actor_id)
+    await lift_items(session, Requirement, ActivityEntityType.REQUIREMENT, project, actor_id)
 
 
 register_on_restriction_changed(_lift_requirements)

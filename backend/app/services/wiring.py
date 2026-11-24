@@ -18,6 +18,7 @@ from app.services import (
     requirement,
     requirement_approvals,
     roster,
+    task,
     user,
     workspace,
 )

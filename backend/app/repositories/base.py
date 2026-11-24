@@ -1,7 +1,7 @@
 """Query helpers shared by every repository."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any
 
 from sqlalchemy import ColumnElement, Result, and_, not_, or_, select, true, update
@@ -12,6 +12,7 @@ from sqlalchemy.sql import Executable, Update
 
 from app.authz.scoping import Scope
 from app.core.base_model import INCLUDE_DELETED, IdMixin
+from app.enums import RestrictionLevel
 
 
 async def get_by_id[M: IdMixin](
@@ -116,3 +117,17 @@ def scope_clause(
             raise ValueError("a content scope needs the export_controlled expression")
         inherited = and_(inherited, not_(export_controlled))
     return or_(id_column.in_(scope.ids), inherited)
+
+
+async def lock_stored_at(
+    session: AsyncSession, model: Any, project_id: uuid.UUID, levels: Collection[RestrictionLevel]
+) -> list[tuple[uuid.UUID, RestrictionLevel]]:
+    """The project's live items of `model` (a content item with `RestrictionMixin`) stored at
+    one of `levels`, locked, in id order (so two raises lock rows in the same order)."""
+    rows = await session.execute(
+        select(model.id, model.restriction_level)
+        .where(model.project_id == project_id, model.restriction_level.in_(levels))
+        .order_by(model.id)
+        .with_for_update()
+    )
+    return [(id_, RestrictionLevel(level)) for id_, level in rows]

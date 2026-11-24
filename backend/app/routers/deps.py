@@ -24,6 +24,7 @@ from app.services.requirement import (
     RequirementService,
 )
 from app.services.requirement_approvals import RequirementApprovalService
+from app.services.task import TaskEntity, TaskService
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
 from app.services.workstream import WorkstreamEntity, WorkstreamService
@@ -161,6 +162,10 @@ async def load_workstream(
     key: str, workstream_id: uuid.UUID, session: SessionDep
 ) -> tuple[WorkstreamEntity, Target] | None:
     return await WorkstreamService(session).load(key, workstream_id)
+
+
+async def load_task(key: str, number: int, session: SessionDep) -> tuple[TaskEntity, Target] | None:
+    return await TaskService(session).load(key, number)
 
 
 async def load_requirement(

@@ -23,6 +23,7 @@ from app.routers import (
     phase,
     project,
     requirement,
+    task,
     user,
     workspace,
     workstream,
@@ -81,6 +82,7 @@ def create_app(
     app.include_router(requirement.router, prefix=API_PREFIX)
     app.include_router(phase.router, prefix=API_PREFIX)
     app.include_router(workstream.router, prefix=API_PREFIX)
+    app.include_router(task.router, prefix=API_PREFIX)
     _add_schema_components(app)
     return app
 

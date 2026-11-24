@@ -5,6 +5,7 @@ import dataclasses
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,7 @@ from app.authz.target import Target, org_target, project_target
 from app.core.errors import FieldError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Page, fetch_page
 from app.enums import (
+    CONTENT_ITEM_CATEGORIES,
     ActivityAction,
     ActivityEntityType,
     ActivityField,
@@ -28,15 +30,18 @@ from app.enums import (
     ProjectRole,
     ProjectType,
     RestrictionCategory,
+    RestrictionLevel,
 )
 from app.models.org import Organization
 from app.models.project import Project, ProjectMembership
 from app.models.user import User
+from app.repositories.base import direct_update, lock_stored_at
 from app.repositories.project import ProjectRepository
 from app.repositories.user import UserRepository
 from app.rules.identifiers import normalize_project_key, project_key_problem
 from app.rules.modules import ALL_MODULES, is_available, recommended_modules, seed_modules
-from app.rules.restriction import Restriction, change, needed_rights
+from app.rules.restriction import Restriction, change, levels_below, needed_rights
+from app.rules.task_types import task_types
 from app.schemas.project import (
     ModuleGuidance,
     ModuleNote,
@@ -191,6 +196,60 @@ def _restriction_json(restriction: Restriction) -> dict[str, JsonValue]:
         "restriction_level": level.value if level else None,
         "restriction_categories": list[JsonValue](_stored(restriction.categories)),
     }
+
+
+def check_item_restriction(
+    project: Project,
+    level: RestrictionLevel | None,
+    categories: frozenset[RestrictionCategory],
+    *,
+    noun: str,
+    level_field: str,
+    categories_field: str,
+) -> None:
+    """A content item's restriction (a requirement's, a task's): 422 for a level below the
+    project's (`below_project`, DL-208) or `export_controlled` (`project_only`: it's set on the
+    project)."""
+    if level in levels_below(project.restriction_level):
+        raise ValidationFailedError.on(
+            ("body", level_field),
+            f"A {noun} can't be restricted below its project.",
+            "below_project",
+        )
+    if not categories <= set(CONTENT_ITEM_CATEGORIES):
+        raise ValidationFailedError.on(
+            ("body", categories_field),
+            f"Export control is set on the project, not on a {noun}.",
+            "project_only",
+        )
+
+
+async def lift_items(
+    session: AsyncSession,
+    model: Any,
+    entity_type: ActivityEntityType,
+    project: Project,
+    actor_id: uuid.UUID,
+) -> None:
+    """A raised project lifts its live items of `model` stored below its new level to it, each
+    logged as the raiser's change, without moving `updated_at` (DL-208 to DL-210): an item
+    area's `on_restriction_changed` handler."""
+    level = project.restriction_level
+    for item_id, old in await lock_stored_at(session, model, project.id, levels_below(level)):
+        await direct_update(
+            session, model, item_id, {"restriction_level": level}, touch_updated_at=False
+        )
+        log_change(
+            session,
+            project_id=project.id,
+            entity_type=entity_type,
+            entity_id=item_id,
+            action=ActivityAction.UPDATED,
+            changed_by=actor_id,
+            field=ActivityField.RESTRICTION_LEVEL,
+            old=old,
+            new=level,
+        )
 
 
 type RestrictionChangedHandler = Callable[[AsyncSession, Project, uuid.UUID], Awaitable[None]]
@@ -366,6 +425,7 @@ class ProjectService:
             restriction_categories=[RestrictionCategory(c) for c in project.restriction_categories],
             # Each module's has-data hook arrives with its slice; none holds data yet.
             modules_holding_data=[],
+            task_types=list(task_types(project.type)),
             allowed_actions=allowed_actions(ctx, project_target(project)),
         )
 

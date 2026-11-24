@@ -1,0 +1,277 @@
+"""Tasks (design-doc §5, §6 "Task"; build plan, S3-C5). Layer 4: calls numbering, phase,
+workstream, and project (its restriction rules and the raise's handler)."""
+
+import uuid
+from typing import cast
+
+from pydantic import BaseModel
+from sqlalchemy import case
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.audit.change_log import log_change
+from app.authz.actions import Action
+from app.authz.authorize import allowed_actions, authorize, ensure
+from app.authz.context import AuthzContext
+from app.authz.target import Target, project_target
+from app.core.errors import NotFoundError, ValidationFailedError
+from app.core.lists import Filter, FilterType, ListSpec, fetch_ranked
+from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    NumberPrefix,
+    Priority,
+    RestrictionCategory,
+    TaskStatus,
+    TaskType,
+)
+from app.models.project import Project
+from app.models.task import Task
+from app.models.user import User
+from app.repositories.project import ProjectRepository
+from app.repositories.requirement import RequirementRepository
+from app.repositories.task import TaskRepository
+from app.repositories.user import UserRepository
+from app.rules.branch_name import branch_name
+from app.rules.rank import rank_between
+from app.rules.restriction import Restriction, effective
+from app.rules.task_transitions import TaskPeople, allowed_transitions
+from app.rules.task_types import task_types
+from app.schemas.task import TaskCreate, TaskItem, TaskList, TaskRead
+from app.services.numbering import NumberingService
+from app.services.phase import PhaseService
+from app.services.project import (
+    check_item_restriction,
+    lift_items,
+    register_on_restriction_changed,
+)
+from app.services.user import required_error
+from app.services.workstream import WorkstreamService
+
+type TaskEntity = Task
+
+# The ranked-view cap (DL-159), as the requirement tree's.
+LIST_CAP = 2_000
+
+# Priority sorts by importance, not by its stored text.
+_PRIORITY_ORDER = case({p.value: index for index, p in enumerate(Priority)}, value=Task.priority)
+
+# The backlog's and board's one list (Q2): filters and display sorts decided Nov 24, 2026 (R2).
+TASKS = ListSpec(
+    name="TaskItem",
+    id_column=Task.id,  # pyright: ignore[reportArgumentType]
+    sorts={
+        "rank": Task.rank,  # pyright: ignore[reportArgumentType]
+        "number": Task.number,  # pyright: ignore[reportArgumentType]
+        "priority": _PRIORITY_ORDER,
+        "due_date": Task.due_date,  # pyright: ignore[reportArgumentType]
+        "updated_at": Task.updated_at,  # pyright: ignore[reportArgumentType]
+    },
+    default_sort=("rank",),
+    filters=(
+        Filter("status", Task.status, FilterType.ENUM, enum=TaskStatus),
+        Filter("type", Task.type, FilterType.ENUM, enum=TaskType),
+        Filter("priority", Task.priority, FilterType.ENUM, enum=Priority),
+        Filter("assignee", Task.assignee_id, FilterType.USER),
+        Filter("reviewer", Task.reviewer_id, FilterType.USER),
+        Filter("workstream", Task.workstream_id, FilterType.REFERENCE),
+        Filter("phase", Task.phase_id, FilterType.REFERENCE),
+        Filter("requirement", Task.requirement_id, FilterType.REFERENCE),
+    ),
+    paging="ranked",
+)
+
+
+def _categories(task: Task) -> list[RestrictionCategory]:
+    return [RestrictionCategory(c) for c in task.restriction_categories]
+
+
+def _person(
+    users: dict[uuid.UUID, User], user_id: uuid.UUID | None
+) -> tuple[str | None, bool | None]:
+    """The person's name and whether their account is active, or None with nobody."""
+    user = users.get(user_id) if user_id else None
+    return (user.name, user.is_active) if user else (None, None)
+
+
+def _item(task: Task, users: dict[uuid.UUID, User]) -> TaskItem:
+    assignee, reviewer = _person(users, task.assignee_id), _person(users, task.reviewer_id)
+    return TaskItem(
+        id=task.id,
+        number=task.number,
+        title=task.title,
+        type=task.type,
+        status=task.status,
+        priority=task.priority,
+        severity=task.severity,
+        assignee_id=task.assignee_id,
+        assignee_name=assignee[0],
+        assignee_is_active=assignee[1],
+        reviewer_id=task.reviewer_id,
+        reviewer_name=reviewer[0],
+        reviewer_is_active=reviewer[1],
+        requirement_id=task.requirement_id,
+        phase_id=task.phase_id,
+        workstream_id=task.workstream_id,
+        due_date=task.due_date,
+        restriction_level=task.restriction_level,
+        restriction_categories=_categories(task),
+    )
+
+
+class TaskService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.repository = TaskRepository(session)
+
+    async def load(self, key: str, number: int) -> tuple[Task, Target] | None:
+        """The task `number` in project `key`, as a target inside its project."""
+        project = await ProjectRepository(self.session).get_by_key(key)
+        if project is None:
+            return None
+        task = await self.repository.get_by_number(project.id, number)
+        return None if task is None else (task, project_target(project, task))
+
+    async def _project(self, task: Task) -> Project:
+        # A foreign key, so never None; the loader's project, an identity-map hit.
+        return cast(Project, await self.session.get(Project, task.project_id))
+
+    async def _people(self, tasks: list[Task]) -> dict[uuid.UUID, User]:
+        return await UserRepository(self.session).get_many(
+            {
+                user_id
+                for task in tasks
+                for user_id in (task.assignee_id, task.reviewer_id, task.reporter_id)
+                if user_id is not None
+            }
+        )
+
+    async def create(self, ctx: AuthzContext, project: Project, values: TaskCreate) -> TaskRead:
+        """A new task in `project`: the next `TA` number, `todo`, reported by the caller, at the
+        bottom of the project's order, logged `created`. 404 for a requirement (live), phase,
+        or workstream outside the project; 422 on `title` (`missing`), `type` (`not_offered`),
+        `workstream_id` (`archived`), `restriction_level` (`below_project`), and
+        `restriction_categories` (`project_only`)."""
+        if problems := required_error(values.title, field="title"):
+            raise ValidationFailedError(problems)
+        if values.type not in task_types(project.type):
+            raise ValidationFailedError.on(
+                ("body", "type"), "This project doesn't offer that task type.", "not_offered"
+            )
+        categories = frozenset(values.restriction_categories)
+        # Held, so a raise committing meanwhile can't leave the item below the level (TD-72).
+        await ProjectRepository(self.session).hold(project)
+        # Checked again on the held row: an archive or export-control change that committed
+        # while this waited takes the right away.
+        ensure(ctx, Action.TASK_CREATE, project_target(project))
+        check_item_restriction(
+            project,
+            values.restriction_level,
+            categories,
+            noun="task",
+            level_field="restriction_level",
+            categories_field="restriction_categories",
+        )
+        # Each held until commit, so a delete (or an archive) can't commit under the new task.
+        if values.requirement_id is not None and (
+            await RequirementRepository(self.session).get_in_project(
+                project.id, values.requirement_id, hold=True
+            )
+            is None
+        ):
+            raise NotFoundError
+        if values.phase_id is not None:
+            await PhaseService(self.session).assignable(project.id, values.phase_id)
+        if values.workstream_id is not None:
+            await WorkstreamService(self.session).assignable(project.id, values.workstream_id)
+        task = Task(
+            project_id=project.id,
+            number=await NumberingService(self.session).allocate_number(project, NumberPrefix.TASK),
+            requirement_id=values.requirement_id,
+            type=values.type,
+            title=values.title.strip(),
+            description_md=values.description_md,
+            priority=values.priority,
+            severity=values.severity,
+            reporter_id=ctx.user_id,
+            phase_id=values.phase_id,
+            workstream_id=values.workstream_id,
+            # Two creates at once may tie: `(rank, id)` orders them, a later move rewrites.
+            rank=rank_between(await self.repository.last_rank(project.id), None),
+            restriction_level=values.restriction_level,
+            restriction_categories=sorted(categories),
+        )
+        self.session.add(task)
+        await self.session.flush()
+        log_change(
+            self.session,
+            project_id=project.id,
+            entity_type=ActivityEntityType.TASK,
+            entity_id=task.id,
+            action=ActivityAction.CREATED,
+            changed_by=ctx.user_id,
+        )
+        return await self.read(ctx, task)
+
+    async def read(self, ctx: AuthzContext, task: Task) -> TaskRead:
+        project = await self._project(task)
+        target = project_target(project, task)
+        users = await self._people([task])
+        reporter = _person(users, task.reporter_id)
+        applies = effective(
+            Restriction(task.restriction_level, frozenset(_categories(task))),
+            Restriction(
+                project.restriction_level,
+                frozenset(RestrictionCategory(c) for c in project.restriction_categories),
+            ),
+        )
+        transitions = (
+            allowed_transitions(
+                task.status,
+                actor_id=ctx.user_id,
+                people=TaskPeople(task.assignee_id, task.reviewer_id),
+                # A project admin as the admin content actions count one (owner, Nov 24, 2026).
+                is_project_admin=authorize(ctx, Action.TASK_REASSIGN_REPORTER, target),
+            )
+            if authorize(ctx, Action.TASK_UPDATE, target)
+            else frozenset[TaskStatus]()
+        )
+        return TaskRead(
+            **_item(task, users).model_dump(),
+            description_md=task.description_md,
+            reporter_id=task.reporter_id,
+            # A foreign key, so the reporter is always there.
+            reporter_name=cast(str, reporter[0]),
+            reporter_is_active=cast(bool, reporter[1]),
+            start_date=task.start_date,
+            time_estimate=task.time_estimate,
+            time_taken=task.time_taken,
+            effective_restriction_level=applies.level,
+            effective_restriction_categories=sorted(applies.categories),
+            branch_name=branch_name(f"{project.key}-{NumberPrefix.TASK}-{task.number}", task.title),
+            version=task.version,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            allowed_actions=allowed_actions(ctx, target),
+            allowed_transitions=[s for s in TaskStatus if s in transitions],
+        )
+
+    async def list(self, ctx: AuthzContext, project: Project, query: BaseModel) -> TaskList:
+        """The project's tasks matching the declared filters, in the requested order (rank by
+        default), up to the cap (DL-159, DL-351)."""
+        rows, truncated = await fetch_ranked(
+            self.session,
+            self.repository.in_project(project.id),
+            TASKS,
+            query,
+            LIST_CAP,
+            current_user_id=ctx.user_id,
+        )
+        users = await self._people(rows)
+        return TaskList(items=[_item(row, users) for row in rows], truncated=truncated)
+
+
+async def _lift_tasks(session: AsyncSession, project: Project, actor_id: uuid.UUID) -> None:
+    await lift_items(session, Task, ActivityEntityType.TASK, project, actor_id)
+
+
+register_on_restriction_changed(_lift_tasks)

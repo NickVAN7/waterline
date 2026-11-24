@@ -107,7 +107,9 @@ class ListSpec:
     descending. `id` is always the last tiebreaker. `sort_first` is a fixed order ahead of the
     requested one (the users list's system admins with no workspace role last, DL-188).
     `paging="cursor"` is for append-only feeds: newest first, by `id` (UUIDv7, so creation
-    order), with no sort parameter. `active_column` (a people list's `User.is_active`) hides
+    order), with no sort parameter. `paging="ranked"` is for ranked views (the backlog): no
+    `limit` or `offset`, every match up to the view's cap (`fetch_ranked`, DL-159, DL-351).
+    `active_column` (a people list's `User.is_active`) hides
     the false rows unless `include_deactivated`, which is restricted (DL-293, DL-294).
     """
 
@@ -120,7 +122,7 @@ class ListSpec:
     search: tuple[Column, ...] = ()
     archived_column: Column | None = None
     active_column: Column | None = None
-    paging: Literal["offset", "cursor"] = "offset"
+    paging: Literal["offset", "cursor", "ranked"] = "offset"
 
     def __post_init__(self) -> None:
         unknown = [name.removeprefix("-") for name in self.default_sort]
@@ -145,9 +147,12 @@ class ListSpec:
     def query_model(self) -> type[BaseModel]:
         """The endpoint's query-parameter model: `Annotated[spec.query_model, Query()]`. Extra
         parameters are forbidden, so a typo is a 422, never a silently unfiltered list."""
-        fields: dict[str, Any] = {"limit": (int, Field(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT))}
+        fields: dict[str, Any] = {}
+        if self.paging != "ranked":
+            fields["limit"] = (int, Field(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT))
         if self.paging == "offset":
             fields["offset"] = (int, Field(0, ge=0, le=MAX_OFFSET))
+        if self.paging in ("offset", "ranked"):
             fields["sort"] = (
                 str | None,
                 Field(
@@ -158,7 +163,7 @@ class ListSpec:
                     ),
                 ),
             )
-        else:
+        if self.paging == "cursor":
             fields["before"] = (
                 uuid.UUID | None,
                 Field(None, description="The `next_cursor` of the previous page"),
@@ -464,6 +469,26 @@ async def fetch_feed(
     more = len(rows) > limit
     items = rows[:limit]
     return FeedResult(items=items, next_cursor=items[-1].id if more else None)
+
+
+async def fetch_ranked(
+    session: AsyncSession,
+    statement: Select[Any],
+    spec: ListSpec,
+    query: BaseModel,
+    cap: int,
+    *,
+    current_user_id: uuid.UUID | None = None,
+    permitted: Collection[str] = frozenset(),
+) -> tuple[list[Any], bool]:
+    """A ranked view's matches, at most `cap`, and whether there were more (`truncated`,
+    DL-159). `statement` selects one entity and is already scoped to what the user may see."""
+    filtered = apply_filters(
+        statement, spec, query, current_user_id=current_user_id, permitted=permitted
+    )
+    ordered = filtered.order_by(*order_by(spec, _value(query, "sort"))).limit(cap + 1)
+    rows = list(await session.scalars(ordered))
+    return rows[:cap], len(rows) > cap
 
 
 # --- Response bodies ------------------------------------------------------------------------------

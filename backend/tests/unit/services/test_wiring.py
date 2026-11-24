@@ -44,7 +44,7 @@ def test_importing_it_alone_fills_every_handler_registry(module: str) -> None:
     assert json.loads(result.stdout) == {
         "email_changed": ["_end_sessions"],
         "member_removed": ["_remove_with_projects"],
-        "restriction_changed": ["_lift_requirements"],
+        "restriction_changed": ["_lift_requirements", "_lift_tasks"],
         "approved": {"requirement": "_approved"},
         "rejected": {"requirement": "_rejected"},
     }

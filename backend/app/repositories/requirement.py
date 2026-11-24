@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.base_model import INCLUDE_DELETED
-from app.enums import RestrictionLevel
 from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
 
@@ -227,19 +226,6 @@ class RequirementRepository:
             select(RequirementRevision.revision_number).where(RequirementRevision.id == revision_id)
         )
         return cast(int, number)
-
-    async def lock_stored_at(
-        self, project_id: uuid.UUID, levels: Collection[RestrictionLevel]
-    ) -> list[tuple[uuid.UUID, RestrictionLevel]]:
-        """The project's live requirements stored at one of `levels`, locked, in id order (so
-        two raises lock rows in the same order)."""
-        rows = await self.session.execute(
-            select(Requirement.id, Requirement.restriction_level)
-            .where(Requirement.project_id == project_id, Requirement.restriction_level.in_(levels))
-            .order_by(Requirement.id)
-            .with_for_update()
-        )
-        return [(id_, RestrictionLevel(level)) for id_, level in rows]
 
     async def siblings(
         self, project_id: uuid.UUID, parent_id: uuid.UUID | None, *, excluding: uuid.UUID

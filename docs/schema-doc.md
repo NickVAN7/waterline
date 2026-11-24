@@ -771,8 +771,8 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | number | integer | displayed `{KEY}-TA-n`; never reused |
 | requirement_id | UUID (FK → requirement), nullable | optional; unlinked tasks flagged in UI |
 | type | enum: feature / bug / chore / spike / config / data / training | labels mapped per project type |
-| title | varchar | |
-| description_md | text | markdown |
+| title | varchar | at most 200 characters, as a requirement's (DL-143) |
+| description_md | text | markdown; at most 20,000 characters, as a requirement's (DL-143) |
 | status | enum: todo / in_progress / blocked / in_review / done / cancelled | default todo; manually set |
 | priority | enum: critical / high / medium / low | default medium |
 | severity | enum: s1 / s2 / s3 / s4, nullable | defect severity; shown for bugs |

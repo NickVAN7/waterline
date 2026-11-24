@@ -1518,6 +1518,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tasks
+         * @description The project's tasks matching the filters, in rank order unless `sort` says otherwise:
+         *     complete up to 2,000, with `truncated` above it (the backlog and the board).
+         */
+        get: operations["list_tasks_api_projects__key__tasks_get"];
+        put?: never;
+        /**
+         * Create Task
+         * @description Create a task: the next `TA` number, `todo`, at the bottom of the project's order. 404
+         *     for a requirement, phase, or workstream outside the project; 422 on `title` (`missing`),
+         *     `type` (`not_offered`), `workstream_id` (`archived`), `restriction_level`
+         *     (`below_project`), and `restriction_categories` (`project_only`).
+         */
+        post: operations["create_task_api_projects__key__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task
+         * @description The task, with the actions and status moves the caller may make.
+         */
+        get: operations["get_task_api_projects__key__tasks__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2822,6 +2870,8 @@ export interface components {
             restriction_categories: components["schemas"]["RestrictionCategory"][];
             /** Modules Holding Data */
             modules_holding_data: components["schemas"]["ProjectModule"][];
+            /** Task Types */
+            task_types: components["schemas"]["TaskType"][];
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -3182,6 +3232,11 @@ export interface components {
             /** Is Current */
             is_current: boolean;
         };
+        /**
+         * Severity
+         * @enum {string}
+         */
+        Severity: "s1" | "s2" | "s3" | "s4";
         /** SignInRequest */
         SignInRequest: {
             /** Email */
@@ -3253,6 +3308,183 @@ export interface components {
             /** New Owner Id */
             new_owner_id?: string | null;
         };
+        /**
+         * TaskCreate
+         * @description A new task: `todo`, reported by the caller, at the bottom of the project's order. `type`
+         *     one the project's type offers (DL-352); `requirement_id`, `phase_id`, and `workstream_id` in
+         *     the same project (anything else a 404; an archived workstream a 422, DL-409); the
+         *     restriction may raise the item's level and add categories (design-doc §3.1).
+         */
+        TaskCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Description Md
+             * @default
+             */
+            description_md: string;
+            /** @default feature */
+            type: components["schemas"]["TaskType"];
+            /** @default medium */
+            priority: components["schemas"]["Priority"];
+            severity?: components["schemas"]["Severity"] | null;
+            /** Requirement Id */
+            requirement_id?: string | null;
+            /** Phase Id */
+            phase_id?: string | null;
+            /** Workstream Id */
+            workstream_id?: string | null;
+            restriction_level?: components["schemas"]["RestrictionLevel"] | null;
+            /**
+             * Restriction Categories
+             * @default []
+             */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * TaskItem
+         * @description A row of the project's task list (the backlog and the board).
+         */
+        TaskItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            type: components["schemas"]["TaskType"];
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["Priority"];
+            severity: components["schemas"]["Severity"] | null;
+            /** Assignee Id */
+            assignee_id: string | null;
+            /** Assignee Name */
+            assignee_name: string | null;
+            /** Assignee Is Active */
+            assignee_is_active: boolean | null;
+            /** Reviewer Id */
+            reviewer_id: string | null;
+            /** Reviewer Name */
+            reviewer_name: string | null;
+            /** Reviewer Is Active */
+            reviewer_is_active: boolean | null;
+            /** Requirement Id */
+            requirement_id: string | null;
+            /** Phase Id */
+            phase_id: string | null;
+            /** Workstream Id */
+            workstream_id: string | null;
+            /** Due Date */
+            due_date: string | null;
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * TaskList
+         * @description The project's tasks, the matches of the declared filters in the requested display order
+         *     (rank by default): complete up to 2,000, with `truncated` above it (DL-159, DL-351).
+         */
+        TaskList: {
+            /** Items */
+            items: components["schemas"]["TaskItem"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * TaskRead
+         * @description One task, with what the caller may do to it: `allowed_actions`, and `allowed_transitions`,
+         *     the statuses design-doc §5's table lets them move it to (a hint; the update checks).
+         */
+        TaskRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            type: components["schemas"]["TaskType"];
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["Priority"];
+            severity: components["schemas"]["Severity"] | null;
+            /** Assignee Id */
+            assignee_id: string | null;
+            /** Assignee Name */
+            assignee_name: string | null;
+            /** Assignee Is Active */
+            assignee_is_active: boolean | null;
+            /** Reviewer Id */
+            reviewer_id: string | null;
+            /** Reviewer Name */
+            reviewer_name: string | null;
+            /** Reviewer Is Active */
+            reviewer_is_active: boolean | null;
+            /** Requirement Id */
+            requirement_id: string | null;
+            /** Phase Id */
+            phase_id: string | null;
+            /** Workstream Id */
+            workstream_id: string | null;
+            /** Due Date */
+            due_date: string | null;
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Description Md */
+            description_md: string;
+            /**
+             * Reporter Id
+             * Format: uuid
+             */
+            reporter_id: string;
+            /** Reporter Name */
+            reporter_name: string;
+            /** Reporter Is Active */
+            reporter_is_active: boolean;
+            /** Start Date */
+            start_date: string | null;
+            /** Time Estimate */
+            time_estimate: string | null;
+            /** Time Taken */
+            time_taken: string | null;
+            effective_restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Effective Restriction Categories */
+            effective_restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Branch Name */
+            branch_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+            /** Allowed Transitions */
+            allowed_transitions: components["schemas"]["TaskStatus"][];
+        };
+        /**
+         * TaskStatus
+         * @enum {string}
+         */
+        TaskStatus: "todo" | "in_progress" | "blocked" | "in_review" | "done" | "cancelled";
+        /**
+         * TaskType
+         * @enum {string}
+         */
+        TaskType: "feature" | "bug" | "chore" | "spike" | "config" | "data" | "training";
         /**
          * TrashItem
          * @description A row of the project's trash: the item, who deleted it, and when (design-doc §9).
@@ -8713,6 +8945,212 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkstreamRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_tasks_api_projects__key__tasks_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated, `-` for descending: due_date, number, priority, rank, updated_at. Default: rank */
+                sort?: string | null;
+                status?: components["schemas"]["TaskStatus"][] | null;
+                status__not?: components["schemas"]["TaskStatus"][] | null;
+                status__is_null?: boolean | null;
+                type?: components["schemas"]["TaskType"][] | null;
+                type__not?: components["schemas"]["TaskType"][] | null;
+                type__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                assignee?: (string | "me")[] | null;
+                assignee__not?: (string | "me")[] | null;
+                assignee__is_null?: boolean | null;
+                reviewer?: (string | "me")[] | null;
+                reviewer__not?: (string | "me")[] | null;
+                reviewer__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                phase?: string[] | null;
+                phase__not?: string[] | null;
+                phase__is_null?: boolean | null;
+                requirement?: string[] | null;
+                requirement__not?: string[] | null;
+                requirement__is_null?: boolean | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_task_api_projects__key__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_task_api_projects__key__tasks__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
                 };
             };
             /** @description Unauthorized */

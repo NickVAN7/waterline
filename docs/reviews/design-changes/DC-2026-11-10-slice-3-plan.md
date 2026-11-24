@@ -169,7 +169,7 @@ docs state the refined rules.
 
 - **R1:** S3-C5, C6, C8, and C9 join the `spec-test-writer` list for their targeted rules; S3-C3
   and C4 stay on it.
-- **R2:** S3-C5's task list declares `status`, `type`, `priority`, `assignee` (`me`, `none`),
+- **R2:** S3-C5's task list declares `status`, `type`, `priority`, `assignee` (`me`, `__is_null`),
   `reviewer` (`me`), `workstream`, `phase`, `requirement`, sorts `rank`, `number`, `priority`,
   `due_date`, `updated_at`; S3-C10's tree declares `status`, `priority`, `workstream`, `reporter`
   (`me`), approval state, and `has_tasks`, no sorts; S3-C13 adds `task-person-candidates` and

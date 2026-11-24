@@ -14,10 +14,14 @@ class PhaseRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_in_project(self, project_id: uuid.UUID, phase_id: uuid.UUID) -> Phase | None:
-        """The phase with this ID if it's in the project."""
+    async def get_in_project(
+        self, project_id: uuid.UUID, phase_id: uuid.UUID, *, hold: bool = False
+    ) -> Phase | None:
+        """The phase with this ID if it's in the project. With `hold`, held `FOR SHARE` until
+        the transaction ends, so a delete waits and then sees what names it."""
+        statement = select(Phase).where(Phase.project_id == project_id, Phase.id == phase_id)
         return await self.session.scalar(
-            select(Phase).where(Phase.project_id == project_id, Phase.id == phase_id)
+            statement.with_for_update(read=True) if hold else statement
         )
 
     async def ranked(self, project_id: uuid.UUID, limit: int) -> list[Phase]:

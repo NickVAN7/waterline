@@ -62,6 +62,14 @@ class PhaseService:
         phase = await self.repository.get_in_project(project.id, phase_id)
         return None if phase is None else (phase, project_target(project, phase))
 
+    async def assignable(self, project_id: uuid.UUID, phase_id: uuid.UUID) -> Phase:
+        """The phase an item in the project is newly given, held until commit so a delete
+        waits: 404 outside the project."""
+        phase = await self.repository.get_in_project(project_id, phase_id, hold=True)
+        if phase is None:
+            raise NotFoundError
+        return phase
+
     async def _project(self, phase: Phase) -> Project:
         # A foreign key, so never None; the loader's project, an identity-map hit.
         return cast(Project, await self.session.get(Project, phase.project_id))

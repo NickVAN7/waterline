@@ -676,11 +676,13 @@ a filter on another table, written with `EXISTS`, never a join, so no item repea
 `search` columns for `?q=`, `archived_column` (archived rows hidden, with `?include_archived=true`
 or alone with `?archived_only=true`; both at once is a 422 `conflict`, DL-181, DL-182),
 `active_column` (a people list's `User.is_active`: deactivated people hidden, with
-`?include_deactivated=true`, DL-293), and `paging="cursor"` for append-only feeds. The router takes `Annotated[SPEC.query_model, Query()]` (unknown
+`?include_deactivated=true`, DL-293), `paging="cursor"` for append-only feeds, and
+`paging="ranked"` for a ranked view with declared filters (no `limit` or `offset`; `sort` stays;
+the task list, S3-C5). The router takes `Annotated[SPEC.query_model, Query()]` (unknown
 parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
 the service; the **repository** builds a statement already scoped to what the user may see and
-calls `fetch_page(...)` (items, `total`, `limit`, `offset`) or `fetch_feed(...)` (newest first,
-`next_cursor`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
+calls `fetch_page(...)` (items, `total`, `limit`, `offset`), `fetch_feed(...)` (newest first,
+`next_cursor`), or `fetch_ranked(..., cap)` (every match up to the cap, and `truncated`), with `current_user_id` for `me`. A filter marked `restricted=True` (a field only
 some users may filter by) and `include_deactivated` (the list's admins only,
 DL-294; the roster's `manage` action) apply only when the endpoint passes them in `permitted=` (decided through `authorize()`); otherwise they're a 422
 `not_permitted` on the parameter. Response bodies are `Page[ItemSchema]` / `Feed[ItemSchema]`;
