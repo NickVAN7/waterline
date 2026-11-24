@@ -1186,8 +1186,14 @@ tests. The rules: `identifiers.py` (project keys, slugs and the reserved top-lev
 usernames; each check returns an `IdentifierProblem` for the field error), `password_policy.py`
 (`password_problems(...)`; the caller checks the hash and passes `same_as_current`), and
 `account_rank.py` (`can_manage_account(actor, target)`, from both users' memberships),
-`modules.py` (each type's recommended modules, and the shipped ones it seeds, DL-136), and
-`restriction.py` (the effective restriction, and the raise and lower rules). `app/rules/`
+`modules.py` (each type's recommended modules, and the shipped ones it seeds, DL-136),
+`restriction.py` (the effective restriction, the raise and lower rules, and the rights a change
+needs, `needed_rights`), `rank.py` (`rank_between`, the fractional keys items are ordered by),
+`approval_policy.py` (a request's outcome from its rows, the status after a rejection, an
+approver's replacement, and the approver who completed it), `task_transitions.py` (who
+may move a task between statuses, `may_transition` and the read's `allowed_transitions`, DL-408),
+`task_types.py` (a project type's task types, DL-352), and `branch_name.py` (a task's branch name
+to copy, DL-408). `app/rules/`
 and `app/authz/` are held to 100% line and branch coverage by a hook in `tests/conftest.py`, so a
 plain `uv run pytest` fails below it. A `match` that covers every type of its subject (pyright
 checks: the function's return type would otherwise allow `None`) marks its last `case` with `#

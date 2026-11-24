@@ -389,18 +389,55 @@ async def test_the_project_is_404_to_whoever_cannot_see_it(client: AsyncClient, 
     [
         (
             "system_admin",
-            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+            [
+                "phase.view",
+                "project.unarchive",
+                "project.view",
+                "project.view_access",
+                "requirement.view",
+                "task.view",
+                "workstream.view",
+            ],
         ),
         (
             "workspace_admin",
-            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+            [
+                "phase.view",
+                "project.unarchive",
+                "project.view",
+                "project.view_access",
+                "requirement.view",
+                "task.view",
+                "workstream.view",
+            ],
         ),
         (
             "org_admin",
-            ["project.unarchive", "project.view", "project.view_access", "requirement.view"],
+            [
+                "phase.view",
+                "project.unarchive",
+                "project.view",
+                "project.view_access",
+                "requirement.view",
+                "task.view",
+                "workstream.view",
+            ],
         ),
-        ("project_admin", ["project.view", "project.view_access", "requirement.view"]),
-        ("project_viewer", ["project.view", "requirement.view"]),
+        (
+            "project_admin",
+            [
+                "phase.view",
+                "project.view",
+                "project.view_access",
+                "requirement.view",
+                "task.view",
+                "workstream.view",
+            ],
+        ),
+        (
+            "project_viewer",
+            ["phase.view", "project.view", "requirement.view", "task.view", "workstream.view"],
+        ),
     ],
 )
 async def test_an_archived_project_is_still_readable_with_only_unarchive_left(

@@ -5177,3 +5177,14 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C1; schema-doc (`task`)
 - **Source:** owner, Nov 23, 2026 (chat, S3-C1's DL-37 question)
+
+### DL-408: A transition with nobody named, and the branch name's slug
+- **Date:** 2026-11-23
+- **Decision:** A task with neither an assignee nor a reviewer may be moved to `done`, or out of
+  `in_review`, by whoever may update it (members and up), project admins as always. Copy branch
+  name's slug is the title lowercased, accents removed, every run of other characters one
+  hyphen, cut to 50 characters with no hyphen at either end; with nothing left, the ID alone.
+- **Supersedes:** none (design-doc §5's table and §6's "Copy branch name" didn't say)
+- **Superseded by:** none
+- **Applies to:** S3-C2; design-doc §5 ("Targeted rules — Task status transitions"), §6 (Task)
+- **Source:** owner, Nov 23, 2026 (chat, S3-C2's questions)

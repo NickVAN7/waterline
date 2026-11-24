@@ -180,6 +180,21 @@ EXPECTED: dict[str, Expected] = {
     "approval_request.cancel": Expected(_P, C, _ADMIN),
     # Deciding one's own row: personal, no role grants it (§5, "Personal actions"; DL-234).
     "approval.decide": Expected(_P, C, personal=True),
+    # Phases, workstreams, tasks, subtasks (S3-plan, "Actions per row"; §3.1, §5; DL-82, DL-211,
+    # DL-219, DL-223): all content.
+    "phase.view": Expected(_P, C, _VIEWER, mutation=False),
+    "phase.manage": Expected(_P, C, _MEMBER),
+    "workstream.view": Expected(_P, C, _VIEWER, mutation=False),
+    "workstream.manage": Expected(_P, C, _MEMBER),
+    "task.view": Expected(_P, C, _VIEWER, mutation=False),
+    "task.create": Expected(_P, C, _MEMBER),
+    "task.update": Expected(_P, C, _MEMBER),
+    "task.reassign_reporter": Expected(_P, C, _ADMIN),
+    "task.raise_restriction": Expected(_P, C, _MEMBER),
+    "task.lower_restriction": Expected(_P, C, _ADMIN, explicit_when_export_controlled=True),
+    "task.delete": Expected(_P, C, _ADMIN),
+    "task.restore": Expected(_P, C, _ADMIN),
+    "subtask.manage": Expected(_P, C, _MEMBER),
 }
 
 _RANK = {_VIEWER: 1, _MEMBER: 2, _ADMIN: 3}

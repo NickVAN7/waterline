@@ -786,8 +786,9 @@ explicit membership (§3.1).
 | `in_review →` any other status | reviewer; if no reviewer, the assignee; always project admin |
 | `→ done` from any other status | assignee; if unassigned, the reviewer; always project admin |
 | Assignee is also the reviewer | allowed |
+| No assignee and no reviewer | whoever may update the task (members and up), for both rows above (DL-408) |
 
-Review is therefore *supported but not enforced* (consistent with §1). Enforced review and
+Every other transition is anyone's who may update the task (`task.update`). Review is therefore *supported but not enforced* (consistent with §1). Enforced review and
 blocking self-review are candidates for per-org settings later. Sending a task back from
 review (`in_review →` any status but `done`) prompts for a comment but doesn't require one
 (comments arrive in Slice 6; until then there is no prompt).
@@ -1116,7 +1117,9 @@ requirement approval.
   (service-layer check).
 - **Copy branch name:** a task offers its branch name to copy: the lowercase task ID plus a
   slug of the title (e.g. `wtl-ta-45-sign-in-throttling`), which branch auto-detection (§12)
-  matches.
+  matches. The slug is the title lowercased, accents removed (é → e), and every run of other
+  characters one hyphen, cut to 50 characters with no hyphen at either end; a title with
+  nothing left (all emoji, say, or another script) gives the ID alone, `wtl-ta-45` (DL-408).
 
 ### Subtask
 - Separate table (not self-referencing) — no multi-level nesting to guard against.

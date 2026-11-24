@@ -6883,7 +6883,20 @@
           "requirement.restore",
           "approval_request.create",
           "approval_request.cancel",
-          "approval.decide"
+          "approval.decide",
+          "phase.view",
+          "phase.manage",
+          "workstream.view",
+          "workstream.manage",
+          "task.view",
+          "task.create",
+          "task.update",
+          "task.reassign_reporter",
+          "task.raise_restriction",
+          "task.lower_restriction",
+          "task.delete",
+          "task.restore",
+          "subtask.manage"
         ],
         "title": "Action",
         "description": "The real actions (DL-44, DL-45, DL-56; each area adds its own)."
