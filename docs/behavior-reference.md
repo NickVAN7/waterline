@@ -126,7 +126,8 @@ requirements showing: open a branch with its arrow, or with the Right arrow key 
 **Expand requirement**; the button says "Expanding…" until it's done. It opens up to 500 rows
 under the requirement, level by level, and says how many it opened; past that it says that
 deeper rows stay closed, and you open them with their arrows or the Right arrow key. A project with more than 2,000
-requirements shows the first 2,000, with a note saying so; there, a requirement you move to the
+requirements shows the first 2,000 (and any of their parents past them, so each still sits
+under its parent), with a note saying so; there, a requirement you move to the
 bottom of its level can fall past the first 2,000 and leave the tree the next time it loads. Anyone who can read the project's
 content can open it; on an export-controlled project, that's only its members.
 

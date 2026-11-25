@@ -593,7 +593,8 @@ Every endpoint follows these; the `new-area` skill carries them into later slice
   offset-paged, never a client-filtered first page.
 - **Sorting:** `?sort=name,-created_at`, from a per-endpoint allowlist; `id` is always the last
   tiebreaker, so order is deterministic and offsets never skip or repeat rows. Each endpoint
-  documents its default sort.
+  documents its default sort; one with a single fixed order (the requirement tree's rank) takes
+  no `sort` (S3-C10).
 - **Filters are declared,** once per list, as a filter spec (field, type, operators). The spec
   generates the endpoint's query-parameter model (so the filters are in the OpenAPI schema and the
   generated client) and drives one shared translator to SQL; endpoints never hand-write filter

@@ -41,6 +41,7 @@ from app.services.project import ProjectEntity
 from app.services.requirement import (
     REVISIONS,
     TRASH,
+    TREE,
     ApprovalRequestEntity,
     RequirementEntity,
     RequirementService,
@@ -65,6 +66,7 @@ Deleted = Annotated[
 Restored = Annotated[
     RequirementEntity, Depends(authorized(load_deleted_requirement, Action.REQUIREMENT_RESTORE))
 ]
+TreeQuery = Annotated[TREE.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 TrashQuery = Annotated[TRASH.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 RevisionsQuery = Annotated[REVISIONS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 ApprovalRequestsQuery = Annotated[APPROVAL_REQUESTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
@@ -98,10 +100,13 @@ async def create_requirement(
 
 
 @router.get("/projects/{key}/requirements", responses=ERRORS)
-async def requirement_tree(project: ProjectContentViewed, session: SessionDep) -> RequirementTree:
-    """The project's requirements for the tree, siblings in rank order: complete up to 2,000,
-    with `truncated` above it (DL-159)."""
-    return await RequirementService(session).tree(project)
+async def requirement_tree(
+    project: ProjectContentViewed, query: TreeQuery, ctx: AuthzContextDep, session: SessionDep
+) -> RequirementTree:
+    """The project's requirements matching the filters, with their ancestors as context
+    (`context`), siblings in rank order: complete up to 2,000 matches, with `truncated` above
+    it (DL-159, DL-351). Each with its tasks and those done, cancelled ones left out."""
+    return await RequirementService(session).tree(ctx, project, query)
 
 
 @router.get("/projects/{key}/requirements/{number}", responses=ERRORS)

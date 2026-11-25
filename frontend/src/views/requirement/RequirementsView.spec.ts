@@ -39,6 +39,9 @@ function item(number: number, title: string): Item {
     current_revision_id: null,
     approved_revision_id: null,
     awaiting_approval: false,
+    task_count: 0,
+    tasks_done: 0,
+    context: false,
   }
 }
 const TREE: Tree = { items: [item(1, 'Invoicing'), item(2, 'Payments')], truncated: false }

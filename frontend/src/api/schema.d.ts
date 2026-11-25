@@ -1040,8 +1040,9 @@ export interface paths {
         };
         /**
          * Requirement Tree
-         * @description The project's requirements for the tree, siblings in rank order: complete up to 2,000,
-         *     with `truncated` above it (DL-159).
+         * @description The project's requirements matching the filters, with their ancestors as context
+         *     (`context`), siblings in rank order: complete up to 2,000 matches, with `truncated` above
+         *     it (DL-159, DL-351). Each with its tasks and those done, cancelled ones left out.
          */
         get: operations["requirement_tree_api_projects__key__requirements_get"];
         put?: never;
@@ -1548,6 +1549,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/requirements/{number}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Tasks
+         * @description The requirement's tasks, as the backlog's rows and in its order: complete up to 2,000,
+         *     with `truncated` above it.
+         */
+        get: operations["requirement_tasks_api_projects__key__requirements__number__tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/tasks/{number}": {
         parameters: {
             query?: never;
@@ -1983,6 +2005,13 @@ export interface components {
          * @enum {string}
          */
         ApprovalRequestStatus: "pending" | "approved" | "rejected" | "cancelled";
+        /**
+         * ApprovalState
+         * @description The requirement tree's approval-state filter (build plan S3-C10): independent facts, so
+         *     one requirement can match several (owner, Nov 25, 2026).
+         * @enum {string}
+         */
+        ApprovalState: "awaiting" | "approved" | "not_approved";
         /**
          * ApprovalWorkItem
          * @description One of the caller's pending approvals, in My work (design-doc §11; DL-236): `title` and
@@ -3132,6 +3161,12 @@ export interface components {
             approved_revision_id: string | null;
             /** Awaiting Approval */
             awaiting_approval: boolean;
+            /** Task Count */
+            task_count: number;
+            /** Tasks Done */
+            tasks_done: number;
+            /** Context */
+            context: boolean;
         };
         /**
          * RequirementMove
@@ -3233,8 +3268,9 @@ export interface components {
         RequirementStatus: "draft" | "approved" | "in_progress" | "done" | "rejected" | "deferred";
         /**
          * RequirementTree
-         * @description The project's requirements in `(rank, id)` order, siblings in rank order (the client
-         *     nests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159).
+         * @description The project's requirements matching the filters, with their ancestors as context, in
+         *     `(rank, id)` order, siblings in rank order (the client nests them by `parent_id`); at most
+         *     2,000 matches, with `truncated` above it (DL-159, DL-351).
          */
         RequirementTree: {
             /** Items */
@@ -7434,7 +7470,22 @@ export interface operations {
     };
     requirement_tree_api_projects__key__requirements_get: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: components["schemas"]["RequirementStatus"][] | null;
+                status__not?: components["schemas"]["RequirementStatus"][] | null;
+                status__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                reporter?: (string | "me")[] | null;
+                reporter__not?: (string | "me")[] | null;
+                reporter__is_null?: boolean | null;
+                approval?: components["schemas"]["ApprovalState"][] | null;
+                has_tasks?: boolean | null;
+            };
             header?: never;
             path: {
                 key: string;
@@ -9370,6 +9421,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_tasks_api_projects__key__requirements__number__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskList"];
                 };
             };
             /** @description Unauthorized */

@@ -3,12 +3,13 @@
 import uuid
 from collections.abc import Collection
 from datetime import datetime
+from typing import cast
 
 from sqlalchemy import Select, false, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base_model import INCLUDE_DELETED
-from app.enums import TrashItemType
+from app.enums import TaskStatus, TrashItemType
 from app.models.task import Subtask, Task
 
 
@@ -58,6 +59,36 @@ class TaskRepository:
         if lock:
             statement = statement.with_for_update().execution_options(populate_existing=True)
         return list(await self.session.scalars(statement))
+
+    async def coverage(
+        self, requirement_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, tuple[int, int]]:
+        """Each requirement's live tasks and those done, cancelled ones left out (the tree's
+        coverage, DL-199; owner, Nov 25, 2026); a requirement with none is absent."""
+        if not requirement_ids:
+            return {}
+        rows = await self.session.execute(
+            select(
+                Task.requirement_id,
+                func.count(),
+                func.count().filter(Task.status == TaskStatus.DONE),
+            )
+            .where(Task.requirement_id.in_(requirement_ids), Task.status != TaskStatus.CANCELLED)
+            .group_by(Task.requirement_id)
+        )
+        return {
+            cast(uuid.UUID, requirement_id): (count, done) for requirement_id, count, done in rows
+        }
+
+    async def for_requirement(self, requirement_id: uuid.UUID, limit: int) -> list[Task]:
+        """The requirement's live tasks in the backlog's `(rank, id)` order, at most `limit`."""
+        rows = await self.session.scalars(
+            select(Task)
+            .where(Task.requirement_id == requirement_id)
+            .order_by(Task.rank, Task.id)
+            .limit(limit)
+        )
+        return list(rows)
 
     def trash_rows(
         self, project_id: uuid.UUID, reporter_id: uuid.UUID | None, *, empty: bool = False

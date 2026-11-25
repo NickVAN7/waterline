@@ -4,9 +4,9 @@ import dataclasses
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import cast
+from typing import Annotated, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.change_log import log_change
@@ -16,15 +16,28 @@ from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
 from app.core.base_model import check_version
 from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
-from app.core.lists import Feed, Filter, FilterType, ListSpec, Page, fetch_feed, fetch_page
+from app.core.lists import (
+    MAX_VALUES,
+    CustomFilter,
+    Feed,
+    Filter,
+    FilterType,
+    ListSpec,
+    Page,
+    fetch_feed,
+    fetch_page,
+    fetch_ranked,
+)
 from app.enums import (
     ActivityAction,
     ActivityEntityType,
     ActivityField,
     ApprovalEntityType,
+    ApprovalState,
     DeletedChildren,
     LinkedTasks,
     NumberPrefix,
+    Priority,
     RequirementStatus,
     RestrictionCategory,
     TrashItemType,
@@ -39,10 +52,12 @@ from app.repositories.approval import ApprovalRepository
 from app.repositories.base import direct_update, write_ranks
 from app.repositories.project import ProjectRepository
 from app.repositories.requirement import (
+    HAS_TASKS,
     TRASH_DELETED_AT,
     TRASH_ID,
     TRASH_TYPE,
     RequirementRepository,
+    with_approval_state,
 )
 from app.repositories.task import TaskRepository
 from app.repositories.user import UserRepository
@@ -88,6 +103,26 @@ TRASH = ListSpec(
     sorts={"deleted_at": TRASH_DELETED_AT},
     default_sort=("-deleted_at",),
     filters=(Filter("type", TRASH_TYPE, FilterType.ENUM, enum=TrashItemType),),
+)
+
+# The tree's filters (DL-351; owner, Nov 24, 2026, R2); no sorts: it keeps rank order.
+TREE = ListSpec(
+    name="RequirementItem",
+    id_column=Requirement.id,  # pyright: ignore[reportArgumentType]
+    sort_first=(Requirement.rank,),  # pyright: ignore[reportArgumentType]
+    filters=(
+        Filter("status", Requirement.status, FilterType.ENUM, enum=RequirementStatus),  # pyright: ignore[reportArgumentType]
+        Filter("priority", Requirement.priority, FilterType.ENUM, enum=Priority),  # pyright: ignore[reportArgumentType]
+        Filter("workstream", Requirement.workstream_id, FilterType.REFERENCE),  # pyright: ignore[reportArgumentType]
+        Filter("reporter", Requirement.reporter_id, FilterType.USER),  # pyright: ignore[reportArgumentType]
+        CustomFilter(
+            "approval",
+            Annotated[list[ApprovalState], Field(max_length=MAX_VALUES)],
+            with_approval_state,
+        ),
+        Filter("has_tasks", HAS_TASKS, FilterType.BOOLEAN),  # pyright: ignore[reportArgumentType]
+    ),
+    paging="ranked",
 )
 
 REVISIONS = ListSpec(
@@ -655,12 +690,24 @@ class RequirementService:
             ]
         )
 
-    async def tree(self, project: Project) -> RequirementTree:
-        """The project's requirements for the tree, up to the cap (DL-159)."""
-        rows = await self.repository.ranked(project.id, TREE_CAP + 1)
+    async def tree(self, ctx: AuthzContext, project: Project, query: BaseModel) -> RequirementTree:
+        """The project's requirements matching the filters, up to the cap (DL-159), with the
+        ancestors they need as context (DL-351), each with its coverage (DL-199)."""
+        matches, truncated = await fetch_ranked(
+            self.session,
+            self.repository.in_project(project.id),
+            TREE,
+            query,
+            TREE_CAP,
+            current_user_id=ctx.user_id,
+        )
+        context = await self.repository.missing_ancestors(matches)
+        rows = sorted([*matches, *context], key=lambda r: (r.rank, r.id))
         awaiting = await ApprovalRepository(self.session).pending_entity_ids(
             project.id, ApprovalEntityType.REQUIREMENT
         )
+        coverage = await TaskRepository(self.session).coverage([r.id for r in rows])
+        in_context = {r.id for r in context}
         return RequirementTree(
             items=[
                 RequirementItem(
@@ -675,10 +722,13 @@ class RequirementService:
                     current_revision_id=r.current_revision_id,
                     approved_revision_id=r.approved_revision_id,
                     awaiting_approval=r.id in awaiting,
+                    task_count=coverage.get(r.id, (0, 0))[0],
+                    tasks_done=coverage.get(r.id, (0, 0))[1],
+                    context=r.id in in_context,
                 )
-                for r in rows[:TREE_CAP]
+                for r in rows
             ],
-            truncated=len(rows) > TREE_CAP,
+            truncated=truncated,
         )
 
     async def _can_delete_children(

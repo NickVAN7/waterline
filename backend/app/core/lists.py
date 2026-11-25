@@ -152,7 +152,8 @@ class ListSpec:
             fields["limit"] = (int, Field(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT))
         if self.paging == "offset":
             fields["offset"] = (int, Field(0, ge=0, le=MAX_OFFSET))
-        if self.paging in ("offset", "ranked"):
+        # A list with no sorts keeps its one order (the requirement tree's rank): no `sort` at all.
+        if self.paging in ("offset", "ranked") and self.sorts:
             fields["sort"] = (
                 str | None,
                 Field(

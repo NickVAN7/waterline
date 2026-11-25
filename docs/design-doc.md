@@ -942,7 +942,10 @@ ApprovalRequest → Approval (one per approver), attached to a requirement, gate
 - Revision history and approval tracking — see §6.1 and §6.2.
 - **Traceability in v1** is coverage columns on the requirement tree: task count and progress,
   test-case count, latest result, and approval state, filled in as Slices 3 and 5 ship. There is
-  no separate requirement × test case matrix page (DL-199).
+  no separate requirement × test case matrix page (DL-199). The task count and progress leave
+  cancelled tasks out (and the tree's "has tasks" filter with them); its approval-state filter
+  takes independent facts (awaiting approval: a pending request; approved: an approved
+  revision; not approved: never approved), so one requirement can match two (DL-414).
 
 ### 6.1 Requirement revisions
 - **Creating a requirement creates revision 1**, in the same transaction, and sets

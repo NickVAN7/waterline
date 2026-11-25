@@ -5254,3 +5254,19 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** S3-C9a; design-doc §9 "Deleting a requirement", "Permissions in the delete
   dialog"
 - **Source:** owner, Nov 25, 2026 (chat, before S3-C9a was built; S3-C9's review question)
+
+### DL-414: The tree's coverage leaves cancelled tasks out; approval states are independent facts; a requirement's tasks are the backlog's rows
+- **Date:** 2026-11-25
+- **Decision:** (1) The requirement tree's `task_count` is its live tasks that aren't cancelled,
+  and `tasks_done` those done ("1 of 2" for one done, one open, one cancelled); the tree's
+  `has_tasks` filter counts the same tasks. (2) The approval-state filter's values are
+  independent facts: `awaiting` (a pending approval request), `approved` (an approved revision),
+  `not_approved` (never approved); an approved requirement with a new request matches both
+  `awaiting` and `approved`, and several values match any of them. (3) `GET
+  …/requirements/{number}/tasks` returns the requirement's live tasks as the backlog's rows
+  (`TaskItem`), in its rank order, complete up to 2,000 with `truncated`; the approver's review
+  reads each task's subtasks from the subtasks endpoint.
+- **Supersedes:** none (DL-199 and the S3-C10 row named neither)
+- **Superseded by:** none
+- **Applies to:** S3-C10; design-doc §6 "Requirement"
+- **Source:** owner, Nov 25, 2026 (chat, before S3-C10 was built)

@@ -142,11 +142,17 @@ class RequirementItem(BaseModel):
     approved_revision_id: uuid.UUID | None
     # A pending approval request on it: the tree's "Awaiting approval" badge (Q12b).
     awaiting_approval: bool
+    # Its live tasks and those done, cancelled ones left out (coverage, DL-199).
+    task_count: int
+    tasks_done: int
+    # Not a match of the tree's filters: shown as the ancestor of one (DL-351).
+    context: bool
 
 
 class RequirementTree(BaseModel):
-    """The project's requirements in `(rank, id)` order, siblings in rank order (the client
-    nests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159)."""
+    """The project's requirements matching the filters, with their ancestors as context, in
+    `(rank, id)` order, siblings in rank order (the client nests them by `parent_id`); at most
+    2,000 matches, with `truncated` above it (DL-159, DL-351)."""
 
     items: list[RequirementItem]
     truncated: bool

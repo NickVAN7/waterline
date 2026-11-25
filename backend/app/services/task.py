@@ -29,6 +29,7 @@ from app.enums import (
     TaskType,
 )
 from app.models.project import Project
+from app.models.requirement import Requirement
 from app.models.task import Task
 from app.models.user import User
 from app.repositories.base import write_ranks
@@ -596,6 +597,20 @@ class TaskService:
         )
         users = await self._people(rows)
         return TaskList(items=[_item(row, users) for row in rows], truncated=truncated)
+
+    async def for_requirement(self, ctx: AuthzContext, requirement: Requirement) -> TaskList:
+        """The requirement's live tasks, as the backlog's rows and in its order, up to the cap
+        (its page and the approver's review, DL-196); none for a caller who may not view
+        tasks."""
+        # A foreign key, so never None; the loader's project, an identity-map hit.
+        project = cast(Project, await self.session.get(Project, requirement.project_id))
+        if not authorize(ctx, Action.TASK_VIEW, project_target(project)):
+            return TaskList(items=[], truncated=False)
+        rows = await self.repository.for_requirement(requirement.id, LIST_CAP + 1)
+        users = await self._people(rows[:LIST_CAP])
+        return TaskList(
+            items=[_item(row, users) for row in rows[:LIST_CAP]], truncated=len(rows) > LIST_CAP
+        )
 
 
 async def _lift_tasks(session: AsyncSession, project: Project, actor_id: uuid.UUID) -> None:

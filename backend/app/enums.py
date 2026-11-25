@@ -220,6 +220,15 @@ class DeletedChildren(StrEnum):
     DELETE = "delete"
 
 
+class ApprovalState(StrEnum):
+    """The requirement tree's approval-state filter (build plan S3-C10): independent facts, so
+    one requirement can match several (owner, Nov 25, 2026)."""
+
+    AWAITING = "awaiting"  # a pending approval request
+    APPROVED = "approved"  # an approved revision
+    NOT_APPROVED = "not_approved"  # never approved
+
+
 class LinkedTasks(StrEnum):
     """What a requirement's delete does with the tasks linked to it (design-doc §9)."""
 

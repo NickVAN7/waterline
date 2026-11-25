@@ -5238,7 +5238,7 @@
           "requirement"
         ],
         "summary": "Requirement Tree",
-        "description": "The project's requirements for the tree, siblings in rank order: complete up to 2,000,\nwith `truncated` above it (DL-159).",
+        "description": "The project's requirements matching the filters, with their ancestors as context\n(`context`), siblings in rank order: complete up to 2,000 matches, with `truncated` above\nit (DL-159, DL-351). Each with its tasks and those done, cancelled ones left out.",
         "operationId": "requirement_tree_api_projects__key__requirements_get",
         "parameters": [
           {
@@ -5248,6 +5248,286 @@
             "schema": {
               "type": "string",
               "title": "Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RequirementStatus"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "status__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RequirementStatus"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status  Not"
+            }
+          },
+          {
+            "name": "status__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status  Is Null"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Priority"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          },
+          {
+            "name": "priority__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Priority"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority  Not"
+            }
+          },
+          {
+            "name": "priority__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority  Is Null"
+            }
+          },
+          {
+            "name": "workstream",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workstream"
+            }
+          },
+          {
+            "name": "workstream__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workstream  Not"
+            }
+          },
+          {
+            "name": "workstream__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workstream  Is Null"
+            }
+          },
+          {
+            "name": "reporter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reporter"
+            }
+          },
+          {
+            "name": "reporter__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reporter  Not"
+            }
+          },
+          {
+            "name": "reporter__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reporter  Is Null"
+            }
+          },
+          {
+            "name": "approval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalState"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approval"
+            }
+          },
+          {
+            "name": "has_tasks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Tasks"
             }
           }
         ],
@@ -8501,6 +8781,88 @@
         }
       }
     },
+    "/api/projects/{key}/requirements/{number}/tasks": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Requirement Tasks",
+        "description": "The requirement's tasks, as the backlog's rows and in its order: complete up to 2,000,\nwith `truncated` above it.",
+        "operationId": "requirement_tasks_api_projects__key__requirements__number__tasks_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/{key}/tasks/{number}": {
       "get": {
         "tags": [
@@ -10191,6 +10553,16 @@
           "cancelled"
         ],
         "title": "ApprovalRequestStatus"
+      },
+      "ApprovalState": {
+        "type": "string",
+        "enum": [
+          "awaiting",
+          "approved",
+          "not_approved"
+        ],
+        "title": "ApprovalState",
+        "description": "The requirement tree's approval-state filter (build plan S3-C10): independent facts, so\none requirement can match several (owner, Nov 25, 2026)."
       },
       "ApprovalWorkItem": {
         "properties": {
@@ -13088,6 +13460,18 @@
           "awaiting_approval": {
             "type": "boolean",
             "title": "Awaiting Approval"
+          },
+          "task_count": {
+            "type": "integer",
+            "title": "Task Count"
+          },
+          "tasks_done": {
+            "type": "integer",
+            "title": "Tasks Done"
+          },
+          "context": {
+            "type": "boolean",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -13102,7 +13486,10 @@
           "restriction_categories",
           "current_revision_id",
           "approved_revision_id",
-          "awaiting_approval"
+          "awaiting_approval",
+          "task_count",
+          "tasks_done",
+          "context"
         ],
         "title": "RequirementItem",
         "description": "A row of the requirement tree."
@@ -13430,7 +13817,7 @@
           "truncated"
         ],
         "title": "RequirementTree",
-        "description": "The project's requirements in `(rank, id)` order, siblings in rank order (the client\nnests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159)."
+        "description": "The project's requirements matching the filters, with their ancestors as context, in\n`(rank, id)` order, siblings in rank order (the client nests them by `parent_id`); at most\n2,000 matches, with `truncated` above it (DL-159, DL-351)."
       },
       "RequirementUpdate": {
         "properties": {

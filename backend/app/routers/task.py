@@ -12,6 +12,7 @@ from app.routers.deps import (
     authorized,
     load_deleted_task,
     load_project,
+    load_requirement,
     load_subtask,
     load_task,
 )
@@ -26,6 +27,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.services.project import ProjectEntity
+from app.services.requirement import RequirementEntity
 from app.services.subtask import SubtaskEntity, SubtaskService
 from app.services.task import TASKS, TaskEntity, TaskService
 
@@ -39,6 +41,9 @@ Deleted = Annotated[TaskEntity, Depends(authorized(load_task, Action.TASK_DELETE
 Restored = Annotated[TaskEntity, Depends(authorized(load_deleted_task, Action.TASK_RESTORE))]
 ChecklistManaged = Annotated[TaskEntity, Depends(authorized(load_task, Action.SUBTASK_MANAGE))]
 SubtaskManaged = Annotated[SubtaskEntity, Depends(authorized(load_subtask, Action.SUBTASK_MANAGE))]
+RequirementViewed = Annotated[
+    RequirementEntity, Depends(authorized(load_requirement, Action.REQUIREMENT_VIEW))
+]
 TasksQuery = Annotated[TASKS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
@@ -60,6 +65,15 @@ async def list_tasks(
     """The project's tasks matching the filters, in rank order unless `sort` says otherwise:
     complete up to 2,000, with `truncated` above it (the backlog and the board)."""
     return await TaskService(session).list(ctx, project, query)
+
+
+@router.get("/projects/{key}/requirements/{number}/tasks", responses=ERRORS)
+async def requirement_tasks(
+    requirement: RequirementViewed, ctx: AuthzContextDep, session: SessionDep
+) -> TaskList:
+    """The requirement's tasks, as the backlog's rows and in its order: complete up to 2,000,
+    with `truncated` above it."""
+    return await TaskService(session).for_requirement(ctx, requirement)
 
 
 @router.get("/projects/{key}/tasks/{number}", responses=ERRORS)

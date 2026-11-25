@@ -30,6 +30,9 @@ function item(number: number, title: string, parent: number | null = null): Item
     current_revision_id: null,
     approved_revision_id: null,
     awaiting_approval: false,
+    task_count: 0,
+    tasks_done: 0,
+    context: false,
   }
 }
 // Top level RQ-1, RQ-2, RQ-3; RQ-4 and RQ-5 under RQ-2, in rank order.

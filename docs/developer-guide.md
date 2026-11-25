@@ -685,7 +685,8 @@ or alone with `?archived_only=true`; both at once is a 422 `conflict`, DL-181, D
 `active_column` (a people list's `User.is_active`: deactivated people hidden, with
 `?include_deactivated=true`, DL-293), `paging="cursor"` for append-only feeds, and
 `paging="ranked"` for a ranked view with declared filters (no `limit` or `offset`; `sort` stays;
-the task list, S3-C5). The router takes `Annotated[SPEC.query_model, Query()]` (unknown
+the task list, S3-C5). A spec with no `sorts` takes no `sort` at all and keeps its `sort_first`
+order (the requirement tree's rank, S3-C10). The router takes `Annotated[SPEC.query_model, Query()]` (unknown
 parameters are a 422, and every filter is in the OpenAPI schema) and passes the parsed query to
 the service; the **repository** builds a statement already scoped to what the user may see and
 calls `fetch_page(...)` (items, `total`, `limit`, `offset`), `fetch_feed(...)` (newest first,
