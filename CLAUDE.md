@@ -7,8 +7,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C10 (Requirement ↔ task reads) done; next: S3-C11 (My work: tasks), after the owner's
-approval.
+S3-C11 (My work: tasks) done; next: S3-C12 (Activity), after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

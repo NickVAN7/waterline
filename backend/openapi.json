@@ -4916,8 +4916,29 @@
           "my_work"
         ],
         "summary": "My Work",
-        "description": "Every section, each with its first items and total.",
+        "description": "Every section, each with its first items and total, and the summary's due counts.",
         "operationId": "my_work_api_me_work_get",
+        "parameters": [
+          {
+            "name": "today",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The browser's date, for the due counts; default the server's UTC date",
+              "title": "Today"
+            },
+            "description": "The browser's date, for the due counts; default the server's UTC date"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4930,24 +4951,24 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
               }
-            }
+            },
+            "description": "Unauthorized"
           },
           "422": {
-            "description": "Unprocessable Content",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Content"
           }
         }
       }
@@ -5011,6 +5032,178 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_ApprovalWorkItem_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/me/work/tasks": {
+      "get": {
+        "tags": [
+          "my_work"
+        ],
+        "summary": "My Tasks",
+        "description": "The caller's open assigned tasks (any status but done or cancelled), priority first.",
+        "operationId": "my_tasks_api_me_work_tasks_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TaskWorkItem_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/me/work/reviews": {
+      "get": {
+        "tags": [
+          "my_work"
+        ],
+        "summary": "My Reviews",
+        "description": "The tasks in review with the caller as reviewer, priority first.",
+        "operationId": "my_reviews_api_me_work_reviews_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date",
+              "title": "Sort"
+            },
+            "description": "Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TaskWorkItem_"
                 }
               }
             }
@@ -11382,11 +11575,15 @@
         "properties": {
           "sections": {
             "$ref": "#/components/schemas/WorkSections"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/WorkSummary"
           }
         },
         "type": "object",
         "required": [
-          "sections"
+          "sections",
+          "summary"
         ],
         "title": "MyWork",
         "description": "`GET /api/me/work` (design-doc §11; DL-76): every section in one response."
@@ -12029,6 +12226,37 @@
           "offset"
         ],
         "title": "Page[StaffRead]"
+      },
+      "Page_TaskWorkItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskWorkItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[TaskWorkItem]"
       },
       "Page_TrashItem_": {
         "properties": {
@@ -15384,6 +15612,71 @@
         "title": "TaskUpdate",
         "description": "Only the fields sent change; null clears a nullable one. `version` is the one the caller\nread (a stale one is a 409). `status` through design-doc §5's table, judged on the people\nstored before this request (a denied move a 403); a newly named assignee or reviewer may\nupdate tasks here and is active (DL-347); `reporter_id` needs `task.reassign_reporter`\n(DL-211); a changed `type` is one the project offers (DL-352); a newly set requirement,\nphase, or workstream is the project's (404), the workstream live (DL-409)."
       },
+      "TaskWorkItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "organization_slug": {
+            "type": "string",
+            "title": "Organization Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "title",
+          "type",
+          "status",
+          "priority",
+          "due_date",
+          "project_key",
+          "project_name",
+          "organization_slug"
+        ],
+        "title": "TaskWorkItem",
+        "description": "A task on My work (design-doc §11): the task, and the project and org it opens in."
+      },
       "TrashItem": {
         "properties": {
           "type": {
@@ -15781,6 +16074,32 @@
         ],
         "title": "WorkSection[OrgWork]"
       },
+      "WorkSection_TaskWorkItem_": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskWorkItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "WorkSection[TaskWorkItem]"
+      },
       "WorkSections": {
         "properties": {
           "favorites": {
@@ -15791,15 +16110,47 @@
           },
           "approvals": {
             "$ref": "#/components/schemas/WorkSection_ApprovalWorkItem_"
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/WorkSection_TaskWorkItem_"
+          },
+          "reviews": {
+            "$ref": "#/components/schemas/WorkSection_TaskWorkItem_"
           }
         },
         "type": "object",
         "required": [
           "favorites",
           "organizations",
-          "approvals"
+          "approvals",
+          "tasks",
+          "reviews"
         ],
         "title": "WorkSections"
+      },
+      "WorkSummary": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "due_soon": {
+            "type": "integer",
+            "title": "Due Soon",
+            "default": 0
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "WorkSummary",
+        "description": "The summary tiles' one count no section's total gives (DL-349): the user's open assigned\ntasks due before today plus 7 days, overdue included, and the overdue part; `available`\nfalse when its query failed."
       },
       "WorkspaceRead": {
         "properties": {

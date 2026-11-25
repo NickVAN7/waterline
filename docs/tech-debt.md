@@ -615,6 +615,17 @@ Entry format:
   any task is linked
 - **Status:** open
 
+### TD-136: My work's spec fixture isn't typed by the API's, and the page sends no `today`
+- **Added:** S3-C11 (ui-reviewer notes)
+- **What:** `MyWorkView.spec.ts`'s `work()` fixture goes through `ok<T>()` (`src/test/api.ts`),
+  which infers its type and casts `as never`, so it still type-checks without S3-C11's `tasks`,
+  `reviews`, and `summary`; and `MyWorkView.vue` doesn't send `?today=` yet (DL-415), so the due
+  counts use the server's UTC date.
+- **Why:** S3-C11 changed the API only; the page shows the sections and tiles in S3-C29.
+- **Fix by:** S3-C29: the fixture typed as `Schemas['MyWork']` (`satisfies`), and `today` the
+  browser's local date (not `toISOString()`'s UTC one)
+- **Status:** open
+
 ## Resolved
 
 ### TD-1: pre-commit has no frontend or generated-file hooks

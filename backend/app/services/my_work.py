@@ -4,6 +4,7 @@ spec and rows live here so the project area (a higher layer) can share them."""
 
 import uuid
 from collections.abc import Awaitable
+from datetime import UTC, date, datetime, timedelta
 from typing import cast
 
 from sqlalchemy.exc import DBAPIError
@@ -18,8 +19,10 @@ from app.enums import ProjectStatus, ProjectType
 from app.models.approval import Approval, ApprovalRequest
 from app.models.project import Project
 from app.models.requirement import RequirementRevision
+from app.models.task import Task
 from app.repositories.approval import ApprovalRepository
 from app.repositories.project import ProjectRepository
+from app.repositories.task import PRIORITY_ORDER, TaskRepository
 from app.schemas.approval import ApprovalWorkItem
 from app.schemas.project import (
     INHERITED_ADMIN,
@@ -29,7 +32,9 @@ from app.schemas.project import (
     ProjectItem,
     WorkSection,
     WorkSections,
+    WorkSummary,
 )
+from app.schemas.task import TaskWorkItem
 
 PROJECTS = ListSpec(
     name="Project",
@@ -47,6 +52,18 @@ APPROVALS = ListSpec(
     sorts={"requested_at": ApprovalRequest.created_at},  # pyright: ignore[reportArgumentType]
     default_sort=("requested_at",),
 )
+# My tasks and reviews (owner, Nov 25, 2026): priority first, then the earliest due (none last).
+TASK_WORK = ListSpec(
+    name="MyTask",
+    id_column=Task.id,  # pyright: ignore[reportArgumentType]
+    sorts={
+        "priority": PRIORITY_ORDER,
+        "due_date": Task.due_date,  # pyright: ignore[reportArgumentType]
+        "updated_at": Task.updated_at,  # pyright: ignore[reportArgumentType]
+    },
+    default_sort=("priority", "due_date"),
+)
+DUE_SOON_DAYS = 7  # "Overdue or due this week" (DL-349)
 FIRST_ITEMS = 10  # the approvals section's items in `GET /api/me/work` (DL-76)
 FIRST_PER_ORG = 5  # each organization's open and hidden projects shown (DL-368)
 
@@ -97,14 +114,32 @@ def approval_item(row: Approval) -> ApprovalWorkItem:
     )
 
 
+def task_item(task: Task) -> TaskWorkItem:
+    """A task as My work shows it; its project and org are loaded."""
+    return TaskWorkItem(
+        id=task.id,
+        number=task.number,
+        title=task.title,
+        type=task.type,
+        status=task.status,
+        priority=task.priority,
+        due_date=task.due_date,
+        project_key=task.project.key,
+        project_name=task.project.name,
+        organization_slug=task.project.organization.slug,
+    )
+
+
 class MyWorkService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def work(self, ctx: AuthzContext) -> MyWork:
-        """Every section's first items and total, in one snapshot. Each section's query runs in
-        a savepoint, so one that fails is returned as unavailable and the rest still show
+    async def work(self, ctx: AuthzContext, today: date | None = None) -> MyWork:
+        """Every section's first items and total, and the summary's due counts as of `today`
+        (the browser's date; the server's UTC date without one), in one snapshot. Each query
+        runs in a savepoint, so one that fails is returned as unavailable and the rest still show
         (backend/CLAUDE.md: the one sanctioned savepoint-and-continue)."""
+        first = TASK_WORK.query_model(limit=FIRST_ITEMS)
         return MyWork(
             sections=WorkSections(
                 favorites=await self._whole_section(self.favorites(ctx)),
@@ -112,8 +147,25 @@ class MyWorkService:
                 approvals=await self._section(
                     self.approvals(ctx, APPROVALS.query_model(limit=FIRST_ITEMS))
                 ),
-            )
+                tasks=await self._section(self.tasks(ctx, first)),
+                reviews=await self._section(self.reviews(ctx, first)),
+            ),
+            summary=await self._summary(ctx, today or datetime.now(UTC).date()),
         )
+
+    async def _summary(self, ctx: AuthzContext, today: date) -> WorkSummary:
+        """The due counts, in a savepoint as each section is."""
+        try:
+            async with self.session.begin_nested():
+                due_soon, overdue = await TaskRepository(self.session).due_counts(
+                    ctx.user_id,
+                    content_scope(ctx),
+                    today,
+                    today + timedelta(days=DUE_SOON_DAYS),
+                )
+        except DBAPIError:
+            return WorkSummary(available=False)
+        return WorkSummary(available=True, due_soon=due_soon, overdue=overdue)
 
     async def _section[T](self, read: Awaitable[Page[T]]) -> WorkSection[T]:
         """One section's first page, in its own savepoint: a failed query is `available` false."""
@@ -197,3 +249,16 @@ class MyWorkService:
         statement = ApprovalRepository(self.session).pending_for(ctx.user_id, content_scope(ctx))
         page = await fetch_page(self.session, statement, APPROVALS, query)  # pyright: ignore[reportArgumentType] -- APPROVALS.query_model
         return page.with_items([approval_item(row) for row in page.items])
+
+    async def tasks(self, ctx: AuthzContext, query: object) -> Page[TaskWorkItem]:
+        """The caller's open assigned tasks in projects whose content they can see (design-doc
+        §11), priority first."""
+        statement = TaskRepository(self.session).assigned_to(ctx.user_id, content_scope(ctx))
+        page = await fetch_page(self.session, statement, TASK_WORK, query)  # pyright: ignore[reportArgumentType] -- TASK_WORK.query_model
+        return page.with_items([task_item(row) for row in page.items])
+
+    async def reviews(self, ctx: AuthzContext, query: object) -> Page[TaskWorkItem]:
+        """The tasks in review with the caller as reviewer, scoped as `tasks`."""
+        statement = TaskRepository(self.session).to_review(ctx.user_id, content_scope(ctx))
+        page = await fetch_page(self.session, statement, TASK_WORK, query)  # pyright: ignore[reportArgumentType] -- TASK_WORK.query_model
+        return page.with_items([task_item(row) for row in page.items])

@@ -16,6 +16,7 @@ from app.enums import (
 )
 from app.schemas.approval import ApprovalWorkItem
 from app.schemas.limits import NAME_MAX, PROJECT_DESCRIPTION_MAX
+from app.schemas.task import TaskWorkItem
 from app.schemas.user import AccessReason
 from app.schemas.workspace import NewUser
 
@@ -169,12 +170,26 @@ class WorkSections(BaseModel):
     # One item per organization the user can open a project in, by name (DL-359).
     organizations: WorkSection[OrgWork]
     approvals: WorkSection[ApprovalWorkItem]
+    # Open tasks assigned to the user, and those in review with them as reviewer (S3-C11).
+    tasks: WorkSection[TaskWorkItem]
+    reviews: WorkSection[TaskWorkItem]
+
+
+class WorkSummary(BaseModel):
+    """The summary tiles' one count no section's total gives (DL-349): the user's open assigned
+    tasks due before today plus 7 days, overdue included, and the overdue part; `available`
+    false when its query failed."""
+
+    available: bool
+    due_soon: int = 0
+    overdue: int = 0
 
 
 class MyWork(BaseModel):
     """`GET /api/me/work` (design-doc §11; DL-76): every section in one response."""
 
     sections: WorkSections
+    summary: WorkSummary
 
 
 class ProjectMemberRead(BaseModel):

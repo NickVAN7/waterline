@@ -980,7 +980,7 @@ export interface paths {
         };
         /**
          * My Work
-         * @description Every section, each with its first items and total.
+         * @description Every section, each with its first items and total, and the summary's due counts.
          */
         get: operations["my_work_api_me_work_get"];
         put?: never;
@@ -1003,6 +1003,46 @@ export interface paths {
          * @description The caller's pending approvals, oldest request first (DL-236).
          */
         get: operations["my_approvals_api_me_work_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/work/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Tasks
+         * @description The caller's open assigned tasks (any status but done or cancelled), priority first.
+         */
+        get: operations["my_tasks_api_me_work_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/work/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Reviews
+         * @description The tasks in review with the caller as reviewer, priority first.
+         */
+        get: operations["my_reviews_api_me_work_reviews_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2386,6 +2426,7 @@ export interface components {
          */
         MyWork: {
             sections: components["schemas"]["WorkSections"];
+            summary: components["schemas"]["WorkSummary"];
         };
         /**
          * NewUser
@@ -2637,6 +2678,17 @@ export interface components {
         Page_StaffRead_: {
             /** Items */
             items: components["schemas"]["StaffRead"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[TaskWorkItem] */
+        Page_TaskWorkItem_: {
+            /** Items */
+            items: components["schemas"]["TaskWorkItem"][];
             /** Total */
             total: number;
             /** Limit */
@@ -3810,6 +3862,32 @@ export interface components {
             workstream_id?: string | null;
         };
         /**
+         * TaskWorkItem
+         * @description A task on My work (design-doc §11): the task, and the project and org it opens in.
+         */
+        TaskWorkItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            type: components["schemas"]["TaskType"];
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["Priority"];
+            /** Due Date */
+            due_date: string | null;
+            /** Project Key */
+            project_key: string;
+            /** Project Name */
+            project_name: string;
+            /** Organization Slug */
+            organization_slug: string;
+        };
+        /**
          * TrashItem
          * @description A row of the project's trash: the item, who deleted it, and when (design-doc §9).
          */
@@ -3974,11 +4052,48 @@ export interface components {
              */
             total: number;
         };
+        /** WorkSection[TaskWorkItem] */
+        WorkSection_TaskWorkItem_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["TaskWorkItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** WorkSections */
         WorkSections: {
             favorites: components["schemas"]["WorkSection_MyProjectItem_"];
             organizations: components["schemas"]["WorkSection_OrgWork_"];
             approvals: components["schemas"]["WorkSection_ApprovalWorkItem_"];
+            tasks: components["schemas"]["WorkSection_TaskWorkItem_"];
+            reviews: components["schemas"]["WorkSection_TaskWorkItem_"];
+        };
+        /**
+         * WorkSummary
+         * @description The summary tiles' one count no section's total gives (DL-349): the user's open assigned
+         *     tasks due before today plus 7 days, overdue included, and the overdue part; `available`
+         *     false when its query failed.
+         */
+        WorkSummary: {
+            /** Available */
+            available: boolean;
+            /**
+             * Due Soon
+             * @default 0
+             */
+            due_soon: number;
+            /**
+             * Overdue
+             * @default 0
+             */
+            overdue: number;
         };
         /** WorkspaceRead */
         WorkspaceRead: {
@@ -7326,7 +7441,10 @@ export interface operations {
     };
     my_work_api_me_work_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The browser's date, for the due counts; default the server's UTC date */
+                today?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7383,6 +7501,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ApprovalWorkItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_tasks_api_me_work_tasks_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date */
+                sort?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TaskWorkItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_reviews_api_me_work_reviews_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date */
+                sort?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TaskWorkItem_"];
                 };
             };
             /** @description Unauthorized */

@@ -146,3 +146,18 @@ class TaskList(BaseModel):
 
     items: list[TaskItem]
     truncated: bool
+
+
+class TaskWorkItem(BaseModel):
+    """A task on My work (design-doc §11): the task, and the project and org it opens in."""
+
+    id: uuid.UUID
+    number: int
+    title: str
+    type: TaskType
+    status: TaskStatus
+    priority: Priority
+    due_date: date | None
+    project_key: str
+    project_name: str
+    organization_slug: str

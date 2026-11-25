@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from typing import cast
 
 from pydantic import BaseModel
-from sqlalchemy import case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.change_log import log_change
@@ -35,7 +34,7 @@ from app.models.user import User
 from app.repositories.base import write_ranks
 from app.repositories.project import ProjectRepository
 from app.repositories.requirement import RequirementRepository
-from app.repositories.task import TaskRepository
+from app.repositories.task import PRIORITY_ORDER, TaskRepository
 from app.repositories.user import UserRepository
 from app.rules.branch_name import branch_name
 from app.rules.rank import place, rank_between
@@ -69,8 +68,6 @@ type TaskEntity = Task
 # The ranked-view cap (DL-159), as the requirement tree's.
 LIST_CAP = 2_000
 
-# Priority sorts by importance, not by its stored text.
-_PRIORITY_ORDER = case({p.value: index for index, p in enumerate(Priority)}, value=Task.priority)
 
 # The backlog's and board's one list (Q2): filters and display sorts decided Nov 24, 2026 (R2).
 TASKS = ListSpec(
@@ -79,7 +76,7 @@ TASKS = ListSpec(
     sorts={
         "rank": Task.rank,  # pyright: ignore[reportArgumentType]
         "number": Task.number,  # pyright: ignore[reportArgumentType]
-        "priority": _PRIORITY_ORDER,
+        "priority": PRIORITY_ORDER,
         "due_date": Task.due_date,  # pyright: ignore[reportArgumentType]
         "updated_at": Task.updated_at,  # pyright: ignore[reportArgumentType]
     },

@@ -460,7 +460,7 @@ against it). Design-doc §5 has the rules; the build plan's "Authorization (§5)
   module, then 403). `hide_denial=True` makes every denial a 404 (the access review).
 - **Lists** scope their query: `project_scope(ctx)` / `org_scope(ctx)` give the `Scope`, and
   `scope_clause(scope, id_column, workspace_column, org_column)` (`app/repositories/base.py`)
-  the `WHERE`. A list of content across projects (My work's approvals) takes
+  the `WHERE`. A list of content across projects (My work's approvals, tasks, and reviews) takes
   `content_scope(ctx)` instead, and passes `scope_clause` the row's project's
   `export_controlled=` expression (as `ProjectRepository.visible` does): an export-controlled
   project's rows are then reached only through an explicit membership.

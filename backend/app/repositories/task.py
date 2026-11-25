@@ -2,15 +2,26 @@
 
 import uuid
 from collections.abc import Collection
-from datetime import datetime
+from datetime import date, datetime
 from typing import cast
 
-from sqlalchemy import Select, false, func, literal, select
+from sqlalchemy import Select, case, false, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import contains_eager
 
+from app.authz.scoping import Scope
 from app.core.base_model import INCLUDE_DELETED
-from app.enums import TaskStatus, TrashItemType
+from app.enums import Priority, TaskStatus, TrashItemType
+from app.models.org import Organization
+from app.models.project import Project
 from app.models.task import Subtask, Task
+from app.repositories.base import scope_clause
+from app.repositories.project import export_controlled
+
+# Priority sorts by importance, not by its stored text.
+PRIORITY_ORDER = case({p.value: index for index, p in enumerate(Priority)}, value=Task.priority)
+# What "open" means for an assigned task (design-doc §11): any status but these.
+CLOSED = (TaskStatus.DONE, TaskStatus.CANCELLED)
 
 
 class TaskRepository:
@@ -89,6 +100,53 @@ class TaskRepository:
             .limit(limit)
         )
         return list(rows)
+
+    def _mine(self, scope: Scope) -> Select[Task]:
+        """Tasks in the live projects of `scope` (the caller's `content_scope`: an
+        export-controlled project only to its explicit members), each with its project and org
+        loaded (My work, design-doc §11)."""
+        return (
+            select(Task)
+            .join(Project, Task.project_id == Project.id)
+            .join(Organization, Project.organization_id == Organization.id)
+            .options(contains_eager(Task.project).contains_eager(Project.organization))
+            .where(
+                Project.archived_at.is_(None),
+                scope_clause(
+                    scope,
+                    Project.id,
+                    Project.workspace_id,
+                    Project.organization_id,
+                    export_controlled=export_controlled(),
+                ),
+            )
+        )
+
+    def assigned_to(self, user_id: uuid.UUID, scope: Scope) -> Select[Task]:
+        """The user's open assigned tasks (the `(assignee_id, status)` index)."""
+        return self._mine(scope).where(Task.assignee_id == user_id, Task.status.not_in(CLOSED))
+
+    def to_review(self, user_id: uuid.UUID, scope: Scope) -> Select[Task]:
+        """The tasks in review with the user as reviewer (the `(reviewer_id, status)` index)."""
+        return self._mine(scope).where(
+            Task.reviewer_id == user_id, Task.status == TaskStatus.IN_REVIEW
+        )
+
+    async def due_counts(
+        self, user_id: uuid.UUID, scope: Scope, today: date, soon: date
+    ) -> tuple[int, int]:
+        """Of the user's open assigned tasks, those due before `soon` (overdue included) and
+        those due before `today` (overdue)."""
+        mine = self.assigned_to(user_id, scope).subquery()
+        due_soon, overdue = (
+            await self.session.execute(
+                select(
+                    func.count().filter(mine.c.due_date < soon),
+                    func.count().filter(mine.c.due_date < today),
+                )
+            )
+        ).one()
+        return due_soon, overdue
 
     def trash_rows(
         self, project_id: uuid.UUID, reporter_id: uuid.UUID | None, *, empty: bool = False

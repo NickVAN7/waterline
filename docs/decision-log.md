@@ -5270,3 +5270,16 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C10; design-doc §6 "Requirement"
 - **Source:** owner, Nov 25, 2026 (chat, before S3-C10 was built)
+
+### DL-415: My work's due counts use the browser's date; its task sections come priority first
+- **Date:** 2026-11-25
+- **Decision:** (1) `GET /api/me/work` takes an optional `?today=YYYY-MM-DD`, the browser's
+  local date, for the summary's `due_soon` (the user's open assigned tasks due before today
+  plus 7 days, overdue included) and `overdue` (due before today); without it the server's UTC
+  date is used. Users have no time zone setting in v1. (2) The tasks and reviews sections, and
+  their "see all" lists, come priority first (critical first), then the earliest due date
+  (none last); `?sort=` offers `priority`, `due_date`, and `updated_at`.
+- **Supersedes:** none (DL-349 and the S3-C11 row named neither)
+- **Superseded by:** none
+- **Applies to:** S3-C11, S3-C29; design-doc §11 "My work"
+- **Source:** owner, Nov 25, 2026 (chat, before S3-C11 was built)

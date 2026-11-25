@@ -1613,10 +1613,13 @@ through the other areas' repositories and calls no service (build plan, "Feature
 - `GET /api/me/work`: every section in one response, each with its first items and a total,
   read in one transaction, so the home page is one request with one consistent snapshot. Each
   section's query runs in a savepoint, so one that fails is returned as unavailable and the
-  rest still show.
+  rest still show. Its `summary` holds the one count no section's total gives (DL-349): the
+  user's open assigned tasks due before today plus 7 days, overdue included, and the overdue
+  part, as of `?today=`, the browser's date (the server's UTC date without one; DL-415).
 - `GET /api/me/work/{section}`: one section as an ordinary offset-paged list (build plan,
-  "API conventions"), for "see all": approvals only, since favorites are shown in full (DL-371)
-  and each organization links to its own list.
+  "API conventions"), for "see all": approvals, tasks, and reviews, since favorites are shown in
+  full (DL-371) and each organization links to its own list. Tasks and reviews come priority
+  first, then the earliest due, undated last (DL-415).
 
 ### Project home: Get started checklist
 DL-201. A new project's home page shows three items, each linking to where it's done and ticked

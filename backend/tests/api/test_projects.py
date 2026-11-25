@@ -759,8 +759,10 @@ async def test_a_section_whose_query_fails_is_unavailable(
             # Both read the visible projects (DL-302, DL-359).
             "favorites": {"available": False, "items": [], "total": 0},
             "organizations": {"available": False, "items": [], "total": 0},
-            # TD-40: the other section still shows.
+            # TD-40: the other sections still show.
             "approvals": {"available": True, "items": [], "total": 0},
+            "tasks": {"available": True, "items": [], "total": 0},
+            "reviews": {"available": True, "items": [], "total": 0},
         },
     )
 
