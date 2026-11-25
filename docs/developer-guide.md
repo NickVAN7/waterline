@@ -719,8 +719,10 @@ time, DL-160).
 get their per-project number from `NumberingService(session).allocate_number(project,
 NumberPrefix.TASK)`, inside the request's transaction (a rollback undoes it). One atomic upsert
 on `project_counter` locks only that (project, prefix) row until commit, so parallel requests
-never collide and other prefixes and the project itself aren't blocked. Never compute
-`MAX(number) + 1`.
+never collide and other prefixes and the project itself aren't blocked. Subtasks take theirs
+from `allocate_subtask_number(task)`: a direct `UPDATE … RETURNING` on
+`task.next_subtask_number`, which holds the task's row (two creates take turns), bumps no
+`version`, and moves the task's `updated_at`. Never compute `MAX(number) + 1`.
 
 **Get by ID** (`app/repositories/base.py`): `get_by_id(session, Model, id)` is always a query,
 never `session.get()`, so the soft-delete filter applies even to an object already in the

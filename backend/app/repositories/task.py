@@ -2,11 +2,11 @@
 
 import uuid
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base_model import INCLUDE_DELETED
-from app.models.task import Task
+from app.models.task import Subtask, Task
 
 
 class TaskRepository:
@@ -53,3 +53,61 @@ class TaskRepository:
             .order_by(Task.rank, Task.id)
         )
         return [(id_, rank) for id_, rank in rows]
+
+    async def subtask(self, task_id: uuid.UUID, number: int) -> Subtask | None:
+        """The task's subtask with this number."""
+        return await self.session.scalar(
+            select(Subtask).where(Subtask.task_id == task_id, Subtask.number == number)
+        )
+
+    async def subtasks(self, task_id: uuid.UUID, limit: int) -> list[Subtask]:
+        """The task's subtasks in `(rank, id)` order, at most `limit`."""
+        rows = await self.session.scalars(
+            select(Subtask)
+            .where(Subtask.task_id == task_id)
+            .order_by(Subtask.rank, Subtask.id)
+            .limit(limit)
+        )
+        return list(rows)
+
+    async def last_subtask_rank(self, task_id: uuid.UUID) -> str | None:
+        return await self.session.scalar(
+            select(Subtask.rank)
+            .where(Subtask.task_id == task_id)
+            .order_by(Subtask.rank.desc())
+            .limit(1)
+        )
+
+    async def other_subtasks(
+        self, task_id: uuid.UUID, *, excluding: uuid.UUID
+    ) -> list[tuple[uuid.UUID, str]]:
+        """The task's other subtasks, `(id, rank)` in `(rank, id)` order."""
+        rows = await self.session.execute(
+            select(Subtask.id, Subtask.rank)
+            .where(Subtask.task_id == task_id, Subtask.id != excluding)
+            .order_by(Subtask.rank, Subtask.id)
+        )
+        return [(id_, rank) for id_, rank in rows]
+
+    async def subtask_counts(self, task_id: uuid.UUID) -> tuple[int, int]:
+        """The task's done subtasks and all of them."""
+        done, total = (
+            await self.session.execute(
+                select(
+                    func.count().filter(Subtask.is_done),
+                    func.count(),
+                ).where(Subtask.task_id == task_id)
+            )
+        ).one()
+        return done, total
+
+    async def lock_subtask(self, subtask: Subtask) -> bool:
+        """Re-read the subtask's row and hold it until the transaction ends; False when a
+        delete committed meanwhile."""
+        row = await self.session.scalar(
+            select(Subtask)
+            .where(Subtask.id == subtask.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return row is not None

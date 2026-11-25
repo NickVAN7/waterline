@@ -5228,3 +5228,13 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** S3-C6; schema-doc (`task`); `backend/tests/api/authz/test_task_update.py`
   (`test_a_null_reporter_is_ignored`, changed with the owner's approval)
 - **Source:** owner, Nov 24, 2026 (chat, S3-C6's review questions)
+
+### DL-412: A subtask's title and description limits
+- **Date:** 2026-11-24
+- **Decision:** A subtask's title is at most 200 characters (as a task's) and its plain-text
+  description at most 2,000 (as a project's, a phase's, or a workstream's): a checklist item,
+  not a document. Enforced with `Field(max_length=…)` (DL-143's way) and in the schema doc.
+- **Supersedes:** none (DL-143 named no subtask fields)
+- **Superseded by:** none
+- **Applies to:** S3-C8; schema-doc (`subtask`)
+- **Source:** owner, Nov 24, 2026 (chat, before S3-C8 was built)

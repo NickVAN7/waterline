@@ -180,6 +180,7 @@ layers = [
     "(requirement_approvals)",
     "(requirement) | (webhook)",
     "(sprint) | (testcase) | (test_run) | (github)",
+    "(subtask)",
     "(task) | (project_members)",
     "(project) | (phase) | (workstream) | (milestone)",
     "(auth) | (workspace) | (org)",

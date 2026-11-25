@@ -1,7 +1,8 @@
-"""`project_counter` (design-doc §3, "Number allocation"). Only the numbering service calls
-this; nothing else touches the table."""
+"""`project_counter` and `task.next_subtask_number` (design-doc §3, "Number allocation"). Only the
+numbering service calls this; nothing else touches the counters."""
 
 import uuid
+from typing import cast
 
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import NumberPrefix
 from app.models.numbering import ProjectCounter
+from app.models.task import Task
+from app.repositories.base import direct_update
 
 
 class NumberingRepository:
@@ -38,3 +41,20 @@ class NumberingRepository:
         )
         # RETURNING always yields exactly one row: the one inserted or updated.
         return (await self.session.execute(statement)).scalar_one()
+
+    async def take_next_subtask(self, task_id: uuid.UUID) -> int:
+        """Hand out the task's next subtask number: `task.next_subtask_number` bumped by a direct
+        `UPDATE … RETURNING`, so two at once queue on the task's row and never share a number;
+        no `version` bump (someone editing the task meanwhile gets no 409), and the task's
+        `updated_at` moves (it changed)."""
+        updated = cast(
+            dict[str, int],
+            await direct_update(
+                self.session,
+                Task,
+                task_id,
+                {"next_subtask_number": Task.next_subtask_number + 1},
+                touch_updated_at=True,
+            ),
+        )
+        return updated["next_subtask_number"] - 1

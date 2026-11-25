@@ -24,6 +24,7 @@ from app.services.requirement import (
     RequirementService,
 )
 from app.services.requirement_approvals import RequirementApprovalService
+from app.services.subtask import SubtaskEntity, SubtaskService
 from app.services.task import TaskEntity, TaskService
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
@@ -166,6 +167,12 @@ async def load_workstream(
 
 async def load_task(key: str, number: int, session: SessionDep) -> tuple[TaskEntity, Target] | None:
     return await TaskService(session).load(key, number)
+
+
+async def load_subtask(
+    key: str, number: int, n: int, session: SessionDep
+) -> tuple[SubtaskEntity, Target] | None:
+    return await SubtaskService(session).load(key, number, n)
 
 
 async def load_requirement(

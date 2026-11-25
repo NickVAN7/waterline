@@ -8,7 +8,9 @@ from app.core.errors import ValidationFailedError
 from app.schemas.move import ItemMove
 
 
-def anchor_position(ids: list[uuid.UUID], move: ItemMove, *, noun: str) -> int:
+def anchor_position(
+    ids: list[uuid.UUID], move: ItemMove, *, noun: str, within: str = "this project"
+) -> int:
     """The index among `ids` (the list's other items, in order) the moved item goes to: after
     `after_id`, before `before_id`, or at the end. 422 on `before_id` with both (`conflict`),
     and on an anchor that isn't one of `ids` (`not_found`: another list's item, or the moved
@@ -22,7 +24,7 @@ def anchor_position(ids: list[uuid.UUID], move: ItemMove, *, noun: str) -> int:
             continue
         if anchor not in ids:
             raise ValidationFailedError.on(
-                ("body", field), f"That isn't another {noun} of this project.", "not_found"
+                ("body", field), f"That isn't another {noun} of {within}.", "not_found"
             )
         return ids.index(anchor) + offset
     return len(ids)

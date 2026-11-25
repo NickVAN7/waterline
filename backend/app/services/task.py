@@ -445,6 +445,7 @@ class TaskService:
         target = project_target(project, task)
         users = await self._people([task])
         reporter = _person(users, task.reporter_id)
+        done, total = await self.repository.subtask_counts(task.id)
         applies = effective(
             Restriction(task.restriction_level, frozenset(_categories(task))),
             Restriction(
@@ -475,6 +476,8 @@ class TaskService:
             time_taken=task.time_taken,
             effective_restriction_level=applies.level,
             effective_restriction_categories=sorted(applies.categories),
+            subtasks_done=done,
+            subtasks_total=total,
             branch_name=branch_name(f"{project.key}-{NumberPrefix.TASK}-{task.number}", task.title),
             version=task.version,
             created_at=task.created_at,

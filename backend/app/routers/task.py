@@ -2,11 +2,20 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.authz.actions import Action
 from app.core.db import SessionDep
-from app.routers.deps import ERRORS, AuthzContextDep, authorized, load_project, load_task
+from app.routers.deps import (
+    ERRORS,
+    AuthzContextDep,
+    authorized,
+    load_project,
+    load_subtask,
+    load_task,
+)
+from app.schemas.move import ItemMove
+from app.schemas.subtask import SubtaskCreate, SubtaskItem, SubtaskList, SubtaskUpdate
 from app.schemas.task import (
     TaskCreate,
     TaskList,
@@ -16,6 +25,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.services.project import ProjectEntity
+from app.services.subtask import SubtaskEntity, SubtaskService
 from app.services.task import TASKS, TaskEntity, TaskService
 
 router = APIRouter(tags=["task"])
@@ -24,6 +34,8 @@ Creating = Annotated[ProjectEntity, Depends(authorized(load_project, Action.TASK
 Listed = Annotated[ProjectEntity, Depends(authorized(load_project, Action.TASK_VIEW))]
 Viewed = Annotated[TaskEntity, Depends(authorized(load_task, Action.TASK_VIEW))]
 Updated = Annotated[TaskEntity, Depends(authorized(load_task, Action.TASK_UPDATE))]
+ChecklistManaged = Annotated[TaskEntity, Depends(authorized(load_task, Action.SUBTASK_MANAGE))]
+SubtaskManaged = Annotated[SubtaskEntity, Depends(authorized(load_subtask, Action.SUBTASK_MANAGE))]
 TasksQuery = Annotated[TASKS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
@@ -82,3 +94,51 @@ async def move_task(
     at the bottom; with `status`, into that board column too, the transition checked first (403,
     nothing saved). 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`)."""
     return await TaskService(session).move(ctx, task, body)
+
+
+# --- Subtasks (design-doc §6, "Subtask"; S3-C8) ---------------------------------------------------
+
+
+@router.get("/projects/{key}/tasks/{number}/subtasks", responses=ERRORS)
+async def list_subtasks(task: Viewed, session: SessionDep) -> SubtaskList:
+    """The task's subtasks in rank order: complete up to 2,000, with `truncated` above it."""
+    return await SubtaskService(session).list(task)
+
+
+@router.post(
+    "/projects/{key}/tasks/{number}/subtasks",
+    status_code=status.HTTP_201_CREATED,
+    responses=ERRORS,
+)
+async def create_subtask(
+    task: ChecklistManaged, body: SubtaskCreate, session: SessionDep
+) -> SubtaskItem:
+    """Add a subtask at the bottom of the task's, numbered from the task's counter (never
+    reused). 422 on `title` (`missing`)."""
+    return await SubtaskService(session).create(task, body)
+
+
+@router.patch("/projects/{key}/tasks/{number}/subtasks/{n}", responses=ERRORS)
+async def update_subtask(
+    subtask: SubtaskManaged, body: SubtaskUpdate, session: SessionDep
+) -> SubtaskItem:
+    """Change the fields sent (check it off with `is_done`). 422 on `title` (`missing`)."""
+    return await SubtaskService(session).update(subtask, body)
+
+
+@router.delete(
+    "/projects/{key}/tasks/{number}/subtasks/{n}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=ERRORS,
+)
+async def delete_subtask(subtask: SubtaskManaged, session: SessionDep) -> None:
+    """Delete the subtask for good; its number isn't reused."""
+    await SubtaskService(session).delete(subtask)
+
+
+@router.post("/projects/{key}/tasks/{number}/subtasks/{n}/move", responses=ERRORS)
+async def move_subtask(subtask: SubtaskManaged, body: ItemMove, session: SessionDep) -> SubtaskItem:
+    """Put the subtask just after `after_id` or just before `before_id` among its task's, or at
+    the bottom. 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`)."""
+    return await SubtaskService(session).move(subtask, body)

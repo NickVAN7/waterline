@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import NumberPrefix
 from app.models.project import Project
+from app.models.task import Task
 from app.repositories.numbering import NumberingRepository
 
 
@@ -21,3 +22,8 @@ class NumberingService:
         No authorization here: callers (the create services) run `authorize()` on the project
         first, archived-project check included, so a denied request never takes a number."""
         return await self.repository.take_next(project.id, prefix)
+
+    async def allocate_subtask_number(self, task: Task) -> int:
+        """The task's next subtask number, inside the caller's transaction, never reused after
+        a delete (schema-doc `subtask`). The caller has authorized `subtask.manage`."""
+        return await self.repository.take_next_subtask(task.id)

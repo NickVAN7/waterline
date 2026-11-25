@@ -471,6 +471,7 @@ ERP modules (Slices 9+) get their own entries when they're designed.
   | 2 | auth, workspace, org | layers 1–1b |
   | 3 | project, phase, workstream, milestone | layers 1–2 |
   | 4 | task, project_members (project membership, a subclass of the project service; S3-C0w) | layers 1–3 |
+  | 4b | subtask (a task's subtasks, above the task service it reads tasks through; S3-C8) | layers 1–4 |
   | 5 | sprint, testcase, test_run, github | layers 1–4 |
   | 6 | requirement, webhook | layers 1–5 |
   | 6b | requirement_approvals (a requirement's approval requests, a subclass of the requirement service; S3-C0w) | layers 1–6 |
@@ -1294,7 +1295,8 @@ offering export control (DL-133).
 - Tests: first allocation returns 1; sequential allocations increase; **concurrent allocations
   from parallel transactions never collide**; a rolled-back transaction doesn't consume a
   number; different prefixes and projects are independent.
-- `allocate_subtask_number(task)` waits for Slice 3, when `task` exists.
+- `allocate_subtask_number(task)`: a direct `UPDATE … RETURNING` on `task.next_subtask_number`
+  (built in S3-C8, concurrency-tested as `project_counter`).
 
 ### Web screens
 - Sign-in; forced password change; account settings (profile, change password); the System /

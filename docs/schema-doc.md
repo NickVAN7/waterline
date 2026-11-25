@@ -810,8 +810,8 @@ requirement's tasks: its page, its coverage counts, the delete's linked-tasks ch
 | id | UUID (PK) | |
 | task_id | UUID (FK → task) | immutable; a subtask cannot move to another task |
 | number | integer | number within its task; displayed `{KEY}-TA-{task number}.{number}` (e.g. `PMT-TA-45.2`); never reused |
-| title | varchar | |
-| description | text | plain text |
+| title | varchar | at most 200 characters (DL-412) |
+| description | text | plain text; at most 2,000 characters (DL-412) |
 | is_done | boolean | default false |
 | rank | varchar | order within its task |
 | created_at / updated_at | timestamptz | |

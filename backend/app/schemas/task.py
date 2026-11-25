@@ -128,6 +128,9 @@ class TaskRead(TaskItem):
     # What applies: the stricter of its and the project's levels, all their categories (DL-265).
     effective_restriction_level: RestrictionLevel | None
     effective_restriction_categories: list[RestrictionCategory]
+    # The checklist's "3 of 5 done" (S3-C8).
+    subtasks_done: int
+    subtasks_total: int
     # The lowercase ID and a title slug, to copy (design-doc §6; DL-408).
     branch_name: str
     version: int
