@@ -294,8 +294,9 @@ Trash**. A link to a deleted requirement shows the page-not-found page.
 **Trash**, a link at the top of the Requirements page beside **New requirement**
 (`/<organization>/projects/<KEY>/trash?type=requirement`), lists the deleted items you may
 restore, newest first, filtered to requirements: **Type** above the list shows the filter, and
-**Any type** removes it (requirements are the only type until tasks arrive). When nothing matches,
-the page says "No deleted items match Type: Requirement", with **Clear filter**. The trail leads
+**Any type** removes it. Deleted tasks are listed too, under **Any type** or **Task**, but
+until the Tasks page arrives (TD-133) a task row shows a requirement's ID and has no
+**Restore**. When nothing matches, the page says "No deleted items match Type: Requirement", with **Clear filter**. The trail leads
 back to Requirements. Each row shows the item's ID and title, who deleted it
 ("Deactivated" after someone since deactivated; **System** for an app command), and when.
 Project admins see everything; a member sees the never-approved requirements they reported. One

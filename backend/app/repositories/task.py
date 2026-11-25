@@ -1,11 +1,14 @@
 """Tasks (schema-doc "Work Items"; design-doc §6)."""
 
 import uuid
+from collections.abc import Collection
+from datetime import datetime
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, false, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base_model import INCLUDE_DELETED
+from app.enums import TrashItemType
 from app.models.task import Subtask, Task
 
 
@@ -18,6 +21,44 @@ class TaskRepository:
         return await self.session.scalar(
             select(Task).where(Task.project_id == project_id, Task.number == number)
         )
+
+    async def get_deleted_by_number(self, project_id: uuid.UUID, number: int) -> Task | None:
+        """The project's task with this number if it's in the trash (design-doc §9)."""
+        return await self.session.scalar(
+            select(Task)
+            .where(
+                Task.project_id == project_id, Task.number == number, Task.deleted_at.is_not(None)
+            )
+            .execution_options(**{INCLUDE_DELETED: True})
+        )
+
+    async def get_many_in_project(
+        self, project_id: uuid.UUID, task_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, Task]:
+        """The project's tasks with these IDs, by ID, deleted ones included: the trash's rows,
+        one restored since the page was read included."""
+        if not task_ids:
+            return {}
+        tasks = await self.session.scalars(
+            select(Task)
+            .where(Task.project_id == project_id, Task.id.in_(task_ids))
+            .execution_options(**{INCLUDE_DELETED: True})
+        )
+        return {task.id: task for task in tasks}
+
+    def trash_rows(
+        self, project_id: uuid.UUID, reporter_id: uuid.UUID | None, *, empty: bool = False
+    ) -> Select[str, uuid.UUID, datetime | None]:
+        """The project's tasks in the trash as the trash's rows (type, id, deleted_at); with
+        `reporter_id`, only that reporter's; with `empty`, none."""
+        statement = select(
+            literal(TrashItemType.TASK.value).label("type"), Task.id, Task.deleted_at
+        ).where(Task.project_id == project_id, Task.deleted_at.is_not(None))
+        if empty:
+            statement = statement.where(false())
+        if reporter_id is not None:
+            statement = statement.where(Task.reporter_id == reporter_id)
+        return statement
 
     def in_project(self, project_id: uuid.UUID) -> Select[Task]:
         """The project's live tasks, for the list's filters and order (`fetch_ranked`)."""

@@ -1560,7 +1560,11 @@ export interface paths {
         get: operations["get_task_api_projects__key__tasks__number__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Task
+         * @description Move the task to the trash, its subtasks hidden with it.
+         */
+        delete: operations["delete_task_api_projects__key__tasks__number__delete"];
         options?: never;
         head?: never;
         /**
@@ -1611,6 +1615,26 @@ export interface paths {
          *     nothing saved). 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`).
          */
         post: operations["move_task_api_projects__key__tasks__number__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Task
+         * @description Bring the task back from the trash with its subtasks. 404 for one not in the trash.
+         */
+        post: operations["restore_task_api_projects__key__tasks__number__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3770,10 +3794,10 @@ export interface components {
         };
         /**
          * TrashItemType
-         * @description What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5).
+         * @description What the trash lists (design-doc §9; test cases join in Slice 5).
          * @enum {string}
          */
-        TrashItemType: "requirement";
+        TrashItemType: "requirement" | "task";
         /** TypeRecommendation */
         TypeRecommendation: {
             type: components["schemas"]["ProjectType"];
@@ -9434,6 +9458,63 @@ export interface operations {
             };
         };
     };
+    delete_task_api_projects__key__tasks__number__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     update_task_api_projects__key__tasks__number__patch: {
         parameters: {
             query?: never;
@@ -9575,6 +9656,65 @@ export interface operations {
                 "application/json": components["schemas"]["TaskMove"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    restore_task_api_projects__key__tasks__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

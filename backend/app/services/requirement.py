@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from typing import cast
 
 from pydantic import BaseModel
-from sqlalchemy import literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.change_log import log_change
@@ -32,15 +31,22 @@ from app.enums import (
 from app.models.approval import ApprovalRequest
 from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
+from app.models.task import Task
 from app.models.user import User
 from app.repositories.activity import ActivityRepository
 from app.repositories.approval import ApprovalRepository
 from app.repositories.base import direct_update, write_ranks
 from app.repositories.project import ProjectRepository
-from app.repositories.requirement import RequirementRepository
+from app.repositories.requirement import (
+    TRASH_DELETED_AT,
+    TRASH_ID,
+    TRASH_TYPE,
+    RequirementRepository,
+)
+from app.repositories.task import TaskRepository
 from app.repositories.user import UserRepository
 from app.rules.rank import place, rank_between
-from app.rules.restriction import Restriction, effective, levels_below
+from app.rules.restriction import Restriction, effective
 from app.schemas.requirement import (
     RequirementAncestor,
     RequirementCreate,
@@ -59,6 +65,7 @@ from app.services.numbering import NumberingService
 from app.services.project import (
     check_item_restriction,
     lift_items,
+    lift_restored,
     register_on_restriction_changed,
     set_item_restriction,
 )
@@ -71,17 +78,14 @@ type ApprovalRequestEntity = ApprovalRequest
 # The ranked-view cap (DL-159; build plan, "API conventions").
 TREE_CAP = 2_000
 
-# The project's trash (design-doc §9): newest first; tasks and test cases join in Slices 3 and 5.
+# The project's trash (design-doc §9): requirements and tasks, newest first; test cases join in
+# Slice 5.
 TRASH = ListSpec(
     name="TrashItem",
-    id_column=Requirement.id,  # pyright: ignore[reportArgumentType]
-    sorts={"deleted_at": Requirement.deleted_at},  # pyright: ignore[reportArgumentType]
+    id_column=TRASH_ID,
+    sorts={"deleted_at": TRASH_DELETED_AT},
     default_sort=("-deleted_at",),
-    filters=(
-        Filter(
-            "type", literal(TrashItemType.REQUIREMENT.value), FilterType.ENUM, enum=TrashItemType
-        ),
-    ),
+    filters=(Filter("type", TRASH_TYPE, FilterType.ENUM, enum=TrashItemType),),
 )
 
 REVISIONS = ListSpec(
@@ -533,72 +537,84 @@ class RequirementService:
                 parent_id,
                 None,
             )
-        below = levels_below(project.restriction_level)
         for item in restored:
             item.deleted_at = None
         await self.session.flush()
         for item in restored:
-            old_level = item.restriction_level
-            lifted = old_level in below
-            if lifted:
-                await direct_update(
-                    self.session,
-                    Requirement,
-                    item.id,
-                    {"restriction_level": project.restriction_level},
-                    touch_updated_at=False,
-                )
             self._log(item, ctx.user_id, ActivityAction.RESTORED)
-            if lifted:
-                self._log(
-                    item,
-                    ctx.user_id,
-                    ActivityAction.UPDATED,
-                    ActivityField.RESTRICTION_LEVEL,
-                    old_level,
-                    project.restriction_level,
-                )
+            await lift_restored(
+                self.session,
+                Requirement,
+                ActivityEntityType.REQUIREMENT,
+                project,
+                item,
+                ctx.user_id,
+            )
         return await self.read(ctx, requirement)
 
     async def trash(self, ctx: AuthzContext, project: Project, query: BaseModel) -> Page[TrashItem]:
-        """The project's deleted items the caller could restore, each by its own rule (DL-220):
-        everything for project admins, the reporter's own never-approved ones for members. A
-        row carries `requirement.restore` only when the whole restore would pass (DL-222)."""
+        """The project's deleted requirements and tasks the caller could restore, each by its
+        own rule (DL-220): everything for project admins; for members, the requirements they
+        reported and never approved, and the tasks they reported. A requirement's row carries
+        `requirement.restore` only when the whole restore would pass (DL-222)."""
         # Who could restore, archived or not: an archived project lists the same rows (DL-220).
         live = dataclasses.replace(project_target(project), archived=False)
-        empty = False
-        if authorize(ctx, Action.REQUIREMENT_RESTORE, live):
-            reporter_id = None
-        else:
-            # A project member's own never-approved one (DL-219): nothing for anyone else.
-            own = Requirement(reporter_id=ctx.user_id, approved_revision_id=None)
-            reporter_id = ctx.user_id
-            empty = not authorize(
-                ctx, Action.REQUIREMENT_RESTORE, dataclasses.replace(live, entity=own)
-            )
+
+        def reach(action: Action, own: Requirement | Task) -> tuple[uuid.UUID | None, bool]:
+            """Everything, or only the caller's own (DL-219, DL-223), or nothing at all."""
+            if authorize(ctx, action, live):
+                return None, False
+            return ctx.user_id, not authorize(ctx, action, dataclasses.replace(live, entity=own))
+
+        requirement_reporter, no_requirements = reach(
+            Action.REQUIREMENT_RESTORE,
+            Requirement(reporter_id=ctx.user_id, approved_revision_id=None),
+        )
+        task_reporter, no_tasks = reach(Action.TASK_RESTORE, Task(reporter_id=ctx.user_id))
+        tasks = TaskRepository(self.session)
         page = await fetch_page(
             self.session,
-            self.repository.trash(project.id, reporter_id, empty=empty),
+            self.repository.trash(
+                self.repository.trash_rows(project.id, requirement_reporter, empty=no_requirements),
+                tasks.trash_rows(project.id, task_reporter, empty=no_tasks),
+            ),
             TRASH,
             query,
         )
-        rows: list[Requirement] = page.items
+        ids: list[uuid.UUID] = page.items
+        found: dict[uuid.UUID, Requirement | Task] = {
+            **await self.repository.get_many_in_project(project.id, ids),
+            **await tasks.get_many_in_project(project.id, ids),
+        }
+        # One restored since the page was read has left the trash.
+        rows = [row for id_ in ids if (row := found[id_]).deleted_at is not None]
+        requirements = {row.id: row for row in rows if isinstance(row, Requirement)}
+        deleted_tasks = [row.id for row in rows if isinstance(row, Task)]
         with_them: dict[uuid.UUID, list[Requirement]] = defaultdict(list)
-        for root, item in await self.repository.deleted_with(rows) if rows else []:
+        for root, item in (
+            await self.repository.deleted_with(list(requirements.values())) if requirements else []
+        ):
             with_them[root].append(item)
-        deleters = await ActivityRepository(self.session).last_deleters(
-            ActivityEntityType.REQUIREMENT, [row.id for row in rows]
-        )
+        activity = ActivityRepository(self.session)
+        deleters = {
+            **await activity.last_deleters(ActivityEntityType.REQUIREMENT, list(requirements)),
+            **await activity.last_deleters(ActivityEntityType.TASK, deleted_tasks),
+        }
         users = await UserRepository(self.session).get_many(
             {user_id for user_id in deleters.values() if user_id is not None}
         )
 
-        def deleter(row: Requirement) -> User | None:
+        def deleter(row: Requirement | Task) -> User | None:
             user_id = deleters.get(row.id)
             return None if user_id is None else users.get(user_id)
 
-        def actions(row: Requirement) -> list[Action]:
-            allowed = allowed_actions(ctx, project_target(project, row))
+        def actions(row: Requirement | Task) -> list[Action]:
+            # Only the row's own type's restore: an admin holds both by role, and a Restore must
+            # never act on another type's item with the same number.
+            other = Action.REQUIREMENT_RESTORE if isinstance(row, Task) else Action.TASK_RESTORE
+            allowed = [
+                a for a in allowed_actions(ctx, project_target(project, row)) if a is not other
+            ]
             if Action.REQUIREMENT_RESTORE in allowed and not all(
                 authorize(ctx, Action.REQUIREMENT_RESTORE, project_target(project, item))
                 for item in with_them[row.id]
@@ -609,7 +625,7 @@ class RequirementService:
         return page.with_items(
             [
                 TrashItem(
-                    type=TrashItemType.REQUIREMENT,
+                    type=TrashItemType.TASK if isinstance(row, Task) else TrashItemType.REQUIREMENT,
                     id=row.id,
                     number=row.number,
                     title=row.title,

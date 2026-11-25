@@ -1,26 +1,28 @@
 """Tasks between truly parallel transactions: a create naming a phase or a requirement while it's
 being deleted (backend/CLAUDE.md: a check that another row exists before a write that depends on
-it holds that row). Sabotage-checked against the code without each hold."""
+it holds that row), and deletes and restores against each other and a reporter change.
+Sabotage-checked against the code without each hold."""
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.authz.context import AuthzContext
+from app.authz.context import AuthzContext, ProjectAccess
 from app.core.db import SessionMaker
-from app.enums import DeletedChildren, RestrictionLevel
+from app.enums import ActivityAction, DeletedChildren, ProjectRole, RestrictionLevel
+from app.models.audit import ActivityLog
 from app.models.phase import Phase
 from app.models.project import Project
 from app.models.requirement import Requirement
 from app.models.task import Task
-from app.schemas.task import TaskCreate, TaskMove, TaskRestrictionUpdate
+from app.schemas.task import TaskCreate, TaskMove, TaskRestrictionUpdate, TaskUpdate
 from app.services.phase import PhaseService
 from app.services.project import ProjectService
 from app.services.requirement import RequirementService
 from app.services.task import TaskService
 from tests.factories.org import OrganizationFactory
 from tests.factories.phase import PhaseFactory
-from tests.factories.project import ProjectFactory
+from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.requirement import RequirementFactory
 from tests.factories.task import TaskFactory
 from tests.factories.user import UserFactory
@@ -40,6 +42,7 @@ TABLES = (
     "requirement_revision",
     "requirement",
     "project_counter",
+    "project_membership",
     "project",
     "organization",
     "workspace",
@@ -243,3 +246,117 @@ async def test_a_move_waiting_on_an_archive_is_refused(
     async with concurrency() as check:
         rank = await check.scalar(select(Task.rank).where(Task.id == one.id))
     assert (refused, rank) == (["ForbiddenError"], "i0")
+
+
+# --- Delete and restore (design-doc §9; S3-C9) ------------------------------------------------
+
+
+async def a_task(concurrency: SessionMaker, ctx: AuthzContext, project: Project) -> Task:
+    async with committing_factories(concurrency):
+        return await TaskFactory.create_async(project=project, number=1, reporter_id=ctx.user_id)
+
+
+async def logged(concurrency: SessionMaker, action: ActivityAction) -> int | None:
+    async with concurrency() as check:
+        return await check.scalar(
+            select(func.count()).select_from(ActivityLog).where(ActivityLog.action == action)
+        )
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_two_deletes_at_once_are_one_delete_and_one_404(concurrency: SessionMaker) -> None:
+    """Without re-reading the row under its lock, both delete, and the deletion is logged
+    twice."""
+    ctx, project = await a_project(concurrency)
+    task = await a_task(concurrency, ctx, project)
+
+    async def delete(session: AsyncSession, _index: int) -> str:
+        loaded = await session.get_one(Task, task.id)
+        return await outcome(TaskService(session).delete(ctx, loaded))
+
+    outcomes = await run_in_parallel(concurrency, 2, delete)
+
+    assert (sorted(outcomes), await logged(concurrency, ActivityAction.DELETED)) == (
+        ["NotFoundError", "ok"],
+        1,
+    )
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_two_restores_at_once_are_one_restore_and_one_404(
+    concurrency: SessionMaker,
+) -> None:
+    """Without checking `deleted_at` on the locked row, both restore, logged twice."""
+    ctx, project = await a_project(concurrency)
+    task = await a_task(concurrency, ctx, project)
+    async with concurrency() as session:
+        await TaskService(session).delete(ctx, await session.get_one(Task, task.id))
+        await session.commit()
+
+    async def restore(session: AsyncSession, _index: int) -> str:
+        loaded = (
+            await session.execute(
+                select(Task).where(Task.id == task.id).execution_options(include_deleted=True)
+            )
+        ).scalar_one()
+        return await outcome(TaskService(session).restore(ctx, loaded))
+
+    outcomes = await run_in_parallel(concurrency, 2, restore)
+
+    assert (sorted(outcomes), await logged(concurrency, ActivityAction.RESTORED)) == (
+        ["NotFoundError", "ok"],
+        1,
+    )
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_a_delete_waiting_on_an_archive_is_refused(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """Checked only as the router loaded it, the delete goes through in a project archived
+    meanwhile, which is read-only (design-doc §5, §9)."""
+    ctx, project = await a_project(concurrency)
+    task = await a_task(concurrency, ctx, project)
+
+    async def archive(session: AsyncSession) -> object:
+        return await ProjectService(session).archive(
+            ctx, await session.get_one(Project, project.id)
+        )
+
+    async def delete(session: AsyncSession) -> object:
+        return await TaskService(session).delete(ctx, await session.get_one(Task, task.id))
+
+    refused = await race(concurrency, concurrency_engine, first=archive, second=delete)
+
+    assert (refused, await logged(concurrency, ActivityAction.DELETED)) == (["ForbiddenError"], 0)
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_a_reporters_delete_waiting_on_a_reporter_change_is_refused(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """Checked only as the row was first loaded, the former reporter's delete goes through once
+    the change commits: a member deletes what they couldn't delete directly (§5, "Deletion")."""
+    admin_ctx, project = await a_project(concurrency)
+    async with committing_factories(concurrency) as session:
+        loaded = await session.get_one(Project, project.id)
+        ann, bob = await UserFactory.create_async(), await UserFactory.create_async()
+        for user in (ann, bob):
+            await ProjectMembershipFactory.create_async(
+                project=loaded, user=user, role=ProjectRole.MEMBER
+            )
+        task = await TaskFactory.create_async(project=loaded, number=1, reporter_id=ann.id)
+    access = ProjectAccess(ProjectRole.MEMBER, project.organization_id, project.workspace_id)
+    ann_ctx = AuthzContext(user_id=ann.id, projects={project.id: access})
+
+    async def reassign(session: AsyncSession) -> object:
+        row = await session.get_one(Task, task.id)
+        body = TaskUpdate(version=1, reporter_id=bob.id)
+        return await TaskService(session).update(admin_ctx, row, body)
+
+    async def ann_deletes(session: AsyncSession) -> object:
+        return await TaskService(session).delete(ann_ctx, await session.get_one(Task, task.id))
+
+    refused = await race(concurrency, concurrency_engine, first=reassign, second=ann_deletes)
+
+    assert refused == ["ForbiddenError"]

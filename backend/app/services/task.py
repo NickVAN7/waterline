@@ -2,6 +2,7 @@
 workstream, and project (its restriction rules and the raise's handler)."""
 
 import uuid
+from datetime import UTC, datetime
 from typing import cast
 
 from pydantic import BaseModel
@@ -54,6 +55,7 @@ from app.services.phase import PhaseService
 from app.services.project import (
     check_item_restriction,
     lift_items,
+    lift_restored,
     register_on_restriction_changed,
     set_item_restriction,
 )
@@ -166,6 +168,15 @@ class TaskService:
         if project is None:
             return None
         task = await self.repository.get_by_number(project.id, number)
+        return None if task is None else (task, project_target(project, task))
+
+    async def load_deleted(self, key: str, number: int) -> tuple[Task, Target] | None:
+        """The task `number` in project `key` if it's in the trash, as a target inside its
+        project."""
+        project = await ProjectRepository(self.session).get_by_key(key)
+        if project is None:
+            return None
+        task = await self.repository.get_deleted_by_number(project.id, number)
         return None if task is None else (task, project_target(project, task))
 
     async def _project(self, task: Task) -> Project:
@@ -414,6 +425,45 @@ class TaskService:
                 old=old_status,
                 new=new_status,
             )
+        return await self.read(ctx, task)
+
+    def _log(self, task: Task, actor_id: uuid.UUID, action: ActivityAction) -> None:
+        log_change(
+            self.session,
+            project_id=task.project_id,
+            entity_type=ActivityEntityType.TASK,
+            entity_id=task.id,
+            action=action,
+            changed_by=actor_id,
+        )
+
+    async def delete(self, ctx: AuthzContext, task: Task) -> None:
+        """Move the task to the trash (design-doc §9): its subtasks stay in place, hidden with
+        it. Logged."""
+        project = await self._project(task)
+        # Held, then the row, as an edit: the rights checked see an archive or a reporter change
+        # that committed while this waited.
+        await ProjectRepository(self.session).hold(project)
+        await self._lock_live(task)
+        ensure(ctx, Action.TASK_DELETE, project_target(project, task))
+        task.deleted_at = datetime.now(UTC)
+        await self.session.flush()
+        self._log(task, ctx.user_id, ActivityAction.DELETED)
+
+    async def restore(self, ctx: AuthzContext, task: Task) -> TaskRead:
+        """Bring the task back from the trash with its subtasks, in its old place in the order;
+        one stored below the project's level is raised to it (DL-209). 404 for one restored
+        meanwhile. Logged."""
+        project = await self._project(task)
+        await ProjectRepository(self.session).hold(project)
+        await self.repository.lock(task)
+        if task.deleted_at is None:
+            raise NotFoundError
+        ensure(ctx, Action.TASK_RESTORE, project_target(project, task))
+        task.deleted_at = None
+        await self.session.flush()
+        self._log(task, ctx.user_id, ActivityAction.RESTORED)
+        await lift_restored(self.session, Task, ActivityEntityType.TASK, project, task, ctx.user_id)
         return await self.read(ctx, task)
 
     async def set_restriction(

@@ -578,6 +578,20 @@ Entry format:
 - **Fix by:** S3-C12 (the workstream named in History and the feed, with a History spec case)
 - **Status:** open
 
+### TD-133: The Trash page shows a task row as a requirement
+- **Added:** S3-C9 (owner, Nov 25, 2026: backend only)
+- **What:** the trash API lists deleted tasks, but `TrashView.vue` shows every row as
+  `{KEY}-RQ-n`, and its text still says requirements only (the empty state, the who-to-ask
+  sentence). A task row has no Restore (it carries `task.restore`, never `requirement.restore`,
+  and the page's Restore is the requirement's). Its type filter offers "Task" (the label map is
+  typed by the API's enum).
+- **Why:** no task page exists for the success status to link to until S3-C23; the owner kept
+  S3-C9 to the backend.
+- **Fix by:** S3-C20 (the Tasks page's Trash link): the row's ID, Restore, and the page's text by
+  type, with a spec case for each `TrashItemType`; the success linking to the task once S3-C23's
+  page exists
+- **Status:** open
+
 ## Resolved
 
 ### TD-1: pre-commit has no frontend or generated-file hooks

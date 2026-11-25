@@ -314,6 +314,35 @@ async def lift_items(
         )
 
 
+async def lift_restored(
+    session: AsyncSession,
+    model: Any,
+    entity_type: ActivityEntityType,
+    project: Project,
+    item: Any,
+    actor_id: uuid.UUID,
+) -> None:
+    """A restored item stored below its project's level, which a raise skips while it's in the
+    trash, is raised to it, logged, without moving `updated_at` (design-doc §9, DL-209)."""
+    level, old = project.restriction_level, item.restriction_level
+    if old not in levels_below(level):
+        return
+    await direct_update(
+        session, model, item.id, {"restriction_level": level}, touch_updated_at=False
+    )
+    log_change(
+        session,
+        project_id=project.id,
+        entity_type=entity_type,
+        entity_id=item.id,
+        action=ActivityAction.UPDATED,
+        changed_by=actor_id,
+        field=ActivityField.RESTRICTION_LEVEL,
+        old=old,
+        new=level,
+    )
+
+
 type RestrictionChangedHandler = Callable[[AsyncSession, Project, uuid.UUID], Awaitable[None]]
 
 # Registered by the item areas (requirements, S2-C6), which this module never imports: each lifts

@@ -5,13 +5,33 @@ from collections.abc import Collection
 from datetime import datetime
 from typing import cast
 
-from sqlalchemy import Select, exists, false, literal, select
+from sqlalchemy import (
+    DateTime,
+    Select,
+    String,
+    Uuid,
+    column,
+    exists,
+    false,
+    literal,
+    select,
+    union_all,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql.expression import ColumnClause
 
 from app.core.base_model import INCLUDE_DELETED
+from app.enums import TrashItemType
 from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
+
+# The project trash's rows (design-doc §9): one per deleted item, whatever its table, so the list
+# filters, sorts, and pages them together (`TRASH`). Unqualified, so they name the columns of the
+# one union `trash()` selects from; each table's part selects these three.
+TRASH_TYPE: ColumnClause[str] = column("type", String)
+TRASH_ID: ColumnClause[uuid.UUID] = column("id", Uuid)
+TRASH_DELETED_AT: ColumnClause[datetime] = column("deleted_at", DateTime(timezone=True))
 
 
 class RequirementRepository:
@@ -171,22 +191,30 @@ class RequirementRepository:
         )
         return [(root, requirement) for root, requirement in rows]
 
-    def trash(
+    def trash_rows(
         self, project_id: uuid.UUID, reporter_id: uuid.UUID | None, *, empty: bool = False
-    ) -> Select[Requirement]:
-        """The project's requirements in the trash; with `reporter_id`, only that reporter's
-        never-approved ones (design-doc §9: each user sees what they may restore); with `empty`,
-        none, still paged as asked."""
-        statement = select(Requirement).where(
-            Requirement.project_id == project_id, Requirement.deleted_at.is_not(None)
-        )
+    ) -> Select[str, uuid.UUID, datetime | None]:
+        """The project's requirements in the trash as the trash's rows; with `reporter_id`, only
+        that reporter's never-approved ones (design-doc §9: each user sees what they may
+        restore); with `empty`, none."""
+        statement = select(
+            literal(TrashItemType.REQUIREMENT.value).label("type"),
+            Requirement.id,
+            Requirement.deleted_at,
+        ).where(Requirement.project_id == project_id, Requirement.deleted_at.is_not(None))
         if empty:
             statement = statement.where(false())
         if reporter_id is not None:
             statement = statement.where(
                 Requirement.reporter_id == reporter_id, Requirement.approved_revision_id.is_(None)
             )
-        return statement.execution_options(**{INCLUDE_DELETED: True})
+        return statement
+
+    def trash(self, *parts: Select[str, uuid.UUID, datetime | None]) -> Select[uuid.UUID]:
+        """The trash's item IDs from each table's part (its `TRASH_TYPE`, `TRASH_ID`, and
+        `TRASH_DELETED_AT`), still paged as asked."""
+        rows = union_all(*parts).subquery("trash")
+        return select(rows.c.id).execution_options(**{INCLUDE_DELETED: True})
 
     def revisions(self, requirement_id: uuid.UUID) -> Select[RequirementRevision]:
         """The requirement's revisions, with their authors (the feed orders them)."""

@@ -221,9 +221,10 @@ class DeletedChildren(StrEnum):
 
 
 class TrashItemType(StrEnum):
-    """What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5)."""
+    """What the trash lists (design-doc §9; test cases join in Slice 5)."""
 
     REQUIREMENT = "requirement"
+    TASK = "task"
 
 
 # --- Change log (design-doc §10; schema-doc `activity_log`) -----------------------------------

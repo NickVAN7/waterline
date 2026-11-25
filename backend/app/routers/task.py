@@ -10,6 +10,7 @@ from app.routers.deps import (
     ERRORS,
     AuthzContextDep,
     authorized,
+    load_deleted_task,
     load_project,
     load_subtask,
     load_task,
@@ -34,6 +35,8 @@ Creating = Annotated[ProjectEntity, Depends(authorized(load_project, Action.TASK
 Listed = Annotated[ProjectEntity, Depends(authorized(load_project, Action.TASK_VIEW))]
 Viewed = Annotated[TaskEntity, Depends(authorized(load_task, Action.TASK_VIEW))]
 Updated = Annotated[TaskEntity, Depends(authorized(load_task, Action.TASK_UPDATE))]
+Deleted = Annotated[TaskEntity, Depends(authorized(load_task, Action.TASK_DELETE))]
+Restored = Annotated[TaskEntity, Depends(authorized(load_deleted_task, Action.TASK_RESTORE))]
 ChecklistManaged = Annotated[TaskEntity, Depends(authorized(load_task, Action.SUBTASK_MANAGE))]
 SubtaskManaged = Annotated[SubtaskEntity, Depends(authorized(load_subtask, Action.SUBTASK_MANAGE))]
 TasksQuery = Annotated[TASKS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
@@ -94,6 +97,23 @@ async def move_task(
     at the bottom; with `status`, into that board column too, the transition checked first (403,
     nothing saved). 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`)."""
     return await TaskService(session).move(ctx, task, body)
+
+
+@router.delete(
+    "/projects/{key}/tasks/{number}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=ERRORS,
+)
+async def delete_task(task: Deleted, ctx: AuthzContextDep, session: SessionDep) -> None:
+    """Move the task to the trash, its subtasks hidden with it."""
+    await TaskService(session).delete(ctx, task)
+
+
+@router.post("/projects/{key}/tasks/{number}/restore", responses=ERRORS)
+async def restore_task(task: Restored, ctx: AuthzContextDep, session: SessionDep) -> TaskRead:
+    """Bring the task back from the trash with its subtasks. 404 for one not in the trash."""
+    return await TaskService(session).restore(ctx, task)
 
 
 # --- Subtasks (design-doc §6, "Subtask"; S3-C8) ---------------------------------------------------

@@ -169,6 +169,12 @@ async def load_task(key: str, number: int, session: SessionDep) -> tuple[TaskEnt
     return await TaskService(session).load(key, number)
 
 
+async def load_deleted_task(
+    key: str, number: int, session: SessionDep
+) -> tuple[TaskEntity, Target] | None:
+    return await TaskService(session).load_deleted(key, number)
+
+
 async def load_subtask(
     key: str, number: int, n: int, session: SessionDep
 ) -> tuple[SubtaskEntity, Target] | None:

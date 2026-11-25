@@ -7,7 +7,8 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C8 (Subtasks) done; next: S3-C9 (Delete, restore & trash), after the owner's approval.
+S3-C9 (Delete, restore & trash) done; next: S3-C9a (A requirement's linked tasks on its delete),
+after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)
