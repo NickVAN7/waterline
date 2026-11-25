@@ -5481,7 +5481,7 @@
           "requirement"
         ],
         "summary": "Delete Requirement",
-        "description": "Move the requirement to the trash: its children promoted to its parent (`promote`, the\ndefault) or deleted with it (`delete`, 403 if the caller may not delete each of them); a\npending approval request on it is cancelled.",
+        "description": "Move the requirement to the trash: its children promoted to its parent (`promote`, the\ndefault) or deleted with it (`delete`, 403 if the caller may not delete each of them); the\ntasks linked to each deleted one detached (`detach`, the default) or deleted with it\n(`delete`, 403 if the caller may not delete each task); a pending approval request on each\nis cancelled.",
         "operationId": "delete_requirement_api_projects__key__requirements__number__delete",
         "parameters": [
           {
@@ -5509,6 +5509,15 @@
             "schema": {
               "$ref": "#/components/schemas/DeletedChildren",
               "default": "promote"
+            }
+          },
+          {
+            "name": "tasks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/LinkedTasks",
+              "default": "detach"
             }
           }
         ],
@@ -10456,6 +10465,15 @@
         "title": "ItemMove",
         "description": "`POST …/{id}/move`: just after `after_id` or just before `before_id`, or with neither at\nthe bottom."
       },
+      "LinkedTasks": {
+        "type": "string",
+        "enum": [
+          "detach",
+          "delete"
+        ],
+        "title": "LinkedTasks",
+        "description": "What a requirement's delete does with the tasks linked to it (design-doc §9)."
+      },
       "MeOrg": {
         "properties": {
           "id": {
@@ -13274,6 +13292,10 @@
             "type": "boolean",
             "title": "Can Delete Children"
           },
+          "can_delete_tasks": {
+            "type": "boolean",
+            "title": "Can Delete Tasks"
+          },
           "approved_at": {
             "anyOf": [
               {
@@ -13337,6 +13359,7 @@
           "approved_revision_number",
           "has_children",
           "can_delete_children",
+          "can_delete_tasks",
           "approved_at",
           "version",
           "created_at",

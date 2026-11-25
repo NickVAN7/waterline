@@ -1075,8 +1075,10 @@ export interface paths {
         /**
          * Delete Requirement
          * @description Move the requirement to the trash: its children promoted to its parent (`promote`, the
-         *     default) or deleted with it (`delete`, 403 if the caller may not delete each of them); a
-         *     pending approval request on it is cancelled.
+         *     default) or deleted with it (`delete`, 403 if the caller may not delete each of them); the
+         *     tasks linked to each deleted one detached (`detach`, the default) or deleted with it
+         *     (`delete`, 403 if the caller may not delete each task); a pending approval request on each
+         *     is cancelled.
          */
         delete: operations["delete_requirement_api_projects__key__requirements__number__delete"];
         options?: never;
@@ -2105,6 +2107,12 @@ export interface components {
             /** Before Id */
             before_id?: string | null;
         };
+        /**
+         * LinkedTasks
+         * @description What a requirement's delete does with the tasks linked to it (design-doc §9).
+         * @enum {string}
+         */
+        LinkedTasks: "detach" | "delete";
         /**
          * MeOrg
          * @description An org the user sees (design-doc §4, "Visibility"), for the org menu. `role` is null
@@ -3187,6 +3195,8 @@ export interface components {
             has_children: boolean;
             /** Can Delete Children */
             can_delete_children: boolean;
+            /** Can Delete Tasks */
+            can_delete_tasks: boolean;
             /** Approved At */
             approved_at: string | null;
             /** Version */
@@ -7605,6 +7615,7 @@ export interface operations {
         parameters: {
             query?: {
                 children?: components["schemas"]["DeletedChildren"];
+                tasks?: components["schemas"]["LinkedTasks"];
             };
             header?: never;
             path: {

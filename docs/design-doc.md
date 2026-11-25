@@ -1361,14 +1361,19 @@ on its children" once their deletion is chosen (DL-289). After a delete, the req
 opens (the side panel closed), focus on its `h1`, with a status naming the item and linking to
 Trash (DL-287).
 
-Every unlink is recorded in `activity_log` (`action = unlinked`). Restoring a requirement does
-not re-link anything automatically; the log shows what was attached, and re-linking is manual.
+Every unlink is recorded in `activity_log` (`action = unlinked`), on both sides: on the task or
+test case and on the requirement, each naming the other (DL-413). Restoring a requirement does
+not re-link anything automatically, nor does it restore the tasks or test cases deleted with it;
+the log shows what was attached, and re-linking is manual. A deleted task keeps its link: one
+already in the trash isn't detached, and a restored task keeps its requirement whether or not
+that requirement is in the trash (DL-413).
 
 **Permissions in the delete dialog:** "soft-delete them too" applies only to items the user
 could delete directly (§5). For linked items they can't delete, or children whose subtree holds a
 requirement they can't delete, only *detach* or *promote* is offered, with a note explaining why;
-the server says which (the requirement read's `can_delete_children`, DL-222), so the dialog never
-works the rule out itself. The dialog never lets someone delete
+the server says which (the requirement read's `can_delete_children`, DL-222, and
+`can_delete_tasks`, over the tasks linked to the requirement and every live descendant, DL-413),
+so the dialog never works the rule out itself. The dialog never lets someone delete
 indirectly what they couldn't delete directly: a delete of the subtree with any descendant the
 user couldn't delete directly is a 403, and nothing is deleted (DL-221). Every requirement in a
 deleted subtree is treated as deleted: each one's pending approval request is cancelled and

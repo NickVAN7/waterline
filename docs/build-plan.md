@@ -437,9 +437,10 @@ ERP modules (Slices 9+) get their own entries when they're designed.
 **Cross-area rules**
 - **Reads:** any service may read through any repository.
 - **Writes:** writing another area's tables always goes through that area's service, because the
-  owning service is where authorization, rules, and logging happen. Example: the requirement
-  delete dialog soft-deletes linked tasks by calling the task service's delete for each one,
-  so each task's own delete permission is checked (design-doc §9: no indirect deletes).
+  owning service is where authorization, rules, and logging happen. Example: a requirement's
+  delete detaches or soft-deletes its linked tasks through the task service
+  (`leave_requirements`), which checks each task's own delete permission (design-doc §9: no
+  indirect deletes).
 - **Callbacks instead of upward calls:** the approval service (in the lowest service layer) never imports the areas it approves.
   Each approvable area (requirement now; milestone gates and test runs later) registers a
   handler (`on_approved`) with it, and one for a rejection (`on_rejected`), for a rejected

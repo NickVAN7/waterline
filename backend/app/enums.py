@@ -220,6 +220,13 @@ class DeletedChildren(StrEnum):
     DELETE = "delete"
 
 
+class LinkedTasks(StrEnum):
+    """What a requirement's delete does with the tasks linked to it (design-doc §9)."""
+
+    DETACH = "detach"
+    DELETE = "delete"
+
+
 class TrashItemType(StrEnum):
     """What the trash lists (design-doc §9; test cases join in Slice 5)."""
 

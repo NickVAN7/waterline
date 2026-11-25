@@ -21,6 +21,7 @@ from app.enums import (
     ActivityAction,
     ActivityEntityType,
     ActivityField,
+    LinkedTasks,
     NumberPrefix,
     Priority,
     RestrictionCategory,
@@ -280,6 +281,16 @@ class TaskService:
         await ProjectRepository(self.session).hold(project)
         target = project_target(project, task)
         ensure(ctx, Action.TASK_UPDATE, target)
+        # Held until commit, so a delete can't commit under the new link; before the task's row,
+        # as a requirement's delete takes them (the requirement, then its tasks), so the two
+        # can't deadlock.
+        requirement = (
+            None
+            if values.requirement_id is None
+            else await RequirementRepository(self.session).get_in_project(
+                project.id, values.requirement_id, hold=True
+            )
+        )
         # Locked and read again, so the version check, the transition, and the old values logged
         # see what a concurrent edit committed.
         await self._lock_live(task)
@@ -344,12 +355,7 @@ class TaskService:
             )
             changes["reporter_id"] = values.reporter_id
         if changed("requirement_id"):
-            if values.requirement_id is not None and (
-                await RequirementRepository(self.session).get_in_project(
-                    project.id, values.requirement_id, hold=True
-                )
-                is None
-            ):
+            if values.requirement_id is not None and requirement is None:
                 raise NotFoundError
             changes["requirement_id"] = values.requirement_id
         if changed("phase_id"):
@@ -465,6 +471,47 @@ class TaskService:
         self._log(task, ctx.user_id, ActivityAction.RESTORED)
         await lift_restored(self.session, Task, ActivityEntityType.TASK, project, task, ctx.user_id)
         return await self.read(ctx, task)
+
+    async def leave_requirements(
+        self,
+        ctx: AuthzContext,
+        project: Project,
+        requirement_ids: list[uuid.UUID],
+        choice: LinkedTasks,
+        deleted_at: datetime,
+    ) -> list[tuple[uuid.UUID, uuid.UUID]]:
+        """The live tasks linked to requirements being deleted (design-doc §9): detached, each
+        logged `unlinked`, or deleted with them at their `deleted_at`, each logged, 403 and
+        nothing changed if the caller may not delete each one directly. Returns each detached
+        `(task id, requirement id)`, for the requirement's side of the log. The caller holds the
+        requirements' rows, which come before their tasks'."""
+        tasks = await self.repository.linked(requirement_ids, lock=True)
+        if choice is LinkedTasks.DELETE:
+            if not all(
+                authorize(ctx, Action.TASK_DELETE, project_target(project, t)) for t in tasks
+            ):
+                raise ForbiddenError
+            for task in tasks:
+                task.deleted_at = deleted_at
+            await self.session.flush()
+            for task in tasks:
+                self._log(task, ctx.user_id, ActivityAction.DELETED)
+            return []
+        detached = [(task.id, cast(uuid.UUID, task.requirement_id)) for task in tasks]
+        for task in tasks:
+            task.requirement_id = None
+        await self.session.flush()
+        for task_id, requirement_id in detached:
+            log_change(
+                self.session,
+                project_id=project.id,
+                entity_type=ActivityEntityType.TASK,
+                entity_id=task_id,
+                action=ActivityAction.UNLINKED,
+                changed_by=ctx.user_id,
+                old=requirement_id,
+            )
+        return detached
 
     async def set_restriction(
         self, ctx: AuthzContext, task: Task, values: TaskRestrictionUpdate

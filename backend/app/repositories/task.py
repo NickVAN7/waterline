@@ -46,6 +46,19 @@ class TaskRepository:
         )
         return {task.id: task for task in tasks}
 
+    async def linked(
+        self, requirement_ids: Collection[uuid.UUID], *, lock: bool = False
+    ) -> list[Task]:
+        """The live tasks linked to these requirements, in ID order; with `lock`, each locked
+        until the transaction ends (ID order, so two deletes can't deadlock), a task deleted or
+        moved to another requirement meanwhile left out."""
+        if not requirement_ids:
+            return []
+        statement = select(Task).where(Task.requirement_id.in_(requirement_ids)).order_by(Task.id)
+        if lock:
+            statement = statement.with_for_update().execution_options(populate_existing=True)
+        return list(await self.session.scalars(statement))
+
     def trash_rows(
         self, project_id: uuid.UUID, reporter_id: uuid.UUID | None, *, empty: bool = False
     ) -> Select[str, uuid.UUID, datetime | None]:

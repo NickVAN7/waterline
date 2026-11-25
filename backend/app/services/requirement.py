@@ -23,6 +23,7 @@ from app.enums import (
     ActivityField,
     ApprovalEntityType,
     DeletedChildren,
+    LinkedTasks,
     NumberPrefix,
     RequirementStatus,
     RestrictionCategory,
@@ -69,6 +70,7 @@ from app.services.project import (
     register_on_restriction_changed,
     set_item_restriction,
 )
+from app.services.task import TaskService
 from app.services.user import check_person, required_error
 from app.services.workstream import WorkstreamService
 
@@ -458,12 +460,18 @@ class RequirementService:
             raise ForbiddenError
 
     async def delete(
-        self, ctx: AuthzContext, requirement: Requirement, children: DeletedChildren
+        self,
+        ctx: AuthzContext,
+        requirement: Requirement,
+        children: DeletedChildren,
+        tasks: LinkedTasks = LinkedTasks.DETACH,
     ) -> None:
         """Move the requirement to the trash (design-doc §9): its children promoted to its
         parent, in its place (DL-217), or its whole subtree deleted with it, 403 if the caller
-        may not delete each one (DL-221). Every deleted one's pending approval request is
-        cancelled (DL-224). One `deleted_at` for all, each logged."""
+        may not delete each one (DL-221). The tasks linked to every deleted one are detached,
+        each unlink logged on both sides, or deleted with them, 403 if the caller may not
+        delete each task (DL-224). Every deleted one's pending approval request is cancelled
+        (DL-224). One `deleted_at` for all, each logged."""
         project = await self._project(requirement)
         await self.repository.lock_tree(project)
         await self._lock_live(requirement)
@@ -475,6 +483,13 @@ class RequirementService:
             self._ensure_each(ctx, project, Action.REQUIREMENT_DELETE, deleted[1:])
         else:
             deleted = [requirement]
+        # One moment for the whole subtree, which a restore brings back together (DL-146).
+        now = datetime.now(UTC)
+        # Before any change, so a refused task delete changes nothing.
+        detached = await TaskService(self.session).leave_requirements(
+            ctx, project, [item.id for item in deleted], tasks, now
+        )
+        if children is DeletedChildren.PROMOTE:
             promoted = await self.repository.lock_children([requirement.id])
             if promoted:
                 parent_id = requirement.parent_requirement_id
@@ -495,11 +510,12 @@ class RequirementService:
                         requirement.id,
                         parent_id,
                     )
-        # One moment for the whole subtree, which a restore brings back together (DL-146).
-        now = datetime.now(UTC)
         for item in deleted:
             item.deleted_at = now
         await self.session.flush()
+        by_id = {item.id: item for item in deleted}
+        for task_id, requirement_id in detached:
+            self._log(by_id[requirement_id], ctx.user_id, ActivityAction.UNLINKED, old=task_id)
         for item in deleted:
             self._log(item, ctx.user_id, ActivityAction.DELETED)
         await ApprovalService(self.session).cancel_pending(
@@ -679,6 +695,22 @@ class RequirementService:
             for item in await self.repository.live_descendants(requirement.id)
         )
 
+    async def _can_delete_tasks(
+        self, ctx: AuthzContext, project: Project, requirement: Requirement
+    ) -> bool:
+        """Whether the caller may delete the requirement with the tasks linked to it and to
+        every live descendant (`?tasks=delete`, whatever happens to the children)."""
+        target = project_target(project, requirement)
+        if requirement.deleted_at is not None or not authorize(
+            ctx, Action.REQUIREMENT_DELETE, target
+        ):
+            return False
+        subtree = [requirement, *await self.repository.live_descendants(requirement.id)]
+        return all(
+            authorize(ctx, Action.TASK_DELETE, project_target(project, task))
+            for task in await TaskRepository(self.session).linked([item.id for item in subtree])
+        )
+
     async def revisions(self, requirement: Requirement, query: BaseModel) -> Feed[RevisionItem]:
         """The requirement's revisions, newest first, cursor-paged (append-only, design-doc
         §6.1)."""
@@ -730,6 +762,7 @@ class RequirementService:
             approved_revision_number=await self._revision_number(requirement.approved_revision_id),
             has_children=await self.repository.has_children(requirement.id),
             can_delete_children=await self._can_delete_children(ctx, project, requirement),
+            can_delete_tasks=await self._can_delete_tasks(ctx, project, requirement),
             approved_at=requirement.approved_at,
             version=requirement.version,
             created_at=requirement.created_at,

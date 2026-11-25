@@ -5238,3 +5238,19 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C8; schema-doc (`subtask`)
 - **Source:** owner, Nov 24, 2026 (chat, before S3-C8 was built)
+
+### DL-413: A requirement delete's linked tasks: the unlink logged on both sides, the flag over the subtree, a restored task keeps its link
+- **Date:** 2026-11-25
+- **Decision:** (1) Detaching a task from a requirement being deleted logs `unlinked` on both
+  sides: on the task (`old_value` the requirement's ID) and on the requirement (`old_value` the
+  task's ID), so the requirement's History shows what was attached once it's restored. (2) The
+  requirement read's `can_delete_tasks` is whether the caller may delete every live task linked
+  to the requirement or to any live descendant, whatever the children choice; the delete still
+  checks the exact set (403, nothing deleted). (3) A task in the trash keeps its link when its
+  requirement is deleted, and a restored task keeps it whether or not the requirement is in
+  the trash.
+- **Supersedes:** none (design-doc §9 named neither side nor scope, nor the restore)
+- **Superseded by:** none
+- **Applies to:** S3-C9a; design-doc §9 "Deleting a requirement", "Permissions in the delete
+  dialog"
+- **Source:** owner, Nov 25, 2026 (chat, before S3-C9a was built; S3-C9's review question)

@@ -3,6 +3,7 @@ being deleted (backend/CLAUDE.md: a check that another row exists before a write
 it holds that row), and deletes and restores against each other and a reporter change.
 Sabotage-checked against the code without each hold."""
 
+import anyio
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -30,7 +31,11 @@ from tests.integration.services.test_requirement_concurrency import outcome
 from tests.integration.services.test_requirement_delete_concurrency import raise_project
 from tests.integration.services.test_restriction_concurrency import Change, race
 from tests.integration.services.test_workstream_concurrency import blocked_then_released
-from tests.support.concurrency import committing_factories, run_in_parallel
+from tests.support.concurrency import (
+    committing_factories,
+    run_in_parallel,
+    wait_until_blocked_on_a_lock,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -345,7 +350,7 @@ async def test_a_reporters_delete_waiting_on_a_reporter_change_is_refused(
             await ProjectMembershipFactory.create_async(
                 project=loaded, user=user, role=ProjectRole.MEMBER
             )
-        task = await TaskFactory.create_async(project=loaded, number=1, reporter_id=ann.id)
+        task = await TaskFactory.create_async(project=loaded, number=1, reporter=ann)
     access = ProjectAccess(ProjectRole.MEMBER, project.organization_id, project.workspace_id)
     ann_ctx = AuthzContext(user_id=ann.id, projects={project.id: access})
 
@@ -360,3 +365,91 @@ async def test_a_reporters_delete_waiting_on_a_reporter_change_is_refused(
     refused = await race(concurrency, concurrency_engine, first=reassign, second=ann_deletes)
 
     assert refused == ["ForbiddenError"]
+
+
+# --- A requirement's delete and its linked tasks (S3-C9a) -------------------------------------
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_a_requirement_deleted_while_a_task_links_to_it_detaches_the_task(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """The edit's link holds RQ-1 until it commits (its foreign-key check alone would too); the
+    delete waits on it, then finds TA-1 linked and detaches it. Reading the links before its
+    lock, the delete misses TA-1, which points at a requirement in the trash (design-doc §9)."""
+    ctx, project = await a_project(concurrency)
+    async with committing_factories(concurrency) as session:
+        loaded = await session.get_one(Project, project.id)
+        rq1 = await RequirementFactory.create_async(project=loaded, number=1)
+        task = await TaskFactory.create_async(project=loaded, number=1)
+
+    async def link(session: AsyncSession) -> object:
+        row = await session.get_one(Task, task.id)
+        return await TaskService(session).update(
+            ctx, row, TaskUpdate(version=1, requirement_id=rq1.id)
+        )
+
+    async def delete(session: AsyncSession) -> object:
+        row = await session.get_one(Requirement, rq1.id)
+        return await RequirementService(session).delete(ctx, row, DeletedChildren.PROMOTE)
+
+    refused = await race(concurrency, concurrency_engine, first=link, second=delete)
+
+    async with concurrency() as check:
+        linked = await check.scalar(select(Task.requirement_id).where(Task.id == task.id))
+    assert (refused, linked) == ([], None)
+
+
+@pytest.mark.concurrency(*TABLES)
+async def test_a_link_queued_behind_a_requirement_delete_does_not_deadlock_with_it(
+    concurrency: SessionMaker, concurrency_engine: AsyncEngine
+) -> None:
+    """A third transaction holds RQ-1. The delete of RQ-1 with its child RQ-2 (TA-1 linked to
+    RQ-2) queues on it, then the edit moving TA-1 to RQ-1 queues behind. Taking TA-1's row before
+    holding RQ-1, the edit holds the row the delete then waits on while it waits on RQ-1, which
+    the delete has: a deadlock, one of them a 500. Holding RQ-1 first, the delete goes through
+    and detaches TA-1, and the edit is refused."""
+    ctx, project = await a_project(concurrency)
+    async with committing_factories(concurrency) as session:
+        loaded = await session.get_one(Project, project.id)
+        rq1 = await RequirementFactory.create_async(project=loaded, number=1)
+        rq2 = await RequirementFactory.create_async(
+            project=loaded, number=2, parent_requirement_id=rq1.id
+        )
+        task = await TaskFactory.create_async(project=loaded, number=1, requirement_id=rq2.id)
+
+    async def delete(session: AsyncSession) -> object:
+        row = await session.get_one(Requirement, rq1.id)
+        return await RequirementService(session).delete(ctx, row, DeletedChildren.DELETE)
+
+    async def link(session: AsyncSession) -> object:
+        row = await session.get_one(Task, task.id)
+        return await TaskService(session).update(
+            ctx, row, TaskUpdate(version=1, requirement_id=rq1.id)
+        )
+
+    outcomes: dict[str, str] = {}
+
+    async def run(name: str, work: Change, started: anyio.Event, pids: list[int]) -> None:
+        async with concurrency() as session:
+            pids.append((await session.execute(select(func.pg_backend_pid()))).scalar_one())
+            started.set()
+            outcomes[name] = await outcome(work(session))
+            await session.commit()
+
+    async with concurrency() as holder:
+        await holder.execute(
+            select(Requirement.id).where(Requirement.id == rq1.id).with_for_update()
+        )
+        with anyio.fail_after(10):
+            async with anyio.create_task_group() as group:
+                for name, work in (("delete", delete), ("link", link)):
+                    started, pids = anyio.Event(), list[int]()
+                    group.start_soon(run, name, work, started, pids)
+                    await started.wait()
+                    await wait_until_blocked_on_a_lock(concurrency_engine, pids[0])
+                await holder.commit()
+
+    async with concurrency() as check:
+        linked = await check.scalar(select(Task.requirement_id).where(Task.id == task.id))
+    assert (outcomes, linked) == ({"delete": "ok", "link": "stale"}, None)

@@ -38,6 +38,7 @@ export function requirementRead(number: number, title: string): Requirement {
     has_children: false,
     ancestors: [],
     can_delete_children: false,
+    can_delete_tasks: false,
     approved_at: null,
     version: 1,
     created_at: '2026-11-02T12:00:00Z',

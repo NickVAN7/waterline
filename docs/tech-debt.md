@@ -592,6 +592,29 @@ Entry format:
   page exists
 - **Status:** open
 
+### TD-134: History shows a requirement's or task's unlink as "made a change"
+- **Added:** S3-C9a (checkpoint-reviewer finding 4)
+- **What:** a requirement's delete logs `unlinked` on the requirement and the task (DL-413), but
+  History's sentences (`RequirementHistory.vue`) have no case for `unlinked`, and the activity
+  service doesn't name a task by its display ID, so a restored requirement shows "made a
+  change" once per detached task, naming none.
+- **Why:** naming items in History and the feed is S3-C12's work (TD-132's reason).
+- **Fix by:** S3-C12 (the unlink named, `{KEY}-TA-n`, on both sides, with a History spec case)
+- **Status:** open
+
+### TD-135: The requirement delete dialog doesn't offer the linked-tasks choice
+- **Added:** S3-C9a (ui-reviewer note)
+- **What:** the API takes `?tasks=detach|delete` and the read carries `can_delete_tasks`
+  (S3-C9a), but `DeleteRequirementDialog.vue` sends no `tasks` value (so detach) and doesn't say
+  linked tasks are unlinked; design-doc §9 asks for a choice per category. The read has no
+  `has_tasks`, so the dialog can't ask only when there are tasks.
+- **Why:** no screen links a task to a requirement before S3-C22; the dialog's tasks fieldset
+  belongs with the requirement's Tasks section.
+- **Fix by:** S3-C25 (Requirement ↔ tasks): the fieldset beside "Its children", on
+  `can_delete_tasks` with the note when delete isn't offered, and the read telling it whether
+  any task is linked
+- **Status:** open
+
 ## Resolved
 
 ### TD-1: pre-commit has no frontend or generated-file hooks

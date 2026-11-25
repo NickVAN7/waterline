@@ -114,6 +114,9 @@ class RequirementRead(BaseModel):
     has_children: bool
     # Whether the caller may delete the whole subtree with it (`?children=delete`, DL-222).
     can_delete_children: bool
+    # Whether the caller may delete the tasks linked to it and its live descendants with it
+    # (`?tasks=delete`, design-doc §9).
+    can_delete_tasks: bool
     approved_at: datetime | None
     version: int
     created_at: datetime

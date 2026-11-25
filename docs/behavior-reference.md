@@ -287,7 +287,9 @@ says it moves to the project's Trash, where it can be restored. If it has childr
 happens to them: **Move them up to its parent** (the default; they take its place) or **Delete
 them too**, with their own children. When you can't delete one of them yourself, only moving them
 up is offered, and the dialog says why. Any pending approval request on it (and on its children,
-when they go too) is cancelled; restoring doesn't bring the request back. **Delete requirement**
+when they go too) is cancelled; restoring doesn't bring the request back. Tasks linked to it (and
+to its children, when they go too) are unlinked, and restoring doesn't link them again; the
+dialog doesn't say so yet, nor offer to delete them (TD-135). **Delete requirement**
 deletes it and opens the requirements tree, which says "ERP-RQ-7 moved to Trash." with **Open
 Trash**. A link to a deleted requirement shows the page-not-found page.
 

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from app.authz.actions import Action
 from app.core.db import SessionDep
 from app.core.lists import Feed, Page
-from app.enums import DeletedChildren
+from app.enums import DeletedChildren, LinkedTasks
 from app.routers.deps import (
     ERRORS,
     AuthzContextDep,
@@ -158,11 +158,14 @@ async def delete_requirement(
     ctx: AuthzContextDep,
     session: SessionDep,
     children: DeletedChildren = DeletedChildren.PROMOTE,
+    tasks: LinkedTasks = LinkedTasks.DETACH,
 ) -> None:
     """Move the requirement to the trash: its children promoted to its parent (`promote`, the
-    default) or deleted with it (`delete`, 403 if the caller may not delete each of them); a
-    pending approval request on it is cancelled."""
-    await RequirementService(session).delete(ctx, requirement, children)
+    default) or deleted with it (`delete`, 403 if the caller may not delete each of them); the
+    tasks linked to each deleted one detached (`detach`, the default) or deleted with it
+    (`delete`, 403 if the caller may not delete each task); a pending approval request on each
+    is cancelled."""
+    await RequirementService(session).delete(ctx, requirement, children, tasks)
 
 
 @router.post("/projects/{key}/requirements/{number}/restore", responses=ERRORS)
