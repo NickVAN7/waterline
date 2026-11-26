@@ -236,6 +236,35 @@ class LinkedTasks(StrEnum):
     DELETE = "delete"
 
 
+class TaskColumn(StrEnum):
+    """A task export's columns, in their default order (S3-C14)."""
+
+    ID = "id"
+    TITLE = "title"
+    TYPE = "type"
+    STATUS = "status"
+    PRIORITY = "priority"
+    SEVERITY = "severity"
+    ASSIGNEE = "assignee"
+    REVIEWER = "reviewer"
+    REQUIREMENT = "requirement"
+    PHASE = "phase"
+    WORKSTREAM = "workstream"
+    DUE_DATE = "due_date"
+
+
+class RequirementColumn(StrEnum):
+    """A requirement export's columns, in their default order (S3-C14)."""
+
+    ID = "id"
+    TITLE = "title"
+    STATUS = "status"
+    PRIORITY = "priority"
+    PARENT = "parent"
+    APPROVAL = "approval"
+    TASKS = "tasks"
+
+
 class TrashItemType(StrEnum):
     """What the trash lists (design-doc §9; test cases join in Slice 5)."""
 

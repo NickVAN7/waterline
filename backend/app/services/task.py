@@ -13,7 +13,9 @@ from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
+from app.core import labels
 from app.core.base_model import check_version
+from app.core.csv import CsvExport, export_query, selected
 from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import Filter, FilterType, ListSpec, fetch_ranked
 from app.enums import (
@@ -24,6 +26,7 @@ from app.enums import (
     NumberPrefix,
     Priority,
     RestrictionCategory,
+    TaskColumn,
     TaskStatus,
     TaskType,
 )
@@ -32,10 +35,12 @@ from app.models.requirement import Requirement
 from app.models.task import Task
 from app.models.user import User
 from app.repositories.base import write_ranks
+from app.repositories.phase import PhaseRepository
 from app.repositories.project import ProjectRepository
 from app.repositories.requirement import RequirementRepository
 from app.repositories.task import PRIORITY_ORDER, TaskRepository
 from app.repositories.user import UserRepository
+from app.repositories.workstream import WorkstreamRepository
 from app.rules.branch_name import branch_name
 from app.rules.rank import place, rank_between
 from app.rules.restriction import Restriction, effective
@@ -93,6 +98,21 @@ TASKS = ListSpec(
     ),
     paging="ranked",
 )
+TASK_EXPORT = export_query(TASKS, TaskColumn)
+TASK_HEADERS = {
+    TaskColumn.ID: "ID",
+    TaskColumn.TITLE: "Title",
+    TaskColumn.TYPE: "Type",
+    TaskColumn.STATUS: "Status",
+    TaskColumn.PRIORITY: "Priority",
+    TaskColumn.SEVERITY: "Severity",
+    TaskColumn.ASSIGNEE: "Assignee",
+    TaskColumn.REVIEWER: "Reviewer",
+    TaskColumn.REQUIREMENT: "Requirement",
+    TaskColumn.PHASE: "Phase",
+    TaskColumn.WORKSTREAM: "Workstream",
+    TaskColumn.DUE_DATE: "Due date",
+}
 
 
 # Design-doc §10's logged task fields; title, description, type, and time taken aren't.
@@ -584,7 +604,15 @@ class TaskService:
     async def list(self, ctx: AuthzContext, project: Project, query: BaseModel) -> TaskList:
         """The project's tasks matching the declared filters, in the requested order (rank by
         default), up to the cap (DL-159, DL-351)."""
-        rows, truncated = await fetch_ranked(
+        rows, truncated = await self._ranked(ctx, project, query)
+        users = await self._people(rows)
+        return TaskList(items=[_item(row, users) for row in rows], truncated=truncated)
+
+    async def _ranked(
+        self, ctx: AuthzContext, project: Project, query: BaseModel
+    ) -> tuple[list[Task], bool]:
+        """The list's filter matches in its order, up to the cap: the list and its export."""
+        return await fetch_ranked(
             self.session,
             self.repository.in_project(project.id),
             TASKS,
@@ -592,8 +620,58 @@ class TaskService:
             LIST_CAP,
             current_user_id=ctx.user_id,
         )
+
+    async def export(self, ctx: AuthzContext, project: Project, query: BaseModel) -> CsvExport:
+        """The task list as filtered and sorted, up to its cap, in the `columns=` asked for:
+        labels as on screen, people by name, items by display ID, phases and workstreams by
+        name (S3-C14)."""
+        rows, truncated = await self._ranked(ctx, project, query)
         users = await self._people(rows)
-        return TaskList(items=[_item(row, users) for row in rows], truncated=truncated)
+        requirements = await RequirementRepository(self.session).get_many_in_project(
+            project.id, {t.requirement_id for t in rows if t.requirement_id}
+        )
+        phases = await PhaseRepository(self.session).names(
+            project.id, {t.phase_id for t in rows if t.phase_id}
+        )
+        workstreams = await WorkstreamRepository(self.session).names(
+            project.id, {t.workstream_id for t in rows if t.workstream_id}
+        )
+        columns = selected(getattr(query, "columns", None), list(TaskColumn))
+
+        def name(user_id: uuid.UUID | None) -> str:
+            user = users.get(user_id) if user_id else None
+            return user.name if user else ""
+
+        def values(task: Task) -> dict[TaskColumn, str]:
+            requirement = requirements.get(task.requirement_id)  # pyright: ignore[reportArgumentType]
+            return {
+                TaskColumn.ID: f"{project.key}-{NumberPrefix.TASK}-{task.number}",
+                TaskColumn.TITLE: task.title,
+                TaskColumn.TYPE: labels.TASK_TYPE[task.type],
+                TaskColumn.STATUS: labels.TASK_STATUS[task.status],
+                TaskColumn.PRIORITY: labels.PRIORITY[task.priority],
+                TaskColumn.SEVERITY: labels.SEVERITY[task.severity] if task.severity else "",
+                TaskColumn.ASSIGNEE: name(task.assignee_id),
+                TaskColumn.REVIEWER: name(task.reviewer_id),
+                TaskColumn.REQUIREMENT: (
+                    f"{project.key}-{NumberPrefix.REQUIREMENT}-{requirement.number}"
+                    if requirement
+                    else ""
+                ),
+                TaskColumn.PHASE: phases.get(task.phase_id, "") if task.phase_id else "",
+                TaskColumn.WORKSTREAM: (
+                    workstreams.get(task.workstream_id, "") if task.workstream_id else ""
+                ),
+                TaskColumn.DUE_DATE: task.due_date.isoformat() if task.due_date else "",
+            }
+
+        today = datetime.now(UTC).date().isoformat()
+        return CsvExport(
+            filename=f"{project.key}-tasks-{today}.csv",
+            header=[TASK_HEADERS[c] for c in columns],
+            rows=[[row[c] for c in columns] for row in map(values, rows)],
+            truncated=truncated,
+        )
 
     async def for_requirement(self, ctx: AuthzContext, requirement: Requirement) -> TaskList:
         """The requirement's live tasks, as the backlog's rows and in its order, up to the cap

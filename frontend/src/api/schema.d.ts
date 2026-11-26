@@ -1182,6 +1182,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/requirements/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Requirements
+         * @description The tree's matches as a CSV file, without their context ancestors (DL-351): the tree's
+         *     filters, `columns=` in the order asked (every column by default), at most 2,000 rows with
+         *     `Waterline-Truncated: true` above it; every cell formula-escaped (S3-C14).
+         */
+        get: operations["export_requirements_api_projects__key__requirements_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/requirements/{number}": {
         parameters: {
             query?: never;
@@ -1666,6 +1688,28 @@ export interface paths {
          *     (`below_project`), and `restriction_categories` (`project_only`).
          */
         post: operations["create_task_api_projects__key__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Tasks
+         * @description The task list as a CSV file: its filters and sort, `columns=` in the order asked (every
+         *     column by default), at most 2,000 rows with `Waterline-Truncated: true` above it; every
+         *     cell formula-escaped (S3-C14).
+         */
+        get: operations["export_tasks_api_projects__key__tasks_export_csv_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3259,6 +3303,12 @@ export interface components {
             version: number;
         };
         /**
+         * RequirementColumn
+         * @description A requirement export's columns, in their default order (S3-C14).
+         * @enum {string}
+         */
+        RequirementColumn: "id" | "title" | "status" | "priority" | "parent" | "approval" | "tasks";
+        /**
          * RequirementCreate
          * @description A new requirement: `draft`, reported by the caller, at the bottom of its siblings.
          *     `parent_id` is a requirement in the same project (anything else is a 404); the restriction
@@ -3714,6 +3764,12 @@ export interface components {
             /** Is Done */
             is_done?: boolean | null;
         };
+        /**
+         * TaskColumn
+         * @description A task export's columns, in their default order (S3-C14).
+         * @enum {string}
+         */
+        TaskColumn: "id" | "title" | "type" | "status" | "priority" | "severity" | "assignee" | "reviewer" | "requirement" | "phase" | "workstream" | "due_date";
         /**
          * TaskCreate
          * @description A new task: `todo`, reported by the caller, at the bottom of the project's order. `type`
@@ -8174,6 +8230,80 @@ export interface operations {
             };
         };
     };
+    export_requirements_api_projects__key__requirements_export_csv_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["RequirementStatus"][] | null;
+                status__not?: components["schemas"]["RequirementStatus"][] | null;
+                status__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                reporter?: (string | "me")[] | null;
+                reporter__not?: (string | "me")[] | null;
+                reporter__is_null?: boolean | null;
+                approval?: components["schemas"]["ApprovalState"][] | null;
+                has_tasks?: boolean | null;
+                columns?: components["schemas"]["RequirementColumn"][] | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     get_requirement_api_projects__key__requirements__number__get: {
         parameters: {
             query?: never;
@@ -9992,6 +10122,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    export_tasks_api_projects__key__tasks_export_csv_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated, `-` for descending: due_date, number, priority, rank, updated_at. Default: rank */
+                sort?: string | null;
+                status?: components["schemas"]["TaskStatus"][] | null;
+                status__not?: components["schemas"]["TaskStatus"][] | null;
+                status__is_null?: boolean | null;
+                type?: components["schemas"]["TaskType"][] | null;
+                type__not?: components["schemas"]["TaskType"][] | null;
+                type__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                assignee?: (string | "me")[] | null;
+                assignee__not?: (string | "me")[] | null;
+                assignee__is_null?: boolean | null;
+                reviewer?: (string | "me")[] | null;
+                reviewer__not?: (string | "me")[] | null;
+                reviewer__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                phase?: string[] | null;
+                phase__not?: string[] | null;
+                phase__is_null?: boolean | null;
+                requirement?: string[] | null;
+                requirement__not?: string[] | null;
+                requirement__is_null?: boolean | null;
+                columns?: components["schemas"]["TaskColumn"][] | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Unauthorized */

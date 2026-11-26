@@ -193,6 +193,8 @@ backend/app/
   core/request_guard.py   the Origin and JSON-only checks (middleware, before everything else)
   core/migration_filters.py   what Alembic autogenerate ignores (procrastinate's objects)
   core/security.py     password hashing (Argon2id, off the event loop), session tokens
+  core/csv.py          CSV export: cell() formula escaping, CsvExport, export_query, csv_response
+  core/labels.py       the words a person sees for stored values (exports; matches labels.ts)
   models/ schemas/ repositories/ services/ routers/   one file per aggregate in each
   routers/deps.py      shared router dependencies: SettingsDep, AuthServiceDep, SignedInUserDep,
                        AuthzContextDep, authorized()
@@ -699,6 +701,19 @@ Parameters by filter type: enum, reference, and user `name` (repeat for any of; 
 also takes `me`), `name__not`, `name__is_null`; date `name__lt`, `name__gt`, `name__is_null`;
 text `name__contains`; boolean `name`; number `name__gte`, `name__lte`. Examples:
 `tests/support/lists.py`.
+
+**CSV export of a list** (`app/core/csv.py`, DL-418; S3-C14). A sibling route `…/export.csv`
+with the list's own action and loader, registered **before** the list's `…/{number}` route
+(which would read `export.csv` as a number), taking `export_query(SPEC, MyColumn)`: the list's
+query model plus `columns=`, a `StrEnum` of the columns in their default order in `app/enums.py`.
+The service reads the rows through the same private method as the list (so its filters, scoping,
+and cap can't drift), builds a `CsvExport` (file name `{KEY}-<list>-{date}.csv`, headers, each
+row's values in `selected(query.columns, list(MyColumn))` order, `truncated`), and the router
+returns `csv_response(export)`: UTF-8 with a BOM, CRLF, every value cell through `cell()`
+(formula escaping), `Waterline-Truncated: true` when capped. Values read as on screen: labels
+from `app/core/labels.py` (a new enum member needs its label there, which
+`tests/unit/core/test_csv.py` checks, and the same words as the frontend's `labels.ts`), people
+by name, items by display ID, an empty cell for nothing.
 
 **Admin events** (`app/audit/admin_event.py`, design-doc §10.1): every admin and security action
 calls `log_admin_event(session, action=..., actor_id=..., workspace_id=..., ...)` in the same

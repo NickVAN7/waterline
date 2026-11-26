@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.authz.actions import Action
+from app.core.csv import csv_response
 from app.core.db import SessionDep
 from app.core.lists import Feed, Page
 from app.enums import DeletedChildren, LinkedTasks
@@ -39,6 +40,7 @@ from app.schemas.requirement import (
 )
 from app.services.project import ProjectEntity
 from app.services.requirement import (
+    REQUIREMENT_EXPORT,
     REVISIONS,
     TRASH,
     TREE,
@@ -67,6 +69,7 @@ Restored = Annotated[
     RequirementEntity, Depends(authorized(load_deleted_requirement, Action.REQUIREMENT_RESTORE))
 ]
 TreeQuery = Annotated[TREE.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+ExportQuery = Annotated[REQUIREMENT_EXPORT, Query()]  # pyright: ignore[reportInvalidTypeForm]
 TrashQuery = Annotated[TRASH.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 RevisionsQuery = Annotated[REVISIONS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 ApprovalRequestsQuery = Annotated[APPROVAL_REQUESTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
@@ -107,6 +110,21 @@ async def requirement_tree(
     (`context`), siblings in rank order: complete up to 2,000 matches, with `truncated` above
     it (DL-159, DL-351). Each with its tasks and those done, cancelled ones left out."""
     return await RequirementService(session).tree(ctx, project, query)
+
+
+# Before `…/requirements/{number}`, which would read `export.csv` as a number.
+@router.get(
+    "/projects/{key}/requirements/export.csv",
+    responses={200: {"content": {"text/csv": {}}, "description": "The CSV file"}, **ERRORS},
+    response_class=Response,
+)
+async def export_requirements(
+    project: ProjectContentViewed, query: ExportQuery, ctx: AuthzContextDep, session: SessionDep
+) -> Response:
+    """The tree's matches as a CSV file, without their context ancestors (DL-351): the tree's
+    filters, `columns=` in the order asked (every column by default), at most 2,000 rows with
+    `Waterline-Truncated: true` above it; every cell formula-escaped (S3-C14)."""
+    return csv_response(await RequirementService(session).export(ctx, project, query))
 
 
 @router.get("/projects/{key}/requirements/{number}", responses=ERRORS)

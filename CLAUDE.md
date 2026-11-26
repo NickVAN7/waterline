@@ -7,7 +7,7 @@ TypeScript frontend (`frontend/`), docs (`docs/`).
 
 ## Status
 
-S3-C13 (Server-side pickers) done; next: S3-C14 (CSV export), after the owner's approval.
+S3-C14 (CSV export) done; next: S3-C15 (Get started & home numbers), after the owner's approval.
 Updated at every checkpoint, and by a design change that changes what's next (DL-315).
 
 ## Docs (source of truth)

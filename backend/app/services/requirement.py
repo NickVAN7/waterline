@@ -14,7 +14,9 @@ from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
+from app.core import labels
 from app.core.base_model import check_version
+from app.core.csv import CsvExport, export_query, selected
 from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
 from app.core.lists import (
     MAX_VALUES,
@@ -38,6 +40,7 @@ from app.enums import (
     LinkedTasks,
     NumberPrefix,
     Priority,
+    RequirementColumn,
     RequirementStatus,
     RestrictionCategory,
     TrashItemType,
@@ -124,6 +127,24 @@ TREE = ListSpec(
     ),
     paging="ranked",
 )
+
+REQUIREMENT_EXPORT = export_query(TREE, RequirementColumn)
+REQUIREMENT_HEADERS = {
+    RequirementColumn.ID: "ID",
+    RequirementColumn.TITLE: "Title",
+    RequirementColumn.STATUS: "Status",
+    RequirementColumn.PRIORITY: "Priority",
+    RequirementColumn.PARENT: "Parent",
+    RequirementColumn.APPROVAL: "Approval",
+    RequirementColumn.TASKS: "Tasks",
+}
+# The approval column: approved and awaiting are independent facts (DL-414).
+APPROVAL_LABEL = {
+    (True, True): "Approved, awaiting approval",
+    (True, False): "Approved",
+    (False, True): "Awaiting approval",
+    (False, False): "",
+}
 
 REVISIONS = ListSpec(
     name="RevisionItem",
@@ -690,10 +711,11 @@ class RequirementService:
             ]
         )
 
-    async def tree(self, ctx: AuthzContext, project: Project, query: BaseModel) -> RequirementTree:
-        """The project's requirements matching the filters, up to the cap (DL-159), with the
-        ancestors they need as context (DL-351), each with its coverage (DL-199)."""
-        matches, truncated = await fetch_ranked(
+    async def _matches(
+        self, ctx: AuthzContext, project: Project, query: BaseModel
+    ) -> tuple[list[Requirement], bool]:
+        """The tree's filter matches in rank order, up to the cap: the tree and its export."""
+        return await fetch_ranked(
             self.session,
             self.repository.in_project(project.id),
             TREE,
@@ -701,6 +723,53 @@ class RequirementService:
             TREE_CAP,
             current_user_id=ctx.user_id,
         )
+
+    async def export(self, ctx: AuthzContext, project: Project, query: BaseModel) -> CsvExport:
+        """The tree's matches as filtered, without their context ancestors (DL-351), in rank
+        order up to the cap, in the `columns=` asked for: labels as on screen, the parent by its
+        display ID, the approval state, and the coverage as "2 of 5 done" (S3-C14)."""
+        matches, truncated = await self._matches(ctx, project, query)
+        parents = await self.repository.get_many_in_project(
+            project.id, {r.parent_requirement_id for r in matches if r.parent_requirement_id}
+        )
+        awaiting = await ApprovalRepository(self.session).pending_entity_ids(
+            project.id, ApprovalEntityType.REQUIREMENT
+        )
+        coverage = await TaskRepository(self.session).coverage([r.id for r in matches])
+        columns = selected(getattr(query, "columns", None), list(RequirementColumn))
+        prefix = f"{project.key}-{NumberPrefix.REQUIREMENT}"
+
+        def values(r: Requirement) -> dict[RequirementColumn, str]:
+            parent = parents.get(r.parent_requirement_id)  # pyright: ignore[reportArgumentType]
+            count, done = coverage.get(r.id, (0, 0))
+            approved = r.approved_revision_id is not None
+            return {
+                RequirementColumn.ID: f"{prefix}-{r.number}",
+                RequirementColumn.TITLE: r.title,
+                RequirementColumn.STATUS: (
+                    labels.APPROVED_MODIFIED
+                    if r.status is RequirementStatus.APPROVED
+                    and r.approved_revision_id not in (None, r.current_revision_id)
+                    else labels.REQUIREMENT_STATUS[r.status]
+                ),
+                RequirementColumn.PRIORITY: labels.PRIORITY[r.priority],
+                RequirementColumn.PARENT: f"{prefix}-{parent.number}" if parent else "",
+                RequirementColumn.APPROVAL: APPROVAL_LABEL[approved, r.id in awaiting],
+                RequirementColumn.TASKS: f"{done} of {count} done" if count else "",
+            }
+
+        today = datetime.now(UTC).date().isoformat()
+        return CsvExport(
+            filename=f"{project.key}-requirements-{today}.csv",
+            header=[REQUIREMENT_HEADERS[c] for c in columns],
+            rows=[[row[c] for c in columns] for row in map(values, matches)],
+            truncated=truncated,
+        )
+
+    async def tree(self, ctx: AuthzContext, project: Project, query: BaseModel) -> RequirementTree:
+        """The project's requirements matching the filters, up to the cap (DL-159), with the
+        ancestors they need as context (DL-351), each with its coverage (DL-199)."""
+        matches, truncated = await self._matches(ctx, project, query)
         context = await self.repository.missing_ancestors(matches)
         rows = sorted([*matches, *context], key=lambda r: (r.rank, r.id))
         awaiting = await ApprovalRepository(self.session).pending_entity_ids(

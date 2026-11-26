@@ -1563,6 +1563,8 @@ table, `audit_event` (schema-doc, "Audit").
 - **CSV export** (DL-197) of the current list, with its filters and columns as shown, for tasks,
   requirements, test cases, and test results: requirements and tasks in Slice 3, test cases and
   test results in Slice 5 (DL-239). Exporting a whole project stays v2 (§16).
+  Its cells read as on screen: labels, names, and display IDs, with `columns=` choosing the
+  columns; every cell is formula-escaped (DL-418).
 
 ### Polymorphic tables
 `comment`, `entity_tag`, `link_attachment`, and `approval_request` reference their parent by

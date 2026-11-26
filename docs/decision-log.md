@@ -5312,3 +5312,22 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** S3-C13, S3-C17; design-doc §5 (DL-347's bullet), §6.2
 - **Source:** owner, Nov 25, 2026 (S3-C13's review: security-reviewer and checkpoint-reviewer
   questions)
+
+### DL-418: CSV exports read as on screen
+- **Date:** 2026-11-25
+- **Decision:** A CSV export's cells hold what a person reads: labels as on screen ("In
+  progress", "High", "Bug"; the server's `app/core/labels.py`, matching the frontend's), people
+  by name, items by display ID, phases and workstreams by name, ISO dates, an empty cell for
+  nothing. `columns=` picks and orders the columns (tasks: id, title, type, status, priority,
+  severity, assignee, reviewer, requirement, phase, workstream, due_date; requirements: id,
+  title, status, priority, parent, approval, tasks as "2 of 5 done"), every column by default.
+  A requirement's status reads as the tree's badge ("Approved · modified" once edited since its
+  approval); its approval reads "Approved", "Awaiting approval", both, or nothing (S3-C14
+  review).
+  The file is UTF-8 with a BOM, CRLF rows, named `{KEY}-tasks-{date}.csv` or
+  `{KEY}-requirements-{date}.csv` (the server's UTC date); an export the cap cut short carries
+  `Waterline-Truncated: true`.
+- **Supersedes:** none (the S3-C14 row named neither the values nor the columns)
+- **Superseded by:** none
+- **Applies to:** S3-C14, S3-C20, S3-C26; design-doc "Lists: saved filters and CSV export"
+- **Source:** owner, Nov 25, 2026 (S3-C14's start, both as recommended)

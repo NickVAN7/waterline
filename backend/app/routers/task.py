@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.authz.actions import Action
+from app.core.csv import csv_response
 from app.core.db import SessionDep
 from app.routers.deps import (
     ERRORS,
@@ -29,7 +30,7 @@ from app.schemas.task import (
 from app.services.project import ProjectEntity
 from app.services.requirement import RequirementEntity
 from app.services.subtask import SubtaskEntity, SubtaskService
-from app.services.task import TASKS, TaskEntity, TaskService
+from app.services.task import TASK_EXPORT, TASKS, TaskEntity, TaskService
 
 router = APIRouter(tags=["task"])
 
@@ -45,6 +46,7 @@ RequirementViewed = Annotated[
     RequirementEntity, Depends(authorized(load_requirement, Action.REQUIREMENT_VIEW))
 ]
 TasksQuery = Annotated[TASKS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+ExportQuery = Annotated[TASK_EXPORT, Query()]  # pyright: ignore[reportInvalidTypeForm]
 
 
 @router.post("/projects/{key}/tasks", status_code=status.HTTP_201_CREATED, responses=ERRORS)
@@ -65,6 +67,21 @@ async def list_tasks(
     """The project's tasks matching the filters, in rank order unless `sort` says otherwise:
     complete up to 2,000, with `truncated` above it (the backlog and the board)."""
     return await TaskService(session).list(ctx, project, query)
+
+
+# Before `…/tasks/{number}`, which would read `export.csv` as a number.
+@router.get(
+    "/projects/{key}/tasks/export.csv",
+    responses={200: {"content": {"text/csv": {}}, "description": "The CSV file"}, **ERRORS},
+    response_class=Response,
+)
+async def export_tasks(
+    project: Listed, query: ExportQuery, ctx: AuthzContextDep, session: SessionDep
+) -> Response:
+    """The task list as a CSV file: its filters and sort, `columns=` in the order asked (every
+    column by default), at most 2,000 rows with `Waterline-Truncated: true` above it; every
+    cell formula-escaped (S3-C14)."""
+    return csv_response(await TaskService(session).export(ctx, project, query))
 
 
 @router.get("/projects/{key}/requirements/{number}/tasks", responses=ERRORS)
