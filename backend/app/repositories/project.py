@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, Row, Select, case, delete, exists, func, or_, select
+from sqlalchemy import ColumnElement, Row, Select, and_, case, delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
@@ -311,6 +311,37 @@ class ProjectRepository:
                 .where(ProjectMembership.user_id == user_id, _in(organization_id, workspace_id))
             )
         )
+
+    def content_people(
+        self, project: Project, roles: Collection[ProjectRole], *, export_controlled: bool
+    ) -> Select[User]:
+        """Whom a content action granted from these project roles reaches, as `authorize()`
+        decides it (design-doc §3.1, §5; for a `ListSpec`): active users holding one of `roles`
+        on the project, and its inherited admins (the system admins, the workspace's and org's
+        owners and admins), who on an export-controlled project need a membership of any role
+        (the gate) (the task person and approver pickers, DL-347, §6.2)."""
+        on_project = select(ProjectMembership.user_id).where(
+            ProjectMembership.project_id == project.id
+        )
+        inherited = or_(
+            User.is_system_admin,
+            User.id.in_(
+                select(WorkspaceMembership.user_id).where(
+                    WorkspaceMembership.workspace_id == project.workspace_id,
+                    WorkspaceMembership.role.in_([WorkspaceRole.OWNER, WorkspaceRole.ADMIN]),
+                )
+            ),
+            User.id.in_(
+                select(Membership.user_id).where(
+                    Membership.organization_id == project.organization_id,
+                    Membership.role.in_([OrgRole.OWNER, OrgRole.ADMIN]),
+                )
+            ),
+        )
+        if export_controlled:
+            inherited = and_(inherited, User.id.in_(on_project))
+        holds_role = User.id.in_(on_project.where(ProjectMembership.role.in_(roles)))
+        return select(User).where(User.is_active, or_(holds_role, inherited))
 
     async def reachers(self, project: Project) -> Reachers:
         members = await self.session.execute(

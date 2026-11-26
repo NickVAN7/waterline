@@ -807,7 +807,7 @@ review (`in_review →` any status but `done`) prompts for a comment but doesn't
   An approved requirement is a signed-off artifact, which is why it needs a project admin.
 - **Task assignee and reviewer** (DL-347): an active user who may update tasks in the project
   (members and up with content access; inherited admins on a project that isn't
-  export-controlled), checked by the same person check as a requirement's reporter and an
+  export-controlled, or on one that is with an explicit membership of any role, DL-417), checked by the same person check as a requirement's reporter and an
   approver (`docs/reviews/s3/S3-plan.md`, C5). A deactivated assignee or reviewer
   stays on existing tasks, with the "Deactivated" badge, until someone reassigns the task (§4).
 - **The project activity feed is content** (from Slice 3; `docs/reviews/s3/S3-plan.md`, Q10):

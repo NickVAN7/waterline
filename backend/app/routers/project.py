@@ -62,6 +62,10 @@ AccessViewed = Annotated[
 ]
 ProjectQuery = Annotated[ORG_PROJECTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 MemberQuery = Annotated[PROJECT_MEMBERS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+TasksUpdated = Annotated[ProjectEntity, Depends(authorized(load_project, Action.TASK_UPDATE))]
+RequirementsUpdated = Annotated[
+    ProjectEntity, Depends(authorized(load_project, Action.REQUIREMENT_UPDATE))
+]
 CandidateQuery = Annotated[MEMBER_CANDIDATES.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 MemberProjectQuery = Annotated[MEMBER_PROJECTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 OrgMembersManaged = Annotated[OrgEntity, Depends(authorized(load_org, Action.ORG_MEMBER_MANAGE))]
@@ -178,6 +182,24 @@ async def project_member_candidates(
 ) -> Page[MemberCandidate]:
     """The picker: the org's members and the workspace's staff not yet on the project."""
     return await ProjectMemberService(session).member_candidates(project, query)
+
+
+@router.get("/projects/{key}/task-person-candidates", responses=ERRORS)
+async def task_person_candidates(
+    project: TasksUpdated, query: CandidateQuery, session: SessionDep
+) -> Page[MemberCandidate]:
+    """The assignee and reviewer pickers: active people who may update the project's tasks
+    (DL-347), offset-paged with `?q=`."""
+    return await ProjectMemberService(session).task_person_candidates(project, query)
+
+
+@router.get("/projects/{key}/approver-candidates", responses=ERRORS)
+async def approver_candidates(
+    project: RequirementsUpdated, query: CandidateQuery, session: SessionDep
+) -> Page[MemberCandidate]:
+    """The approver picker: active people an approval request may name (design-doc §6.2),
+    inherited admins included unless the project is export-controlled; offset-paged with `?q=`."""
+    return await ProjectMemberService(session).approver_candidates(project, query)
 
 
 @router.post("/projects/{key}/members", status_code=status.HTTP_201_CREATED, responses=ERRORS)

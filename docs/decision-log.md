@@ -5298,3 +5298,17 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C12, S3-C28; design-doc §10
 - **Source:** owner, Nov 25, 2026 (S3-C12's start, option "Display ID")
+
+### DL-417: The task person and approver pickers show each candidate's email
+- **Date:** 2026-11-25
+- **Decision:** `task-person-candidates` and `approver-candidates` return `member-candidates`'
+  rows, email included, to whoever may call them (`task.update`, `requirement.update`), inherited
+  admins among the candidates included: the email tells two people with the same name apart.
+  The pickers offer exactly whom `authorize()` accepts: on an export-controlled project, an
+  inherited admin with an explicit membership of any role is offered as a task's assignee or
+  reviewer (their admin role grants `task.update` once the gate lets them through).
+- **Supersedes:** none (DL-401 covers a named approver's email; this covers candidates)
+- **Superseded by:** none
+- **Applies to:** S3-C13, S3-C17; design-doc §5 (DL-347's bullet), §6.2
+- **Source:** owner, Nov 25, 2026 (S3-C13's review: security-reviewer and checkpoint-reviewer
+  questions)

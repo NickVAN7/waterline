@@ -886,6 +886,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/task-person-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task Person Candidates
+         * @description The assignee and reviewer pickers: active people who may update the project's tasks
+         *     (DL-347), offset-paged with `?q=`.
+         */
+        get: operations["task_person_candidates_api_projects__key__task_person_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/approver-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Approver Candidates
+         * @description The approver picker: active people an approval request may name (design-doc §6.2),
+         *     inherited admins included unless the project is export-controlled; offset-paged with `?q=`.
+         */
+        get: operations["approver_candidates_api_projects__key__approver_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/members/new": {
         parameters: {
             query?: never;
@@ -4760,6 +4802,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
                 role?: components["schemas"]["WorkspaceRole"][] | null;
                 role__not?: components["schemas"]["WorkspaceRole"][] | null;
@@ -5261,6 +5304,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
             };
             header?: never;
@@ -5565,6 +5609,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
                 role?: components["schemas"]["OrgRole"][] | null;
                 role__not?: components["schemas"]["OrgRole"][] | null;
@@ -6287,6 +6332,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: key, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_archived?: boolean;
                 archived_only?: boolean;
                 status?: components["schemas"]["ProjectStatus"][] | null;
@@ -7136,6 +7182,134 @@ export interface operations {
         };
     };
     project_member_candidates_api_projects__key__member_candidates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberCandidate_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    task_person_candidates_api_projects__key__task_person_candidates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberCandidate_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approver_candidates_api_projects__key__approver_candidates_get: {
         parameters: {
             query?: {
                 limit?: number;

@@ -80,6 +80,8 @@ ORG_PROJECTS = dataclasses.replace(
     PROJECTS,
     name="OrgProject",
     archived_column=Project.archived_at,  # pyright: ignore[reportArgumentType]
+    # The project selector's search (TD-38).
+    search=(Project.name, Project.key),  # pyright: ignore[reportArgumentType]
 )
 
 

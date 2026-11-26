@@ -261,6 +261,7 @@ USERS = ListSpec(
     sorts={"name": User.name, "email": User.email},  # pyright: ignore[reportArgumentType]
     default_sort=("name",),
     sort_first=(NO_ROLE_SYSTEM_ADMIN,),
+    search=(User.name, User.email, User.username),  # pyright: ignore[reportArgumentType]
     active_column=User.is_active,  # pyright: ignore[reportArgumentType]
 )
 

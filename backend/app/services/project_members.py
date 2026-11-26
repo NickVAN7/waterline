@@ -148,6 +148,30 @@ class ProjectMemberService(ProjectService):
         """The picker: the org's active members and the workspace's staff not yet on it."""
         return await self._candidates(self.repository.candidates(project), query)
 
+    async def task_person_candidates(
+        self, project: Project, query: object
+    ) -> Page[MemberCandidate]:
+        """Whom a task's assignee or reviewer may be (DL-347): active people who may update
+        tasks in the project, members and up, inherited admins unless it's export-controlled;
+        the same people `check_person` accepts with `task.update`."""
+        return await self._content_people(project, (ProjectRole.MEMBER, ProjectRole.ADMIN), query)
+
+    async def approver_candidates(self, project: Project, query: object) -> Page[MemberCandidate]:
+        """Whom an approval request may name (design-doc §6.2): active people who may view the
+        project's requirements, viewers and up, inherited admins unless it's export-controlled
+        (TD-96); the same people `check_person` accepts with `requirement.view`."""
+        roles = (ProjectRole.VIEWER, ProjectRole.MEMBER, ProjectRole.ADMIN)
+        return await self._content_people(project, roles, query)
+
+    async def _content_people(
+        self, project: Project, roles: tuple[ProjectRole, ...], query: object
+    ) -> Page[MemberCandidate]:
+        export_controlled = project_target(project).export_controlled
+        return await self._candidates(
+            self.repository.content_people(project, roles, export_controlled=export_controlled),
+            query,
+        )
+
     async def _candidates(self, people: Select[User], query: object) -> Page[MemberCandidate]:
         page = await fetch_page(
             self.session,
