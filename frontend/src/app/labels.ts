@@ -261,6 +261,7 @@ export const HISTORY_FIELD: Partial<Record<components['schemas']['ActivityField'
   restriction_level: 'restriction level',
   restriction_categories: 'restriction categories',
   parent_requirement_id: 'parent',
+  workstream_id: 'workstream',
 }
 
 /** A person's workspace role and system admin as text ("Owner, System admin"), or `none` with

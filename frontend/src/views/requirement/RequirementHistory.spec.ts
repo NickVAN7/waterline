@@ -16,6 +16,9 @@ function entry(id: string, fields: Partial<Entry> = {}): Entry {
   return {
     id,
     entity_type: 'requirement',
+    entity_id: 'r-7',
+    entity_name: 'ERP-RQ-7',
+    entity_is_active: true,
     action: 'updated',
     field_changed: null,
     old_value: null,
@@ -210,6 +213,65 @@ describe('RequirementHistory', () => {
       'Ben Ortiz changed the parent from ERP-RQ-3 Deleted to the top level',
       'Ben Ortiz changed the parent from the top level to ERP-RQ-4',
     ])
+  })
+
+  it('names a workstream by its name, and none as none (TD-132)', async () => {
+    mountHistory(
+      feed([
+        entry('2', {
+          field_changed: 'workstream_id',
+          old_value: 'w-1',
+          old_value_name: 'Finance',
+          old_value_is_active: true,
+          new_value: null,
+        }),
+        entry('1', {
+          field_changed: 'workstream_id',
+          old_value: null,
+          new_value: 'w-1',
+          new_value_name: 'Finance',
+          new_value_is_active: true,
+        }),
+      ]),
+    )
+    await flushPromises()
+
+    expect(lines()).toEqual([
+      'Ben Ortiz changed the workstream from Finance to none',
+      'Ben Ortiz changed the workstream from none to Finance',
+    ])
+  })
+
+  it('names the task an unlink detached, "Deleted" while it is in the trash (TD-134)', async () => {
+    mountHistory(
+      feed([
+        entry('2', {
+          action: 'unlinked',
+          old_value: 't-5',
+          old_value_name: 'ERP-TA-5',
+          old_value_is_active: false,
+        }),
+        entry('1', {
+          action: 'unlinked',
+          old_value: 't-4',
+          old_value_name: 'ERP-TA-4',
+          old_value_is_active: true,
+        }),
+      ]),
+    )
+    await flushPromises()
+
+    expect(lines()).toEqual([
+      'Ben Ortiz unlinked task ERP-TA-5 Deleted',
+      'Ben Ortiz unlinked task ERP-TA-4',
+    ])
+  })
+
+  it('says "unlinked a task" when the task has no name', async () => {
+    mountHistory(feed([entry('1', { action: 'unlinked', old_value: 't-9' })]))
+    await flushPromises()
+
+    expect(lines()).toEqual(['Ben Ortiz unlinked a task'])
   })
 
   it('names an approval by its revision (DL-276)', async () => {

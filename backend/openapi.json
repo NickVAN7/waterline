@@ -5344,6 +5344,459 @@
         }
       }
     },
+    "/api/projects/{key}/tasks/{number}/activity": {
+      "get": {
+        "tags": [
+          "activity"
+        ],
+        "summary": "Task Activity",
+        "description": "The task's history, newest first (`?before=` the previous page's `next_cursor`).",
+        "operationId": "task_activity_api_projects__key__tasks__number__activity_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `next_cursor` of the previous page",
+              "title": "Before"
+            },
+            "description": "The `next_cursor` of the previous page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed_ActivityEntry_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/projects/{key}/activity": {
+      "get": {
+        "tags": [
+          "activity"
+        ],
+        "summary": "Project Activity",
+        "description": "Every change logged in the project, newest first, filtered by item type, actor (`me`;\n`actor__is_null` for the system's), field, and the UTC day of the change.",
+        "operationId": "project_activity_api_projects__key__activity_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `next_cursor` of the previous page",
+              "title": "Before"
+            },
+            "description": "The `next_cursor` of the previous page"
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityEntityType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "entity_type__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityEntityType"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type  Not"
+            }
+          },
+          {
+            "name": "entity_type__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type  Is Null"
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor"
+            }
+          },
+          {
+            "name": "actor__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "const": "me",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor  Not"
+            }
+          },
+          {
+            "name": "actor__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor  Is Null"
+            }
+          },
+          {
+            "name": "field",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityField"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field"
+            }
+          },
+          {
+            "name": "field__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityField"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field  Not"
+            }
+          },
+          {
+            "name": "field__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field  Is Null"
+            }
+          },
+          {
+            "name": "changed_at__lt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Changed At  Lt"
+            }
+          },
+          {
+            "name": "changed_at__gt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Changed At  Gt"
+            }
+          },
+          {
+            "name": "changed_at__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Changed At  Is Null"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed_ActivityEntry_"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/{key}/requirements": {
       "post": {
         "tags": [
@@ -10155,6 +10608,7 @@
           "project.favorite",
           "project_member.manage",
           "project.view_access",
+          "project.view_activity",
           "project.raise_restriction",
           "project.lower_restriction",
           "requirement.view",
@@ -10221,6 +10675,26 @@
           },
           "entity_type": {
             "$ref": "#/components/schemas/ActivityEntityType"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "entity_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Name"
+          },
+          "entity_is_active": {
+            "type": "boolean",
+            "title": "Entity Is Active"
           },
           "action": {
             "$ref": "#/components/schemas/ActivityAction"
@@ -10345,6 +10819,9 @@
         "required": [
           "id",
           "entity_type",
+          "entity_id",
+          "entity_name",
+          "entity_is_active",
           "action",
           "field_changed",
           "old_value",
@@ -10359,7 +10836,7 @@
           "new_value_is_active"
         ],
         "title": "ActivityEntry",
-        "description": "One change, newest first in its feed. Names are resolved by the server at read time, so a\nformer member's name stays; `*_is_active` false shows the \"Deactivated\" badge. `changed_by_*`\nis null when an app CLI command made the change. `old_value_*` and `new_value_*` name the\nuser in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);\nin `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while\nit's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).\nThey are null for any other field, and for a value that's empty (no parent). `entity_type`\nsays whose entry it is: the requirement's own, or one of its approval requests' (requested,\napproved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397)."
+        "description": "One change, newest first in its feed. Names are resolved by the server at read time, so a\nformer member's name stays; `*_is_active` false shows the \"Deactivated\" badge. `changed_by_*`\nis null when an app CLI command made the change. `old_value_*` and `new_value_*` name the\nuser in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);\nin `parent_requirement_id` and `requirement_id`, and in a `linked` or `unlinked` entry's\nother item, a requirement's or task's display ID (`ERP-RQ-12`), `*_is_active` false while\nit's deleted; in `phase_id` and `workstream_id`, the name (a deleted phase: null); in\n`approved_revision_id`, the revision's number, `*_is_active` null (DL-276, DL-416). They are\nnull for any other field, and for a value that's empty (no parent). `entity_type`\nsays whose entry it is: the requirement's own, or one of its approval requests' (requested,\napproved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397), or in the\nproject feed any of the project's items or the project itself. `entity_name` names that item\n(DL-416): a requirement or task by its display ID (`ERP-TA-5`), an approval request by its\nrequirement's, a phase or the project by its name; `entity_is_active` is false while the\nitem is deleted (a deleted phase is gone, so its name is null)."
       },
       "ActivityField": {
         "type": "string",

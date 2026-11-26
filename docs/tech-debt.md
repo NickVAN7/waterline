@@ -568,16 +568,6 @@ Entry format:
 
 ---
 
-### TD-132: History names a requirement's workstream change only as "made a change"
-- **Added:** S3-C4 (ui-reviewer note; checkpoint-reviewer question)
-- **What:** a requirement's `workstream_id` change is logged (§10), but the activity service's
-  `NAMED_FIELDS` and the frontend's `HISTORY_FIELD` have no workstream, so History shows the
-  generic entry. No screen sets a requirement's workstream yet; only the API does.
-- **Why:** naming it needs the workstream's name resolved on the read, which is S3-C12's work
-  (names resolved server-side for the feed and History).
-- **Fix by:** S3-C12 (the workstream named in History and the feed, with a History spec case)
-- **Status:** open
-
 ### TD-133: The Trash page shows a task row as a requirement
 - **Added:** S3-C9 (owner, Nov 25, 2026: backend only)
 - **What:** the trash API lists deleted tasks, but `TrashView.vue` shows every row as
@@ -590,16 +580,6 @@ Entry format:
 - **Fix by:** S3-C20 (the Tasks page's Trash link): the row's ID, Restore, and the page's text by
   type, with a spec case for each `TrashItemType`; the success linking to the task once S3-C23's
   page exists
-- **Status:** open
-
-### TD-134: History shows a requirement's or task's unlink as "made a change"
-- **Added:** S3-C9a (checkpoint-reviewer finding 4)
-- **What:** a requirement's delete logs `unlinked` on the requirement and the task (DL-413), but
-  History's sentences (`RequirementHistory.vue`) have no case for `unlinked`, and the activity
-  service doesn't name a task by its display ID, so a restored requirement shows "made a
-  change" once per detached task, naming none.
-- **Why:** naming items in History and the feed is S3-C12's work (TD-132's reason).
-- **Fix by:** S3-C12 (the unlink named, `{KEY}-TA-n`, on both sides, with a History spec case)
 - **Status:** open
 
 ### TD-135: The requirement delete dialog doesn't offer the linked-tasks choice
@@ -1060,3 +1040,14 @@ Entry format:
 - **Added:** S3-C4 (checkpoint-reviewer finding 6)
 - **Status:** resolved in S3-C7: `anchor_position()` in `app/services/ordering.py` and the
   `ItemMove` schema, used by the phase, workstream, and task moves
+
+### TD-132: History names a requirement's workstream change only as "made a change"
+- **Added:** S3-C4 (ui-reviewer note; checkpoint-reviewer question)
+- **Status:** resolved in S3-C12: the activity service names `workstream_id` (and `phase_id`,
+  `requirement_id`) values; History says "changed the workstream from … to …"
+
+### TD-134: History shows a requirement's or task's unlink as "made a change"
+- **Added:** S3-C9a (checkpoint-reviewer finding 4)
+- **Status:** resolved in S3-C12: a `linked`/`unlinked` entry's other item is named by its
+  display ID; the requirement's History says "unlinked task ERP-TA-5" (the task's History
+  page is S3-C24)

@@ -90,6 +90,7 @@ class Action(StrEnum):
     PROJECT_FAVORITE = "project.favorite"
     PROJECT_MEMBER_MANAGE = "project_member.manage"
     PROJECT_VIEW_ACCESS = "project.view_access"
+    PROJECT_VIEW_ACTIVITY = "project.view_activity"
     PROJECT_RAISE_RESTRICTION = "project.raise_restriction"
     PROJECT_LOWER_RESTRICTION = "project.lower_restriction"
     REQUIREMENT_VIEW = "requirement.view"
@@ -441,6 +442,8 @@ REGISTRY: dict[str, ActionSpec] = {
     Action.APPROVAL_DECIDE: ActionSpec(Level.PROJECT, relationship=_named_approver_still_pending),
     # Phases, workstreams, tasks, and subtasks (Slice 3; S3-plan, "Actions per row"): content,
     # so the export-control gate leaves only explicit members (§3.1).
+    # The project activity feed is content, every entry of it (design-doc §5; S3-plan, Q10).
+    Action.PROJECT_VIEW_ACTIVITY: _CONTENT_VIEWERS,
     Action.PHASE_VIEW: _CONTENT_VIEWERS,
     Action.PHASE_MANAGE: _CONTENT_MEMBERS,
     Action.WORKSTREAM_VIEW: _CONTENT_VIEWERS,

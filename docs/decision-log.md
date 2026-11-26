@@ -5283,3 +5283,18 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C11, S3-C29; design-doc §11 "My work"
 - **Source:** owner, Nov 25, 2026 (chat, before S3-C11 was built)
+
+### DL-416: An activity entry names its item
+- **Date:** 2026-11-25
+- **Decision:** Every activity entry (the project feed, and the requirement's and task's History)
+  carries `entity_id`, `entity_name`, and `entity_is_active`, resolved by the server at read
+  time within the entry's project: a requirement or task by its display ID (`ERP-RQ-12`,
+  `ERP-TA-5`), `entity_is_active` false while it's deleted; an approval request by its
+  requirement's display ID; a phase by its name (a deleted phase is gone: no name,
+  `entity_is_active` false); the project by its name. The feed's `changed_at` filter compares
+  the UTC day of the change, as other date filters compare a date.
+- **Supersedes:** none (the S3-C12 row said names are resolved server-side but not which item
+  an entry names)
+- **Superseded by:** none
+- **Applies to:** S3-C12, S3-C28; design-doc §10
+- **Source:** owner, Nov 25, 2026 (S3-C12's start, option "Display ID")

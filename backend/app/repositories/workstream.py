@@ -1,6 +1,7 @@
 """Workstreams (schema-doc "Planning Structure"; design-doc §6)."""
 
 import uuid
+from collections.abc import Collection
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,19 @@ class WorkstreamRepository:
                 populate_existing=True
             )
         return await self.session.scalar(statement)
+
+    async def names(
+        self, project_id: uuid.UUID, workstream_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """The names of the project's workstreams with these IDs, by ID, archived ones included."""
+        if not workstream_ids:
+            return {}
+        rows = await self.session.execute(
+            select(Workstream.id, Workstream.name).where(
+                Workstream.project_id == project_id, Workstream.id.in_(workstream_ids)
+            )
+        )
+        return dict(rows.all())
 
     async def ranked(
         self, project_id: uuid.UUID, limit: int, *, include_archived: bool

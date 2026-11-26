@@ -49,6 +49,23 @@ class ApprovalRepository:
             ApprovalRequest.entity_type == entity_type, ApprovalRequest.entity_id == entity_id
         )
 
+    async def entity_ids(
+        self, project_id: uuid.UUID, request_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        """The requirement each of the project's requirement requests with these IDs is for, by
+        request ID (the activity feed names a request's entry by its requirement; a milestone's
+        or test run's request, from Slice 4, isn't named yet)."""
+        if not request_ids:
+            return {}
+        rows = await self.session.execute(
+            select(ApprovalRequest.id, ApprovalRequest.entity_id).where(
+                ApprovalRequest.project_id == project_id,
+                ApprovalRequest.entity_type == ApprovalEntityType.REQUIREMENT,
+                ApprovalRequest.id.in_(request_ids),
+            )
+        )
+        return dict(rows.all())
+
     async def get(self, request_id: uuid.UUID) -> ApprovalRequest | None:
         """The request, loaded for a read, read again if the session holds it (after a change)."""
         return await self.session.scalar(

@@ -161,6 +161,7 @@ EXPECTED: dict[str, Expected] = {
     "project.favorite": Expected(_P, project_role=_VIEWER),
     "project_member.manage": Expected(_P, project_role=_ADMIN),
     "project.view_access": Expected(_P, project_role=_ADMIN, mutation=False),
+    "project.view_activity": Expected(_P, C, _VIEWER, mutation=False),
     "project.raise_restriction": Expected(_P, project_role=_ADMIN),
     "project.lower_restriction": Expected(
         _P, project_role=_ADMIN, explicit_when_export_controlled=True

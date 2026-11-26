@@ -67,6 +67,9 @@ function value(entry: Entry, which: 'old' | 'new'): Part {
     case 'parent_requirement_id':
       if (!raw) return 'the top level'
       return { text: name ?? '', badge: active === false ? DELETED : undefined }
+    case 'workstream_id':
+      // An archived workstream is still named; workstreams are never deleted.
+      return raw ? (name ?? '') : 'none'
     default:
       return { text: name ?? '', badge: active === false ? DEACTIVATED : undefined }
   }
@@ -95,6 +98,12 @@ function sentence(entry: Entry): Part[] {
   if (entry.action === 'created') return ['created the requirement']
   if (entry.action === 'deleted') return ['deleted it']
   if (entry.action === 'restored') return ['restored it']
+  // A delete detaching a task logs the task's ID as the old value (DL-413, TD-134).
+  if (entry.action === 'unlinked') {
+    if (!entry.old_value_name) return ['unlinked a task']
+    const deleted = entry.old_value_is_active === false ? DELETED : undefined
+    return ['unlinked task', { text: entry.old_value_name, badge: deleted }]
+  }
   if (entry.field_changed === 'approved_revision_id') {
     return entry.new_value_name ? [`approved revision ${entry.new_value_name}`] : ['approved it']
   }

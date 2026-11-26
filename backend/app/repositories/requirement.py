@@ -295,14 +295,14 @@ class RequirementRepository:
         )
 
     async def revision_numbers(
-        self, requirement_id: uuid.UUID, revision_ids: Collection[uuid.UUID]
+        self, requirement_ids: Collection[uuid.UUID], revision_ids: Collection[uuid.UUID]
     ) -> dict[uuid.UUID, int]:
-        """The numbers of the requirement's revisions with these IDs, by ID (DL-276)."""
+        """The numbers of these requirements' revisions with these IDs, by ID (DL-276)."""
         if not revision_ids:
             return {}
         rows = await self.session.execute(
             select(RequirementRevision.id, RequirementRevision.revision_number).where(
-                RequirementRevision.requirement_id == requirement_id,
+                RequirementRevision.requirement_id.in_(requirement_ids),
                 RequirementRevision.id.in_(revision_ids),
             )
         )

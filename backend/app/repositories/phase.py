@@ -1,6 +1,7 @@
 """Phases (schema-doc "Planning Structure"; design-doc §6)."""
 
 import uuid
+from collections.abc import Collection
 
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,19 @@ class PhaseRepository:
         return await self.session.scalar(
             statement.with_for_update(read=True) if hold else statement
         )
+
+    async def names(
+        self, project_id: uuid.UUID, phase_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """The names of the project's phases with these IDs, by ID (a deleted phase is gone)."""
+        if not phase_ids:
+            return {}
+        rows = await self.session.execute(
+            select(Phase.id, Phase.name).where(
+                Phase.project_id == project_id, Phase.id.in_(phase_ids)
+            )
+        )
+        return dict(rows.all())
 
     async def ranked(self, project_id: uuid.UUID, limit: int) -> list[Phase]:
         """The project's phases in `(rank, id)` order, at most `limit`."""

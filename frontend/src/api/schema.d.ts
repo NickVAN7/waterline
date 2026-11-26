@@ -1071,6 +1071,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/tasks/{number}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task Activity
+         * @description The task's history, newest first (`?before=` the previous page's `next_cursor`).
+         */
+        get: operations["task_activity_api_projects__key__tasks__number__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Activity
+         * @description Every change logged in the project, newest first, filtered by item type, actor (`me`;
+         *     `actor__is_null` for the system's), field, and the UTC day of the change.
+         */
+        get: operations["project_activity_api_projects__key__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/requirements": {
         parameters: {
             query?: never;
@@ -1828,7 +1869,7 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project.favorite" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide" | "phase.view" | "phase.manage" | "workstream.view" | "workstream.manage" | "task.view" | "task.create" | "task.update" | "task.reassign_reporter" | "task.raise_restriction" | "task.lower_restriction" | "task.delete" | "task.restore" | "subtask.manage";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project.favorite" | "project_member.manage" | "project.view_access" | "project.view_activity" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide" | "phase.view" | "phase.manage" | "workstream.view" | "workstream.manage" | "task.view" | "task.create" | "task.update" | "task.reassign_reporter" | "task.raise_restriction" | "task.lower_restriction" | "task.delete" | "task.restore" | "subtask.manage";
         /**
          * ActivityAction
          * @enum {string}
@@ -1845,11 +1886,17 @@ export interface components {
          *     former member's name stays; `*_is_active` false shows the "Deactivated" badge. `changed_by_*`
          *     is null when an app CLI command made the change. `old_value_*` and `new_value_*` name the
          *     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);
-         *     in `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while
-         *     it's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).
-         *     They are null for any other field, and for a value that's empty (no parent). `entity_type`
+         *     in `parent_requirement_id` and `requirement_id`, and in a `linked` or `unlinked` entry's
+         *     other item, a requirement's or task's display ID (`ERP-RQ-12`), `*_is_active` false while
+         *     it's deleted; in `phase_id` and `workstream_id`, the name (a deleted phase: null); in
+         *     `approved_revision_id`, the revision's number, `*_is_active` null (DL-276, DL-416). They are
+         *     null for any other field, and for a value that's empty (no parent). `entity_type`
          *     says whose entry it is: the requirement's own, or one of its approval requests' (requested,
-         *     approved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397).
+         *     approved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397), or in the
+         *     project feed any of the project's items or the project itself. `entity_name` names that item
+         *     (DL-416): a requirement or task by its display ID (`ERP-TA-5`), an approval request by its
+         *     requirement's, a phase or the project by its name; `entity_is_active` is false while the
+         *     item is deleted (a deleted phase is gone, so its name is null).
          */
         ActivityEntry: {
             /**
@@ -1858,6 +1905,15 @@ export interface components {
              */
             id: string;
             entity_type: components["schemas"]["ActivityEntityType"];
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Name */
+            entity_name: string | null;
+            /** Entity Is Active */
+            entity_is_active: boolean;
             action: components["schemas"]["ActivityAction"];
             field_changed: components["schemas"]["ActivityField"] | null;
             /** Old Value */
@@ -7620,6 +7676,143 @@ export interface operations {
             path: {
                 key: string;
                 number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_ActivityEntry_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    task_activity_api_projects__key__tasks__number__activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_ActivityEntry_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    project_activity_api_projects__key__activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+                entity_type?: components["schemas"]["ActivityEntityType"][] | null;
+                entity_type__not?: components["schemas"]["ActivityEntityType"][] | null;
+                entity_type__is_null?: boolean | null;
+                actor?: (string | "me")[] | null;
+                actor__not?: (string | "me")[] | null;
+                actor__is_null?: boolean | null;
+                field?: components["schemas"]["ActivityField"][] | null;
+                field__not?: components["schemas"]["ActivityField"][] | null;
+                field__is_null?: boolean | null;
+                changed_at__lt?: string | null;
+                changed_at__gt?: string | null;
+                changed_at__is_null?: boolean | null;
+            };
+            header?: never;
+            path: {
+                key: string;
             };
             cookie?: never;
         };

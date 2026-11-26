@@ -1459,7 +1459,9 @@ what was deleted, by whom, and when, and restoring the item brings its history b
 - `project_id` on every row makes the project activity feed a single indexed query. The feed's
   API and page arrive in Slice 3, with the filter bar; Slice 2 logs to the table and shows each
   requirement's own entries on its History tab (§6.1; DL-147), with its approval requests'
-  entries from S3-C0q (DL-388).
+  entries from S3-C0q (DL-388). Each entry names its item, resolved at read time: a
+  requirement or task by its display ID, an approval request by its requirement's, a phase or
+  the project by its name (DL-416).
 - **Implementation rules:**
   - Only the shared helper `log_change(...)` writes to `activity_log` — never an endpoint
     directly. Endpoints pass enum members; the helper serializes them.
