@@ -622,7 +622,8 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(menu).toBeFocused()
   await expectNoA11yViolations(page)
   await menu.getByRole('menuitem', { name: 'In progress' }).click()
-  await expect(page.getByText('Status: In progress')).toBeVisible()
+  // The badge, not the live region announcing the same words for a moment.
+  await expect(page.locator('span', { hasText: 'Status: In progress' })).toBeVisible()
   await expect(changeOnPage).toBeFocused()
   await expectNoA11yViolations(page)
 
