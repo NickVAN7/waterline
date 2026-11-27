@@ -158,3 +158,22 @@ test('the filter bar works by keyboard, focus never dropping (UI-TBL-10, DL-419)
   await expect(search).toBeFocused()
   await expectNoA11yViolations(page)
 })
+
+test('a filter picked from Add filter with the mouse stays open to choose from (DL-419)', async ({
+  page,
+}) => {
+  await signIn(page, 'wendy')
+  await page.goto('/workspace/staff')
+  await expect(page.getByRole('table', { name: 'Staff' })).toBeVisible()
+
+  // The click that picks Role must not count as a click outside the popover it opens.
+  await page.getByRole('button', { name: 'Add filter' }).click()
+  await page.getByRole('menuitem', { name: 'Role' }).click()
+  const popover = page.getByRole('dialog', { name: 'Role filter' })
+  await expect(popover).toBeVisible()
+  await popover.getByRole('checkbox', { name: 'Owner' }).click()
+
+  await expect(page).toHaveURL(/role=owner/)
+  await expect(popover).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Role: Owner' })).toBeVisible()
+})

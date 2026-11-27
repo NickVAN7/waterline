@@ -36,6 +36,11 @@ themselves are `docs/ui-design-guide.md`'s, by ID.
   `alertKey`); a repeated live message is cleared and set again after `ANNOUNCE_DELAY_MS`; Retry
   focuses the control whose action failed before repeating it; a landmark with nothing in it
   isn't rendered (UI-FBK-2, UI-FRM-6, UI-FRM-7, UI-SHL-2; DL-93).
+- An overlay opened by a click on another (a menu item that opens a popover) opens after a
+  `setTimeout`, not a tick: a browser runs microtasks between a click's listeners, so the new
+  overlay sees that click reach the document as an outside click and closes at once. jsdom's
+  scripted `.click()` and a keyboard Enter don't show it; an e2e clicks with the mouse
+  (`FilterBar`'s Add filter; owner, S3-C16).
 - Overlays: a popover moves focus into itself when it opens (the filter, the current link, or the
   first, once loaded content has rendered): it sits at the end of `<body>`, so Tab from its
   button never reaches it. A PrimeVue menu's active item (`.p-focus`) gets the focus ring

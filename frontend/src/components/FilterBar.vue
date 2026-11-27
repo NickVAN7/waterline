@@ -109,7 +109,10 @@ function toggleAdd(event: Event) {
 
 async function startFilter(filter: EnumFilter) {
   added.value = filter.name
-  await nextTick()
+  // Open once the click that picked it has finished: a browser runs microtasks between a click's
+  // listeners, so a popover opened a tick later would see that click reach the document as one
+  // outside it, and close at once (the owner, S3-C16).
+  await new Promise((resolve) => setTimeout(resolve))
   open(filter)
 }
 
