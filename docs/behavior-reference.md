@@ -315,7 +315,8 @@ its active members and their roles (Admin, Member, Viewer); anyone on the projec
 project's admins (and organization owners and admins, workspace owners and admins, and system
 admins) can also:
 
-- **Show deactivated**, above the list: deactivated members are listed too, each marked
+- **Show deactivated**, last in the filter bar (which also has **Search people** and the
+  **Role** filter, as on the workspace's lists): deactivated members are listed too, each marked
   **Deactivated**. An archived project's list has no **Show deactivated**: it shows its active
   members only.
 
@@ -440,9 +441,18 @@ Workspace owners and admins (and system admins) find **Administration** in the a
 the top right. Its pages are listed in the sidebar, under the caption **Workspace administration**, in place of the project selector: **Staff**, **Organizations**,
 **Users**, and **Settings** (workspace admins see the settings; owners and system admins change
 them). Anyone else who opens these pages is told to ask a workspace owner or admin. Each row's actions are in
-its **Actions for …** menu, which lists only what you may do to that person. **Staff**,
+its **Actions for …** menu, which lists only what you may do to that person; a list where you
+may do nothing to anyone has no actions column. Above each list is its filter bar (DL-419):
+**Search people** (or **Search users**) finds people by name, email, or username as you type;
+**Add filter** offers **Role** (not on **Users**), which becomes a chip ("Role: Admin, Member")
+whose button opens **Is any of** or **Is none of** and the roles, each applied as you tick it,
+and whose **Remove Role filter** button takes it away; **Clear** undoes everything set,
+**Show deactivated** included. All of it is in the address, so a link or a reload opens the same
+list. A search or filter that matches no one says so ("No people match “zed”", or "No people
+match these filters"), with **Clear filters**, which does what **Clear** does and puts you back in
+the search field. **Staff**,
 **Users**, and an organization's **Members** list active people only: select **Show
-deactivated**, above the list, to include deactivated people: on **Staff** and **Members** each
+deactivated**, last in the filter bar, to include deactivated people: on **Staff** and **Members** each
 such row's text is muted and **· Deactivated** follows the name; on **Users** the **Status**
 column says **Deactivated**. The columns keep their widths. That's
 how you find someone to reactivate. A list with only deactivated people shows as empty ("No

@@ -161,7 +161,7 @@ describe('UsersView', () => {
       'workspace.view',
       'workspace_staff.manage',
     ])
-    const box = wrapper.get<HTMLInputElement>('#show-deactivated')
+    const box = wrapper.get<HTMLInputElement>('input[name=include_deactivated]')
     expect(box.element.labels?.[0]?.textContent?.trim()).toBe('Show deactivated')
 
     await box.setValue(true)
@@ -177,6 +177,46 @@ describe('UsersView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it('has no Actions column for someone who may act on no one, and keeps it for the staff admins (TD-102)', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage([USERS[0]!])))
+    const member = await mountWorkspaceView(UsersView, '/workspace/users')
+    const headers = (w: typeof member.wrapper) => w.findAll('thead th').map((th) => th.text())
+
+    expect(headers(member.wrapper)).toEqual(['Name', 'Email', 'Username', 'Role', 'Status'])
+
+    const admin = await mountWorkspaceView(UsersView, '/workspace/users', [
+      'workspace.view',
+      'workspace_staff.manage',
+    ])
+    // Fixed columns for the list's admins: a search or a page never moves them (S3-C0k).
+    expect(headers(admin.wrapper)).toEqual([
+      'Name',
+      'Email',
+      'Username',
+      'Role',
+      'Status',
+      'Actions',
+    ])
+  })
+
+  it("sends the filter bar's search from the URL, and says when no one matches (DL-419)", async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage([])))
+
+    const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users?q=zed')
+
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, sort: 'name', q: 'zed' },
+      },
+    })
+    expect(wrapper.get('label[for]').text()).toBe('Search users')
+    expect(wrapper.get('h3').text()).toBe('No users match “zed”')
+    // No filters declared on this list: nothing to add.
+    expect(wrapper.text()).not.toContain('Add filter')
+    await expectNoA11yViolations(wrapper)
+  })
+
   it('offers no Show deactivated without workspace_staff.manage, and ignores it in a link (DL-294)', async () => {
     const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(USERS)))
 
@@ -185,7 +225,7 @@ describe('UsersView', () => {
       '/workspace/users?include_deactivated=true',
     )
 
-    expect(wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(wrapper.find('input[name=include_deactivated]').exists()).toBe(false)
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: WORKSPACE_ID },

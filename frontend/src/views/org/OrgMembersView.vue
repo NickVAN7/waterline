@@ -12,7 +12,7 @@ import { allows } from '@/composables/allowedActions'
 import { useRouteOrg } from '@/composables/useRouteOrg'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RosterPage from '@/views/roster/RosterPage.vue'
-import type { AddOptions, Roster } from '@/views/roster/roster'
+import type { AddOptions, Roster, RosterListQuery } from '@/views/roster/roster'
 
 import { WHO_TO_ASK } from './orgAdmin'
 
@@ -100,7 +100,7 @@ const roster = computed<Roster>(() => ({
 
 // The workspace comes first, so the rows and Add person (and their dialogs) appear only once the
 // user check can run; a failure of either is the list's error, with Try again.
-async function list(query: { limit: number; offset: number; include_deactivated?: boolean }) {
+async function list(query: RosterListQuery<components['schemas']['OrgRole']>) {
   if (!workspaceId.value) {
     workspaceId.value = (
       await api(client.GET('/api/orgs/{org_id}', { params: { path: path() } }))

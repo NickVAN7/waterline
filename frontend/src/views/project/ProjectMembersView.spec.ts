@@ -146,9 +146,11 @@ describe('ProjectMembersView', () => {
       expect(
         wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
       ).toEqual([
-        ['Ann Lee', 'ann@acme.example', 'Admin', ''],
-        ['Dee Gone · Deactivated', 'dee@acme.example', 'Viewer', ''],
+        ['Ann Lee', 'ann@acme.example', 'Admin'],
+        ['Dee Gone · Deactivated', 'dee@acme.example', 'Viewer'],
       ])
+      // Nobody they may change, so no Actions column (TD-102).
+      expect(wrapper.findAll('thead th').map((th) => th.text())).toEqual(['Name', 'Email', 'Role'])
       await expectNoA11yViolations(wrapper)
     },
   )
@@ -169,12 +171,14 @@ describe('ProjectMembersView', () => {
     const viewer = await mountAt(project({ allowed_actions: ['project.view'] }), [
       member('Ann Lee'),
     ])
-    expect(viewer.wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(viewer.wrapper.find('input[name=include_deactivated]').exists()).toBe(false)
     viewer.wrapper.unmount()
 
     const admin = await mountAt(project({ allowed_actions: ADMIN }), [member('Ann Lee')])
 
-    expect(admin.wrapper.get('label:has(#show-deactivated)').text()).toBe('Show deactivated')
+    expect(admin.wrapper.get('label:has(input[name=include_deactivated])').text()).toBe(
+      'Show deactivated',
+    )
   })
 
   it("offers its admins Add member, Add by email, and the project's access review", async () => {

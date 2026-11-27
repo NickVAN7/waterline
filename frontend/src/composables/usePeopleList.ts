@@ -1,27 +1,20 @@
 /**
  * The people lists' shared pieces (Staff, an org's and a project's Members, Users): the
- * "Show deactivated" filter kept in the URL (DL-293, DL-295), and focus after an action that may
+ * "Show deactivated" filter kept in the URL (DL-293, DL-295, its toggle in the filter bar, DL-419), and focus after an action that may
  * take a person off the list (UI-FRM-14).
  */
 import { computed, nextTick, type Ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import { focusHeading } from '@/app/routeFocus'
 
-import type { useListQuery } from './useListQuery'
-
-type PeopleQuery = ReturnType<typeof useListQuery<'include_deactivated'>>
-
 /** Whether deactivated people are asked for: only by the list's admins (`canShow`), so an old
- * link's `include_deactivated` from anyone else is ignored (DL-294). */
-export function useShowDeactivated(query: PeopleQuery, canShow: () => boolean) {
-  const router = useRouter()
-  const show = computed(() => canShow() && query.filter.value.include_deactivated === 'true')
-  function toggle(event: Event) {
-    const checked = (event.target as HTMLInputElement).checked
-    void router.replace(query.filtered({ include_deactivated: checked ? 'true' : '' }))
-  }
-  return { show, toggle }
+ * link's `include_deactivated` from anyone else is ignored (DL-294). The filter bar's toggle sets
+ * it (DL-419). */
+export function useShowDeactivated(
+  query: { filter: Ref<{ include_deactivated: string }> },
+  canShow: () => boolean,
+) {
+  return computed(() => canShow() && query.filter.value.include_deactivated === 'true')
 }
 
 /** Remembers the row an action ran on; once the list reloads, if that person has left it, focus

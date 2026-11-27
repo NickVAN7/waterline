@@ -11,11 +11,16 @@ async function setUp(path: string, offsetKey?: string) {
     routes: [{ path: '/acme/projects', component: { template: '<p />' } }],
   })
   await router.push(path)
-  let list!: ReturnType<typeof useListQuery<'status' | 'type'>>
+  let list!: ReturnType<typeof useListQuery<'status' | 'type', 'role' | 'role__not'>>
   mount(
     {
       setup() {
-        list = useListQuery({ limit: 25, filters: ['status', 'type'], offsetKey })
+        list = useListQuery({
+          limit: 25,
+          filters: ['status', 'type'],
+          multi: ['role', 'role__not'],
+          offsetKey,
+        })
         return () => null
       },
     },
@@ -81,6 +86,30 @@ describe('useListQuery', () => {
 
     await router.push(list.filtered({ status: '', type: '' }))
     expect(router.currentRoute.value.fullPath).toBe('/acme/projects?view=all')
+  })
+
+  it('reads a repeated filter as its values, one or several, and sends only those set', async () => {
+    const { list } = await setUp('/acme/projects?role=admin&role=member&role__not=owner&role__not=')
+
+    expect(list.values.value).toEqual({ role: ['admin', 'member'], role__not: ['owner'] })
+    expect(list.params.value).toEqual({
+      limit: 25,
+      offset: 0,
+      role: ['admin', 'member'],
+      role__not: ['owner'],
+    })
+    expect(list.filtering.value).toBe(true)
+  })
+
+  it('sets a repeated filter from the first page, and clears it with no values', async () => {
+    const { router, list } = await setUp('/acme/projects?offset=25&role=owner')
+
+    await router.push(list.filtered({ role: ['admin', 'member'] }))
+    expect(router.currentRoute.value.fullPath).toBe('/acme/projects?role=admin&role=member')
+
+    await router.push(list.filtered({ role: [] }))
+    expect(router.currentRoute.value.fullPath).toBe('/acme/projects')
+    expect(list.values.value).toEqual({ role: [], role__not: [] })
   })
 
   it('reads and links its page under its own name, leaving the other list alone', async () => {

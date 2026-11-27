@@ -7219,6 +7219,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
                 role?: components["schemas"]["ProjectRole"][] | null;
                 role__not?: components["schemas"]["ProjectRole"][] | null;

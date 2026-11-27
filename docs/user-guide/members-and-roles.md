@@ -6,7 +6,8 @@ description: Who's on a project, what each role can do, and how to add people.
 ---
 
 Open **Members** in the sidebar under a project to see who's on it and their roles. Anyone on the
-project can see the list.
+project can see the list, search it by name, email, or username, and narrow it by role with **Add
+filter**; **Clear** shows the whole list again.
 
 ![A project's members, each with their email and role, and the Add member and Add by email buttons.](images/project-members.webp)
 

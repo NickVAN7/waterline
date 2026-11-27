@@ -4277,6 +4277,24 @@
             "description": "Comma-separated, `-` for descending: email, name. Default: name"
           },
           {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
             "name": "include_deactivated",
             "in": "query",
             "required": false,

@@ -117,3 +117,44 @@ test('someone not on the staff gets the 403 page, saying who to ask (UI-FBK-14)'
   await expectNoA11yViolations(page)
   await expectFocusNotObscured(page)
 })
+
+test('the filter bar works by keyboard, focus never dropping (UI-TBL-10, DL-419)', async ({
+  page,
+}) => {
+  await signIn(page, 'wendy')
+  await page.goto('/workspace/staff')
+  await expect(page.getByRole('table', { name: 'Staff' })).toBeVisible()
+
+  // Add filter's menu, then Role: its popover opens with focus on the operator (traps.md).
+  await page.getByRole('button', { name: 'Add filter' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu', { name: 'Add filter' })).toBeFocused()
+  // PrimeVue's menu opens with no item active: ArrowDown to Role, then Enter, which focuses the
+  // Add filter button (gone a tick later: Role was the last filter to add) before it picks.
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  const popover = page.getByRole('dialog', { name: 'Role filter' })
+  await expect(popover.getByRole('radio', { name: 'Is any of' })).toBeFocused()
+  await expectNoA11yViolations(page)
+
+  // A value, by keyboard: applied at once, in the address.
+  await page.keyboard.press('Tab')
+  await expect(popover.getByRole('checkbox', { name: 'Owner' })).toBeFocused()
+  await page.keyboard.press('Space')
+  await expect(page).toHaveURL(/role=owner/)
+
+  // Esc: back on the chip; Remove: on Add filter.
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: 'Role: Owner' })).toBeFocused()
+  await page.getByRole('button', { name: 'Remove Role filter' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: 'Add filter' })).toBeFocused()
+  await expect(page).not.toHaveURL(/role=/)
+
+  // The search: in the address once typing settles, focus staying in the field.
+  const search = page.getByRole('searchbox', { name: 'Search people' })
+  await search.fill('wen')
+  await expect(page).toHaveURL(/q=wen/)
+  await expect(search).toBeFocused()
+  await expectNoA11yViolations(page)
+})

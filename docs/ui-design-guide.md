@@ -867,8 +867,8 @@ render inside the full shell when signed in.
   system admins who have no workspace role listed last (DL-183, DL-188; from S2-C0j); the
   per-person access review shows system admin as text too (DL-189, from S2-C0j). **Deactivated
   users are left out** of every picker and of the member and user lists (org members, project
-  members, workspace staff and users); that scope's admins get a "Show deactivated" checkbox above
-  those lists, in the URL like any list filter (UI-TBL-2), which mixes deactivated people in
+  members, workspace staff and users); that scope's admins get a "Show deactivated" toggle, last in
+  those lists' filter bar (UI-TBL-10, DL-419), in the URL like any list filter (UI-TBL-2), which mixes deactivated people in
   (with only deactivated people, the "nothing yet" empty state, and for those admins one
   sentence pointing to the checkbox, DL-297), and the badge and Status column apply there (DL-200, DL-295, DL-297; the built Slice 1
   lists change in S2-C21a, DL-238). The lead picker keeps a current lead who has been
@@ -988,6 +988,17 @@ Decided in screen-inventory step 5; restated so the reviewer has one list.
   focus), and a polite live region announces how many were added ("20 more entries"). Its paging
   stays in the page, not the URL, and it shows no total, which a cursor feed doesn't have: UI-TBL-2's URL
   state and UI-TBL-3's pagination are for offset-paged tables (DL-273).
+- **UI-TBL-10** **The filter bar** (`FilterBar`, DL-419) sits above its list, in this order: a
+  search field with its visible label ("Search people"), applied once typing settles; **Add
+  filter**, a menu of the list's declared filters not yet in use (absent when there are none); a
+  chip per filter in use, whose button names its values ("Role: Admin, Member", "Role: not
+  Owner") and opens a popover (focus moves in, on the operator) where each change applies at once,
+  and a 32×32 **Remove <filter> filter** button; **Clear**, only while something is set; and the
+  list's widening toggle last ("Show deactivated"), which is not a chip. Everything is in the URL
+  (UI-TBL-2), and the count is announced (UI-TBL-3). Focus never drops when a control goes:
+  Remove moves it to Add filter, Clear to the search field, and closing a chip just added with
+  no value to Add filter; a chip being edited stays until its popover closes. A list narrowed to
+  nothing shows UI-FBK-8's no-results state, its **Clear filters** the bar's Clear.
 
 ### 7.1 SVAR widgets: Kanban, DataGrid, Gantt
 

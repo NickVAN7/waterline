@@ -1,12 +1,13 @@
 """`?q=` on the lists the pickers load (build plan, S3-C13; TD-41, TD-38): an org's members, the
-workspace's staff and users by name, email, or username; an org's projects by name or key."""
+workspace's staff and users, and a project's members (S3-C16, DL-419) by name, email, or username;
+an org's projects by name or key."""
 
 import pytest
 from httpx import AsyncClient
 
-from app.enums import OrgRole, WorkspaceRole
+from app.enums import OrgRole, ProjectRole, WorkspaceRole
 from tests.factories.org import MembershipFactory
-from tests.factories.project import ProjectFactory
+from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceMembershipFactory
 from tests.support.authz import Tenancy, persona_user, sign_in_as, tenancy
@@ -22,7 +23,7 @@ async def t(client: AsyncClient) -> Tenancy:
 
 
 async def people(t: Tenancy) -> None:
-    """Bob by name, Cy by email, Di by username; each in the org and on the staff."""
+    """Bob by name, Cy by email, Di by username; each in the org, on the staff, and on PMT."""
     for name, email, username in [
         ("Bob Baker", "bob@acme.example", "bob"),
         ("Cy Cole", "cy@finance.example", "cy"),
@@ -33,21 +34,26 @@ async def people(t: Tenancy) -> None:
         await WorkspaceMembershipFactory.create_async(
             workspace=t.workspace, user=user, role=WorkspaceRole.MEMBER
         )
+        await ProjectMembershipFactory.create_async(
+            project=t.project, user=user, role=ProjectRole.MEMBER
+        )
 
 
-@pytest.mark.parametrize("list_", ["org_members", "staff", "users"])
+@pytest.mark.parametrize("list_", ["org_members", "staff", "users", "project_members"])
 @pytest.mark.parametrize(
     ("q", "found"), [("BAKER", ["Bob Baker"]), ("finance", ["Cy Cole"]), ("ledger", ["Di Diaz"])]
 )
 async def test_the_people_lists_search_name_email_and_username(
     client: AsyncClient, t: Tenancy, list_: str, q: str, found: list[str]
 ) -> None:
-    """Bug: the list ignores `?q=` (422 before S3-C13), or searches one column only."""
+    """Bug: the list ignores `?q=` (422 before S3-C13; project members before S3-C16), or
+    searches one column only."""
     await people(t)
     url = {
         "org_members": f"/api/orgs/{t.org.id}/members",
         "staff": f"/api/workspaces/{t.workspace.id}/staff",
         "users": f"/api/workspaces/{t.workspace.id}/users",
+        "project_members": "/api/projects/PMT/members",
     }[list_]
 
     response = await client.get(url, params={"q": q})

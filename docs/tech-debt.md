@@ -312,15 +312,6 @@ Entry format:
 - **Fix by:** S3-C17 (the approver picker becomes the searchable person picker, on S3-C13's candidates endpoint for everyone §6.2 allows)
 - **Status:** open
 
-### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
-- **Added:** DC-2026-11-06 (DL-295)
-- **What:** the org members, project members, workspace staff, and workspace users lists show
-  their "Show deactivated" checkbox above the list, not in a filter bar.
-- **Why:** the filter bar is built in Slice 3 (build plan, API conventions, "Frontend"); S2-C21a
-  needs only the one checkbox.
-- **Fix by:** S3-C16 (the filter bar: the checkbox moves into it on the four lists)
-- **Status:** open
-
 ### TD-98: The session list shows the 200 most recently active sessions only
 - **Added:** S2-C21b
 - **What:** Account settings' Sessions asks for one page of 200, the API's page limit, and never
@@ -339,14 +330,6 @@ Entry format:
   added for every list.
 - **Why:** S2-C20 code, fixed only when needed (DL-106); it behaves the same.
 - **Fix by:** Slice 3 (its tech-debt review, S3-C33: no Slice 3 row touches approval reads)
-- **Status:** open
-
-### TD-102: A members list with no row actions still shows an Actions column
-- **Added:** S2-C22 (user-guide-verifier finding 9)
-- **What:** for someone who may change nobody (a project member), the roster's table keeps its
-  "Actions" header over empty cells.
-- **Why:** Slice 1 and S2-C17 roster code, fixed only when needed (DL-106); it's cosmetic.
-- **Fix by:** S3-C16 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
 - **Status:** open
 
 ### TD-104: The documentation has no search of its own
@@ -980,6 +963,11 @@ Entry format:
 - **Status:** resolved in S2-C20 (Revisions takes the approved revision's number from the
   requirement's read)
 
+### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
+- **Added:** DC-2026-11-06 (DL-295)
+- **Status:** resolved in S3-C16: the toggle is the last control of each people list's
+  `FilterBar` (DL-419, UI-TBL-10)
+
 ### TD-99: A row action's network failure has no Retry
 - **Added:** S2-C21c
 - **Status:** resolved in DC-2026-11-09-s2-retro-and-ui-polish (UI-FRM-7: a row or inline
@@ -990,6 +978,11 @@ Entry format:
 - **Status:** resolved in S3-C0v: `RequirementService._check_person`, one helper taking the
   action, the field, and the refusal (a 404 for an approver, a 422 for a reporter), its hold
   kept; S3-C6's assignee and reviewer use it (DL-406)
+
+### TD-102: A members list with no row actions still shows an Actions column
+- **Added:** S2-C22 (user-guide-verifier finding 9)
+- **Status:** resolved in S3-C16: the roster and users tables show the column only when a row on
+  the page has an action
 
 ### TD-103: TextField's slot shadows its `describedBy` prop
 - **Added:** S2-C22 (CI lint warning, Slice 2 retro)

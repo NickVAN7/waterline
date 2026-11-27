@@ -884,7 +884,8 @@ frontend/src/
                      TemporaryPasswordNotice, Badge, EmptyState, ErrorState, Skeleton,
                      Pagination, SuccessStatus, PageHeader, ModalDialog, ItemPanel,
                      ConfirmDialog, GroupError, RowActions, MoreActionsMenu, Icon,
-                     NameSlugSettings,
+                     NameSlugSettings, FilterBar (a list's search, filters, and toggle,
+                     UI-TBL-10),
                      CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9)
   composables/       shared logic: useFormErrors, useActionFailure, useLoad, useListQuery,
                      usePasswordPolicy, useAvailability, useRouteOrg, useSettingsSave,
@@ -1005,6 +1006,15 @@ anything else, the not-found page. Every top-level segment is on the reserved-sl
   two paged lists names the second's offset apart (`offsetKey`, the org overview's
   `archived_offset`) and each `Pagination` after its list (`label`). Put the polite live region outside the `aria-busy` region:
   screen readers hold back changes inside a busy one. See `src/views/project/OrgProjectsView.vue`.
+- **A list's filter bar** (`FilterBar`, UI-TBL-10, DL-419): declare the single-valued
+  parameters in `useListQuery`'s `filters` (`q`, a toggle) and the repeated ones in `multi`
+  (an enum filter's `role` and `role__not`), read as `filter` and `values`; `filtered()` takes a
+  string or a list ('' or [] clears one). Pass the bar the current values (only ones the list
+  knows: drop the rest before the request too), apply its `change` with
+  `router.replace(query.filtered(changes))`, and give the no-results state (UI-FBK-8) a Clear
+  filters that calls the bar's `clear()` through a template ref. The bar holds no state but the
+  typing. A filter type other than enum joins with the list that first declares one (DL-419).
+  See `src/views/roster/RosterPage.vue`.
 - **A success with no other visible trace** (a saved profile) shows `SuccessStatus` under the
   form's buttons, which is visible and polite.
 - **Allowed actions:** `allows(entity, 'project.create')` (`@/composables/allowedActions`)

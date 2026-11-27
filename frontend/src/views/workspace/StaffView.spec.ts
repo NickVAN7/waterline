@@ -123,7 +123,7 @@ describe('StaffView', () => {
       'workspace.view',
       'workspace_staff.manage',
     ])
-    const box = wrapper.get<HTMLInputElement>('#show-deactivated')
+    const box = wrapper.get<HTMLInputElement>('input[name=include_deactivated]')
     expect(box.element.labels?.[0]?.textContent?.trim()).toBe('Show deactivated')
     expect(box.element.checked).toBe(false)
 
@@ -142,6 +142,73 @@ describe('StaffView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it("sends the filter bar's search and role from the URL, dropping an unknown role (DL-419)", async () => {
+    const get = staffAnswers([OLGA])
+
+    const { wrapper } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?q=olga&role=owner&role=boss',
+      ['workspace.view'],
+    )
+
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, q: 'olga', role: ['owner'] },
+      },
+    })
+    expect(wrapper.get<HTMLInputElement>('input[type=search]').element.value).toBe('olga')
+    expect(wrapper.text()).toContain('Role: Owner')
+  })
+
+  it('sends Is none of from the URL, dropping a role no list has, even an object built-in (DL-419)', async () => {
+    const get = staffAnswers([OLGA])
+
+    const { wrapper } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?role__not=admin&role__not=toString&role__not=boss',
+      ['workspace.view'],
+    )
+
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, role__not: ['admin'] },
+      },
+    })
+    expect(wrapper.text()).toContain('Role: not Admin')
+  })
+
+  it('names a search that matches no one, and Clear filters puts the search back (UI-FBK-8)', async () => {
+    staffAnswers([])
+    const { wrapper, router } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?q=zed&role=owner',
+      ['workspace.view'],
+    )
+
+    expect(wrapper.get('h3').text()).toBe('No people match “zed”')
+    await expectNoA11yViolations(wrapper)
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Clear filters')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/staff')
+    expect(document.activeElement).toBe(wrapper.get('input[type=search]').element)
+  })
+
+  it('says no one matches the filters when there is no search', async () => {
+    staffAnswers([])
+
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff?role=owner', [
+      'workspace.view',
+    ])
+
+    expect(wrapper.get('h3').text()).toBe('No people match these filters')
+  })
+
   it("offers no Show deactivated to someone who can't manage the staff, and ignores it in a link (DL-294)", async () => {
     const get = staffAnswers([OLGA])
 
@@ -151,7 +218,7 @@ describe('StaffView', () => {
       ['workspace.view'],
     )
 
-    expect(wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(wrapper.find('input[name=include_deactivated]').exists()).toBe(false)
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })

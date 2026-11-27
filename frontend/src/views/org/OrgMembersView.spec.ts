@@ -121,7 +121,9 @@ describe('OrgMembersView', () => {
 
     const { wrapper } = await mountOrgView(OrgMembersView, '/acme/members', [...ADMIN])
 
-    expect(wrapper.get('label:has(#show-deactivated)').text()).toBe('Show deactivated')
+    expect(wrapper.get('label:has(input[name=include_deactivated])').text()).toBe(
+      'Show deactivated',
+    )
   })
 
   it('offers each row only the roster actions its allowed_actions carry', async () => {

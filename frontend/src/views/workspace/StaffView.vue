@@ -10,7 +10,7 @@ import { WORKSPACE_ROLE } from '@/app/labels'
 import { allows } from '@/composables/allowedActions'
 import { useWorkspace } from '@/composables/useWorkspace'
 import RosterPage from '@/views/roster/RosterPage.vue'
-import type { Roster } from '@/views/roster/roster'
+import type { Roster, RosterListQuery } from '@/views/roster/roster'
 
 import { WHO_TO_ASK } from './workspaceAdmin'
 
@@ -70,7 +70,7 @@ const roster = computed<Roster>(() => ({
     ).items,
 }))
 
-async function list(query: { limit: number; offset: number; include_deactivated?: boolean }) {
+async function list(query: RosterListQuery<components['schemas']['WorkspaceRole']>) {
   return api(
     client.GET('/api/workspaces/{workspace_id}/staff', { params: { path: path(), query } }),
   )

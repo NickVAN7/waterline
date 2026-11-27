@@ -16,7 +16,7 @@ import Button from '@/components/Button.vue'
 import { allows } from '@/composables/allowedActions'
 import NotFoundView from '@/views/errors/NotFoundView.vue'
 import RosterPage from '@/views/roster/RosterPage.vue'
-import type { AddOptions, Roster } from '@/views/roster/roster'
+import type { AddOptions, Roster, RosterListQuery } from '@/views/roster/roster'
 
 import AddMemberDialog from './AddMemberDialog.vue'
 import ProjectHeader from './ProjectHeader.vue'
@@ -91,7 +91,7 @@ const roster = computed<Roster>(() => ({
 
 // For its admins, the workspace comes first, so Add by email (and its dialog) appears only once
 // the user check can run; a failure of either is the list's error, with Try again.
-async function list(query: { limit: number; offset: number; include_deactivated?: boolean }) {
+async function list(query: RosterListQuery<components['schemas']['ProjectRole']>) {
   if (canManage.value && !workspaceId.value) {
     workspaceId.value = (
       await api(

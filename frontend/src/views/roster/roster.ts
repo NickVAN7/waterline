@@ -8,6 +8,17 @@ import type { components } from '@/api/schema'
 
 export type RoleOption = { value: string; label: string }
 
+/** A roster list's request: its page, the filter bar's search and role filter (DL-419), and its
+ * admins' "Show deactivated". */
+export type RosterListQuery<R extends string = string> = {
+  limit: number
+  offset: number
+  q?: string
+  role?: R[]
+  role__not?: R[]
+  include_deactivated?: boolean
+}
+
 export type RosterPerson = { user_id: string; name: string; email: string; is_active: boolean }
 
 export type NewPerson = {

@@ -31,7 +31,10 @@ Each person's row has a menu with the actions your role allows you:
 - **Deactivate** stops them signing in. Their work stays. **Reactivate** brings them back.
 - **Access review** shows every organization and project they can reach, and why.
 
-Lists show active people only; select **Show deactivated** to include the others.
+Search a list by name, email, or username, or narrow it with **Add filter**: pick **Role**, then
+the roles to show (or, with **Is none of**, to leave out). Lists show active people only; select
+**Show deactivated** to include the others. **Clear** undoes the search, the filters, and **Show
+deactivated**.
 
 | Action | Who can do this |
 |---|---|

@@ -585,7 +585,7 @@ and fills the gaps.
   member pickers; a current lead who has been deactivated stays in the lead picker, marked,
   until replaced, DL-296) and **left out of the member and user lists** (org members,
   project members, workspace staff and users), which show active people only. **Admins of that
-  scope** get a **"Show deactivated"** checkbox above those lists (DL-295), which is
+  scope** get a **"Show deactivated"** toggle, last in those lists' filter bar (DL-295, DL-419), which is
   how they find someone to reactivate;
   no one else sees deactivated people listed. Their existing work keeps their name with the
   "Deactivated" badge (an item they're assigned, comments, history), and items still assigned
