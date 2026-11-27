@@ -114,7 +114,7 @@ marked with its row, as Slice 2 did, DL-137, DL-158).
 | 13 | Server-side pickers | `?q=` search on the people candidates the pickers need: task assignee/reviewer candidates (Q5), approver candidates for everyone §6.2 allows (TD-96), and the existing pickers' sources (TD-41); the project selector's `?q=` (TD-38); offset-paged, scoped as their lists |
 | 14 | CSV export | `GET …/requirements/export.csv` and `GET …/tasks/export.csv`: the list's filters (the tree's per Q13) and the visible columns (`columns=`), same scoping and cap as the list, formula-injection escaping, a `Content-Disposition` filename with the project key and date |
 | 15 | Get started & home numbers | The checklist (design-doc §11, DL-201) computed on the project home read (member besides the creator; a dated phase; a requirement and a task); the per-project hide flag (a column, its migration, `PUT/DELETE …/get-started/hidden`, project admins); headline numbers per Q11 |
-| 16 | Filter bar *(provisional)* | The shared `FilterBar` (chips for any number of declared filters, operators per type, `me`, Clear, the URL through `useListQuery`, UI-TBL-2/3), first used on the four people lists with "Show deactivated" moved into it (TD-97, TD-102); a UI-TBL rule |
+| 16 | Filter bar | DL-419: the shared `FilterBar` (search `q`, Add filter, a chip per filter in use with its operator and values in a popover and a named remove, Clear, the URL through `useListQuery`, the result count announced, UI-TBL-2/3), with the enum type (any of, none of) and the toggle; first used on the four people lists, each with search (project members gains `q` on name, email, username: backend, API tests, `wl gen-client`), role where declared, and "Show deactivated" as the bar's last control (TD-97); the Actions column only when a row has an action (TD-102); a UI-TBL rule |
 | 17 | Searchable pickers *(provisional)* | One searchable person picker on S3-C13's endpoints, replacing the 200-row pickers (TD-41) and the approver picker (TD-96); the project selector's search (TD-38) |
 | 18 | Board widget *(provisional)* | The `TaskBoard` wrapper on SVAR Kanban (DL-64; UI-SVR-1 to 7): pinned packages and their licenses, `svar-theme.css`, accessible name, visible and announced selection, server-decided moves (`api.intercept`), the move menu and status control outside the widget, `e2e/svar-known-issues.ts`; component specs on a fixture; task status, priority, and severity tones (UI guide open item 8) |
 | 19 | Backlog widget *(provisional)* | Per S3-C0i's result: a `TaskGrid` wrapper on SVAR DataGrid, or the DataTable reorder through our own component; its component specs |
@@ -255,6 +255,7 @@ actions are denied by the export-control gate to anyone without an explicit memb
 | S3-C13 | candidates endpoints | the action of the field they fill (`task.update`, `approval_request.create`, …) | as that action | as that action |
 | S3-C14 | `…/requirements/export.csv`, `…/tasks/export.csv` | `requirement.view`, `task.view` | viewers and up | content |
 | S3-C15 | `PUT/DELETE …/get-started/hidden` | `project.update` | project admins | management |
+| S3-C16 | `GET /api/projects/{key}/members` gains `?q=` (DL-419) | unchanged (`project.view`) | as today | management |
 | S3-C32 | `/api/me/saved-filters` | signed in (the user's own rows) | — | — |
 
 ## Threat-model pass

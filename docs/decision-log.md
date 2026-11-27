@@ -5331,3 +5331,21 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Superseded by:** none
 - **Applies to:** S3-C14, S3-C20, S3-C26; design-doc "Lists: saved filters and CSV export"
 - **Source:** owner, Nov 25, 2026 (S3-C14's start, both as recommended)
+
+### DL-419: The filter bar's shape, and its types built with their first lists
+- **Date:** 2026-11-26
+- **Decision:** The shared `FilterBar` (S3-C16) has, in order: a search field (`q`), an **Add
+  filter** menu of the list's declared filters, one chip per filter in use ("Role: Admin,
+  Member"; its button opens a popover with the operator and the values; a named remove button),
+  **Clear** while anything is set, and the list's "Show deactivated" toggle last, for that list's
+  admins (not a chip: it widens the list; Clear resets it). The result count is announced
+  (UI-TBL-3). S3-C16 builds the enum type (any of, none of) and the toggle; each other type joins
+  with the row that first declares one: user (with `me`) and reference in S3-C20, a boolean chip
+  in S3-C26, date in S3-C28; text and number with the first list that declares one. All four
+  people lists get search: the project members list gains `q` on name, email, and username.
+- **Supersedes:** none (the S3-C16 row's "operators per type, `me`" is narrowed; DL-393's first
+  consumer rule)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C16, S3-C20, S3-C26, S3-C28); `docs/reviews/s3/S3-plan.md`
+  (rows and actions)
+- **Source:** owner, Nov 26, 2026 (S3-C16's re-cut, all four as recommended)
