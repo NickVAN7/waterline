@@ -5375,3 +5375,21 @@ Design changes are applied with the `design-change` skill, which adds the entrie
 - **Applies to:** design-doc §11 "Project home: Get started checklist"; screen inventory (Step
   5); build plan (S3-C15)
 - **Source:** owner, Nov 26, 2026 (S3-C15's report, questions 1 and 2, as recommended)
+
+### DL-422: The searchable pickers' shape
+- **Date:** 2026-11-27
+- **Decision:** One `PersonPicker` (from the add-member dialog's searchable combobox) serves
+  every people picker: the replacement owner (all three rosters), the new org's owner, the first
+  admin, and the approvers. Approvers are added one at a time from it into a list below, each
+  with a named Remove button. `approver-candidates` gains a `user_id` reference filter (any of),
+  so Re-request asks about exactly the earlier approvers and still names those left out
+  (DL-282). The first admin is a **Me** / **Someone else** radio pair, Me first and chosen;
+  Someone else shows the picker. The project selector searches on the server
+  (`/orgs/{org_id}/projects?q=`), opening on the first page and saying when more match than it
+  shows (TD-38).
+- **Supersedes:** none (the S3-C17 row's "one searchable person picker" is narrowed; DL-278's
+  member-only approver list was already due to go, TD-96)
+- **Superseded by:** none
+- **Applies to:** build plan (S3-C17; "The project members API", `approver-candidates`);
+  `docs/reviews/s3/S3-plan.md` (rows and actions)
+- **Source:** owner, Nov 27, 2026 (S3-C17's re-cut, all four as recommended)
