@@ -12,6 +12,7 @@ import { ACME, failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { projectItem } from '@/test/projects'
 import { testRouter } from '@/test/router'
+import { SEARCH_DELAY_MS } from '@/components/FilterBar.vue'
 
 import ProjectSelector from './ProjectSelector.vue'
 
@@ -19,7 +20,9 @@ type Item = components['schemas']['ProjectItem']
 
 const item = (key: string, name: string): Item => projectItem(key, { id: `project-${key}`, name })
 
-const page = (items: Item[]) => ok({ items, total: items.length, limit: 200, offset: 0 })
+const page = (items: Item[], total = items.length) => ok({ items, total, limit: 50, offset: 0 })
+// More projects than a page holds: the first page of a bigger org.
+const many = (n: number) => Array.from({ length: n }, (_, i) => item(`P${i}`, `Project ${i}`))
 
 async function openSelector(
   answer = page([item('ERP', 'ERP rollout'), item('PORTAL', 'Portal')]),
@@ -50,6 +53,7 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = ''
+  vi.useRealTimers()
 })
 
 describe('ProjectSelector', () => {
@@ -58,7 +62,7 @@ describe('ProjectSelector', () => {
 
     expect(wrapper.get('button').text()).toContain('Choose a project')
     expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/projects', {
-      params: { path: { org_id: ACME.id }, query: { limit: 200 } },
+      params: { path: { org_id: ACME.id }, query: { limit: 50 } },
     })
     const links = [...dialog().querySelectorAll('a')]
     expect(
@@ -173,6 +177,125 @@ describe('ProjectSelector', () => {
       a.textContent?.replace(/\s+/g, ' ').trim(),
     )
     expect(names).toEqual(['Inventory INV'])
+  })
+
+  it('says when more projects match than it shows, read with the filter (DL-422, TD-38)', async () => {
+    await openSelector(page(many(50), 312))
+
+    const more = dialog().querySelector('#popover-projects-more')!
+    expect(more.textContent!.trim()).toBe('Showing 50 of 312. Filter to find the rest.')
+    ;[...dialog().querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Filter projects')!
+      .click()
+    await flushPromises()
+    expect(document.activeElement?.getAttribute('aria-describedby')).toBe('popover-projects-more')
+    await expectNoA11yViolations(document.body)
+  })
+
+  it('searches the org on the server as the filter is typed, keeping the field when fewer match', async () => {
+    const { get } = await openSelector(page(many(12)))
+    ;[...dialog().querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Filter projects')!
+      .click()
+    await flushPromises()
+    // The server's match, which the text alone wouldn't find: the list is what it answers.
+    get.mockResolvedValue(page([item('PORTAL', 'Portal')]))
+    vi.useFakeTimers()
+    const filter = dialog().querySelector<HTMLInputElement>('input[type=search]')!
+    filter.value = 'erp'
+    filter.dispatchEvent(new Event('input'))
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS - 50)
+    // Not on every keystroke.
+    expect(get).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(100)
+    vi.useRealTimers()
+    await flushPromises()
+
+    expect(get).toHaveBeenLastCalledWith('/api/orgs/{org_id}/projects', {
+      params: { path: { org_id: ACME.id }, query: { limit: 50, q: 'erp' } },
+    })
+    expect([...dialog().querySelectorAll('li a')].map((a) => a.getAttribute('href'))).toEqual([
+      '/acme/projects/PORTAL',
+    ])
+    // Bug: the field gone with the results, and focus with it.
+    expect(document.activeElement).toBe(dialog().querySelector('input[type=search]'))
+  })
+
+  it('announces a failed search at once, focus staying in the filter (UI-FBK-2)', async () => {
+    const { get } = await openSelector(page(many(12)))
+    ;[...dialog().querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Filter projects')!
+      .click()
+    await flushPromises()
+    get.mockResolvedValue(failed(503, { code: 'network_error', message: '', details: {} }))
+    vi.useFakeTimers()
+    const filter = dialog().querySelector<HTMLInputElement>('input[type=search]')!
+    filter.value = 'erp'
+    filter.dispatchEvent(new Event('input'))
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS + 50)
+    vi.useRealTimers()
+    await flushPromises()
+
+    const error = document.getElementById('project-selector-error')!
+    expect(error.textContent!.trim()).toBe("Couldn't load the projects.")
+    // The user's own search: an alert the first time (a load on open stays quiet until Try again).
+    expect(error.getAttribute('role')).toBe('alert')
+    expect(document.activeElement).toBe(filter)
+    // Not "Trying…": Try again didn't start it.
+    const retry = [...dialog().querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Try again'),
+    )!
+    expect(retry.getAttribute('aria-disabled')).not.toBe('true')
+    // No count from the last good answer beside the error.
+    expect(document.getElementById('popover-projects-more')).toBeNull()
+
+    retry.focus()
+    retry.click()
+    await flushPromises()
+    // A failed Try again keeps focus on it, filter open or not (UI-FBK-15).
+    expect(document.activeElement).toBe(retry)
+  })
+
+  it('says no projects match a search that finds none', async () => {
+    const { get } = await openSelector(page(many(12)))
+    ;[...dialog().querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Filter projects')!
+      .click()
+    await flushPromises()
+    get.mockResolvedValue(page([]))
+    vi.useFakeTimers()
+    const filter = dialog().querySelector<HTMLInputElement>('input[type=search]')!
+    filter.value = 'zzz'
+    filter.dispatchEvent(new Event('input'))
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS + 50)
+    vi.useRealTimers()
+    await flushPromises()
+
+    expect(dialog().textContent).toContain('No projects match.')
+  })
+
+  it('opens afresh after a search, unfiltered', async () => {
+    const { wrapper, get } = await openSelector(page(many(12)))
+    ;[...dialog().querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Filter projects')!
+      .click()
+    await flushPromises()
+    vi.useFakeTimers()
+    const filter = dialog().querySelector<HTMLInputElement>('input[type=search]')!
+    filter.value = 'erp'
+    filter.dispatchEvent(new Event('input'))
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY_MS + 50)
+    vi.useRealTimers()
+    await flushPromises()
+
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(get).toHaveBeenLastCalledWith('/api/orgs/{org_id}/projects', {
+      params: { path: { org_id: ACME.id }, query: { limit: 50 } },
+    })
   })
 
   it('says so when the org has no projects to show', async () => {

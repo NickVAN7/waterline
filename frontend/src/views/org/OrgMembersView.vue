@@ -88,11 +88,11 @@ const roster = computed<Roster>(() => ({
         },
       }),
     ),
-  everyone: async () =>
+  searchPeople: async (q) =>
     (
       await api(
         client.GET('/api/orgs/{org_id}/members', {
-          params: { path: path(), query: { limit: 200 } },
+          params: { path: path(), query: { limit: 20, ...(q ? { q } : {}) } },
         }),
       )
     ).items,

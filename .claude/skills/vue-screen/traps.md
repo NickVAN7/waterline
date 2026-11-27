@@ -201,6 +201,7 @@ base`: PrimeVue's layer comes later and wins over `base`, and `!important` isn't
 - A spec that picks from an `AutoComplete` types by setting the value and triggering `input`
   alone (a `change`, as `setValue` sends, makes `force-selection` clear the text), then chooses
   with ArrowDown and Enter: a click on the option doesn't reach its handler in jsdom (S1-C16b).
+  A `PersonPicker` spec does it through `src/test/picker.ts` (`choosePerson`, `typeInPicker`).
 - An e2e step after a dialog closes waits for the dialog to be hidden and focus to be back on
   its opener before it moves focus: the close event returns focus a task later, and would take
   it back (S1-C16b).

@@ -20,12 +20,14 @@ want to plan and track. Every item in it is numbered after the project's key.
 4. Set its **Restriction** if its content is sensitive.
 5. Select **Create project**. The project opens, with you as its first admin and lead.
 
-Organization owners and admins can name someone else as its **First admin** and lead instead.
+Organization owners and admins can choose **Someone else** under **First admin** instead, and
+search for the person to be its first admin and lead.
 
 ## Find a project
 
-The project selector lists the organization's projects. **All projects**, below the list, opens
-the organization's project list, which you can narrow by status and type.
+The project selector lists the organization's projects. In a long list, select **Filter
+projects** and type part of a name or key to search them all. **All projects**, below the list,
+opens the organization's project list, which you can narrow by status and type.
 
 ## Change a project's settings
 

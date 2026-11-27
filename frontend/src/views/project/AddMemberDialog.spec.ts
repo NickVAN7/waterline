@@ -6,6 +6,7 @@ import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
+import { choosePerson } from '@/test/picker'
 import { listPage } from '@/test/workspace'
 
 import AddMemberDialog from './AddMemberDialog.vue'
@@ -31,22 +32,6 @@ async function openDialog(exportControlled = false) {
 }
 
 type Wrapper = Awaited<ReturnType<typeof openDialog>>['wrapper']
-
-/** Types into the picker, waits for its search, and chooses the first person it offers with the
- * keyboard (arrow down, Enter). */
-async function choose(wrapper: Wrapper, typed: string) {
-  vi.useFakeTimers()
-  // `input` alone, as typing fires: `change` comes on blur, and `force-selection` clears there.
-  const input = wrapper.get<HTMLInputElement>('#add-member-person')
-  input.element.value = typed
-  await input.trigger('input')
-  await vi.advanceTimersByTimeAsync(400)
-  vi.useRealTimers()
-  await flushPromises()
-  await input.trigger('keydown', { code: 'ArrowDown', key: 'ArrowDown' })
-  await input.trigger('keydown', { code: 'Enter', key: 'Enter' })
-  await flushPromises()
-}
 
 async function submit(wrapper: Wrapper) {
   await wrapper.get('form').trigger('submit')
@@ -121,7 +106,7 @@ describe('AddMemberDialog: the picker', () => {
   it("searches the project's candidates for what's typed and adds the one chosen", async () => {
     const { wrapper, get, post } = await openDialog()
 
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
     expect(get).toHaveBeenCalledWith('/api/projects/{key}/member-candidates', {
       params: { path: { key: 'ERP' }, query: { q: 'ann', limit: 20 } },
     })
@@ -152,7 +137,7 @@ describe('AddMemberDialog: the picker', () => {
         { loc: ['body', 'user_id'], message: 'Already on the project.', type: 'already_member' },
       ]),
     )
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
 
     await submit(wrapper)
 
@@ -168,7 +153,7 @@ describe('AddMemberDialog: the picker', () => {
         { loc: ['body', 'user_id'], message: 'Already on the project.', type: 'already_member' },
       ]),
     )
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
     const input = wrapper.get('#add-member-person')
     await input.trigger('blur')
     get.mockClear()
@@ -183,7 +168,7 @@ describe('AddMemberDialog: the picker', () => {
 
   it('blocks the add on an export-controlled project until the person is confirmed authorized', async () => {
     const { wrapper, post } = await openDialog(true)
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
 
     const add = button(wrapper, 'Add member')
     expect(add.attributes('aria-disabled')).toBe('true')
@@ -201,7 +186,7 @@ describe('AddMemberDialog: the picker', () => {
   it('tells the page on a 403, so it reloads what the user may do (UI-FRM-7)', async () => {
     const { wrapper, post } = await openDialog()
     post.mockResolvedValue(failed(403, { code: 'forbidden', message: '', details: {} }))
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
 
     await submit(wrapper)
 
@@ -212,7 +197,7 @@ describe('AddMemberDialog: the picker', () => {
   it('returns focus to Add member when its alert is dismissed (UI-FBK-13)', async () => {
     const { wrapper, post } = await openDialog()
     post.mockResolvedValue(failed(503, { code: 'network_error', message: '', details: {} }))
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
     await submit(wrapper)
 
     await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')
@@ -224,10 +209,10 @@ describe('AddMemberDialog: the picker', () => {
 
   it('asks again after another person is chosen: the confirmation was for the first (§3.1)', async () => {
     const { wrapper } = await openDialog(true)
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
     await wrapper.get('input[type=checkbox]').setValue(true)
 
-    await choose(wrapper, 'an')
+    await choosePerson('add-member-person', 'an')
 
     expect(wrapper.get<HTMLInputElement>('input[type=checkbox]').element.checked).toBe(false)
     expect(button(wrapper, 'Add member').attributes('aria-disabled')).toBe('true')
@@ -245,10 +230,10 @@ describe('AddMemberDialog: the picker', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-    expect(wrapper.get('#add-member-search-failed').text()).toBe(
+    expect(wrapper.get('#add-member-person-search-failed').text()).toBe(
       "Couldn't search. Type again to try again.",
     )
-    expect(input.attributes('aria-describedby')).toContain('add-member-search-failed')
+    expect(input.attributes('aria-describedby')).toContain('add-member-person-search-failed')
     expect(wrapper.emitted('refused')).toHaveLength(1)
     expect(post).not.toHaveBeenCalled()
   })
@@ -260,33 +245,13 @@ describe('AddMemberDialog: the picker', () => {
         { loc: ['body', 'user_id'], message: 'Already on the project.', type: 'already_member' },
       ]),
     )
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
 
     await submit(wrapper)
 
     expect(wrapper.get('#add-member-person').classes()).toEqual(
       expect.arrayContaining(['border-2', 'border-tone-danger-edge']),
     )
-  })
-
-  it('announces each failed search, a second in a row too (UI-FRM-6)', async () => {
-    const { wrapper, get } = await openDialog()
-    get.mockResolvedValue(failed(503, { code: 'network_error', message: '', details: {} }))
-    vi.useFakeTimers()
-    const input = wrapper.get<HTMLInputElement>('#add-member-person')
-    const region = () => wrapper.findAll('[aria-live="polite"]').at(-1)!.text()
-
-    input.element.value = 'ann'
-    await input.trigger('input')
-    await vi.advanceTimersByTimeAsync(500)
-    expect(region()).toBe("Couldn't search. Type again to try again.")
-
-    input.element.value = 'anne'
-    await input.trigger('input')
-    await vi.advanceTimersByTimeAsync(350)
-    expect(region()).toBe('')
-    await vi.advanceTimersByTimeAsync(200)
-    expect(region()).toBe("Couldn't search. Type again to try again.")
   })
 
   it("tells the page when the project's export control changed, so it reloads (DL-116)", async () => {
@@ -300,7 +265,7 @@ describe('AddMemberDialog: the picker', () => {
         },
       ]),
     )
-    await choose(wrapper, 'ann')
+    await choosePerson('add-member-person', 'ann')
 
     await submit(wrapper)
 

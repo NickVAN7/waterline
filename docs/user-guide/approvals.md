@@ -15,7 +15,8 @@ revision of the requirement, and every approver named must approve it.
 Project admins request approval from a requirement's **Approval** section:
 
 1. Select **Request approval**.
-2. Pick the approvers from the project's members, and add a **Note** if it helps them.
+2. Under **Add an approver**, search for each approver by name or email and select them. Anyone
+   added by mistake has a **Remove** button. Add a **Note** if it helps them.
 3. Select **Request approval**.
 
 If the description has no **Acceptance Criteria** heading, Waterline warns you before you request

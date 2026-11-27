@@ -36,17 +36,23 @@ test('an admin requests approval, and the approver reviews and decides', async (
   const { number } = (await created.json()) as { number: number }
   const url = `/globex/projects/${KEY}/requirements/${number}`
 
-  // The admin's side: the dialog opens on the approver list, from the keyboard.
+  // The admin's side: the dialog opens on the approvers, from the keyboard.
   await page.goto(url)
   const section = page.getByRole('region', { name: 'Approval', exact: true })
   await expect(section).toContainText('No approval has been requested.')
   await section.getByRole('button', { name: 'Request approval' }).focus()
   await page.keyboard.press('Enter')
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('checkbox').first()).toBeFocused()
+  await expect(dialog.getByRole('group', { name: /^Approvers/ })).toBeFocused()
+  // Added from the searchable picker into the list (DL-422).
+  const picker = dialog.getByRole('combobox', { name: 'Add an approver' })
+  await picker.click()
+  await picker.pressSequentially(approverName.split(' ')[0]!)
+  await dialog.getByRole('option', { name: new RegExp(`^${approverName}`) }).click()
+  await expect(dialog.getByRole('listitem')).toHaveText([new RegExp(`^${approverName}`)])
+  await expect(picker).toHaveValue('')
   await expectNoA11yViolations(page)
   await expectOnlyTokenColors(page, 'dialog[open]')
-  await dialog.getByRole('checkbox', { name: approverName }).check()
   await dialog.getByRole('textbox', { name: 'Note' }).fill('Before the release')
   await dialog.getByRole('button', { name: 'Request approval' }).click()
   await expect(dialog).toBeHidden()

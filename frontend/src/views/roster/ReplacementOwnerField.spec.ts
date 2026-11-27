@@ -1,49 +1,79 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
+import { choosePerson, typeInPicker } from '@/test/picker'
 
 import { PEOPLE } from './fakeRoster'
 import ReplacementOwnerField from './ReplacementOwnerField.vue'
 
-function mountField(everyone: () => Promise<typeof PEOPLE>) {
-  return mount(ReplacementOwnerField, {
+function mountField(search = vi.fn().mockResolvedValue(PEOPLE)) {
+  const wrapper = mount(ReplacementOwnerField, {
     props: {
       id: 'owner',
       reason: 'Olga Owner is the last owner.',
       exclude: 'u-olga',
-      everyone,
+      search,
       modelValue: '',
     },
+    global: { plugins: [PrimeVue] },
     attachTo: document.body,
   })
+  void wrapper.setProps({
+    'onUpdate:modelValue': (id: string) => wrapper.setProps({ modelValue: id }),
+  })
+  return { wrapper, search }
 }
 
 afterEach(() => {
   document.body.innerHTML = ''
+  vi.useRealTimers()
 })
+enableAutoUnmount(afterEach)
 
-describe('ReplacementOwnerField (DL-59)', () => {
-  it("says why, and lists the roster's other active people", async () => {
-    const wrapper = mountField(() => Promise.resolve(PEOPLE))
-    await flushPromises()
+describe('ReplacementOwnerField (DL-59, DL-422)', () => {
+  it("says why, and searches the roster's other active people", async () => {
+    const { wrapper, search } = mountField()
+
+    await typeInPicker('owner', 'a')
 
     expect(wrapper.text()).toContain('Olga Owner is the last owner.')
-    expect(wrapper.findAll('option').map((o) => o.text())).toEqual([
-      'Choose a person',
+    expect(search).toHaveBeenLastCalledWith('a')
+    // Not Olga, whom it replaces; not Dee, deactivated.
+    expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toEqual([
       'Ada Admin (ada@acme.example)',
     ])
+    expect(wrapper.get('label[for="owner"]').text()).toContain('New owner')
     await expectNoA11yViolations(wrapper)
   })
 
-  it("says so when the people can't be loaded", async () => {
-    const wrapper = mountField(() =>
-      Promise.reject(new ApiError(503, { code: 'network_error', message: '', details: {} })),
-    )
+  it('is read with its reason as focus lands on it (DL-118)', async () => {
+    const { wrapper } = mountField()
+
+    const described = wrapper.get('#owner').attributes('aria-describedby')!.split(' ')
+
+    expect(described).toContain('owner-reason')
+    expect(wrapper.get('#owner-reason').text()).toBe('Olga Owner is the last owner.')
+  })
+
+  it("sets the model to the chosen person's id, and '' once they're typed away", async () => {
+    const { wrapper } = mountField()
+
+    await choosePerson('owner', 'ada')
+    expect(wrapper.props('modelValue')).toBe('u-ada')
+
+    await typeInPicker('owner', 'ad')
+    expect(wrapper.props('modelValue')).toBe('')
+  })
+
+  it('empties the picker when the dialog resets the model', async () => {
+    const { wrapper } = mountField()
+    await choosePerson('owner', 'ada')
+
+    await wrapper.setProps({ modelValue: '' })
     await flushPromises()
 
-    expect(wrapper.find('select').exists()).toBe(false)
-    expect(wrapper.text()).toContain("Couldn't load the people to choose from.")
+    expect(wrapper.get<HTMLInputElement>('#owner').element.value).toBe('')
   })
 })

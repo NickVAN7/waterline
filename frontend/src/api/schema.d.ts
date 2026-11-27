@@ -941,7 +941,8 @@ export interface paths {
         /**
          * Approver Candidates
          * @description The approver picker: active people an approval request may name (design-doc §6.2),
-         *     inherited admins included unless the project is export-controlled; offset-paged with `?q=`.
+         *     inherited admins included unless the project is export-controlled; offset-paged with `?q=`,
+         *     and `user_id` for Re-request's earlier approvers (DL-422).
          */
         get: operations["approver_candidates_api_projects__key__approver_candidates_get"];
         put?: never;
@@ -7541,6 +7542,9 @@ export interface operations {
                 /** @description Comma-separated, `-` for descending: name. Default: name */
                 sort?: string | null;
                 q?: string | null;
+                user_id?: string[] | null;
+                user_id__not?: string[] | null;
+                user_id__is_null?: boolean | null;
             };
             header?: never;
             path: {

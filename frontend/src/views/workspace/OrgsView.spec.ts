@@ -6,6 +6,7 @@ import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, workspaceEntry } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { choosePerson } from '@/test/picker'
 import { trail } from '@/test/trail'
 import {
   cleanUpAfterEach,
@@ -159,7 +160,7 @@ describe('OrgsView', () => {
 
     await wrapper.get('#org-name').setValue('Initech')
     await wrapper.get('#org-slug').setValue('initech')
-    await wrapper.get('#org-owner-id').setValue('u-ann')
+    await choosePerson('org-owner-id', 'ann')
     await wrapper.get<HTMLInputElement>('#org-name').element.form!.requestSubmit()
     await flushPromises()
 

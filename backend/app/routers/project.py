@@ -35,6 +35,7 @@ from app.schemas.workspace import SlugAvailability
 from app.services.org import OrgEntity
 from app.services.project import ORG_PROJECTS, ProjectEntity, ProjectService, module_guidance
 from app.services.project_members import (
+    APPROVER_CANDIDATES,
     MEMBER_CANDIDATES,
     MEMBER_PROJECTS,
     PROJECT_MEMBERS,
@@ -67,6 +68,7 @@ RequirementsUpdated = Annotated[
     ProjectEntity, Depends(authorized(load_project, Action.REQUIREMENT_UPDATE))
 ]
 CandidateQuery = Annotated[MEMBER_CANDIDATES.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+ApproverCandidateQuery = Annotated[APPROVER_CANDIDATES.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 MemberProjectQuery = Annotated[MEMBER_PROJECTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 OrgMembersManaged = Annotated[OrgEntity, Depends(authorized(load_org, Action.ORG_MEMBER_MANAGE))]
 
@@ -211,10 +213,11 @@ async def task_person_candidates(
 
 @router.get("/projects/{key}/approver-candidates", responses=ERRORS)
 async def approver_candidates(
-    project: RequirementsUpdated, query: CandidateQuery, session: SessionDep
+    project: RequirementsUpdated, query: ApproverCandidateQuery, session: SessionDep
 ) -> Page[MemberCandidate]:
     """The approver picker: active people an approval request may name (design-doc §6.2),
-    inherited admins included unless the project is export-controlled; offset-paged with `?q=`."""
+    inherited admins included unless the project is export-controlled; offset-paged with `?q=`,
+    and `user_id` for Re-request's earlier approvers (DL-422)."""
     return await ProjectMemberService(session).approver_candidates(project, query)
 
 

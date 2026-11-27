@@ -129,27 +129,6 @@ Entry format:
 - **Fix by:** S3-C29 (My work's "see all" for approvals; its route exists, so frontend only)
 - **Status:** open
 
-### TD-38: The project selector lists an org's first 200 projects
-- **Added:** S1-C14a
-- **What:** the project selector loads the current org's projects in one request at the API's
-  page limit (200) and filters them in the browser, so an org with more than 200 projects
-  shows only the first 200 there (all of them are on its project list).
-- **Why:** smallest complete change: v1's orgs have tens of projects. A server-side search
-  parameter would be new API.
-- **Fix by:** S3-C17 (the selector's search, on S3-C13's server-side `?q=`)
-- **Status:** open
-
-### TD-41: Pickers of people load the first 200
-- **Added:** S1-C15
-- **What:** the replacement-owner picker (the roster's people), the create-org dialog's owner
-  picker (the workspace's active users), and the create-project dialog's first-admin picker (the
-  org's active members and the workspace's active staff, DL-152) each load one page at the API's limit (200) and
-  offer those; a roster, workspace, or org with more people shows only the first 200 by name.
-- **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
-  would be new API (the lists have no text filter yet).
-- **Fix by:** S3-C17 (one searchable person picker, on S3-C13's server-side `?q=`)
-- **Status:** open
-
 ### TD-42: The own-row reset is hidden by a client-side check
 - **Added:** S1-C15
 - **What:** the server refuses an admin's reset of their own password (403, S1-C4 security
@@ -300,16 +279,6 @@ Entry format:
 - **Fix by:** Slice 8 (the end of v1), or sooner if a project nears 1,000 requirements:
   measure again with the largest real project, and change the tree's rendering only if one
   nears the cap
-- **Status:** open
-
-### TD-96: The approver picker can't name an inherited project admin
-- **Added:** DC-2026-11-05 (DL-278)
-- **What:** the request dialog's approver picker lists the project's explicit members only, so an
-  inherited project admin without a membership, whom design-doc §6.2 lets a request name, can't
-  be picked in the UI; the API accepts them.
-- **Why:** the members list already exists; a candidates endpoint for everyone §6.2 allows is a
-  new endpoint the owner chose not to build in S2-C20 (DL-278).
-- **Fix by:** S3-C17 (the approver picker becomes the searchable person picker, on S3-C13's candidates endpoint for everyone §6.2 allows)
 - **Status:** open
 
 ### TD-98: The session list shows the 200 most recently active sessions only
@@ -589,6 +558,17 @@ Entry format:
   browser's local date (not `toISOString()`'s UTC one)
 - **Status:** open
 
+### TD-137: No end-to-end test of the project selector's search or the replacement-owner picker
+- **Added:** S3-C17 (ui-reviewer gaps)
+- **What:** the selector's server search ("Showing 50 of 312", typing, focus) and the
+  replacement-owner picker after a last-owner refusal are covered by component specs only; no
+  Playwright run opens either list in a real browser, so axe never checks a picker list open
+  there, and Esc in the open list is checked end to end only in Create project
+- **Why:** the specs cover each behavior; the e2e flows for these screens are the slice's
+  verification, and the same Esc handling is PrimeVue's in every dialog
+- **Fix by:** S3-C33 (the slice verification's e2e pass)
+- **Status:** open
+
 ## Resolved
 
 ### TD-1: pre-commit has no frontend or generated-file hooks
@@ -750,6 +730,11 @@ Entry format:
 - **Status:** resolved in S1-C14a: a query-only navigation moves neither focus nor the title; the list
   announces its count instead
 
+### TD-38: The project selector lists an org's first 200 projects
+- **Added:** S1-C14a
+- **Status:** resolved in S3-C17: the selector opens on the first 50 and its filter searches the
+  org's projects on the server (`?q=`), saying "Showing 50 of 312" when more match (DL-422)
+
 ### TD-39: No `PageHeader` component yet
 - **Added:** S1-C14a
 - **Status:** resolved in S1-C15: `PageHeader`, on the admin pages and the earlier pages (My work,
@@ -762,6 +747,11 @@ Entry format:
   (`MyWorkService._section`), and the page gives the projects section its own error state, keyed
   on its failed loads in a row of either kind (the request or the section), so another section's
   failure leaves it showing
+
+### TD-41: Pickers of people load the first 200
+- **Added:** S1-C15
+- **Status:** resolved in S3-C17: the replacement-owner, org-owner, and first-admin pickers are
+  the shared searchable `PersonPicker` on their lists' `?q=` (DL-422)
 
 ### TD-43: The two settings forms repeat their save handling
 - **Added:** S1-C15a
@@ -962,6 +952,11 @@ Entry format:
 - **Added:** S2-C19a
 - **Status:** resolved in S2-C20 (Revisions takes the approved revision's number from the
   requirement's read)
+
+### TD-96: The approver picker can't name an inherited project admin
+- **Added:** DC-2026-11-05 (DL-278)
+- **Status:** resolved in S3-C17: approvers are added from the `PersonPicker` on
+  `approver-candidates`, everyone §6.2 allows, inherited admins included (DL-422)
 
 ### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
 - **Added:** DC-2026-11-06 (DL-295)

@@ -123,13 +123,13 @@ defineExpose({ open })
         </label>
       </div>
       <ReplacementOwnerField
-        v-if="replacing && person && roster.everyone"
+        v-if="replacing && person && roster.searchPeople"
         id="remove-owner"
         ref="ownerField"
         v-model="newOwner"
         :reason="replacing"
         :exclude="person.user_id"
-        :everyone="roster.everyone"
+        :search="roster.searchPeople"
         :error="errors.fieldErrors.value.new_owner_id"
         @update:model-value="errors.clearField('new_owner_id')"
       />

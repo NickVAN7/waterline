@@ -60,11 +60,11 @@ const roster = computed<Roster>(() => ({
         },
       }),
     ),
-  everyone: async () =>
+  searchPeople: async (q) =>
     (
       await api(
         client.GET('/api/workspaces/{workspace_id}/staff', {
-          params: { path: path(), query: { limit: 200 } },
+          params: { path: path(), query: { limit: 20, ...(q ? { q } : {}) } },
         }),
       )
     ).items,

@@ -886,7 +886,8 @@ frontend/src/
                      ConfirmDialog, GroupError, RowActions, MoreActionsMenu, Icon,
                      NameSlugSettings, FilterBar (a list's search, filters, and toggle,
                      UI-TBL-10),
-                     CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9)
+                     CursorFeed (a cursor-paged feed with "Show more", UI-TBL-9),
+                     PersonPicker (the searchable people combobox, DL-422)
   composables/       shared logic: useFormErrors, useActionFailure, useLoad, useListQuery,
                      usePasswordPolicy, useAvailability, useRouteOrg, useSettingsSave,
                      useSignOut, useTheme,
@@ -907,7 +908,8 @@ frontend/src/
                      overlay.ts (`stubResizeObserver`, `stubDialog`, `stubWidth`), router.ts,
                      workspace.ts
                      (`mountWorkspaceView`, `mountSignedIn`), org.ts (`mountOrgView`,
-                     `mountOrgPages`)
+                     `mountOrgPages`), picker.ts (`choosePerson`, `typeInPicker`: a
+                     `PersonPicker`, by its id)
 frontend/e2e/        Playwright specs; support/ (a11y.ts, demo.ts)
 ```
 

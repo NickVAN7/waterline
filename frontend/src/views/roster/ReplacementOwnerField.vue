@@ -1,12 +1,11 @@
 <script setup lang="ts">
 // The replacement-owner picker (DL-59): shown once the server refuses a change because the person
-// is the last owner, it lists the roster's other active people; the one chosen becomes owner first.
-// The server checks the choice (`not_member`, `account_inactive`, `same_user`); its 422 shows here.
-import { computed, onMounted, ref } from 'vue'
+// is the last owner, it searches the roster's other active people (`PersonPicker`, DL-422); the one
+// chosen becomes owner first. The server checks the choice (`not_member`, `account_inactive`,
+// `same_user`); its 422 shows here. The model is the chosen person's id, '' while there's none.
+import { ref, watch } from 'vue'
 
-import { ApiError } from '@/api/client'
-import Icon from '@/components/Icon.vue'
-import SelectField from '@/components/SelectField.vue'
+import PersonPicker, { type Person } from '@/components/PersonPicker.vue'
 
 import type { RosterPerson } from './roster'
 
@@ -15,50 +14,38 @@ const props = defineProps<{
   /** Why it's needed: the server's own message for the refusal. */
   reason: string
   exclude: string
-  everyone: () => Promise<RosterPerson[]>
+  search: (q: string) => Promise<RosterPerson[]>
   error?: string
 }>()
 
 const model = defineModel<string>({ required: true })
-const people = ref<RosterPerson[]>([])
-const failed = ref(false)
-const field = ref<InstanceType<typeof SelectField>>()
-defineExpose({ focus: () => field.value?.focus() })
-
-const options = computed(() => [
-  { value: '', label: 'Choose a person' },
-  // The roster lists active people only (DL-293); `is_active` is kept as a second check.
-  ...people.value
-    .filter((p) => p.is_active && p.user_id !== props.exclude)
-    .map((p) => ({ value: p.user_id, label: `${p.name} (${p.email})` })),
-])
-
-onMounted(async () => {
-  try {
-    people.value = await props.everyone()
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-    failed.value = true
-  }
+const person = ref<Person | null>(null)
+watch(person, (p) => (model.value = p?.user_id ?? ''))
+watch(model, (id) => {
+  if (id !== (person.value?.user_id ?? '')) person.value = null
 })
+const picker = ref<InstanceType<typeof PersonPicker>>()
+defineExpose({ focus: () => picker.value?.focus() })
+
+// The roster lists active people only (DL-293); `is_active` is kept as a second check.
+const others = async (q: string) =>
+  (await props.search(q)).filter((p) => p.is_active && p.user_id !== props.exclude)
 </script>
 
 <template>
   <div class="flex flex-col gap-2">
-    <p class="m-0">{{ reason }}</p>
-    <p v-if="failed" class="m-0 flex items-center gap-1 text-tone-danger-fg">
-      <Icon name="alert" />Couldn't load the people to choose from. Close this dialog and try again.
-    </p>
-    <SelectField
-      v-else
+    <!-- Read as focus lands on the picker (DL-118). -->
+    <p :id="`${id}-reason`" class="m-0">{{ reason }}</p>
+    <PersonPicker
       :id="id"
-      ref="field"
-      v-model="model"
+      ref="picker"
+      v-model="person"
       label="New owner"
-      help="They become an owner before this change is made."
-      :options="options"
+      help="Search by name, email, or username. They become an owner before this change is made."
       required
       :error="error"
+      :described-by="`${id}-reason`"
+      :search="others"
     />
   </div>
 </template>

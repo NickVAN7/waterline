@@ -72,10 +72,10 @@ export type Roster = {
   changeRole: (userId: string, role: string, newOwnerId?: string) => Promise<unknown>
   remove: (userId: string, withProjects: boolean, newOwnerId?: string) => Promise<unknown>
   /**
-   * Everyone on the roster, for the replacement-owner picker (DL-59); none for a project's roster,
-   * which has no last-owner guard (DL-71).
+   * The roster's search, a page of the people matching `q` (all for ''), for the replacement-owner
+   * picker (DL-59, DL-422); none for a project's roster, which has no last-owner guard (DL-71).
    */
-  everyone?: () => Promise<RosterPerson[]>
+  searchPeople?: (q: string) => Promise<RosterPerson[]>
   /**
    * The org's projects for the add's last step, and the project roles to offer there (DL-379);
    * none for the workspace's and a project's rosters.

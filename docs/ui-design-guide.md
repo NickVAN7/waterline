@@ -480,9 +480,10 @@ render inside the full shell when signed in.
   the current one marked as an admin page's is (DL-338; from S3-C0g).
 - **UI-SHL-6** **Project selector and project pages.** The selector is a menu button showing the
   current project that opens a disclosure popover of **links** (not a Select or listbox),
-  headed by the current org's name (it lists that org's projects only); past about eight projects,
-  a **Filter projects** button shows a filter field and moves focus to it (the org menu's the same,
-  shared `LinkPopover`); then "All projects" (a menu row with an arrow, below a rule, not
+  headed by the current org's name (it lists that org's projects only, the first 50); past about
+  eight projects, a **Filter projects** button shows a filter field and moves focus to it (the org
+  menu's the same, shared `LinkPopover`); the selector's filter searches the server, and says
+  "Showing 50 of 312" when more match (DL-422); then "All projects" (a menu row with an arrow, below a rule, not
   underlined) and "New project" (only when allowed; not indented) (DL-137). In the sidebar the
   selector fills its width, its arrow at the end (owner, S2 feedback; S3-C0j). Below it, the selected project's pages
   are links, flat, in this order (DL-202): Home, Requirements, Tasks (Board and Backlog as tabs),
@@ -713,8 +714,11 @@ render inside the full shell when signed in.
   `<fieldset>` with a `<legend>`; a single checkbox's label is to its right. Use radios for
   three or four choices on a page, and a Select for more fixed choices, or for fixed choices in a
   dialog's form (type, role, priority; DL-259). Use the combobox only
-  where the user must search people or orgs; a people picker opens its list on focus and filters
-  as the user types (DL-137; from S2-C0h).
+  where the user must search people or orgs; a people picker is the shared `PersonPicker`, which
+  opens its list on focus and searches the server as the user types (DL-137, DL-422). Choosing
+  several people adds each from the picker to a list below it, each with a Remove button named
+  for the person (the approvers); a default that names no one is a radio beside it (**Me** /
+  **Someone else**, the first admin).
 - **UI-FRM-13** **No redundant entry (3.3.7):** a multi-step flow keeps what the user typed. The
   **email-first** add-person flow asks for the email first and checks it (the user check, DL-66).
   If an account exists, a confirm step says only "An account already exists for <email>. Add
@@ -1201,6 +1205,7 @@ Shared components live in `src/components/`; each has a spec that calls the axe 
 | `FormField` | Wires label, required asterisk, help, hint, and error ids and `aria-*` for every control inside it |
 | `TextField`, `PasswordField`, `SelectField`, `CheckboxField`, `RadioGroup` | Built on `FormField`; `PasswordField` has the inside toggle (UI-FRM-10) |
 | `PasswordRequirements` | The live requirements list under a new-password field (UI-FRM-10, DL-91), from S1-C14a |
+| `PersonPicker` | The searchable people combobox (UI-FRM-12, DL-422), on the caller's server search; a failed search says so at the field (UI-FRM-7), from S3-C17 |
 | `Alert` | Tone, icon, text, optional actions, optional dismiss (UI-FBK-13); `role="alert"` only per UI-FBK-2 |
 | `Badge`, `Banner` | Driven by the mapping module (UI-FBK-5, UI-FBK-6); banners are not dismissible |
 | `ModalDialog`, `ConfirmDialog` | Native `<dialog>`; UI-FRM-14. A confirmation is a `ModalDialog` whose Cancel is marked `data-autofocus`; `ConfirmDialog` is a promise-based one (S1-C16a) |

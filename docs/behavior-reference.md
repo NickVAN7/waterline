@@ -38,8 +38,10 @@ Every page after sign-in has the same frame:
 - **The sidebar**, on the left, stays where it is while the page scrolls: **My work**, then, under
   the caption **Project**, the **project selector**. Open the selector to see the current
   organization's projects, under its name, and choose one, or choose **All projects** (below the
-  list) for the organization's project list. With more than eight, **Filter projects** shows a
-  field that narrows the list as you type.
+  list) for the organization's project list. It shows the first 50; with more than eight,
+  **Filter projects** shows a field that searches all of the organization's projects as you
+  type, and when more match than it shows, it says how many ("Showing 50 of 312").
+  Closing it clears the filter.
   Once you're in a project, its pages are listed below the selector: **Home**, **Requirements**
   (if you may read its content), **Members**, and **Settings** (if you may change any of its
   settings). Trash isn't listed: it's a link on the Requirements page.
@@ -99,8 +101,8 @@ if it's taken. Pick its type (Software, ERP implementation, or General). Once a 
 the type also suggests its modules: each is described, and a module that isn't built yet can't
 be turned on: its box is greyed out, with "Not available yet"; until then there's no module
 choice (DL-402). You become its first admin and lead, unless you're an
-organization owner or admin, who may name someone else instead: any active member of the
-organization, or of the workspace's staff. You can also set its restriction: a level (None,
+organization owner or admin, who may choose **Someone else** instead of **Me** and search for
+any active member of the organization, or of the workspace's staff. You can also set its restriction: a level (None,
 Internal, or Confidential, each described) and its **Categories**, why it's sensitive (Financial,
 Proprietary, Personal data (PII)). Once created, the project opens.
 
@@ -203,12 +205,14 @@ their decision (**Not decided**, **Approved**, **Rejected**, or **Replaced**, fo
 lost access and whose place the requester took) and comment. With no request yet it says "No
 approval has been requested." A project admin can:
 
-- **Request approval:** pick the approvers from the project's members (deactivated people aren't
-  listed; every one of them must approve), add an optional **Note**, and press **Request
-  approval**. The request is for the current revision. Only one request can be pending at a
+- **Request approval:** add the approvers one at a time with **Add an approver**, which searches
+  everyone the request may name: the project's members, viewers included, and the admins who
+  reach it through the organization or workspace, unless it's export-controlled (deactivated
+  people aren't offered; every approver must approve). Each is listed with **Remove**. Add an
+  optional **Note**, and press **Request approval**. The request is for the current revision. Only one request can be pending at a
   time: while one is, Request approval is unavailable, after the actions you can take, and says
   why. After a rejection, the dialog
-  opens with the same approvers ticked; anyone who can no longer be named is left out, and the
+  opens with the same approvers listed; anyone who can no longer be named is left out, and the
   dialog says who. On a requirement without an "Acceptance Criteria" heading, the dialog warns
   that it has no acceptance criteria; you can still send the request.
 - **Re-open approval:** on an Approved requirement that hasn't changed since, the same dialog
@@ -227,7 +231,7 @@ If the requirement changed after approval was requested, a warning says approver
 on the requested revision; cancel and request again to have them review the latest. If an
 approver lost access and the requester is no longer a project admin to take their place, the
 request can't complete: it says **An approver no longer has access**, and **Re-request** cancels
-it and opens the dialog with its approvers ticked, leaving out anyone who can no longer be named;
+it and opens the dialog with its approvers listed, leaving out anyone who can no longer be named;
 the dialog says the earlier request is cancelled, and closing it leaves it cancelled. If someone
 you picked can no longer be named when you send the request, the dialog says so and lists only
 those who can.
@@ -476,7 +480,8 @@ staff yet"), with a pointer to **Show deactivated**.
   **Projects** (the archived left out), **Members** (active accounts), and **Owners** (**None**
   if it has none). **Create organization** asks for its
   name, its slug (used in its web addresses; you're told if it's taken), and its first owner: an
-  existing person, or a new account with a temporary password, shown once.
+  existing person, searched among the workspace's active people, or a new account with a
+  temporary password, shown once.
 - **Users** lists everyone in the workspace. **Role** shows their workspace role (**Owner**,
   **Admin**, or **Member**) and **System admin** for system admins (**Owner, System admin**;
   granted outside the app, so you can read it but not change it), then each organization they

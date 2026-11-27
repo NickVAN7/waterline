@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +10,7 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, ok, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
+import { choosePerson, typeInPicker } from '@/test/picker'
 import { project } from '@/test/projects'
 import { testRouter } from '@/test/router'
 import { listPage } from '@/test/workspace'
@@ -74,7 +76,7 @@ async function openDialog(allowed: Action[] = ['project.create'], guidance = GUI
   const router = await testRouter('/acme/projects')
   const wrapper = mount(CreateProjectDialog, {
     props: { org: { ...ACME, allowed_actions: allowed } },
-    global: { plugins: [router] },
+    global: { plugins: [router, PrimeVue] },
     attachTo: document.body,
   })
   await wrapper.vm.open()
@@ -226,35 +228,91 @@ describe('CreateProjectDialog', () => {
     expect(document.activeElement?.id).toBe('create-project-key')
   })
 
-  it('offers no first-admin picker without project.assign_first_admin', async () => {
-    const { wrapper, get } = await openDialog(['project.create'])
+  it('offers no first-admin choice without project.assign_first_admin', async () => {
+    const { wrapper } = await openDialog(['project.create'])
 
+    expect(wrapper.find('input[name="create-project-first-admin"]').exists()).toBe(false)
     expect(wrapper.find('#create-project-first-admin-id').exists()).toBe(false)
-    expect(get).not.toHaveBeenCalledWith(
-      '/api/orgs/{org_id}/first-admin-candidates',
-      expect.anything(),
-    )
   })
 
-  it('offers the first-admin candidates other than you, and names the one chosen', async () => {
+  it('starts the first admin on Me, sending no first_admin_id (DL-422)', async () => {
+    const { wrapper, post } = await openDialog(['project.create', 'project.assign_first_admin'])
+    const radios = wrapper.findAll<HTMLInputElement>('input[name="create-project-first-admin"]')
+
+    expect(radios.map((r) => r.element.closest('label')!.textContent!.trim())).toEqual([
+      'Me (Casey Cole)',
+      'Someone else',
+    ])
+    expect(radios[0]!.element.checked).toBe(true)
+    expect(wrapper.find('#create-project-first-admin-id').exists()).toBe(false)
+    await fill(wrapper)
+    await submit(wrapper)
+
+    expect(sent(post)).not.toHaveProperty('first_admin_id')
+  })
+
+  it('searches the candidates other than you under Someone else, and names the one chosen', async () => {
     const { wrapper, get, post } = await openDialog([
       'project.create',
       'project.assign_first_admin',
     ])
     await fill(wrapper)
+    await wrapper.get('input[name="create-project-first-admin"][value="other"]').setValue(true)
+
+    await typeInPicker('create-project-first-admin-id', 'a')
 
     expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/first-admin-candidates', {
-      params: { path: { org_id: ACME.id }, query: { limit: 200 } },
+      params: { path: { org_id: ACME.id }, query: { limit: 20, q: 'a' } },
     })
-    expect(wrapper.findAll('#create-project-first-admin-id option').map((o) => o.text())).toEqual([
-      'Me (Casey Cole)',
+    expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toEqual([
       'Ann Lee (ann@acme.example)',
       'Sam Staff (sam@acme.example)',
     ])
-    await wrapper.get('#create-project-first-admin-id').setValue('u-ann')
+    await choosePerson('create-project-first-admin-id', 'ann')
     await submit(wrapper)
 
     expect(sent(post)).toMatchObject({ first_admin_id: 'u-ann' })
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it('sends no first_admin_id once back on Me, though someone was chosen under Someone else', async () => {
+    // Bug: the chosen person made first admin and lead while the dialog says Me.
+    const { wrapper, post } = await openDialog(['project.create', 'project.assign_first_admin'])
+    await fill(wrapper)
+    await wrapper.get('input[name="create-project-first-admin"][value="other"]').setValue(true)
+    await choosePerson('create-project-first-admin-id', 'ann')
+
+    await wrapper.get('input[name="create-project-first-admin"][value="me"]').setValue(true)
+    await submit(wrapper)
+
+    expect(sent(post)).not.toHaveProperty('first_admin_id')
+  })
+
+  it('reloads /me when the first-admin search is refused (UI-FRM-7)', async () => {
+    const { wrapper, get } = await openDialog(['project.create', 'project.assign_first_admin'])
+    await wrapper.get('input[name="create-project-first-admin"][value="other"]').setValue(true)
+    get.mockImplementation(((path: string) =>
+      Promise.resolve(
+        path === '/api/auth/me'
+          ? ok(me())
+          : failed(403, { code: 'forbidden', message: '', details: {} }),
+      )) as never)
+
+    await typeInPicker('create-project-first-admin-id', 'ann')
+
+    expect(get).toHaveBeenCalledWith('/api/auth/me')
+  })
+
+  it('asks for the person under Someone else before sending, focusing the picker', async () => {
+    const { wrapper, post } = await openDialog(['project.create', 'project.assign_first_admin'])
+    await fill(wrapper)
+    await wrapper.get('input[name="create-project-first-admin"][value="other"]').setValue(true)
+
+    await submit(wrapper)
+
+    expect(post).not.toHaveBeenCalled()
+    expect(wrapper.get('#create-project-first-admin-id-error').text()).toBe('This is required.')
+    expect(document.activeElement?.id).toBe('create-project-first-admin-id')
   })
 
   it("doesn't offer export control (DL-133)", async () => {

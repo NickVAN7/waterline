@@ -62,6 +62,12 @@ MEMBER_CANDIDATES = ListSpec(
     default_sort=("name",),
     search=(User.name, User.email, User.username),  # pyright: ignore[reportArgumentType]
 )
+# The approver picker's, plus `user_id`: Re-request asks about its earlier approvers (DL-422).
+APPROVER_CANDIDATES = dataclasses.replace(
+    MEMBER_CANDIDATES,
+    name="ApproverCandidate",
+    filters=(Filter("user_id", User.id, FilterType.REFERENCE),),  # pyright: ignore[reportArgumentType]
+)
 
 MEMBER_PROJECTS = ListSpec(
     name="MemberProject",
@@ -162,23 +168,30 @@ class ProjectMemberService(ProjectService):
         project's requirements, viewers and up, inherited admins unless it's export-controlled
         (TD-96); the same people `check_person` accepts with `requirement.view`."""
         roles = (ProjectRole.VIEWER, ProjectRole.MEMBER, ProjectRole.ADMIN)
-        return await self._content_people(project, roles, query)
+        return await self._content_people(project, roles, query, APPROVER_CANDIDATES)
 
     async def _content_people(
-        self, project: Project, roles: tuple[ProjectRole, ...], query: object
+        self,
+        project: Project,
+        roles: tuple[ProjectRole, ...],
+        query: object,
+        spec: ListSpec = MEMBER_CANDIDATES,
     ) -> Page[MemberCandidate]:
         export_controlled = project_target(project).export_controlled
         return await self._candidates(
             self.repository.content_people(project, roles, export_controlled=export_controlled),
             query,
+            spec,
         )
 
-    async def _candidates(self, people: Select[User], query: object) -> Page[MemberCandidate]:
+    async def _candidates(
+        self, people: Select[User], query: object, spec: ListSpec = MEMBER_CANDIDATES
+    ) -> Page[MemberCandidate]:
         page = await fetch_page(
             self.session,
             people,
-            MEMBER_CANDIDATES,
-            query,  # pyright: ignore[reportArgumentType] -- MEMBER_CANDIDATES.query_model
+            spec,
+            query,  # pyright: ignore[reportArgumentType] -- the spec's query_model
         )
         return page.with_items(
             [

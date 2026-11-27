@@ -1,29 +1,23 @@
 <script setup lang="ts">
-// Adding a project member from the picker (build plan, "The project members API"): a searchable
-// combobox of the org's members and the workspace's staff not yet on the project (deactivated
-// accounts aren't offered; UI-STY-3, UI-FRM-12), and a role. On an export-controlled project the
+// Adding a project member from the picker (build plan, "The project members API"): the shared
+// `PersonPicker` over the org's members and the workspace's staff not yet on the project
+// (deactivated accounts aren't offered; UI-FRM-12), and a role. On an export-controlled project the
 // admin first confirms the person is authorized (design-doc §3.1), the button blocked until then
-// (UI-FRM-15), and choosing someone else clears the confirmation. A failed search says so under the
-// picker, where typing again retries it; it isn't the form's alert, whose Retry is the add. A 403,
-// or a refusal for the project's changed export control, tells the page (`refused`), so it reloads
-// what the user may do (UI-FRM-7, DL-116). The picker's list opens on focus while no one is chosen
-// (DL-137; once someone is, focus back after a refusal shows the error, not the list), so the
-// dialog starts on its title, not the picker (S3-C0l); the role starts at Member. The list scrolls
-// itself, the listbox the combobox controls, not its unnamed container: the keyboard reaches it
-// through the combobox, which axe recognises only on the listbox (`scrollable-region-focusable`).
-import AutoComplete from 'primevue/autocomplete'
+// (UI-FRM-15), and choosing someone else clears the confirmation. A 403 from the search or the
+// add, or a refusal for the project's changed export control, tells the page (`refused`), so it
+// reloads what the user may do (UI-FRM-7, DL-116). The picker's list opens on focus while no one
+// is chosen (DL-137), so the dialog starts on its title, not the picker (S3-C0l); the role starts
+// at Member.
 import { nextTick, ref } from 'vue'
 
-import { api, ApiError, client } from '@/api/client'
+import { api, type ApiError, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
-import FormField from '@/components/FormField.vue'
-import Icon from '@/components/Icon.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
+import PersonPicker from '@/components/PersonPicker.vue'
 import SelectField from '@/components/SelectField.vue'
 import {
-  ANNOUNCE_DELAY_MS,
   dismissToSubmit,
   refetchNeeded,
   retryFromSubmit,
@@ -43,15 +37,9 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ done: [message: string]; refused: [] }>()
 
-const person = ref<Candidate | string | null>(null)
+const person = ref<Candidate | null>(null)
 const role = ref('')
 const authorized = ref(false)
-const suggestions = ref<Candidate[]>([])
-const searchFailed = ref(false)
-const SEARCH_FAILED = "Couldn't search. Type again to try again."
-// Its own live message, cleared and set again, so a second failure in a row is announced too.
-const searchAnnouncement = ref('')
-let announcing: ReturnType<typeof setTimeout> | undefined
 const pending = ref(false)
 const status = ref('')
 const errors = useFormErrors({ user_id: 'Person', role: 'Role' })
@@ -59,42 +47,29 @@ const errors = useFormErrors({ user_id: 'Person', role: 'Role' })
 const dialog = ref<InstanceType<typeof ModalDialog>>()
 const alertBox = ref<InstanceType<typeof FormAlert>>()
 const roleField = ref<InstanceType<typeof SelectField>>()
+const picker = ref<InstanceType<typeof PersonPicker>>()
 const formElement = ref<HTMLFormElement>()
-
-// While the admin types, the model holds the text; it's a candidate only once one is chosen.
-const chosen = () => (typeof person.value === 'object' ? person.value : null)
-const label = (c: Candidate) => `${c.name} (${c.email})`
 
 async function open(): Promise<void> {
   person.value = null
   role.value = 'member'
   authorized.value = false
-  suggestions.value = []
-  searchFailed.value = false
   errors.reset()
   status.value = ''
   await dialog.value?.open()
 }
 
-async function search(q: string): Promise<void> {
-  try {
-    const page = await api(
-      client.GET('/api/projects/{key}/member-candidates', {
-        // On focus the query is empty: the first candidates, unfiltered (`q` can't be empty).
-        params: { path: { key: props.projectKey }, query: { limit: 20, ...(q ? { q } : {}) } },
-      }),
-    )
-    suggestions.value = page.items
-    searchFailed.value = false
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-    suggestions.value = []
-    searchFailed.value = true
-    searchAnnouncement.value = ''
-    clearTimeout(announcing)
-    announcing = setTimeout(() => (searchAnnouncement.value = SEARCH_FAILED), ANNOUNCE_DELAY_MS)
-    if (error.status === 403) emit('refused')
-  }
+async function search(q: string): Promise<Candidate[]> {
+  const page = await api(
+    client.GET('/api/projects/{key}/member-candidates', {
+      params: { path: { key: props.projectKey }, query: { limit: 20, ...(q ? { q } : {}) } },
+    }),
+  )
+  return page.items
+}
+
+function searchFailed(error: ApiError) {
+  if (error.status === 403) emit('refused')
 }
 
 function personChanged() {
@@ -107,14 +82,14 @@ async function focus(target: 'user_id' | 'role' | 'alert') {
   await nextTick()
   if (target === 'alert') alertBox.value?.focus()
   else if (target === 'role') roleField.value?.focus()
-  else document.getElementById('add-member-person')?.focus()
+  else picker.value?.focus()
 }
 
 const blocked = () => props.exportControlled && !authorized.value
 
 async function submit(): Promise<void> {
   if (pending.value || blocked()) return
-  const picked = chosen()
+  const picked = person.value
   const empty = errors.requireFilled({ user_id: picked?.user_id ?? '', role: role.value })
   if (empty || !picked) return focus(empty ?? 'user_id')
   pending.value = true
@@ -164,51 +139,18 @@ defineExpose({ open })
       <p class="m-0 text-sm text-text-muted">
         <span aria-hidden="true" class="font-bold text-danger">*</span> Required field
       </p>
-      <FormField
+      <PersonPicker
         id="add-member-person"
+        ref="picker"
+        v-model="person"
         label="Person"
         required
         help="Search the organization's members and the workspace's staff by name, email, or username."
         :error="errors.fieldErrors.value.user_id"
-        :described-by="searchFailed ? 'add-member-search-failed' : undefined"
-      >
-        <template #default="{ describedBy, invalid }">
-          <!-- In the dialog's own subtree: the page behind a modal dialog is inert. -->
-          <AutoComplete
-            v-model="person"
-            input-id="add-member-person"
-            :suggestions="suggestions"
-            :option-label="label"
-            force-selection
-            :complete-on-focus="!chosen()"
-            append-to="self"
-            scroll-height="none"
-            :pt="{ list: { class: 'max-h-56 overflow-y-auto' } }"
-            empty-search-message="No one found."
-            :input-props="{
-              'aria-required': 'true',
-              'aria-invalid': invalid ? 'true' : undefined,
-              'aria-describedby': describedBy,
-              autocomplete: 'off',
-            }"
-            :invalid="invalid"
-            :input-class="[
-              'min-h-(--control-height) w-full',
-              invalid ? 'border-2 border-tone-danger-edge' : '',
-            ]"
-            class="w-full max-w-80"
-            @complete="search($event.query)"
-            @update:model-value="personChanged"
-          />
-        </template>
-      </FormField>
-      <p
-        v-if="searchFailed"
-        id="add-member-search-failed"
-        class="m-0 -mt-2 flex items-center gap-1 text-sm text-tone-danger-fg"
-      >
-        <Icon name="alert" />{{ SEARCH_FAILED }}
-      </p>
+        :search="search"
+        @failed="searchFailed"
+        @update:model-value="personChanged"
+      />
       <SelectField
         id="add-member-role"
         ref="roleField"
@@ -238,7 +180,6 @@ defineExpose({ open })
         </p>
       </div>
       <p class="sr-only" aria-live="polite">{{ errors.announcement.value || status }}</p>
-      <p class="sr-only" aria-live="polite">{{ searchAnnouncement }}</p>
     </form>
   </ModalDialog>
 </template>

@@ -32,7 +32,7 @@ export function fakeRoster(): Roster & {
     create: vi.fn().mockResolvedValue({}),
     changeRole: vi.fn().mockResolvedValue({}),
     remove: vi.fn().mockResolvedValue(undefined),
-    everyone: () => Promise.resolve(PEOPLE),
+    searchPeople: () => Promise.resolve(PEOPLE),
   }
 }
 

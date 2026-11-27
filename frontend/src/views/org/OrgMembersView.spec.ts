@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
+import { choosePerson } from '@/test/picker'
 import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { acme, mountOrgPages, mountOrgView } from '@/test/org'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
@@ -265,12 +266,12 @@ describe('OrgMembersView', () => {
     await wrapper.get('#role-change').setValue('admin')
     await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
     await flushPromises()
-    await wrapper.get('#role-change-owner').setValue(ANN.user_id)
+    await choosePerson('role-change-owner', 'ann')
     await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
     await flushPromises()
 
     expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/members', {
-      params: { path: { org_id: ACME.id }, query: { limit: 200 } },
+      params: { path: { org_id: ACME.id }, query: { limit: 20, q: 'ann' } },
     })
     expect(patch).toHaveBeenLastCalledWith('/api/orgs/{org_id}/members/{user_id}', {
       params: { path: { org_id: ACME.id, user_id: OLIVIA.user_id } },
@@ -303,7 +304,7 @@ describe('OrgMembersView', () => {
     await wrapper.get('#remove-with-projects').setValue(false)
     await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
     await flushPromises()
-    await wrapper.get('#remove-owner').setValue(ANN.user_id)
+    await choosePerson('remove-owner', 'ann')
     await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
     await flushPromises()
 

@@ -190,3 +190,41 @@ async def test_a_candidate_is_exactly_who_the_person_check_accepts(
         if authorize(await users.authz_context(user), action, target)
     }
     assert offered == accepted
+
+
+async def test_the_approver_candidates_filter_by_user_id(client: AsyncClient) -> None:
+    """DL-422: Re-request asks about its earlier approvers by `user_id` (any of). Bug: the filter
+    ignored (everyone listed), or it lets someone through who isn't a candidate."""
+    t = await tenancy()
+    admin = await UserFactory.create_async(name="Ada Admin")
+    bob = await UserFactory.create_async(name="Bob Baker")
+    gone = await UserFactory.create_async(name="Gus Gone", is_active=False)
+    for user in (admin, bob, gone):
+        await ProjectMembershipFactory.create_async(
+            project=t.project, user=user, role=ProjectRole.MEMBER
+        )
+    await ProjectMembershipFactory.create_async(
+        project=t.project,
+        user=await UserFactory.create_async(name="Cy Cole"),
+        role=ProjectRole.MEMBER,
+    )
+    outsider = await UserFactory.create_async(name="Olive Out")
+    await sign_in_as(client, admin)
+
+    response = await client.get(
+        APPROVERS, params={"user_id": [str(bob.id), str(gone.id), str(outsider.id)]}
+    )
+
+    assert names(response) == ["Bob Baker"]
+    assert response.json()["total"] == 1
+
+
+async def test_only_the_approver_candidates_take_a_user_id(client: AsyncClient) -> None:
+    """DL-422 adds `user_id` to the approver picker only: elsewhere it's a typo, a 422."""
+    t = await tenancy()
+    await sign_in_as(client, await persona_user(t, "project_admin"))
+
+    response = await client.get(TASK_PEOPLE, params={"user_id": str(t.project.id)})
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"

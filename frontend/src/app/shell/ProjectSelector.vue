@@ -2,7 +2,8 @@
 // The project selector (UI-SHL-6): a menu button showing the selected project, opening a popover
 // headed by the current org's name, of links to that org's projects, then "All projects" (a menu
 // row with an arrow, set apart from the projects by a rule) and "New project" for those who may create one
-// (`project.create`), lined up with the rows, which opens the create dialog (DL-137).
+// (`project.create`), lined up with the rows, which opens the create dialog (DL-137). It opens on
+// the first page of projects; its filter searches the org's projects on the server (DL-422, TD-38).
 import { computed, ref } from 'vue'
 
 import { api, client } from '@/api/client'
@@ -25,22 +26,48 @@ function newProject(close: () => void) {
   void creator.value?.open()
 }
 
-// shortcut: the selector lists an org's first 200 projects (the API's page limit; TD-38); a
-// server-side search replaces it if an org ever has more.
-const PROJECTS_LIMIT = 200
+const PROJECTS_LIMIT = 50
+const q = ref('')
 
-// Loaded on each open; `useLoad` keeps only the latest answer, so a slow one from another org
-// never lands here.
+// Loaded on each open and each search; `useLoad` keeps only the latest answer, so a slow one from
+// another org, or for older text, never lands here.
 const page = useLoad(() =>
   api(
     client.GET('/api/orgs/{org_id}/projects', {
-      params: { path: { org_id: nav.org!.id }, query: { limit: PROJECTS_LIMIT } },
+      params: {
+        path: { org_id: nav.org!.id },
+        query: { limit: PROJECTS_LIMIT, ...(q.value ? { q: q.value } : {}) },
+      },
     }),
   ),
 )
 
+// What started the load: a typed search's failure is the user's own action, an alert at once
+// (UI-FBK-2); only Try again shows its pending state.
+const searched = ref(false)
+const retrying = ref(false)
+
 function load() {
   if (nav.org) void page.run()
+}
+
+function opened() {
+  q.value = ''
+  searched.value = false
+  retrying.value = false
+  load()
+}
+
+function search(term: string) {
+  q.value = term
+  searched.value = true
+  retrying.value = false
+  load()
+}
+
+function tryAgain() {
+  retrying.value = true
+  load()
 }
 
 // Nothing listed while loading, so the last org's projects never show under this one.
@@ -53,7 +80,7 @@ const failedOnce = computed(() => page.failures.value > 0)
 
 const emptyText = computed(() => {
   if (page.loading.value) return 'Loading projects…'
-  return page.data.value?.items.length ? 'No projects match.' : 'No projects to show.'
+  return q.value ? 'No projects match.' : 'No projects to show.'
 })
 
 const links = computed(() =>
@@ -78,7 +105,10 @@ const links = computed(() =>
     :links="links"
     :current-id="nav.project?.id"
     :busy="page.loading.value"
-    @open="load"
+    search
+    :total="page.loading.value || page.error.value ? undefined : page.data.value?.total"
+    @open="opened"
+    @filter="search"
   >
     <template #button>
       <span class="sr-only">Project: </span>{{ nav.project?.name ?? 'Choose a project' }}
@@ -93,16 +123,16 @@ const links = computed(() =>
         <span
           id="project-selector-error"
           :key="page.failures.value"
-          :role="page.failures.value > 1 ? 'alert' : undefined"
+          :role="page.failures.value > 1 || searched ? 'alert' : undefined"
         >
           Couldn't load the projects.
         </span>
         <Button
           variant="secondary"
           aria-describedby="project-selector-error"
-          :pending="page.loading.value"
+          :pending="page.loading.value && retrying"
           pending-label="Trying…"
-          @click="load"
+          @click="tryAgain"
         >
           Try again
         </Button>

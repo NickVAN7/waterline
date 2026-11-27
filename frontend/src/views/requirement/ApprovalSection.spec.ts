@@ -1,5 +1,5 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
@@ -9,6 +9,7 @@ import { ANNOUNCE_DELAY_MS } from '@/composables/useFormErrors'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
+import { choosePerson, typeInPicker } from '@/test/picker'
 import { requirementRead } from '@/test/requirements'
 
 import ApprovalSection from './ApprovalSection.vue'
@@ -16,12 +17,12 @@ import ApprovalSection from './ApprovalSection.vue'
 type Requirement = components['schemas']['RequirementRead']
 type Request = components['schemas']['ApprovalRequestRead']
 type Row = components['schemas']['ApprovalRead']
-type Member = components['schemas']['ProjectMemberRead']
+type Member = components['schemas']['MemberCandidate']
 type Action = components['schemas']['Action']
 
 const LIST = '/api/projects/{key}/requirements/{number}/approval-requests'
 const READ = '/api/approval-requests/{request_id}'
-const MEMBERS = '/api/projects/{key}/members'
+const CANDIDATES = '/api/projects/{key}/approver-candidates'
 
 const ADMIN: Action[] = [
   'approval_request.create',
@@ -67,19 +68,33 @@ function request(overrides: Partial<Request> = {}): Request {
   }
 }
 
-function member(id: string, name: string, is_active = true): Member {
+function member(id: string, name: string): Member {
   return {
     user_id: id,
     email: `${name.split(' ')[0]!.toLowerCase()}@harbor.example`,
     username: id,
     name,
-    role: 'viewer',
-    is_active,
-    allowed_actions: [],
   }
 }
 
 const MEMBERS_LIST = [member('u-vera', 'Vera Viewer'), member('u-max', 'Max Member')]
+
+type Options = { params?: { query?: { user_id?: string[] } } }
+// The approver candidates the server answers: a `user_id` filter keeps only those it names (DL-422).
+const candidates = (people: Member[], options?: Options) => {
+  const ids = options?.params?.query?.user_id
+  const items = ids ? people.filter((p) => ids.includes(p.user_id)) : people
+  return ok({ items, total: items.length, limit: 20, offset: 0 })
+}
+const ADD = 'request-approval-add'
+// The approvers the dialog lists, by name.
+const listed = () =>
+  [...document.querySelectorAll('#request-approval-approver_ids > ul > li')].map((li) =>
+    li
+      .textContent!.replace(/\s+/g, ' ')
+      .replace(/\s*Remove$/, '')
+      .trim(),
+  )
 
 function mountSection(
   shown: Requirement,
@@ -88,7 +103,7 @@ function mountSection(
 ) {
   const get = vi
     .spyOn(client, 'GET')
-    .mockImplementation(((path: string) =>
+    .mockImplementation(((path: string, options?: Options) =>
       Promise.resolve(
         path === LIST
           ? listFails
@@ -96,8 +111,8 @@ function mountSection(
             : ok({ items: latest ? [latest] : [], total: latest ? 1 : 0, limit: 1, offset: 0 })
           : path === READ
             ? ok(latest)
-            : path === MEMBERS
-              ? ok({ items: members, total: members.length, limit: 200, offset: 0 })
+            : path === CANDIDATES
+              ? candidates(members, options)
               : failed(404, { code: 'not_found', message: 'Not found', details: {} }),
       )) as never)
   const post = vi.spyOn(client, 'POST')
@@ -105,6 +120,7 @@ function mountSection(
   const reloadRequirement = vi.fn(() => Promise.resolve(requirementReloads))
   const wrapper = mount(ApprovalSection, {
     props: { projectKey: 'ERP', requirement: shown, reloadPage, reloadRequirement },
+    global: { plugins: [PrimeVue] },
     attachTo: document.body,
   })
   return { wrapper, get, post, reloadPage, reloadRequirement }
@@ -131,13 +147,13 @@ const text = () => document.body.textContent!.replace(/\s+/g, ' ')
 const heading = () => document.querySelector('h2')!
 const alertText = () => document.querySelector('[role=alert]')!.textContent!
 const answering = (latest: Request | null) =>
-  ((path: string) =>
+  ((path: string, options?: Options) =>
     Promise.resolve(
       path === LIST
         ? ok({ items: latest ? [latest] : [], total: latest ? 1 : 0, limit: 1, offset: 0 })
         : path === READ
           ? ok(latest)
-          : ok({ items: MEMBERS_LIST, total: 2, limit: 200, offset: 0 }),
+          : candidates(MEMBERS_LIST, options),
     )) as never
 
 const confirmButton = (name: string) =>
@@ -276,25 +292,23 @@ describe('ApprovalSection', () => {
     expect(button(label)).toBeDefined()
   })
 
-  it('requests approval from the members picked, with the note, and shows the new request', async () => {
-    const { post } = mountSection(requirement(), null, {
-      members: [...MEMBERS_LIST, member('u-dee', 'Dee Gone', false)],
-    })
+  it('requests approval from the people added, with the note, and shows the new request', async () => {
+    const { post, get } = mountSection(requirement(), null)
     await flushPromises()
     button('Request approval')!.click()
     await flushPromises()
+    expect(listed()).toEqual([])
+    expect(dialogOpen()!.textContent).toContain('No approvers yet.')
 
-    const labels = [...dialogOpen()!.querySelectorAll('label')].map((l) =>
-      l.textContent!.replace(/\s+/g, ' ').trim(),
-    )
-    expect(labels).toEqual([
-      'Vera Viewer (vera@harbor.example)',
-      'Max Member (max@harbor.example)',
-      'Note',
-    ])
+    await choosePerson(ADD, 'max', 'Max Member')
+
+    expect(get).toHaveBeenCalledWith(CANDIDATES, {
+      params: { path: { key: 'ERP' }, query: { limit: 20, q: 'max' } },
+    })
+    expect(listed()).toEqual(['Max Member (max@harbor.example)'])
+    // The picker is empty again, for the next one.
+    expect((document.getElementById(ADD) as HTMLInputElement).value).toBe('')
     await expectNoA11yViolations(document.body)
-    const box = dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-max"]')!
-    box.click()
     const note = document.getElementById('request-approval-note') as HTMLInputElement
     note.value = 'Please check totals'
     note.dispatchEvent(new Event('input'))
@@ -310,6 +324,44 @@ describe('ApprovalSection', () => {
     expect(details()).toContain('Latest request Awaiting approval')
   })
 
+  it('offers only those not listed yet, and Remove takes one off, focus on the next Remove', async () => {
+    mountSection(requirement(), null)
+    await flushPromises()
+    button('Request approval')!.click()
+    await flushPromises()
+    await choosePerson(ADD, 'v', 'Vera Viewer')
+    await choosePerson(ADD, 'm', 'Max Member')
+    expect(listed()).toEqual([
+      'Vera Viewer (vera@harbor.example)',
+      'Max Member (max@harbor.example)',
+    ])
+
+    await typeInPicker(ADD, 'a')
+    // Bug: someone listed offered again, and named twice in the request.
+    expect(dialogOpen()!.querySelectorAll('[role="option"]')).toHaveLength(1)
+    expect(dialogOpen()!.querySelector('[role="option"]')!.textContent).toBe('No one found.')
+
+    const remove = dialogOpen()!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Remove Vera Viewer (vera@harbor.example)"]',
+    )!
+    expect(remove.textContent!.trim()).toBe('Remove')
+    remove.click()
+    await flushPromises()
+
+    expect(listed()).toEqual(['Max Member (max@harbor.example)'])
+    // Not the picker, whose list would open (DL-137).
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(
+      'Remove Max Member (max@harbor.example)',
+    )
+    expect(text()).toContain('Vera Viewer removed.')
+    ;(document.activeElement as HTMLButtonElement).click()
+    await flushPromises()
+
+    expect(listed()).toEqual([])
+    // The group, not the picker, whose list would open on focus.
+    expect(document.activeElement).toBe(document.getElementById('request-approval-approver_ids'))
+  })
+
   // The button that opened the dialog goes as the request is made: focus lands on the blocked
   // Request approval, whose reason is read with it. Bug: focus left on the heading, or on <body>.
   it('moves focus to the blocked Request approval once a request is made', async () => {
@@ -317,7 +369,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
     press('Request approval')
     await flushPromises()
-    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-vera"]')!.click()
+    await choosePerson(ADD, 'vera', 'Vera Viewer')
     post.mockResolvedValue(ok(request(), 201))
     dialogOpen()!.querySelector('form')!.requestSubmit()
     await flushPromises()
@@ -356,7 +408,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
     button('Request approval')!.click()
     await flushPromises()
-    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-vera"]')!.click()
+    await choosePerson(ADD, 'vera', 'Vera Viewer')
     post.mockResolvedValue(
       validationFailed([
         {
@@ -374,27 +426,36 @@ describe('ApprovalSection', () => {
     expect(group.textContent).toContain('This account is deactivated.')
   })
 
-  it('says why at the list when the members fail to load, and Try again loads them', async () => {
-    const { get } = mountSection(requirement(), null)
+  it("says why at the list when the earlier approvers can't be checked, and Try again checks them", async () => {
+    const rejected = request({
+      status: 'rejected',
+      allowed_actions: [],
+      approvals: [row('u-vera', 'Vera Viewer', { decision: 'rejected' })],
+    })
+    const { get } = mountSection(requirement(), rejected)
     await flushPromises()
     get.mockImplementation(((path: string) =>
       Promise.resolve(
-        path === MEMBERS
+        path === CANDIDATES
           ? failed(500, { code: 'internal_error', message: 'Boom', details: {} })
-          : ok({ items: [], total: 0, limit: 1, offset: 0 }),
+          : ok({ items: [rejected], total: 1, limit: 1, offset: 0 }),
       )) as never)
     button('Request approval')!.click()
     await flushPromises()
-    expect(dialogOpen()!.textContent).toContain("Couldn't load the project's members.")
+    expect(dialogOpen()!.textContent).toContain("Couldn't check the earlier approvers.")
+    // Bug: someone added unseen, or the earlier approvers lost, while the check has failed.
+    expect(document.getElementById(ADD)).toBeNull()
+    const retry = [...dialogOpen()!.querySelectorAll('button')].find(
+      (b) => b.textContent!.trim() === 'Try again',
+    )!
+    expect(document.activeElement).toBe(retry)
 
-    get.mockImplementation((() =>
-      Promise.resolve(ok({ items: MEMBERS_LIST, total: 2, limit: 200, offset: 0 }))) as never)
-    ;[...dialogOpen()!.querySelectorAll('button')]
-      .find((b) => b.textContent!.trim() === 'Try again')!
-      .click()
+    get.mockImplementation(answering(rejected))
+    retry.click()
     await flushPromises()
 
-    expect(dialogOpen()!.querySelectorAll('input[type=checkbox]')).toHaveLength(2)
+    expect(listed()).toEqual(['Vera Viewer (vera@harbor.example)'])
+    expect(document.activeElement).toBe(document.getElementById('request-approval-approver_ids'))
   })
 
   it('pre-fills after a rejection with the same approvers, naming anyone left out (DL-282)', async () => {
@@ -414,11 +475,13 @@ describe('ApprovalSection', () => {
     button('Request approval')!.click()
     await flushPromises()
 
-    const checked = [...dialogOpen()!.querySelectorAll<HTMLInputElement>('input:checked')]
-    expect(checked.map((box) => box.value)).toEqual(['u-vera'])
-    expect(dialogOpen()!.textContent).toContain(
-      'Left out, as they can no longer be named: Gus Gone.',
-    )
+    expect(listed()).toEqual(['Vera Viewer (vera@harbor.example)'])
+    const leftOut = document.getElementById('request-approval-dropped')!
+    expect(leftOut.textContent).toContain('Left out, as they can no longer be named: Gus Gone.')
+    // Read as focus lands on the group (DL-118).
+    const group = document.getElementById('request-approval-approver_ids')!
+    expect(document.activeElement).toBe(group)
+    expect(group.getAttribute('aria-describedby')!.split(' ')).toContain('request-approval-dropped')
   })
 
   it('cancels a request once confirmed, and shows it cancelled', async () => {
@@ -491,8 +554,7 @@ describe('ApprovalSection', () => {
     expect(post).toHaveBeenCalledWith('/api/approval-requests/{request_id}/cancel', {
       params: { path: { request_id: 'req-1' } },
     })
-    const checked = [...dialogOpen()!.querySelectorAll<HTMLInputElement>('input:checked')]
-    expect(checked.map((box) => box.value)).toEqual(['u-vera'])
+    expect(listed()).toEqual(['Vera Viewer (vera@harbor.example)'])
     expect(dialogOpen()!.textContent).toContain(
       'Left out, as they can no longer be named: Gus Gone.',
     )
@@ -785,20 +847,29 @@ describe('ApprovalSection', () => {
     expect(button('Cancel request')).toBeUndefined()
   })
 
-  it('opens the request dialog on the approver list, then its first approver once loaded (UI-FRM-14)', async () => {
-    const { get } = mountSection(requirement(), null)
+  it('opens Re-request on the approver list while it checks, and keeps it there once checked (UI-FRM-14)', async () => {
+    const rejected = request({
+      status: 'rejected',
+      allowed_actions: [],
+      approvals: [row('u-vera', 'Vera Viewer', { decision: 'rejected' })],
+    })
+    const { get } = mountSection(requirement(), rejected)
     await flushPromises()
     let answer: (value: unknown) => void = () => undefined
     get.mockImplementation((() => new Promise((resolve) => (answer = resolve))) as never)
     button('Request approval')!.click()
     await flushPromises()
 
-    // Bug: focus passing through Note while the list loads.
-    expect(document.activeElement).toBe(document.getElementById('request-approval-approver_ids'))
-    answer(ok({ items: MEMBERS_LIST, total: 2, limit: 200, offset: 0 }))
+    // Bug: focus passing through Note while the list is checked, or the picker's list popping up.
+    const group = document.getElementById('request-approval-approver_ids')!
+    expect(document.activeElement).toBe(group)
+    expect(group.getAttribute('aria-busy')).toBe('true')
+    answer(candidates(MEMBERS_LIST, { params: { query: { user_id: ['u-vera'] } } }))
     await flushPromises()
 
-    expect(document.activeElement).toBe(dialogOpen()!.querySelector('input[value="u-vera"]'))
+    expect(document.activeElement).toBe(group)
+    expect(group.getAttribute('aria-busy')).toBe('false')
+    expect(document.querySelector('[role="listbox"]')).toBeNull()
   })
 
   // A 404 is also a requirement gone meanwhile. Bug: blaming the approvers when no one dropped out.
@@ -807,7 +878,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
     button('Request approval')!.click()
     await flushPromises()
-    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-vera"]')!.click()
+    await choosePerson(ADD, 'vera', 'Vera Viewer')
     post.mockResolvedValue(failed(404, { code: 'not_found', message: 'Not found', details: {} }))
     dialogOpen()!.querySelector('form')!.requestSubmit()
     await flushPromises()
@@ -835,7 +906,7 @@ describe('ApprovalSection', () => {
     await flushPromises()
     button('Request approval')!.click()
     await flushPromises()
-    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-vera"]')!.click()
+    await choosePerson(ADD, 'vera', 'Vera Viewer')
     post.mockResolvedValue(
       validationFailed([
         {
@@ -853,30 +924,29 @@ describe('ApprovalSection', () => {
     expect(details()).toContain('Latest request Awaiting approval')
   })
 
-  it('reloads the list when someone picked can no longer be named (a 404), saying so', async () => {
+  it('checks the list again when someone listed can no longer be named (a 404), saying so', async () => {
     const { post, get } = mountSection(requirement(), null)
     await flushPromises()
     button('Request approval')!.click()
     await flushPromises()
-    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-vera"]')!.click()
-    // v-model's next array is built from the last render's: a user's second click comes after one.
-    await nextTick()
-    dialogOpen()!.querySelector<HTMLInputElement>('input[value="u-max"]')!.click()
+    await choosePerson(ADD, 'vera', 'Vera Viewer')
+    await choosePerson(ADD, 'max', 'Max Member')
     post.mockResolvedValue(failed(404, { code: 'not_found', message: 'Not found', details: {} }))
-    get.mockImplementation((() =>
-      Promise.resolve(
-        ok({ items: [member('u-max', 'Max Member')], total: 1, limit: 200, offset: 0 }),
-      )) as never)
+    get.mockImplementation(((_path: string, options?: Options) =>
+      Promise.resolve(candidates([member('u-max', 'Max Member')], options))) as never)
     dialogOpen()!.querySelector('form')!.requestSubmit()
     await flushPromises()
 
-    const checked = [...dialogOpen()!.querySelectorAll<HTMLInputElement>('input:checked')]
-    expect(checked.map((box) => box.value)).toEqual(['u-max'])
+    expect(get).toHaveBeenLastCalledWith(CANDIDATES, {
+      params: { path: { key: 'ERP' }, query: { user_id: ['u-vera', 'u-max'], limit: 200 } },
+    })
+    expect(listed()).toEqual(['Max Member (max@harbor.example)'])
     expect(dialogOpen()!.textContent).toContain(
       'Left out, as they can no longer be named: Vera Viewer.',
     )
     const group = document.getElementById('request-approval-approver_ids')!
     expect(group.textContent).toContain('Someone you picked can no longer be named')
+    expect(document.activeElement).toBe(group)
   })
 
   it('names Keep request as the way out of Cancel request', async () => {

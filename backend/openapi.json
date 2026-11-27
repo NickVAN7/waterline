@@ -4884,7 +4884,7 @@
           "project"
         ],
         "summary": "Approver Candidates",
-        "description": "The approver picker: active people an approval request may name (design-doc §6.2),\ninherited admins included unless the project is export-controlled; offset-paged with `?q=`.",
+        "description": "The approver picker: active people an approval request may name (design-doc §6.2),\ninherited admins included unless the project is export-controlled; offset-paged with `?q=`,\nand `user_id` for Re-request's earlier approvers (DL-422).",
         "operationId": "approver_candidates_api_projects__key__approver_candidates_get",
         "parameters": [
           {
@@ -4954,6 +4954,64 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "user_id__not",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id  Not"
+            }
+          },
+          {
+            "name": "user_id__is_null",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id  Is Null"
             }
           }
         ],

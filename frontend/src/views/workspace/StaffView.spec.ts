@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
+import { choosePerson } from '@/test/picker'
 import { failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { trail } from '@/test/trail'
@@ -470,12 +471,12 @@ describe('StaffView', () => {
     await wrapper.get('#role-change').setValue('admin')
     await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
     await flushPromises()
-    await wrapper.get('#role-change-owner').setValue(MO.user_id)
+    await choosePerson('role-change-owner', 'mo')
     await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
     await flushPromises()
 
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
-      params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 200 } },
+      params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 20, q: 'mo' } },
     })
     expect(patch).toHaveBeenLastCalledWith('/api/workspaces/{workspace_id}/staff/{user_id}', {
       params: { path: { workspace_id: WORKSPACE_ID, user_id: OLGA.user_id } },
@@ -507,7 +508,7 @@ describe('StaffView', () => {
     await wrapper.get('#remove-with-projects').setValue(false)
     await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
     await flushPromises()
-    await wrapper.get('#remove-owner').setValue(MO.user_id)
+    await choosePerson('remove-owner', 'mo')
     await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
     await flushPromises()
 
