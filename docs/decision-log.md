@@ -2566,7 +2566,8 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   all three are ticked, and a project admin can hide it sooner, through a per-project flag
   designed with its slice (the owner's to place). GitHub isn't part of it.
 - **Supersedes:** none
-- **Superseded by:** DL-354 (in part: Compile your plan is live from Slice 3)
+- **Superseded by:** DL-354 (in part: Compile your plan is live from Slice 3); DL-421 (in part:
+  a member besides its first admin)
 - **Applies to:** design-doc §11; screen-inventory step 5, step 6
 - **Source:** owner, Oct 27, 2026 (handoff decision 27; who sees it and the loose ticks answered
   in chat, Oct 27, 2026)
@@ -5345,7 +5346,32 @@ Design changes are applied with the `design-change` skill, which adds the entrie
   people lists get search: the project members list gains `q` on name, email, and username.
 - **Supersedes:** none (the S3-C16 row's "operators per type, `me`" is narrowed; DL-393's first
   consumer rule)
-- **Superseded by:** none
+- **Superseded by:** DL-420 (in part: Clear leaves the toggle)
 - **Applies to:** build plan (S3-C16, S3-C20, S3-C26, S3-C28); `docs/reviews/s3/S3-plan.md`
   (rows and actions)
 - **Source:** owner, Nov 26, 2026 (S3-C16's re-cut, all four as recommended)
+
+### DL-420: Clear leaves the list's toggle alone
+- **Date:** 2026-11-26
+- **Decision:** The filter bar's **Clear** (and the no-results state's **Clear filters**) undoes
+  the search and every filter, but not the list's widening toggle: "Show deactivated" stays as it
+  is, so Clear never hides people. Clear shows while a search or a filter is set; the toggle alone
+  doesn't show it.
+- **Supersedes:** DL-419 in part ("Clear resets it")
+- **Superseded by:** none
+- **Applies to:** ui-design-guide UI-TBL-10; build plan (S3-C16a)
+- **Source:** owner, Nov 26, 2026 (S3-C16's report, question 1, option (b))
+
+### DL-421: "Invite your team" ticks with a member besides the first admin
+- **Date:** 2026-11-26
+- **Decision:** The Get started checklist's **Invite your team** ticks once the project has a
+  member besides its first admin, that is, more than one membership: a project is created with
+  exactly one, its first admin's, who may not be the person who created it. A project whose
+  creator named someone else as first admin starts unticked, and one left with a single member
+  unticks. The checklist is for every project admin, inherited ones included (§5); any of them
+  can hide it.
+- **Supersedes:** DL-201 in part ("a member besides the creator")
+- **Superseded by:** none
+- **Applies to:** design-doc §11 "Project home: Get started checklist"; screen inventory (Step
+  5); build plan (S3-C15)
+- **Source:** owner, Nov 26, 2026 (S3-C15's report, questions 1 and 2, as recommended)

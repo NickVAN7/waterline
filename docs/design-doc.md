@@ -1628,7 +1628,7 @@ through the other areas' repositories and calls no service (build plan, "Feature
 ### Project home: Get started checklist
 DL-201. A new project's home page shows three items, each linking to where it's done and ticked
 automatically from the project's data: **Invite your team** (ticked once the project has a
-member besides its creator), **Compile your plan** (once it has a phase or milestone with a
+member besides its first admin, DL-421), **Compile your plan** (once it has a phase or milestone with a
 date; shown from S3-C27, when phases ship, a dated milestone counting too from Slice 4, DL-354), and **Start your project** (a
 requirement, a test case, and a task, each part shown once its feature ships). The ticks are
 loose: a step started counts. It's shown only to the project's admins, disappears when all three

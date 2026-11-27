@@ -993,8 +993,9 @@ Decided in screen-inventory step 5; restated so the reviewer has one list.
   filter**, a menu of the list's declared filters not yet in use (absent when there are none); a
   chip per filter in use, whose button names its values ("Role: Admin, Member", "Role: not
   Owner") and opens a popover (focus moves in, on the operator) where each change applies at once,
-  and a 32×32 **Remove <filter> filter** button; **Clear**, only while something is set; and the
-  list's widening toggle last ("Show deactivated"), which is not a chip. Everything is in the URL
+  and a 32×32 **Remove <filter> filter** button; **Clear**, only while a search or a filter is
+  set, which leaves the toggle alone (DL-420); and the list's widening toggle last ("Show
+  deactivated"), which is not a chip. Everything is in the URL
   (UI-TBL-2), and the count is announced (UI-TBL-3). Focus never drops when a control goes:
   Remove moves it to Add filter, Clear to the search field, and closing a chip just added with
   no value to Add filter; a chip being edited stays until its popover closes. A list narrowed to

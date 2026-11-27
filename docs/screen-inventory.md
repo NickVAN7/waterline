@@ -596,7 +596,7 @@ and fills the gaps.
   to the project's admins (owner, Oct 27, 2026). The ticks are loose: they show the step has
   been started, not that it's complete.
   1. **Invite your team:** add members and set up their roles. Ticked once the project has a
-     member besides its creator.
+     member besides its first admin (DL-421).
   2. **Compile your plan:** add milestones and phases, with dates. Ticked once the project has
      a phase or milestone with a date; shown from S3-C27, when phases ship, a dated milestone
      counting too from Slice 4 (DL-354).
