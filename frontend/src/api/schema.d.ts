@@ -796,6 +796,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/get-started/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Hide Get Started
+         * @description Hide the home's Get started checklist (DL-201); hiding it again changes nothing.
+         */
+        put: operations["hide_get_started_api_projects__key__get_started_hidden_put"];
+        post?: never;
+        /**
+         * Show Get Started
+         * @description Show the home's Get started checklist again; showing a shown one changes nothing.
+         */
+        delete: operations["show_get_started_api_projects__key__get_started_hidden_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/favorite": {
         parameters: {
             query?: never;
@@ -2285,6 +2309,24 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /**
+         * GetStarted
+         * @description The home's Get started checklist (design-doc §11, DL-201, DL-354), each step ticked from
+         *     the project's data; loose: a step started counts. Start your project's parts are its
+         *     requirement and its task (a test case joins in Slice 5).
+         */
+        GetStarted: {
+            /** Hidden */
+            hidden: boolean;
+            /** Invite Team */
+            invite_team: boolean;
+            /** Compile Plan */
+            compile_plan: boolean;
+            /** Has Requirement */
+            has_requirement: boolean;
+            /** Has Task */
+            has_task: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2306,6 +2348,17 @@ export interface components {
              * @constant
              */
             database: "ok";
+        };
+        /**
+         * HomeNumbers
+         * @description The home's headline numbers (design-doc §11, Q11); untested requirements join in
+         *     Slice 5.
+         */
+        HomeNumbers: {
+            /** Blocked Tasks */
+            blocked_tasks: number;
+            /** Pending Approvals */
+            pending_approvals: number;
         };
         /**
          * ItemMove
@@ -3248,6 +3301,8 @@ export interface components {
             modules_holding_data: components["schemas"]["ProjectModule"][];
             /** Task Types */
             task_types: components["schemas"]["TaskType"][];
+            get_started: components["schemas"]["GetStarted"] | null;
+            home_numbers: components["schemas"]["HomeNumbers"] | null;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -6878,6 +6933,118 @@ export interface operations {
         };
     };
     unarchive_project_api_projects__key__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    hide_get_started_api_projects__key__get_started_hidden_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    show_get_started_api_projects__key__get_started_hidden_delete: {
         parameters: {
             query?: never;
             header?: never;

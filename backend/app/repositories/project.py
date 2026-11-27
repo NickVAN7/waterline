@@ -4,15 +4,40 @@ import uuid
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, Row, Select, and_, case, delete, exists, func, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Exists,
+    Row,
+    ScalarSelect,
+    Select,
+    and_,
+    case,
+    delete,
+    exists,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from app.authz.scoping import Scope
-from app.enums import OrgRole, ProjectRole, ProjectStatus, RestrictionCategory, WorkspaceRole
+from app.enums import (
+    ApprovalRequestStatus,
+    OrgRole,
+    ProjectRole,
+    ProjectStatus,
+    RestrictionCategory,
+    TaskStatus,
+    WorkspaceRole,
+)
+from app.models.approval import ApprovalRequest
 from app.models.org import Membership, Organization
+from app.models.phase import Phase
 from app.models.project import Project, ProjectFavorite, ProjectMembership
+from app.models.requirement import Requirement
+from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import WorkspaceMembership
 from app.repositories.base import scope_clause
@@ -29,6 +54,19 @@ class Reachers:
     system_admins: list[User]
     workspace_admins: list[tuple[User, WorkspaceRole]]
     org_admins: list[tuple[User, OrgRole]]
+
+
+@dataclass(frozen=True)
+class HomeFacts:
+    """What the project home's Get started checklist and headline numbers are computed from
+    (design-doc §11), live items only."""
+
+    members: int
+    has_dated_phase: bool
+    has_requirement: bool
+    has_task: bool
+    blocked_tasks: int
+    pending_approvals: int
 
 
 class ProjectRepository:
@@ -161,6 +199,37 @@ class ProjectRepository:
             .with_for_update(read=True)
         )
         return org_member is not None or staff is not None
+
+    async def home_facts(self, project_id: uuid.UUID) -> HomeFacts:
+        """The project's `HomeFacts`, in one round trip (the soft-delete filter reaches each
+        subquery)."""
+
+        def has(entity: type[Phase | Requirement | Task], *where: ColumnElement[bool]) -> Exists:
+            return exists().where(entity.project_id == project_id, *where)
+
+        def count(
+            entity: type[ProjectMembership | Task | ApprovalRequest], *where: ColumnElement[bool]
+        ) -> ScalarSelect[int]:
+            return (
+                select(func.count())
+                .select_from(entity)
+                .where(entity.project_id == project_id, *where)
+                .scalar_subquery()
+            )
+
+        row = (
+            await self.session.execute(
+                select(
+                    count(ProjectMembership),
+                    has(Phase, or_(Phase.start_date.is_not(None), Phase.end_date.is_not(None))),
+                    has(Requirement),
+                    has(Task),
+                    count(Task, Task.status == TaskStatus.BLOCKED),
+                    count(ApprovalRequest, ApprovalRequest.status == ApprovalRequestStatus.PENDING),
+                )
+            )
+        ).one()
+        return HomeFacts(*row)
 
     async def is_member(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         return bool(

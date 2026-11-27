@@ -3956,6 +3956,136 @@
         }
       }
     },
+    "/api/projects/{key}/get-started/hidden": {
+      "put": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Hide Get Started",
+        "description": "Hide the home's Get started checklist (DL-201); hiding it again changes nothing.",
+        "operationId": "hide_get_started_api_projects__key__get_started_hidden_put",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "project"
+        ],
+        "summary": "Show Get Started",
+        "description": "Show the home's Get started checklist again; showing a shown one changes nothing.",
+        "operationId": "show_get_started_api_projects__key__get_started_hidden_delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
     "/api/projects/{key}/favorite": {
       "put": {
         "tags": [
@@ -12746,6 +12876,40 @@
         ],
         "title": "Feed[RevisionItem]"
       },
+      "GetStarted": {
+        "properties": {
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden"
+          },
+          "invite_team": {
+            "type": "boolean",
+            "title": "Invite Team"
+          },
+          "compile_plan": {
+            "type": "boolean",
+            "title": "Compile Plan"
+          },
+          "has_requirement": {
+            "type": "boolean",
+            "title": "Has Requirement"
+          },
+          "has_task": {
+            "type": "boolean",
+            "title": "Has Task"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hidden",
+          "invite_team",
+          "compile_plan",
+          "has_requirement",
+          "has_task"
+        ],
+        "title": "GetStarted",
+        "description": "The home's Get started checklist (design-doc §11, DL-201, DL-354), each step ticked from\nthe project's data; loose: a step started counts. Start your project's parts are its\nrequirement and its task (a test case joins in Slice 5)."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -12779,6 +12943,25 @@
         ],
         "title": "HealthRead",
         "description": "A healthy response. When the database is unreachable the endpoint returns 503 with the\nstandard error body instead (`service_unavailable`)."
+      },
+      "HomeNumbers": {
+        "properties": {
+          "blocked_tasks": {
+            "type": "integer",
+            "title": "Blocked Tasks"
+          },
+          "pending_approvals": {
+            "type": "integer",
+            "title": "Pending Approvals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "blocked_tasks",
+          "pending_approvals"
+        ],
+        "title": "HomeNumbers",
+        "description": "The home's headline numbers (design-doc §11, Q11); untested requirements join in\nSlice 5."
       },
       "ItemMove": {
         "properties": {
@@ -15168,6 +15351,26 @@
             "type": "array",
             "title": "Task Types"
           },
+          "get_started": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GetStarted"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "home_numbers": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeNumbers"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "allowed_actions": {
             "items": {
               "$ref": "#/components/schemas/Action"
@@ -15194,6 +15397,8 @@
           "restriction_categories",
           "modules_holding_data",
           "task_types",
+          "get_started",
+          "home_numbers",
           "allowed_actions"
         ],
         "title": "ProjectRead"

@@ -44,6 +44,8 @@ from app.rules.modules import ALL_MODULES, is_available, recommended_modules, se
 from app.rules.restriction import Restriction, change, levels_below, needed_rights
 from app.rules.task_types import task_types
 from app.schemas.project import (
+    GetStarted,
+    HomeNumbers,
     ModuleGuidance,
     ModuleNote,
     ProjectAccessEntry,
@@ -501,6 +503,29 @@ class ProjectService:
     async def read(self, ctx: AuthzContext, project: Project) -> ProjectRead:
         # By id, not `project.lead`: right after a create or a lead change too (DL-111).
         lead = await UserRepository(self.session).get(project.lead_id) if project.lead_id else None
+        actions = allowed_actions(ctx, project_target(project))
+        get_started, numbers = None, None
+        # Both come from items, so both need content access (§3.1: export control).
+        if Action.TASK_VIEW in actions and Action.REQUIREMENT_VIEW in actions:
+            facts = await self.repository.home_facts(project.id)
+            numbers = HomeNumbers(
+                blocked_tasks=facts.blocked_tasks, pending_approvals=facts.pending_approvals
+            )
+            steps = GetStarted(
+                hidden=project.get_started_hidden,
+                # A project starts with one member, its first admin.
+                invite_team=facts.members > 1,
+                compile_plan=facts.has_dated_phase,
+                has_requirement=facts.has_requirement,
+                has_task=facts.has_task,
+            )
+            done = (
+                steps.invite_team
+                and steps.compile_plan
+                and (steps.has_requirement or steps.has_task)
+            )
+            if Action.PROJECT_UPDATE in actions and not done:
+                get_started = steps
         return ProjectRead(
             id=project.id,
             organization_id=project.organization_id,
@@ -519,7 +544,9 @@ class ProjectService:
             # Each module's has-data hook arrives with its slice; none holds data yet.
             modules_holding_data=[],
             task_types=list(task_types(project.type)),
-            allowed_actions=allowed_actions(ctx, project_target(project)),
+            get_started=get_started,
+            home_numbers=numbers,
+            allowed_actions=actions,
         )
 
     async def update(
@@ -661,6 +688,23 @@ class ProjectService:
         await self.session.flush()
         self._log(AuditAction.PROJECT_ARCHIVED, ctx.user_id, project)
         await ApprovalService(self.session).cancel_pending_in_project(project.id, ctx.user_id)
+
+    async def set_get_started_hidden(
+        self, ctx: AuthzContext, project: Project, *, hidden: bool
+    ) -> None:
+        """Hide or show the home's Get started checklist (DL-201; `project_updated`, an audit
+        event only); no change records nothing."""
+        await self.repository.lock(project)
+        # An archive that committed meanwhile still denies it, as in `update`.
+        if project.archived_at is not None:
+            raise ForbiddenError
+        if changed := await apply_changes(self.session, project, {"get_started_hidden": hidden}):
+            self._log(
+                AuditAction.PROJECT_UPDATED,
+                ctx.user_id,
+                project,
+                details=change_details(_json(changed)),
+            )
 
     async def favorite(self, ctx: AuthzContext, project: Project) -> None:
         """Star the project for the caller; no audit event or activity entry (DL-304)."""

@@ -147,6 +147,22 @@ async def unarchive_project(project: Unarchived, ctx: AuthzContextDep, session: 
     await ProjectService(session).unarchive(ctx, project)
 
 
+@router.put(
+    "/projects/{key}/get-started/hidden", status_code=status.HTTP_204_NO_CONTENT, responses=ERRORS
+)
+async def hide_get_started(project: Updated, ctx: AuthzContextDep, session: SessionDep) -> None:
+    """Hide the home's Get started checklist (DL-201); hiding it again changes nothing."""
+    await ProjectService(session).set_get_started_hidden(ctx, project, hidden=True)
+
+
+@router.delete(
+    "/projects/{key}/get-started/hidden", status_code=status.HTTP_204_NO_CONTENT, responses=ERRORS
+)
+async def show_get_started(project: Updated, ctx: AuthzContextDep, session: SessionDep) -> None:
+    """Show the home's Get started checklist again; showing a shown one changes nothing."""
+    await ProjectService(session).set_get_started_hidden(ctx, project, hidden=False)
+
+
 @router.put("/projects/{key}/favorite", status_code=status.HTTP_204_NO_CONTENT, responses=ERRORS)
 async def favorite_project(project: Favorited, ctx: AuthzContextDep, session: SessionDep) -> None:
     """Star the project on your My work; starring a favorite changes nothing (DL-304)."""

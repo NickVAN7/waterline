@@ -48,6 +48,26 @@ class ProjectUpdate(BaseModel):
     enabled_modules: list[ProjectModule] | None = None
 
 
+class GetStarted(BaseModel):
+    """The home's Get started checklist (design-doc §11, DL-201, DL-354), each step ticked from
+    the project's data; loose: a step started counts. Start your project's parts are its
+    requirement and its task (a test case joins in Slice 5)."""
+
+    hidden: bool
+    invite_team: bool
+    compile_plan: bool
+    has_requirement: bool
+    has_task: bool
+
+
+class HomeNumbers(BaseModel):
+    """The home's headline numbers (design-doc §11, Q11); untested requirements join in
+    Slice 5."""
+
+    blocked_tasks: int
+    pending_approvals: int
+
+
 class ProjectRead(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
@@ -67,6 +87,10 @@ class ProjectRead(BaseModel):
     modules_holding_data: list[ProjectModule]
     # The task types this project offers, in `TaskType` order (DL-352).
     task_types: list[TaskType]
+    # Only for the project's admins with content access, and None once every step is ticked.
+    get_started: GetStarted | None
+    # Only for a caller who may see the project's tasks and requirements (content, §3.1).
+    home_numbers: HomeNumbers | None
     allowed_actions: list[Action]
 
 
