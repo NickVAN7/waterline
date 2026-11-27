@@ -446,8 +446,8 @@ may do nothing to anyone has no actions column. Above each list is its filter ba
 **Search people** (or **Search users**) finds people by name, email, or username as you type;
 **Add filter** offers **Role** (not on **Users**), which becomes a chip ("Role: Admin, Member")
 whose button opens **Is any of** or **Is none of** and the roles, each applied as you tick it,
-and whose **Remove Role filter** button takes it away; **Clear** undoes everything set,
-**Show deactivated** included. All of it is in the address, so a link or a reload opens the same
+and whose **Remove Role filter** button takes it away; **Clear** undoes the search and the
+filters, leaving **Show deactivated** as it is (DL-420). All of it is in the address, so a link or a reload opens the same
 list. A search or filter that matches no one says so ("No people match “zed”", or "No people
 match these filters"), with **Clear filters**, which does what **Clear** does and puts you back in
 the search field. **Staff**,

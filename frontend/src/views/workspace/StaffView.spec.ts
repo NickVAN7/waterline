@@ -199,6 +199,26 @@ describe('StaffView', () => {
     expect(document.activeElement).toBe(wrapper.get('input[type=search]').element)
   })
 
+  it('keeps Show deactivated in the address when Clear filters undoes the search (DL-420)', async () => {
+    staffAnswers([])
+    const { wrapper, router } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?q=zed&include_deactivated=true',
+      ['workspace.view', 'workspace_staff.manage'],
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Clear filters')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/staff?include_deactivated=true')
+    expect(wrapper.get<HTMLInputElement>('input[name=include_deactivated]').element.checked).toBe(
+      true,
+    )
+  })
+
   it('says no one matches the filters when there is no search', async () => {
     staffAnswers([])
 

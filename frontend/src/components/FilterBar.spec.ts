@@ -232,14 +232,14 @@ describe('FilterBar', () => {
     expect(document.activeElement).toBe(button(wrapper, 'Add filter')!.element)
   })
 
-  it('offers Clear only while something is set', () => {
+  it('offers Clear only while a search or a filter is set, not for the toggle alone (DL-420)', () => {
     expect(button(mountBar(), 'Clear')).toBeUndefined()
     expect(button(mountBar({ search: 'ann' }), 'Clear')).toBeDefined()
     expect(button(mountBar({ values: { role: ['admin'] } }), 'Clear')).toBeDefined()
-    expect(button(mountBar({ toggle: { ...TOGGLE, checked: true } }), 'Clear')).toBeDefined()
+    expect(button(mountBar({ toggle: { ...TOGGLE, checked: true } }), 'Clear')).toBeUndefined()
   })
 
-  it('clears the search, every filter, and the toggle, focus moving to the search', async () => {
+  it('clears the search and every filter, leaving the toggle, focus moving to the search (DL-420)', async () => {
     const wrapper = mountBar({
       search: 'ann',
       values: { role: ['admin'] },
@@ -249,7 +249,7 @@ describe('FilterBar', () => {
     await button(wrapper, 'Clear')!.trigger('click')
     await flushPromises()
 
-    expect(changes(wrapper)).toEqual([{ q: '', role: [], role__not: [], include_deactivated: '' }])
+    expect(changes(wrapper)).toEqual([{ q: '', role: [], role__not: [] }])
     expect(wrapper.get<HTMLInputElement>('input[type=search]').element.value).toBe('')
     expect(document.activeElement).toBe(wrapper.get('input[type=search]').element)
   })

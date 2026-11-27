@@ -6,9 +6,10 @@ export const SEARCH_DELAY_MS = 300
 <script setup lang="ts">
 // A list's filter bar (DL-419, UI-TBL-10): a search field (`q`), an Add filter menu of the list's
 // declared filters, a chip per filter in use (its button opens a popover with the operator and
-// the values; a named remove button), Clear while anything is set, and the list's toggle last
-// ("Show deactivated"; not a chip, since it widens the list). It holds no state of its own beyond
-// the typing and a filter just added: the URL does (`useListQuery`), so the host passes the
+// the values; a named remove button), Clear while a search or a filter is set, and the list's
+// toggle last ("Show deactivated"; not a chip, since it widens the list; Clear leaves it alone,
+// DL-420). One type size throughout, the form fields' (`--text-base`). It holds no state of its
+// own beyond the typing and a filter just added: the URL does (`useListQuery`), so the host passes the
 // current values and applies the `change` it emits (`query.filtered`). An enum filter is "any of"
 // (`name`) or "none of" (`name__not`); other types join with their first lists (DL-419).
 import Menu from 'primevue/menu'
@@ -198,9 +199,8 @@ function remove(filter: EnumFilter) {
 
 // --- Clear and the toggle -------------------------------------------------------------------
 
-const anything = computed(
-  () => !!props.search || filters.value.some(inUse) || !!props.toggle?.checked,
-)
+// A search or a filter: Clear leaves the toggle alone, so it never hides people (DL-420).
+const anything = computed(() => !!props.search || filters.value.some(inUse))
 
 async function clear() {
   clearTimeout(timer)
@@ -211,7 +211,6 @@ async function clear() {
     changes[filter.name] = []
     changes[`${filter.name}__not`] = []
   }
-  if (props.toggle) changes[props.toggle.name] = ''
   emit('change', changes)
   await nextTick()
   // Clear has gone with what it cleared.
@@ -233,7 +232,7 @@ const menuPt = { item: () => ({ 'aria-level': undefined }) }
 <template>
   <div role="group" aria-label="Filters" class="flex flex-wrap items-center gap-2">
     <div class="flex items-center gap-2">
-      <label :for="`${id}-search`" class="text-sm font-medium">{{ searchLabel }}</label>
+      <label :for="`${id}-search`" class="font-medium">{{ searchLabel }}</label>
       <input
         :id="`${id}-search`"
         ref="searchInput"
@@ -253,7 +252,7 @@ const menuPt = { item: () => ({ 'aria-level': undefined }) }
         aria-haspopup="menu"
         :aria-controls="adding ? `${id}-add` : undefined"
         :aria-expanded="adding ? 'true' : 'false'"
-        class="inline-flex min-h-(--control-height) items-center gap-1 rounded-md border border-border bg-bg px-3 text-sm text-text hover:bg-hover"
+        class="inline-flex min-h-(--control-height) items-center gap-1 rounded-md border border-border bg-bg px-3 text-text hover:bg-hover"
         @click="toggleAdd"
       >
         Add filter<Icon name="chevron-down" />
@@ -280,7 +279,7 @@ const menuPt = { item: () => ({ 'aria-level': undefined }) }
           aria-haspopup="dialog"
           :aria-expanded="editing === filter ? 'true' : 'false'"
           :aria-controls="editing === filter ? popoverId : undefined"
-          class="inline-flex min-h-(--control-height) max-w-full items-center gap-1 rounded-l-md px-3 text-left text-sm text-text hover:bg-hover"
+          class="inline-flex min-h-(--control-height) max-w-full items-center gap-1 rounded-l-md px-3 text-left text-text hover:bg-hover"
           @click="open(filter, $event)"
         >
           <span class="break-words">{{ chipText(filter) }}</span
@@ -300,7 +299,7 @@ const menuPt = { item: () => ({ 'aria-level': undefined }) }
     <button
       v-if="anything"
       type="button"
-      class="inline-flex min-h-(--control-height) items-center rounded-md px-2 text-sm text-text-muted underline hover:text-text"
+      class="inline-flex min-h-(--control-height) items-center rounded-md px-2 text-text-muted underline hover:text-text"
       @click="clear"
     >
       Clear
@@ -324,7 +323,7 @@ const menuPt = { item: () => ({ 'aria-level': undefined }) }
     >
       <div v-if="editing" class="flex w-64 max-w-full flex-col gap-3">
         <fieldset class="m-0 flex flex-col gap-1 border-0 p-0">
-          <legend class="mb-1 text-sm font-medium">{{ editing.label }}</legend>
+          <legend class="mb-1 font-medium">{{ editing.label }}</legend>
           <label class="flex items-center gap-2">
             <input
               type="radio"
@@ -346,7 +345,10 @@ const menuPt = { item: () => ({ 'aria-level': undefined }) }
             <span>Is none of</span>
           </label>
         </fieldset>
-        <fieldset class="m-0 flex flex-col gap-1 border-0 p-0">
+        <!-- A rule between the operator and the values (owner, S3-C16's report). -->
+        <fieldset
+          class="m-0 flex flex-col gap-1 border-x-0 border-t border-b-0 border-border-subtle p-0 pt-3"
+        >
           <legend class="sr-only">{{ editing.label }} values</legend>
           <label
             v-for="option in editing.options"
