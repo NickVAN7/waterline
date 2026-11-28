@@ -4,15 +4,18 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.core.settings import TEST_DATABASE_NAME
+from tests.conftest import HarnessSettings
 from tests.factories import SEED
 from tests.support.models import Widget, WidgetFactory
 
 pytestmark = pytest.mark.anyio
 
 
-async def test_tests_run_against_the_test_database(session: AsyncSession, worker_id: str) -> None:
-    expected = TEST_DATABASE_NAME if worker_id == "master" else f"{TEST_DATABASE_NAME}_{worker_id}"
+async def test_tests_run_against_the_test_database(
+    session: AsyncSession, worker_id: str, settings: HarnessSettings
+) -> None:
+    base = settings.waterline_test_database
+    expected = base if worker_id == "master" else f"{base}_{worker_id}"
     assert await session.scalar(text("SELECT current_database()")) == expected
 
 

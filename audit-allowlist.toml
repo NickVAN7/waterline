@@ -13,3 +13,8 @@
 id = "GHSA-vfj7-8cjw-p6xm"
 reason = "braces (via @vue/eslint-config-typescript, a dev dependency) has no fixed release; it only expands the repo's own ESLint globs"
 tech_debt = "TD-19"
+
+[[npm]]
+id = "GHSA-fc5q-39xc-vjpf"
+reason = "picomatch (via vite, vitest, vue-router's plugin, vue-tsc and fast-glob, all dev tooling) has no fixed release; it only matches the repo's own config globs"
+tech_debt = "TD-116"

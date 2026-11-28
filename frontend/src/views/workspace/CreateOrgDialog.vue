@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Creating an org with its first owner (build plan, "The workspace and org API"; design-doc §4): a
-// name, a slug checked live (UI-FRM-9), and the owner: an existing active person, or a new account
+// name, a slug checked live (UI-FRM-9), and the owner: an existing active person, searched in the
+// `PersonPicker` (DL-422), or a new account
 // (`NewAccountFields`: email, name, username suggested from the name, and a temporary password
 // shown once, UI-FRM-11). A taken email or username reports on its field, wherever the server puts it
 // (`new_owner.email` or `email` on a race, TD-25): `useFormErrors` reads the field from the end of
@@ -11,7 +12,7 @@ import { api, ApiError, client } from '@/api/client'
 import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
-import SelectField from '@/components/SelectField.vue'
+import PersonPicker, { type Person } from '@/components/PersonPicker.vue'
 import TemporaryPasswordNotice from '@/components/TemporaryPasswordNotice.vue'
 import TextField from '@/components/TextField.vue'
 import { useAvailability } from '@/composables/useAvailability'
@@ -30,7 +31,7 @@ type Owner = 'existing' | 'new'
 const owner = ref<Owner>('existing')
 const values = ref({ name: '', slug: '', owner_id: '' })
 const newOwner = ref<NewAccount>({ email: '', name: '', username: '', password: '' })
-const people = ref<{ value: string; label: string }[]>([])
+const ownerPerson = ref<Person | null>(null)
 const created = ref(false)
 // Kept here: the new owner's fields go when "An existing person" is chosen (TD-59).
 const usernameEdited = ref(false)
@@ -53,7 +54,7 @@ const doneButton = ref<InstanceType<typeof Button>>()
 const fields = {
   name: ref<InstanceType<typeof TextField>>(),
   slug: ref<InstanceType<typeof TextField>>(),
-  owner_id: ref<InstanceType<typeof SelectField>>(),
+  owner_id: ref<InstanceType<typeof PersonPicker>>(),
 }
 const ownerFields = ref<InstanceType<typeof NewAccountFields>>()
 const OWNER_LABELS = { email: "Owner's email", name: "Owner's name", username: "Owner's username" }
@@ -71,6 +72,7 @@ const { message: slugAvailability } = useAvailability(slug, 'Slug', (value) =>
 async function open(): Promise<void> {
   owner.value = 'existing'
   values.value = { name: '', slug: '', owner_id: '' }
+  ownerPerson.value = null
   newOwner.value = { email: '', name: '', username: '', password: '' }
   created.value = false
   usernameEdited.value = false
@@ -78,17 +80,26 @@ async function open(): Promise<void> {
   ownerErrors.reset()
   status.value = ''
   await dialog.value?.open()
-  try {
-    const users = await api(
-      client.GET('/api/workspaces/{workspace_id}/users', {
-        params: { path: path(), query: { limit: 200, sort: 'name' } },
-      }),
-    )
-    people.value = users.items.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-    // The picker stays empty; "A new account" still works.
-  }
+}
+
+// The workspace's active users (deactivated ones aren't listed without `include_deactivated`).
+async function searchUsers(q: string): Promise<Person[]> {
+  const users = await api(
+    client.GET('/api/workspaces/{workspace_id}/users', {
+      params: { path: path(), query: { limit: 20, sort: 'name', ...(q ? { q } : {}) } },
+    }),
+  )
+  return users.items.map((u) => ({ user_id: u.id, name: u.name, email: u.email }))
+}
+
+// What the user may do changed: `/me`'s workspace actions follow (UI-FRM-7).
+function searchFailed(error: ApiError) {
+  if (error.status === 403) store.load().catch(() => {})
+}
+
+function ownerChosen(person: Person | null) {
+  values.value.owner_id = person?.user_id ?? ''
+  orgErrors.clearField('owner_id')
 }
 
 // The org's fields, or the new owner's (`owner.<field>`: both have a `name`).
@@ -270,16 +281,18 @@ defineExpose({ open })
           A new account
         </label>
       </fieldset>
-      <SelectField
+      <PersonPicker
         v-if="owner === 'existing'"
         id="org-owner-id"
         :ref="(el) => (fields.owner_id.value = el as never)"
-        v-model="values.owner_id"
+        v-model="ownerPerson"
         label="Owner"
-        :options="[{ value: '', label: 'Choose a person' }, ...people]"
+        help="Search the workspace's people by name, email, or username."
         required
         :error="orgErrors.fieldErrors.value.owner_id"
-        @update:model-value="orgErrors.clearField('owner_id')"
+        :search="searchUsers"
+        @failed="searchFailed"
+        @update:model-value="ownerChosen"
       />
       <NewAccountFields
         v-else

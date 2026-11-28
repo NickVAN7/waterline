@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="R extends string">
 // A roster page (workspace staff; an org's members, DL-103): the list, with each person's role and
 // whether they're active (DL-102); add (email first) or create a person; change a role, stepping
 // down from your own row (the last owner names a replacement, DL-59); remove (D2, with the
@@ -7,15 +7,17 @@
 // project's page (S1-C16b) puts its own header in the `header` slot and its own dialogs in
 // `dialogs`. A 403 in a dialog reloads the list and `/me`, and tells the page (`refused`), since
 // what the user may do has changed (UI-FRM-7). The list shows active people only; its admins get
-// "Show deactivated", kept in the URL (DL-293, DL-295).
+// "Show deactivated", kept in the URL (DL-293, DL-295), last in its filter bar with the search and
+// the role filter (DL-419). The Actions column shows only when a row has an action (TD-102).
 import { computed, ref, watch } from 'vue'
 
-import { DEACTIVATED } from '@/app/labels'
 import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
-import Badge from '@/components/Badge.vue'
+import type { Crumb } from '@/components/Breadcrumbs.vue'
 import Button from '@/components/Button.vue'
+import PersonName from '@/components/PersonName.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
+import FilterBar, { type EnumFilter, type FilterChanges } from '@/components/FilterBar.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import RowActions, { type RowAction } from '@/components/RowActions.vue'
@@ -24,6 +26,7 @@ import SuccessStatus from '@/components/SuccessStatus.vue'
 import { allows, type Action } from '@/composables/allowedActions'
 import { useListQuery } from '@/composables/useListQuery'
 import { useRefocusWhenGone, useShowDeactivated } from '@/composables/usePeopleList'
+import { useRouter } from 'vue-router'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
@@ -33,7 +36,7 @@ import AccountActions from '@/views/user/AccountActions.vue'
 import AddPersonDialog from './AddPersonDialog.vue'
 import ChangeRoleDialog from './ChangeRoleDialog.vue'
 import RemoveDialog from './RemoveDialog.vue'
-import type { Roster, RosterPerson } from './roster'
+import type { Roster, RosterListQuery, RosterPerson } from './roster'
 
 export type RosterRow = RosterPerson & {
   username: string
@@ -48,16 +51,15 @@ const props = defineProps<{
   /** The list, for the loading and error words ("the staff"). */
   thing: string
   roster: Roster
-  list: (params: { limit: number; offset: number; include_deactivated?: boolean }) => Promise<{
-    items: RosterRow[]
-    total: number
-  }>
+  list: (params: RosterListQuery<R>) => Promise<{ items: RosterRow[]; total: number }>
   /** The row action for changing a role and removing (`workspace_staff.manage`). */
   manage: Action
   removeLabel: string
-  roleLabels: Record<string, string>
+  roleLabels: Record<R, string>
   /** May the user add people (the page-level `manage` action)? */
   canAdd?: boolean
+  /** The page's breadcrumb trail (DL-327). */
+  crumbs?: Crumb[]
   /** May the user list deactivated people too (the list's admins, DL-294)? */
   canShowDeactivated?: boolean
   /** May the user open the page at all? Otherwise, the 403 page naming `whoToAsk` (UI-FBK-14). */
@@ -73,21 +75,57 @@ const props = defineProps<{
 const emit = defineEmits<{ refused: [] }>()
 
 const store = useCurrentUserStore()
-const query = useListQuery({ limit: 25, filters: ['include_deactivated'] as const })
+const router = useRouter()
+const query = useListQuery({
+  limit: 25,
+  filters: ['include_deactivated', 'q'] as const,
+  multi: ['role', 'role__not'] as const,
+})
 const done = ref('')
 const table = ref<HTMLTableElement>()
-const { show: showDeactivated, toggle: toggleDeactivated } = useShowDeactivated(
-  query,
-  () => !!props.canShowDeactivated,
-)
+const showDeactivated = useShowDeactivated(query, () => !!props.canShowDeactivated)
 const refocus = useRefocusWhenGone(table)
+
+const roleFilter = computed<EnumFilter>(() => ({
+  name: 'role',
+  label: 'Role',
+  options: Object.entries<string>(props.roleLabels).map(([value, label]) => ({ value, label })),
+}))
+// An old link's unknown role is dropped, not sent (it would be the list's 422).
+const roles = (values: string[]) =>
+  values.filter((v): v is R => Object.prototype.hasOwnProperty.call(props.roleLabels, v))
+const roleQuery = computed(() => {
+  const any = roles(query.values.value.role)
+  const none = roles(query.values.value.role__not)
+  return { ...(any.length ? { role: any } : {}), ...(none.length ? { role__not: none } : {}) }
+})
+// The search or a filter narrows the list (the toggle only widens it).
+const narrowed = computed(() => !!query.filter.value.q || Object.keys(roleQuery.value).length > 0)
+const noMatch = computed(() =>
+  query.filter.value.q
+    ? `No people match “${query.filter.value.q}”`
+    : 'No people match these filters',
+)
+const bar = ref<InstanceType<typeof FilterBar>>()
+function onFilter(changes: FilterChanges) {
+  void router.replace(query.filtered(changes))
+}
 
 const page = useLoad(() =>
   props.list({
     limit: query.limit,
     offset: query.offset.value,
+    ...(query.filter.value.q ? { q: query.filter.value.q } : {}),
+    ...roleQuery.value,
     ...(showDeactivated.value ? { include_deactivated: true } : {}),
   }),
+)
+// The Actions column, for the list's admins always (so filtering or paging never moves the
+// columns, S3-C0k), for anyone else only when a row on the page has an action (TD-102).
+const withActions = computed(
+  () =>
+    !!props.canShowDeactivated ||
+    (page.data.value?.items.some((row) => actionsFor(row).length > 0) ?? false),
 )
 // `showDeactivated` too: losing the list's admin rights drops `include_deactivated` (DL-294).
 watch(
@@ -182,21 +220,24 @@ const announcement = computed(() => {
   <ForbiddenView v-else-if="refused" :who-to-ask="whoToAsk" />
   <div v-else class="flex flex-col gap-6">
     <slot name="header" :add="() => adder?.open()">
-      <PageHeader :title="title">
+      <PageHeader :title="title" :crumbs="crumbs">
         <Button v-if="canAdd" @click="adder?.open()">Add person</Button>
       </PageHeader>
     </slot>
     <SuccessStatus :message="done" />
-    <label v-if="canShowDeactivated" class="flex items-center gap-2 self-start">
-      <input
-        id="show-deactivated"
-        type="checkbox"
-        class="size-(--target-min) shrink-0"
-        :checked="showDeactivated"
-        @change="toggleDeactivated"
-      />
-      <span>Show deactivated</span>
-    </label>
+    <FilterBar
+      ref="bar"
+      search-label="Search people"
+      :search="query.filter.value.q"
+      :filters="[roleFilter]"
+      :values="roleQuery"
+      :toggle="
+        canShowDeactivated
+          ? { name: 'include_deactivated', label: 'Show deactivated', checked: showDeactivated }
+          : undefined
+      "
+      @change="onFilter"
+    />
     <section
       aria-labelledby="roster-heading"
       :aria-busy="page.loading.value ? 'true' : 'false'"
@@ -212,6 +253,13 @@ const announcement = computed(() => {
         @retry="page.retry"
       />
       <Skeleton v-else-if="!page.data.value" />
+      <!-- A search or a filter that matches no one names it, with Clear filters (UI-FBK-8). -->
+      <EmptyState v-else-if="!page.data.value.total && narrowed" :heading="noMatch" :level="3">
+        Try another search or role, or clear the filters.
+        <template #action>
+          <Button variant="secondary" @click="bar?.clear()">Clear filters</Button>
+        </template>
+      </EmptyState>
       <!-- Only deactivated people, unticked: "nothing yet", and its admins a pointer (DL-297). -->
       <EmptyState
         v-else-if="!page.data.value.total"
@@ -225,40 +273,47 @@ const announcement = computed(() => {
         }}
       </EmptyState>
       <template v-else>
-        <div role="region" aria-labelledby="roster-heading" tabindex="0" class="overflow-x-auto">
+        <div
+          role="region"
+          aria-labelledby="roster-heading"
+          tabindex="0"
+          class="relative overflow-x-auto"
+        >
           <table
             ref="table"
             aria-labelledby="roster-heading"
-            class="w-full border-collapse text-sm"
+            class="w-full min-w-(--content-narrow) table-fixed border-collapse text-sm"
           >
+            <!-- Fixed widths, so showing the deactivated never moves the columns (owner, S3-C0k); its
+                 minimum width scrolls it in its region on a narrow screen. -->
+            <colgroup>
+              <col class="w-1/3" />
+              <col />
+              <col class="w-1/4" />
+              <col v-if="withActions" class="w-16" />
+            </colgroup>
             <thead>
               <tr class="border-b border-border text-left">
                 <th scope="col" class="p-2">Name</th>
                 <th scope="col" class="p-2">Email</th>
                 <th scope="col" class="p-2">Role</th>
-                <th scope="col" class="p-2"><span class="sr-only">Actions</span></th>
+                <th v-if="withActions" scope="col" class="p-2">
+                  <span class="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="row in page.data.value.items"
                 :key="row.user_id"
-                class="border-b border-border-subtle"
+                :class="['border-b border-border-subtle', !row.is_active && 'text-text-muted']"
               >
-                <td class="p-2">
-                  <span class="flex flex-wrap items-center gap-2">
-                    {{ row.name }}
-                    <Badge
-                      v-if="!row.is_active"
-                      :tone="DEACTIVATED.tone"
-                      :icon="DEACTIVATED.icon"
-                      >{{ DEACTIVATED.label }}</Badge
-                    >
-                  </span>
+                <td class="p-2 break-words">
+                  <PersonName :name="row.name" :active="row.is_active" />
                 </td>
-                <td class="p-2">{{ row.email }}</td>
-                <td class="p-2">{{ roleLabels[row.role] }}</td>
-                <td class="p-2 text-right">
+                <td class="p-2 break-words">{{ row.email }}</td>
+                <td class="p-2">{{ roleLabels[row.role as R] }}</td>
+                <td v-if="withActions" class="p-2 text-right">
                   <RowActions :name="row.name" :actions="actionsFor(row)" />
                 </td>
               </tr>

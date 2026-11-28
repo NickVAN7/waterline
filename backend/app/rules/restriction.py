@@ -53,3 +53,12 @@ def levels_below(project: RestrictionLevel | None) -> frozenset[RestrictionLevel
     """The levels an item may not store on a project at `project`: those ranking below it
     (DL-208). An item's null level inherits the project's, so it's never below."""
     return frozenset(level for level in RestrictionLevel if _RANK[level] < _RANK[project])
+
+
+def needed_rights[A](kind: Change, raise_: A, lower: A) -> list[A]:
+    """The rights a restriction change needs, given the two actions that grant them: `raise_`
+    for a raise, `lower` for a lower, both for a change that does both; one that does neither
+    (the restriction already held included) needs either, so `[raise_]`: lower is never granted
+    without raise (design-doc §3.1, "Who sets it"; DL-82)."""
+    needed = [action for action, does in ((raise_, kind.raises), (lower, kind.lowers)) if does]
+    return needed or [raise_]

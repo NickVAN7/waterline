@@ -3,6 +3,7 @@ that): what each change does, its audit event, and its errors (build plan, "The 
 API", DL-55; design-doc §4, §10.1)."""
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -12,14 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import SessionMaker
 from app.core.security import verify_password
 from app.core.settings import Settings
-from app.enums import AuditAction, AuditEntityType, WorkspaceRole
+from app.enums import AuditAction, AuditEntityType, OrgRole, WorkspaceRole
 from app.main import create_app
 from app.models.audit_event import AuditEvent
 from app.models.auth import UserSession
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMembership
 from app.services.roster import MemberRemoval
-from tests.factories.org import OrganizationFactory
+from tests.factories.org import MembershipFactory, OrganizationFactory
+from tests.factories.project import ProjectFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
 from tests.support.api import api_client
@@ -626,6 +628,37 @@ async def test_the_org_list_is_the_workspaces_orgs_by_name(
     response = await client.get(f"/api/workspaces/{workspace.id}/orgs")
 
     assert [org["name"] for org in response.json()["items"]] == ["Bolt", "Cove"]
+
+
+async def test_each_listed_org_counts_its_projects_and_members_and_names_its_owners(
+    client: AsyncClient, workspace: Workspace
+) -> None:
+    """S3-C0k: projects without the archived; members and owners whose accounts are active,
+    owners by name. Bug: a count leaking across orgs, or counting the archived or deactivated."""
+    await owner_of(client, workspace)
+    bolt = await OrganizationFactory.create_async(workspace=workspace, name="Bolt")
+    await OrganizationFactory.create_async(workspace=workspace, name="Cove")
+    await ProjectFactory.create_async(organization=bolt)
+    await ProjectFactory.create_async(organization=bolt)
+    await ProjectFactory.create_async(organization=bolt, archived_at=datetime.now(UTC))
+    zoe = await UserFactory.create_async(name="Zoe Zed")
+    amy = await UserFactory.create_async(name="Amy Ash")
+    gone = await UserFactory.create_async(name="Gus Gone", is_active=False)
+    await MembershipFactory.create_async(organization=bolt, user=zoe, role=OrgRole.OWNER)
+    await MembershipFactory.create_async(organization=bolt, user=amy, role=OrgRole.OWNER)
+    await MembershipFactory.create_async(organization=bolt, user=gone, role=OrgRole.OWNER)
+    await MembershipFactory.create_async(
+        organization=bolt, user=await UserFactory.create_async(), role=OrgRole.MEMBER
+    )
+
+    items = (await client.get(f"/api/workspaces/{workspace.id}/orgs")).json()["items"]
+
+    bolt_row, cove_row = items
+    assert (bolt_row["project_count"], bolt_row["member_count"]) == (2, 3)
+    assert [o["name"] for o in bolt_row["owners"]] == ["Amy Ash", "Zoe Zed"]
+    assert bolt_row["owners"][0]["id"] == str(amy.id)
+    assert (cove_row["name"], cove_row["project_count"], cove_row["member_count"]) == ("Cove", 0, 0)
+    assert cove_row["owners"] == []
 
 
 # --- Access ends on the next request (design-doc §4, "Sessions") ------------------------------

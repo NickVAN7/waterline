@@ -41,6 +41,31 @@ class ApprovalRepository:
             .options(*_FOR_READ)
         )
 
+    def ids_for_entity(
+        self, entity_type: ApprovalEntityType, entity_id: uuid.UUID
+    ) -> Select[uuid.UUID]:
+        """The entity's request IDs, every status, as a subquery (its History, DL-388)."""
+        return select(ApprovalRequest.id).where(
+            ApprovalRequest.entity_type == entity_type, ApprovalRequest.entity_id == entity_id
+        )
+
+    async def entity_ids(
+        self, project_id: uuid.UUID, request_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        """The requirement each of the project's requirement requests with these IDs is for, by
+        request ID (the activity feed names a request's entry by its requirement; a milestone's
+        or test run's request, from Slice 4, isn't named yet)."""
+        if not request_ids:
+            return {}
+        rows = await self.session.execute(
+            select(ApprovalRequest.id, ApprovalRequest.entity_id).where(
+                ApprovalRequest.project_id == project_id,
+                ApprovalRequest.entity_type == ApprovalEntityType.REQUIREMENT,
+                ApprovalRequest.id.in_(request_ids),
+            )
+        )
+        return dict(rows.all())
+
     async def get(self, request_id: uuid.UUID) -> ApprovalRequest | None:
         """The request, loaded for a read, read again if the session holds it (after a change)."""
         return await self.session.scalar(
@@ -62,6 +87,20 @@ class ApprovalRepository:
                 )
             )
         )
+
+    async def pending_entity_ids(
+        self, project_id: uuid.UUID, entity_type: ApprovalEntityType
+    ) -> set[uuid.UUID]:
+        """The project's entities of this type with a pending request (the `(project_id,
+        status)` index; the requirement tree's "Awaiting approval", Q12b)."""
+        rows = await self.session.scalars(
+            select(ApprovalRequest.entity_id).where(
+                ApprovalRequest.project_id == project_id,
+                ApprovalRequest.status == ApprovalRequestStatus.PENDING,
+                ApprovalRequest.entity_type == entity_type,
+            )
+        )
+        return set(rows)
 
     async def lock(self, request: ApprovalRequest) -> None:
         """Re-read the request's row and hold it until the transaction ends."""
@@ -86,13 +125,6 @@ class ApprovalRepository:
         return self._mine(approver_id, scope).where(
             Approval.decision == ApprovalDecision.PENDING,
             ApprovalRequest.status == ApprovalRequestStatus.PENDING,
-        )
-
-    def decided_for(self, approver_id: uuid.UUID, scope: Scope) -> Select[Approval]:
-        """The rows the approver approved or rejected, whatever their request's status now (My
-        work's past decisions, DL-286)."""
-        return self._mine(approver_id, scope).where(
-            Approval.decision.in_((ApprovalDecision.APPROVED, ApprovalDecision.REJECTED))
         )
 
     def _mine(self, approver_id: uuid.UUID, scope: Scope) -> Select[Approval]:

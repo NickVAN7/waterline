@@ -1,13 +1,15 @@
 """Helpers behind the `concurrency` fixture (tests/conftest.py) and race tests
 (testing-strategy.md, "Concurrency"; TD-4)."""
 
+import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
-from typing import cast
+from typing import Any, cast
 
 import anyio
 import pytest
 from sqlalchemy import URL, select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from app.core.db import SessionMaker
@@ -182,6 +184,52 @@ async def refusal(work: Awaitable[object]) -> AppError | None:
     except AppError as error:
         return error
     return None
+
+
+async def failure(work: Awaitable[object]) -> AppError | DBAPIError | None:
+    """As `refusal`, but a database error (a deadlock Postgres broke) is recorded too."""
+    try:
+        return await refusal(work)
+    except DBAPIError as error:
+        return error
+
+
+async def attempt(session: AsyncSession, work: Awaitable[object]) -> AppError | DBAPIError | None:
+    """`failure(work)`, committing `session` when it succeeds: one transaction of a race whose
+    outcome the test asserts after its task group closes."""
+    outcome = await failure(work)
+    if outcome is None:
+        await session.commit()
+    return outcome
+
+
+class PausedMembershipLocks:
+    """Holds a roster repository's locking `membership` read, in the sessions passed to
+    `pause`, until `release()`: a race test's pause between a change's owners' lock and its
+    target's row (a test of lock order takes the steps by hand). `reached` is set when one
+    arrives."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, repository: type[Any]) -> None:
+        self.reached = anyio.Event()
+        self._released = anyio.Event()
+        self._sessions: set[AsyncSession] = set()
+        original = repository.membership
+
+        async def membership(
+            repo: Any, scope_id: uuid.UUID, user_id: uuid.UUID, *, lock: bool = False
+        ) -> object:
+            if lock and repo.session in self._sessions:
+                self.reached.set()
+                await self._released.wait()
+            return await original(repo, scope_id, user_id, lock=lock)
+
+        monkeypatch.setattr(repository, "membership", membership)
+
+    def pause(self, session: AsyncSession) -> None:
+        self._sessions.add(session)
+
+    def release(self) -> None:
+        self._released.set()
 
 
 async def refusal_types(work: Awaitable[object]) -> list[str]:

@@ -24,6 +24,10 @@ const links = computed(() =>
 <template>
   <!-- A landmark with nothing in it isn't rendered (UI-SHL-2). -->
   <nav v-if="links.length" aria-label="Organization administration" class="flex flex-col gap-1">
+    <!-- Whose pages these are (owner, S2 feedback): the organization's, not a project's. The
+         landmark already says "Organization", so a screen reader hears only the org's name. -->
+    <p class="m-0 px-2 text-sm font-semibold text-text-muted" aria-hidden="true">Organization</p>
+    <p class="m-0 mb-1 px-2 font-semibold break-words">{{ org.name }}</p>
     <SidebarLink
       v-for="link in links"
       :key="link.name"

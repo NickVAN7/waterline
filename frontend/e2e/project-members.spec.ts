@@ -43,16 +43,17 @@ test("a project's members are added by email and from the picker, changed, remov
   await expect(adder).toBeHidden()
   await expect(page.getByRole('button', { name: 'Add by email' })).toBeFocused()
   const row = members.getByRole('row', { name: new RegExp(name) })
-  await expect(row).toContainText('Viewer')
+  // Added as a Member, the form's default (S3-C0l).
+  await expect(row).toContainText('Member')
 
   // A new role, from the row's menu, by keyboard.
   await row.getByRole('button', { name: `Actions for ${name}` }).focus()
   await page.keyboard.press('Enter')
   await page.getByRole('menuitem', { name: 'Change role' }).click()
   const changer = page.getByRole('dialog', { name: `Change the role of ${name}` })
-  await changer.getByRole('combobox', { name: 'Role' }).selectOption('member')
+  await changer.getByRole('combobox', { name: 'Role' }).selectOption('viewer')
   await changer.getByRole('button', { name: 'Change role' }).click()
-  await expect(row).toContainText('Member')
+  await expect(row).toContainText('Viewer')
 
   // Removed: no option about other projects, since it's one project.
   await row.getByRole('button', { name: `Actions for ${name}` }).click()
@@ -67,6 +68,10 @@ test("a project's members are added by email and from the picker, changed, remov
   await page.getByRole('button', { name: 'Add member' }).click()
   const picker = page.getByRole('dialog', { name: 'Add a member' })
   const person = picker.getByRole('combobox', { name: 'Person' })
+  // It starts on its title, the picker's list closed until the user moves to it (S3-C0l).
+  await expect(picker.getByRole('heading', { name: 'Add a member' })).toBeFocused()
+  await expect(picker.getByRole('listbox')).toHaveCount(0)
+  await page.keyboard.press('Tab')
   await expect(person).toBeFocused()
   await person.pressSequentially(run)
   await expect(picker.getByRole('option', { name: new RegExp(name) })).toBeVisible()
@@ -74,7 +79,7 @@ test("a project's members are added by email and from the picker, changed, remov
   await picker.getByRole('option', { name: new RegExp(name) }).click()
   await picker.getByRole('button', { name: 'Add member' }).click()
   await expect(picker).toBeHidden()
-  await expect(row).toContainText('Viewer')
+  await expect(row).toContainText('Member')
 
   // The access review: them by their role, and olivia through the org.
   await page.getByRole('link', { name: 'Access review' }).click()
@@ -82,7 +87,7 @@ test("a project's members are added by email and from the picker, changed, remov
     page.getByRole('heading', { level: 1, name: 'Customer Portal project access review' }),
   ).toBeFocused()
   const review = page.getByRole('table', { name: 'Who reaches the project' })
-  await expect(review.getByRole('row', { name: new RegExp(name) })).toContainText('Project viewer')
+  await expect(review.getByRole('row', { name: new RegExp(name) })).toContainText('Project member')
   await expect(review.getByRole('row', { name: /Olivia Ortiz/ })).toContainText('Org owner')
   await expectNoA11yViolations(page)
   await expectFocusNotObscured(page)

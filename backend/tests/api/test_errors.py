@@ -93,6 +93,17 @@ def build_app(sessionmaker: SessionMaker) -> FastAPI:
 
         return StreamingResponse(chunks())
 
+    @app.post("/widgets/then-deadlock")
+    async def create_then_deadlock(session: SessionDep) -> None:
+        session.add(Widget(name="kept?"))
+        await session.flush()
+        # A real Postgres error with the deadlock's SQLSTATE, through the driver.
+        await session.execute(text("DO $$ BEGIN RAISE EXCEPTION USING ERRCODE = '40P01'; END $$"))
+
+    @app.get("/lock-timeout")
+    async def lock_timeout(session: SessionDep) -> None:
+        await session.execute(text("DO $$ BEGIN RAISE EXCEPTION USING ERRCODE = '55P03'; END $$"))
+
     @app.post("/widgets")
     async def create_widget(name: str, quantity: int) -> dict[str, str]:
         return {"name": name, "quantity": str(quantity)}
@@ -252,6 +263,34 @@ async def test_unhandled_exception_is_500_in_the_standard_format_without_its_det
         "details": {},
     }
     assert "hunter2" not in response.text
+
+
+async def test_a_deadlock_is_a_503_to_retry_and_keeps_nothing(
+    client: AsyncClient, sessionmaker: SessionMaker
+) -> None:
+    """The handoff's Package 4 item 4 (interim for TD-83): Postgres broke a deadlock, so the
+    request's transaction was rolled back and a retry is safe. Bug: a 500, no `Retry-After`, or
+    the request's write kept."""
+    response = await client.post("/widgets/then-deadlock")
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "1"
+    assert response.json() == {
+        "code": "service_unavailable",
+        "message": "The service is temporarily unavailable.",
+        "details": {},
+    }
+    async with sessionmaker() as session:
+        assert await session.scalar(select(Widget.name)) is None
+
+
+async def test_another_database_error_is_still_a_500(client: AsyncClient) -> None:
+    """Bug: every operational error read as a deadlock, and retried when it isn't safe to."""
+    response = await client.get("/lock-timeout")
+
+    assert response.status_code == 500
+    assert response.json()["code"] == "internal_error"
+    assert "retry-after" not in response.headers
 
 
 async def test_unhandled_exception_is_logged_with_its_traceback(

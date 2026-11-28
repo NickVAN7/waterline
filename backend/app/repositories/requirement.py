@@ -5,14 +5,77 @@ from collections.abc import Collection
 from datetime import datetime
 from typing import cast
 
-from sqlalchemy import Select, exists, false, select
+from sqlalchemy import (
+    DateTime,
+    Select,
+    String,
+    Uuid,
+    column,
+    exists,
+    false,
+    literal,
+    or_,
+    select,
+    union_all,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql.expression import ColumnClause
 
 from app.core.base_model import INCLUDE_DELETED
-from app.enums import RestrictionLevel
+from app.enums import (
+    ApprovalEntityType,
+    ApprovalRequestStatus,
+    ApprovalState,
+    TaskStatus,
+    TrashItemType,
+)
+from app.models.approval import ApprovalRequest
 from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
+from app.models.task import Task
+
+# The project trash's rows (design-doc §9): one per deleted item, whatever its table, so the list
+# filters, sorts, and pages them together (`TRASH`). Unqualified, so they name the columns of the
+# one union `trash()` selects from; each table's part selects these three.
+TRASH_TYPE: ColumnClause[str] = column("type", String)
+TRASH_ID: ColumnClause[uuid.UUID] = column("id", Uuid)
+TRASH_DELETED_AT: ColumnClause[datetime] = column("deleted_at", DateTime(timezone=True))
+
+
+# The requirement tree's filters that read other tables (S3-C10), as `EXISTS`, never a join, so a
+# requirement is listed once (DL-35).
+HAS_TASKS = (
+    select(Task.id)
+    .where(
+        Task.requirement_id == Requirement.id,
+        Task.deleted_at.is_(None),
+        # Left out of the coverage counts, so of "has tasks" too (owner, Nov 25, 2026).
+        Task.status != TaskStatus.CANCELLED,
+    )
+    .exists()
+)
+AWAITING_APPROVAL = (
+    select(ApprovalRequest.id)
+    .where(
+        ApprovalRequest.entity_type == ApprovalEntityType.REQUIREMENT,
+        ApprovalRequest.entity_id == Requirement.id,
+        ApprovalRequest.status == ApprovalRequestStatus.PENDING,
+    )
+    .exists()
+)
+
+
+def with_approval_state(
+    statement: Select[Requirement], states: list[ApprovalState]
+) -> Select[Requirement]:
+    """The requirements in any of these approval states (the tree's `approval` filter)."""
+    conditions = {
+        ApprovalState.AWAITING: AWAITING_APPROVAL,
+        ApprovalState.APPROVED: Requirement.approved_revision_id.is_not(None),
+        ApprovalState.NOT_APPROVED: Requirement.approved_revision_id.is_(None),
+    }
+    return statement.where(or_(*(conditions[state] for state in states)))
 
 
 class RequirementRepository:
@@ -81,15 +144,31 @@ class RequirementRepository:
             .limit(1)
         )
 
-    async def ranked(self, project_id: uuid.UUID, limit: int) -> list[Requirement]:
-        """The project's requirements in `(rank, id)` order, at most `limit`."""
-        rows = await self.session.scalars(
-            select(Requirement)
-            .where(Requirement.project_id == project_id)
-            .order_by(Requirement.rank, Requirement.id)
-            .limit(limit)
+    def in_project(self, project_id: uuid.UUID) -> Select[Requirement]:
+        """The project's live requirements, for the tree's filters and order (`fetch_ranked`)."""
+        return select(Requirement).where(Requirement.project_id == project_id)
+
+    async def missing_ancestors(self, rows: Collection[Requirement]) -> list[Requirement]:
+        """The live ancestors of these requirements that aren't among them (a recursive query):
+        a filtered tree's context (DL-351)."""
+        ids = {row.id for row in rows}
+        parents = {row.parent_requirement_id for row in rows} - ids - {None}
+        if not parents:
+            return []
+        chain = (
+            select(Requirement.id, Requirement.parent_requirement_id)
+            .where(Requirement.id.in_(parents))
+            .cte(recursive=True)
         )
-        return list(rows)
+        chain = chain.union_all(
+            select(Requirement.id, Requirement.parent_requirement_id).join(
+                chain, Requirement.id == chain.c.parent_requirement_id
+            )
+        )
+        found = await self.session.scalars(
+            select(Requirement).where(Requirement.id.in_(select(chain.c.id)))
+        )
+        return [row for row in found if row.id not in ids]
 
     async def lock(self, requirement: Requirement) -> None:
         """Re-read the requirement's row, in the trash or not, and hold it until the transaction
@@ -172,22 +251,30 @@ class RequirementRepository:
         )
         return [(root, requirement) for root, requirement in rows]
 
-    def trash(
+    def trash_rows(
         self, project_id: uuid.UUID, reporter_id: uuid.UUID | None, *, empty: bool = False
-    ) -> Select[Requirement]:
-        """The project's requirements in the trash; with `reporter_id`, only that reporter's
-        never-approved ones (design-doc §9: each user sees what they may restore); with `empty`,
-        none, still paged as asked."""
-        statement = select(Requirement).where(
-            Requirement.project_id == project_id, Requirement.deleted_at.is_not(None)
-        )
+    ) -> Select[str, uuid.UUID, datetime | None]:
+        """The project's requirements in the trash as the trash's rows; with `reporter_id`, only
+        that reporter's never-approved ones (design-doc §9: each user sees what they may
+        restore); with `empty`, none."""
+        statement = select(
+            literal(TrashItemType.REQUIREMENT.value).label("type"),
+            Requirement.id,
+            Requirement.deleted_at,
+        ).where(Requirement.project_id == project_id, Requirement.deleted_at.is_not(None))
         if empty:
             statement = statement.where(false())
         if reporter_id is not None:
             statement = statement.where(
                 Requirement.reporter_id == reporter_id, Requirement.approved_revision_id.is_(None)
             )
-        return statement.execution_options(**{INCLUDE_DELETED: True})
+        return statement
+
+    def trash(self, *parts: Select[str, uuid.UUID, datetime | None]) -> Select[uuid.UUID]:
+        """The trash's item IDs from each table's part (its `TRASH_TYPE`, `TRASH_ID`, and
+        `TRASH_DELETED_AT`), still paged as asked."""
+        rows = union_all(*parts).subquery("trash")
+        return select(rows.c.id).execution_options(**{INCLUDE_DELETED: True})
 
     def revisions(self, requirement_id: uuid.UUID) -> Select[RequirementRevision]:
         """The requirement's revisions, with their authors (the feed orders them)."""
@@ -208,14 +295,14 @@ class RequirementRepository:
         )
 
     async def revision_numbers(
-        self, requirement_id: uuid.UUID, revision_ids: Collection[uuid.UUID]
+        self, requirement_ids: Collection[uuid.UUID], revision_ids: Collection[uuid.UUID]
     ) -> dict[uuid.UUID, int]:
-        """The numbers of the requirement's revisions with these IDs, by ID (DL-276)."""
+        """The numbers of these requirements' revisions with these IDs, by ID (DL-276)."""
         if not revision_ids:
             return {}
         rows = await self.session.execute(
             select(RequirementRevision.id, RequirementRevision.revision_number).where(
-                RequirementRevision.requirement_id == requirement_id,
+                RequirementRevision.requirement_id.in_(requirement_ids),
                 RequirementRevision.id.in_(revision_ids),
             )
         )
@@ -227,19 +314,6 @@ class RequirementRepository:
             select(RequirementRevision.revision_number).where(RequirementRevision.id == revision_id)
         )
         return cast(int, number)
-
-    async def lock_stored_at(
-        self, project_id: uuid.UUID, levels: Collection[RestrictionLevel]
-    ) -> list[tuple[uuid.UUID, RestrictionLevel]]:
-        """The project's live requirements stored at one of `levels`, locked, in id order (so
-        two raises lock rows in the same order)."""
-        rows = await self.session.execute(
-            select(Requirement.id, Requirement.restriction_level)
-            .where(Requirement.project_id == project_id, Requirement.restriction_level.in_(levels))
-            .order_by(Requirement.id)
-            .with_for_update()
-        )
-        return [(id_, RestrictionLevel(level)) for id_, level in rows]
 
     async def siblings(
         self, project_id: uuid.UUID, parent_id: uuid.UUID | None, *, excluding: uuid.UUID
@@ -258,6 +332,27 @@ class RequirementRepository:
             .order_by(Requirement.rank, Requirement.id)
         )
         return [(id_, rank) for id_, rank in rows]
+
+    async def ancestors(self, requirement: Requirement) -> list[tuple[int, str]]:
+        """The requirement's live ancestors' numbers and titles, root first (DL-328; a recursive
+        query). A live requirement's ancestors are all live: a delete moves its children up or
+        takes them with it, and a restore under a parent in the trash goes to the top (DL-217)."""
+        chain = (
+            select(Requirement.parent_requirement_id, literal(1).label("depth"))
+            .where(Requirement.id == requirement.id)
+            .cte(recursive=True)
+        )
+        chain = chain.union_all(
+            select(Requirement.parent_requirement_id, (chain.c.depth + 1).label("depth")).join(
+                chain, Requirement.id == chain.c.parent_requirement_id
+            )
+        )
+        rows = await self.session.execute(
+            select(Requirement.number, Requirement.title)
+            .join(chain, Requirement.id == chain.c.parent_requirement_id)
+            .order_by(chain.c.depth.desc())
+        )
+        return [(number, title) for number, title in rows]
 
     async def is_in_ancestry(self, requirement_id: uuid.UUID, of: uuid.UUID) -> bool:
         """Whether `requirement_id` is `of` or one of its ancestors (a recursive query, so the

@@ -1,4 +1,5 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { client } from '@/api/client'
@@ -45,6 +46,7 @@ function request(overrides: Partial<Request> = {}): Request {
         id: 'row-vera',
         approver_id: 'u-vera',
         approver_name: 'Vera Viewer',
+        approver_email: 'vera@example.test',
         approver_is_active: true,
         decision: 'pending',
         comment: null,
@@ -100,6 +102,7 @@ function mountSection(
   const reloadRequirement = vi.fn(() => Promise.resolve(true))
   mount(ApprovalSection, {
     props: { projectKey: 'ERP', requirement: shown, reloadPage, reloadRequirement },
+    global: { plugins: [PrimeVue] },
     attachTo: document.body,
   })
   return { get, post, reloadPage, reloadRequirement }

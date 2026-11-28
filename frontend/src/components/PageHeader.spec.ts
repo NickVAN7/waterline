@@ -25,6 +25,8 @@ describe('PageHeader', () => {
   it('renders no actions container without actions', () => {
     const wrapper = mount(PageHeader, { props: { title: 'Users' } })
 
-    expect([...wrapper.element.children].map((el) => el.tagName)).toEqual(['H1'])
+    expect([...wrapper.get('h1').element.parentElement!.children].map((el) => el.tagName)).toEqual([
+      'H1',
+    ])
   })
 })

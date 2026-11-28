@@ -13,10 +13,12 @@ defineProps<{ to: RouteLocationRaw }>()
       :href="href"
       :aria-current="isExactActive ? 'page' : undefined"
       :class="[
-        'flex items-center gap-2 rounded-md border-l-3 px-2 py-1 text-text no-underline',
+        'flex items-center gap-2 rounded-md py-1 pr-2 text-text no-underline',
+        // The bar only on the current link: forced colors draw a transparent border too, so every
+        // link would show it (UI-TOK-9, TD-112). The others get its width as padding (1 + 3 + 8).
         isExactActive
-          ? 'border-accent bg-selected font-semibold'
-          : 'border-transparent hover:bg-hover',
+          ? 'ml-px border-l-3 border-accent bg-selected pl-2 font-semibold'
+          : 'pl-3 hover:bg-hover',
       ]"
       @click="navigate"
     >

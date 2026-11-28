@@ -4,7 +4,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from app.authz.actions import Action
-from app.enums import AccessKind, WorkspaceRole
+from app.enums import AccessKind, OrgRole, WorkspaceRole
 from app.schemas.limits import NAME_MAX
 
 
@@ -21,6 +21,17 @@ class UsernameSuggestion(BaseModel):
     suggestion: str | None
 
 
+class UserOrgMembership(BaseModel):
+    """One org in a user's row (S3-C0k): their org role, if they hold one, and how many of its
+    projects they're on."""
+
+    org_id: uuid.UUID
+    org_name: str
+    org_slug: str
+    role: OrgRole | None
+    project_count: int
+
+
 class UserRow(BaseModel):
     """A user as the workspace users list shows them (DL-72), with the account actions the caller
     may take on them."""
@@ -33,6 +44,8 @@ class UserRow(BaseModel):
     is_system_admin: bool
     # The person's staff role in the workspace, or null (DL-183).
     workspace_role: WorkspaceRole | None
+    # Each of the workspace's orgs they belong to, by org name (S3-C0k).
+    memberships: list[UserOrgMembership]
     allowed_actions: list[Action]
 
 

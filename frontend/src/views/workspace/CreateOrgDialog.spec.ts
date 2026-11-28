@@ -1,4 +1,5 @@
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createPinia, setActivePinia } from 'pinia'
@@ -7,6 +8,7 @@ import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
+import { choosePerson, typeInPicker } from '@/test/picker'
 import { listPage } from '@/test/workspace'
 import { AVAILABILITY_DELAY_MS } from '@/composables/useAvailability'
 
@@ -29,7 +31,11 @@ async function openDialog() {
     if (path === '/api/auth/me') return Promise.resolve(ok(me()))
     return Promise.resolve(ok({ available: true, problem: null }))
   }) as never)
-  const wrapper = mount(CreateOrgDialog, { props: { workspaceId: 'ws' }, attachTo: document.body })
+  const wrapper = mount(CreateOrgDialog, {
+    props: { workspaceId: 'ws' },
+    global: { plugins: [PrimeVue] },
+    attachTo: document.body,
+  })
   await wrapper.vm.open()
   await flushPromises()
   return { wrapper, get }
@@ -58,21 +64,47 @@ afterEach(() => {
 enableAutoUnmount(afterEach)
 
 describe('CreateOrgDialog', () => {
-  it("offers the workspace's active people as the first owner", async () => {
+  it("searches the workspace's people for the first owner (DL-422)", async () => {
     const { wrapper, get } = await openDialog()
+    expect(document.activeElement?.id).toBe('org-name')
+
+    await choosePerson('org-owner-id', 'ann')
 
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
-      params: {
-        path: { workspace_id: 'ws' },
-        query: { limit: 200, sort: 'name' },
-      },
+      params: { path: { workspace_id: 'ws' }, query: { limit: 20, sort: 'name', q: 'ann' } },
     })
-    expect(wrapper.findAll('#org-owner-id option').map((o) => o.text())).toEqual([
-      'Choose a person',
+    expect(wrapper.get<HTMLInputElement>('#org-owner-id').element.value).toBe(
       'Ann Lee (ann@acme.example)',
-    ])
-    expect(document.activeElement?.id).toBe('org-name')
+    )
     await expectNoA11yViolations(wrapper)
+  })
+
+  it('sends the chosen owner as owner_id', async () => {
+    const post = vi.spyOn(client, 'POST').mockResolvedValue(ok({}, 201))
+    const { wrapper } = await openDialog()
+    await fillOrg(wrapper)
+    await choosePerson('org-owner-id', 'ann')
+
+    await submit(wrapper)
+
+    expect(post).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/orgs', {
+      params: { path: { workspace_id: 'ws' } },
+      body: { name: 'Initech', slug: 'initech', owner_id: 'u-ann' },
+    })
+  })
+
+  it('reloads /me when the owner search is refused (UI-FRM-7)', async () => {
+    const { get } = await openDialog()
+    get.mockImplementation(((path: string) =>
+      Promise.resolve(
+        path === '/api/auth/me'
+          ? ok(me())
+          : failed(403, { code: 'forbidden', message: '', details: {} }),
+      )) as never)
+
+    await typeInPicker('org-owner-id', 'ann')
+
+    expect(get).toHaveBeenCalledWith('/api/auth/me')
   })
 
   it('asks for the owner when none is chosen, sending nothing', async () => {
@@ -152,7 +184,7 @@ describe('CreateOrgDialog', () => {
     )
     const { wrapper } = await openDialog()
     await fillOrg(wrapper)
-    await wrapper.get('#org-owner-id').setValue('u-ann')
+    await choosePerson('org-owner-id', 'ann')
 
     await submit(wrapper)
 
@@ -166,7 +198,7 @@ describe('CreateOrgDialog', () => {
       failed(403, { code: 'forbidden', message: '', details: {} }),
     )
     await fillOrg(wrapper)
-    await wrapper.get('#org-owner-id').setValue('u-ann')
+    await choosePerson('org-owner-id', 'ann')
 
     await submit(wrapper)
 
@@ -180,7 +212,7 @@ describe('CreateOrgDialog', () => {
       failed(503, { code: 'network_error', message: '', details: {} }),
     )
     await fillOrg(wrapper)
-    await wrapper.get('#org-owner-id').setValue('u-ann')
+    await choosePerson('org-owner-id', 'ann')
     await submit(wrapper)
 
     await wrapper.get('button[aria-label="Dismiss alert"]').trigger('click')

@@ -8,6 +8,7 @@ import { ACME, failed, ok } from '@/test/api'
 import { mountOrgView } from '@/test/org'
 import { projectItem } from '@/test/projects'
 import { cleanUpAfterEach, listPage } from '@/test/workspace'
+import { trail } from '@/test/trail'
 
 import OrgOverviewView from './OrgOverviewView.vue'
 
@@ -46,12 +47,14 @@ describe('OrgOverviewView', () => {
       params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Acme Manufacturing overview')
-    expect(
-      wrapper.findAll('dl > div').map((row) => [row.get('dt').text(), row.get('dd').text()]),
-    ).toEqual([
-      ['Name', 'Acme Manufacturing'],
-      ['Slug', 'acme'],
-    ])
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [['Acme Manufacturing', '/acme/projects']],
+      current: 'Overview',
+    })
+    // The slug under the title, named for a screen reader; no separate Name line (S3-C0k).
+    expect(wrapper.find('dl').exists()).toBe(false)
+    expect(wrapper.get('p.font-mono').text()).toBe('Slug: acme')
     const projects = wrapper.get('section[aria-labelledby=overview-projects-heading]')
     expect(projects.findAll('th').map((th) => th.text())).toEqual([
       'Name',
@@ -73,7 +76,7 @@ describe('OrgOverviewView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
-  it('lists the archived projects below, headed "Archived", each linking to its settings (DL-180)', async () => {
+  it('lists the archived projects below, headed "Archived projects", each marked Archived (DL-180, S3-C0k)', async () => {
     const get = answering(PROJECTS, ARCHIVED)
 
     const { wrapper } = await mountOrgView(OrgOverviewView, '/acme/overview', ['org_member.manage'])
@@ -81,11 +84,12 @@ describe('OrgOverviewView', () => {
     expect(get).toHaveBeenCalledWith('/api/orgs/{org_id}/projects', {
       params: { path: { org_id: ACME.id }, query: { limit: 25, offset: 0, archived_only: true } },
     })
-    expect(wrapper.findAll('h2').map((h) => h.text())).toEqual(['Projects', 'Archived'])
+    expect(wrapper.findAll('h2').map((h) => h.text())).toEqual(['Projects', 'Archived projects'])
     const archived = wrapper.get('section[aria-labelledby=overview-archived-heading]')
     expect(
       archived.findAll('tbody tr').map((tr) => tr.findAll('td').map((td) => td.text().trim())),
-    ).toEqual([['Old site settings', 'OLD', 'Software', 'Completed', 'No lead']])
+      // Archived, not its old status: an archived project in Completed or Planning reads oddly.
+    ).toEqual([['Old site settings', 'OLD', 'Software', 'Archived', 'No lead']])
     expect(archived.get('tbody a').attributes('href')).toBe('/acme/projects/OLD/settings')
     expect(archived.get('[role=region]').attributes('aria-labelledby')).toBe(
       'overview-archived-heading',
@@ -167,8 +171,9 @@ describe('OrgOverviewView', () => {
     const { wrapper } = await mountOrgView(OrgOverviewView, '/acme/overview', ['org_member.manage'])
 
     expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
       'Projects pagination',
-      'Archived pagination',
+      'Archived projects pagination',
     ])
   })
 

@@ -20,6 +20,14 @@ describe('OrgNav', () => {
     )
 
     expect(wrapper.get('nav').attributes('aria-label')).toBe('Organization administration')
+    // Captioned "Organization" and its name, before the links (S3-C0j); the word is hidden from a
+    // screen reader, whose landmark already says it.
+    const [word, name] = wrapper.findAll('nav > p')
+    expect([word!.text(), word!.attributes('aria-hidden'), name!.text()]).toEqual([
+      'Organization',
+      'true',
+      acme([]).name,
+    ])
     const links = wrapper.findAll('a')
     expect(links.map((a) => [a.text(), a.attributes('href')])).toEqual([
       ['Overview', '/acme/overview'],

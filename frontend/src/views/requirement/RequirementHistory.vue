@@ -4,7 +4,10 @@
 // included, with the "Deactivated" badge; "System" for an app command; a parent by its ID, with
 // "Deleted" while it's in the trash; an approval's revision by its number). A cursor feed: "Show
 // more" appends the next page (`CursorFeed`, UI-TBL-9). It reloads when the requirement changes
-// (`stamp`), so a change made on the page shows here.
+// (`stamp`), so a change made on the page shows here. Its approval requests' entries come in the
+// same feed, each saying whose it is (`entity_type`, DL-388, DL-395): requested, rejected,
+// approved, cancelled, and an approver replaced (DL-397: a re-open round's approval logs nothing
+// on the requirement, so the request's own entry is its only record).
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
 import {
@@ -64,15 +67,43 @@ function value(entry: Entry, which: 'old' | 'new'): Part {
     case 'parent_requirement_id':
       if (!raw) return 'the top level'
       return { text: name ?? '', badge: active === false ? DELETED : undefined }
+    case 'workstream_id':
+      // An archived workstream is still named; workstreams are never deleted.
+      return raw ? (name ?? '') : 'none'
     default:
       return { text: name ?? '', badge: active === false ? DEACTIVATED : undefined }
   }
 }
 
+// A request's status entries, by the status it moved to.
+const REQUEST_STATUS_SENTENCE = new Map([
+  ['approved', 'approved the approval request'],
+  ['rejected', 'rejected the approval request'],
+  ['cancelled', 'cancelled the approval request'],
+])
+
+// An approval request's entry: the server logs only these five (DL-388, DL-397).
+function requestSentence(entry: Entry): Part[] {
+  if (entry.action === 'created') return ['requested approval']
+  if (entry.field_changed === 'approver_id') {
+    return ['replaced approver', value(entry, 'old'), 'with', value(entry, 'new')]
+  }
+  const status =
+    entry.field_changed === 'status' && REQUEST_STATUS_SENTENCE.get(entry.new_value ?? '')
+  return [status || 'made a change to the approval request']
+}
+
 function sentence(entry: Entry): Part[] {
+  if (entry.entity_type === 'approval_request') return requestSentence(entry)
   if (entry.action === 'created') return ['created the requirement']
   if (entry.action === 'deleted') return ['deleted it']
   if (entry.action === 'restored') return ['restored it']
+  // A delete detaching a task logs the task's ID as the old value (DL-413, TD-134).
+  if (entry.action === 'unlinked') {
+    if (!entry.old_value_name) return ['unlinked a task']
+    const deleted = entry.old_value_is_active === false ? DELETED : undefined
+    return ['unlinked task', { text: entry.old_value_name, badge: deleted }]
+  }
   if (entry.field_changed === 'approved_revision_id') {
     return entry.new_value_name ? [`approved revision ${entry.new_value_name}`] : ['approved it']
   }

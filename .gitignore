@@ -25,6 +25,9 @@ playwright-report/
 
 # Claude Code: each developer's own settings (developer guide, section 11)
 .claude/settings.local.json
+# Impeccable (DL-381): its state and engine cache, and DESIGN.md, which isn't kept; PRODUCT.md is
+.impeccable/
+DESIGN.md
 
 # Editors / OS
 .idea/

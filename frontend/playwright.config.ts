@@ -9,6 +9,9 @@ export default defineConfig({
   // One worker: every test shares the one seeded stack.
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
+  // The @timing test runs only when asked, in CI's own non-gating job (DL-403):
+  // `WL_TIMING_TEST=1 uv run wl e2e --grep @timing`.
+  grepInvert: process.env.WL_TIMING_TEST ? undefined : /@timing/,
   reporter: 'list',
   use: { baseURL: BASE_URL, trace: 'retain-on-failure' },
   // Every flow runs once per theme, so its axe checks cover both (docs/ui-design-guide.md §9).

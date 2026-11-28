@@ -1,9 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { stubDialog } from '@/test/overlay'
+import { choosePerson } from '@/test/picker'
 
 import { fakeRoster, invalid, PEOPLE } from './fakeRoster'
 import RemoveDialog from './RemoveDialog.vue'
@@ -17,6 +19,7 @@ async function openDialog(fallbackFocus = vi.fn()) {
   opener.focus()
   const wrapper = mount(RemoveDialog, {
     props: { roster, fallbackFocus },
+    global: { plugins: [PrimeVue] },
     attachTo: document.body,
   })
   await wrapper.vm.open(OLGA)
@@ -82,7 +85,7 @@ describe('RemoveDialog (D2)', () => {
     expect(wrapper.text()).toContain('Olga Owner is the last owner. Choose who becomes owner.')
     expect(document.activeElement?.id).toBe('remove-owner')
 
-    await wrapper.get('#remove-owner').setValue('u-ada')
+    await choosePerson('remove-owner', 'ada')
     await submit(wrapper)
 
     expect(roster.remove).toHaveBeenLastCalledWith('u-olga', true, 'u-ada')
@@ -145,7 +148,11 @@ describe('RemoveDialog (D2)', () => {
 
   it("offers no projects option on a project's roster, and removes without it", async () => {
     const roster = { ...fakeRoster(), projects: undefined }
-    const wrapper = mount(RemoveDialog, { props: { roster }, attachTo: document.body })
+    const wrapper = mount(RemoveDialog, {
+      props: { roster },
+      global: { plugins: [PrimeVue] },
+      attachTo: document.body,
+    })
     await wrapper.vm.open(OLGA)
     await flushPromises()
 

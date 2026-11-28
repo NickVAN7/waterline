@@ -15,6 +15,7 @@ from app.authz.target import Target
 from app.enums import AccessKind, ApprovalDecision, OrgRole, ProjectRole, WorkspaceRole
 from app.models.approval import ApprovalRequest
 from app.models.requirement import Requirement
+from app.models.task import Task
 from app.rules.account_rank import Account, can_manage_account
 
 
@@ -89,6 +90,7 @@ class Action(StrEnum):
     PROJECT_FAVORITE = "project.favorite"
     PROJECT_MEMBER_MANAGE = "project_member.manage"
     PROJECT_VIEW_ACCESS = "project.view_access"
+    PROJECT_VIEW_ACTIVITY = "project.view_activity"
     PROJECT_RAISE_RESTRICTION = "project.raise_restriction"
     PROJECT_LOWER_RESTRICTION = "project.lower_restriction"
     REQUIREMENT_VIEW = "requirement.view"
@@ -103,6 +105,19 @@ class Action(StrEnum):
     APPROVAL_REQUEST_CREATE = "approval_request.create"
     APPROVAL_REQUEST_CANCEL = "approval_request.cancel"
     APPROVAL_DECIDE = "approval.decide"
+    PHASE_VIEW = "phase.view"
+    PHASE_MANAGE = "phase.manage"
+    WORKSTREAM_VIEW = "workstream.view"
+    WORKSTREAM_MANAGE = "workstream.manage"
+    TASK_VIEW = "task.view"
+    TASK_CREATE = "task.create"
+    TASK_UPDATE = "task.update"
+    TASK_REASSIGN_REPORTER = "task.reassign_reporter"
+    TASK_RAISE_RESTRICTION = "task.raise_restriction"
+    TASK_LOWER_RESTRICTION = "task.lower_restriction"
+    TASK_DELETE = "task.delete"
+    TASK_RESTORE = "task.restore"
+    SUBTASK_MANAGE = "subtask.manage"
 
 
 # Workspace owners/admins, and system admins (DL-45).
@@ -153,6 +168,47 @@ def _named_approver_still_pending(user_id: uuid.UUID, entity: object) -> bool:
         row.approver_id == user_id and row.decision is ApprovalDecision.PENDING
         for row in entity.approvals
     )
+
+
+def _reporter_as_member(ctx: AuthzContext, target: Target) -> bool:
+    """A task's delete and restore rule (design-doc §5, "Deletion"; DL-219, DL-223): its
+    reporter, as a project member or above."""
+    access = ctx.projects.get(target.project_id)  # pyright: ignore[reportArgumentType] -- None finds nothing
+    return (
+        isinstance(target.entity, Task)
+        and target.entity.reporter_id == ctx.user_id
+        and access is not None
+        and access.role in (ProjectRole.MEMBER, ProjectRole.ADMIN)
+    )
+
+
+# Content actions by the lowest project role they need; inherited admins included (§5).
+_CONTENT_VIEWERS = ActionSpec(
+    Level.PROJECT,
+    workspace_role=WorkspaceRole.ADMIN,
+    org_role=OrgRole.ADMIN,
+    project_role=ProjectRole.VIEWER,
+    mutation=False,
+)
+_CONTENT_MEMBERS = ActionSpec(
+    Level.PROJECT,
+    workspace_role=WorkspaceRole.ADMIN,
+    org_role=OrgRole.ADMIN,
+    project_role=ProjectRole.MEMBER,
+)
+_CONTENT_ADMINS = ActionSpec(
+    Level.PROJECT,
+    workspace_role=WorkspaceRole.ADMIN,
+    org_role=OrgRole.ADMIN,
+    project_role=ProjectRole.ADMIN,
+)
+_TASK_DELETERS = ActionSpec(
+    Level.PROJECT,
+    workspace_role=WorkspaceRole.ADMIN,
+    org_role=OrgRole.ADMIN,
+    project_role=ProjectRole.ADMIN,
+    rule=_reporter_as_member,
+)
 
 
 def _self_or_outranks(ctx: AuthzContext, target: Target) -> bool:
@@ -384,4 +440,32 @@ REGISTRY: dict[str, ActionSpec] = {
     ),
     # Personal: only the named approver's own pending row grants it, no role (§5).
     Action.APPROVAL_DECIDE: ActionSpec(Level.PROJECT, relationship=_named_approver_still_pending),
+    # Phases, workstreams, tasks, and subtasks (Slice 3; S3-plan, "Actions per row"): content,
+    # so the export-control gate leaves only explicit members (§3.1).
+    # The project activity feed is content, every entry of it (design-doc §5; S3-plan, Q10).
+    Action.PROJECT_VIEW_ACTIVITY: _CONTENT_VIEWERS,
+    Action.PHASE_VIEW: _CONTENT_VIEWERS,
+    Action.PHASE_MANAGE: _CONTENT_MEMBERS,
+    Action.WORKSTREAM_VIEW: _CONTENT_VIEWERS,
+    Action.WORKSTREAM_MANAGE: _CONTENT_MEMBERS,
+    Action.TASK_VIEW: _CONTENT_VIEWERS,
+    Action.TASK_CREATE: _CONTENT_MEMBERS,
+    Action.TASK_UPDATE: _CONTENT_MEMBERS,
+    # Members raise an item's restriction (§3.1, "Who sets it").
+    Action.TASK_RAISE_RESTRICTION: _CONTENT_MEMBERS,
+    # Project admins, inherited included, as a requirement's (DL-211).
+    Action.TASK_REASSIGN_REPORTER: _CONTENT_ADMINS,
+    # Lowering: project admins, and on an export-controlled project an explicit one's (§3.1).
+    Action.TASK_LOWER_RESTRICTION: ActionSpec(
+        Level.PROJECT,
+        workspace_role=WorkspaceRole.ADMIN,
+        org_role=OrgRole.ADMIN,
+        project_role=ProjectRole.ADMIN,
+        explicit_when_export_controlled=True,
+    ),
+    # Project admins, inherited included, and the reporter as a member (§5, "Deletion"; DL-219,
+    # DL-223; whoever may delete it may restore it).
+    Action.TASK_DELETE: _TASK_DELETERS,
+    Action.TASK_RESTORE: _TASK_DELETERS,
+    Action.SUBTASK_MANAGE: _CONTENT_MEMBERS,
 }

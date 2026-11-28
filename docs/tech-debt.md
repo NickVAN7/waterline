@@ -42,7 +42,7 @@ Entry format:
   mkcert with Vite's `https` option) and end-to-end runs on Firefox and WebKit.
 - **Status:** open
 
-### TD-14: The pre-deployment items in design-doc §4 have no slice
+### TD-14: The pre-deployment items in design-doc §4 wait for Slice 7
 - **Added:** S1 planning (Sept 30, 2026)
 - **What:** Design-doc §4, "Before the first non-local deployment", lists work with no slice
   of its own: sign-in throttling (`login_attempt`), password re-entry for sensitive actions, the nightly expired-session cleanup, per-org session
@@ -54,7 +54,8 @@ Entry format:
   styles have their own entries, TD-12, TD-13, and TD-87.)
 - **Why:** v1 runs locally for a few users; none of these matter until the app is deployed.
 - **Fix by:** Slice 7 (before the first non-local deployment, and by the end of v1 at the
-  latest; re-target if deployment moves later): build each item, or give it its own slice.
+  latest; re-target if deployment moves later): build each item in Slice 7, pre-deployment
+  hardening (DL-393).
 - **Status:** open
 
 ### TD-17: The app connects as the owner of its tables
@@ -83,29 +84,6 @@ Entry format:
   The vulnerable code only expands glob patterns from the repository's own ESLint
   configuration, never untrusted input, and never ships in the app.
 - **Fix by:** Slice 3 (its tech-debt review): still no fixed `braces` (3.0.3 is the latest) (owner, S2-C22 tech-debt review, Nov 8, 2026)
-- **Status:** open
-
-### TD-20: What the git guard can't see
-- **Added:** DC-2026-10-08 (review passes 3, 6, and 7; narrowed by DC-2026-10-08b and DL-31)
-- **What:** The git guard (`.claude/hooks/guard_git.py`) checks the shell commands Claude runs. It
-  doesn't see (1) a script or program that runs git itself or changes `.git/hooks/` (`bash
-  <script>`, `python <file>`, a tool that commits, `uv run pre-commit uninstall`), (2) a write to a
-  shell startup file (`~/.bashrc`: an exported `SKIP`, a `git` function) that changes later shells,
-  or (3) a call that doesn't mention git redirecting to a target built by an expansion (`>>
-  .gi$'t'/config`); blocking every expansion in a target would also block the common `>
-  "$TMP/x"`. The deny-list guard's gaps (a `cd` in a subshell, exported variables, `include.path`,
-  nested shells, run-time `gh api` arguments) are closed by the allow-list (DL-26), and so are
-  review DC-2026-10-08b's (redirects into `.git/` or a git config file from a call that mentions
-  git, read options that run or write, unquoted heredocs, expansions that hide a command, a glob
-  in a redirect target). Claude's file tools editing `.git/` or a git config file are blocked by
-  the protected-files hook (DL-31), and `.pre-commit-config.yaml` is the owner's (DL-30). Push and
-  fetch configuration is left to the rulesets (DL-28). A program that writes a git config file
-  without naming it is part of (1).
-- **Why:** No command guard can read what another program does. GitHub's rulesets (DL-27) refuse
-  pushes to `main`, force-pushes, and deletions whatever runs them; a skipped local hook is
-  caught by CI's `wl check`.
-- **Fix by:** Slice 7 (the owner decides whether this closes as won't-fix now that the
-  rulesets are on).
 - **Status:** open
 
 ### TD-28: A user's name is one field, so username suggestions guess first and last names
@@ -137,51 +115,18 @@ Entry format:
   sensitive actions")
 - **Status:** open
 
-### TD-31: Other locked mutations check rights against the role loaded before the lock
-- **Added:** S1-C13
-- **What:** the `AuthzContext` is loaded at the start of a request. The restriction change
-  re-reads the caller's own project role after taking the project's lock (`with_current_role`,
-  owner decision in the S1-C13 security review), so a role removed while it waits is seen. The
-  other mutations that wait on a lock (project update, archive, member adds, role changes and
-  removals, and the workspace and org rosters) still check rights against the context as loaded:
-  a caller whose role is removed while their request waits can still finish it. The window is
-  milliseconds and needs a request already in flight.
-- **Why:** the owner decided the restriction change in S1-C13 and chose to revisit the rest
-  later.
-- **Fix by:** Slice 3 (its tech-debt review re-checks it); accepted again (owner, S2-C22 tech-debt review, Nov 8, 2026); fix it when a checkpoint adds a locked mutation where the race would matter
-- **Status:** open
-
 ### TD-37: My work has no "see all" for its sections
 - **Added:** S1-C14a
 - **What:** My work's projects section shows the first 10 projects (`GET /api/me/work`) and says
   how many there are, but has no "see all" list over `GET /api/me/work/{section}` (design-doc
   §11); a user on more than 10 projects finds the rest on each org's project list. From S2-C20b,
-  the approvals and past decisions sections too (`/approvals`, `/decisions`): past 10, the page
-  says how many there are; an approval past the first 10 shows once an older one is decided.
+  the approvals section too (`/approvals`): past 10, the page says how many there are; an
+  approval past the first 10 shows once an older one is decided. From S3-C0f each org's section
+  links to its list (DL-359); from S3-C0j favorites are shown in full (DL-369), so approvals
+  alone need one.
 - **Why:** smallest complete change: no demo user is on more than two projects, and the org list
   already shows them all; no demo user has more than a few approvals. The "see all" list belongs with the sections that need one most.
-- **Fix by:** Slice 3 (with My work's tasks section, whose lists are long)
-- **Status:** open
-
-### TD-38: The project selector lists an org's first 200 projects
-- **Added:** S1-C14a
-- **What:** the project selector loads the current org's projects in one request at the API's
-  page limit (200) and filters them in the browser, so an org with more than 200 projects
-  shows only the first 200 there (all of them are on its project list).
-- **Why:** smallest complete change: v1's orgs have tens of projects. A server-side search
-  parameter would be new API.
-- **Fix by:** Slice 3 (the filter bar's text search, which the selector can call)
-- **Status:** open
-
-### TD-41: Pickers of people load the first 200
-- **Added:** S1-C15
-- **What:** the replacement-owner picker (the roster's people), the create-org dialog's owner
-  picker (the workspace's active users), and the create-project dialog's first-admin picker (the
-  org's active members and the workspace's active staff, DL-152) each load one page at the API's limit (200) and
-  offer those; a roster, workspace, or org with more people shows only the first 200 by name.
-- **Why:** smallest complete change, as TD-38: v1's workspaces have tens of people, and a search
-  would be new API (the lists have no text filter yet).
-- **Fix by:** Slice 3 (the filter bar's text search, which the pickers can call)
+- **Fix by:** S3-C29 (My work's "see all" for approvals; its route exists, so frontend only)
 - **Status:** open
 
 ### TD-42: The own-row reset is hidden by a client-side check
@@ -249,19 +194,7 @@ Entry format:
 - **Why:** the tree is a ranked view, returned whole for drag-and-drop (build plan, "API
   conventions"); the owner judged 2,000 more than enough for v1 (DL-159), and accepted the moved
   row's case (DL-256).
-- **Fix by:** Slice 7 (the end of v1), or sooner when a project nears 2,000 requirements: then paged (DL-159); reviewed (owner, S2-C22 tech-debt review, Nov 8, 2026)
-- **Status:** open
-
-### TD-73: The rank rewrite sends one UPDATE per sibling
-- **Added:** S2-C7 (checkpoint-reviewer finding 4)
-- **What:** a move with no rank between its neighbors (a tie or the 255-character cap, DL-204,
-  DL-213) rewrites the parent's children with one `direct_update` each, so a rewrite among the
-  tree's cap of 2,000 top-level requirements is about 2,000 round trips under the project's
-  tree lock (DL-214), holding up other moves in that project for a second or two.
-- **Why:** the rewrite is rare (only a tie or the cap triggers it) and correct as built; one
-  statement (`UPDATE … FROM (VALUES …)`) needs `updated_at` held back by hand, outside the
-  helper that does it now.
-- **Fix by:** Slice 7 (the end of v1), or sooner if a rewrite's timing is noticed: one statement (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner when a project nears 2,000 requirements: then paged (DL-159); reviewed (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-76: The revision feed has no `(requirement_id, id)` index
@@ -271,7 +204,7 @@ Entry format:
   `UNIQUE(requirement_id, revision_number)` index and sorts the requirement's revisions by `id`.
 - **Why:** a requirement has tens of revisions, not thousands, so the sort is cheap; an index is
   a migration for no measured gain.
-- **Fix by:** Slice 7 (the end of v1), or sooner if a requirement's revisions number in the thousands: the index (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner if a requirement's revisions number in the thousands: the index (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-79: Each approver costs about eight queries
@@ -282,7 +215,7 @@ Entry format:
 - **Why:** bounded by the 50-approver cap (DL-226), and a request names a handful in practice; a
   batched version needs `hold_access` and `authz_context` for many users at once, which nothing
   else needs yet.
-- **Fix by:** Slice 7 (the end of v1), or sooner if requests name many approvers: batch the holds and the contexts (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner if requests name many approvers: batch the holds and the contexts (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-83: A request created while someone loses access can deadlock with the change
@@ -294,7 +227,8 @@ Entry format:
   projects (the add committed while the removal waited on their org or staff row). Those are
   the two places a project is locked after a person's rows. A request naming them in such a
   project, holding it and waiting on their rows, can deadlock with the change. Postgres aborts
-  one of the two: a 500, and nothing it did is kept.
+  one of the two, and nothing it did is kept: since S3-C0s a 503 with `Retry-After: 1`, which
+  the client may retry, not yet retried by the server.
 - **Why:** the window is a request created in the same moments as the person's removal,
   deactivation, or role change; the owner accepted it rather than a retry (DL-235).
 - **Fix by:** Slice 7 (before the first non-local deployment): retry once on a deadlock, or confirm the window is still rare (owner, S2-C22 tech-debt review, Nov 8, 2026)
@@ -308,7 +242,7 @@ Entry format:
   table only grows: requests are cancelled, never deleted.
 - **Why:** negligible at the expected volumes (one firm's requests); an index is a schema change,
   which goes through a design change (schema-doc).
-- **Fix by:** Slice 7 (the end of v1), or sooner if `approval_request` grows large: an index on `(requested_by, status)`, through a design change (owner, S2-C22 tech-debt review, Nov 8, 2026)
+- **Fix by:** Slice 8 (the end of v1), or sooner if `approval_request` grows large: an index on `(requested_by, status)`, through a design change (owner, S2-C22 tech-debt review, Nov 8, 2026)
 - **Status:** open
 
 ### TD-86: npm overrides pin `minimatch` and `glob`
@@ -342,40 +276,9 @@ Entry format:
   cap.
 - **Why:** v1 projects are far below the cap; a fix (virtual scrolling, or a widget that draws
   only the rows in view) is a widget change.
-- **Fix by:** Slice 7 (the end of v1), or sooner if a project nears 1,000 requirements:
+- **Fix by:** Slice 8 (the end of v1), or sooner if a project nears 1,000 requirements:
   measure again with the largest real project, and change the tree's rendering only if one
   nears the cap
-- **Status:** open
-
-### TD-92: Closing the side panel drops an open edit
-- **Added:** S2-C18b
-- **What:** while the requirement's edit form is open in the side panel, **Close**, the browser's
-  Back, and **Open full page** close the panel and drop what was typed, without asking. Esc in
-  the form is the form's (it does nothing, as on the page), so it no longer closes the panel.
-- **Why:** no rule says what an item's panel does with unsaved changes (keep them, or ask
-  first); that's the owner's to decide (S2-C18b review, `ui-reviewer`'s proposed UI-SHL-11
-  addition), and the panel is the shared one tasks reuse in Slice 3.
-- **Fix by:** S3-C0d (the split pane asks **Discard your changes?** first, DL-323)
-- **Status:** open
-
-### TD-96: The approver picker can't name an inherited project admin
-- **Added:** DC-2026-11-05 (DL-278)
-- **What:** the request dialog's approver picker lists the project's explicit members only, so an
-  inherited project admin without a membership, whom design-doc §6.2 lets a request name, can't
-  be picked in the UI; the API accepts them.
-- **Why:** the members list already exists; a candidates endpoint for everyone §6.2 allows is a
-  new endpoint the owner chose not to build in S2-C20 (DL-278).
-- **Fix by:** Slice 3 (the filter bar's text search, with TD-41): the approver picker becomes a searchable dropdown, with a candidates endpoint for everyone §6.2 allows (owner, S2-C22 tech-debt review, Nov 8, 2026)
-- **Status:** open
-
-### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
-- **Added:** DC-2026-11-06 (DL-295)
-- **What:** the org members, project members, workspace staff, and workspace users lists show
-  their "Show deactivated" checkbox above the list, not in a filter bar.
-- **Why:** the filter bar is built in Slice 3 (build plan, API conventions, "Frontend"); S2-C21a
-  needs only the one checkbox.
-- **Fix by:** Slice 3, the checkpoint that builds the filter bar: the checkbox moves into it on
-  the four lists
 - **Status:** open
 
 ### TD-98: The session list shows the 200 most recently active sessions only
@@ -385,54 +288,286 @@ Entry format:
   be among them. Sign out other sessions still ends all of them.
 - **Why:** a user has a handful of live sessions (each ends after 7 idle days); paging a list
   nobody fills is code with no use yet.
-- **Fix by:** Slice 7 (the operations screen), or sooner when someone has more than 200 live
+- **Fix by:** Slice 8 (the operations screen), or sooner when someone has more than 200 live
   sessions: page the list (`Pagination`, `useListQuery`)
 - **Status:** open
 
 ### TD-100: The approval-request list builds its page by hand
 - **Added:** S2-C22 (repo-auditor finding 2)
-- **What:** `RequirementService.approval_requests` builds `Page[ApprovalRequestItem](items=…,
-  total=…, limit=…, offset=…)` itself rather than `page.with_items(rows)`, the helper TD-54
+- **What:** `RequirementApprovalService.approval_requests` (`app/services/requirement_approvals.py`)
+  builds `Page[ApprovalRequestItem](items=…, total=…, limit=…, offset=…)` itself rather than `page.with_items(rows)`, the helper TD-54
   added for every list.
 - **Why:** S2-C20 code, fixed only when needed (DL-106); it behaves the same.
-- **Fix by:** Slice 3 (the next checkpoint that touches approval reads, or its tech-debt review)
-- **Status:** open
-
-### TD-101: The reporter and approver checks are near-copies
-- **Added:** S2-C22 (repo-auditor finding 3)
-- **What:** `RequirementService._check_reporter` and `_check_approver` take the same four steps
-  (hold the access, get the user, load their context and authorize, check `is_active`); only the
-  action and the error differ, so a change to one (TD-79's batching) has to be made in both.
-- **Why:** S2-C11 and S2-C10 code, fixed only when needed (DL-106).
-- **Fix by:** Slice 3 (with TD-79, or the next change to either check)
-- **Status:** open
-
-### TD-102: A members list with no row actions still shows an Actions column
-- **Added:** S2-C22 (user-guide-verifier finding 9)
-- **What:** for someone who may change nobody (a project member), the roster's table keeps its
-  "Actions" header over empty cells.
-- **Why:** Slice 1 and S2-C17 roster code, fixed only when needed (DL-106); it's cosmetic.
-- **Fix by:** Slice 3 (the filter bar's checkpoint, which reshapes the roster's table, TD-97)
-- **Status:** open
-
-### TD-103: TextField's slot shadows its `describedBy` prop
-- **Added:** S2-C22 (CI lint warning, Slice 2 retro)
-- **What:** `frontend/src/components/TextField.vue`'s `FormField` slot names its merged IDs
-  `describedBy`, the prop's name, so ESLint warns "already declared in the upper scope".
-  Behavior is correct: the input should use the slot's merged value.
-- **Why:** app code, which waits for Slice 3 (the owner, Slice 2 retro).
-- **Fix by:** S3-C0a (rename it in the slot, as `PasswordField.vue` does: `describedBy: ids`)
+- **Fix by:** Slice 3 (its tech-debt review, S3-C33: no Slice 3 row touches approval reads)
 - **Status:** open
 
 ### TD-104: The documentation has no search of its own
 - **Added:** DC-2026-11-09-s2-retro-and-ui-polish (DL-342)
 - **What:** the reader's guide (from S3-C0g) has no docs-only search.
-- **Why:** deferred by the owner: about 2,500 words fit in a nav, and Slice 6's site-wide
-  search covers the docs.
+- **Why:** deferred by the owner: the guide is small enough to browse from its nav, and Slice
+  6's site-wide search covers the docs.
 - **Fix by:** Slice 6 (the site-wide search): revisit a docs-only search as the docs grow
 - **Status:** open
 
+### TD-107: An icon button's tooltip is its `title`, which keyboard focus never shows
+- **Added:** S3-C0d
+- **What:** the side panel's Open full page, Copy link, and Close, ⋯ More actions, and
+  `RowActions` before them, show their name on hover through the native `title` only: it doesn't
+  appear on keyboard focus and can't be dismissed with Esc (WCAG 1.4.13), so a sighted keyboard
+  user sees bare icons. Their accessible names are right.
+- **Why:** the repo's one pattern for a tooltip; a focus-showing hint (the guide's `FieldHint`)
+  isn't built yet, and building one is its own component (ui-reviewer, S3-C0d, finding 5).
+- **Fix by:** S3-C33 (the tech-debt review: build the hint then, or before the first new icon button)
+- **Status:** open
+
+### TD-109: A dialog opened from the panel may stop being modal when the window crosses 80rem
+- **Added:** S3-C0d
+- **What:** Change restriction…, Delete…, and Request approval are `<dialog>`s inside the side
+  panel's teleported content. If one is open when the window crosses 80rem (64rem until
+  S3-C0o, DL-383), the move takes it
+  out of the top layer: by the HTML spec it stays open but isn't modal any more, so the page
+  behind isn't inert and its Esc may reach the panel instead (ui-reviewer, S3-C0d pass 2).
+- **Why:** unconfirmed: it needs a real browser to see what happens, and crossing the width with
+  a dialog open (a tablet turned, a zoom) is rare; the fix, if needed, is to close or reopen the
+  nested dialog on the breakpoint change.
+- **Fix by:** S3-C33 (the manual pass checks it at 1280px; fixed in the slice if it shows)
+- **Status:** open
+
+### TD-110: Focus on the trail's "…" or a middle crumb drops when the window crosses 40rem
+- **Added:** S3-C0e
+- **What:** the fold and the middle crumbs switch with CSS at 40rem (UI-SHL-14), so a resize or
+  zoom across it while one of them has focus hides that control and focus falls to `<body>`.
+- **Why:** it needs a resize while focus is on that one control; a fix (focus the nearest shown
+  crumb when the media query flips) adds a listener to every page for a rare case (ui-reviewer,
+  S3-C0e, note).
+- **Fix by:** S3-C33 (the manual pass zooms across 40rem with focus on the trail; fixed if it
+  shows)
+- **Status:** open
+
+### TD-113: UI-SVR-3 doesn't say SVAR's stylesheet must be imported, or that Willow's icons go blank
+- **Added:** S3-C0i
+- **What:** the S3-C0i spike found that a SVAR widget draws unstyled unless its own stylesheet
+  (`@svar-ui/vue-grid/all.css`, and each widget's) is imported before our mapping, and that
+  `<Willow :fonts="false">`, which UI-SVR-3 requires, also leaves out Willow's icons (an icon
+  font from SVAR's CDN, which UI-STY-4 rules out), so a wrapper draws its own (in the spike, the
+  grid's drag handle; for the board, any Willow icon its card shows). UI-SVR-3 says neither, and the first SVAR wrapper would find both again.
+- **Why:** a rule change, outside a spike's scope (checkpoint-reviewer, S3-C0i, minor).
+- **Fix by:** S3-C18 (the first SVAR wrapper, the board): UI-SVR-3 gains both, and the board's
+  Willow icons are checked
+- **Status:** open
+
+### TD-114: No e2e opens a popover past eight links from the keyboard
+- **Added:** S3-C0j
+- **What:** the project selector and org menu show a **Filter** button past eight links
+  (UI-SHL-6). Its spec opens one, runs axe, and checks focus; no e2e opens one from the keyboard,
+  as the overlay trap (`.claude/skills/vue-screen/traps.md`) asks, because the e2e stack's demo data has no org with
+  more than eight projects (`--manual-pass`'s `acme` has eleven).
+- **Why:** the e2e stack counts what `--demo` builds; growing it means reworking its counts
+  (ui-reviewer, S3-C0j, a coverage gap).
+- **Fix by:** S3-C33 (slice verification's manual pass on `--manual-pass`), or the first e2e
+  that needs a bigger org
+- **Status:** open
+
+### TD-115: The org add's projects step shows only the first 200 projects
+- **Added:** S3-C0m
+- **What:** the add-person dialog's **Also add to projects** loads one page of
+  `GET …/member-projects` at the list cap (200, `MAX_LIMIT`), by name; an org with more live
+  projects can't pick the rest there, and nothing says so. They can still be added from each
+  project's Members.
+- **Why:** an org with 200 live projects is past v1's expected size (the cap matches the add's
+  `projects` limit, `MEMBER_PROJECTS_MAX`).
+- **Fix by:** Slice 6 (search): a filter on the step, or a "more" note, if an org nears it
+- **Status:** open
+
+### TD-116: npm advisory GHSA-fc5q-39xc-vjpf (picomatch) is allowlisted
+- **Added:** `chore(deps)` after DC-2026-11-17b (Nov 17, 2026)
+- **What:** `wl audit` ignores GHSA-fc5q-39xc-vjpf (high: a regular-expression denial of service
+  in `picomatch`), through its entry in `audit-allowlist.toml`. `picomatch` comes only through
+  dev tooling: `vite`, `vitest`, `vue-router`'s build plugin, `vue-tsc`, and
+  `@vue/eslint-config-typescript` → `fast-glob` → `micromatch`.
+- **Why:** No fixed release exists: the advisory covers every `picomatch` version up to 4.0.7, the
+  latest. npm's only "fix" is a major `vitest` downgrade. The vulnerable code only matches glob
+  patterns from the repository's own build, test and lint configuration, never untrusted input,
+  and never ships in the app.
+- **Fix by:** Slice 3 (its tech-debt review), or sooner when `wl audit` shows a fixed release
+- **Status:** open
+
+### TD-117: A shared `?open=` link leaves the open item's row hidden in a collapsed tree
+- **Added:** S3-C0o (Impeccable's critique, P2)
+- **What:** the tree loads with only the top level open, so a requirement under collapsed parents,
+  opened by its `?open=RQ-<n>` link, has no visible row: none of its marks (Open, bold, the bar)
+  show, and nothing places it in the tree.
+- **Why:** expanding the item's ancestors on load (the read's `ancestors` has them) is new tree
+  behavior, outside S3-C0o's scope (owner, Nov 18).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
+### TD-118: The requirement's full page has no line-length cap at wide widths
+- **Added:** S3-C0o (Impeccable's critique, P2)
+- **What:** `main` has no width cap (DL-360), so at 1920px the details list's two columns sit
+  about 830px apart and the description runs about 1630px wide.
+- **Why:** a cap (`--content-prose`, now only for guide articles, DL-373) on a content page is a
+  design change (owner, Nov 18).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
+### TD-119: The side panel's focused title shows a focus ring like a text field's
+- **Added:** S3-C0o (Impeccable's critique, P3)
+- **What:** opening the panel focuses its title (DL-324), and the base `:focus-visible` ring
+  (ui-design-guide 3.3) draws round the `h2`, so beside Edit it reads as an editable field.
+- **Why:** changing the ring on programmatically focused headings changes the guide's base rule and
+  UI-TOK-5's reach, a design change (owner, Nov 18).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
+### TD-121: The panel's two-column grids follow the window's width, not the panel's
+- **Added:** S3-C0p (Impeccable critique, P2)
+- **What:** the details, the Approval section's list, and edit mode's grid switch to two columns
+  at `sm:` (the window), so a 400px split pane gets two columns of about 160px: a parent's ID and
+  title, a requester with a badge and a date, and the Priority field are squeezed.
+- **Why:** a container-query layout reaches every item that opens in the panel; S3-C0p kept to its
+  findings (owner, Nov 19).
+- **Fix by:** S3-C23 (the task panel reuses this layout): container queries on the panel's body
+- **Status:** open
+
+### TD-122: Heading sizes don't follow the type-scale tokens' roles
+- **Added:** S3-C0p (Impeccable critique, P2)
+- **What:** `tokens.css` names `text-lg`, `text-xl`, and `text-2xl` as the h3, h2, and h1 sizes;
+  the requirement's section `h2`s are `text-lg`, its `h3`s (Approvers, the decide panel's) the
+  body size, set apart by weight alone.
+- **Why:** aligning them changes every page's headings and the token comments, wider than S3-C0p
+  (owner, Nov 19).
+- **Fix by:** S3-C23 (with TD-121): align the headings or the token comments
+- **Status:** open
+
+### TD-123: One conflict message says "approve it again" for every Approval action
+- **Added:** S3-C0p (Impeccable critique, minor)
+- **What:** `ApprovalSection`'s `fail()` gives every 409 the same text, "approve it again if you
+  still need to"; only Approve by hand can get a 409 today, but the copy would be wrong for any
+  other action that could.
+- **Why:** built before S3-C0p and not one of its findings; no action shows the wrong text today.
+- **Fix by:** S3-C33 (the slice's tech-debt review): pass the action's verb in
+- **Status:** open
+
+### TD-125: Tests that time out on the owner's machine, not on CI
+- **Added:** S3-C0q
+- **What:** on the owner's WSL machine (4 cores, 5.7 GiB):
+  - `RequirementsTree.spec.ts`'s "opens the first level even when it is over 500 rows" takes
+    14.7 s on CI's runner but 36.6 s alone and about 65 s in the full suite, past its 60 s
+    limit, so the local frontend gate is red on it every full run.
+  - The e2e "a requirement's side panel and page" (`e2e/requirements.spec.ts`) takes about 33 s
+    alone, past Playwright's 30 s default, with or without S3-C0q's added status-menu checks.
+  - In the full suite only (they pass alone, the two files' 76 tests in about 30 s), past
+    Vitest's 5 s default: `RequirementsView.spec.ts`'s "shows the project's requirement tree,
+    with the move menu for those who may move" (5.7 s) and `ProjectMembersView.spec.ts`'s "lists
+    the members with their roles, a deactivated one marked, under the project header" (5.2 s).
+
+  S3-C0q's frontend and e2e were verified by CI's `wl check --full`, not locally. On an
+  8-core, 15 GiB machine all four pass well within their limits, so the cause is the machine
+  (DL-398).
+- **Why:** the tests and their limits are outside S3-C0q's scope; the owner chose to log them
+  (the two 5 s ones added on Nov 22, after the gate's run at close).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks when): make them cheaper on
+  that machine (fewer rows drawn in jsdom; the e2e split in two). S3-C0r gave the four explicit,
+  longer limits, each with its reason (DL-398): 120 s for the tree's, 15 s for the two 5 s ones,
+  60 s for the e2e
+- **Status:** open
+
+### TD-126: Request approval's note names left-out approvers without their email
+- **Added:** S3-C0r (ui-reviewer note 3)
+- **What:** `RequestApprovalDialog.vue`'s "Left out, as they can no longer be named" lists the
+  earlier request's approvers by name alone, and names aren't unique (traps). `ApprovalRead`
+  carries `approver_email` since S3-C0r, so its `Earlier` type could carry it.
+- **Why:** existing code outside S3-C0r's row, and a note rather than a confirmation; the owner
+  chose to log it (Nov 23).
+- **Fix by:** S3-C33 (the slice's tech-debt review: the owner picks the row)
+- **Status:** open
+
+### TD-127: A spec test's docstring still says every module shows as a disabled checkbox
+- **Added:** S3-C0t (checkpoint-reviewer finding 1)
+- **What:** `backend/tests/unit/rules/test_modules.py`, `test_no_module_is_available_yet`: its
+  docstring says the UI shows every module as a disabled checkbox with "Not available yet";
+  since DL-402 the UI offers no module choice until one has shipped.
+- **Why:** a comment in a spec test, which changes only with the owner's approval; behavior is
+  unaffected.
+- **Fix by:** S3-C33 (the slice's tech-debt review), or earlier with the owner's approval of the
+  one-line comment change
+- **Status:** open
+
+### TD-128: No gated browser check of the tree's stopped "Expand requirement" state
+- **Added:** S3-C0u (checkpoint-reviewer finding 3, ui-reviewer note)
+- **What:** the `@timing` test was the only end-to-end test that reaches the stopped state (its
+  note, "Deeper rows under … stay closed") and runs axe on it in both themes; since DL-403 it runs
+  only in CI's non-gating job. The stop itself is still gated (`RequirementsTree.spec.ts`), but
+  jsdom checks no rendered contrast.
+- **Why:** the handoff moved the timing test whole; a gated test of the stopped state (a tree
+  just over 500 rows, Expand requirement, the note, axe) is new scope, for the owner.
+- **Fix by:** S3-C33 (the slice's tech-debt review), or a later row the owner picks
+- **Status:** open
+
+### TD-129: Three action surfaces still hand-roll their failure alert
+- **Added:** S3-C0x (DL-406)
+- **What:** `components/RequirementsTree.vue` (the move menu), `views/requirement/ApprovalSection.vue`
+  (the request, cancel, and approve-by-hand actions), and `views/user/SessionsSection.vue` (sign
+  out a session) keep their own failure message, count, alert ref, and focus-if-lost, the
+  pattern `composables/useActionFailure.ts` now holds; `TrashView.vue` and
+  `RequirementDetail.vue` use it.
+- **Why:** DL-406 converts only the two reference views; each other surface changes with the
+  row that next touches it.
+- **Fix by:** S3-C33 (the slice's tech-debt review), or earlier, the row that next touches each
+  surface
+- **Status:** open
+
 ---
+
+### TD-133: The Trash page shows a task row as a requirement
+- **Added:** S3-C9 (owner, Nov 25, 2026: backend only)
+- **What:** the trash API lists deleted tasks, but `TrashView.vue` shows every row as
+  `{KEY}-RQ-n`, and its text still says requirements only (the empty state, the who-to-ask
+  sentence). A task row has no Restore (it carries `task.restore`, never `requirement.restore`,
+  and the page's Restore is the requirement's). Its type filter offers "Task" (the label map is
+  typed by the API's enum).
+- **Why:** no task page exists for the success status to link to until S3-C23; the owner kept
+  S3-C9 to the backend.
+- **Fix by:** S3-C20 (the Tasks page's Trash link): the row's ID, Restore, and the page's text by
+  type, with a spec case for each `TrashItemType`; the success linking to the task once S3-C23's
+  page exists
+- **Status:** open
+
+### TD-135: The requirement delete dialog doesn't offer the linked-tasks choice
+- **Added:** S3-C9a (ui-reviewer note)
+- **What:** the API takes `?tasks=detach|delete` and the read carries `can_delete_tasks`
+  (S3-C9a), but `DeleteRequirementDialog.vue` sends no `tasks` value (so detach) and doesn't say
+  linked tasks are unlinked; design-doc §9 asks for a choice per category. The read has no
+  `has_tasks`, so the dialog can't ask only when there are tasks.
+- **Why:** no screen links a task to a requirement before S3-C22; the dialog's tasks fieldset
+  belongs with the requirement's Tasks section.
+- **Fix by:** S3-C25 (Requirement ↔ tasks): the fieldset beside "Its children", on
+  `can_delete_tasks` with the note when delete isn't offered, and the read telling it whether
+  any task is linked
+- **Status:** open
+
+### TD-136: My work's spec fixture isn't typed by the API's, and the page sends no `today`
+- **Added:** S3-C11 (ui-reviewer notes)
+- **What:** `MyWorkView.spec.ts`'s `work()` fixture goes through `ok<T>()` (`src/test/api.ts`),
+  which infers its type and casts `as never`, so it still type-checks without S3-C11's `tasks`,
+  `reviews`, and `summary`; and `MyWorkView.vue` doesn't send `?today=` yet (DL-415), so the due
+  counts use the server's UTC date.
+- **Why:** S3-C11 changed the API only; the page shows the sections and tiles in S3-C29.
+- **Fix by:** S3-C29: the fixture typed as `Schemas['MyWork']` (`satisfies`), and `today` the
+  browser's local date (not `toISOString()`'s UTC one)
+- **Status:** open
+
+### TD-137: No end-to-end test of the project selector's search or the replacement-owner picker
+- **Added:** S3-C17 (ui-reviewer gaps)
+- **What:** the selector's server search ("Showing 50 of 312", typing, focus) and the
+  replacement-owner picker after a last-owner refusal are covered by component specs only; no
+  Playwright run opens either list in a real browser, so axe never checks a picker list open
+  there, and Esc in the open list is checked end to end only in Create project
+- **Why:** the specs cover each behavior; the e2e flows for these screens are the slice's
+  verification, and the same Esc handling is PrimeVue's in every dialog
+- **Fix by:** S3-C33 (the slice verification's e2e pass)
+- **Status:** open
 
 ## Resolved
 
@@ -512,6 +647,12 @@ Entry format:
 - **Status:** resolved in S1-C3 (`test_any_interleaving_numbers_each_sequence_1_2_3`; an
   allocator that ignores the prefix fails it)
 
+### TD-20: What the git guard can't see
+- **Added:** DC-2026-10-08 (review passes 3, 6, and 7; narrowed by DC-2026-10-08b and DL-31)
+- **Status:** resolved in DC-2026-11-18b, accepted by the guard's stated scope (DL-391): evasion
+  (a script, a shell startup file, a redirect built at run time) is out of it, and GitHub's
+  rulesets (DL-27), CI, and `wl check`'s repository-state step cover it
+
 ### TD-21: A user-level audit event's workspace is null when it's ambiguous
 - **Added:** S1-C6
 - **Status:** resolved in DL-48: left as it is until a second workspace is needed (the owner,
@@ -558,6 +699,12 @@ Entry format:
   auth race tests use them, and the versioning race test records its outcome with `suppress`; each
   asserts after its task group closes)
 
+### TD-31: Other locked mutations check rights against the role loaded before the lock
+- **Added:** S1-C13
+- **Status:** resolved in DC-2026-11-19, accepted by the concurrency policy (`backend/CLAUDE.md`,
+  DL-393): authorization uses the context loaded at the start of the request, and no lock or hold
+  is added to close an authorization-freshness window
+
 ### TD-32: No page handles a 404 yet
 - **Added:** S1-C14
 - **Status:** resolved in S1-C14a: the project home shows the not-found page for an API 404, and
@@ -583,6 +730,11 @@ Entry format:
 - **Status:** resolved in S1-C14a: a query-only navigation moves neither focus nor the title; the list
   announces its count instead
 
+### TD-38: The project selector lists an org's first 200 projects
+- **Added:** S1-C14a
+- **Status:** resolved in S3-C17: the selector opens on the first 50 and its filter searches the
+  org's projects on the server (`?q=`), saying "Showing 50 of 312" when more match (DL-422)
+
 ### TD-39: No `PageHeader` component yet
 - **Added:** S1-C14a
 - **Status:** resolved in S1-C15: `PageHeader`, on the admin pages and the earlier pages (My work,
@@ -595,6 +747,11 @@ Entry format:
   (`MyWorkService._section`), and the page gives the projects section its own error state, keyed
   on its failed loads in a row of either kind (the request or the section), so another section's
   failure leaves it showing
+
+### TD-41: Pickers of people load the first 200
+- **Added:** S1-C15
+- **Status:** resolved in S3-C17: the replacement-owner, org-owner, and first-admin pickers are
+  the shared searchable `PersonPicker` on their lists' `?q=` (DL-422)
 
 ### TD-43: The two settings forms repeat their save handling
 - **Added:** S1-C15a
@@ -707,6 +864,12 @@ Entry format:
   a move's tree lock, against DL-214; a raise's `FOR UPDATE` still conflicts with it; the
   export-control marking is TD-74)
 
+### TD-73: The rank rewrite sends one UPDATE per sibling
+- **Added:** S2-C7 (checkpoint-reviewer finding 4)
+- **Status:** resolved in S3-C7: `write_ranks()` in `app/repositories/base.py`, one
+  `UPDATE … FROM (VALUES …)` with `updated_at` held, for the tree's, phases', workstreams', and
+  the task order's rewrites (DL-345)
+
 ### TD-74: A new reporter's inherited admin isn't held against marking the project export-controlled
 - **Added:** S2-C8
 - **Status:** resolved in S2-C12 (checkpoint-reviewer pass 2): the edit holds the project, then
@@ -771,6 +934,11 @@ Entry format:
   `:level="2"`, so a description's `#` is an `h3` under "Description"); closed in S2-C22 by the
   owner
 
+### TD-92: Closing the side panel drops an open edit
+- **Added:** S2-C18b
+- **Status:** resolved in S3-C0d: Close, Esc, Back, another item's ID, and Open full page ask
+  **Discard your changes?** first (DL-323)
+
 ### TD-93: Expand all may not be the right action for the tree
 - **Added:** DC-2026-11-04b (DL-270)
 - **Status:** resolved in S2-C18c ("Expand requirement" in place of "Expand all", DL-271, DL-272)
@@ -785,7 +953,89 @@ Entry format:
 - **Status:** resolved in S2-C20 (Revisions takes the approved revision's number from the
   requirement's read)
 
+### TD-96: The approver picker can't name an inherited project admin
+- **Added:** DC-2026-11-05 (DL-278)
+- **Status:** resolved in S3-C17: approvers are added from the `PersonPicker` on
+  `approver-candidates`, everyone §6.2 allows, inherited admins included (DL-422)
+
+### TD-97: "Show deactivated" sits above the people lists, outside a filter bar
+- **Added:** DC-2026-11-06 (DL-295)
+- **Status:** resolved in S3-C16: the toggle is the last control of each people list's
+  `FilterBar` (DL-419, UI-TBL-10)
+
 ### TD-99: A row action's network failure has no Retry
 - **Added:** S2-C21c
 - **Status:** resolved in DC-2026-11-09-s2-retro-and-ui-polish (UI-FRM-7: a row or inline
   action's control is its own retry, DL-319)
+
+### TD-101: The reporter and approver checks are near-copies
+- **Added:** S2-C22 (repo-auditor finding 3)
+- **Status:** resolved in S3-C0v: `RequirementService._check_person`, one helper taking the
+  action, the field, and the refusal (a 404 for an approver, a 422 for a reporter), its hold
+  kept; S3-C6's assignee and reviewer use it (DL-406)
+
+### TD-102: A members list with no row actions still shows an Actions column
+- **Added:** S2-C22 (user-guide-verifier finding 9)
+- **Status:** resolved in S3-C16: the roster and users tables show the column only when a row on
+  the page has an action
+
+### TD-103: TextField's slot shadows its `describedBy` prop
+- **Added:** S2-C22 (CI lint warning, Slice 2 retro)
+- **Status:** resolved in S3-C0a (the slot's IDs are `ids`, as in `PasswordField.vue`)
+
+### TD-105: A project key's API error messages describe a slug
+- **Added:** S3-C0c
+- **Status:** resolved in S3-C0l: a key's 422 has its own messages (`PROJECT_KEY_MESSAGES`: at
+  least 3, at most 6, only letters and digits)
+
+### TD-106: The requirement's header has no Parent row yet
+- **Added:** S3-C0d
+- **Status:** resolved in S3-C0e: Parent (its ID linked, then its title; None at the top level),
+  from the read's `ancestors` (DL-357)
+
+### TD-108: Just above 64rem, the split pane leaves the list little room
+- **Added:** S3-C0d
+- **Status:** resolved in S3-C0o: the pane starts at 80rem (DL-383), and with no stored width it
+  opens narrower than 560px where the list would keep less than 30rem, never below 400px
+  (DL-385). A stored 800px still leaves the list less, as the viewer chose.
+
+### TD-111: No test loads a bundled guide image under the CSP
+- **Added:** S3-C0g
+- **Status:** resolved in S3-C0h: `csp.spec.ts` opens a guide page's screenshot, in each theme
+  and with the theme chosen against the system's, and asserts it loads with no CSP violation
+
+### TD-112: SidebarLink's transparent bar draws on every link under forced colors
+- **Added:** S3-C0g
+- **Status:** resolved in S3-C0j: the bar only on the current link, the others padded by its
+  width; `shell.spec.ts` checks under forced colors that only the current link has it
+
+### TD-120: Three code comments still put GitHub in Slice 7
+- **Added:** DC-2026-11-19 (DL-393 moved GitHub to Slice 8)
+- **Status:** resolved in S3-C0r: the three say Slice 8, the spec test's comment with the
+  owner's approval (DL-399)
+
+### TD-124: Approve by hand's confirmation names the bypassed approvers without their email
+- **Added:** S3-C0p (ui-reviewer finding 4)
+- **Status:** resolved in S3-C0r: `ApprovalRead` carries `approver_email`, and the confirmation
+  names each approver still to decide as "Name (email)", a deactivated one "Name (email,
+  deactivated)"
+
+### TD-130: The phase move copies the requirement move's placement
+- **Added:** S3-C3 (checkpoint-reviewer finding 3)
+- **Status:** resolved in S3-C4: `place()` in `app/rules/rank.py` (test-first, `spec-test-writer`), used by the requirement, phase, and workstream moves
+
+### TD-131: The phase and workstream moves resolve their anchors in two copies
+- **Added:** S3-C4 (checkpoint-reviewer finding 6)
+- **Status:** resolved in S3-C7: `anchor_position()` in `app/services/ordering.py` and the
+  `ItemMove` schema, used by the phase, workstream, and task moves
+
+### TD-132: History names a requirement's workstream change only as "made a change"
+- **Added:** S3-C4 (ui-reviewer note; checkpoint-reviewer question)
+- **Status:** resolved in S3-C12: the activity service names `workstream_id` (and `phase_id`,
+  `requirement_id`) values; History says "changed the workstream from … to …"
+
+### TD-134: History shows a requirement's or task's unlink as "made a change"
+- **Added:** S3-C9a (checkpoint-reviewer finding 4)
+- **Status:** resolved in S3-C12: a `linked`/`unlinked` entry's other item is named by its
+  display ID; the requirement's History says "unlinked task ERP-TA-5" (the task's History
+  page is S3-C24)

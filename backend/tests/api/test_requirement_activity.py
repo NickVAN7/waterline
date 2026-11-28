@@ -9,10 +9,19 @@ from typing import Any
 import pytest
 from httpx import AsyncClient, Response
 
-from app.enums import ActivityAction, ActivityEntityType, ActivityField, ProjectRole
+from app.enums import (
+    ActivityAction,
+    ActivityEntityType,
+    ActivityField,
+    ApprovalEntityType,
+    ApprovalRequestStatus,
+    ProjectRole,
+)
+from app.models.approval import ApprovalRequest
 from app.models.audit import ActivityLog
 from app.models.requirement import Requirement
 from app.models.user import User
+from tests.factories.approval import ApprovalRequestFactory
 from tests.factories.audit import ActivityLogFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.requirement import RequirementFactory, RequirementRevisionFactory
@@ -289,3 +298,119 @@ async def test_another_requirements_revision_is_never_named(
     [item] = items(await client.get(HISTORY))
 
     assert names(item) == (None, None, None, None)
+
+
+# --- The approval requests' entries (DL-388, DL-395) -------------------------------------------
+
+
+async def request_on(requirement: Requirement, requester: User) -> ApprovalRequest:
+    revision = await RequirementRevisionFactory.create_async(
+        requirement=requirement, revision_number=1, creator=requester
+    )
+    return await ApprovalRequestFactory.create_async(
+        project_id=requirement.project_id,
+        entity_type=ApprovalEntityType.REQUIREMENT,
+        entity_id=requirement.id,
+        requirement_revision_id=revision.id,
+        requester=requester,
+    )
+
+
+async def request_entry(t: Tenancy, request: ApprovalRequest, **values: object) -> ActivityLog:
+    return await ActivityLogFactory.create_async(
+        project=t.project,
+        entity_type=ActivityEntityType.APPROVAL_REQUEST,
+        entity_id=request.id,
+        **values,
+    )
+
+
+def status_change(new: ApprovalRequestStatus) -> dict[str, object]:
+    return {
+        "action": ActivityAction.UPDATED,
+        "field_changed": ActivityField.STATUS,
+        "old_value": ApprovalRequestStatus.PENDING,
+        "new_value": new,
+    }
+
+
+async def test_the_history_holds_its_approval_requests_entries_with_their_type(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-388: requested, rejected, and cancelled show with the requirement's own, newest first,
+    each saying whose it is (DL-395). Bug: the requests' rows left out, or `entity_type` missing,
+    so the screen calls a request's creation the requirement's."""
+    own = await entry(t, requirement)
+    first = await request_on(requirement, viewer)
+    requested = await request_entry(t, first)
+    rejected = await request_entry(t, first, **status_change(ApprovalRequestStatus.REJECTED))
+    cancelled = await request_entry(t, first, **status_change(ApprovalRequestStatus.CANCELLED))
+
+    response = await client.get(HISTORY)
+
+    assert [(e["id"], e["entity_type"]) for e in items(response)] == [
+        (str(cancelled.id), "approval_request"),
+        (str(rejected.id), "approval_request"),
+        (str(requested.id), "approval_request"),
+        (str(own.id), "requirement"),
+    ]
+
+
+async def test_an_approver_replaced_names_both_approvers(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-388: "replaced approver <A> with <B>". Bug: the request's user field left unnamed."""
+    ann = await UserFactory.create_async(name="Ann Approver", is_active=False)
+    ben = await UserFactory.create_async(name="Ben Requester")
+    request = await request_on(requirement, ben)
+    await request_entry(
+        t,
+        request,
+        action=ActivityAction.UPDATED,
+        field_changed=ActivityField.APPROVER_ID,
+        old_value=str(ann.id),
+        new_value=str(ben.id),
+    )
+
+    [item] = items(await client.get(HISTORY))
+
+    assert names(item) == ("Ann Approver", False, "Ben Requester", True)
+
+
+async def test_a_requests_approval_shows_even_when_the_requirement_logs_nothing(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """DL-397: an approved re-open round changes nothing on the requirement (its status and
+    revision stay), so the request's own approved entry is the only record. Bug: the request's
+    approved row filtered out, leaving "requested approval" as if still pending."""
+    request = await request_on(requirement, viewer)
+    requested = await request_entry(t, request)
+    approved = await request_entry(t, request, **status_change(ApprovalRequestStatus.APPROVED))
+
+    response = await client.get(HISTORY)
+
+    assert [e["id"] for e in items(response)] == [str(approved.id), str(requested.id)]
+
+
+@pytest.mark.security
+async def test_only_this_requirements_requests_entries_show(
+    client: AsyncClient, t: Tenancy, requirement: Requirement, viewer: User
+) -> None:
+    """Bug: requests matched by entity id alone (a milestone's request with the requirement's ID
+    by coincidence), by project, or a request row whose ID happens to be the requirement's."""
+    other = await RequirementFactory.create_async(project=t.project, number=8)
+    mine = await request_entry(t, await request_on(requirement, viewer))
+    await request_entry(t, await request_on(other, viewer))
+    milestone = await ApprovalRequestFactory.create_async(
+        project_id=t.project.id, entity_id=requirement.id, requester=viewer
+    )
+    await request_entry(t, milestone)
+    await ActivityLogFactory.create_async(
+        project=t.project,
+        entity_type=ActivityEntityType.APPROVAL_REQUEST,
+        entity_id=requirement.id,
+    )
+
+    response = await client.get(HISTORY)
+
+    assert [e["id"] for e in items(response)] == [str(mine.id)]

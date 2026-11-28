@@ -2,7 +2,7 @@
 Everything else is tested over HTTP (tests/api/core/test_lists.py)."""
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from pydantic import ValidationError
@@ -93,6 +93,15 @@ def test_the_sort_parameter_documents_the_default() -> None:
 
     assert description is not None
     assert description.endswith("Default: name")
+
+
+@pytest.mark.parametrize("paging", ["offset", "ranked"])
+def test_a_list_with_no_sorts_takes_no_sort_parameter(paging: Literal["offset", "ranked"]) -> None:
+    """Bug: a `sort` offered that every value fails, or that reorders a list with one order
+    (the requirement tree's rank, S3-C10)."""
+    spec = ListSpec(name="Z", id_column=column("id"), sort_first=(column("rank"),), paging=paging)
+
+    assert "sort" not in spec.query_model.model_fields
 
 
 SECRET: ColumnClause[Any] = column("secret")

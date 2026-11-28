@@ -6,6 +6,7 @@ import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok } from '@/test/api'
 import { cleanUpAfterEach, mountWorkspaceView } from '@/test/workspace'
+import { trail } from '@/test/trail'
 
 import AccessReviewView from './AccessReviewView.vue'
 
@@ -56,6 +57,14 @@ describe('AccessReviewView', () => {
       params: { path: { user_id: 'u-sam' } },
     })
     expect(wrapper.get('h1').text()).toBe('Access review: Sam Member')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Workspace', '/workspace/staff'],
+        ['Users', '/workspace/users'],
+      ],
+      current: 'Sam Member',
+    })
     expect(wrapper.text()).toContain('Deactivated')
     const rows = (heading: string) =>
       wrapper
@@ -72,6 +81,20 @@ describe('AccessReviewView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it("has no trail for someone who came from an org's members, without the workspace pages (UI-SHL-14)", async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(REVIEW))
+
+    const { wrapper } = await mountWorkspaceView(
+      AccessReviewView,
+      '/workspace/users/u-sam/access',
+      // A workspace entry without `workspace.view`: the check is the action, not the entry.
+      ['user.view_access'],
+    )
+
+    expect(wrapper.get('h1').text()).toBe('Access review: Sam Member')
+    expect(trail()).toBeNull()
+  })
+
   it('shows Access, on the export-controlled projects only, when one is (DL-177)', async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(
       ok({ ...REVIEW, projects: [...REVIEW.projects, EXPORT_CONTROLLED] }),
@@ -83,7 +106,7 @@ describe('AccessReviewView', () => {
     expect(projects.findAll('th').map((th) => th.text())).toEqual([
       'Project',
       'Organization',
-      'Why they reach it',
+      'Access through',
       'Access',
     ])
     expect(

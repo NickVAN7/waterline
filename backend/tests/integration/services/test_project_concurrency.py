@@ -22,6 +22,7 @@ from app.models.workspace import Workspace
 from app.schemas.project import ProjectCreate, ProjectMemberAdd, ProjectUpdate
 from app.services.org import OrgService
 from app.services.project import ProjectService
+from app.services.project_members import ProjectMemberService
 from app.services.workspace import WorkspaceService
 from tests.factories.org import MembershipFactory, OrganizationFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
@@ -161,7 +162,7 @@ async def test_a_member_add_waiting_on_an_archive_is_denied(
             adder_connected.set()
             loaded = await session.get_one(Project, project.id)
             with suppress(ForbiddenError):
-                await ProjectService(session).add_member(
+                await ProjectMemberService(session).add_member(
                     ctx, loaded, ProjectMemberAdd(user_id=bob.id, role=ProjectRole.MEMBER)
                 )
                 await session.commit()
@@ -269,7 +270,7 @@ async def test_a_project_add_waiting_on_a_removal_with_projects_is_a_404(
             loaded = await session.get_one(Project, project.id)
             outcome.append(
                 await refusal(
-                    ProjectService(session).add_member(
+                    ProjectMemberService(session).add_member(
                         ctx, loaded, ProjectMemberAdd(user_id=bob.id, role=ProjectRole.MEMBER)
                     )
                 )
@@ -331,7 +332,7 @@ async def test_a_removal_with_projects_waiting_on_a_project_add_removes_it_too(
 
     async with concurrency() as adding:
         loaded = await adding.get_one(Project, project.id)
-        await ProjectService(adding).add_member(
+        await ProjectMemberService(adding).add_member(
             ctx, loaded, ProjectMemberAdd(user_id=bob.id, role=ProjectRole.MEMBER)
         )
         with anyio.fail_after(5):
@@ -388,7 +389,7 @@ async def test_a_removal_with_projects_waiting_on_a_direct_removal_records_it_on
 
     async with concurrency() as removing:
         loaded = await removing.get_one(Project, project.id)
-        await ProjectService(removing).remove_member(ctx, loaded, bob.id)
+        await ProjectMemberService(removing).remove_member(ctx, loaded, bob.id)
         with anyio.fail_after(5):
             async with anyio.create_task_group() as group:
                 group.start_soon(remove_bob_from_the_org)
@@ -506,7 +507,7 @@ async def test_a_project_add_waiting_on_a_staff_removal_with_projects_is_a_404(
             loaded = await session.get_one(Project, project.id)
             outcome.append(
                 await refusal(
-                    ProjectService(session).add_member(
+                    ProjectMemberService(session).add_member(
                         ctx, loaded, ProjectMemberAdd(user_id=sam.id, role=ProjectRole.MEMBER)
                     )
                 )

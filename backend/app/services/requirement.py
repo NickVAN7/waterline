@@ -4,10 +4,9 @@ import dataclasses
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
-from typing import cast
+from typing import Annotated, cast
 
-from pydantic import BaseModel
-from sqlalchemy import literal
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.change_log import log_change
@@ -15,45 +14,60 @@ from app.authz.actions import Action
 from app.authz.authorize import allowed_actions, authorize, ensure
 from app.authz.context import AuthzContext
 from app.authz.target import Target, project_target
+from app.core import labels
 from app.core.base_model import check_version
+from app.core.csv import CsvExport, export_query, selected
 from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
-from app.core.lists import Feed, Filter, FilterType, ListSpec, Page, fetch_feed, fetch_page
+from app.core.lists import (
+    MAX_VALUES,
+    CustomFilter,
+    Feed,
+    Filter,
+    FilterType,
+    ListSpec,
+    Page,
+    fetch_feed,
+    fetch_page,
+    fetch_ranked,
+)
 from app.enums import (
-    CONTENT_ITEM_CATEGORIES,
     ActivityAction,
     ActivityEntityType,
     ActivityField,
     ApprovalEntityType,
-    ApprovalRequestStatus,
+    ApprovalState,
     DeletedChildren,
+    LinkedTasks,
     NumberPrefix,
+    Priority,
+    RequirementColumn,
     RequirementStatus,
     RestrictionCategory,
-    RestrictionLevel,
     TrashItemType,
 )
 from app.models.approval import ApprovalRequest
 from app.models.project import Project
 from app.models.requirement import Requirement, RequirementRevision
+from app.models.task import Task
 from app.models.user import User
 from app.repositories.activity import ActivityRepository
 from app.repositories.approval import ApprovalRepository
-from app.repositories.base import direct_update, get_by_id
+from app.repositories.base import direct_update, write_ranks
 from app.repositories.project import ProjectRepository
-from app.repositories.requirement import RequirementRepository
-from app.repositories.user import UserRepository
-from app.rules.approval_policy import status_after_rejection
-from app.rules.rank import rank_between
-from app.rules.restriction import Restriction, change, effective, levels_below
-from app.schemas.approval import (
-    ApprovalDecisionCreate,
-    ApprovalRead,
-    ApprovalRequestCreate,
-    ApprovalRequestItem,
-    ApprovalRequestRead,
+from app.repositories.requirement import (
+    HAS_TASKS,
+    TRASH_DELETED_AT,
+    TRASH_ID,
+    TRASH_TYPE,
+    RequirementRepository,
+    with_approval_state,
 )
+from app.repositories.task import TaskRepository
+from app.repositories.user import UserRepository
+from app.rules.rank import place, rank_between
+from app.rules.restriction import Restriction, effective
 from app.schemas.requirement import (
-    RequirementApprove,
+    RequirementAncestor,
     RequirementCreate,
     RequirementItem,
     RequirementMove,
@@ -65,31 +79,72 @@ from app.schemas.requirement import (
     RevisionRead,
     TrashItem,
 )
-from app.services.approval import ApprovalService, register_on_approved, register_on_rejected
+from app.services.approval import ApprovalService
 from app.services.numbering import NumberingService
-from app.services.project import register_on_restriction_changed
-from app.services.user import required_error
+from app.services.project import (
+    check_item_restriction,
+    lift_items,
+    lift_restored,
+    register_on_restriction_changed,
+    set_item_restriction,
+)
+from app.services.task import TaskService
+from app.services.user import check_person, required_error
+from app.services.workstream import WorkstreamService
 
 type RequirementEntity = Requirement
 type ApprovalRequestEntity = ApprovalRequest
 
 # The ranked-view cap (DL-159; build plan, "API conventions").
 TREE_CAP = 2_000
-# The rank length cap: a drop past it rewrites the gap's siblings (design-doc §6; DL-204).
-RANK_MAX = 255
 
-# The project's trash (design-doc §9): newest first; tasks and test cases join in Slices 3 and 5.
+# The project's trash (design-doc §9): requirements and tasks, newest first; test cases join in
+# Slice 5.
 TRASH = ListSpec(
     name="TrashItem",
-    id_column=Requirement.id,  # pyright: ignore[reportArgumentType]
-    sorts={"deleted_at": Requirement.deleted_at},  # pyright: ignore[reportArgumentType]
+    id_column=TRASH_ID,
+    sorts={"deleted_at": TRASH_DELETED_AT},
     default_sort=("-deleted_at",),
-    filters=(
-        Filter(
-            "type", literal(TrashItemType.REQUIREMENT.value), FilterType.ENUM, enum=TrashItemType
-        ),
-    ),
+    filters=(Filter("type", TRASH_TYPE, FilterType.ENUM, enum=TrashItemType),),
 )
+
+# The tree's filters (DL-351; owner, Nov 24, 2026, R2); no sorts: it keeps rank order.
+TREE = ListSpec(
+    name="RequirementItem",
+    id_column=Requirement.id,  # pyright: ignore[reportArgumentType]
+    sort_first=(Requirement.rank,),  # pyright: ignore[reportArgumentType]
+    filters=(
+        Filter("status", Requirement.status, FilterType.ENUM, enum=RequirementStatus),  # pyright: ignore[reportArgumentType]
+        Filter("priority", Requirement.priority, FilterType.ENUM, enum=Priority),  # pyright: ignore[reportArgumentType]
+        Filter("workstream", Requirement.workstream_id, FilterType.REFERENCE),  # pyright: ignore[reportArgumentType]
+        Filter("reporter", Requirement.reporter_id, FilterType.USER),  # pyright: ignore[reportArgumentType]
+        CustomFilter(
+            "approval",
+            Annotated[list[ApprovalState], Field(max_length=MAX_VALUES)],
+            with_approval_state,
+        ),
+        Filter("has_tasks", HAS_TASKS, FilterType.BOOLEAN),  # pyright: ignore[reportArgumentType]
+    ),
+    paging="ranked",
+)
+
+REQUIREMENT_EXPORT = export_query(TREE, RequirementColumn)
+REQUIREMENT_HEADERS = {
+    RequirementColumn.ID: "ID",
+    RequirementColumn.TITLE: "Title",
+    RequirementColumn.STATUS: "Status",
+    RequirementColumn.PRIORITY: "Priority",
+    RequirementColumn.PARENT: "Parent",
+    RequirementColumn.APPROVAL: "Approval",
+    RequirementColumn.TASKS: "Tasks",
+}
+# The approval column: approved and awaiting are independent facts (DL-414).
+APPROVAL_LABEL = {
+    (True, True): "Approved, awaiting approval",
+    (True, False): "Approved",
+    (False, True): "Awaiting approval",
+    (False, False): "",
+}
 
 REVISIONS = ListSpec(
     name="RevisionItem",
@@ -97,41 +152,9 @@ REVISIONS = ListSpec(
     paging="cursor",
 )
 
-# A requirement's approval requests: newest first, offset-paged (DL-227).
-APPROVAL_REQUESTS = ListSpec(
-    name="ApprovalRequestItem",
-    id_column=ApprovalRequest.id,  # pyright: ignore[reportArgumentType]
-    sorts={"created_at": ApprovalRequest.created_at},  # pyright: ignore[reportArgumentType]
-    default_sort=("-created_at",),
-)
-
 
 def _categories(requirement: Requirement) -> list[RestrictionCategory]:
     return [RestrictionCategory(c) for c in requirement.restriction_categories]
-
-
-def _check_restriction(
-    project: Project,
-    level: RestrictionLevel | None,
-    categories: frozenset[RestrictionCategory],
-    *,
-    level_field: str,
-    categories_field: str,
-) -> None:
-    """422 for a level below the project's (`below_project`, DL-208) or `export_controlled`
-    (`project_only`: it's set on the project)."""
-    if level in levels_below(project.restriction_level):
-        raise ValidationFailedError.on(
-            ("body", level_field),
-            "A requirement can't be restricted below its project.",
-            "below_project",
-        )
-    if not categories <= set(CONTENT_ITEM_CATEGORIES):
-        raise ValidationFailedError.on(
-            ("body", categories_field),
-            "Export control is set on the project, not on a requirement.",
-            "project_only",
-        )
 
 
 class RequirementService:
@@ -212,10 +235,11 @@ class RequirementService:
         # Checked again on the held row: an archive or export-control change that committed
         # while this waited takes the right away.
         ensure(ctx, Action.REQUIREMENT_CREATE, project_target(project))
-        _check_restriction(
+        check_item_restriction(
             project,
             values.restriction_level,
             categories,
+            noun="requirement",
             level_field="restriction_level",
             categories_field="restriction_categories",
         )
@@ -273,8 +297,9 @@ class RequirementService:
         title or description makes the next revision, with `change_note`. `status` `approved`:
         403 without `requirement.approve_manually`, else 422 `use_approve` (DL-161). A changed
         `reporter_id` needs `requirement.reassign_reporter`, and someone who may create
-        requirements here (422 `not_member` or `account_inactive`, DL-211). Logs `status`,
-        `priority`, and `reporter_id`."""
+        requirements here (422 `not_member` or `account_inactive`, DL-211). A newly set
+        `workstream_id` is a live workstream of the project (404 outside it, 422 `archived`).
+        Logs `status`, `priority`, `reporter_id`, and `workstream_id`."""
         project = await self._project(requirement)
         # Held, then read: the target sees what a restriction change committed meanwhile
         # (TD-74). Project, then requirement, as every requirement path takes them, so a member
@@ -296,7 +321,18 @@ class RequirementService:
         reporter_id = values.reporter_id
         if reporter_id is not None and reporter_id != requirement.reporter_id:
             ensure(ctx, Action.REQUIREMENT_REASSIGN_REPORTER, target)
-            await self._check_reporter(target, reporter_id)
+            await check_person(
+                self.session,
+                target,
+                reporter_id,
+                Action.REQUIREMENT_CREATE,
+                "reporter_id",
+                ValidationFailedError.on(
+                    ("body", "reporter_id"),
+                    "The reporter must be able to create requirements in this project.",
+                    "not_member",
+                ),
+            )
         else:
             reporter_id = None
         if values.title is not None and (problems := required_error(values.title, field="title")):
@@ -332,29 +368,17 @@ class RequirementService:
             if new is not None and new != old:
                 setattr(requirement, field.value, new)
                 logged.append((field, old, new))
+        # Nullable: null clears it.
+        old_workstream = requirement.workstream_id
+        if "workstream_id" in values.model_fields_set and values.workstream_id != old_workstream:
+            if values.workstream_id is not None:
+                await WorkstreamService(self.session).assignable(project.id, values.workstream_id)
+            requirement.workstream_id = values.workstream_id
+            logged.append((ActivityField.WORKSTREAM_ID, old_workstream, values.workstream_id))
         await self.session.flush()
         for field, old, new in logged:
             self._log(requirement, ctx.user_id, ActivityAction.UPDATED, field, old, new)
         return await self.read(ctx, requirement)
-
-    async def _check_reporter(self, target: Target, user_id: uuid.UUID) -> None:
-        """The new reporter may create requirements in the project (DL-211)."""
-        users = UserRepository(self.session)
-        # Held, so a removal or deactivation committing meanwhile waits for this one (TD-72).
-        await users.hold_access(user_id)
-        user = await users.get(user_id)
-        if user is None or not authorize(
-            await users.authz_context(user), Action.REQUIREMENT_CREATE, target
-        ):
-            raise ValidationFailedError.on(
-                ("body", "reporter_id"),
-                "The reporter must be able to create requirements in this project.",
-                "not_member",
-            )
-        if not user.is_active:
-            raise ValidationFailedError.on(
-                ("body", "reporter_id"), "This account is deactivated.", "account_inactive"
-            )
 
     async def set_restriction(
         self, ctx: AuthzContext, requirement: Requirement, values: RequirementRestrictionUpdate
@@ -369,37 +393,17 @@ class RequirementService:
         await ProjectRepository(self.session).hold(project)
         await self._lock_live(requirement)
         # Built on the held rows: an archive or export-control change meanwhile is seen (TD-80).
-        target = project_target(project, requirement)
-        old = Restriction(requirement.restriction_level, frozenset(_categories(requirement)))
-        new = Restriction(values.level, frozenset(values.categories))
-        kind = change(old, new)
-        raise_, lower = Action.REQUIREMENT_RAISE_RESTRICTION, Action.REQUIREMENT_LOWER_RESTRICTION
-        needed = [a for a, does in ((raise_, kind.raises), (lower, kind.lowers)) if does]
-        # Neither: either action will do, and lower is never granted without raise.
-        for action in needed or [raise_]:
-            ensure(ctx, action, target)
-        _check_restriction(
-            project, new.level, new.categories, level_field="level", categories_field="categories"
+        await set_item_restriction(
+            self.session,
+            ctx,
+            project,
+            requirement,
+            Restriction(values.level, frozenset(values.categories)),
+            entity_type=ActivityEntityType.REQUIREMENT,
+            raise_action=Action.REQUIREMENT_RAISE_RESTRICTION,
+            lower_action=Action.REQUIREMENT_LOWER_RESTRICTION,
+            noun="requirement",
         )
-        stored = sorted(new.categories)
-        logged = [
-            (field, before, after)
-            for field, before, after in (
-                (ActivityField.RESTRICTION_LEVEL, old.level, new.level),
-                (ActivityField.RESTRICTION_CATEGORIES, _categories(requirement), stored),
-            )
-            if before != after
-        ]
-        if logged:
-            await direct_update(
-                self.session,
-                Requirement,
-                requirement.id,
-                {"restriction_level": new.level, "restriction_categories": stored},
-                touch_updated_at=True,
-            )
-        for field, before, after in logged:
-            self._log(requirement, ctx.user_id, ActivityAction.UPDATED, field, before, after)
         return await self.read(ctx, requirement)
 
     async def move(
@@ -474,31 +478,21 @@ class RequirementService:
         in order). With no room between the neighbors (a tie, or past 255 characters), the
         parent's children are rewritten in order (DL-204, DL-213, DL-218). No `version` bump; a
         placed item's `updated_at` moves when `reparented`."""
-        before = siblings[position - 1][1] if position > 0 else None
-        after = siblings[position][1] if position < len(siblings) else None
-        ranks: list[str] = []
-        if before is None or before != after:
-            for _ in placed:
-                ranks.append(rank_between(ranks[-1] if ranks else before, after))
-        if ranks and len(ranks[-1]) <= RANK_MAX:
-            updates = list(zip(placed, ranks, strict=True))
-        else:
-            # Fresh ranks in the same order: short again, and ties broken.
-            ids = [id_ for id_, _ in siblings]
-            fresh: str | None = None
-            updates: list[tuple[uuid.UUID, str]] = []
-            for id_ in [*ids[:position], *placed, *ids[position:]]:
-                fresh = rank_between(fresh, None)
-                updates.append((id_, fresh))
-        for id_, rank in updates:
-            moved = id_ in placed
-            await direct_update(
-                self.session,
-                Requirement,
-                id_,
-                {"rank": rank, "parent_requirement_id": parent_id} if moved else {"rank": rank},
-                touch_updated_at=moved and reparented,
-            )
+        writes = place(siblings, placed, position)
+        moved = set(placed)
+        for id_, rank in writes:
+            if id_ in moved:
+                await direct_update(
+                    self.session,
+                    Requirement,
+                    id_,
+                    {"rank": rank, "parent_requirement_id": parent_id},
+                    touch_updated_at=reparented,
+                )
+        # The rest of a rewrite in one statement (DL-345, TD-73).
+        await write_ranks(
+            self.session, Requirement, [(id_, rank) for id_, rank in writes if id_ not in moved]
+        )
 
     async def _subtree(
         self, requirement: Requirement, *, deleted_at: datetime | None = None
@@ -522,12 +516,18 @@ class RequirementService:
             raise ForbiddenError
 
     async def delete(
-        self, ctx: AuthzContext, requirement: Requirement, children: DeletedChildren
+        self,
+        ctx: AuthzContext,
+        requirement: Requirement,
+        children: DeletedChildren,
+        tasks: LinkedTasks = LinkedTasks.DETACH,
     ) -> None:
         """Move the requirement to the trash (design-doc §9): its children promoted to its
         parent, in its place (DL-217), or its whole subtree deleted with it, 403 if the caller
-        may not delete each one (DL-221). Every deleted one's pending approval request is
-        cancelled (DL-224). One `deleted_at` for all, each logged."""
+        may not delete each one (DL-221). The tasks linked to every deleted one are detached,
+        each unlink logged on both sides, or deleted with them, 403 if the caller may not
+        delete each task (DL-224). Every deleted one's pending approval request is cancelled
+        (DL-224). One `deleted_at` for all, each logged."""
         project = await self._project(requirement)
         await self.repository.lock_tree(project)
         await self._lock_live(requirement)
@@ -539,6 +539,13 @@ class RequirementService:
             self._ensure_each(ctx, project, Action.REQUIREMENT_DELETE, deleted[1:])
         else:
             deleted = [requirement]
+        # One moment for the whole subtree, which a restore brings back together (DL-146).
+        now = datetime.now(UTC)
+        # Before any change, so a refused task delete changes nothing.
+        detached = await TaskService(self.session).leave_requirements(
+            ctx, project, [item.id for item in deleted], tasks, now
+        )
+        if children is DeletedChildren.PROMOTE:
             promoted = await self.repository.lock_children([requirement.id])
             if promoted:
                 parent_id = requirement.parent_requirement_id
@@ -559,11 +566,12 @@ class RequirementService:
                         requirement.id,
                         parent_id,
                     )
-        # One moment for the whole subtree, which a restore brings back together (DL-146).
-        now = datetime.now(UTC)
         for item in deleted:
             item.deleted_at = now
         await self.session.flush()
+        by_id = {item.id: item for item in deleted}
+        for task_id, requirement_id in detached:
+            self._log(by_id[requirement_id], ctx.user_id, ActivityAction.UNLINKED, old=task_id)
         for item in deleted:
             self._log(item, ctx.user_id, ActivityAction.DELETED)
         await ApprovalService(self.session).cancel_pending(
@@ -601,72 +609,84 @@ class RequirementService:
                 parent_id,
                 None,
             )
-        below = levels_below(project.restriction_level)
         for item in restored:
             item.deleted_at = None
         await self.session.flush()
         for item in restored:
-            old_level = item.restriction_level
-            lifted = old_level in below
-            if lifted:
-                await direct_update(
-                    self.session,
-                    Requirement,
-                    item.id,
-                    {"restriction_level": project.restriction_level},
-                    touch_updated_at=False,
-                )
             self._log(item, ctx.user_id, ActivityAction.RESTORED)
-            if lifted:
-                self._log(
-                    item,
-                    ctx.user_id,
-                    ActivityAction.UPDATED,
-                    ActivityField.RESTRICTION_LEVEL,
-                    old_level,
-                    project.restriction_level,
-                )
+            await lift_restored(
+                self.session,
+                Requirement,
+                ActivityEntityType.REQUIREMENT,
+                project,
+                item,
+                ctx.user_id,
+            )
         return await self.read(ctx, requirement)
 
     async def trash(self, ctx: AuthzContext, project: Project, query: BaseModel) -> Page[TrashItem]:
-        """The project's deleted items the caller could restore, each by its own rule (DL-220):
-        everything for project admins, the reporter's own never-approved ones for members. A
-        row carries `requirement.restore` only when the whole restore would pass (DL-222)."""
+        """The project's deleted requirements and tasks the caller could restore, each by its
+        own rule (DL-220): everything for project admins; for members, the requirements they
+        reported and never approved, and the tasks they reported. A requirement's row carries
+        `requirement.restore` only when the whole restore would pass (DL-222)."""
         # Who could restore, archived or not: an archived project lists the same rows (DL-220).
         live = dataclasses.replace(project_target(project), archived=False)
-        empty = False
-        if authorize(ctx, Action.REQUIREMENT_RESTORE, live):
-            reporter_id = None
-        else:
-            # A project member's own never-approved one (DL-219): nothing for anyone else.
-            own = Requirement(reporter_id=ctx.user_id, approved_revision_id=None)
-            reporter_id = ctx.user_id
-            empty = not authorize(
-                ctx, Action.REQUIREMENT_RESTORE, dataclasses.replace(live, entity=own)
-            )
+
+        def reach(action: Action, own: Requirement | Task) -> tuple[uuid.UUID | None, bool]:
+            """Everything, or only the caller's own (DL-219, DL-223), or nothing at all."""
+            if authorize(ctx, action, live):
+                return None, False
+            return ctx.user_id, not authorize(ctx, action, dataclasses.replace(live, entity=own))
+
+        requirement_reporter, no_requirements = reach(
+            Action.REQUIREMENT_RESTORE,
+            Requirement(reporter_id=ctx.user_id, approved_revision_id=None),
+        )
+        task_reporter, no_tasks = reach(Action.TASK_RESTORE, Task(reporter_id=ctx.user_id))
+        tasks = TaskRepository(self.session)
         page = await fetch_page(
             self.session,
-            self.repository.trash(project.id, reporter_id, empty=empty),
+            self.repository.trash(
+                self.repository.trash_rows(project.id, requirement_reporter, empty=no_requirements),
+                tasks.trash_rows(project.id, task_reporter, empty=no_tasks),
+            ),
             TRASH,
             query,
         )
-        rows: list[Requirement] = page.items
+        ids: list[uuid.UUID] = page.items
+        found: dict[uuid.UUID, Requirement | Task] = {
+            **await self.repository.get_many_in_project(project.id, ids),
+            **await tasks.get_many_in_project(project.id, ids),
+        }
+        # One restored since the page was read has left the trash.
+        rows = [row for id_ in ids if (row := found[id_]).deleted_at is not None]
+        requirements = {row.id: row for row in rows if isinstance(row, Requirement)}
+        deleted_tasks = [row.id for row in rows if isinstance(row, Task)]
         with_them: dict[uuid.UUID, list[Requirement]] = defaultdict(list)
-        for root, item in await self.repository.deleted_with(rows) if rows else []:
+        for root, item in (
+            await self.repository.deleted_with(list(requirements.values())) if requirements else []
+        ):
             with_them[root].append(item)
-        deleters = await ActivityRepository(self.session).last_deleters(
-            ActivityEntityType.REQUIREMENT, [row.id for row in rows]
-        )
+        activity = ActivityRepository(self.session)
+        deleters = {
+            **await activity.last_deleters(ActivityEntityType.REQUIREMENT, list(requirements)),
+            **await activity.last_deleters(ActivityEntityType.TASK, deleted_tasks),
+        }
         users = await UserRepository(self.session).get_many(
             {user_id for user_id in deleters.values() if user_id is not None}
         )
 
-        def deleter(row: Requirement) -> User | None:
+        def deleter(row: Requirement | Task) -> User | None:
             user_id = deleters.get(row.id)
             return None if user_id is None else users.get(user_id)
 
-        def actions(row: Requirement) -> list[Action]:
-            allowed = allowed_actions(ctx, project_target(project, row))
+        def actions(row: Requirement | Task) -> list[Action]:
+            # Only the row's own type's restore: an admin holds both by role, and a Restore must
+            # never act on another type's item with the same number.
+            other = Action.REQUIREMENT_RESTORE if isinstance(row, Task) else Action.TASK_RESTORE
+            allowed = [
+                a for a in allowed_actions(ctx, project_target(project, row)) if a is not other
+            ]
             if Action.REQUIREMENT_RESTORE in allowed and not all(
                 authorize(ctx, Action.REQUIREMENT_RESTORE, project_target(project, item))
                 for item in with_them[row.id]
@@ -677,7 +697,7 @@ class RequirementService:
         return page.with_items(
             [
                 TrashItem(
-                    type=TrashItemType.REQUIREMENT,
+                    type=TrashItemType.TASK if isinstance(row, Task) else TrashItemType.REQUIREMENT,
                     id=row.id,
                     number=row.number,
                     title=row.title,
@@ -691,35 +711,72 @@ class RequirementService:
             ]
         )
 
-    async def lift_to_project(self, project: Project, actor_id: uuid.UUID) -> None:
-        """A raised project lifts its live requirements stored below its new level to it, each
-        logged as the raiser's change, without moving `updated_at` (DL-208 to DL-210)."""
-        level = project.restriction_level
-        for requirement_id, old in await self.repository.lock_stored_at(
-            project.id, levels_below(level)
-        ):
-            await direct_update(
-                self.session,
-                Requirement,
-                requirement_id,
-                {"restriction_level": level},
-                touch_updated_at=False,
-            )
-            log_change(
-                self.session,
-                project_id=project.id,
-                entity_type=ActivityEntityType.REQUIREMENT,
-                entity_id=requirement_id,
-                action=ActivityAction.UPDATED,
-                changed_by=actor_id,
-                field=ActivityField.RESTRICTION_LEVEL,
-                old=old,
-                new=level,
-            )
+    async def _matches(
+        self, ctx: AuthzContext, project: Project, query: BaseModel
+    ) -> tuple[list[Requirement], bool]:
+        """The tree's filter matches in rank order, up to the cap: the tree and its export."""
+        return await fetch_ranked(
+            self.session,
+            self.repository.in_project(project.id),
+            TREE,
+            query,
+            TREE_CAP,
+            current_user_id=ctx.user_id,
+        )
 
-    async def tree(self, project: Project) -> RequirementTree:
-        """The project's requirements for the tree, up to the cap (DL-159)."""
-        rows = await self.repository.ranked(project.id, TREE_CAP + 1)
+    async def export(self, ctx: AuthzContext, project: Project, query: BaseModel) -> CsvExport:
+        """The tree's matches as filtered, without their context ancestors (DL-351), in rank
+        order up to the cap, in the `columns=` asked for: labels as on screen, the parent by its
+        display ID, the approval state, and the coverage as "2 of 5 done" (S3-C14)."""
+        matches, truncated = await self._matches(ctx, project, query)
+        parents = await self.repository.get_many_in_project(
+            project.id, {r.parent_requirement_id for r in matches if r.parent_requirement_id}
+        )
+        awaiting = await ApprovalRepository(self.session).pending_entity_ids(
+            project.id, ApprovalEntityType.REQUIREMENT
+        )
+        coverage = await TaskRepository(self.session).coverage([r.id for r in matches])
+        columns = selected(getattr(query, "columns", None), list(RequirementColumn))
+        prefix = f"{project.key}-{NumberPrefix.REQUIREMENT}"
+
+        def values(r: Requirement) -> dict[RequirementColumn, str]:
+            parent = parents.get(r.parent_requirement_id)  # pyright: ignore[reportArgumentType]
+            count, done = coverage.get(r.id, (0, 0))
+            approved = r.approved_revision_id is not None
+            return {
+                RequirementColumn.ID: f"{prefix}-{r.number}",
+                RequirementColumn.TITLE: r.title,
+                RequirementColumn.STATUS: (
+                    labels.APPROVED_MODIFIED
+                    if r.status is RequirementStatus.APPROVED
+                    and r.approved_revision_id not in (None, r.current_revision_id)
+                    else labels.REQUIREMENT_STATUS[r.status]
+                ),
+                RequirementColumn.PRIORITY: labels.PRIORITY[r.priority],
+                RequirementColumn.PARENT: f"{prefix}-{parent.number}" if parent else "",
+                RequirementColumn.APPROVAL: APPROVAL_LABEL[approved, r.id in awaiting],
+                RequirementColumn.TASKS: f"{done} of {count} done" if count else "",
+            }
+
+        today = datetime.now(UTC).date().isoformat()
+        return CsvExport(
+            filename=f"{project.key}-requirements-{today}.csv",
+            header=[REQUIREMENT_HEADERS[c] for c in columns],
+            rows=[[row[c] for c in columns] for row in map(values, matches)],
+            truncated=truncated,
+        )
+
+    async def tree(self, ctx: AuthzContext, project: Project, query: BaseModel) -> RequirementTree:
+        """The project's requirements matching the filters, up to the cap (DL-159), with the
+        ancestors they need as context (DL-351), each with its coverage (DL-199)."""
+        matches, truncated = await self._matches(ctx, project, query)
+        context = await self.repository.missing_ancestors(matches)
+        rows = sorted([*matches, *context], key=lambda r: (r.rank, r.id))
+        awaiting = await ApprovalRepository(self.session).pending_entity_ids(
+            project.id, ApprovalEntityType.REQUIREMENT
+        )
+        coverage = await TaskRepository(self.session).coverage([r.id for r in rows])
+        in_context = {r.id for r in context}
         return RequirementTree(
             items=[
                 RequirementItem(
@@ -733,10 +790,14 @@ class RequirementService:
                     restriction_categories=_categories(r),
                     current_revision_id=r.current_revision_id,
                     approved_revision_id=r.approved_revision_id,
+                    awaiting_approval=r.id in awaiting,
+                    task_count=coverage.get(r.id, (0, 0))[0],
+                    tasks_done=coverage.get(r.id, (0, 0))[1],
+                    context=r.id in in_context,
                 )
-                for r in rows[:TREE_CAP]
+                for r in rows
             ],
-            truncated=len(rows) > TREE_CAP,
+            truncated=truncated,
         )
 
     async def _can_delete_children(
@@ -751,6 +812,22 @@ class RequirementService:
         return all(
             authorize(ctx, Action.REQUIREMENT_DELETE, project_target(project, item))
             for item in await self.repository.live_descendants(requirement.id)
+        )
+
+    async def _can_delete_tasks(
+        self, ctx: AuthzContext, project: Project, requirement: Requirement
+    ) -> bool:
+        """Whether the caller may delete the requirement with the tasks linked to it and to
+        every live descendant (`?tasks=delete`, whatever happens to the children)."""
+        target = project_target(project, requirement)
+        if requirement.deleted_at is not None or not authorize(
+            ctx, Action.REQUIREMENT_DELETE, target
+        ):
+            return False
+        subtree = [requirement, *await self.repository.live_descendants(requirement.id)]
+        return all(
+            authorize(ctx, Action.TASK_DELETE, project_target(project, task))
+            for task in await TaskRepository(self.session).linked([item.id for item in subtree])
         )
 
     async def revisions(self, requirement: Requirement, query: BaseModel) -> Feed[RevisionItem]:
@@ -791,6 +868,7 @@ class RequirementService:
             description_md=requirement.description_md,
             status=requirement.status,
             priority=requirement.priority,
+            workstream_id=requirement.workstream_id,
             reporter_id=requirement.reporter_id,
             reporter_name=reporter.name,
             reporter_is_active=reporter.is_active,
@@ -803,11 +881,16 @@ class RequirementService:
             approved_revision_number=await self._revision_number(requirement.approved_revision_id),
             has_children=await self.repository.has_children(requirement.id),
             can_delete_children=await self._can_delete_children(ctx, project, requirement),
+            can_delete_tasks=await self._can_delete_tasks(ctx, project, requirement),
             approved_at=requirement.approved_at,
             version=requirement.version,
             created_at=requirement.created_at,
             updated_at=requirement.updated_at,
             allowed_actions=allowed_actions(ctx, project_target(project, requirement)),
+            ancestors=[
+                RequirementAncestor(number=number, title=title)
+                for number, title in await self.repository.ancestors(requirement)
+            ],
         )
 
     async def _revision_number(self, revision_id: uuid.UUID | None) -> int | None:
@@ -818,292 +901,6 @@ class RequirementService:
             RequirementRevision, await self.session.get(RequirementRevision, revision_id)
         )
         return revision.revision_number
-
-    # --- Approval requests (design-doc §6.2; S2-C10) -------------------------------------------
-
-    async def load_approval_request(
-        self, request_id: uuid.UUID
-    ) -> tuple[ApprovalRequest, Target] | None:
-        """The request, as a target on its live requirement inside its project; None for a
-        deleted requirement's (DL-228)."""
-        loaded = await self._load_request(request_id)
-        if loaded is None:
-            return None
-        request, requirement, project = loaded
-        return request, project_target(project, requirement)
-
-    async def _load_request(
-        self, request_id: uuid.UUID
-    ) -> tuple[ApprovalRequest, Requirement, Project] | None:
-        request = await ApprovalRepository(self.session).get(request_id)
-        if request is None or request.entity_type is not ApprovalEntityType.REQUIREMENT:
-            return None
-        requirement = await get_by_id(self.session, Requirement, request.entity_id)
-        if requirement is None:
-            return None
-        return request, requirement, await self._project(requirement)
-
-    async def load_approval_request_to_decide(
-        self, request_id: uuid.UUID
-    ) -> tuple[ApprovalRequest, Target] | None:
-        """The request on a live requirement, as a target whose entity is the request with its
-        rows, for `approval.decide`'s relationship (the named approver's own pending row)."""
-        loaded = await self._load_request(request_id)
-        if loaded is None:
-            return None
-        request, _, project = loaded
-        return request, project_target(project, request)
-
-    async def decide(
-        self, ctx: AuthzContext, request: ApprovalRequest, body: ApprovalDecisionCreate
-    ) -> ApprovalRequestRead:
-        """The caller's decision on their own row (final, DL-195); 422 `not_pending` for a request
-        that isn't pending (DL-230). The policy then completes or rejects the request (design-doc
-        §6.2): completion runs the requirement's `on_approved` handler; a rejected re-open round
-        moves it back to `draft`."""
-        requirement, project = await self._request_entities(request)
-        # Project, requirement, then request: the order a delete takes them, so neither waits on
-        # the other in a cycle; the rule checked again under them.
-        await ProjectRepository(self.session).hold(project)
-        await self._lock_live(requirement)
-        approvals = ApprovalService(self.session)
-        request = await approvals.lock(request)
-        # The caller's access read again, whole: a removal, role change, revocation, or
-        # deactivation takes the project's lock first, so one that committed while this waited,
-        # leaving their row pending, is seen (TD-82).
-        ctx = await self._current_context(ctx)
-        ensure(ctx, Action.APPROVAL_DECIDE, project_target(project, request))
-        await approvals.decide(request, ctx.user_id, body.decision, body.comment)
-        return await self._read_approval_request(
-            ctx, request.id, project_target(project, requirement)
-        )
-
-    async def approve(
-        self, ctx: AuthzContext, requirement: Requirement, body: RequirementApprove
-    ) -> RequirementRead:
-        """Approve by hand (design-doc §5): the current revision, by the caller, now; a pending
-        request cancelled. 409 on a stale `version` (DL-169)."""
-        project = await self._project(requirement)
-        await ProjectRepository(self.session).hold(project)
-        await self._lock_live(requirement)
-        target = project_target(project, requirement)
-        ensure(ctx, Action.REQUIREMENT_APPROVE_MANUALLY, target)
-        check_version(requirement, body.version)
-        # A foreign key set at creation, so never None (design-doc §6.1).
-        revision_id = cast(uuid.UUID, requirement.current_revision_id)
-        self._record_approval(requirement, revision_id, ctx.user_id, RequirementStatus.APPROVED)
-        await self.session.flush()
-        await ApprovalService(self.session).cancel_pending(
-            ApprovalEntityType.REQUIREMENT, [requirement.id], ctx.user_id
-        )
-        return await self.read(ctx, requirement)
-
-    async def complete_approval(self, request: ApprovalRequest, approver_id: uuid.UUID) -> None:
-        """A completed request (design-doc §6.2): its revision approved by the approver whose
-        decision completed it, when it completed; only a `draft` requirement moves to `approved`
-        (DL-148). The decision holds the requirement's lock; a replacement holds the project's,
-        which every requirement write takes first."""
-        requirement = cast(Requirement, await self.session.get(Requirement, request.entity_id))
-        status = (
-            RequirementStatus.APPROVED
-            if requirement.status is RequirementStatus.DRAFT
-            else requirement.status
-        )
-        revision_id = cast(uuid.UUID, request.requirement_revision_id)
-        # Approved when the request completed (schema-doc `requirement`), the same instant.
-        self._record_approval(
-            requirement, revision_id, approver_id, status, at=cast(datetime, request.completed_at)
-        )
-
-    async def reject_approval(self, request: ApprovalRequest, actor_id: uuid.UUID) -> None:
-        """A rejected request: a re-open round moves the requirement back to `draft`, logged;
-        anything else changes nothing (DL-195)."""
-        requirement = cast(Requirement, await self.session.get(Requirement, request.entity_id))
-        old = requirement.status
-        new = status_after_rejection(
-            old, requirement.approved_revision_id, cast(uuid.UUID, request.requirement_revision_id)
-        )
-        if new is not old:
-            requirement.status = new
-            self._log(requirement, actor_id, ActivityAction.UPDATED, ActivityField.STATUS, old, new)
-
-    def _record_approval(
-        self,
-        requirement: Requirement,
-        revision_id: uuid.UUID,
-        approved_by: uuid.UUID,
-        status: RequirementStatus,
-        *,
-        at: datetime | None = None,
-    ) -> None:
-        """`approved_revision_id`, `approved_by`, and `approved_at`, and the status; the revision
-        and the status logged when they change (§10), as `approved_by`."""
-        changes = [
-            (ActivityField.STATUS, requirement.status, status),
-            (ActivityField.APPROVED_REVISION_ID, requirement.approved_revision_id, revision_id),
-        ]
-        requirement.status = status
-        requirement.approved_revision_id = revision_id
-        requirement.approved_by = approved_by
-        requirement.approved_at = at or datetime.now(UTC)
-        for field, old, new in changes:
-            if old != new:
-                self._log(requirement, approved_by, ActivityAction.UPDATED, field, old, new)
-
-    async def request_approval(
-        self, ctx: AuthzContext, requirement: Requirement, body: ApprovalRequestCreate
-    ) -> ApprovalRequestRead:
-        """A request bound to the current revision, one pending at a time (DL-225, DL-229),
-        naming eligible approvers (DL-226); logged `created`."""
-        if len(set(body.approver_ids)) < len(body.approver_ids):
-            raise ValidationFailedError.on(
-                ("body", "approver_ids"), "Name each approver once.", "duplicate"
-            )
-        # The project held first (the order every requirement path takes), so an archive or an
-        # export-control change meanwhile waits, and the check runs again under it.
-        project = await self._project(requirement)
-        await ProjectRepository(self.session).hold(project)
-        # Then the requirement, so two creates (or a create and a delete) take turns (DL-229).
-        await self._lock_live(requirement)
-        target = project_target(project, requirement)
-        ensure(ctx, Action.APPROVAL_REQUEST_CREATE, target)
-        for approver_id in body.approver_ids:
-            await self._check_approver(target, approver_id)
-        request = await ApprovalService(self.session).create(
-            project_id=project.id,
-            entity_type=ApprovalEntityType.REQUIREMENT,
-            entity_id=requirement.id,
-            requirement_revision_id=requirement.current_revision_id,
-            approver_ids=body.approver_ids,
-            note=body.note,
-            actor_id=ctx.user_id,
-        )
-        return await self._read_approval_request(ctx, request.id, target)
-
-    async def _check_approver(self, target: Target, user_id: uuid.UUID) -> None:
-        """The approver has content access to the project (404 otherwise, as the member picker,
-        design-doc §6.2) and is active (422 `account_inactive`, DL-226)."""
-        users = UserRepository(self.session)
-        # Held, so a removal or deactivation committing meanwhile waits for this one (TD-72).
-        await users.hold_access(user_id)
-        user = await users.get(user_id)
-        if user is None or not authorize(
-            await users.authz_context(user), Action.REQUIREMENT_VIEW, target
-        ):
-            raise NotFoundError
-        if not user.is_active:
-            raise ValidationFailedError.on(
-                ("body", "approver_ids"), "This account is deactivated.", "account_inactive"
-            )
-
-    async def approval_requests(
-        self, requirement: Requirement, query: BaseModel
-    ) -> Page[ApprovalRequestItem]:
-        """The requirement's approval requests, newest first (DL-227)."""
-        page = await fetch_page(
-            self.session,
-            ApprovalRepository(self.session).for_entity(
-                ApprovalEntityType.REQUIREMENT, requirement.id
-            ),
-            APPROVAL_REQUESTS,
-            query,
-        )
-        flagged = await ApprovalService(self.session).flagged(
-            await self._project(requirement), page.items
-        )
-        return Page[ApprovalRequestItem](
-            items=[
-                _approval_request(row, requirement.current_revision_id, row.id in flagged)
-                for row in page.items
-            ],
-            total=page.total,
-            limit=page.limit,
-            offset=page.offset,
-        )
-
-    async def read_approval_request(
-        self, ctx: AuthzContext, request: ApprovalRequest
-    ) -> ApprovalRequestRead:
-        """The request, with the actions the caller may take on it."""
-        requirement, project = await self._request_entities(request)
-        return await self._read_approval_request(
-            ctx, request.id, project_target(project, requirement)
-        )
-
-    async def cancel_approval_request(
-        self, ctx: AuthzContext, request: ApprovalRequest
-    ) -> ApprovalRequestRead:
-        """Cancel a pending request, logged (`status`); 422 `not_pending` otherwise (DL-228)."""
-        requirement, project = await self._request_entities(request)
-        # Held and checked again, as the create is: an export-control change meanwhile waits.
-        await ProjectRepository(self.session).hold(project)
-        target = project_target(project, requirement)
-        ensure(ctx, Action.APPROVAL_REQUEST_CANCEL, target)
-        await ApprovalService(self.session).cancel(request, ctx.user_id)
-        return await self._read_approval_request(ctx, request.id, target)
-
-    async def _request_entities(self, request: ApprovalRequest) -> tuple[Requirement, Project]:
-        # The loader's requirement and project, identity-map hits.
-        requirement = cast(Requirement, await self.session.get(Requirement, request.entity_id))
-        return requirement, await self._project(requirement)
-
-    async def _read_approval_request(
-        self, ctx: AuthzContext, request_id: uuid.UUID, target: Target
-    ) -> ApprovalRequestRead:
-        # A foreign key's row the caller just loaded or wrote, so never None.
-        request = cast(ApprovalRequest, await ApprovalRepository(self.session).get(request_id))
-        # The request's own actions only: the requirement's are on the requirement (S2-C22).
-        actions = [a for a in allowed_actions(ctx, target) if a is Action.APPROVAL_REQUEST_CANCEL]
-        if request.status is ApprovalRequestStatus.PENDING:
-            # Decide's relationship needs the request (its rows), not the requirement (DL-233).
-            if authorize(ctx, Action.APPROVAL_DECIDE, dataclasses.replace(target, entity=request)):
-                actions = sorted([*actions, Action.APPROVAL_DECIDE])
-        else:
-            # Ruled out for good by its state (DL-231, DL-232).
-            actions = [a for a in actions if a is not Action.APPROVAL_REQUEST_CANCEL]
-        requirement = cast(Requirement, target.entity)
-        flagged = await ApprovalService(self.session).flagged(
-            await self._project(requirement), [request]
-        )
-        return ApprovalRequestRead(
-            **_approval_request(
-                request, requirement.current_revision_id, request.id in flagged
-            ).model_dump(),
-            allowed_actions=actions,
-        )
-
-
-def _approval_request(
-    request: ApprovalRequest, current_revision_id: uuid.UUID | None, flagged: bool
-) -> ApprovalRequestItem:
-    # A requirement's request is bound to a revision (the CHECK `requirement_revision`).
-    revision = cast(RequirementRevision, request.requirement_revision)
-    return ApprovalRequestItem(
-        id=request.id,
-        status=request.status,
-        requirement_revision_id=revision.id,
-        revision_number=revision.revision_number,
-        note=request.note,
-        requested_by_id=request.requested_by,
-        requested_by_name=request.requester.name,
-        requested_by_is_active=request.requester.is_active,
-        created_at=request.created_at,
-        completed_at=request.completed_at,
-        newer_revision_exists=revision.id != current_revision_id,
-        flagged=flagged,
-        approvals=[
-            ApprovalRead(
-                id=row.id,
-                approver_id=row.approver_id,
-                approver_name=row.approver.name,
-                approver_is_active=row.approver.is_active,
-                decision=row.decision,
-                comment=row.comment,
-                decided_at=row.decided_at,
-            )
-            for row in request.approvals
-        ],
-    )
 
 
 def _revision(row: RequirementRevision) -> RevisionItem:
@@ -1120,19 +917,7 @@ def _revision(row: RequirementRevision) -> RevisionItem:
 
 
 async def _lift_requirements(session: AsyncSession, project: Project, actor_id: uuid.UUID) -> None:
-    await RequirementService(session).lift_to_project(project, actor_id)
+    await lift_items(session, Requirement, ActivityEntityType.REQUIREMENT, project, actor_id)
 
 
 register_on_restriction_changed(_lift_requirements)
-
-
-async def _approved(session: AsyncSession, request: ApprovalRequest, actor_id: uuid.UUID) -> None:
-    await RequirementService(session).complete_approval(request, actor_id)
-
-
-async def _rejected(session: AsyncSession, request: ApprovalRequest, actor_id: uuid.UUID) -> None:
-    await RequirementService(session).reject_approval(request, actor_id)
-
-
-register_on_approved(ApprovalEntityType.REQUIREMENT, _approved)
-register_on_rejected(ApprovalEntityType.REQUIREMENT, _rejected)

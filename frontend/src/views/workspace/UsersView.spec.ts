@@ -28,6 +28,7 @@ const USERS: Row[] = [
     is_active: true,
     is_system_admin: true,
     workspace_role: 'admin',
+    memberships: [],
     allowed_actions: [],
   },
   {
@@ -38,6 +39,7 @@ const USERS: Row[] = [
     is_active: false,
     is_system_admin: false,
     workspace_role: null,
+    memberships: [],
     allowed_actions: ['user.manage'],
   },
   {
@@ -48,6 +50,7 @@ const USERS: Row[] = [
     is_active: true,
     is_system_admin: true,
     workspace_role: null,
+    memberships: [],
     allowed_actions: [],
   },
 ]
@@ -74,6 +77,12 @@ describe('UsersView', () => {
 
     const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
 
+    // Its trail: the workspace area, then this page (DL-327).
+    const trail = wrapper.get('nav[aria-label=Breadcrumb]')
+    expect(trail.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Workspace', '/workspace/staff'],
+    ])
+    expect(trail.get('[aria-current=page]').text()).toBe('Users')
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: WORKSPACE_ID },
@@ -108,13 +117,51 @@ describe('UsersView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it("lists each user's orgs under their role: the org, its role, their projects (S3-C0k)", async () => {
+    const pia: Row = {
+      ...USERS[2]!,
+      id: 'u-pia',
+      name: 'Pia Projects',
+      is_system_admin: false,
+      memberships: [
+        { org_id: 'o-acme', org_name: 'Acme', org_slug: 'acme', role: 'admin', project_count: 2 },
+        { org_id: 'o-glob', org_name: 'Globex', org_slug: 'globex', role: null, project_count: 1 },
+      ],
+    }
+    const sam: Row = {
+      ...USERS[0]!,
+      memberships: [
+        { org_id: 'o-acme', org_name: 'Acme', org_slug: 'acme', role: 'owner', project_count: 0 },
+      ],
+    }
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage([sam, pia])))
+
+    const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users')
+
+    const role = (row: number) => wrapper.findAll('tbody tr')[row]!.findAll('td')[3]!
+    // The staff role first, then each org; with no staff role, no "User": the orgs say it.
+    expect(role(0).find('p').text()).toBe('Admin, System admin')
+    expect(
+      role(0)
+        .findAll('li')
+        .map((li) => li.text()),
+    ).toEqual(['Acme · Owner'])
+    expect(role(1).find('p').exists()).toBe(false)
+    expect(
+      role(1)
+        .findAll('li')
+        .map((li) => li.text()),
+    ).toEqual(['Acme · Admin · 2 projects', 'Globex · 1 project'])
+    await expectNoA11yViolations(wrapper)
+  })
+
   it('offers the staff admins Show deactivated, which asks for them and keeps the choice in the URL (DL-293, DL-295)', async () => {
     const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(USERS)))
     const { wrapper, router } = await mountWorkspaceView(UsersView, '/workspace/users', [
       'workspace.view',
       'workspace_staff.manage',
     ])
-    const box = wrapper.get<HTMLInputElement>('#show-deactivated')
+    const box = wrapper.get<HTMLInputElement>('input[name=include_deactivated]')
     expect(box.element.labels?.[0]?.textContent?.trim()).toBe('Show deactivated')
 
     await box.setValue(true)
@@ -130,6 +177,46 @@ describe('UsersView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it('has no Actions column for someone who may act on no one, and keeps it for the staff admins (TD-102)', async () => {
+    vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage([USERS[0]!])))
+    const member = await mountWorkspaceView(UsersView, '/workspace/users')
+    const headers = (w: typeof member.wrapper) => w.findAll('thead th').map((th) => th.text())
+
+    expect(headers(member.wrapper)).toEqual(['Name', 'Email', 'Username', 'Role', 'Status'])
+
+    const admin = await mountWorkspaceView(UsersView, '/workspace/users', [
+      'workspace.view',
+      'workspace_staff.manage',
+    ])
+    // Fixed columns for the list's admins: a search or a page never moves them (S3-C0k).
+    expect(headers(admin.wrapper)).toEqual([
+      'Name',
+      'Email',
+      'Username',
+      'Role',
+      'Status',
+      'Actions',
+    ])
+  })
+
+  it("sends the filter bar's search from the URL, and says when no one matches (DL-419)", async () => {
+    const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage([])))
+
+    const { wrapper } = await mountWorkspaceView(UsersView, '/workspace/users?q=zed')
+
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, sort: 'name', q: 'zed' },
+      },
+    })
+    expect(wrapper.get('label[for]').text()).toBe('Search users')
+    expect(wrapper.get('h3').text()).toBe('No users match “zed”')
+    // No filters declared on this list: nothing to add.
+    expect(wrapper.text()).not.toContain('Add filter')
+    await expectNoA11yViolations(wrapper)
+  })
+
   it('offers no Show deactivated without workspace_staff.manage, and ignores it in a link (DL-294)', async () => {
     const get = vi.spyOn(client, 'GET').mockResolvedValue(ok(listPage(USERS)))
 
@@ -138,7 +225,7 @@ describe('UsersView', () => {
       '/workspace/users?include_deactivated=true',
     )
 
-    expect(wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(wrapper.find('input[name=include_deactivated]').exists()).toBe(false)
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/users', {
       params: {
         path: { workspace_id: WORKSPACE_ID },

@@ -20,12 +20,18 @@ from app.routers import (
     health,
     my_work,
     org,
+    phase,
     project,
     requirement,
+    task,
     user,
     workspace,
+    workstream,
 )
 from app.rules.identifiers import RESERVED_SLUGS
+from app.services import (
+    wiring,  # noqa: F401  # pyright: ignore[reportUnusedImport] -- registers every handler
+)
 
 API_PREFIX = "/api"
 
@@ -74,6 +80,9 @@ def create_app(
     app.include_router(my_work.router, prefix=API_PREFIX)
     app.include_router(activity.router, prefix=API_PREFIX)
     app.include_router(requirement.router, prefix=API_PREFIX)
+    app.include_router(phase.router, prefix=API_PREFIX)
+    app.include_router(workstream.router, prefix=API_PREFIX)
+    app.include_router(task.router, prefix=API_PREFIX)
     _add_schema_components(app)
     return app
 

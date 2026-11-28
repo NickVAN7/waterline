@@ -435,8 +435,11 @@ export interface paths {
         put?: never;
         /**
          * Add Member
-         * @description Add an existing account by email. 422 on `email`: `already_member`, `no_account`, or
-         *     `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`.
+         * @description Add an existing account by email, and to `projects` too, all or nothing (DL-379; the
+         *     project service, which calls the org's). 422 on `email`: `already_member`, `no_account`, or
+         *     `account_inactive`; 403 for an owner or admin role without `org_member.manage_admins`. A
+         *     project entry: 422 `duplicate` or an export-control confirmation's on
+         *     `projects.<i>`, 404 for a project outside the org, 403 for one archived.
          */
         post: operations["add_member_api_orgs__org_id__members_post"];
         delete?: never;
@@ -456,8 +459,8 @@ export interface paths {
         put?: never;
         /**
          * Create Member
-         * @description Create the account and its membership in one step; the user must change the temporary
-         *     password at their first sign-in.
+         * @description Create the account and its membership in one step, and add it to `projects` too, as the
+         *     add does (DL-379); the user must change the temporary password at their first sign-in.
          */
         post: operations["create_member_api_orgs__org_id__members_new_post"];
         delete?: never;
@@ -793,6 +796,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/get-started/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Hide Get Started
+         * @description Hide the home's Get started checklist (DL-201); hiding it again changes nothing.
+         */
+        put: operations["hide_get_started_api_projects__key__get_started_hidden_put"];
+        post?: never;
+        /**
+         * Show Get Started
+         * @description Show the home's Get started checklist again; showing a shown one changes nothing.
+         */
+        delete: operations["show_get_started_api_projects__key__get_started_hidden_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/favorite": {
         parameters: {
             query?: never;
@@ -842,6 +869,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/orgs/{org_id}/member-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Org Member Projects
+         * @description An org add's projects step (DL-379): the org's live projects, by name, with whether each
+         *     is export-controlled; for whoever may add org members.
+         */
+        get: operations["org_member_projects_api_orgs__org_id__member_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/member-candidates": {
         parameters: {
             query?: never;
@@ -854,6 +902,49 @@ export interface paths {
          * @description The picker: the org's members and the workspace's staff not yet on the project.
          */
         get: operations["project_member_candidates_api_projects__key__member_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/task-person-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task Person Candidates
+         * @description The assignee and reviewer pickers: active people who may update the project's tasks
+         *     (DL-347), offset-paged with `?q=`.
+         */
+        get: operations["task_person_candidates_api_projects__key__task_person_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/approver-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Approver Candidates
+         * @description The approver picker: active people an approval request may name (design-doc §6.2),
+         *     inherited admins included unless the project is export-controlled; offset-paged with `?q=`,
+         *     and `user_id` for Re-request's earlier approvers (DL-422).
+         */
+        get: operations["approver_candidates_api_projects__key__approver_candidates_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -956,49 +1047,9 @@ export interface paths {
         };
         /**
          * My Work
-         * @description Every section, each with its first items and total.
+         * @description Every section, each with its first items and total, and the summary's due counts.
          */
         get: operations["my_work_api_me_work_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me/work/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Projects
-         * @description The projects the user can open, archived left out.
-         */
-        get: operations["my_projects_api_me_work_projects_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/me/work/favorites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * My Favorites
-         * @description The projects the user starred and can open, archived left out, by name (DL-302).
-         */
-        get: operations["my_favorites_api_me_work_favorites_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1027,7 +1078,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/me/work/decisions": {
+    "/api/me/work/tasks": {
         parameters: {
             query?: never;
             header?: never;
@@ -1035,10 +1086,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * My Decisions
-         * @description The caller's past decisions, newest first (DL-286).
+         * My Tasks
+         * @description The caller's open assigned tasks (any status but done or cancelled), priority first.
          */
-        get: operations["my_decisions_api_me_work_decisions_get"];
+        get: operations["my_tasks_api_me_work_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/work/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Reviews
+         * @description The tasks in review with the caller as reviewer, priority first.
+         */
+        get: operations["my_reviews_api_me_work_reviews_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1067,6 +1138,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/tasks/{number}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task Activity
+         * @description The task's history, newest first (`?before=` the previous page's `next_cursor`).
+         */
+        get: operations["task_activity_api_projects__key__tasks__number__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Activity
+         * @description Every change logged in the project, newest first, filtered by item type, actor (`me`;
+         *     `actor__is_null` for the system's), field, and the UTC day of the change.
+         */
+        get: operations["project_activity_api_projects__key__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{key}/requirements": {
         parameters: {
             query?: never;
@@ -1076,8 +1188,9 @@ export interface paths {
         };
         /**
          * Requirement Tree
-         * @description The project's requirements for the tree, siblings in rank order: complete up to 2,000,
-         *     with `truncated` above it (DL-159).
+         * @description The project's requirements matching the filters, with their ancestors as context
+         *     (`context`), siblings in rank order: complete up to 2,000 matches, with `truncated` above
+         *     it (DL-159, DL-351). Each with its tasks and those done, cancelled ones left out.
          */
         get: operations["requirement_tree_api_projects__key__requirements_get"];
         put?: never;
@@ -1088,6 +1201,28 @@ export interface paths {
          *     `restriction_categories` (`project_only`: `export_controlled` is set on the project).
          */
         post: operations["create_requirement_api_projects__key__requirements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Requirements
+         * @description The tree's matches as a CSV file, without their context ancestors (DL-351): the tree's
+         *     filters, `columns=` in the order asked (every column by default), at most 2,000 rows with
+         *     `Waterline-Truncated: true` above it; every cell formula-escaped (S3-C14).
+         */
+        get: operations["export_requirements_api_projects__key__requirements_export_csv_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1111,8 +1246,10 @@ export interface paths {
         /**
          * Delete Requirement
          * @description Move the requirement to the trash: its children promoted to its parent (`promote`, the
-         *     default) or deleted with it (`delete`, 403 if the caller may not delete each of them); a
-         *     pending approval request on it is cancelled.
+         *     default) or deleted with it (`delete`, 403 if the caller may not delete each of them); the
+         *     tasks linked to each deleted one detached (`detach`, the default) or deleted with it
+         *     (`delete`, 403 if the caller may not delete each task); a pending approval request on each
+         *     is cancelled.
          */
         delete: operations["delete_requirement_api_projects__key__requirements__number__delete"];
         options?: never;
@@ -1367,6 +1504,429 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{key}/phases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Phases
+         * @description The project's phases in rank order: complete up to 2,000, with `truncated` above it.
+         */
+        get: operations["list_phases_api_projects__key__phases_get"];
+        put?: never;
+        /**
+         * Create Phase
+         * @description Create a phase at the bottom of the project's phases. 422 on `name` (`missing`, `taken`)
+         *     and on `end_date` (`before_start`).
+         */
+        post: operations["create_phase_api_projects__key__phases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/phases/{phase_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Phase
+         * @description The phase, with the actions the caller may take on it.
+         */
+        get: operations["get_phase_api_projects__key__phases__phase_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Phase
+         * @description Delete the phase for good: a 422 `in_use` while any task, one in the trash too, is in it.
+         */
+        delete: operations["delete_phase_api_projects__key__phases__phase_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Phase
+         * @description Change the fields sent; null clears the description or a date. Status, dates, and
+         *     baselines are logged. 422 on `name` (`missing`, `taken`) and on `end_date` (`before_start`).
+         */
+        patch: operations["update_phase_api_projects__key__phases__phase_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/phases/{phase_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Phase
+         * @description Put the phase just after `after_id` or just before `before_id`, or at the bottom. 422
+         *     on `after_id` or `before_id` (`not_found`) and on both (`conflict`).
+         */
+        post: operations["move_phase_api_projects__key__phases__phase_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/workstreams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Workstreams
+         * @description The project's workstreams in rank order, archived ones only with `include_archived`:
+         *     complete up to 2,000, with `truncated` above it.
+         */
+        get: operations["list_workstreams_api_projects__key__workstreams_get"];
+        put?: never;
+        /**
+         * Create Workstream
+         * @description Create a workstream at the bottom of the project's. 422 on `name` (`missing`, `taken`)
+         *     and on `lead_id` (`not_member`, `account_inactive`).
+         */
+        post: operations["create_workstream_api_projects__key__workstreams_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/workstreams/{workstream_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workstream
+         * @description The workstream, archived or not, with the actions the caller may take on it.
+         */
+        get: operations["get_workstream_api_projects__key__workstreams__workstream_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Workstream
+         * @description Change the fields sent; null clears the description or the lead. 422 on `name`
+         *     (`missing`, `taken`) and on a newly named `lead_id` (`not_member`, `account_inactive`).
+         */
+        patch: operations["update_workstream_api_projects__key__workstreams__workstream_id__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/workstreams/{workstream_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Workstream
+         * @description Put the workstream just after `after_id` or just before `before_id`, or at the bottom.
+         *     422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`).
+         */
+        post: operations["move_workstream_api_projects__key__workstreams__workstream_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/workstreams/{workstream_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Workstream
+         * @description Hide the workstream from pickers; items keep it. Archiving it again changes nothing.
+         */
+        post: operations["archive_workstream_api_projects__key__workstreams__workstream_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/workstreams/{workstream_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Workstream
+         * @description Offer the workstream in pickers again.
+         */
+        post: operations["unarchive_workstream_api_projects__key__workstreams__workstream_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tasks
+         * @description The project's tasks matching the filters, in rank order unless `sort` says otherwise:
+         *     complete up to 2,000, with `truncated` above it (the backlog and the board).
+         */
+        get: operations["list_tasks_api_projects__key__tasks_get"];
+        put?: never;
+        /**
+         * Create Task
+         * @description Create a task: the next `TA` number, `todo`, at the bottom of the project's order. 404
+         *     for a requirement, phase, or workstream outside the project; 422 on `title` (`missing`),
+         *     `type` (`not_offered`), `workstream_id` (`archived`), `restriction_level`
+         *     (`below_project`), and `restriction_categories` (`project_only`).
+         */
+        post: operations["create_task_api_projects__key__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Tasks
+         * @description The task list as a CSV file: its filters and sort, `columns=` in the order asked (every
+         *     column by default), at most 2,000 rows with `Waterline-Truncated: true` above it; every
+         *     cell formula-escaped (S3-C14).
+         */
+        get: operations["export_tasks_api_projects__key__tasks_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/requirements/{number}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Requirement Tasks
+         * @description The requirement's tasks, as the backlog's rows and in its order: complete up to 2,000,
+         *     with `truncated` above it.
+         */
+        get: operations["requirement_tasks_api_projects__key__requirements__number__tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task
+         * @description The task, with the actions and status moves the caller may make.
+         */
+        get: operations["get_task_api_projects__key__tasks__number__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Task
+         * @description Move the task to the trash, its subtasks hidden with it.
+         */
+        delete: operations["delete_task_api_projects__key__tasks__number__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Task
+         * @description Change the fields sent. 409 on a stale `version`; 403 for a status move design-doc §5's
+         *     table denies, or a reporter change without `task.reassign_reporter`; 404 for a requirement,
+         *     phase, or workstream outside the project; 422 on `title`, `type`, `assignee_id`,
+         *     `reviewer_id`, `reporter_id`, and `workstream_id`.
+         */
+        patch: operations["update_task_api_projects__key__tasks__number__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/restriction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Task Restriction
+         * @description Replace the task's restriction, without `version` (DL-162): a raise needs
+         *     `task.raise_restriction`, a lower `task.lower_restriction` (403); 422 on `level`
+         *     (`below_project`) and `categories` (`project_only`).
+         */
+        put: operations["set_task_restriction_api_projects__key__tasks__number__restriction_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Task
+         * @description Put the task just after `after_id` or just before `before_id` in the project's order, or
+         *     at the bottom; with `status`, into that board column too, the transition checked first (403,
+         *     nothing saved). 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`).
+         */
+        post: operations["move_task_api_projects__key__tasks__number__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Task
+         * @description Bring the task back from the trash with its subtasks. 404 for one not in the trash.
+         */
+        post: operations["restore_task_api_projects__key__tasks__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/subtasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Subtasks
+         * @description The task's subtasks in rank order: complete up to 2,000, with `truncated` above it.
+         */
+        get: operations["list_subtasks_api_projects__key__tasks__number__subtasks_get"];
+        put?: never;
+        /**
+         * Create Subtask
+         * @description Add a subtask at the bottom of the task's, numbered from the task's counter (never
+         *     reused). 422 on `title` (`missing`).
+         */
+        post: operations["create_subtask_api_projects__key__tasks__number__subtasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/subtasks/{n}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Subtask
+         * @description Delete the subtask for good; its number isn't reused.
+         */
+        delete: operations["delete_subtask_api_projects__key__tasks__number__subtasks__n__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Subtask
+         * @description Change the fields sent (check it off with `is_done`). 422 on `title` (`missing`).
+         */
+        patch: operations["update_subtask_api_projects__key__tasks__number__subtasks__n__patch"];
+        trace?: never;
+    };
+    "/api/projects/{key}/tasks/{number}/subtasks/{n}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Subtask
+         * @description Put the subtask just after `after_id` or just before `before_id` among its task's, or at
+         *     the bottom. 422 on `after_id` or `before_id` (`not_found`) and on both (`conflict`).
+         */
+        post: operations["move_subtask_api_projects__key__tasks__number__subtasks__n__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1420,21 +1980,34 @@ export interface components {
          * @description The real actions (DL-44, DL-45, DL-56; each area adds its own).
          * @enum {string}
          */
-        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project.favorite" | "project_member.manage" | "project.view_access" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide";
+        Action: "workspace.view" | "workspace.update" | "workspace_staff.manage" | "workspace_staff.manage_admins" | "org.create" | "org.view" | "org.update" | "org_member.manage" | "org_member.manage_admins" | "user.check" | "user.manage" | "user.view_access" | "project.create" | "project.assign_first_admin" | "project.view" | "project.update" | "project.archive" | "project.unarchive" | "project.favorite" | "project_member.manage" | "project.view_access" | "project.view_activity" | "project.raise_restriction" | "project.lower_restriction" | "requirement.view" | "requirement.create" | "requirement.update" | "requirement.reassign_reporter" | "requirement.raise_restriction" | "requirement.lower_restriction" | "requirement.approve_manually" | "requirement.delete" | "requirement.restore" | "approval_request.create" | "approval_request.cancel" | "approval.decide" | "phase.view" | "phase.manage" | "workstream.view" | "workstream.manage" | "task.view" | "task.create" | "task.update" | "task.reassign_reporter" | "task.raise_restriction" | "task.lower_restriction" | "task.delete" | "task.restore" | "subtask.manage";
         /**
          * ActivityAction
          * @enum {string}
          */
         ActivityAction: "created" | "updated" | "deleted" | "restored" | "linked" | "unlinked";
         /**
+         * ActivityEntityType
+         * @enum {string}
+         */
+        ActivityEntityType: "requirement" | "task" | "testcase" | "phase" | "milestone" | "approval_request" | "test_result" | "project";
+        /**
          * ActivityEntry
          * @description One change, newest first in its feed. Names are resolved by the server at read time, so a
          *     former member's name stays; `*_is_active` false shows the "Deactivated" badge. `changed_by_*`
          *     is null when an app CLI command made the change. `old_value_*` and `new_value_*` name the
          *     user in a user field (`reporter_id`, `assignee_id`, `reviewer_id`, `lead_id`, `approver_id`);
-         *     in `parent_requirement_id`, the parent's display ID (`ERP-RQ-12`), `*_is_active` false while
-         *     it's deleted; in `approved_revision_id`, the revision's number, `*_is_active` null (DL-276).
-         *     They are null for any other field, and for a value that's empty (no parent).
+         *     in `parent_requirement_id` and `requirement_id`, and in a `linked` or `unlinked` entry's
+         *     other item, a requirement's or task's display ID (`ERP-RQ-12`), `*_is_active` false while
+         *     it's deleted; in `phase_id` and `workstream_id`, the name (a deleted phase: null); in
+         *     `approved_revision_id`, the revision's number, `*_is_active` null (DL-276, DL-416). They are
+         *     null for any other field, and for a value that's empty (no parent). `entity_type`
+         *     says whose entry it is: the requirement's own, or one of its approval requests' (requested,
+         *     approved, rejected, cancelled, an approver replaced; DL-388, DL-395, DL-397), or in the
+         *     project feed any of the project's items or the project itself. `entity_name` names that item
+         *     (DL-416): a requirement or task by its display ID (`ERP-TA-5`), an approval request by its
+         *     requirement's, a phase or the project by its name; `entity_is_active` is false while the
+         *     item is deleted (a deleted phase is gone, so its name is null).
          */
         ActivityEntry: {
             /**
@@ -1442,6 +2015,16 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            entity_type: components["schemas"]["ActivityEntityType"];
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Entity Name */
+            entity_name: string | null;
+            /** Entity Is Active */
+            entity_is_active: boolean;
             action: components["schemas"]["ActivityAction"];
             field_changed: components["schemas"]["ActivityField"] | null;
             /** Old Value */
@@ -1514,6 +2097,8 @@ export interface components {
             approver_id: string;
             /** Approver Name */
             approver_name: string;
+            /** Approver Email */
+            approver_email: string;
             /** Approver Is Active */
             approver_is_active: boolean;
             decision: components["schemas"]["ApprovalDecision"];
@@ -1628,6 +2213,13 @@ export interface components {
          */
         ApprovalRequestStatus: "pending" | "approved" | "rejected" | "cancelled";
         /**
+         * ApprovalState
+         * @description The requirement tree's approval-state filter (build plan S3-C10): independent facts, so
+         *     one requirement can match several (owner, Nov 25, 2026).
+         * @enum {string}
+         */
+        ApprovalState: "awaiting" | "approved" | "not_approved";
+        /**
          * ApprovalWorkItem
          * @description One of the caller's pending approvals, in My work (design-doc §11; DL-236): `title` and
          *     `revision_number` are the revision under approval's, whatever the requirement is now.
@@ -1674,40 +2266,6 @@ export interface components {
             new_password: string;
         };
         /**
-         * DecisionWorkItem
-         * @description One of the caller's past decisions, in My work (design-doc §11; DL-286): `title` and
-         *     `revision_number` are the decided revision's, `request_status` the request's now.
-         */
-        DecisionWorkItem: {
-            /**
-             * Request Id
-             * Format: uuid
-             */
-            request_id: string;
-            decision: components["schemas"]["ApprovalDecision"];
-            /**
-             * Decided At
-             * Format: date-time
-             */
-            decided_at: string;
-            /** Comment */
-            comment: string | null;
-            request_status: components["schemas"]["ApprovalRequestStatus"];
-            entity_type: components["schemas"]["ApprovalEntityType"];
-            /** Entity Number */
-            entity_number: number;
-            /** Title */
-            title: string;
-            /** Revision Number */
-            revision_number: number;
-            /** Project Key */
-            project_key: string;
-            /** Project Name */
-            project_name: string;
-            /** Organization Slug */
-            organization_slug: string;
-        };
-        /**
          * DeletedChildren
          * @description What a requirement's delete does with its children (design-doc §9).
          * @enum {string}
@@ -1752,6 +2310,24 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /**
+         * GetStarted
+         * @description The home's Get started checklist (design-doc §11, DL-201, DL-354), each step ticked from
+         *     the project's data; loose: a step started counts. Start your project's parts are its
+         *     requirement and its task (a test case joins in Slice 5).
+         */
+        GetStarted: {
+            /** Hidden */
+            hidden: boolean;
+            /** Invite Team */
+            invite_team: boolean;
+            /** Compile Plan */
+            compile_plan: boolean;
+            /** Has Requirement */
+            has_requirement: boolean;
+            /** Has Task */
+            has_task: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1774,6 +2350,34 @@ export interface components {
              */
             database: "ok";
         };
+        /**
+         * HomeNumbers
+         * @description The home's headline numbers (design-doc §11, Q11); untested requirements join in
+         *     Slice 5.
+         */
+        HomeNumbers: {
+            /** Blocked Tasks */
+            blocked_tasks: number;
+            /** Pending Approvals */
+            pending_approvals: number;
+        };
+        /**
+         * ItemMove
+         * @description `POST …/{id}/move`: just after `after_id` or just before `before_id`, or with neither at
+         *     the bottom.
+         */
+        ItemMove: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+        };
+        /**
+         * LinkedTasks
+         * @description What a requirement's delete does with the tasks linked to it (design-doc §9).
+         * @enum {string}
+         */
+        LinkedTasks: "detach" | "delete";
         /**
          * MeOrg
          * @description An org the user sees (design-doc §4, "Visibility"), for the org menu. `role` is null
@@ -1844,12 +2448,15 @@ export interface components {
         };
         /**
          * MemberAdd
-         * @description Add an existing account, found by email (design-doc §4: the email comes first).
+         * @description Add an existing account, found by email (design-doc §4: the email comes first), and to
+         *     `projects` too, all or nothing (DL-379).
          */
         MemberAdd: {
             /** Email */
             email: string;
             role: components["schemas"]["OrgRole"];
+            /** Projects */
+            projects?: components["schemas"]["MemberProjectAdd"][];
         };
         /**
          * MemberCandidate
@@ -1879,6 +2486,45 @@ export interface components {
             /** Password */
             password: string;
             role: components["schemas"]["OrgRole"];
+            /** Projects */
+            projects?: components["schemas"]["MemberProjectAdd"][];
+        };
+        /**
+         * MemberProject
+         * @description A project an org add can add the person to as well (Q12g, DL-379): the org's live
+         *     projects; whoever may add org members administers each.
+         */
+        MemberProject: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Export Controlled */
+            export_controlled: boolean;
+        };
+        /**
+         * MemberProjectAdd
+         * @description One of the org's projects to add the new member to as well (Q12g, DL-379).
+         *     `export_control_confirmed`: on an export-controlled project only, and required there (DL-81).
+         */
+        MemberProjectAdd: {
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** @default member */
+            role: components["schemas"]["ProjectRole"];
+            /**
+             * Export Control Confirmed
+             * @default false
+             */
+            export_control_confirmed: boolean;
         };
         /**
          * MemberRead
@@ -1967,6 +2613,8 @@ export interface components {
             is_favorite: boolean;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
+            /** Archived */
+            archived: boolean;
         };
         /**
          * MyWork
@@ -1974,6 +2622,7 @@ export interface components {
          */
         MyWork: {
             sections: components["schemas"]["WorkSections"];
+            summary: components["schemas"]["WorkSummary"];
         };
         /**
          * NewUser
@@ -2004,7 +2653,10 @@ export interface components {
             owner_id?: string | null;
             new_owner?: components["schemas"]["NewUser"] | null;
         };
-        /** OrgListItem */
+        /**
+         * OrgListItem
+         * @description An org on the workspace's list, with its counts and owners (S3-C0k).
+         */
         OrgListItem: {
             /**
              * Id
@@ -2015,6 +2667,22 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+            /** Project Count */
+            project_count: number;
+            /** Member Count */
+            member_count: number;
+            /** Owners */
+            owners: components["schemas"]["OrgOwner"][];
+        };
+        /** OrgOwner */
+        OrgOwner: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** OrgReach */
         OrgReach: {
@@ -2065,6 +2733,34 @@ export interface components {
             slug?: string | null;
         };
         /**
+         * OrgWork
+         * @description One organization's section on My work (DL-329, DL-330, DL-349, DL-359): its first open
+         *     projects (Active, Planning, On hold, each by name) and how many there are, its first hidden
+         *     ones (Completed, Cancelled, then archived, each by name) and how many, and how many its org
+         *     list shows (all but the archived).
+         */
+        OrgWork: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Projects */
+            projects: components["schemas"]["MyProjectItem"][];
+            /** Total */
+            total: number;
+            /** Hidden */
+            hidden: components["schemas"]["MyProjectItem"][];
+            /** Hidden Total */
+            hidden_total: number;
+            /** Listed Total */
+            listed_total: number;
+        };
+        /**
          * OwnProfileUpdate
          * @description The signed-in user's change to their own profile: their email isn't theirs to change in v1
          *     (design-doc §4).
@@ -2097,17 +2793,6 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[DecisionWorkItem] */
-        Page_DecisionWorkItem_: {
-            /** Items */
-            items: components["schemas"]["DecisionWorkItem"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
         /** Page[MemberCandidate] */
         Page_MemberCandidate_: {
             /** Items */
@@ -2119,10 +2804,10 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[MemberRead] */
-        Page_MemberRead_: {
+        /** Page[MemberProject] */
+        Page_MemberProject_: {
             /** Items */
-            items: components["schemas"]["MemberRead"][];
+            items: components["schemas"]["MemberProject"][];
             /** Total */
             total: number;
             /** Limit */
@@ -2130,10 +2815,10 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[MyProjectItem] */
-        Page_MyProjectItem_: {
+        /** Page[MemberRead] */
+        Page_MemberRead_: {
             /** Items */
-            items: components["schemas"]["MyProjectItem"][];
+            items: components["schemas"]["MemberRead"][];
             /** Total */
             total: number;
             /** Limit */
@@ -2196,6 +2881,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[TaskWorkItem] */
+        Page_TaskWorkItem_: {
+            /** Items */
+            items: components["schemas"]["TaskWorkItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[TrashItem] */
         Page_TrashItem_: {
             /** Items */
@@ -2251,6 +2947,123 @@ export interface components {
         PasswordReset: {
             /** Password */
             password: string;
+        };
+        /**
+         * PhaseCreate
+         * @description A new phase, at the bottom of the project's phases. `end_date` before `start_date` is a
+         *     422; phases may overlap.
+         */
+        PhaseCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Baseline Start */
+            baseline_start?: string | null;
+            /** Baseline End */
+            baseline_end?: string | null;
+            /** @default planned */
+            status: components["schemas"]["PhaseStatus"];
+        };
+        /**
+         * PhaseItem
+         * @description A row of the project's phases.
+         */
+        PhaseItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Baseline Start */
+            baseline_start: string | null;
+            /** Baseline End */
+            baseline_end: string | null;
+            status: components["schemas"]["PhaseStatus"];
+        };
+        /**
+         * PhaseList
+         * @description The project's phases in `(rank, id)` order: complete up to 2,000, with `truncated`
+         *     above it (DL-159).
+         */
+        PhaseList: {
+            /** Items */
+            items: components["schemas"]["PhaseItem"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * PhaseRead
+         * @description One phase, with the actions the caller may take on it.
+         */
+        PhaseRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Baseline Start */
+            baseline_start: string | null;
+            /** Baseline End */
+            baseline_end: string | null;
+            status: components["schemas"]["PhaseStatus"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * PhaseStatus
+         * @enum {string}
+         */
+        PhaseStatus: "planned" | "active" | "completed";
+        /**
+         * PhaseUpdate
+         * @description Only the fields sent change; null clears the description or a date. No `version`: the
+         *     last save wins, each change logged (design-doc §10).
+         */
+        PhaseUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Baseline Start */
+            baseline_start?: string | null;
+            /** Baseline End */
+            baseline_end?: string | null;
+            status?: components["schemas"]["PhaseStatus"] | null;
         };
         /**
          * Priority
@@ -2487,6 +3300,10 @@ export interface components {
             restriction_categories: components["schemas"]["RestrictionCategory"][];
             /** Modules Holding Data */
             modules_holding_data: components["schemas"]["ProjectModule"][];
+            /** Task Types */
+            task_types: components["schemas"]["TaskType"][];
+            get_started: components["schemas"]["GetStarted"] | null;
+            home_numbers: components["schemas"]["HomeNumbers"] | null;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -2522,6 +3339,17 @@ export interface components {
             enabled_modules?: components["schemas"]["ProjectModule"][] | null;
         };
         /**
+         * RequirementAncestor
+         * @description One of a requirement's ancestors: its number, shown as its ID, and its title, for the
+         *     Parent row (DL-328, TD-106).
+         */
+        RequirementAncestor: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+        };
+        /**
          * RequirementApprove
          * @description Approve by hand the revision the admin saw: `version` the one they read (a stale one is a
          *     409, DL-169).
@@ -2530,6 +3358,12 @@ export interface components {
             /** Version */
             version: number;
         };
+        /**
+         * RequirementColumn
+         * @description A requirement export's columns, in their default order (S3-C14).
+         * @enum {string}
+         */
+        RequirementColumn: "id" | "title" | "status" | "priority" | "parent" | "approval" | "tasks";
         /**
          * RequirementCreate
          * @description A new requirement: `draft`, reported by the caller, at the bottom of its siblings.
@@ -2581,6 +3415,14 @@ export interface components {
             current_revision_id: string | null;
             /** Approved Revision Id */
             approved_revision_id: string | null;
+            /** Awaiting Approval */
+            awaiting_approval: boolean;
+            /** Task Count */
+            task_count: number;
+            /** Tasks Done */
+            tasks_done: number;
+            /** Context */
+            context: boolean;
         };
         /**
          * RequirementMove
@@ -2617,6 +3459,8 @@ export interface components {
             description_md: string;
             status: components["schemas"]["RequirementStatus"];
             priority: components["schemas"]["Priority"];
+            /** Workstream Id */
+            workstream_id: string | null;
             /**
              * Reporter Id
              * Format: uuid
@@ -2642,6 +3486,8 @@ export interface components {
             has_children: boolean;
             /** Can Delete Children */
             can_delete_children: boolean;
+            /** Can Delete Tasks */
+            can_delete_tasks: boolean;
             /** Approved At */
             approved_at: string | null;
             /** Version */
@@ -2658,6 +3504,8 @@ export interface components {
             updated_at: string;
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
+            /** Ancestors */
+            ancestors: components["schemas"]["RequirementAncestor"][];
         };
         /**
          * RequirementRestrictionUpdate
@@ -2676,8 +3524,9 @@ export interface components {
         RequirementStatus: "draft" | "approved" | "in_progress" | "done" | "rejected" | "deferred";
         /**
          * RequirementTree
-         * @description The project's requirements in `(rank, id)` order, siblings in rank order (the client
-         *     nests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159).
+         * @description The project's requirements matching the filters, with their ancestors as context, in
+         *     `(rank, id)` order, siblings in rank order (the client nests them by `parent_id`); at most
+         *     2,000 matches, with `truncated` above it (DL-159, DL-351).
          */
         RequirementTree: {
             /** Items */
@@ -2690,7 +3539,8 @@ export interface components {
          * @description Only the fields sent change. `version` is the one the caller read (a stale one is a
          *     409). A new revision, with `change_note`, only when `title` or `description_md` changes
          *     (design-doc §6.1). `status` may not be `approved` (DL-161); `reporter_id` needs
-         *     `requirement.reassign_reporter` (DL-211).
+         *     `requirement.reassign_reporter` (DL-211). A newly set `workstream_id` is one of the
+         *     project's live workstreams (404 outside it, 422 `archived`).
          */
         RequirementUpdate: {
             /** Version */
@@ -2705,6 +3555,8 @@ export interface components {
             priority?: components["schemas"]["Priority"] | null;
             /** Reporter Id */
             reporter_id?: string | null;
+            /** Workstream Id */
+            workstream_id?: string | null;
         };
         /**
          * RestrictionCategory
@@ -2827,6 +3679,11 @@ export interface components {
             /** Is Current */
             is_current: boolean;
         };
+        /**
+         * Severity
+         * @enum {string}
+         */
+        Severity: "s1" | "s2" | "s3" | "s4";
         /** SignInRequest */
         SignInRequest: {
             /** Email */
@@ -2899,6 +3756,348 @@ export interface components {
             new_owner_id?: string | null;
         };
         /**
+         * SubtaskCreate
+         * @description A new subtask at the bottom of its task's, numbered from the task's counter.
+         */
+        SubtaskCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+        };
+        /**
+         * SubtaskItem
+         * @description A subtask, shown as `{KEY}-TA-{task number}.{number}`.
+         */
+        SubtaskItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Is Done */
+            is_done: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SubtaskList
+         * @description The task's subtasks in `(rank, id)` order: complete up to 2,000, with `truncated` above
+         *     it (DL-159).
+         */
+        SubtaskList: {
+            /** Items */
+            items: components["schemas"]["SubtaskItem"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * SubtaskUpdate
+         * @description Only the fields sent change; null is no change.
+         */
+        SubtaskUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Is Done */
+            is_done?: boolean | null;
+        };
+        /**
+         * TaskColumn
+         * @description A task export's columns, in their default order (S3-C14).
+         * @enum {string}
+         */
+        TaskColumn: "id" | "title" | "type" | "status" | "priority" | "severity" | "assignee" | "reviewer" | "requirement" | "phase" | "workstream" | "due_date";
+        /**
+         * TaskCreate
+         * @description A new task: `todo`, reported by the caller, at the bottom of the project's order. `type`
+         *     one the project's type offers (DL-352); `requirement_id`, `phase_id`, and `workstream_id` in
+         *     the same project (anything else a 404; an archived workstream a 422, DL-409); the
+         *     restriction may raise the item's level and add categories (design-doc §3.1).
+         */
+        TaskCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Description Md
+             * @default
+             */
+            description_md: string;
+            /** @default feature */
+            type: components["schemas"]["TaskType"];
+            /** @default medium */
+            priority: components["schemas"]["Priority"];
+            severity?: components["schemas"]["Severity"] | null;
+            /** Requirement Id */
+            requirement_id?: string | null;
+            /** Phase Id */
+            phase_id?: string | null;
+            /** Workstream Id */
+            workstream_id?: string | null;
+            restriction_level?: components["schemas"]["RestrictionLevel"] | null;
+            /**
+             * Restriction Categories
+             * @default []
+             */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * TaskItem
+         * @description A row of the project's task list (the backlog and the board).
+         */
+        TaskItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            type: components["schemas"]["TaskType"];
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["Priority"];
+            severity: components["schemas"]["Severity"] | null;
+            /** Assignee Id */
+            assignee_id: string | null;
+            /** Assignee Name */
+            assignee_name: string | null;
+            /** Assignee Is Active */
+            assignee_is_active: boolean | null;
+            /** Reviewer Id */
+            reviewer_id: string | null;
+            /** Reviewer Name */
+            reviewer_name: string | null;
+            /** Reviewer Is Active */
+            reviewer_is_active: boolean | null;
+            /** Requirement Id */
+            requirement_id: string | null;
+            /** Phase Id */
+            phase_id: string | null;
+            /** Workstream Id */
+            workstream_id: string | null;
+            /** Due Date */
+            due_date: string | null;
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * TaskList
+         * @description The project's tasks, the matches of the declared filters in the requested display order
+         *     (rank by default): complete up to 2,000, with `truncated` above it (DL-159, DL-351).
+         */
+        TaskList: {
+            /** Items */
+            items: components["schemas"]["TaskItem"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * TaskMove
+         * @description `POST …/tasks/{number}/move`: the place in the project's one order (DL-345), and for a
+         *     cross-column drop on the board the new `status`, both in one request: the transition is
+         *     checked first, and nothing is saved if it's denied (design-doc §6, "Manual ordering").
+         */
+        TaskMove: {
+            /** After Id */
+            after_id?: string | null;
+            /** Before Id */
+            before_id?: string | null;
+            status?: components["schemas"]["TaskStatus"] | null;
+        };
+        /**
+         * TaskRead
+         * @description One task, with what the caller may do to it: `allowed_actions`, and `allowed_transitions`,
+         *     the statuses design-doc §5's table lets them move it to (a hint; the update checks).
+         */
+        TaskRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            type: components["schemas"]["TaskType"];
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["Priority"];
+            severity: components["schemas"]["Severity"] | null;
+            /** Assignee Id */
+            assignee_id: string | null;
+            /** Assignee Name */
+            assignee_name: string | null;
+            /** Assignee Is Active */
+            assignee_is_active: boolean | null;
+            /** Reviewer Id */
+            reviewer_id: string | null;
+            /** Reviewer Name */
+            reviewer_name: string | null;
+            /** Reviewer Is Active */
+            reviewer_is_active: boolean | null;
+            /** Requirement Id */
+            requirement_id: string | null;
+            /** Phase Id */
+            phase_id: string | null;
+            /** Workstream Id */
+            workstream_id: string | null;
+            /** Due Date */
+            due_date: string | null;
+            restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Restriction Categories */
+            restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Description Md */
+            description_md: string;
+            /**
+             * Reporter Id
+             * Format: uuid
+             */
+            reporter_id: string;
+            /** Reporter Name */
+            reporter_name: string;
+            /** Reporter Is Active */
+            reporter_is_active: boolean;
+            /** Start Date */
+            start_date: string | null;
+            /** Time Estimate */
+            time_estimate: string | null;
+            /** Time Taken */
+            time_taken: string | null;
+            effective_restriction_level: components["schemas"]["RestrictionLevel"] | null;
+            /** Effective Restriction Categories */
+            effective_restriction_categories: components["schemas"]["RestrictionCategory"][];
+            /** Subtasks Done */
+            subtasks_done: number;
+            /** Subtasks Total */
+            subtasks_total: number;
+            /** Branch Name */
+            branch_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+            /** Allowed Transitions */
+            allowed_transitions: components["schemas"]["TaskStatus"][];
+        };
+        /**
+         * TaskRestrictionUpdate
+         * @description `PUT …/tasks/{number}/restriction` (DL-162): `level` (null: inherit the project's) and
+         *     `categories` replace the current ones. No `version` (DL-168).
+         */
+        TaskRestrictionUpdate: {
+            level: components["schemas"]["RestrictionLevel"] | null;
+            /** Categories */
+            categories: components["schemas"]["RestrictionCategory"][];
+        };
+        /**
+         * TaskStatus
+         * @enum {string}
+         */
+        TaskStatus: "todo" | "in_progress" | "blocked" | "in_review" | "done" | "cancelled";
+        /**
+         * TaskType
+         * @enum {string}
+         */
+        TaskType: "feature" | "bug" | "chore" | "spike" | "config" | "data" | "training";
+        /**
+         * TaskUpdate
+         * @description Only the fields sent change; null clears a nullable one. `version` is the one the caller
+         *     read (a stale one is a 409). `status` through design-doc §5's table, judged on the people
+         *     stored before this request (a denied move a 403); a newly named assignee or reviewer may
+         *     update tasks here and is active (DL-347); `reporter_id` needs `task.reassign_reporter`
+         *     (DL-211); a changed `type` is one the project offers (DL-352); a newly set requirement,
+         *     phase, or workstream is the project's (404), the workstream live (DL-409).
+         */
+        TaskUpdate: {
+            /** Version */
+            version: number;
+            /** Title */
+            title?: string | null;
+            /** Description Md */
+            description_md?: string | null;
+            type?: components["schemas"]["TaskType"] | null;
+            status?: components["schemas"]["TaskStatus"] | null;
+            priority?: components["schemas"]["Priority"] | null;
+            severity?: components["schemas"]["Severity"] | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Time Estimate */
+            time_estimate?: number | string | null;
+            /** Time Taken */
+            time_taken?: number | string | null;
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /** Reviewer Id */
+            reviewer_id?: string | null;
+            /** Reporter Id */
+            reporter_id?: string | null;
+            /** Requirement Id */
+            requirement_id?: string | null;
+            /** Phase Id */
+            phase_id?: string | null;
+            /** Workstream Id */
+            workstream_id?: string | null;
+        };
+        /**
+         * TaskWorkItem
+         * @description A task on My work (design-doc §11): the task, and the project and org it opens in.
+         */
+        TaskWorkItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            type: components["schemas"]["TaskType"];
+            status: components["schemas"]["TaskStatus"];
+            priority: components["schemas"]["Priority"];
+            /** Due Date */
+            due_date: string | null;
+            /** Project Key */
+            project_key: string;
+            /** Project Name */
+            project_name: string;
+            /** Organization Slug */
+            organization_slug: string;
+        };
+        /**
          * TrashItem
          * @description A row of the project's trash: the item, who deleted it, and when (design-doc §9).
          */
@@ -2929,15 +4128,34 @@ export interface components {
         };
         /**
          * TrashItemType
-         * @description What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5).
+         * @description What the trash lists (design-doc §9; test cases join in Slice 5).
          * @enum {string}
          */
-        TrashItemType: "requirement";
+        TrashItemType: "requirement" | "task";
         /** TypeRecommendation */
         TypeRecommendation: {
             type: components["schemas"]["ProjectType"];
             /** Recommended */
             recommended: string[];
+        };
+        /**
+         * UserOrgMembership
+         * @description One org in a user's row (S3-C0k): their org role, if they hold one, and how many of its
+         *     projects they're on.
+         */
+        UserOrgMembership: {
+            /**
+             * Org Id
+             * Format: uuid
+             */
+            org_id: string;
+            /** Org Name */
+            org_name: string;
+            /** Org Slug */
+            org_slug: string;
+            role: components["schemas"]["OrgRole"] | null;
+            /** Project Count */
+            project_count: number;
         };
         /**
          * UserRow
@@ -2961,6 +4179,8 @@ export interface components {
             /** Is System Admin */
             is_system_admin: boolean;
             workspace_role: components["schemas"]["WorkspaceRole"] | null;
+            /** Memberships */
+            memberships: components["schemas"]["UserOrgMembership"][];
             /** Allowed Actions */
             allowed_actions: components["schemas"]["Action"][];
         };
@@ -3012,21 +4232,6 @@ export interface components {
              */
             total: number;
         };
-        /** WorkSection[DecisionWorkItem] */
-        WorkSection_DecisionWorkItem_: {
-            /** Available */
-            available: boolean;
-            /**
-             * Items
-             * @default []
-             */
-            items: components["schemas"]["DecisionWorkItem"][];
-            /**
-             * Total
-             * @default 0
-             */
-            total: number;
-        };
         /** WorkSection[MyProjectItem] */
         WorkSection_MyProjectItem_: {
             /** Available */
@@ -3042,12 +4247,63 @@ export interface components {
              */
             total: number;
         };
+        /** WorkSection[OrgWork] */
+        WorkSection_OrgWork_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["OrgWork"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** WorkSection[TaskWorkItem] */
+        WorkSection_TaskWorkItem_: {
+            /** Available */
+            available: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["TaskWorkItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** WorkSections */
         WorkSections: {
             favorites: components["schemas"]["WorkSection_MyProjectItem_"];
-            projects: components["schemas"]["WorkSection_MyProjectItem_"];
+            organizations: components["schemas"]["WorkSection_OrgWork_"];
             approvals: components["schemas"]["WorkSection_ApprovalWorkItem_"];
-            decisions: components["schemas"]["WorkSection_DecisionWorkItem_"];
+            tasks: components["schemas"]["WorkSection_TaskWorkItem_"];
+            reviews: components["schemas"]["WorkSection_TaskWorkItem_"];
+        };
+        /**
+         * WorkSummary
+         * @description The summary tiles' one count no section's total gives (DL-349): the user's open assigned
+         *     tasks due before today plus 7 days, overdue included, and the overdue part; `available`
+         *     false when its query failed.
+         */
+        WorkSummary: {
+            /** Available */
+            available: boolean;
+            /**
+             * Due Soon
+             * @default 0
+             */
+            due_soon: number;
+            /**
+             * Overdue
+             * @default 0
+             */
+            overdue: number;
         };
         /** WorkspaceRead */
         WorkspaceRead: {
@@ -3077,6 +4333,100 @@ export interface components {
             name?: string | null;
             /** Slug */
             slug?: string | null;
+        };
+        /**
+         * WorkstreamCreate
+         * @description A new workstream, at the bottom of the project's. `lead_id` an active project member.
+         */
+        WorkstreamCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Lead Id */
+            lead_id?: string | null;
+        };
+        /**
+         * WorkstreamItem
+         * @description A row of the project's workstreams.
+         */
+        WorkstreamItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Lead Id */
+            lead_id: string | null;
+            /** Lead Name */
+            lead_name: string | null;
+            /** Lead Is Active */
+            lead_is_active: boolean | null;
+            /** Archived */
+            archived: boolean;
+        };
+        /**
+         * WorkstreamList
+         * @description The project's workstreams in `(rank, id)` order: complete up to 2,000, with `truncated`
+         *     above it (DL-159).
+         */
+        WorkstreamList: {
+            /** Items */
+            items: components["schemas"]["WorkstreamItem"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * WorkstreamRead
+         * @description One workstream, with the actions the caller may take on it.
+         */
+        WorkstreamRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Lead Id */
+            lead_id: string | null;
+            /** Lead Name */
+            lead_name: string | null;
+            /** Lead Is Active */
+            lead_is_active: boolean | null;
+            /** Archived */
+            archived: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Allowed Actions */
+            allowed_actions: components["schemas"]["Action"][];
+        };
+        /**
+         * WorkstreamUpdate
+         * @description Only the fields sent change; null clears the description or the lead. A newly named
+         *     lead is an active project member; an unchanged one is no change.
+         */
+        WorkstreamUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Lead Id */
+            lead_id?: string | null;
         };
         /**
          * ReservedSlug
@@ -3564,6 +4914,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
                 role?: components["schemas"]["WorkspaceRole"][] | null;
                 role__not?: components["schemas"]["WorkspaceRole"][] | null;
@@ -4065,6 +5416,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
             };
             header?: never;
@@ -4369,6 +5721,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
                 role?: components["schemas"]["OrgRole"][] | null;
                 role__not?: components["schemas"]["OrgRole"][] | null;
@@ -5091,6 +6444,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: key, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_archived?: boolean;
                 archived_only?: boolean;
                 status?: components["schemas"]["ProjectStatus"][] | null;
@@ -5635,6 +6989,118 @@ export interface operations {
             };
         };
     };
+    hide_get_started_api_projects__key__get_started_hidden_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    show_get_started_api_projects__key__get_started_hidden_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     favorite_project_api_projects__key__favorite_put: {
         parameters: {
             query?: never;
@@ -5754,6 +7220,7 @@ export interface operations {
                 offset?: number;
                 /** @description Comma-separated, `-` for descending: email, name. Default: name */
                 sort?: string | null;
+                q?: string | null;
                 include_deactivated?: boolean;
                 role?: components["schemas"]["ProjectRole"][] | null;
                 role__not?: components["schemas"]["ProjectRole"][] | null;
@@ -5876,6 +7343,69 @@ export interface operations {
             };
         };
     };
+    org_member_projects_api_orgs__org_id__member_projects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberProject_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     project_member_candidates_api_projects__key__member_candidates_get: {
         parameters: {
             query?: {
@@ -5884,6 +7414,137 @@ export interface operations {
                 /** @description Comma-separated, `-` for descending: name. Default: name */
                 sort?: string | null;
                 q?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberCandidate_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    task_person_candidates_api_projects__key__task_person_candidates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MemberCandidate_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approver_candidates_api_projects__key__approver_candidates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: name. Default: name */
+                sort?: string | null;
+                q?: string | null;
+                user_id?: string[] | null;
+                user_id__not?: string[] | null;
+                user_id__is_null?: boolean | null;
             };
             header?: never;
             path: {
@@ -6238,7 +7899,10 @@ export interface operations {
     };
     my_work_api_me_work_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The browser's date, for the due counts; default the server's UTC date */
+                today?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6252,104 +7916,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyWork"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-        };
-    };
-    my_projects_api_me_work_projects_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                /** @description Comma-separated, `-` for descending: key, name. Default: name */
-                sort?: string | null;
-                status?: components["schemas"]["ProjectStatus"][] | null;
-                status__not?: components["schemas"]["ProjectStatus"][] | null;
-                status__is_null?: boolean | null;
-                type?: components["schemas"]["ProjectType"][] | null;
-                type__not?: components["schemas"]["ProjectType"][] | null;
-                type__is_null?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Page_MyProjectItem_"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody"];
-                };
-            };
-        };
-    };
-    my_favorites_api_me_work_favorites_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                /** @description Comma-separated, `-` for descending: key, name. Default: name */
-                sort?: string | null;
-                status?: components["schemas"]["ProjectStatus"][] | null;
-                status__not?: components["schemas"]["ProjectStatus"][] | null;
-                status__is_null?: boolean | null;
-                type?: components["schemas"]["ProjectType"][] | null;
-                type__not?: components["schemas"]["ProjectType"][] | null;
-                type__is_null?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Page_MyProjectItem_"];
                 };
             };
             /** @description Unauthorized */
@@ -6415,12 +7981,12 @@ export interface operations {
             };
         };
     };
-    my_decisions_api_me_work_decisions_get: {
+    my_tasks_api_me_work_tasks_get: {
         parameters: {
             query?: {
                 limit?: number;
                 offset?: number;
-                /** @description Comma-separated, `-` for descending: decided_at. Default: -decided_at */
+                /** @description Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date */
                 sort?: string | null;
             };
             header?: never;
@@ -6435,7 +8001,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_DecisionWorkItem_"];
+                    "application/json": components["schemas"]["Page_TaskWorkItem_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    my_reviews_api_me_work_reviews_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Comma-separated, `-` for descending: due_date, priority, updated_at. Default: priority,due_date */
+                sort?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TaskWorkItem_"];
                 };
             };
             /** @description Unauthorized */
@@ -6521,9 +8130,161 @@ export interface operations {
             };
         };
     };
+    task_activity_api_projects__key__tasks__number__activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_ActivityEntry_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    project_activity_api_projects__key__activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `next_cursor` of the previous page */
+                before?: string | null;
+                entity_type?: components["schemas"]["ActivityEntityType"][] | null;
+                entity_type__not?: components["schemas"]["ActivityEntityType"][] | null;
+                entity_type__is_null?: boolean | null;
+                actor?: (string | "me")[] | null;
+                actor__not?: (string | "me")[] | null;
+                actor__is_null?: boolean | null;
+                field?: components["schemas"]["ActivityField"][] | null;
+                field__not?: components["schemas"]["ActivityField"][] | null;
+                field__is_null?: boolean | null;
+                changed_at__lt?: string | null;
+                changed_at__gt?: string | null;
+                changed_at__is_null?: boolean | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Feed_ActivityEntry_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     requirement_tree_api_projects__key__requirements_get: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: components["schemas"]["RequirementStatus"][] | null;
+                status__not?: components["schemas"]["RequirementStatus"][] | null;
+                status__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                reporter?: (string | "me")[] | null;
+                reporter__not?: (string | "me")[] | null;
+                reporter__is_null?: boolean | null;
+                approval?: components["schemas"]["ApprovalState"][] | null;
+                has_tasks?: boolean | null;
+            };
             header?: never;
             path: {
                 key: string;
@@ -6641,6 +8402,80 @@ export interface operations {
             };
         };
     };
+    export_requirements_api_projects__key__requirements_export_csv_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["RequirementStatus"][] | null;
+                status__not?: components["schemas"]["RequirementStatus"][] | null;
+                status__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                reporter?: (string | "me")[] | null;
+                reporter__not?: (string | "me")[] | null;
+                reporter__is_null?: boolean | null;
+                approval?: components["schemas"]["ApprovalState"][] | null;
+                has_tasks?: boolean | null;
+                columns?: components["schemas"]["RequirementColumn"][] | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     get_requirement_api_projects__key__requirements__number__get: {
         parameters: {
             query?: never;
@@ -6704,6 +8539,7 @@ export interface operations {
         parameters: {
             query?: {
                 children?: components["schemas"]["DeletedChildren"];
+                tasks?: components["schemas"]["LinkedTasks"];
             };
             header?: never;
             path: {
@@ -7524,6 +9360,1757 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_phases_api_projects__key__phases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhaseList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_phase_api_projects__key__phases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhaseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhaseRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_phase_api_projects__key__phases__phase_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                phase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhaseRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_phase_api_projects__key__phases__phase_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                phase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_phase_api_projects__key__phases__phase_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                phase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhaseUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhaseRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_phase_api_projects__key__phases__phase_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                phase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhaseRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_workstreams_api_projects__key__workstreams_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkstreamList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_workstream_api_projects__key__workstreams_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkstreamCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkstreamRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_workstream_api_projects__key__workstreams__workstream_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                workstream_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkstreamRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_workstream_api_projects__key__workstreams__workstream_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                workstream_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkstreamUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkstreamRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_workstream_api_projects__key__workstreams__workstream_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                workstream_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkstreamRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    archive_workstream_api_projects__key__workstreams__workstream_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                workstream_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkstreamRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    unarchive_workstream_api_projects__key__workstreams__workstream_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                workstream_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkstreamRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_tasks_api_projects__key__tasks_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated, `-` for descending: due_date, number, priority, rank, updated_at. Default: rank */
+                sort?: string | null;
+                status?: components["schemas"]["TaskStatus"][] | null;
+                status__not?: components["schemas"]["TaskStatus"][] | null;
+                status__is_null?: boolean | null;
+                type?: components["schemas"]["TaskType"][] | null;
+                type__not?: components["schemas"]["TaskType"][] | null;
+                type__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                assignee?: (string | "me")[] | null;
+                assignee__not?: (string | "me")[] | null;
+                assignee__is_null?: boolean | null;
+                reviewer?: (string | "me")[] | null;
+                reviewer__not?: (string | "me")[] | null;
+                reviewer__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                phase?: string[] | null;
+                phase__not?: string[] | null;
+                phase__is_null?: boolean | null;
+                requirement?: string[] | null;
+                requirement__not?: string[] | null;
+                requirement__is_null?: boolean | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_task_api_projects__key__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    export_tasks_api_projects__key__tasks_export_csv_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated, `-` for descending: due_date, number, priority, rank, updated_at. Default: rank */
+                sort?: string | null;
+                status?: components["schemas"]["TaskStatus"][] | null;
+                status__not?: components["schemas"]["TaskStatus"][] | null;
+                status__is_null?: boolean | null;
+                type?: components["schemas"]["TaskType"][] | null;
+                type__not?: components["schemas"]["TaskType"][] | null;
+                type__is_null?: boolean | null;
+                priority?: components["schemas"]["Priority"][] | null;
+                priority__not?: components["schemas"]["Priority"][] | null;
+                priority__is_null?: boolean | null;
+                assignee?: (string | "me")[] | null;
+                assignee__not?: (string | "me")[] | null;
+                assignee__is_null?: boolean | null;
+                reviewer?: (string | "me")[] | null;
+                reviewer__not?: (string | "me")[] | null;
+                reviewer__is_null?: boolean | null;
+                workstream?: string[] | null;
+                workstream__not?: string[] | null;
+                workstream__is_null?: boolean | null;
+                phase?: string[] | null;
+                phase__not?: string[] | null;
+                phase__is_null?: boolean | null;
+                requirement?: string[] | null;
+                requirement__not?: string[] | null;
+                requirement__is_null?: boolean | null;
+                columns?: components["schemas"]["TaskColumn"][] | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    requirement_tasks_api_projects__key__requirements__number__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_task_api_projects__key__tasks__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_task_api_projects__key__tasks__number__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_task_api_projects__key__tasks__number__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    set_task_restriction_api_projects__key__tasks__number__restriction_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskRestrictionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_task_api_projects__key__tasks__number__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    restore_task_api_projects__key__tasks__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_subtasks_api_projects__key__tasks__number__subtasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtaskList"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_subtask_api_projects__key__tasks__number__subtasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubtaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtaskItem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_subtask_api_projects__key__tasks__number__subtasks__n__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_subtask_api_projects__key__tasks__number__subtasks__n__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubtaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtaskItem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    move_subtask_api_projects__key__tasks__number__subtasks__n__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                number: number;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtaskItem"];
                 };
             };
             /** @description Unauthorized */

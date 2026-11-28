@@ -16,7 +16,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -254,9 +254,26 @@ class UnhandledErrorMiddleware:
             await response(scope, receive, send)
 
 
+DEADLOCK_DETECTED = "40P01"
+
+
+async def operational_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """A deadlock Postgres broke is a 503 with `Retry-After: 1`: the request's transaction was
+    rolled back, so a retry is safe (the handoff's Package 4 item 4, interim for TD-83). Any other
+    is re-raised, a 500 as if unhandled."""
+    exc = cast(OperationalError, exc)
+    if getattr(exc.orig, "sqlstate", None) != DEADLOCK_DETECTED:
+        raise exc
+    logger.warning("Deadlock on %s %s", request.method, request.url.path)
+    response = app_error_handler_response(ServiceUnavailableError())
+    response.headers["Retry-After"] = "1"
+    return response
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(IntegrityError, integrity_error_handler)
+    app.add_exception_handler(OperationalError, operational_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.add_middleware(UnhandledErrorMiddleware)

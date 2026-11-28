@@ -2,8 +2,9 @@
 No tables; it reads through other areas' repositories and calls no service. The project list's
 spec and rows live here so the project area (a higher layer) can share them."""
 
+import uuid
 from collections.abc import Awaitable
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import cast
 
 from sqlalchemy.exc import DBAPIError
@@ -13,22 +14,27 @@ from app.authz.authorize import allowed_actions
 from app.authz.context import AuthzContext
 from app.authz.scoping import content_scope, project_scope
 from app.authz.target import project_target
-from app.core.lists import Filter, FilterType, ListSpec, Page, PageResult, fetch_page
+from app.core.lists import Filter, FilterType, ListSpec, Page, PageResult, fetch_page, order_by
 from app.enums import ProjectStatus, ProjectType
 from app.models.approval import Approval, ApprovalRequest
 from app.models.project import Project
 from app.models.requirement import RequirementRevision
+from app.models.task import Task
 from app.repositories.approval import ApprovalRepository
 from app.repositories.project import ProjectRepository
-from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
+from app.repositories.task import PRIORITY_ORDER, TaskRepository
+from app.schemas.approval import ApprovalWorkItem
 from app.schemas.project import (
     INHERITED_ADMIN,
     MyProjectItem,
     MyWork,
+    OrgWork,
     ProjectItem,
     WorkSection,
     WorkSections,
+    WorkSummary,
 )
+from app.schemas.task import TaskWorkItem
 
 PROJECTS = ListSpec(
     name="Project",
@@ -46,13 +52,20 @@ APPROVALS = ListSpec(
     sorts={"requested_at": ApprovalRequest.created_at},  # pyright: ignore[reportArgumentType]
     default_sort=("requested_at",),
 )
-DECISIONS = ListSpec(
-    name="MyDecision",
-    id_column=Approval.id,  # pyright: ignore[reportArgumentType]
-    sorts={"decided_at": Approval.decided_at},  # pyright: ignore[reportArgumentType]
-    default_sort=("-decided_at",),
+# My tasks and reviews (owner, Nov 25, 2026): priority first, then the earliest due (none last).
+TASK_WORK = ListSpec(
+    name="MyTask",
+    id_column=Task.id,  # pyright: ignore[reportArgumentType]
+    sorts={
+        "priority": PRIORITY_ORDER,
+        "due_date": Task.due_date,  # pyright: ignore[reportArgumentType]
+        "updated_at": Task.updated_at,  # pyright: ignore[reportArgumentType]
+    },
+    default_sort=("priority", "due_date"),
 )
-FIRST_ITEMS = 10  # each section's items in `GET /api/me/work` (DL-76)
+DUE_SOON_DAYS = 7  # "Overdue or due this week" (DL-349)
+FIRST_ITEMS = 10  # the approvals section's items in `GET /api/me/work` (DL-76)
+FIRST_PER_ORG = 5  # each organization's open and hidden projects shown (DL-368)
 
 
 def item(ctx: AuthzContext, project: Project) -> ProjectItem:
@@ -101,23 +114,19 @@ def approval_item(row: Approval) -> ApprovalWorkItem:
     )
 
 
-def decision_item(row: Approval) -> DecisionWorkItem:
-    """A past decision as My work shows it (DL-286), loaded as `approval_item`'s row."""
-    request = row.approval_request
-    revision = cast(RequirementRevision, request.requirement_revision)
-    return DecisionWorkItem(
-        request_id=request.id,
-        decision=row.decision,
-        decided_at=cast(datetime, row.decided_at),  # the decision sets it (ApprovalService)
-        comment=row.comment,
-        request_status=request.status,
-        entity_type=request.entity_type,
-        entity_number=revision.requirement.number,
-        title=revision.title,
-        revision_number=revision.revision_number,
-        project_key=request.project.key,
-        project_name=request.project.name,
-        organization_slug=request.project.organization.slug,
+def task_item(task: Task) -> TaskWorkItem:
+    """A task as My work shows it; its project and org are loaded."""
+    return TaskWorkItem(
+        id=task.id,
+        number=task.number,
+        title=task.title,
+        type=task.type,
+        status=task.status,
+        priority=task.priority,
+        due_date=task.due_date,
+        project_key=task.project.key,
+        project_name=task.project.name,
+        organization_slug=task.project.organization.slug,
     )
 
 
@@ -125,26 +134,38 @@ class MyWorkService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def work(self, ctx: AuthzContext) -> MyWork:
-        """Every section's first items and total, in one snapshot. Each section's query runs in
-        a savepoint, so one that fails is returned as unavailable and the rest still show
+    async def work(self, ctx: AuthzContext, today: date | None = None) -> MyWork:
+        """Every section's first items and total, and the summary's due counts as of `today`
+        (the browser's date; the server's UTC date without one), in one snapshot. Each query
+        runs in a savepoint, so one that fails is returned as unavailable and the rest still show
         (backend/CLAUDE.md: the one sanctioned savepoint-and-continue)."""
+        first = TASK_WORK.query_model(limit=FIRST_ITEMS)
         return MyWork(
             sections=WorkSections(
-                favorites=await self._section(
-                    self.favorites(ctx, PROJECTS.query_model(limit=FIRST_ITEMS))
-                ),
-                projects=await self._section(
-                    self.projects(ctx, PROJECTS.query_model(limit=FIRST_ITEMS))
-                ),
+                favorites=await self._whole_section(self.favorites(ctx)),
+                organizations=await self._whole_section(self.organizations(ctx)),
                 approvals=await self._section(
                     self.approvals(ctx, APPROVALS.query_model(limit=FIRST_ITEMS))
                 ),
-                decisions=await self._section(
-                    self.decisions(ctx, DECISIONS.query_model(limit=FIRST_ITEMS))
-                ),
-            )
+                tasks=await self._section(self.tasks(ctx, first)),
+                reviews=await self._section(self.reviews(ctx, first)),
+            ),
+            summary=await self._summary(ctx, today or datetime.now(UTC).date()),
         )
+
+    async def _summary(self, ctx: AuthzContext, today: date) -> WorkSummary:
+        """The due counts, in a savepoint as each section is."""
+        try:
+            async with self.session.begin_nested():
+                due_soon, overdue = await TaskRepository(self.session).due_counts(
+                    ctx.user_id,
+                    content_scope(ctx),
+                    today,
+                    today + timedelta(days=DUE_SOON_DAYS),
+                )
+        except DBAPIError:
+            return WorkSummary(available=False)
+        return WorkSummary(available=True, due_soon=due_soon, overdue=overdue)
 
     async def _section[T](self, read: Awaitable[Page[T]]) -> WorkSection[T]:
         """One section's first page, in its own savepoint: a failed query is `available` false."""
@@ -155,34 +176,71 @@ class MyWorkService:
             return WorkSection[T](available=False)
         return WorkSection[T](available=True, items=page.items, total=page.total)
 
-    async def projects(self, ctx: AuthzContext, query: object) -> Page[MyProjectItem]:
-        """The projects the user can open, archived left out."""
-        return await self._my_projects(ctx, query, PROJECTS, favorites_only=False)
+    async def _whole_section[T](self, read: Awaitable[list[T]]) -> WorkSection[T]:
+        """A section shown in full (favorites, organizations), in its own savepoint as `_section`'s
+        are."""
+        try:
+            async with self.session.begin_nested():
+                items = await read
+        except DBAPIError:
+            return WorkSection[T](available=False)
+        return WorkSection[T](available=True, items=items, total=len(items))
 
-    async def favorites(self, ctx: AuthzContext, query: object) -> Page[MyProjectItem]:
-        """The projects the user starred and can still open, archived left out (DL-302)."""
-        return await self._my_projects(ctx, query, PROJECTS, favorites_only=True)
-
-    async def _my_projects(
-        self, ctx: AuthzContext, query: object, spec: ListSpec, *, favorites_only: bool
-    ) -> Page[MyProjectItem]:
-        """My work's project rows, each with its star and its allowed actions (DL-306)."""
+    async def organizations(self, ctx: AuthzContext) -> list[OrgWork]:
+        """Each organization the user can open a project in, by name, with its first open and
+        hidden projects and their counts (DL-329, DL-330, DL-359). Two queries, however many
+        orgs: the ranks and counts, then the projects shown."""
         projects = ProjectRepository(self.session)
-        statement = projects.visible(project_scope(ctx)).where(Project.archived_at.is_(None))
-        if favorites_only:
-            statement = projects.favorites_only(statement, ctx.user_id)
-        page = await fetch_page(self.session, statement, spec, query)  # pyright: ignore[reportArgumentType] -- spec.query_model
-        rows: list[Project] = page.items
+        scope = project_scope(ctx)
+        ranks = await projects.ranked_by_org(scope, FIRST_PER_ORG)
+        hidden_ids = {row.id for row in ranks if row.hidden}
+        rows = await projects.in_my_work_order(scope, [row.id for row in ranks])
         starred = await projects.favorite_ids(ctx.user_id, [p.id for p in rows])
-        return page.with_items(
-            [
-                MyProjectItem(
-                    **item(ctx, p).model_dump(),
-                    is_favorite=p.id in starred,
-                    allowed_actions=allowed_actions(ctx, project_target(p)),
+        counts = {row.id: row for row in ranks}
+        orgs: dict[uuid.UUID, OrgWork] = {}
+        for project in rows:
+            row = counts[project.id]
+            org = orgs.get(project.organization_id)
+            if org is None:
+                org = orgs[project.organization_id] = OrgWork(
+                    id=project.organization_id,
+                    slug=project.organization.slug,
+                    name=project.organization.name,
+                    projects=[],
+                    total=0,
+                    hidden=[],
+                    hidden_total=0,
+                    listed_total=row.listed_total,
                 )
-                for p in rows
-            ]
+            shown = self._row(ctx, project, project.id in starred)
+            if project.id in hidden_ids:
+                org.hidden.append(shown)
+                org.hidden_total = row.group_total
+            else:
+                org.projects.append(shown)
+                org.total = row.group_total
+        return list(orgs.values())
+
+    async def favorites(self, ctx: AuthzContext) -> list[MyProjectItem]:
+        """Every project the user starred and can still open, archived left out, by name
+        (DL-302; no cap, DL-369)."""
+        projects = ProjectRepository(self.session)
+        statement = projects.favorites_only(
+            projects.visible(project_scope(ctx)).where(Project.archived_at.is_(None)),
+            ctx.user_id,
+        )
+        rows = (await self.session.scalars(statement.order_by(*order_by(PROJECTS, None)))).all()
+        return [self._row(ctx, p, True) for p in rows]
+
+    @staticmethod
+    def _row(ctx: AuthzContext, project: Project, starred: bool) -> MyProjectItem:
+        """A project row on My work, with its star and its allowed actions (DL-306): an
+        archived project's deny `project.favorite`, so it has no star (DL-330)."""
+        return MyProjectItem(
+            **item(ctx, project).model_dump(),
+            is_favorite=starred,
+            allowed_actions=allowed_actions(ctx, project_target(project)),
+            archived=project.archived_at is not None,
         )
 
     async def approvals(self, ctx: AuthzContext, query: object) -> Page[ApprovalWorkItem]:
@@ -192,9 +250,15 @@ class MyWorkService:
         page = await fetch_page(self.session, statement, APPROVALS, query)  # pyright: ignore[reportArgumentType] -- APPROVALS.query_model
         return page.with_items([approval_item(row) for row in page.items])
 
-    async def decisions(self, ctx: AuthzContext, query: object) -> Page[DecisionWorkItem]:
-        """The caller's past decisions in projects whose content they can see, newest first
-        (DL-286)."""
-        statement = ApprovalRepository(self.session).decided_for(ctx.user_id, content_scope(ctx))
-        page = await fetch_page(self.session, statement, DECISIONS, query)  # pyright: ignore[reportArgumentType] -- DECISIONS.query_model
-        return page.with_items([decision_item(row) for row in page.items])
+    async def tasks(self, ctx: AuthzContext, query: object) -> Page[TaskWorkItem]:
+        """The caller's open assigned tasks in projects whose content they can see (design-doc
+        §11), priority first."""
+        statement = TaskRepository(self.session).assigned_to(ctx.user_id, content_scope(ctx))
+        page = await fetch_page(self.session, statement, TASK_WORK, query)  # pyright: ignore[reportArgumentType] -- TASK_WORK.query_model
+        return page.with_items([task_item(row) for row in page.items])
+
+    async def reviews(self, ctx: AuthzContext, query: object) -> Page[TaskWorkItem]:
+        """The tasks in review with the caller as reviewer, scoped as `tasks`."""
+        statement = TaskRepository(self.session).to_review(ctx.user_id, content_scope(ctx))
+        page = await fetch_page(self.session, statement, TASK_WORK, query)  # pyright: ignore[reportArgumentType] -- TASK_WORK.query_model
+        return page.with_items([task_item(row) for row in page.items])

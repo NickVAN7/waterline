@@ -1,0 +1,602 @@
+diff --git a/docs/behavior-reference.md b/docs/behavior-reference.md
+index 729e489..a56b5c3 100644
+--- a/docs/behavior-reference.md
++++ b/docs/behavior-reference.md
+@@ -117,7 +117,8 @@ shows its requirements as a tree, each with its ID (`ERP-RQ-7`) and its status,
+ made, cancelled, or decided in the side panel shows there at once). **Expand requirement** and
+ **Move** sit at the right, above the tree; until you select a row, one line before them says
+ "Select a requirement to expand or move it." ("…to expand it." if you can't move requirements).
+-It opens with only the top-level
++The tree is one Tab stop of its own before its rows: when it's wider than its room (beside the
++side panel, or in a narrow window), the Left and Right arrow keys there scroll it sideways. It opens with only the top-level
+ requirements showing: open a branch with its arrow, or with the Right arrow key on its row
+ (Left closes it). To open a requirement's whole branch at once, select its row and choose
+ **Expand requirement**; the button says "Expanding…" until it's done. It opens up to 500 rows
+diff --git a/docs/spikes/S3-C0b-guard-trial/friction-log.md b/docs/spikes/S3-C0b-guard-trial/friction-log.md
+index 3551f0b..354a210 100644
+--- a/docs/spikes/S3-C0b-guard-trial/friction-log.md
++++ b/docs/spikes/S3-C0b-guard-trial/friction-log.md
+@@ -44,5 +44,6 @@ means the guard stopped something it should have.
+ | 35 | S3-C0n (supply-chain check) | `curl` of GitHub's API for the 4.8.0 tag (`…/git/ref/tags/…`, read-only) with a download, in one call | text mentioning git in a command | a scratchpad script (`fetch480.sh`) | legit (as #13) |
+ | 36 | S3-C0n | a `python3 -` heredoc tidying `setup.py`, whose text holds its `git add` line | text mentioning git in a command | the Edit tool | legit (as #8) |
+ | 37 | S3-C0n | `cat >> docs/decision-log.md <<'EOF'` adding DL-380, whose text names the clone's `.git/info/exclude` | text mentioning git in a command | the Edit tool | legit (as #7) |
++| 38 | S3-C0n trial (`/impeccable critique`) | `sha256sum …; git diff --stat HEAD -- frontend; …` (checking the target was unchanged since the last critique) in one call | a compound command with git in it | separate calls | legit; my slip (as #15) |
+
+ None of the blocks so far stopped anything the rules forbid.
+diff --git a/frontend/CLAUDE.md b/frontend/CLAUDE.md
+index 08905d2..ba92c29 100644
+--- a/frontend/CLAUDE.md
++++ b/frontend/CLAUDE.md
+@@ -85,14 +85,23 @@ Full rules and rule IDs: `docs/ui-design-guide.md`. The ones that break silently
+ - A click handler that routes a container's links in the app (the guide article's `follow`)
+   leaves to the browser a link with a `target` and a modified or middle click: routing it opens
+   the URL as an app page, a 404 (owner, S3-C0j). Its spec and e2e click such a link.
+-- A table's scroll region (`role="region"`, `overflow-x-auto`) is also `relative`: a visually
+-  hidden label inside is absolutely positioned, and escapes a static scroll container, widening
+-  the page at 320 px (UI-SHL-7; S3-C0k review). A table with a fixed layout sets a minimum width
++- Every scroll container that isn't already positioned is also `relative`: a table's scroll
++  region (`role="region"`, `overflow-x-auto`), and a pane that scrolls its own content (the split
++  pane's `overflow-y-auto`). A visually hidden label inside is absolutely positioned, and escapes
++  a static scroll container: it widened the page at 320 px (UI-SHL-7; S3-C0k review), and made
++  the page scroll into blank space below an open split pane (S3-C0n trial). A table with a fixed layout sets a minimum width
+   (`min-w-(--content-narrow)`), so below it the region scrolls instead of the columns crushing,
+   and a column that holds a badge or a button gets a `rem` width that fits it, never a fraction.
+ - A sidebar section's visible caption names its landmark (`aria-labelledby`), or is
+   `aria-hidden` when the landmark or its control already says it: never a caption and a
+   matching `aria-label`, read twice (UI-SHL-5; S3-C0j review).
++- A style added to a shared component (`Badge`'s no-wrap) is checked against that component's
++  longest real content at 320 px and at the split pane's narrowest (a restriction badge with
++  every category), or goes only where it's needed (the tree's status cell; S3-C0n trial).
++- A fix for a browser default action (a text selection, a native drag, the focus a press gives)
++  is proven by an e2e that drives the real pointer (`page.mouse`, a few quick steps) where the
++  default did harm, and asserts the outcome: a jsdom check of `defaultPrevented` passes whether or
++  not the browser honors it (the separator's press beside a link; S3-C0n trial).
+ - A style that only a class turns on (a callout's tone) is checked in an e2e by its computed value
+   against the token: a spec of the class passes with the style missing (owner, S3-C0j).
+ - Tokens only: colors, type sizes, radii, and sizes come from `src/app/styles/tokens.css`,
+diff --git a/frontend/e2e/approvals.spec.ts b/frontend/e2e/approvals.spec.ts
+index 85c834b..0eed09d 100644
+--- a/frontend/e2e/approvals.spec.ts
++++ b/frontend/e2e/approvals.spec.ts
+@@ -50,7 +50,7 @@ test('an admin requests approval, and the approver reviews and decides', async (
+   await dialog.getByRole('textbox', { name: 'Note' }).fill('Before the release')
+   await dialog.getByRole('button', { name: 'Request approval' }).click()
+   await expect(dialog).toBeHidden()
+-  await expect(section).toContainText(/Latest request:\s*Pending/)
++  await expect(section).toContainText(/Latest request\s*Pending/)
+   await signOut(page)
+
+   // The approver's side: on My work, then the revision under approval, then the decision.
+@@ -80,7 +80,7 @@ test('an admin requests approval, and the approver reviews and decides', async (
+
+   await comment.fill('Matches the card rules.')
+   await section.getByRole('button', { name: 'Approve' }).click()
+-  await expect(section).toContainText(/Latest request:\s*Approved/)
++  await expect(section).toContainText(/Latest request\s*Approved/)
+   await expect(section).toContainText('Last approved: revision 1')
+   await expect(section).toContainText('Matches the card rules.')
+   await expect(section.getByRole('button', { name: 'Approve' })).toHaveCount(0)
+diff --git a/frontend/e2e/requirements.spec.ts b/frontend/e2e/requirements.spec.ts
+index 2246b84..61cf1fd 100644
+--- a/frontend/e2e/requirements.spec.ts
++++ b/frontend/e2e/requirements.spec.ts
+@@ -366,6 +366,13 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
+     }
+   })
+   expect(placed).toEqual({ top: 0, bottom: 0, right: 0, mainEnd: 0 })
++  // The pane scrolls its own content: nothing in it, a visually hidden note included, makes the
++  // page taller than the window and scroll into blank space below the layout (S3-C0n trial).
++  const fits = await page.evaluate(() => ({
++    height: document.documentElement.scrollHeight,
++    window: window.innerHeight,
++  }))
++  expect(fits.height).toBe(fits.window)
+   const create = (await page.getByRole('button', { name: 'New requirement' }).boundingBox())!
+   const panelBox = (await panel.boundingBox())!
+   expect(create.x + create.width).toBeLessThan(panelBox.x)
+@@ -404,6 +411,32 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
+   // Its row is marked by more than color (DL-324).
+   const openRow = page.getByRole('row', { name: /Stored payload/ })
+   await expect(openRow).toContainText('Open')
++  // Beside the pane a badge stays whole, never broken over lines, and a tree wider than its room
++  // scrolls in a named region the keyboard reaches (S3-C0n trial).
++  expect(
++    await openRow
++      .getByText('Draft', { exact: true })
++      .evaluate((el) => getComputedStyle(el).whiteSpace),
++  ).toBe('nowrap')
++  // Only the tree's: any other badge wraps, or a long one (a restriction with every category)
++  // would push a 320px page sideways.
++  expect(
++    await panel
++      .getByText('Status: Draft', { exact: true })
++      .evaluate((el) => getComputedStyle(el).whiteSpace),
++  ).toBe('normal')
++  await expect(page.getByRole('region', { name: 'Requirements' })).toHaveAttribute('tabindex', '0')
++  // The panel's tabs and the tree sit on the pane and the page, not raised above them: no fill
++  // of their own (S3-C0n trial). PrimeVue paints a tab list's fill and a tab panel's on the
++  // element around each.
++  const fills = await Promise.all(
++    [
++      panel.getByRole('tablist').locator('..'),
++      panel.getByRole('tabpanel').locator('..'),
++      page.getByRole('columnheader', { name: 'Title' }),
++    ].map((part) => part.evaluate((el) => getComputedStyle(el).backgroundColor)),
++  )
++  expect(fills).toEqual(['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'])
+   await expectNoA11yViolations(page)
+   await expectOnlyTokenColors(page, 'aside')
+
+@@ -576,6 +609,36 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
+ // At 320 CSS px the tree reflows (WCAG 1.4.10, UI-SHL-7): the IDs don't wrap and a row can hold
+ // two badges ("Awaiting approval", S3-C0l), yet nothing scrolls the page sideways. The demo's
+ // PORTAL has a requirement awaiting approval; a nested branch adds the indent.
++test("a fast drag of the panel's edge beside a link resizes it", async ({ page }, testInfo) => {
++  const { user, key } = runFor(testInfo)
++  await signIn(page, user)
++  const parent = await createRequirement(page, key, 'Flick parent')
++  const child = await createRequirement(page, key, 'Flick child', parent.id)
++  await page.goto(`/acme/projects/${key}/requirements?open=RQ-${child.number}`)
++  const panel = page.getByRole('complementary', { name: `Requirement ${key}-RQ-${child.number}` })
++  await expect(panel.getByRole('heading', { name: 'Flick child' })).toBeFocused()
++
++  // Pressed level with the Parent link just right of it, then moved in two quick steps: the press's
++  // default (a text selection) made Chromium drag that link and cancel the pointer, the width
++  // left as it was (S3-C0n trial). The real pointer, since jsdom has no default to prevent.
++  const separator = page.getByRole('separator', { name: 'Resize the panel' })
++  const edge = (await separator.boundingBox())!
++  const link = (await panel
++    .getByRole('link', { name: `${key}-RQ-${parent.number}` })
++    .boundingBox())!
++  const x = edge.x + edge.width / 2
++  const y = link.y + link.height / 2
++  await page.mouse.move(x, y)
++  await page.mouse.down()
++  await page.mouse.move(x - 50, y)
++  await page.mouse.move(x - 100, y)
++  await page.mouse.up()
++
++  await expect(separator).toHaveAttribute('aria-valuenow', '660')
++  await expect(separator).toBeFocused()
++  expect(await page.evaluate(() => getSelection()!.toString())).toBe('')
++})
++
+ test('the requirement tree reflows at 320 px', async ({ page }, testInfo) => {
+   const { user, key } = runFor(testInfo)
+   await signIn(page, user)
+@@ -591,4 +654,11 @@ test('the requirement tree reflows at 320 px', async ({ page }, testInfo) => {
+   await expect(page.getByRole('row', { name: /Reflow grandchild/ })).toBeVisible()
+
+   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
++  // A branch's toggle keeps its 24px beside a long title in the narrow cell (UI-TOK-6, S3-C0n
++  // trial).
++  const toggle = await page
++    .getByRole('row', { name: /Reflow parent/ })
++    .locator('[data-pc-section="nodetogglebutton"]')
++    .boundingBox()
++  expect({ width: toggle!.width, height: toggle!.height }).toEqual({ width: 24, height: 24 })
+ })
+diff --git a/frontend/src/app/theme/preset.ts b/frontend/src/app/theme/preset.ts
+index 9617993..895732c 100644
+--- a/frontend/src/app/theme/preset.ts
++++ b/frontend/src/app/theme/preset.ts
+@@ -140,11 +140,27 @@ export const overrides = {
+   // tokens are still Aura's: map them here before using `dropdown` or `multiple` (UI-STY-6).
+   components: {
+     // The requirement tree (S2-C15): Aura's border is `{surface.800}` in dark, off our tokens.
+-    treetable: { root: { borderColor: token('border-subtle') } },
++    // Tabs and the tree sit on the page or the side pane, never above it: Aura fills them with
++    // `content.background` (`surface-raised`, which only floating layers use, as the popup menu
++    // still does), so they'd read as raised cards in dark and as white blocks on the pane in
++    // light. They take the surface they sit on (S3-C0n trial). Neither scrolls under a sticky
++    // part, so nothing shows through.
++    treetable: {
++      root: { borderColor: token('border-subtle') },
++      header: { background: 'transparent' },
++      headerCell: { background: 'transparent' },
++      row: { background: 'transparent' },
++      footer: { background: 'transparent' },
++      footerCell: { background: 'transparent' },
++    },
+     // MarkdownEditor's Write and Preview (S2-C16): Aura marks the selected tab with accent text
+     // and a 1 px bar; 3 px makes the bar a cue of its own (base.css keeps it in forced colors).
+     // The tab's focus ring stays inset, as the menu item's does: the tab list clips overflow.
+-    tabs: { activeBar: { height: '3px' } },
++    tabs: {
++      tablist: { background: 'transparent' },
++      tabpanel: { background: 'transparent' },
++      activeBar: { height: '3px' },
++    },
+     // The breadcrumb trail (S3-C0e, DL-327): flush with the h1 below it, on the page's own
+     // background; its crumbs' colors are `Breadcrumbs`' (muted links, the current one in text).
+     breadcrumb: { root: { padding: '0', background: 'transparent' } },
+diff --git a/frontend/src/components/ItemPanel.spec.ts b/frontend/src/components/ItemPanel.spec.ts
+index 5b05cf2..397e8d3 100644
+--- a/frontend/src/components/ItemPanel.spec.ts
++++ b/frontend/src/components/ItemPanel.spec.ts
+@@ -296,6 +296,15 @@ describe("ItemPanel's separator", () => {
+         ['pointercancel', 400, 0],
+       ],
+     ],
++    [
++      'a drag whose capture is lost before its release',
++      [
++        ['pointerdown', 500, 0],
++        ['pointermove', 400, 0],
++        ['lostpointercapture', 400, 0],
++        ['pointermove', 300, 0],
++      ],
++    ],
+   ] as const)('%s leaves the width as it was, unsaved', async (_, events) => {
+     await mountPanel({ wide: true })
+     separator().setPointerCapture = vi.fn()
+@@ -322,6 +331,95 @@ describe("ItemPanel's separator", () => {
+     expect(separator().getAttribute('aria-valuenow')).toBe('660')
+     expect(window.localStorage.getItem(STORED)).toBe('660')
+   })
++
++  it("takes focus on a press without the press's own default: no text selection, so no drag of a link nearby, which would cancel the pointer", async () => {
++    await mountPanel({ wide: true })
++    separator().setPointerCapture = vi.fn()
++    const press = new PointerEvent('pointerdown', { clientX: 500, bubbles: true, cancelable: true })
++
++    separator().dispatchEvent(press)
++
++    expect(press.defaultPrevented).toBe(true)
++    expect(document.activeElement).toBe(separator())
++  })
++
++  it('drags again after a drag whose capture was lost', async () => {
++    await mountPanel({ wide: true })
++    separator().setPointerCapture = vi.fn()
++    const pointer = (type: string, clientX: number) =>
++      separator().dispatchEvent(new MouseEvent(type, { clientX, bubbles: true }))
++
++    pointer('pointerdown', 500)
++    pointer('pointermove', 450)
++    pointer('lostpointercapture', 450)
++    // From elsewhere on the separator: a drag still running from 500 would land somewhere else.
++    pointer('pointerdown', 600)
++    pointer('pointermove', 500)
++    pointer('pointerup', 500)
++    await flushPromises()
++
++    expect(separator().getAttribute('aria-valuenow')).toBe('660')
++    expect(window.localStorage.getItem(STORED)).toBe('660')
++  })
++
++  // Each case's second pointer would leave its own mark if it were followed: a restart from 300
++  // (the first pointer's moves then ignored, 560), a move to 250 (800), a release as a click
++  // (a step to 800), a cancel (back to 560).
++  it.each([
++    [
++      'press',
++      [
++        ['pointerdown', 1, 500],
++        ['pointerdown', 2, 300],
++        ['pointermove', 1, 400],
++        ['pointerup', 1, 400],
++      ],
++      '660',
++    ],
++    [
++      'move',
++      [
++        ['pointerdown', 1, 500],
++        ['pointermove', 1, 400],
++        ['pointermove', 2, 250],
++        ['pointerup', 1, 400],
++      ],
++      '660',
++    ],
++    [
++      'release',
++      [
++        ['pointerdown', 1, 500],
++        ['pointerup', 2, 250],
++        ['pointermove', 1, 380],
++        ['pointerup', 1, 380],
++      ],
++      '680',
++    ],
++    [
++      'cancel',
++      [
++        ['pointerdown', 1, 500],
++        ['pointermove', 1, 400],
++        ['pointercancel', 2, 400],
++        ['pointerup', 1, 400],
++      ],
++      '660',
++    ],
++  ] as const)(
++    "follows only the pointer that started the drag: a second one's %s is ignored",
++    async (_, events, width) => {
++      await mountPanel({ wide: true })
++      separator().setPointerCapture = vi.fn()
++
++      for (const [type, pointerId, clientX] of events)
++        separator().dispatchEvent(new PointerEvent(type, { pointerId, clientX, bubbles: true }))
++      await flushPromises()
++
++      expect(separator().getAttribute('aria-valuenow')).toBe(width)
++      expect(window.localStorage.getItem(STORED)).toBe(width)
++    },
++  )
+ })
+
+ describe("ItemPanel's Copy link", () => {
+diff --git a/frontend/src/components/ItemPanel.vue b/frontend/src/components/ItemPanel.vue
+index 1834063..670d336 100644
+--- a/frontend/src/components/ItemPanel.vue
++++ b/frontend/src/components/ItemPanel.vue
+@@ -73,27 +73,37 @@ function resizeKey(event: KeyboardEvent) {
+ const STEPS = [WIDTH.min, WIDTH.initial, WIDTH.max]
+ // Less movement than this between press and release is a click, not a drag.
+ const CLICK_SLOP = 4
+-let dragFrom: { x: number; width: number; moved: boolean } | null = null
++// The pointer that started the drag owns it: a second finger or pen on the separator meanwhile is
++// ignored, never a new start or a second hand on the width.
++let dragFrom: { pointer: number; x: number; width: number; moved: boolean } | null = null
++const owns = (event: PointerEvent) => dragFrom?.pointer === event.pointerId
+ function dragStart(event: PointerEvent) {
+   // The primary button only: a right-click opens the browser's menu, and isn't a click here.
+-  if (event.button !== 0) return
+-  dragFrom = { x: event.clientX, width: width.value, moved: false }
+-  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
++  if (event.button !== 0 || dragFrom) return
++  // A fast mouse drag would start a text selection, then the browser's own drag of whatever link
++  // it reached, which cancels the pointer. Preventing that also skips the press's focus: give it.
++  event.preventDefault()
++  const separator = event.currentTarget as HTMLElement
++  separator.focus()
++  dragFrom = { pointer: event.pointerId, x: event.clientX, width: width.value, moved: false }
++  separator.setPointerCapture(event.pointerId)
+ }
+ function dragMove(event: PointerEvent) {
+-  if (!dragFrom) return
++  if (!dragFrom || !owns(event)) return
+   if (Math.abs(event.clientX - dragFrom.x) >= CLICK_SLOP) dragFrom.moved = true
+   if (dragFrom.moved) width.value = clamp(dragFrom.width + dragFrom.x - event.clientX)
+ }
+-function dragEnd() {
+-  if (!dragFrom) return
++function dragEnd(event: PointerEvent) {
++  if (!dragFrom || !owns(event)) return
+   if (!dragFrom.moved) width.value = STEPS.find((step) => step > width.value) ?? WIDTH.min
+   dragFrom = null
+   keepWidth()
+ }
+-// A press the browser cancels (a system gesture) is neither a click nor a finished drag.
+-function dragCancel() {
+-  if (!dragFrom) return
++// A press the browser cancels (a system gesture), or one whose capture is lost before it's
++// released (the separator moved or gone), is neither a click nor a finished drag. After a
++// release the capture goes too, with nothing left to undo.
++function dragCancel(event: PointerEvent) {
++  if (!dragFrom || !owns(event)) return
+   width.value = dragFrom.width
+   dragFrom = null
+ }
+@@ -228,12 +238,15 @@ defineExpose({ open, close, swapped, focusTitle: () => heading.value?.focus() })
+         @pointermove="dragMove"
+         @pointerup="dragEnd"
+         @pointercancel="dragCancel"
++        @lostpointercapture="dragCancel"
+       >
+         <span
+           class="border-l border-border group-hover:border-accent group-focus-visible:border-accent"
+         />
+       </div>
+-      <div :id="wideId" class="min-w-0 flex-1 overflow-y-auto bg-surface" />
++      <!-- `relative`, as every scroll container is: a visually hidden note inside is absolutely
++           positioned, and escapes a static one to make the page taller than the layout. -->
++      <div :id="wideId" class="relative min-w-0 flex-1 overflow-y-auto bg-surface" />
+     </aside>
+   </Teleport>
+   <!-- The overlay below 64rem, docked at the right at full height. -->
+diff --git a/frontend/src/components/RequirementsTree.spec.ts b/frontend/src/components/RequirementsTree.spec.ts
+index daefc11..5734048 100644
+--- a/frontend/src/components/RequirementsTree.spec.ts
++++ b/frontend/src/components/RequirementsTree.spec.ts
+@@ -155,6 +155,16 @@ describe('RequirementsTree', () => {
+     await expectNoA11yViolations(document.body)
+   })
+
++  it('scrolls a tree wider than its room in a named region in the Tab order (UI-TBL-1)', async () => {
++    mountTree()
++    await flushPromises()
++
++    const region = document.querySelector('[role=region]')!
++    expect(region.getAttribute('aria-label')).toBe('Requirements')
++    expect(region.getAttribute('tabindex')).toBe('0')
++    expect(region.contains(document.querySelector('table'))).toBe(true)
++  })
++
+   it('links each ID to its requirement, open in the side panel (DL-264, UI-SHL-11)', async () => {
+     mountTree()
+     await flushPromises()
+diff --git a/frontend/src/components/RequirementsTree.vue b/frontend/src/components/RequirementsTree.vue
+index 54ff64f..26fadb1 100644
+--- a/frontend/src/components/RequirementsTree.vue
++++ b/frontend/src/components/RequirementsTree.vue
+@@ -404,8 +404,16 @@ function onKeydown(event: KeyboardEvent) {
+
+ // The table's name lands on the outer `div` unless set on the table itself, and the expand
+ // button (`tabindex="-1"`; the row carries `aria-expanded`) leaves the accessibility tree.
+-const tablePt = { table: { 'aria-label': 'Requirements' } }
+-const columnPt = { nodeToggleButton: { 'aria-hidden': 'true' } }
++// TreeTable's own container scrolls a tree wider than its room (beside the split pane, its
++// badges kept whole): a named region in the Tab order, so the keyboard can scroll it, and
++// `relative` as every table's scroll region is (UI-TBL-1, UI-SHL-7).
++const tablePt = {
++  table: { 'aria-label': 'Requirements' },
++  tableContainer: { role: 'region', 'aria-label': 'Requirements', tabindex: 0, class: 'relative' },
++}
++// It keeps its 24px (UI-TOK-6): a long title in a narrow cell would otherwise shrink it, and
++// shift that row's title out of line with the rest.
++const columnPt = { nodeToggleButton: { 'aria-hidden': 'true', class: 'shrink-0' } }
+ // A selected row also gets the leading bar, not color alone (UI-TOK-9), on its first cell: the
+ // table's borders are separate, where a `tr`'s border isn't drawn. Only the selected row has one,
+ // since forced colors would draw a transparent border. The row open in the side panel has the
+@@ -487,7 +495,7 @@ const headerPt = { headerCell: { scope: 'col' } }
+                component with slot content would re-render each time (DL-253's pass mark). -->
+           <span
+             v-memo="[node.data.number, focusedKey === node.key, node.data.number === openNumber]"
+-            class="inline-flex items-center gap-2"
++            class="inline-flex flex-wrap items-center gap-x-2"
+           >
+             <RouterLink
+               :to="{ query: { open: `RQ-${node.data.number}` } }"
+@@ -508,7 +516,9 @@ const headerPt = { headerCell: { scope: 'col' } }
+       <Column header="Status" :pt="headerPt">
+         <template #body="{ node }">
+           <!-- The status badge (DL-148, DL-252), and "Awaiting approval" beside it while a request
+-               is pending (Q12b), memoized as the ID cell is. -->
++               is pending (Q12b), memoized as the ID cell is. Each badge stays whole, never broken
++               over lines beside the pane: the tree scrolls instead. Only here: a badge elsewhere
++               (a long restriction) has to wrap to fit 320px. -->
+           <span
+             v-memo="[
+               node.data.status,
+@@ -519,12 +529,14 @@ const headerPt = { headerCell: { scope: 'col' } }
+             class="inline-flex flex-wrap items-center gap-2"
+           >
+             <Badge
++              class="whitespace-nowrap"
+               :tone="requirementStatusBadge(node.data).tone"
+               :icon="requirementStatusBadge(node.data).icon"
+               >{{ requirementStatusBadge(node.data).label }}</Badge
+             >
+             <Badge
+               v-if="node.data.awaiting_approval"
++              class="whitespace-nowrap"
+               :tone="AWAITING_APPROVAL.tone"
+               :icon="AWAITING_APPROVAL.icon"
+               >{{ AWAITING_APPROVAL.label }}</Badge
+diff --git a/frontend/src/views/requirement/ApprovalSection.spec.ts b/frontend/src/views/requirement/ApprovalSection.spec.ts
+index 6427842..50f57ce 100644
+--- a/frontend/src/views/requirement/ApprovalSection.spec.ts
++++ b/frontend/src/views/requirement/ApprovalSection.spec.ts
+@@ -203,12 +203,12 @@ describe('ApprovalSection', () => {
+     mountSection(requirement(), latest)
+     await flushPromises()
+
+-    expect(details()).toContain('Latest request: Rejected')
+-    expect(details()).toContain('Revision: 2')
+-    expect(details().find((d) => d.startsWith('Requested by:'))).toMatch(
+-      /^Requested by: Ada Admin .+/,
++    expect(details()).toContain('Latest request Rejected')
++    expect(details()).toContain('Revision 2')
++    expect(details().find((d) => d.startsWith('Requested by '))).toMatch(
++      /^Requested by Ada Admin .+/,
+     )
+-    expect(details()).toContain('Note: Before the October release')
++    expect(details()).toContain('Note Before the October release')
+     const approvers = [...document.querySelectorAll('li')].map((li) =>
+       li.textContent!.replace(/\s+/g, ' ').trim(),
+     )
+@@ -303,7 +303,7 @@ describe('ApprovalSection', () => {
+       body: { approver_ids: ['u-max'], note: 'Please check totals' },
+     })
+     expect(dialogOpen()).toBeNull()
+-    expect(details()).toContain('Latest request: Pending')
++    expect(details()).toContain('Latest request Pending')
+   })
+
+   it('asks for an approver before sending, at the list', async () => {
+@@ -409,7 +409,7 @@ describe('ApprovalSection', () => {
+     expect(post).toHaveBeenCalledWith('/api/approval-requests/{request_id}/cancel', {
+       params: { path: { request_id: 'req-1' } },
+     })
+-    expect(details()).toContain('Latest request: Cancelled')
++    expect(details()).toContain('Latest request Cancelled')
+     expect(text()).toContain('Request cancelled.')
+     expect(button('Cancel request')).toBeUndefined()
+     // Cancel request went with its own action: the section's heading takes focus.
+@@ -442,7 +442,7 @@ describe('ApprovalSection', () => {
+     expect(document.querySelector('[role=alert]')!.textContent).toContain(
+       "This request isn't pending any more.",
+     )
+-    expect(details()).toContain('Latest request: Approved')
++    expect(details()).toContain('Latest request Approved')
+   })
+
+   it('shows a flagged request with Re-request, which cancels and opens the dialog pre-filled (DL-281)', async () => {
+@@ -567,7 +567,7 @@ describe('ApprovalSection', () => {
+     await wrapper.setProps({ requirement: { ...r, version: r.version + 1 } })
+     await flushPromises()
+
+-    expect(details()).toContain('Latest request: Cancelled')
++    expect(details()).toContain('Latest request Cancelled')
+     expect(button('Cancel request')).toBeUndefined()
+   })
+
+@@ -636,7 +636,7 @@ describe('ApprovalSection', () => {
+     await flushPromises()
+
+     expect(dialogOpen()!.textContent).toContain('This item already has a pending approval request.')
+-    expect(details()).toContain('Latest request: Pending')
++    expect(details()).toContain('Latest request Pending')
+   })
+
+   it('reloads the list when someone picked can no longer be named (a 404), saying so', async () => {
+diff --git a/frontend/src/views/requirement/ApprovalSection.vue b/frontend/src/views/requirement/ApprovalSection.vue
+index 14f4685..afa0feb 100644
+--- a/frontend/src/views/requirement/ApprovalSection.vue
++++ b/frontend/src/views/requirement/ApprovalSection.vue
+@@ -325,9 +325,11 @@ async function dismiss() {
+           This requirement has changed since approval was requested. Approvers decide on revision
+           {{ request.revision_number }}; cancel and request again to have them review the latest.
+         </Alert>
+-        <dl class="m-0 flex flex-col gap-1">
+-          <div class="flex flex-wrap items-center gap-2">
+-            <dt class="font-medium">Latest request:</dt>
++        <!-- Terms and values as the requirement's details list above (DL-325): one way to read a
++             label and its value in the panel and on the page. -->
++        <dl class="m-0 grid gap-x-6 gap-y-3 sm:grid-cols-2">
++          <div class="flex flex-col items-start gap-1">
++            <dt class="text-sm font-medium text-text-muted">Latest request</dt>
+             <dd class="m-0">
+               <Badge
+                 :tone="APPROVAL_REQUEST_STATUS[request.status].tone"
+@@ -336,12 +338,12 @@ async function dismiss() {
+               >
+             </dd>
+           </div>
+-          <div class="flex flex-wrap gap-2">
+-            <dt class="font-medium">Revision:</dt>
++          <div class="flex flex-col gap-1">
++            <dt class="text-sm font-medium text-text-muted">Revision</dt>
+             <dd class="m-0">{{ request.revision_number }}</dd>
+           </div>
+-          <div class="flex flex-wrap items-center gap-2">
+-            <dt class="font-medium">Requested by:</dt>
++          <div class="flex flex-col gap-1 sm:col-span-2">
++            <dt class="text-sm font-medium text-text-muted">Requested by</dt>
+             <dd class="m-0 flex flex-wrap items-center gap-2">
+               {{ request.requested_by_name }}
+               <Badge
+@@ -353,8 +355,8 @@ async function dismiss() {
+               <span class="text-text-muted">{{ when(request.created_at) }}</span>
+             </dd>
+           </div>
+-          <div v-if="request.note" class="flex flex-wrap gap-2">
+-            <dt class="font-medium">Note:</dt>
++          <div v-if="request.note" class="flex flex-col gap-1 sm:col-span-2">
++            <dt class="text-sm font-medium text-text-muted">Note</dt>
+             <dd class="m-0">{{ request.note }}</dd>
+           </div>
+         </dl>
+diff --git a/frontend/src/views/requirement/RequirementDetail.vue b/frontend/src/views/requirement/RequirementDetail.vue
+index a6e044e..3ac00fe 100644
+--- a/frontend/src/views/requirement/RequirementDetail.vue
++++ b/frontend/src/views/requirement/RequirementDetail.vue
+@@ -354,6 +354,7 @@ function restrictionSaved(saved: Requirement) {
+             v-if="!editing && allows(requirement, 'requirement.update')"
+             ref="editButton"
+             variant="secondary"
++            class="min-h-(--control-height-sm) px-3 text-sm"
+             @click="edit"
+             >Edit</Button
+           >

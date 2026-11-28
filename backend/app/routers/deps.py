@@ -16,14 +16,19 @@ from app.core.settings import Settings
 from app.enums import ProjectModule
 from app.services.auth import AuthService, SignedInUser
 from app.services.org import OrgEntity, OrgService
+from app.services.phase import PhaseEntity, PhaseService
 from app.services.project import ProjectEntity, ProjectService
 from app.services.requirement import (
     ApprovalRequestEntity,
     RequirementEntity,
     RequirementService,
 )
+from app.services.requirement_approvals import RequirementApprovalService
+from app.services.subtask import SubtaskEntity, SubtaskService
+from app.services.task import TaskEntity, TaskService
 from app.services.user import UserEntity, UserService
 from app.services.workspace import WorkspaceEntity, WorkspaceService
+from app.services.workstream import WorkstreamEntity, WorkstreamService
 
 # `__Host-`: the browser only accepts it with `Secure`, `Path=/`, and no `Domain` (design-doc
 # §4, "Slice 1 security checklist").
@@ -148,6 +153,34 @@ async def load_project(key: str, session: SessionDep) -> tuple[ProjectEntity, Ta
     return await ProjectService(session).load(key)
 
 
+async def load_phase(
+    key: str, phase_id: uuid.UUID, session: SessionDep
+) -> tuple[PhaseEntity, Target] | None:
+    return await PhaseService(session).load(key, phase_id)
+
+
+async def load_workstream(
+    key: str, workstream_id: uuid.UUID, session: SessionDep
+) -> tuple[WorkstreamEntity, Target] | None:
+    return await WorkstreamService(session).load(key, workstream_id)
+
+
+async def load_task(key: str, number: int, session: SessionDep) -> tuple[TaskEntity, Target] | None:
+    return await TaskService(session).load(key, number)
+
+
+async def load_deleted_task(
+    key: str, number: int, session: SessionDep
+) -> tuple[TaskEntity, Target] | None:
+    return await TaskService(session).load_deleted(key, number)
+
+
+async def load_subtask(
+    key: str, number: int, n: int, session: SessionDep
+) -> tuple[SubtaskEntity, Target] | None:
+    return await SubtaskService(session).load(key, number, n)
+
+
 async def load_requirement(
     key: str, number: int, session: SessionDep
 ) -> tuple[RequirementEntity, Target] | None:
@@ -157,13 +190,13 @@ async def load_requirement(
 async def load_approval_request(
     request_id: uuid.UUID, session: SessionDep
 ) -> tuple[ApprovalRequestEntity, Target] | None:
-    return await RequirementService(session).load_approval_request(request_id)
+    return await RequirementApprovalService(session).load_approval_request(request_id)
 
 
 async def load_approval_request_to_decide(
     request_id: uuid.UUID, session: SessionDep
 ) -> tuple[ApprovalRequestEntity, Target] | None:
-    return await RequirementService(session).load_approval_request_to_decide(request_id)
+    return await RequirementApprovalService(session).load_approval_request_to_decide(request_id)
 
 
 async def load_deleted_requirement(

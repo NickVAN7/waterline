@@ -13,6 +13,8 @@ import { failed, me, noContent, ok, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
 import { project } from '@/test/projects'
 import { listPage } from '@/test/workspace'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import ProjectSettingsView from './ProjectSettingsView.vue'
 
@@ -62,16 +64,22 @@ const MEMBERS = [
   member('Casey Cole', { user_id: ME.id, role: 'admin' }),
 ]
 
+// As shipped today: no module has.
+const NONE_SHIPPED: typeof GUIDANCE = {
+  ...GUIDANCE,
+  modules: GUIDANCE.modules.map((m) => ({ ...m, available: false })),
+}
+
 /** Mounts the page for `shown`; each later GET of the project answers with `next` if given. The
  * members come `pageSize` at a time. */
-async function mountAt(shown: Project, next: Project[] = [], pageSize = 200) {
+async function mountAt(shown: Project, next: Project[] = [], pageSize = 200, guidance = GUIDANCE) {
   useCurrentUserStore().me = me()
   const answers = [shown, ...next]
   const get = vi.spyOn(client, 'GET').mockImplementation(((
     path: string,
     init?: { params?: { query?: { offset?: number } } },
   ) => {
-    if (path === '/api/module-guidance') return Promise.resolve(ok(GUIDANCE))
+    if (path === '/api/module-guidance') return Promise.resolve(ok(guidance))
     if (path === '/api/projects/{key}/members') {
       const offset = init?.params?.query?.offset ?? 0
       return Promise.resolve(
@@ -85,7 +93,7 @@ async function mountAt(shown: Project, next: Project[] = [], pageSize = 200) {
   }) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       { path: '/:orgSlug/projects/:key', name: 'project-home', component: Page },
@@ -95,7 +103,7 @@ async function mountAt(shown: Project, next: Project[] = [], pageSize = 200) {
         component: ProjectSettingsView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(`/acme/projects/${shown.key}/settings`)
@@ -149,7 +157,15 @@ describe('ProjectSettingsView', () => {
       .mockResolvedValue(ok(project({ ...shown, name: 'Billing', status: 'on_hold' })))
 
     expect(wrapper.get('h1').text()).toBe('ERP rollout settings')
-    expect(document.title).toBe('ERP rollout settings · Waterline')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({
+      links: [
+        ['Acme Manufacturing', '/acme/projects'],
+        ['ERP rollout', '/acme/projects/ERP'],
+      ],
+      current: 'Settings',
+    })
+    expect(document.title).toBe('ERP settings · Waterline')
     expect(wrapper.get<HTMLInputElement>('#project-settings-name').element.value).toBe(
       'ERP rollout',
     )
@@ -223,6 +239,99 @@ describe('ProjectSettingsView', () => {
 
     expect(wrapper.text()).toContain('This account is deactivated.')
     expect(document.activeElement?.id).toBe('project-settings-lead-id')
+  })
+
+  describe('Modules, collapsed to one line (Q12c)', () => {
+    const modules = () => document.querySelector<HTMLDetailsElement>('details')!
+
+    // The handoff's Package 4 item 5. Bug: the section shown with nothing it can turn on.
+    it('is left out until a module has shipped, the rest of the form kept', async () => {
+      const { wrapper } = await mountAt(
+        project({ enabled_modules: [], allowed_actions: ADMIN }),
+        [],
+        200,
+        NONE_SHIPPED,
+      )
+
+      expect(document.querySelector('details')).toBeNull()
+      expect(wrapper.text()).not.toContain('Modules')
+      expect(wrapper.text()).not.toContain('modules')
+      expect(wrapper.text()).toContain('Save settings')
+      await expectNoA11yViolations(wrapper.element)
+    })
+
+    it('shows the modules turned on, and opens on demand', async () => {
+      const { wrapper } = await mountAt(
+        project({ enabled_modules: ['sprints', 'github'], allowed_actions: ADMIN }),
+      )
+
+      expect(modules().open).toBe(false)
+      expect(wrapper.get('summary').text()).toBe('Modules Sprints, GitHub Edit')
+      // With a module shipped, the type's help speaks of its modules (DL-402).
+      expect(wrapper.text()).toContain(
+        'Changes the labels and the recommended modules, never the data or the modules turned on.',
+      )
+      modules().open = true
+      modules().dispatchEvent(new Event('toggle'))
+      await flushPromises()
+      expect(wrapper.get('summary').text()).toBe('Modules Sprints, GitHub')
+      // What it says follows the form, before a save.
+      await wrapper.get('input[type=checkbox][value=sprints]').setValue(false)
+      await wrapper.get('input[type=checkbox][value=github]').setValue(false)
+      expect(wrapper.get('summary').text()).toBe('Modules None turned on')
+      await expectNoA11yViolations(wrapper)
+    })
+
+    it("opens for the server's 422 on the modules, and focuses them", async () => {
+      const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        validationFailed([
+          {
+            loc: ['body', 'enabled_modules'],
+            message: 'This module is not available yet.',
+            type: 'module_unavailable',
+          },
+        ]),
+      )
+      await wrapper.get('input[type=checkbox][value=github]').setValue(true)
+
+      await submitForm(wrapper, 0)
+
+      expect(modules().open).toBe(true)
+      expect(document.activeElement?.id).toBe('project-settings-enabled-modules')
+    })
+
+    it('opens for an error on the modules when focus goes to an earlier field', async () => {
+      const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        validationFailed([
+          {
+            loc: ['body', 'lead_id'],
+            message: 'This account is deactivated.',
+            type: 'account_inactive',
+          },
+          {
+            loc: ['body', 'enabled_modules'],
+            message: 'This module is not available yet.',
+            type: 'module_unavailable',
+          },
+        ]),
+      )
+      await wrapper.get('input[type=checkbox][value=github]').setValue(true)
+
+      await submitForm(wrapper, 0)
+
+      expect(document.activeElement?.id).toBe('project-settings-lead-id')
+      expect(modules().open).toBe(true)
+      expect(wrapper.text()).toContain('This module is not available yet.')
+    })
+  })
+
+  it('gives Save restriction the primary tone, as Save settings (UI-FRM-15: one per form)', async () => {
+    const { wrapper } = await mountAt(project({ allowed_actions: ADMIN }))
+
+    const save = wrapper.findAll('button').find((b) => b.text() === 'Save restriction')!
+    expect(save.classes()).toContain('bg-accent')
   })
 
   it('asks for the name first, focusing it, and sends nothing', async () => {
@@ -495,7 +604,7 @@ describe('ProjectSettingsView', () => {
     )
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [
+      routes: withTrailRoutes([
         { path: '/', name: 'my-work', component: Page },
         { path: '/status', name: 'status', component: Page },
         {
@@ -503,7 +612,7 @@ describe('ProjectSettingsView', () => {
           name: 'project-settings',
           component: ProjectSettingsView,
         },
-      ],
+      ]),
     })
     wrapper.unmount()
     await router.push('/acme/projects/ERP/settings')

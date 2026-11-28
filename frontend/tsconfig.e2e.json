@@ -1,6 +1,6 @@
 {
   "extends": "@tsconfig/node22/tsconfig.json",
-  "include": ["playwright.config.ts", "e2e/**/*.ts"],
+  "include": ["playwright*.config.ts", "e2e/**/*.ts"],
   "compilerOptions": {
     "module": "preserve",
     "moduleResolution": "bundler",

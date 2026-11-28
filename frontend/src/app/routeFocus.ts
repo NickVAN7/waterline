@@ -1,5 +1,6 @@
 /**
- * After each navigation (UI-SHL-9): the title becomes `<h1 text> · Waterline`, and focus moves to
+ * After each navigation (UI-SHL-9): the title becomes `<short title> · Waterline`, the `h1`'s
+ * `data-tab-title` (an item's ID, a project page's key and page) or else its text, and focus moves to
  * the new page's `h1`, except on the first page load (no autofocus on load, UI-FRM-16). A change
  * to the query alone (a list's page, through `useListQuery`) does neither: the list announces its
  * new count instead. A page whose `h1` waits for its data (`meta.settlesItself`) calls
@@ -37,11 +38,13 @@ export async function redirectInPlace(go: () => Promise<unknown>): Promise<void>
   }
 }
 
-/** Set the title from the `h1`, for a page whose `h1` changed in place (a rename). */
+/** Set the title from the `h1`, for a page whose `h1` changed in place (a rename): its short
+ * `data-tab-title` when it has one, so a tab shows what tells it apart first (UI-SHL-9). */
 export async function syncTitle(): Promise<void> {
   await nextTick()
   const h1 = heading()
-  document.title = h1?.textContent ? `${h1.textContent.trim()} · ${APP_NAME}` : APP_NAME
+  const short = h1?.dataset.tabTitle || h1?.textContent?.trim()
+  document.title = short ? `${short} · ${APP_NAME}` : APP_NAME
 }
 
 /** A page a user's action replaced (a reload after a refusal, or a save that found the item

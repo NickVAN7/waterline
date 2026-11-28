@@ -155,6 +155,41 @@ class Priority(StrEnum):
     LOW = "low"
 
 
+# --- Planning and work items (schema-doc "Planning Structure", "Work Items") -----------------
+
+
+class PhaseStatus(StrEnum):
+    PLANNED = "planned"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+
+
+class TaskType(StrEnum):
+    FEATURE = "feature"
+    BUG = "bug"
+    CHORE = "chore"
+    SPIKE = "spike"
+    CONFIG = "config"
+    DATA = "data"
+    TRAINING = "training"
+
+
+class TaskStatus(StrEnum):
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    BLOCKED = "blocked"
+    IN_REVIEW = "in_review"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class Severity(StrEnum):
+    S1 = "s1"
+    S2 = "s2"
+    S3 = "s3"
+    S4 = "s4"
+
+
 # --- Approvals (design-doc §6.2; schema-doc "Approvals") --------------------------------------
 
 
@@ -185,10 +220,56 @@ class DeletedChildren(StrEnum):
     DELETE = "delete"
 
 
+class ApprovalState(StrEnum):
+    """The requirement tree's approval-state filter (build plan S3-C10): independent facts, so
+    one requirement can match several (owner, Nov 25, 2026)."""
+
+    AWAITING = "awaiting"  # a pending approval request
+    APPROVED = "approved"  # an approved revision
+    NOT_APPROVED = "not_approved"  # never approved
+
+
+class LinkedTasks(StrEnum):
+    """What a requirement's delete does with the tasks linked to it (design-doc §9)."""
+
+    DETACH = "detach"
+    DELETE = "delete"
+
+
+class TaskColumn(StrEnum):
+    """A task export's columns, in their default order (S3-C14)."""
+
+    ID = "id"
+    TITLE = "title"
+    TYPE = "type"
+    STATUS = "status"
+    PRIORITY = "priority"
+    SEVERITY = "severity"
+    ASSIGNEE = "assignee"
+    REVIEWER = "reviewer"
+    REQUIREMENT = "requirement"
+    PHASE = "phase"
+    WORKSTREAM = "workstream"
+    DUE_DATE = "due_date"
+
+
+class RequirementColumn(StrEnum):
+    """A requirement export's columns, in their default order (S3-C14)."""
+
+    ID = "id"
+    TITLE = "title"
+    STATUS = "status"
+    PRIORITY = "priority"
+    PARENT = "parent"
+    APPROVAL = "approval"
+    TASKS = "tasks"
+
+
 class TrashItemType(StrEnum):
-    """What the trash lists (design-doc §9; tasks and test cases join in Slices 3 and 5)."""
+    """What the trash lists (design-doc §9; test cases join in Slice 5)."""
 
     REQUIREMENT = "requirement"
+    TASK = "task"
 
 
 # --- Change log (design-doc §10; schema-doc `activity_log`) -----------------------------------

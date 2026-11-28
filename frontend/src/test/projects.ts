@@ -40,6 +40,9 @@ export function project(overrides: Partial<Project> = {}): Project {
     restriction_level: null,
     restriction_categories: [],
     modules_holding_data: [],
+    task_types: ['feature', 'bug', 'chore', 'spike', 'config', 'data', 'training'],
+    get_started: null,
+    home_numbers: null,
     allowed_actions: [],
     ...overrides,
   }
@@ -50,5 +53,11 @@ export function myProjectItem(
   key: string,
   overrides: Partial<components['schemas']['MyProjectItem']> = {},
 ): components['schemas']['MyProjectItem'] {
-  return { ...projectItem(key), is_favorite: false, allowed_actions: [], ...overrides }
+  return {
+    ...projectItem(key),
+    is_favorite: false,
+    allowed_actions: [],
+    archived: false,
+    ...overrides,
+  }
 }

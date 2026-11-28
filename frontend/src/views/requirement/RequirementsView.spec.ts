@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -11,9 +11,11 @@ import { useCurrentOrgStore } from '@/stores/currentOrg'
 import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, me, ok } from '@/test/api'
-import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { stubDialog, stubResizeObserver, stubWidth } from '@/test/overlay'
 import { requirementRead } from '@/test/requirements'
 import { project } from '@/test/projects'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import RequirementsView from './RequirementsView.vue'
 
@@ -36,6 +38,10 @@ function item(number: number, title: string): Item {
     restriction_categories: [],
     current_revision_id: null,
     approved_revision_id: null,
+    awaiting_approval: false,
+    task_count: 0,
+    tasks_done: 0,
+    context: false,
   }
 }
 const TREE: Tree = { items: [item(1, 'Invoicing'), item(2, 'Payments')], truncated: false }
@@ -52,6 +58,10 @@ const MOVER = project({
 
 /** Mounts the page at `at`; `trees`, `projects`, and `requirements` (one's read) answer the GETs
  * in turn, the last one repeating. */
+// The panel's title: just before its icon buttons, on their row (DL-387).
+const panelTitle = () =>
+  document.querySelector('button[aria-label="Close"]')!.parentElement!.previousElementSibling!
+
 async function mountAt(
   projects: Project[],
   trees: unknown[] = [ok(TREE)],
@@ -60,6 +70,8 @@ async function mountAt(
     at = '/acme/projects/ERP/requirements',
     requirements = [] as unknown[],
     state = undefined as Record<string, string> | undefined,
+    // The latest approval request the panel's Approval section finds, or none.
+    latest = null as components['schemas']['ApprovalRequestRead'] | null,
   } = {},
 ) {
   useCurrentUserStore().me = me()
@@ -72,16 +84,18 @@ async function mountAt(
         path === '/api/projects/{key}/requirements'
           ? next(answers.tree)
           : path === '/api/projects/{key}/requirements/{number}/approval-requests'
-            ? ok({ items: [], total: 0, limit: 1, offset: 0 })
-            : path === '/api/projects/{key}/requirements/{number}/activity'
-              ? ok({ items: [], next_cursor: null })
-              : path === '/api/projects/{key}/requirements/{number}'
-                ? next(answers.requirements)
-                : next(answers.project),
+            ? ok({ items: latest ? [latest] : [], total: latest ? 1 : 0, limit: 1, offset: 0 })
+            : path === '/api/approval-requests/{request_id}'
+              ? ok(latest)
+              : path === '/api/projects/{key}/requirements/{number}/activity'
+                ? ok({ items: [], next_cursor: null })
+                : path === '/api/projects/{key}/requirements/{number}'
+                  ? next(answers.requirements)
+                  : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -96,7 +110,7 @@ async function mountAt(
         component: Page,
       },
       { path: '/:orgSlug/projects/:key/trash', name: 'project-trash', component: Page },
-    ],
+    ]),
   })
   installRouteFocus(router)
   // Arrived at from another page, as a reload after an action finds it: focus then settles on the
@@ -118,12 +132,18 @@ const treeCalls = (get: Spy) =>
 const projectCalls = (get: Spy) =>
   get.mock.calls.filter((call) => call[0] === '/api/projects/{key}')
 
+// The tree's Move menu button: the trail's "…" fold is a menu button too.
+const moveButton = () =>
+  [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup=menu]')].find(
+    (b) => !b.closest('nav'),
+  )
+
 async function moveUp(title: string) {
   ;[...document.querySelectorAll<HTMLElement>('tbody tr')]
     .find((r) => r.textContent!.includes(title))!
     .click()
   await flushPromises()
-  document.querySelector<HTMLButtonElement>('button[aria-haspopup=menu]')!.click()
+  moveButton()!.click()
   await flushPromises()
   ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
     .find((li) => li.textContent!.trim() === 'Move up')!
@@ -136,6 +156,8 @@ beforeEach(() => {
   setActivePinia(createPinia())
   stubResizeObserver()
   stubDialog()
+  // The overlay, below 80rem, unless a test widens it (DL-321, DL-383).
+  stubWidth(false)
 })
 afterEach(() => {
   document.body.innerHTML = ''
@@ -143,26 +165,47 @@ afterEach(() => {
 })
 
 describe('RequirementsView', () => {
-  it("shows the project's requirement tree, with the move menu for those who may move", async () => {
-    const { wrapper } = await mountAt([MOVER])
+  // 15 s: past the 5 s default in a 4-core machine's full suite, under 1 s alone (TD-125).
+  it(
+    "shows the project's requirement tree, with the move menu for those who may move",
+    { timeout: 15_000 },
+    async () => {
+      const { wrapper } = await mountAt([MOVER])
 
-    expect(wrapper.get('h1').text()).toBe('ERP rollout requirements')
-    expect(document.title).toBe('ERP rollout requirements · Waterline')
-    expect(wrapper.findAll('tbody tr').map((r) => r.find('td').text().trim())).toEqual([
-      'Invoicing',
-      'Payments',
-    ])
-    expect(wrapper.find('button[aria-haspopup=menu]').text()).toBe('Move')
-    expect(wrapper.find('[role=alert]').exists()).toBe(false)
-    await expectNoA11yViolations(wrapper)
-  })
+      expect(wrapper.get('h1').text()).toBe('ERP rollout requirements')
+      // Its trail (DL-327, UI-SHL-14).
+      expect(trail()).toEqual({
+        links: [
+          ['Acme Manufacturing', '/acme/projects'],
+          ['ERP rollout', '/acme/projects/ERP'],
+        ],
+        current: 'Requirements',
+      })
+      expect(document.title).toBe('ERP requirements · Waterline')
+      expect(wrapper.findAll('tbody tr').map((r) => r.find('td').text().trim())).toEqual([
+        'Invoicing',
+        'Payments',
+      ])
+      expect(moveButton()!.textContent!.trim()).toBe('Move')
+      expect(wrapper.find('[role=alert]').exists()).toBe(false)
+      await expectNoA11yViolations(wrapper)
+    },
+  )
 
   it('has no move menu for someone who may only read, but still Expand requirement', async () => {
     const { wrapper } = await mountAt([READER])
 
     expect(wrapper.findAll('tbody tr')).toHaveLength(2)
-    expect(wrapper.find('button[aria-haspopup=menu]').exists()).toBe(false)
+    expect(moveButton()).toBeUndefined()
     expect(wrapper.findAll('button').map((b) => b.text())).toContain('Expand requirement')
+  })
+
+  it('links Trash in its header, filtered to requirements, for anyone who reads them (DL-350)', async () => {
+    const { wrapper } = await mountAt([READER])
+
+    const header = wrapper.get('header')
+    const link = header.findAll('a').find((a) => a.text() === 'Trash')!
+    expect(link.attributes('href')).toBe('/acme/projects/ERP/trash?type=requirement')
   })
 
   it("is the 403 page, without asking for the tree, for someone who can't read an export-controlled project's content", async () => {
@@ -255,7 +298,7 @@ describe('RequirementsView', () => {
     await moveUp('Payments')
 
     expect(projectCalls(get)).toHaveLength(2)
-    expect(wrapper.find('button[aria-haspopup=menu]').exists()).toBe(false)
+    expect(moveButton()).toBeUndefined()
     expect(wrapper.get('[role=alert]').text()).toContain(
       "You don't have permission to move this requirement.",
     )
@@ -436,7 +479,7 @@ describe('RequirementsView', () => {
       )!
     const inPanel = (label: string) =>
       [...panel()!.querySelectorAll<HTMLElement>('button, a')].find(
-        (b) => b.textContent!.trim() === label,
+        (b) => b.textContent!.trim() === label || b.getAttribute('aria-label') === label,
       )
     const requirementCalls = (get: Spy) =>
       get.mock.calls.filter((call) => call[0] === '/api/projects/{key}/requirements/{number}')
@@ -500,11 +543,31 @@ describe('RequirementsView', () => {
       const back = vi.spyOn(router, 'back')
       const replace = vi.spyOn(router, 'replace')
 
-      panel()!.close()
+      // Esc: the native cancel, which the panel turns into a request to its page.
+      panel()!.dispatchEvent(new Event('cancel', { cancelable: true }))
       await flushPromises()
 
       expect(back).toHaveBeenCalledOnce()
       expect(replace).not.toHaveBeenCalled()
+    })
+
+    it("its Parent row's ID swaps the panel to the parent, and it has no trail of its own (TD-106)", async () => {
+      const child = { ...PAYMENTS, ancestors: [{ number: 1, title: 'Invoicing' }] }
+      const parent = { ...requirementRead(1, 'Invoicing') }
+      const { router } = await mountAt([READER], [ok(TREE)], {
+        direct: true,
+        at: '/acme/projects/ERP/requirements?open=RQ-2',
+        requirements: [ok(child), ok(parent)],
+      })
+      expect(panel()!.querySelector('nav[aria-label=Breadcrumb]')).toBeNull()
+      const link = inPanel('ERP-RQ-1')!
+      expect(link.getAttribute('href')).toBe('/acme/projects/ERP/requirements?open=RQ-1')
+
+      link.click()
+      await flushPromises()
+
+      expect(router.currentRoute.value.fullPath).toBe('/acme/projects/ERP/requirements?open=RQ-1')
+      expect(panel()!.querySelector('h2')!.textContent!.trim()).toBe('Invoicing')
     })
 
     it('Close on a shared link replaces it with the list, focus on its h1', async () => {
@@ -579,6 +642,51 @@ describe('RequirementsView', () => {
       expect(document.getElementById(panel()!.getAttribute('aria-labelledby')!)!.textContent).toBe(
         'Card payments',
       )
+    })
+
+    it('a request no longer pending, as the panel finds it, leaves the row\'s "Awaiting approval" (Q12b)', async () => {
+      const waiting = {
+        items: [item(1, 'Invoicing'), { ...item(2, 'Payments'), awaiting_approval: true }],
+        truncated: false,
+      }
+      await mountAt([READER], [ok(waiting)], { requirements: [ok(PAYMENTS)] })
+      expect(idLink(2).closest('tr')!.textContent).toContain('Awaiting approval')
+
+      await openFromTree(2)
+
+      // The panel's approval section finds no request pending.
+      expect(idLink(2).closest('tr')!.textContent).not.toContain('Awaiting approval')
+    })
+
+    it('a pending request the panel finds gives its row "Awaiting approval" (Q12b)', async () => {
+      await mountAt([READER], [ok(TREE)], {
+        requirements: [ok(PAYMENTS)],
+        latest: {
+          id: 'req-1',
+          status: 'pending',
+          requirement_revision_id: 'rev-1',
+          revision_number: 1,
+          note: null,
+          requested_by_id: 'u-ada',
+          requested_by_name: 'Ada Admin',
+          requested_by_is_active: true,
+          created_at: '2026-11-03T14:30:00Z',
+          completed_at: null,
+          newer_revision_exists: false,
+          flagged: false,
+          approvals: [],
+          allowed_actions: [],
+        },
+      })
+      expect(idLink(2).closest('tr')!.textContent).not.toContain('Awaiting approval')
+
+      await openFromTree(2)
+
+      expect(idLink(2).closest('tr')!.textContent).toContain('Awaiting approval')
+      expect(idLink(1).closest('tr')!.textContent).not.toContain('Awaiting approval')
+      // And in the panel's header, beside its status (DL-386, F13).
+      const panelTop = panelTitle().parentElement!.previousElementSibling!
+      expect(panelTop.textContent).toContain('Awaiting approval')
     })
 
     it("a Try again that loads it sends focus to the panel's title, not the page behind (UI-FBK-15)", async () => {
@@ -665,7 +773,12 @@ describe('RequirementsView', () => {
       )
       await openFromTree(2)
 
-      inPanel('Delete')!.click()
+      inPanel('More actions for ERP-RQ-2')!.click()
+      await flushPromises()
+      ;[...document.querySelectorAll<HTMLElement>('[role=menuitem]')]
+        .find((li) => li.textContent!.trim() === 'Delete…')!
+        .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+        .click()
       await flushPromises()
       // The delete dialog, over the panel.
       const confirm = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1)!
@@ -687,5 +800,245 @@ describe('RequirementsView', () => {
       )
       expect(document.activeElement).toBe(document.querySelector('main h1'))
     })
+  })
+})
+
+describe('RequirementsView: the split pane, swapping, and unsaved edits (DL-321 to DL-324)', () => {
+  const PAYMENTS = { ...requirementRead(2, 'Payments'), allowed_actions: ['requirement.update'] }
+  const INVOICING = { ...requirementRead(1, 'Invoicing'), allowed_actions: ['requirement.update'] }
+  const region = () => document.querySelector<HTMLElement>('aside[aria-label^="Requirement "]')
+  const idLink = (number: number) =>
+    [...document.querySelectorAll<HTMLAnchorElement>('tbody a')].find(
+      (a) => a.textContent === `ERP-RQ-${number}`,
+    )!
+  const row = (number: number) => idLink(number).closest('tr')!
+  const title = () => document.querySelector<HTMLElement>('main h2[tabindex="-1"]')
+  const named = (label: string) =>
+    [...document.querySelectorAll<HTMLElement>('button, a')].find(
+      (b) => b.textContent!.trim() === label || b.getAttribute('aria-label') === label,
+    )!
+  const confirmation = () =>
+    [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].find((d) =>
+      d.textContent!.includes('Discard your changes?'),
+    )
+  async function openFromTree(number: number) {
+    idLink(number).focus()
+    idLink(number).click()
+    await flushPromises()
+  }
+  async function typeInto(selector: string, text: string) {
+    const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!
+    field.value = text
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+  }
+  async function pick(selector: string) {
+    document.querySelector<HTMLInputElement>(selector)!.click()
+    await flushPromises()
+  }
+  async function editTitle(text: string) {
+    named('Edit').click()
+    await flushPromises()
+    const field = document.querySelector<HTMLInputElement>('#edit-requirement-title')!
+    field.value = text
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+  }
+
+  it('opens beside the tree at 80rem and wider: a named region, the tree still usable', async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+
+    await openFromTree(2)
+
+    expect(region()!.getAttribute('aria-label')).toBe('Requirement ERP-RQ-2')
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(document.activeElement).toBe(title())
+    expect(title()!.textContent!.trim()).toBe('Payments')
+    expect(region()!.textContent).toContain('ERP-RQ-2')
+    // Not a modal: the tree's controls aren't inert behind it.
+    expect(document.querySelector('main [inert]')).toBeNull()
+    await expectNoA11yViolations(document.body)
+  })
+
+  it("marks the open requirement's row by more than color: bold, and an Open label", async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+
+    await openFromTree(2)
+
+    expect(row(2).classList).toContain('bg-selected')
+    expect(row(2).querySelector('.font-semibold')!.textContent).toBe('Payments')
+    expect(row(2).textContent).toContain('Open')
+    expect(idLink(2).getAttribute('aria-current')).toBe('true')
+    expect(idLink(1).hasAttribute('aria-current')).toBe(false)
+    expect(row(1).classList).not.toContain('bg-selected')
+    expect(row(1).textContent).not.toContain('Open')
+  })
+
+  it('another ID swaps what it shows and the URL, focus on the new title', async () => {
+    stubWidth(true)
+    const { router } = await mountAt([READER], [ok(TREE)], {
+      requirements: [ok(PAYMENTS), ok(INVOICING)],
+    })
+    await openFromTree(2)
+
+    await openFromTree(1)
+
+    expect(router.currentRoute.value.query.open).toBe('RQ-1')
+    expect(region()!.getAttribute('aria-label')).toBe('Requirement ERP-RQ-1')
+    expect(title()!.textContent!.trim()).toBe('Invoicing')
+    expect(document.activeElement).toBe(title())
+    expect(row(1).textContent).toContain('Open')
+    expect(row(2).textContent).not.toContain('Open')
+  })
+
+  it('Close after a swap returns focus to the ID that opened what it shows', async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS), ok(INVOICING)] })
+    await openFromTree(2)
+    await openFromTree(1)
+
+    named('Close').click()
+    await flushPromises()
+
+    expect(region()).toBeNull()
+    expect(document.activeElement).toBe(idLink(1))
+  })
+
+  it('Esc from inside closes it, back on the ID', async () => {
+    stubWidth(true)
+    await mountAt([READER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+
+    title()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+
+    expect(region()).toBeNull()
+    expect(document.activeElement).toBe(idLink(2))
+  })
+
+  it('an edit with nothing changed closes without asking', async () => {
+    await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    named('Edit').click()
+    await flushPromises()
+
+    named('Close').click()
+    await flushPromises()
+
+    expect(confirmation()).toBeUndefined()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+  })
+
+  it('Close with unsaved edits asks first, on Keep editing, naming the item and what happens', async () => {
+    const { router } = await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    await editTitle('Card payments')
+
+    named('Close').click()
+    await flushPromises()
+
+    const asked = confirmation()!
+    expect(asked.textContent).toContain(
+      "Your edits to ERP-RQ-2 aren't saved. Closing the panel discards them.",
+    )
+    expect(document.activeElement!.textContent!.trim()).toBe('Keep editing')
+    expect(named('Discard changes').className).toContain('danger')
+    await expectNoA11yViolations(asked)
+    expect(router.currentRoute.value.query.open).toBe('RQ-2')
+  })
+
+  // Each field the form keeps counts: a change to any one alone asks (DL-323).
+  it.each([
+    ['the title', () => typeInto('#edit-requirement-title', 'Card payments')],
+    ['the description', () => typeInto('#edit-requirement-description', 'Pays by card.')],
+    ['the priority', () => pick('input[name=edit-requirement-priority][value=high]')],
+    ['the change note', () => typeInto('#edit-requirement-change-note', 'Why')],
+  ])('a change to %s alone asks before Close', async (_, change) => {
+    await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    named('Edit').click()
+    await flushPromises()
+    await change()
+
+    named('Close').click()
+    await flushPromises()
+
+    expect(confirmation()).toBeDefined()
+  })
+
+  // F17: the title is in its field, so the panel's heading doesn't repeat it (DL-395).
+  it('heads the panel "Editing <ID>" while editing, its title again afterwards', async () => {
+    await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    const heading = () => panelTitle().textContent!.trim()
+    const title = heading()
+
+    named('Edit').click()
+    await flushPromises()
+    expect(heading()).toBe('Editing ERP-RQ-2')
+    ;[
+      ...document.querySelectorAll<HTMLButtonElement>(
+        'form[aria-label="Edit the requirement"] button',
+      ),
+    ]
+      .find((b) => b.textContent!.trim() === 'Cancel')!
+      .click()
+    await flushPromises()
+
+    expect(heading()).toBe(title)
+    expect(title).not.toBe('Editing ERP-RQ-2')
+  })
+
+  it('Keep editing keeps the panel and what was typed', async () => {
+    const { router } = await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    await editTitle('Card payments')
+    named('Close').click()
+    await flushPromises()
+
+    named('Keep editing').click()
+    await flushPromises()
+
+    expect(confirmation()).toBeUndefined()
+    expect(router.currentRoute.value.query.open).toBe('RQ-2')
+    expect(document.querySelector<HTMLInputElement>('#edit-requirement-title')!.value).toBe(
+      'Card payments',
+    )
+  })
+
+  it('Discard changes closes it, and saves nothing', async () => {
+    const patch = vi.spyOn(client, 'PATCH')
+    const { router } = await mountAt([MOVER], [ok(TREE)], { requirements: [ok(PAYMENTS)] })
+    await openFromTree(2)
+    await editTitle('Card payments')
+    named('Close').click()
+    await flushPromises()
+
+    named('Discard changes').click()
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.open).toBeUndefined()
+    expect(document.querySelector('dialog[open]')).toBeNull()
+    expect(patch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['another ID', () => openFromTree(1), 'Opening ERP-RQ-1 discards them.'],
+    ['Open full page', () => named('Open full page').click(), 'Leaving this page discards them.'],
+    ['Back', (router: Router) => router.back(), 'Closing the panel discards them.'],
+  ])('%s with unsaved edits asks first, saying what happens', async (_, act, happens) => {
+    const { router } = await mountAt([MOVER], [ok(TREE)], {
+      requirements: [ok(PAYMENTS), ok(INVOICING)],
+    })
+    await openFromTree(2)
+    await editTitle('Card payments')
+
+    await act(router)
+    await flushPromises()
+
+    expect(confirmation()!.textContent).toContain(happens)
+    expect(router.currentRoute.value.query.open).toBe('RQ-2')
   })
 })

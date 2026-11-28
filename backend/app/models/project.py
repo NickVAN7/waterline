@@ -10,6 +10,7 @@ from sqlalchemy import (
     Index,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -54,6 +55,8 @@ class Project(RestrictionMixin, BaseModel):
     lead_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(User.id))
     enabled_modules: Mapped[list[str]] = mapped_column(ARRAY(Text))
     archived_at: Mapped[datetime | None]
+    # A project admin hid the home's Get started checklist (design-doc §11, DL-201).
+    get_started_hidden: Mapped[bool] = mapped_column(server_default=text("false"))
 
     organization: Mapped[Organization] = relationship(lazy="raise")
     lead: Mapped[User | None] = relationship(lazy="raise")

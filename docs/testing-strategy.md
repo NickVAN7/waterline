@@ -63,6 +63,12 @@ tested, what each kind of test is for, and the gates every change passes.
   workers), each worker on its own database, `waterline_test_gw<n>`, dropped, recreated, and
   migrated at its start. A run with `-n 0` (a filtered `wl backend test`, mutmut) uses
   `waterline_test` itself. No test depends on another's order or state.
+- **A review copy's own** (DL-392): `WATERLINE_TEST_DATABASE` (in the env or `.env`; `wl
+  review-copy --with-env` writes `waterline_test_<8 hex>`) names the test database instead, its
+  workers' copies `<name>_gw<n>`; the conftest refuses any name but `waterline_test` or
+  `waterline_test_<suffix>`. Two copies' runs never touch each other's databases.
+- **A test that hangs fails** after 120 seconds (`pytest-timeout`, `timeout` in
+  `backend/pyproject.toml`): a planted bug once made a test run 20 minutes.
 - **Exception — concurrency tests** need separate connections and real commits (parallel
   transactions, or a background worker processing a job); they use the `concurrency` fixture,
   whose sessions really commit, and are marked `@pytest.mark.concurrency("<table>", ...)`;
@@ -225,7 +231,7 @@ tested, what each kind of test is for, and the gates every change passes.
     `https://x`), a missing `Origin`, `Origin: null`, a non-`http(s)` `Origin` (e.g.
     `file://x`), an unparseable `Origin`, and a missing `Host`, including for a request with
     no session or with `must_change_password` set (the check runs first). Each exempt
-    endpoint (from Slice 7) is reachable without `Origin` and still rejects a request that
+    endpoint (from Slice 8) is reachable without `Origin` and still rejects a request that
     fails its own authentication.
   - Disabled-module endpoints return 404.
   - The API test client uses an `https://` base URL (a shared fixture): httpx won't send the
@@ -266,9 +272,10 @@ saying why.
   ("Spec tests"); if the implementation can't pass one, the owner decides whether the doc or the
   test is wrong, and any change they approve is listed there. `checkpoint-reviewer` compares the
   committed files with the recorded hashes, and an unlisted change is a blocker.
-- **Sabotage check** everywhere else: for each behavior, make the smallest change that breaks it
-  (invert a condition, remove a `log_change()` call, drop an org filter), confirm a test fails,
-  and restore the code.
+- **Sabotage check** everywhere else, where a test might not catch its bug: make the smallest
+  change that breaks the behavior (invert a condition, remove a `log_change()` call, drop an org
+  filter), confirm a test fails, and restore the code. It isn't recorded: outside `rules/` and
+  `authz/`, the reviewer's sabotage spot-check covers it (DL-393).
 - **Independent sabotage spot-check:** `checkpoint-reviewer` picks two or three of the
   checkpoint's behaviors by risk, from the docs (not from the author's list), breaks each in a
   temporary copy of the repository, and records which test caught it. None failing is a major
@@ -276,8 +283,8 @@ saying why.
   verification: nothing counts as verified because the session that did the work says so.
 - Tests are written **alongside** the code: in the same checkpoint and commit.
 - The `test-writer` skill (`.claude/skills/test-writer/`) is the working procedure: a behavior
-  table with a source, layer, the bug each test catches, and the proof it fails; rules for
-  assertions; banned patterns.
+  table with a source, layer, and the bug each test catches, plus the proof it fails for
+  `rules/` and `authz/` only (DL-393); rules for assertions; banned patterns.
 
 ## Mutation testing
 
@@ -304,10 +311,9 @@ saying why.
 - **`wl check`** (the developer CLI; `waterline check` in full) is the gate before every commit:
   everything CI runs except the supply-chain audit and the end-to-end tests, and mutation testing
   only when something it depends on changed (DL-99). **`wl check --full`** runs everything; CI
-  calls it, so local and CI can't diverge. A new gate joins `wl check` unless it needs the
+  runs its parts as parallel jobs through the CLI, which a CLI test keeps equal to it (DL-392), so
+  local and CI can't diverge. A new gate joins `wl check` unless it needs the
   network or a running stack, which put it in `--full` only (DL-101).
-  While fixing review findings, run only the affected tests (`wl frontend test <spec>`,
-  `wl backend test -k …`), and `wl check` once the batch of fixes is done (DL-106).
   A distributed backend run with Postgres out of reach stops at once with the test database's
   message, before xdist starts its workers (DL-107).
 - **CI (GitHub Actions)** is the full gate: lint, type checks (pyright, vue-tsc), all backend
@@ -321,19 +327,19 @@ saying why.
   `audit-allowlist.toml` entry with a reason and an open tech-debt entry whose Fix by is the
   deadline. A red audit is fixed before any checkpoint starts (`chore(deps):` commit).
 - **Slice verification, from Slice 3:** `wl docs-screenshots` regenerates the guide's
-  screenshots, in light and dark (also whenever a UI change affects one; DL-343), and
+  screenshots, in light and dark, from the manual pass's data (DL-361) (also whenever a UI change affects one; DL-343), and
   `user-guide-verifier` checks in two parts: the behavior reference followed literally in a
   browser, and the reader's guide checked against it (DL-336). Both arrive in S3-C0g and S3-C0h.
-- **Pull requests:** each slice works on one branch with one draft PR, and CI runs on every
-  push; a checkpoint goes to the owner only with green CI, and the slice's PR merges to `main`
-  (a merge commit) only with green CI (build-plan, "Pull requests"). GitHub enforces it: the
-  `wl check` status check is required on `main` (DL-27).
+- **When each gate runs in the workflow** (and how findings are fixed): the `checkpoint` skill;
+  the branch and PR rules: build plan, "Pull requests". GitHub requires the `wl check` status
+  check on `main` (DL-27).
 - **Flaky tests are bugs:** a test that fails intermittently is fixed or quarantined with a
   tech-debt entry the same day, never retried until green. The one deliberate timing test,
   "Expand requirement" on a 2,000-row tree under one top-level requirement, which stops on exactly
-  500 rows, asserted (`e2e/requirements.spec.ts`, DL-271, DL-272), fails on a task over 1 s on the workstation and over 3 s in CI (DL-253, DL-254). It is never quarantined or changed to get a
-  green run: when it fails in CI, the job is rerun once and both runs' numbers go to the owner,
-  who revisits the test if it keeps failing (DL-257).
+  500 rows, asserted (`e2e/requirements.spec.ts`, DL-271, DL-272), fails on a task over 1 s on
+  the workstation and over 3 s in CI (DL-253, DL-254), and is outside the gate: tagged `@timing`,
+  `wl e2e` leaves it out and CI runs it in its own job that never fails the run (DL-403). A run
+  over its limit is read from that job's log, not fixed to get a green run.
 
 ## Test naming and structure
 

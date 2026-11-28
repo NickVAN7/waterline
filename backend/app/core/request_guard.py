@@ -14,7 +14,7 @@ from app.core.errors import error_response
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 # Endpoints that authenticate their caller another way and carry no browser session. Adding
-# one needs the owner's approval, recorded in design-doc §4 (only the GitHub webhook, Slice 7).
+# one needs the owner's approval, recorded in design-doc §4 (only the GitHub webhook, Slice 8).
 ORIGIN_EXEMPT_PATHS: frozenset[str] = frozenset()
 
 _DEFAULT_PORTS = {"http": 80, "https": 443}

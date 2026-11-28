@@ -26,6 +26,7 @@ dev = [
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.8.0",
     "ruff>=0.16.9",
 ]
@@ -77,6 +78,8 @@ addopts = [
 ]
 filterwarnings = ["error"]
 xfail_strict = true
+# A test that hangs (a planted cycle bug ran 20 minutes) fails instead (pytest-timeout).
+timeout = 120
 markers = [
     "security: security-relevant behavior (testing-strategy.md, \"Specialized tests\"); run alone with -m security",
     "concurrency(*tables): real commits on separate connections (the `concurrency` fixture); the named tables are truncated afterwards",
@@ -173,12 +176,15 @@ name = "Service layers: services call lower layers only"
 type = "layers"
 containers = ["app.services"]
 layers = [
+    "(wiring)",
+    "(requirement_approvals)",
     "(requirement) | (webhook)",
     "(sprint) | (testcase) | (test_run) | (github)",
-    "(task)",
+    "(subtask)",
+    "(task) | (project_members)",
     "(project) | (phase) | (workstream) | (milestone)",
     "(auth) | (workspace) | (org)",
     "(roster)",
-    "(user) | (numbering) | (approval) | (activity) | (comment) | (tag) | (link) | (search) | (my_work) | (health)",
+    "(user) | (numbering) | (ordering) | (approval) | (activity) | (comment) | (tag) | (link) | (search) | (my_work) | (health)",
 ]
 broken_contract_guidance = "Call only services in lower layers; reach upward with a registered handler."

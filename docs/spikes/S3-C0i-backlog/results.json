@@ -1,0 +1,625 @@
+{
+  "svar": {
+    "renderMs": 153,
+    "semantics": {
+      "role": "grid",
+      "name": null,
+      "rowsInDom": 19,
+      "rowindexMin": 0,
+      "ariaSelectedOnRows": false,
+      "tabStops": 1,
+      "handleFocusable": false
+    },
+    "keyboard": {
+      "tabIn": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "arrowDown": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 2TA-2In progressFinn Fisc",
+        "inWidget": true
+      },
+      "arrowUp": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "anyKeyReorders": false,
+      "afterKeys": {
+        "tag": "body",
+        "role": null,
+        "text": "Backlog: SVAR DataGrid Drag a ",
+        "inWidget": false
+      },
+      "tabOut": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 5TA-5To do",
+        "inWidget": true
+      }
+    },
+    "licenseNotice": 0,
+    "errors": [],
+    "theme_light": {
+      "tokensResolved": 36,
+      "unmapped": {}
+    },
+    "axe_light_selected": [
+      "aria-valid-attr-value (critical, 1 nodes)"
+    ],
+    "theme_dark": {
+      "tokensResolved": 38,
+      "unmapped": {}
+    },
+    "axe_dark_selected": [
+      "aria-valid-attr-value (critical, 1 nodes)"
+    ],
+    "menuMoveAllowed": {
+      "first5": [
+        1,
+        2,
+        4,
+        3,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "focusAfter": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragAllowed": {
+      "first6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "events": [
+        "2 after 3 (in progress)",
+        "2 after 4 (in progress)",
+        "2 after 5 (in progress)",
+        "2 undefined 5"
+      ]
+    },
+    "menuMoveDenied": {
+      "first5": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "focusAfter": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragDenied": {
+      "first6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "events": [
+        "2 after 3 (in progress)",
+        "2 after 4 (in progress)",
+        "2 after 5 (in progress)",
+        "2 undefined 5"
+      ]
+    },
+    "rowsInDomAtCap": 19,
+    "moveMsAtCap": 47,
+    "renderMsAtCap": 135
+  },
+  "svar_fixed": {
+    "renderMs": 122,
+    "semantics": {
+      "role": "grid",
+      "name": null,
+      "rowsInDom": 19,
+      "rowindexMin": 0,
+      "ariaSelectedOnRows": false,
+      "tabStops": 1,
+      "handleFocusable": false
+    },
+    "keyboard": {
+      "tabIn": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "arrowDown": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 2TA-2In progressFinn Fisc",
+        "inWidget": true
+      },
+      "arrowUp": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "anyKeyReorders": false,
+      "afterKeys": {
+        "tag": "body",
+        "role": null,
+        "text": "Backlog: SVAR DataGrid Drag a ",
+        "inWidget": false
+      },
+      "tabOut": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 5TA-5To do",
+        "inWidget": true
+      }
+    },
+    "licenseNotice": 0,
+    "errors": [],
+    "theme_light": {
+      "tokensResolved": 36,
+      "unmapped": {}
+    },
+    "axe_light_selected": [
+      "aria-valid-attr-value (critical, 1 nodes)"
+    ],
+    "theme_dark": {
+      "tokensResolved": 38,
+      "unmapped": {}
+    },
+    "axe_dark_selected": [
+      "aria-valid-attr-value (critical, 1 nodes)"
+    ],
+    "menuMoveAllowed": {
+      "first5": [
+        1,
+        2,
+        4,
+        3,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "focusAfter": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragAllowed": {
+      "first6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "events": [
+        "2 after 3 (in progress)",
+        "2 after 4 (in progress)",
+        "2 after 5 (in progress)",
+        "2 undefined 5"
+      ]
+    },
+    "menuMoveDenied": {
+      "first5": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "focusAfter": {
+        "tag": "div",
+        "role": "gridcell",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragDenied": {
+      "first6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "events": [
+        "2 after 3 (in progress)",
+        "2 after 4 (in progress)",
+        "2 after 5 (in progress)",
+        "2 undefined 5"
+      ]
+    },
+    "rowsInDomAtCap": 19,
+    "moveMsAtCap": 46,
+    "renderMsAtCap": 129
+  },
+  "prime": {
+    "renderMs": 1059,
+    "semantics": {
+      "role": "table",
+      "name": "Backlog",
+      "rowsInDom": 500,
+      "rowindexMin": null,
+      "ariaSelectedOnRows": true,
+      "tabStops": 1,
+      "handleFocusable": false
+    },
+    "keyboard": {
+      "tabIn": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "arrowDown": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 2TA-2In progressFinn Fisc",
+        "inWidget": true
+      },
+      "arrowUp": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "anyKeyReorders": false,
+      "afterKeys": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 4TA-4DoneCasey Cole",
+        "inWidget": true
+      },
+      "tabOut": {
+        "tag": "body",
+        "role": null,
+        "text": "Backlog: PrimeVue DataTable Dr",
+        "inWidget": false
+      }
+    },
+    "licenseNotice": 0,
+    "errors": [],
+    "theme_light": {
+      "tokensResolved": 36,
+      "unmapped": {}
+    },
+    "axe_light_selected": [
+      "empty-table-header (minor, 1 nodes)"
+    ],
+    "theme_dark": {
+      "tokensResolved": 38,
+      "unmapped": {
+        "border-bottom-color: rgb(39, 39, 42)": "th.p-datatable-header-cell"
+      }
+    },
+    "axe_dark_selected": [
+      "empty-table-header (minor, 1 nodes)"
+    ],
+    "menuMoveAllowed": {
+      "first5": [
+        1,
+        2,
+        4,
+        3,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "focusAfter": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragAllowed": {
+      "first6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "events": [
+        "2 1 -> 4"
+      ]
+    },
+    "menuMoveDenied": {
+      "first5": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "focusAfter": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragDenied": {
+      "first6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "events": [
+        "2 1 -> 4"
+      ]
+    },
+    "rowsInDomAtCap": 2000,
+    "moveMsAtCap": 65,
+    "renderMsAtCap": 3495
+  },
+  "prime_fixed": {
+    "renderMs": 196,
+    "semantics": {
+      "role": "table",
+      "name": "Backlog",
+      "rowsInDom": 32,
+      "rowindexMin": null,
+      "ariaSelectedOnRows": true,
+      "tabStops": 2,
+      "handleFocusable": false
+    },
+    "keyboard": {
+      "tabIn": {
+        "tag": "div",
+        "role": null,
+        "text": "ReorderTitleIDStatusAssigneeTa",
+        "inWidget": false
+      },
+      "secondTab": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "arrowDown": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 2TA-2In progressFinn Fisc",
+        "inWidget": true
+      },
+      "arrowUp": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 1TA-1To doBen Brooks",
+        "inWidget": true
+      },
+      "anyKeyReorders": false,
+      "afterKeys": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 4TA-4DoneCasey Cole",
+        "inWidget": true
+      },
+      "tabOut": {
+        "tag": "body",
+        "role": null,
+        "text": "Backlog: PrimeVue DataTable Dr",
+        "inWidget": false
+      }
+    },
+    "licenseNotice": 0,
+    "errors": [],
+    "theme_light": {
+      "tokensResolved": 36,
+      "unmapped": {}
+    },
+    "axe_light_selected": [],
+    "theme_dark": {
+      "tokensResolved": 38,
+      "unmapped": {}
+    },
+    "axe_dark_selected": [],
+    "menuMoveAllowed": {
+      "first5": [
+        1,
+        2,
+        4,
+        3,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "focusAfter": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragAllowed": {
+      "first6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "events": [
+        "2 1 -> 4"
+      ]
+    },
+    "menuMoveDenied": {
+      "first5": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "focusAfter": {
+        "tag": "tr",
+        "role": "row",
+        "text": "Task 3TA-3In reviewSam Silva",
+        "inWidget": true
+      }
+    },
+    "dragDenied": {
+      "first6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "The server refused the move; the backlog is unchanged.",
+      "events": [
+        "2 1 -> 4"
+      ]
+    },
+    "rowsInDomAtCap": 32,
+    "moveMsAtCap": 58,
+    "renderMsAtCap": 206
+  },
+  "prime_virtual": {
+    "rowsInDomAtCap": 32,
+    "dragAllowed": {
+      "first6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenFirst6": [
+        1,
+        3,
+        4,
+        5,
+        2,
+        6
+      ],
+      "screenEqualsData": true,
+      "message": "",
+      "events": [
+        "2 1 -> 4"
+      ]
+    },
+    "axe": [
+      "empty-table-header (minor, 1 nodes)"
+    ],
+    "renderMsAtCap": 197,
+    "moveMsAtCap": 59
+  }
+}

@@ -2,6 +2,7 @@
 // Account settings (design-doc §4): your profile, the System / Light / Dark theme (UI-TOK-2,
 // DL-164: applied as soon as it's chosen), a link to change your password, its own page
 // (DL-137), and your sessions (DL-298).
+import { BUTTON_BASE, VARIANTS } from '@/components/Button.vue'
 import { computed } from 'vue'
 
 import PageHeader from '@/components/PageHeader.vue'
@@ -47,7 +48,10 @@ const THEMES: { value: ThemeChoice; label: string }[] = [
     <section aria-labelledby="password-heading" class="flex flex-col gap-4">
       <h2 id="password-heading" class="m-0 text-lg font-semibold">Password</h2>
       <p class="m-0 text-text-muted">Changing it signs you out everywhere else.</p>
-      <RouterLink :to="{ name: 'account-password' }" class="self-start font-medium"
+      <!-- A link, since it goes to its own page, drawn as a secondary button (owner, S2 feedback). -->
+      <RouterLink
+        :to="{ name: 'account-password' }"
+        :class="[BUTTON_BASE, VARIANTS.secondary, 'self-start']"
         >Change password</RouterLink
       >
     </section>

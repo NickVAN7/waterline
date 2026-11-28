@@ -15,15 +15,37 @@ type Schemas = components['schemas']
 type Section<T> = { available: boolean; items: T[]; total: number }
 type Projects = Section<Schemas['MyProjectItem']>
 type Approvals = Section<Schemas['ApprovalWorkItem']>
-type Decisions = Section<Schemas['DecisionWorkItem']>
 const none = <T>(): Section<T> => ({ available: true, items: [], total: 0 })
 const UNAVAILABLE = { available: false, items: [], total: 0 }
+type Org = Schemas['OrgWork']
+/** An org's section: these open projects, with no hidden ones unless given (DL-359). */
+const orgWork = (projects: Projects, overrides: Partial<Org> = {}): Org => ({
+  id: '0190f0a0-0000-7000-8000-0000000000a1',
+  slug: 'acme',
+  name: 'Acme Manufacturing',
+  projects: projects.items,
+  total: projects.total,
+  hidden: [],
+  hidden_total: 0,
+  listed_total: projects.total,
+  ...overrides,
+})
+/** My work's answer; `projects` are one org's open projects, or the section unavailable. */
 const work = (
-  projects: Projects,
+  projects: Projects | Section<Org>,
   approvals: Approvals = none(),
-  decisions: Decisions = none(),
   favorites: Projects = none(),
-) => ok({ sections: { favorites, projects, approvals, decisions } })
+) => {
+  const organizations =
+    'items' in projects && projects.items.length && 'slug' in projects.items[0]!
+      ? (projects as Section<Org>)
+      : !projects.available
+        ? UNAVAILABLE
+        : projects.total
+          ? { available: true, items: [orgWork(projects as Projects)], total: 1 }
+          : none()
+  return ok({ sections: { favorites, organizations, approvals } })
+}
 const NETWORK = failed(503, { code: 'network_error', message: '', details: {} })
 
 const approval = (overrides: Partial<Schemas['ApprovalWorkItem']> = {}) => ({
@@ -38,21 +60,6 @@ const approval = (overrides: Partial<Schemas['ApprovalWorkItem']> = {}) => ({
   revision_number: 2,
   project_key: 'ERP',
   project_name: 'ERP rollout',
-  organization_slug: 'acme',
-  ...overrides,
-})
-const decision = (overrides: Partial<Schemas['DecisionWorkItem']> = {}) => ({
-  request_id: '0190f0a0-0000-7000-8000-00000000d001',
-  decision: 'approved' as const,
-  decided_at: '2026-10-06T12:00:00Z',
-  comment: null,
-  request_status: 'approved' as const,
-  entity_type: 'requirement' as const,
-  entity_number: 9,
-  title: 'Refund by card',
-  revision_number: 1,
-  project_key: 'PORTAL',
-  project_name: 'Customer portal',
   organization_slug: 'acme',
   ...overrides,
 })
@@ -111,28 +118,39 @@ describe('MyWorkView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
-  it("shows each project's org and the user's access, with the status last (DL-153)", async () => {
+  it("shows each project's key, the user's access, and its status, in compact rows (DL-153, DL-334)", async () => {
     vi.spyOn(client, 'GET').mockResolvedValue(
-      work({
-        available: true,
-        items: [
-          projectItem('ERP', { organization_name: 'Bolt Foods', my_access: 'viewer' }),
-          projectItem('PORTAL', { my_access: 'inherited_admin' }),
-        ],
-        total: 2,
-      }),
+      work(
+        {
+          available: true,
+          items: [
+            projectItem('ERP', { my_access: 'viewer' }),
+            projectItem('PORTAL', { my_access: 'inherited_admin', status: 'on_hold' }),
+          ],
+          total: 2,
+        },
+        none(),
+        {
+          available: true,
+          items: [projectItem('ERP', { organization_name: 'Bolt Foods' })],
+          total: 1,
+        },
+      ),
     )
 
     const wrapper = await mountView()
 
     const rows = section(wrapper, 'projects').findAll('li')
-    expect(rows.map((li) => li.findAll(':scope > span').map((s) => s.text()))).toEqual([
-      ['ERP', 'Organization: Bolt Foods', 'Your access: Viewer', 'Active'],
-      ['PORTAL', 'Organization: Acme Manufacturing', 'Your access: Admin (inherited)', 'Active'],
+    // Each row: the star's place, the name, the key, the access, then the status at the end.
+    expect(rows.map((li) => li.findAll(':scope > *').map((part) => part.text()))).toEqual([
+      ['', 'ERP project', 'ERP', 'Your access: Viewer', 'Active'],
+      ['', 'PORTAL project', 'PORTAL', 'Your access: Admin (inherited)', 'On hold'],
     ])
-    // Right-aligned (DL-137): the badge takes the row's free space before it.
-    expect(rows[0]!.findAll(':scope > span').at(-1)!.classes()).toContain('ml-auto')
-    expect(rows[0]!.text()).not.toContain('Software')
+    expect(rows[0]!.findAll(':scope > *').at(-1)!.classes()).toContain('ml-auto')
+    // One bordered list; the org only in Favorites, the one cross-org list (DL-332).
+    expect(section(wrapper, 'projects').findAll('ul')).toHaveLength(1)
+    expect(section(wrapper, 'favorites').get('li').text()).toContain('Organization: Bolt Foods')
+    expect(rows[0]!.text()).not.toContain('Organization')
   })
 
   it('lists the approvals waiting for the user, each opening its requirement (DL-236)', async () => {
@@ -170,48 +188,8 @@ describe('MyWorkView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
-  it('lists the past decisions, each opening its requirement, with the request now (DL-286)', async () => {
-    vi.spyOn(client, 'GET').mockResolvedValue(
-      work(ONE_PROJECT, none(), {
-        available: true,
-        items: [
-          decision({ decision: 'rejected', request_status: 'rejected', comment: 'Missing VAT' }),
-          decision({
-            request_id: 'x2',
-            entity_number: 4,
-            title: 'Card refunds',
-            request_status: 'cancelled',
-          }),
-        ],
-        total: 2,
-      }),
-    )
-
-    const wrapper = await mountView()
-
-    const decisions = section(wrapper, 'decisions')
-    expect(decisions.get('h2').text()).toBe('My past decisions')
-    expect(decisions.findAll('li a').map((a) => [a.text(), a.attributes('href')])).toEqual([
-      ['Refund by card', '/acme/projects/PORTAL/requirements/9'],
-      ['Card refunds', '/acme/projects/PORTAL/requirements/4'],
-    ])
-    const [rejected, approved] = decisions.findAll('li')
-    expect(rejected!.text()).toContain('Your decision: Rejected')
-    expect(rejected!.findAll('p').map((p) => p.text())).toEqual([
-      'Decided on Oct 6, 2026. Request: Rejected',
-      'Your comment: Missing VAT',
-    ])
-    expect(approved!.text()).toContain('Your decision: Approved')
-    expect(approved!.findAll('p').map((p) => p.text())).toEqual([
-      'Decided on Oct 6, 2026. Request: Cancelled',
-    ])
-    await expectNoA11yViolations(wrapper)
-  })
-
   it('still lists the other sections when one is unavailable, with its own error (TD-40)', async () => {
-    vi.spyOn(client, 'GET').mockResolvedValue(
-      work(ONE_PROJECT, UNAVAILABLE, { available: true, items: [decision()], total: 1 }),
-    )
+    vi.spyOn(client, 'GET').mockResolvedValue(work(ONE_PROJECT, UNAVAILABLE))
 
     const wrapper = await mountView()
 
@@ -221,11 +199,6 @@ describe('MyWorkView', () => {
         .map((a) => a.text()),
     ).toEqual(['ERP project'])
     expect(section(wrapper, 'approvals').text()).toContain("Couldn't load your approvals")
-    expect(
-      section(wrapper, 'decisions')
-        .findAll('li a')
-        .map((a) => a.text()),
-    ).toEqual(['Refund by card'])
     expect(wrapper.findAll('button').filter((b) => b.text() === 'Try again')).toHaveLength(1)
   })
 
@@ -261,7 +234,6 @@ describe('MyWorkView', () => {
       'true',
       'true',
       'true',
-      'true',
     ])
     expect(wrapper.get('p.sr-only[aria-live=polite]').text()).toBe('Loading your work…')
   })
@@ -269,7 +241,6 @@ describe('MyWorkView', () => {
   it.each([
     ['projects', 'No projects yet'],
     ['approvals', 'Nothing to decide'],
-    ['decisions', 'No decisions yet'],
   ])('has an empty state for %s', async (id, heading) => {
     vi.spyOn(client, 'GET').mockResolvedValue(work({ available: true, items: [], total: 0 }))
 
@@ -283,17 +254,12 @@ describe('MyWorkView', () => {
     [
       'projects',
       work({ available: true, items: [projectItem('ERP')], total: 14 }),
-      'Showing 1 of 14 projects.',
+      'Showing 1 of 14',
     ],
     [
       'approvals',
       work(ONE_PROJECT, { available: true, items: [approval()], total: 14 }),
       'Showing the 1 oldest of 14 approvals.',
-    ],
-    [
-      'decisions',
-      work(ONE_PROJECT, none(), { available: true, items: [decision()], total: 14 }),
-      'Showing the 1 newest of 14 decisions.',
     ],
   ])(
     'says how many %s it shows when there are more than the first items',
@@ -320,9 +286,9 @@ describe('MyWorkView', () => {
     ['the request fails', NETWORK, "Couldn't load your work"],
     ['the projects are unavailable', work(UNAVAILABLE), "Couldn't load your projects"],
     [
-      'the decisions are unavailable',
+      'the favorites are unavailable',
       work(ONE_PROJECT, none(), UNAVAILABLE),
-      "Couldn't load your past decisions",
+      "Couldn't load your favorite projects",
     ],
   ])(
     'announces a failed Try again as a new alert, focus staying on Try again, when %s',
@@ -380,16 +346,16 @@ describe('MyWorkView', () => {
     vi.spyOn(client, 'GET').mockResolvedValue(work(ONE_PROJECT, UNAVAILABLE, UNAVAILABLE))
     const wrapper = await mountView()
 
-    await section(wrapper, 'decisions')
+    await section(wrapper, 'favorites')
       .findAll('button')
       .find((b) => b.text() === 'Try again')!
       .trigger('click')
     await flushPromises()
 
     expect(wrapper.findAll('[role=alert]').map((a) => a.text())).toEqual([
-      expect.stringContaining("Couldn't load your past decisions"),
+      expect.stringContaining("Couldn't load your favorite projects"),
     ])
-    expect(section(wrapper, 'decisions').element.contains(document.activeElement)).toBe(true)
+    expect(section(wrapper, 'favorites').element.contains(document.activeElement)).toBe(true)
   })
 
   it.each([
@@ -429,7 +395,7 @@ describe('MyWorkView', () => {
 
     it('lists the favorites first, each starred, and stars only where the server allows it', async () => {
       vi.spyOn(client, 'GET').mockResolvedValue(
-        work(listOf(erp, portal, plain), none(), none(), listOf(erp)),
+        work(listOf(erp, portal, plain), none(), listOf(erp)),
       )
 
       const wrapper = await mountView()
@@ -451,18 +417,18 @@ describe('MyWorkView', () => {
 
       expect(section(wrapper, 'favorites').text()).toContain('No favorite projects')
       expect(section(wrapper, 'favorites').text()).toContain(
-        'Star a project under Projects to keep it here, at the top.',
+        'Star a project below to keep it here, at the top.',
       )
     })
 
     it('stars a project, says so, reloads, and keeps focus on its star', async () => {
       const get = vi
         .spyOn(client, 'GET')
-        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+        .mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       const put = vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
       const wrapper = await mountView()
       const starred = { ...portal, is_favorite: true }
-      get.mockResolvedValue(work(listOf(erp, starred), none(), none(), listOf(starred, erp)))
+      get.mockResolvedValue(work(listOf(erp, starred), none(), listOf(starred, erp)))
 
       ;(star(wrapper, 'projects', 'Customer portal').element as HTMLElement).focus()
       await star(wrapper, 'projects', 'Customer portal').trigger('click')
@@ -480,7 +446,7 @@ describe('MyWorkView', () => {
     it('unstars from the favorites, and focus goes to the star now in its place, or the h1', async () => {
       const get = vi
         .spyOn(client, 'GET')
-        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+        .mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(noContent())
       const wrapper = await mountView()
       get.mockResolvedValue(work(listOf({ ...erp, is_favorite: false }, portal)))
@@ -496,9 +462,7 @@ describe('MyWorkView', () => {
     })
 
     it('says a failed change in an alert that takes focus, and its dismiss returns to the star', async () => {
-      vi.spyOn(client, 'GET').mockResolvedValue(
-        work(listOf(erp, portal), none(), none(), listOf(erp)),
-      )
+      vi.spyOn(client, 'GET').mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       vi.spyOn(client, 'PUT').mockResolvedValue(
         failed(500, { code: 'internal_error', message: '', details: {} }),
       )
@@ -520,12 +484,12 @@ describe('MyWorkView', () => {
 
     it('moves focus to the star now in its place when an unstarred favorite leaves the list', async () => {
       const both = listOf(erp, { ...portal, is_favorite: true })
-      const get = vi.spyOn(client, 'GET').mockResolvedValue(work(both, none(), none(), both))
+      const get = vi.spyOn(client, 'GET').mockResolvedValue(work(both, none(), both))
       vi.spyOn(client, 'DELETE').mockResolvedValue(noContent())
       const wrapper = await mountView()
       const left = { ...portal, is_favorite: true }
       get.mockResolvedValue(
-        work(listOf({ ...erp, is_favorite: false }, left), none(), none(), listOf(left)),
+        work(listOf({ ...erp, is_favorite: false }, left), none(), listOf(left)),
       )
 
       await star(wrapper, 'favorites', 'ERP rollout').trigger('click')
@@ -535,9 +499,7 @@ describe('MyWorkView', () => {
     })
 
     it('ignores a second press while the first is being sent', async () => {
-      vi.spyOn(client, 'GET').mockResolvedValue(
-        work(listOf(erp, portal), none(), none(), listOf(erp)),
-      )
+      vi.spyOn(client, 'GET').mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       let answer: (value: unknown) => void = () => {}
       const put = vi
         .spyOn(client, 'PUT')
@@ -553,9 +515,7 @@ describe('MyWorkView', () => {
     })
 
     it('says a refused change in its own words (a 403: archived or access lost)', async () => {
-      vi.spyOn(client, 'GET').mockResolvedValue(
-        work(listOf(erp, portal), none(), none(), listOf(erp)),
-      )
+      vi.spyOn(client, 'GET').mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       vi.spyOn(client, 'PUT').mockResolvedValue(
         failed(403, { code: 'forbidden', message: '', details: {} }),
       )
@@ -572,7 +532,7 @@ describe('MyWorkView', () => {
     it('makes the page error the one live alert when the reload after a star fails', async () => {
       const get = vi
         .spyOn(client, 'GET')
-        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+        .mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
       const wrapper = await mountView()
       get.mockResolvedValue(failed(500, { code: 'internal_error', message: '', details: {} }))
@@ -587,10 +547,10 @@ describe('MyWorkView', () => {
     it("leaves a section's first error quiet after a star, so the star keeps focus (UI-FBK-15)", async () => {
       const get = vi
         .spyOn(client, 'GET')
-        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+        .mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
       const wrapper = await mountView()
-      get.mockResolvedValue(work(listOf(erp, portal), UNAVAILABLE, none(), listOf(erp)))
+      get.mockResolvedValue(work(listOf(erp, portal), UNAVAILABLE, listOf(erp)))
 
       await star(wrapper, 'projects', 'Customer portal').trigger('click')
       await flushPromises()
@@ -602,7 +562,7 @@ describe('MyWorkView', () => {
     it('stays pending through the reload: no star change is sent until it ends', async () => {
       const get = vi
         .spyOn(client, 'GET')
-        .mockResolvedValue(work(listOf(erp, portal), none(), none(), listOf(erp)))
+        .mockResolvedValue(work(listOf(erp, portal), none(), listOf(erp)))
       const put = vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(noContent())
       const wrapper = await mountView()
@@ -613,10 +573,197 @@ describe('MyWorkView', () => {
       await flushPromises()
       await star(wrapper, 'projects', 'Customer portal').trigger('click')
       await star(wrapper, 'projects', 'ERP rollout').trigger('click')
-      reloaded(work(listOf(erp, portal), none(), none(), listOf(erp)))
+      reloaded(work(listOf(erp, portal), none(), listOf(erp)))
       await flushPromises()
 
       expect([put.mock.calls.length, del.mock.calls.length]).toEqual([1, 0])
+    })
+  })
+
+  describe('organizations (DL-329, DL-330, DL-349, DL-359)', () => {
+    const list = (...items: Schemas['MyProjectItem'][]) => ({
+      available: true,
+      items,
+      total: items.length,
+    })
+    const orgs = (...items: Org[]) => ({ available: true, items, total: items.length })
+    const BOLT = { id: '0190f0a0-0000-7000-8000-0000000000b2', slug: 'bolt', name: 'Bolt Foods' }
+
+    it('gives each org its own section, headed by its name with how many of its projects you can open', async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(
+          orgs(
+            orgWork(list(projectItem('ERP')), { hidden_total: 2 }),
+            orgWork(list(projectItem('FIN', { organization_slug: 'bolt' })), BOLT),
+          ),
+        ),
+      )
+
+      const wrapper = await mountView()
+
+      expect(section(wrapper, 'org-acme').get('h2').text()).toBe('Acme Manufacturing')
+      expect(section(wrapper, 'org-acme').text()).toContain('3 projects')
+      expect(section(wrapper, 'org-bolt').get('h2').text()).toBe('Bolt Foods')
+      expect(section(wrapper, 'org-bolt').text()).toContain('1 project')
+      expect(wrapper.find('section[aria-labelledby="projects-heading"]').exists()).toBe(false)
+      // Every project of every org, the hidden ones included.
+      expect(wrapper.get('p.sr-only[aria-live=polite]').text()).toBe(
+        '4 projects, 0 approvals waiting for you',
+      )
+      await expectNoA11yViolations(wrapper)
+    })
+
+    it("links to the org's list, counted as that list counts (all but the archived)", async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(orgs(orgWork(list(projectItem('ERP')), { total: 12, listed_total: 14 }))),
+      )
+
+      const wrapper = await mountView()
+
+      const all = section(wrapper, 'projects').get('a[href="/acme/projects"]')
+      expect(all.text()).toBe('All 14 projects')
+      expect(section(wrapper, 'projects').text()).toContain('Showing 1 of 12')
+    })
+
+    it('keeps the hidden projects behind a toggle that says how many, and shows them on demand', async () => {
+      const archived = projectItem('OLD', {
+        name: 'Old rollout',
+        status: 'completed',
+        archived: true,
+      })
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(
+          orgs(
+            orgWork(list(projectItem('ERP')), {
+              hidden: [projectItem('DONE', { status: 'completed' }), archived],
+              hidden_total: 12,
+            }),
+          ),
+        ),
+      )
+      const wrapper = await mountView()
+      const toggle = section(wrapper, 'projects')
+        .findAll('button')
+        .find((b) => b.text().includes('hidden'))!
+      const hidden = wrapper.get(`#${toggle.attributes('aria-controls')}`)
+      expect(toggle.text()).toBe('Show 12 hidden projects')
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(hidden.isVisible()).toBe(false)
+
+      await toggle.trigger('click')
+
+      expect(toggle.text()).toBe('Hide 12 hidden projects')
+      expect(toggle.attributes('aria-expanded')).toBe('true')
+      expect(hidden.isVisible()).toBe(true)
+      expect(hidden.findAll('li a').map((a) => a.text())).toEqual(['DONE project', 'Old rollout'])
+      // An archived one says so, beside its status (DL-330).
+      expect(hidden.findAll('li')[1]!.text()).toContain('Archived')
+      expect(hidden.findAll('li')[0]!.text()).not.toContain('Archived')
+      expect(hidden.text()).toContain('Showing 2 of 12 hidden projects')
+      await expectNoA11yViolations(wrapper)
+    })
+
+    it('shows only the toggle for an org whose projects are all hidden', async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(
+          orgs(
+            orgWork(list(), {
+              hidden: [projectItem('DONE', { status: 'cancelled' })],
+              hidden_total: 1,
+              listed_total: 1,
+            }),
+          ),
+        ),
+      )
+
+      const wrapper = await mountView()
+
+      const projects = section(wrapper, 'projects')
+      expect(projects.text()).toContain('Show 1 hidden project')
+      expect(projects.findAll('li').filter((li) => li.isVisible())).toHaveLength(0)
+      expect(projects.text()).not.toContain('No projects yet')
+      // Its list shows the cancelled one, so the link stays: only none listed takes it away.
+      expect(projects.get('a[href="/acme/projects"]').text()).toBe('All 1 project')
+    })
+
+    it("has no All link when the org's list would show nothing: every project there is archived", async () => {
+      vi.spyOn(client, 'GET').mockResolvedValue(
+        work(
+          orgs(
+            orgWork(list(), {
+              hidden: [projectItem('OLD', { archived: true })],
+              hidden_total: 1,
+              listed_total: 0,
+            }),
+          ),
+        ),
+      )
+
+      const wrapper = await mountView()
+
+      expect(section(wrapper, 'projects').find('a[href="/acme/projects"]').exists()).toBe(false)
+    })
+
+    it('keeps focus on a star pressed in the hidden list, the list still open after the reload', async () => {
+      const done = projectItem('DONE', {
+        name: 'Done project',
+        status: 'completed',
+        allowed_actions: ['project.favorite'],
+      })
+      const answer = (favorite: boolean) =>
+        work(
+          orgs(
+            orgWork(list(projectItem('ERP', { allowed_actions: ['project.favorite'] })), {
+              hidden: [{ ...done, is_favorite: favorite }],
+              hidden_total: 1,
+            }),
+          ),
+        )
+      const get = vi.spyOn(client, 'GET').mockResolvedValue(answer(false))
+      vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      await section(wrapper, 'projects')
+        .findAll('button')
+        .find((b) => b.text().includes('hidden'))!
+        .trigger('click')
+      get.mockResolvedValue(answer(true))
+      const star = () =>
+        section(wrapper, 'projects').get('button[aria-label="Favorite Done project"]')
+
+      ;(star().element as HTMLElement).focus()
+      await star().trigger('click')
+      await flushPromises()
+
+      expect(star().attributes('aria-pressed')).toBe('true')
+      expect(star().isVisible()).toBe(true)
+      expect(document.activeElement).toBe(star().element)
+    })
+
+    it("keeps focus on a star pressed in a second org's list after the reload", async () => {
+      const fin = projectItem('FIN', {
+        name: 'Finance',
+        organization_slug: 'bolt',
+        allowed_actions: ['project.favorite'],
+      })
+      const answer = (favorite: boolean) =>
+        work(
+          orgs(
+            orgWork(list(projectItem('ERP'))),
+            orgWork(list({ ...fin, is_favorite: favorite }), BOLT),
+          ),
+        )
+      const get = vi.spyOn(client, 'GET').mockResolvedValue(answer(false))
+      vi.spyOn(client, 'PUT').mockResolvedValue(noContent())
+      const wrapper = await mountView()
+      get.mockResolvedValue(answer(true))
+      const star = () => section(wrapper, 'org-bolt').get('button[aria-label="Favorite Finance"]')
+
+      ;(star().element as HTMLElement).focus()
+      await star().trigger('click')
+      await flushPromises()
+
+      expect(star().attributes('aria-pressed')).toBe('true')
+      expect(document.activeElement).toBe(star().element)
     })
   })
 })

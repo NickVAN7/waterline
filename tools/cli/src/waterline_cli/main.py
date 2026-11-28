@@ -13,7 +13,7 @@ import typer
 from waterline_cli import mutation, steps
 from waterline_cli.audit import ALLOWLIST, AllowlistError, load_allowlist, uv_ignores
 from waterline_cli.doctor import CHECKS, Status, run_checks
-from waterline_cli.review_copy import CopyError, describe, make_copy
+from waterline_cli.review_copy import CopyError, describe, discard, make_copy
 from waterline_cli.runner import Step, find_repo_root, run_steps
 
 app = typer.Typer(
@@ -25,6 +25,8 @@ backend = typer.Typer(help="Commands for the backend only.", no_args_is_help=Tru
 app.add_typer(backend, name="backend")
 frontend = typer.Typer(help="Commands for the frontend only.", no_args_is_help=True)
 app.add_typer(frontend, name="frontend")
+cli = typer.Typer(help="Commands for the developer CLI and the hooks only.", no_args_is_help=True)
+app.add_typer(cli, name="cli")
 
 DryRun = Annotated[
     bool, typer.Option("--dry-run", help="Print the underlying commands instead of running them.")
@@ -65,9 +67,9 @@ def _audit_steps() -> list[Step]:
     return steps.audit(uv_ignores(allowlist))
 
 
-def _run_e2e(extra: list[str], *, dry_run: bool) -> None:
+def _run_e2e(stack_steps: list[Step], *, dry_run: bool) -> None:
     try:
-        run_steps(steps.e2e(extra), dry_run=dry_run)
+        run_steps(stack_steps, dry_run=dry_run)
     finally:
         run_steps(steps.e2e_down(), dry_run=dry_run)
 
@@ -111,21 +113,32 @@ def check(
         dry_run=dry_run,
     )
     if full:
-        _run_e2e([], dry_run=dry_run)
+        _run_e2e(steps.e2e(), dry_run=dry_run)
 
 
 @app.command(context_settings=PASS_THROUGH)
 def e2e(ctx: typer.Context, dry_run: DryRun = False) -> None:
     """End-to-end tests: start an isolated stack seeded with the demo data, run Playwright
     (extra arguments go to it), and always tear the stack down."""
-    _run_e2e(ctx.args, dry_run=dry_run)
+    _run_e2e(steps.e2e(ctx.args), dry_run=dry_run)
+
+
+@app.command("docs-screenshots")
+def docs_screenshots(dry_run: DryRun = False) -> None:
+    """Regenerate the guide's screenshots, light and dark, in docs/user-guide/images/: start an
+    isolated stack seeded with the manual pass's data, take each shot, and always tear the stack
+    down."""
+    _run_e2e(steps.docs_screenshots(), dry_run=dry_run)
 
 
 @app.command("review-copy")
 def review_copy(
     dest: Annotated[Path, typer.Argument(help="A new or empty directory for the copy.")],
     with_env: Annotated[
-        bool, typer.Option("--with-env", help="Also copy .env (for running the tests).")
+        bool,
+        typer.Option(
+            "--with-env", help="Also copy .env, with a test database of the copy's own (DL-392)."
+        ),
     ] = False,
     dry_run: DryRun = False,
 ) -> None:
@@ -142,6 +155,26 @@ def review_copy(
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
     typer.echo(f"Copy ready at {dest} ({len(untracked)} untracked files copied).")
+
+
+@app.command("discard-copy")
+def discard_copy(
+    dest: Annotated[Path, typer.Argument(help="A copy made with `wl review-copy --with-env`.")],
+    dry_run: DryRun = False,
+) -> None:
+    """Drop a review copy's own test databases, then delete the copy (DL-392)."""
+    root = find_repo_root()
+    if dry_run:
+        drop = "uv run python -m tests.support.review_databases drop <the copy's>"
+        typer.echo(f"(cd {root / 'backend'} && {drop})")
+        typer.echo(f"delete {dest}")
+        return
+    try:
+        name = discard(root, dest)
+    except CopyError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"Dropped {name} and every database named after it; deleted {dest}.")
 
 
 @app.command()
@@ -251,6 +284,12 @@ def backend_lint(dry_run: DryRun = False) -> None:
 def backend_fmt(dry_run: DryRun = False) -> None:
     """Format backend code and apply safe lint fixes."""
     run_steps(steps.backend_fmt(), dry_run=dry_run)
+
+
+@cli.command("check")
+def cli_check(dry_run: DryRun = False) -> None:
+    """The repository's state, then the developer CLI's and the hooks' gates (CI's `cli` job)."""
+    run_steps(steps.cli_check(), dry_run=dry_run)
 
 
 @frontend.command("check")

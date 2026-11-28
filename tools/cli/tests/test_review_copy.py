@@ -1,7 +1,9 @@
 """`wl review-copy` (DL-29): a throwaway copy of the repository as it is about to be committed,
 built against real git repositories."""
 
+import re
 import subprocess
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
@@ -149,16 +151,156 @@ def test_with_env_also_copies_the_env_file(repo: Path, tmp_path: Path) -> None:
 
     review_copy.make_copy(repo, dest, with_env=True)
 
-    assert (dest / ".env").read_text() == "POSTGRES_PASSWORD=x\n"
+    # The repository's settings, and a test database of the copy's own (DL-392).
+    assert re.fullmatch(
+        r"POSTGRES_PASSWORD=x\nWATERLINE_TEST_DATABASE=waterline_test_[0-9a-f]{8}\n",
+        (dest / ".env").read_text(),
+    )
+    assert not (repo / ".env").read_text().count("WATERLINE_TEST_DATABASE")
 
 
-def test_with_env_and_no_env_file_copies_nothing_extra(repo: Path, tmp_path: Path) -> None:
+def test_each_copy_gets_a_test_database_of_its_own(repo: Path, tmp_path: Path) -> None:
+    for name in ("a", "b"):
+        review_copy.make_copy(repo, tmp_path / name, with_env=True)
+
+    names = {
+        review_copy.TEST_DATABASE.findall((tmp_path / n / ".env").read_text())[0] for n in "ab"
+    }
+    assert len(names) == 2
+
+
+def test_with_env_and_no_env_file_writes_only_the_test_database(repo: Path, tmp_path: Path) -> None:
     (repo / ".env").unlink()
     dest = tmp_path / "copy"
 
     review_copy.make_copy(repo, dest, with_env=True)
 
-    assert not (dest / ".env").exists()
+    assert re.fullmatch(
+        r"WATERLINE_TEST_DATABASE=waterline_test_[0-9a-f]{8}\n", (dest / ".env").read_text()
+    )
+
+
+def test_without_env_no_env_file_is_written(repo: Path, tmp_path: Path) -> None:
+    review_copy.make_copy(repo, tmp_path / "copy", with_env=False)
+
+    assert not (tmp_path / "copy" / ".env").exists()
+
+
+# --- Discarding a copy: its test databases, then the copy (DL-392) ----------------------------
+
+
+@dataclass
+class Drop:
+    returncode: int = 0
+    stderr: str = ""
+    calls: list[tuple[list[str], Path]] = field(default_factory=list[tuple[list[str], Path]])
+
+    def __call__(self, cmd: list[str], *, cwd: Path, **_: object) -> "Drop":
+        self.calls.append((cmd, cwd))
+        return self
+
+
+def a_copy(
+    tmp_path: Path, env: str | None = "WATERLINE_TEST_DATABASE=waterline_test_3fa9c1d2\n"
+) -> Path:
+    dest = tmp_path / "copy"
+    dest.mkdir()
+    (dest / "file").write_text("x")
+    if env is not None:
+        (dest / ".env").write_text(f"POSTGRES_DB=waterline\n{env}")
+    return dest
+
+
+def test_discarding_drops_the_copys_databases_from_the_backend_then_deletes_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    drop = Drop()
+    monkeypatch.setattr(review_copy.subprocess, "run", drop)
+    dest = a_copy(tmp_path)
+
+    assert review_copy.discard(Path("/r"), dest) == "waterline_test_3fa9c1d2"
+    assert drop.calls == [
+        (
+            [
+                "uv",
+                "run",
+                "python",
+                "-m",
+                "tests.support.review_databases",
+                "drop",
+                "waterline_test_3fa9c1d2",
+            ],
+            Path("/r/backend"),
+        )
+    ]
+    assert not dest.exists()
+
+
+@pytest.mark.parametrize("env", [None, "", "WATERLINE_TEST_DATABASE=waterline_test\n"])
+def test_a_directory_that_isnt_a_with_env_copy_is_left_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, env: str | None
+) -> None:
+    drop = Drop()
+    monkeypatch.setattr(review_copy.subprocess, "run", drop)
+    dest = a_copy(tmp_path, env)
+
+    with pytest.raises(review_copy.CopyError, match="isn't a `--with-env` review copy"):
+        review_copy.discard(Path("/r"), dest)
+    assert drop.calls == []
+    assert (dest / "file").exists()
+
+
+def test_a_failed_drop_keeps_the_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(review_copy.subprocess, "run", Drop(returncode=1, stderr="no Postgres\n"))
+    dest = a_copy(tmp_path)
+
+    with pytest.raises(
+        review_copy.CopyError, match="couldn't drop its test databases: no Postgres"
+    ):
+        review_copy.discard(Path("/r"), dest)
+    assert dest.exists()
+
+
+def test_uv_that_cannot_run_keeps_the_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def cannot(*_: object, **__: object) -> None:
+        raise OSError("no uv")
+
+    monkeypatch.setattr(review_copy.subprocess, "run", cannot)
+    dest = a_copy(tmp_path)
+
+    with pytest.raises(review_copy.CopyError, match="no uv"):
+        review_copy.discard(Path("/r"), dest)
+    assert dest.exists()
+
+
+def test_the_discard_command_reports_and_exits_1_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(main, "find_repo_root", lambda: Path("/r"))
+    monkeypatch.setattr(review_copy.subprocess, "run", Drop())
+
+    done = runner.invoke(main.app, ["discard-copy", str(a_copy(tmp_path))])
+    refused = runner.invoke(main.app, ["discard-copy", str(tmp_path)])
+
+    assert done.exit_code == 0, done.output
+    assert "Dropped waterline_test_3fa9c1d2" in done.output
+    assert refused.exit_code == 1
+
+
+def test_the_discard_command_dry_run_changes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(main, "find_repo_root", lambda: Path("/r"))
+    dest = a_copy(tmp_path)
+
+    result = runner.invoke(main.app, ["discard-copy", str(dest), "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.splitlines() == [
+        "(cd /r/backend && uv run python -m tests.support.review_databases drop <the copy's>)",
+        f"delete {dest}",
+    ]
+    assert dest.exists()
 
 
 def test_making_a_copy_never_changes_the_repository(repo: Path, tmp_path: Path) -> None:
@@ -263,6 +405,7 @@ def test_the_command_exits_1_when_the_copy_fails(
                 "copy each file listed by `git -C /r ls-files --others --exclude-standard` "
                 "into /work/c",
                 "copy /r/.env into /work/c (if it exists)",
+                "add WATERLINE_TEST_DATABASE=waterline_test_<8 hex> to /work/c/.env",
             ],
         ),
     ],

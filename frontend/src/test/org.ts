@@ -12,6 +12,7 @@ import OrgSettingsView from '@/views/org/OrgSettingsView.vue'
 
 import { ACME, me } from './api'
 import { mountSignedIn } from './workspace'
+import { withTrailRoutes } from '@/test/router'
 
 /** `ACME` (slug `acme`) with the org-level actions its admin page needs. */
 export function acme(allowed: Action[]) {
@@ -32,13 +33,13 @@ export async function mountOrgPages(path: string, allowed: Action[]) {
   useCurrentUserStore().me = me({ orgs: [acme(allowed)] })
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       // The 404 and 403 pages link to these.
       { path: '/', name: 'my-work', component: { template: '<p />' } },
       { path: '/status', name: 'status', component: { template: '<p />' } },
       { path: '/:orgSlug/members', name: 'org-members', component: OrgMembersView },
       { path: '/:orgSlug/settings', name: 'org-settings', component: OrgSettingsView },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(path)

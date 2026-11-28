@@ -4,14 +4,20 @@
 // read-only, whether they're a system admin (granted only through the CLI, design-doc §4), and the
 // account actions their row's `allowed_actions` allow. Accounts are created through the staff and
 // org flows, never here (DL-75). Active accounts only; the staff's admins get "Show
-// deactivated", kept in the URL (DL-293 to DL-295).
+// deactivated", kept in the URL (DL-293 to DL-295), last in the filter bar after its search
+// (DL-419); the list declares no other filter. The Actions column shows only when a row has an
+// action (TD-102).
 import { computed, ref, watch } from 'vue'
 
 import { api, client } from '@/api/client'
-import { ACTIVE, DEACTIVATED, USER, workspaceRoleText } from '@/app/labels'
+import { WORKSPACE_CRUMB } from '@/app/crumbs'
+import { ACTIVE, DEACTIVATED, orgMembershipText, USER, workspaceRoleText } from '@/app/labels'
 import { focusHeading, replacedPage, settlePage } from '@/app/routeFocus'
 import Badge from '@/components/Badge.vue'
+import Button from '@/components/Button.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import ErrorState from '@/components/ErrorState.vue'
+import FilterBar, { type FilterChanges } from '@/components/FilterBar.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import RowActions from '@/components/RowActions.vue'
@@ -23,6 +29,7 @@ import { useRefocusWhenGone, useShowDeactivated } from '@/composables/usePeopleL
 import { useLoad } from '@/composables/useLoad'
 import { useWorkspace } from '@/composables/useWorkspace'
 import { useCurrentUserStore } from '@/stores/currentUser'
+import { useRouter } from 'vue-router'
 import ForbiddenView from '@/views/errors/ForbiddenView.vue'
 import AccountActions from '@/views/user/AccountActions.vue'
 
@@ -30,12 +37,14 @@ import { WHO_TO_ASK } from './workspaceAdmin'
 
 const workspace = useWorkspace()
 const store = useCurrentUserStore()
-const list = useListQuery({ limit: 25, filters: ['include_deactivated'] as const })
+const router = useRouter()
+const list = useListQuery({ limit: 25, filters: ['include_deactivated', 'q'] as const })
 const canShowDeactivated = computed(() => allows(workspace.value, 'workspace_staff.manage'))
-const { show: showDeactivated, toggle: toggleDeactivated } = useShowDeactivated(
-  list,
-  () => canShowDeactivated.value,
-)
+const showDeactivated = useShowDeactivated(list, () => canShowDeactivated.value)
+const bar = ref<InstanceType<typeof FilterBar>>()
+function onFilter(changes: FilterChanges) {
+  void router.replace(list.filtered(changes))
+}
 const done = ref('')
 const account = ref<InstanceType<typeof AccountActions>>()
 
@@ -48,6 +57,7 @@ const page = useLoad(() =>
           limit: list.limit,
           offset: list.offset.value,
           sort: 'name',
+          ...(list.filter.value.q ? { q: list.filter.value.q } : {}),
           ...(showDeactivated.value ? { include_deactivated: true } : {}),
         },
       },
@@ -94,6 +104,14 @@ function actionsFor(user: UserRow) {
   )
 }
 
+// The Actions column, for the staff's admins always (so a search or a page never moves the
+// columns, S3-C0k), for anyone else only when a row on the page has an action (TD-102).
+const withActions = computed(
+  () =>
+    canShowDeactivated.value ||
+    (page.data.value?.items.some((user) => actionsFor(user).length > 0) ?? false),
+)
+
 async function finished(message: string) {
   done.value = message
   await page.run()
@@ -122,21 +140,22 @@ const announcement = computed(() => {
     :who-to-ask="WHO_TO_ASK"
   />
   <div v-else class="flex flex-col gap-6">
-    <PageHeader title="Users" />
+    <PageHeader title="Users" :crumbs="[WORKSPACE_CRUMB, { label: 'Users' }]" />
     <p class="m-0 text-text-muted">
       People join through Staff or an organization's members; their accounts are managed here.
     </p>
     <SuccessStatus :message="done" />
-    <label v-if="canShowDeactivated" class="flex items-center gap-2 self-start">
-      <input
-        id="show-deactivated"
-        type="checkbox"
-        class="size-(--target-min) shrink-0"
-        :checked="showDeactivated"
-        @change="toggleDeactivated"
-      />
-      <span>Show deactivated</span>
-    </label>
+    <FilterBar
+      ref="bar"
+      search-label="Search users"
+      :search="list.filter.value.q"
+      :toggle="
+        canShowDeactivated
+          ? { name: 'include_deactivated', label: 'Show deactivated', checked: showDeactivated }
+          : undefined
+      "
+      @change="onFilter"
+    />
     <section
       aria-labelledby="users-heading"
       :aria-busy="page.loading.value ? 'true' : 'false'"
@@ -152,9 +171,39 @@ const announcement = computed(() => {
         @retry="page.retry"
       />
       <Skeleton v-else-if="!page.data.value" />
+      <!-- Never empty unfiltered (it lists the user); a search can match no one (UI-FBK-8). -->
+      <EmptyState
+        v-else-if="!page.data.value.total && list.filter.value.q"
+        :heading="`No users match “${list.filter.value.q}”`"
+        :level="3"
+      >
+        Try another search, or clear it.
+        <template #action>
+          <Button variant="secondary" @click="bar?.clear()">Clear filters</Button>
+        </template>
+      </EmptyState>
       <template v-else>
-        <div role="region" aria-labelledby="users-heading" tabindex="0" class="overflow-x-auto">
-          <table ref="table" aria-labelledby="users-heading" class="w-full border-collapse text-sm">
+        <div
+          role="region"
+          aria-labelledby="users-heading"
+          tabindex="0"
+          class="relative overflow-x-auto"
+        >
+          <!-- Fixed widths, so showing the deactivated never moves the columns (owner, S3-C0k); its
+               minimum width scrolls it in its region on a narrow screen. -->
+          <table
+            ref="table"
+            aria-labelledby="users-heading"
+            class="w-full min-w-(--content-narrow) table-fixed border-collapse text-sm"
+          >
+            <colgroup>
+              <col class="w-1/6" />
+              <col class="w-1/5" />
+              <col class="w-1/8" />
+              <col />
+              <col class="w-36" />
+              <col v-if="withActions" class="w-16" />
+            </colgroup>
             <thead>
               <tr class="border-b border-border text-left">
                 <th scope="col" class="p-2">Name</th>
@@ -162,7 +211,9 @@ const announcement = computed(() => {
                 <th scope="col" class="p-2">Username</th>
                 <th scope="col" class="p-2">Role</th>
                 <th scope="col" class="p-2">Status</th>
-                <th scope="col" class="p-2"><span class="sr-only">Actions</span></th>
+                <th v-if="withActions" scope="col" class="p-2">
+                  <span class="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -171,12 +222,23 @@ const announcement = computed(() => {
                 :key="user.id"
                 class="border-b border-border-subtle"
               >
-                <td class="p-2">{{ user.name }}</td>
-                <td class="p-2">{{ user.email }}</td>
-                <td class="p-2 font-mono">{{ user.username }}</td>
+                <td class="p-2 break-words">{{ user.name }}</td>
+                <td class="p-2 break-words">{{ user.email }}</td>
+                <td class="p-2 font-mono break-words">{{ user.username }}</td>
                 <td class="p-2">
-                  <!-- The staff role and system admin as text, or "User" with neither (DL-188). -->
-                  {{ workspaceRoleText(user.workspace_role, user.is_system_admin, USER) }}
+                  <!-- The staff role and system admin, then each org the user belongs to (S3-C0k);
+                       "User" only with neither (DL-188). -->
+                  <p
+                    v-if="user.workspace_role || user.is_system_admin || !user.memberships.length"
+                    class="m-0"
+                  >
+                    {{ workspaceRoleText(user.workspace_role, user.is_system_admin, USER) }}
+                  </p>
+                  <ul v-if="user.memberships.length" class="m-0 list-none p-0 text-text-muted">
+                    <li v-for="m in user.memberships" :key="m.org_id">
+                      {{ orgMembershipText(m) }}
+                    </li>
+                  </ul>
                 </td>
                 <td class="p-2">
                   <Badge v-if="!user.is_active" :tone="DEACTIVATED.tone" :icon="DEACTIVATED.icon">{{
@@ -184,7 +246,7 @@ const announcement = computed(() => {
                   }}</Badge>
                   <template v-else>{{ ACTIVE }}</template>
                 </td>
-                <td class="p-2 text-right">
+                <td v-if="withActions" class="p-2 text-right">
                   <RowActions :name="user.name" :actions="actionsFor(user)" />
                 </td>
               </tr>

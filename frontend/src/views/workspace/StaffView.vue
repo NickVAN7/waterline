@@ -5,11 +5,12 @@ import { computed } from 'vue'
 
 import { api, client } from '@/api/client'
 import type { components } from '@/api/schema'
+import { WORKSPACE_CRUMB } from '@/app/crumbs'
 import { WORKSPACE_ROLE } from '@/app/labels'
 import { allows } from '@/composables/allowedActions'
 import { useWorkspace } from '@/composables/useWorkspace'
 import RosterPage from '@/views/roster/RosterPage.vue'
-import type { Roster } from '@/views/roster/roster'
+import type { Roster, RosterListQuery } from '@/views/roster/roster'
 
 import { WHO_TO_ASK } from './workspaceAdmin'
 
@@ -59,17 +60,17 @@ const roster = computed<Roster>(() => ({
         },
       }),
     ),
-  everyone: async () =>
+  searchPeople: async (q) =>
     (
       await api(
         client.GET('/api/workspaces/{workspace_id}/staff', {
-          params: { path: path(), query: { limit: 200 } },
+          params: { path: path(), query: { limit: 20, ...(q ? { q } : {}) } },
         }),
       )
     ).items,
 }))
 
-async function list(query: { limit: number; offset: number; include_deactivated?: boolean }) {
+async function list(query: RosterListQuery<components['schemas']['WorkspaceRole']>) {
   return api(
     client.GET('/api/workspaces/{workspace_id}/staff', { params: { path: path(), query } }),
   )
@@ -79,6 +80,7 @@ async function list(query: { limit: number; offset: number; include_deactivated?
 <template>
   <RosterPage
     title="Workspace staff"
+    :crumbs="[WORKSPACE_CRUMB, { label: 'Staff' }]"
     list-name="Staff"
     thing="the staff"
     :roster="roster"

@@ -15,10 +15,13 @@ from app.models.audit_event import AuditEvent
 from app.models.auth import UserSession
 from app.models.numbering import ProjectCounter
 from app.models.org import Membership, Organization
+from app.models.phase import Phase
 from app.models.project import Project, ProjectMembership
 from app.models.requirement import Requirement, RequirementRevision
+from app.models.task import Subtask, Task
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMembership
+from app.models.workstream import Workstream
 from tests.factories import BaseFactory, fake_slug, reset_factories
 from tests.factories.approval import ApprovalFactory, ApprovalRequestFactory
 from tests.factories.audit import ActivityLogFactory
@@ -26,10 +29,13 @@ from tests.factories.audit_event import AuditEventFactory
 from tests.factories.auth import UserSessionFactory
 from tests.factories.numbering import ProjectCounterFactory
 from tests.factories.org import MembershipFactory, OrganizationFactory
+from tests.factories.phase import PhaseFactory
 from tests.factories.project import ProjectFactory, ProjectMembershipFactory
 from tests.factories.requirement import RequirementFactory, RequirementRevisionFactory
+from tests.factories.task import SubtaskFactory, TaskFactory
 from tests.factories.user import UserFactory
 from tests.factories.workspace import WorkspaceFactory, WorkspaceMembershipFactory
+from tests.factories.workstream import WorkstreamFactory
 
 pytestmark = pytest.mark.anyio
 
@@ -49,6 +55,10 @@ pytestmark = pytest.mark.anyio
         (AuditEventFactory, AuditEvent),
         (RequirementFactory, Requirement),
         (RequirementRevisionFactory, RequirementRevision),
+        (PhaseFactory, Phase),
+        (WorkstreamFactory, Workstream),
+        (TaskFactory, Task),
+        (SubtaskFactory, Subtask),
         (ApprovalRequestFactory, ApprovalRequest),
         (ApprovalFactory, Approval),
         (ActivityLogFactory, ActivityLog),

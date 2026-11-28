@@ -14,6 +14,7 @@ import { failed, me, ok } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
 import { project } from '@/test/projects'
 import { requirementRead } from '@/test/requirements'
+import { withTrailRoutes } from '@/test/router'
 
 import RequirementView from './RequirementView.vue'
 
@@ -31,6 +32,22 @@ const REFUNDS: Requirement = {
   reporter_name: 'Ben Ortiz',
   allowed_actions: ['requirement.view'],
 }
+const PENDING: components['schemas']['ApprovalRequestRead'] = {
+  id: 'req-1',
+  status: 'pending',
+  requirement_revision_id: 'rev-1',
+  revision_number: 1,
+  note: null,
+  requested_by_id: 'u-ada',
+  requested_by_name: 'Ada Admin',
+  requested_by_is_active: true,
+  created_at: '2026-11-03T14:30:00Z',
+  completed_at: null,
+  newer_revision_exists: false,
+  flagged: false,
+  approvals: [],
+  allowed_actions: [],
+}
 const withActions = (...actions: Action[]): Requirement => ({
   ...REFUNDS,
   allowed_actions: ['requirement.view', ...actions],
@@ -42,7 +59,8 @@ async function mountAt(
   items: unknown[],
   path = '/acme/projects/ERP/requirements/7',
   // The visit's first page, opened from a link: focus moves only when the page says so.
-  { direct = false } = {},
+  // `pending`: the latest approval request is pending (the header's badge, DL-386).
+  { direct = false, pending = false } = {},
 ) {
   useCurrentUserStore().me = me()
   const answers = { project: projects.map((p) => ok(p)), item: [...items] }
@@ -52,17 +70,19 @@ async function mountAt(
     .mockImplementation(((path: string) =>
       Promise.resolve(
         path === '/api/projects/{key}/requirements/{number}/approval-requests'
-          ? ok({ items: [], total: 0, limit: 1, offset: 0 })
-          : path === '/api/projects/{key}/requirements/{number}/activity' ||
-              path === '/api/projects/{key}/requirements/{number}/revisions'
-            ? ok({ items: [], next_cursor: null })
-            : path === '/api/projects/{key}/requirements/{number}'
-              ? next(answers.item)
-              : next(answers.project),
+          ? ok({ items: pending ? [PENDING] : [], total: pending ? 1 : 0, limit: 1, offset: 0 })
+          : path === '/api/approval-requests/{request_id}'
+            ? ok(PENDING)
+            : path === '/api/projects/{key}/requirements/{number}/activity' ||
+                path === '/api/projects/{key}/requirements/{number}/revisions'
+              ? ok({ items: [], next_cursor: null })
+              : path === '/api/projects/{key}/requirements/{number}'
+                ? next(answers.item)
+                : next(answers.project),
       )) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       {
@@ -76,7 +96,7 @@ async function mountAt(
         component: RequirementView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(direct ? path : '/')
@@ -98,6 +118,37 @@ const button = (name: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('main button')].find(
     (b) => b.textContent!.trim() === name,
   )
+// A term's value in the definition list (DL-325, DL-326).
+const definition = (term: string) =>
+  [...document.querySelectorAll('main dt')]
+    .find((dt) => dt.textContent!.trim() === term)!
+    .nextElementSibling!.textContent!.replace(/\s+/g, ' ')
+    .trim()
+// ⋯ More actions (DL-325): absent when it would be empty, else its items' labels.
+const moreButton = () =>
+  document.querySelector<HTMLButtonElement>('button[aria-label="More actions for ERP-RQ-7"]')
+const moreItems = () =>
+  [...document.querySelectorAll<HTMLElement>('[role=menuitem]')].filter((li) =>
+    li.closest('[aria-label="More actions for ERP-RQ-7"]'),
+  )
+async function moreLabels(): Promise<string[]> {
+  if (!moreButton()) return []
+  moreButton()!.click()
+  await flushPromises()
+  const labels = moreItems().map((li) => li.textContent!.trim())
+  moreButton()!.click()
+  await flushPromises()
+  return labels
+}
+async function more(label: string) {
+  moreButton()!.click()
+  await flushPromises()
+  moreItems()
+    .find((li) => li.textContent!.trim() === label)!
+    .querySelector<HTMLElement>('[data-pc-section=itemcontent]')!
+    .click()
+  await flushPromises()
+}
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -115,17 +166,65 @@ describe('RequirementView', () => {
     const { wrapper } = await mountAt([READER], [ok(REFUNDS)])
 
     expect(wrapper.get('h1').text()).toBe('Refunds')
-    expect(document.title).toBe('Refunds · Waterline')
+    expect(document.title).toBe('ERP-RQ-7 · Waterline')
     expect(document.activeElement).toBe(wrapper.get('h1').element)
     expect(wrapper.text()).toContain('ERP-RQ-7')
     expect(wrapper.text()).toContain('Status: Draft')
-    expect(wrapper.text()).toContain('Priority:High')
-    expect(wrapper.text()).toContain('Reporter:Ben Ortiz')
-    // Under the Description h2, the description's ## is an h4 (UI-MD-1, UI-SHL-8).
-    expect(wrapper.find('.markdown h4').text()).toBe('Context')
-    expect(wrapper.findAll('.markdown h2, .markdown h3')).toHaveLength(0)
-    expect(wrapper.get('a[href="/acme/projects/ERP/requirements"]').text()).toBe('Requirements')
+    expect(definition('Priority')).toBe('High')
+    expect(definition('Reporter')).toBe('Ben Ortiz')
+    expect(definition('Restriction')).toBe('None')
+    // Under the Description h2, the description's top heading, a ##, is an h3, never skipping a
+    // level (UI-MD-1, DL-382, UI-SHL-8).
+    expect(wrapper.find('.markdown h3').text()).toBe('Context')
+    expect(wrapper.findAll('.markdown h2, .markdown h4')).toHaveLength(0)
     await expectNoA11yViolations(wrapper)
+  })
+
+  it('has its trail above the h1: the org, the project, Requirements, its ancestors, then itself (DL-327, DL-328)', async () => {
+    const nested = {
+      ...REFUNDS,
+      ancestors: [
+        { number: 1, title: 'Finance' },
+        { number: 3, title: 'Order to cash' },
+      ],
+    }
+    const { wrapper } = await mountAt([READER], [ok(nested)])
+
+    const trail = wrapper.get('nav[aria-label=Breadcrumb]')
+    expect(trail.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+      ['Acme Manufacturing', '/acme/projects'],
+      ['ERP rollout', '/acme/projects/ERP'],
+      ['Requirements', '/acme/projects/ERP/requirements'],
+      ['ERP-RQ-1', '/acme/projects/ERP/requirements/1'],
+      ['ERP-RQ-3', '/acme/projects/ERP/requirements/3'],
+    ])
+    expect(trail.get('[aria-current=page]').text()).toBe('ERP-RQ-7')
+    // Above the h1, in document order.
+    expect(trail.element.compareDocumentPosition(wrapper.get('h1').element)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    await expectNoA11yViolations(wrapper)
+  })
+
+  it("shows its parent's ID, linked to its page, then its title; None at the top level (TD-106)", async () => {
+    const nested = {
+      ...REFUNDS,
+      ancestors: [
+        { number: 1, title: 'Finance' },
+        { number: 3, title: 'Order to cash' },
+      ],
+    }
+    const { wrapper } = await mountAt([READER], [ok(nested)])
+
+    expect(definition('Parent')).toBe('ERP-RQ-3 Order to cash')
+    const link = wrapper.get('dd a[href="/acme/projects/ERP/requirements/3"]')
+    expect(link.text()).toBe('ERP-RQ-3')
+  })
+
+  it('says None for the Parent of a top-level requirement (TD-106)', async () => {
+    await mountAt([READER], [ok(REFUNDS)])
+
+    expect(definition('Parent')).toBe('None')
   })
 
   it('has a History tab below the description, open, with its entries (DL-268, DL-269)', async () => {
@@ -233,9 +332,9 @@ describe('RequirementView', () => {
   )
 
   it('marks a deactivated reporter (TD-77)', async () => {
-    const { wrapper } = await mountAt([READER], [ok({ ...REFUNDS, reporter_is_active: false })])
+    await mountAt([READER], [ok({ ...REFUNDS, reporter_is_active: false })])
 
-    expect(wrapper.text()).toContain('Reporter:Ben Ortiz Deactivated')
+    expect(definition('Reporter')).toBe('Ben Ortiz Deactivated')
   })
 
   it.each([
@@ -255,10 +354,46 @@ describe('RequirementView', () => {
     },
   )
 
-  it('says so when there is no description', async () => {
+  // F15: quiet, under the description; the warning is at approval (DL-384). Bug: a warning or
+  // info alert above the description, the loudest thing on the page.
+  it('notes missing criteria as quiet text under the description, not an alert', async () => {
+    await mountAt([READER], [ok({ ...REFUNDS, description_md: 'Just text.' })])
+
+    const notes = [...document.querySelectorAll('main p')].filter((p) =>
+      p.textContent!.includes('No acceptance criteria'),
+    )
+    expect(notes).toHaveLength(1)
+    expect(notes[0]!.closest('[role=alert], [role=status], .border')).toBeNull()
+    expect(notes[0]!.className).toContain('text-text-muted')
+    const markdown = [...document.querySelectorAll('main p')].find(
+      (p) => p.textContent === 'Just text.',
+    )!
+    expect(
+      markdown.compareDocumentPosition(notes[0]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  // DL-386 (F13). Bug: the header says only "Draft" while the tree says it's awaiting approval.
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'shows Awaiting approval beside the status while a request is pending: %s',
+    async (pending, shown) => {
+      await mountAt([READER], [ok(REFUNDS)], undefined, { pending })
+
+      const header = document.querySelector('main header')!
+      expect(header.textContent!.includes('Awaiting approval')).toBe(shown)
+    },
+  )
+
+  // One note, never two (S3-C0n, F11). Bug: "No description." under a criteria note too.
+  it('says so in one note when there is no description', async () => {
     const { wrapper } = await mountAt([READER], [ok({ ...REFUNDS, description_md: '' })])
 
-    expect(wrapper.text()).toContain('No description.')
+    expect(wrapper.text()).toContain('No description: the requirement has no acceptance criteria.')
+    expect(wrapper.text()).not.toContain('No acceptance criteria')
+    expect(wrapper.text()).not.toContain('No description.')
   })
 
   it('renders the description without running what it holds (UI-MD-1)', async () => {
@@ -368,19 +503,61 @@ describe('RequirementView', () => {
       expect(menuButton()).toBeNull()
     })
 
-    it('offers every status but its own and Approved', async () => {
+    it('offers every status but Approved, the current one marked, and says why (DL-388)', async () => {
       await mountAt([READER], [ok(withActions('requirement.update'))])
 
       menuButton()!.click()
       await flushPromises()
 
       expect(items().map((li) => li.textContent!.trim())).toEqual([
+        'Draft (current)',
         'In progress',
         'Done',
         'Rejected',
         'Deferred',
       ])
+      // Marked three ways (DL-395): the check, "(current)", and `aria-disabled`; the rest plain.
+      expect(items().map((li) => li.getAttribute('aria-disabled'))).toEqual([
+        'true',
+        null,
+        null,
+        null,
+        null,
+      ])
+      // Each item holds the check, so the labels line up; only the current one's shows.
+      expect(items().map((li) => li.querySelector('svg')!.classList.contains('invisible'))).toEqual(
+        [false, true, true, true, true],
+      )
+      const list = document.querySelector('[role=menu]')!
+      const note = document.getElementById(list.getAttribute('aria-describedby')!)
+      expect(note?.textContent?.trim()).toBe('Approved is set by an approval.')
       await expectNoA11yViolations(document.body)
+    })
+
+    it('lists Approved only as the current status, never as a choice', async () => {
+      await mountAt([READER], [ok({ ...withActions('requirement.update'), status: 'approved' })])
+
+      menuButton()!.click()
+      await flushPromises()
+
+      expect(items().map((li) => li.textContent!.trim())).toEqual([
+        'Draft',
+        'Approved (current)',
+        'In progress',
+        'Done',
+        'Rejected',
+        'Deferred',
+      ])
+    })
+
+    it('sends nothing when the current status is chosen, and keeps the menu button focused', async () => {
+      const patch = vi.spyOn(client, 'PATCH')
+      await mountAt([READER], [ok(withActions('requirement.update'))])
+
+      await choose('Draft (current)')
+
+      expect(patch).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(menuButton())
     })
 
     it('sends the status with the version read, and shows what the server answers', async () => {
@@ -435,8 +612,7 @@ describe('RequirementView', () => {
         )
       expect(historyCalls()).toHaveLength(1)
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       const dialog = document.querySelector('dialog[open]')!
       dialog.querySelector<HTMLInputElement>('input[type=radio][value=confidential]')!.click()
       dialog.querySelector('form')!.requestSubmit()
@@ -509,7 +685,7 @@ describe('RequirementView', () => {
       async (...actions) => {
         await mountAt([READER], [ok(withActions(...actions))])
 
-        expect(Boolean(button('Change restriction'))).toBe(actions.length > 0)
+        expect((await moreLabels()).includes('Change restriction…')).toBe(actions.length > 0)
       },
     )
 
@@ -537,8 +713,7 @@ describe('RequirementView', () => {
         [ok(withActions('requirement.raise_restriction'))],
       )
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
 
       expect(document.querySelector('dialog[open] fieldset')!.textContent).toContain(words)
     })
@@ -565,8 +740,7 @@ describe('RequirementView', () => {
       )
       expect(wrapper.text()).toContain('Restriction: Internal')
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       const dialog = document.querySelector('dialog[open]')!
       expect(dialog.querySelector('h2')!.textContent).toBe('Restriction of ERP-RQ-7')
       await expectNoA11yViolations(dialog as HTMLElement)
@@ -593,14 +767,13 @@ describe('RequirementView', () => {
         [ok(withActions('requirement.raise_restriction')), ok(REFUNDS)],
       )
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit()
       await flushPromises()
 
       expect(get.mock.calls.filter((c) => c[0] === '/api/projects/{key}')).toHaveLength(2)
       expect(itemCalls(get)).toHaveLength(2)
-      expect(button('Change restriction')).toBeUndefined()
+      expect(await moreLabels()).not.toContain('Change restriction…')
     })
 
     it("shows the server's 422 on the level, with focus there", async () => {
@@ -621,8 +794,7 @@ describe('RequirementView', () => {
       )
       await mountAt([READER], [ok(withActions('requirement.lower_restriction'))])
 
-      button('Change restriction')!.click()
-      await flushPromises()
+      await more('Change restriction…')
       document.querySelector<HTMLFormElement>('dialog[open] form')!.requestSubmit()
       await flushPromises()
 
@@ -673,6 +845,34 @@ describe('RequirementView', () => {
       expect(button('Edit')).toBeDefined()
     })
 
+    // F17 (DL-395). Bug: the actions left in edit mode, the heading repeating the title field,
+    // or the details reshuffled below the form.
+    it('hides the actions, heads the page "Editing <ID>", and keeps the details grid in place', async () => {
+      await mountAt([READER], [ok(withActions('requirement.update', 'requirement.delete'))])
+      const order = () =>
+        [...document.querySelectorAll('main dt, main legend')].map((t) =>
+          t.textContent!.replace(/\s+/g, ' ').replace('*', '').trim(),
+        )
+      const before = order()
+      const statusMenu = () => document.querySelector('[aria-label="Change status of ERP-RQ-7"]')
+      expect(statusMenu()).not.toBeNull()
+      expect(moreButton()).not.toBeNull()
+
+      await edit()
+
+      expect(document.querySelector('h1')!.textContent!.trim()).toBe('Editing ERP-RQ-7')
+      expect(button('Edit')).toBeUndefined()
+      expect(moreButton()).toBeNull()
+      expect(statusMenu()).toBeNull()
+      // Priority, now a field, in its cell, then the same values in the same order.
+      expect(before.slice(0, 4)).toEqual(['Priority', 'Reporter', 'Parent', 'Restriction'])
+      expect(order().slice(0, 4)).toEqual(['Priority', 'Reporter', 'Parent', 'Restriction'])
+      const grid = document.querySelector('form fieldset')!.parentElement!
+      expect(grid.className).toContain('grid')
+      expect(grid.querySelector('dl')!.textContent).toContain('Ben Ortiz')
+      expect(definition('Reporter')).toBe('Ben Ortiz')
+    })
+
     it('turns the title, description, and priority into a form, focus on the title', async () => {
       const { wrapper } = await mountAt([READER], [ok(EDITOR)])
 
@@ -688,7 +888,7 @@ describe('RequirementView', () => {
       expect(document.activeElement).toBe(title())
       // The status menu waits: its change would make the save a 409.
       expect(button('Edit')).toBeUndefined()
-      expect(wrapper.find('[aria-haspopup]').exists()).toBe(false)
+      expect(wrapper.find('[aria-label^="Change status"]').exists()).toBe(false)
       expect(wrapper.find('#description-heading').exists()).toBe(false)
       await expectNoA11yViolations(wrapper)
     })
@@ -708,7 +908,7 @@ describe('RequirementView', () => {
         body: { version: 1, title: 'Refunds and returns', change_note: 'Returns too' },
       })
       expect(wrapper.get('h1').text()).toBe('Refunds and returns')
-      expect(document.title).toBe('Refunds and returns · Waterline')
+      expect(document.title).toBe('ERP-RQ-7 · Waterline')
       expect(document.querySelector('#edit-requirement-title')).toBeNull()
       expect(document.activeElement).toBe(button('Edit'))
       await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_DELAY_MS * 2))
@@ -824,6 +1024,33 @@ describe('RequirementView', () => {
       expect(document.activeElement).toBe(note())
     })
 
+    // F17 put Priority above the description: a 422 on both focuses the one first on screen
+    // (UI-FRM-6). Bug: the old order, focus skipping past Priority to the description.
+    it('a 422 on the description and the priority focuses the priority, first on screen', async () => {
+      vi.spyOn(client, 'PATCH').mockResolvedValue(
+        failed(422, {
+          code: 'validation_error',
+          message: 'The request is invalid.',
+          details: {
+            fields: [
+              { loc: ['body', 'description_md'], message: 'Too long.', type: 'string_too_long' },
+              { loc: ['body', 'priority'], message: 'Not a priority.', type: 'enum' },
+            ],
+          },
+        }),
+      )
+      await mountAt([READER], [ok(EDITOR)])
+      await edit()
+      await choosePriority('low')
+      await type(description(), 'Changed')
+
+      await save()
+
+      expect(
+        document.activeElement!.closest('fieldset')!.querySelector('legend')!.textContent,
+      ).toContain('Priority')
+    })
+
     it('a 409 says someone else changed it, with Reload, and keeps what was typed (UI-FRM-7)', async () => {
       vi.spyOn(client, 'PATCH').mockResolvedValue(conflict())
       const { wrapper } = await mountAt([READER], [ok(EDITOR)])
@@ -929,7 +1156,7 @@ describe('RequirementView', () => {
       async (...actions) => {
         await mountAt([READER], [ok(withActions(...actions))])
 
-        expect(Boolean(button('Delete'))).toBe(actions.length > 0)
+        expect((await moreLabels()).includes('Delete…')).toBe(actions.length > 0)
       },
     )
 
@@ -937,8 +1164,7 @@ describe('RequirementView', () => {
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
       const { router } = await mountAt([READER], [ok(deletable())])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       expect(dialog().querySelector('h2')!.textContent).toBe('Delete ERP-RQ-7?')
       expect(document.activeElement!.textContent!.trim()).toBe('Cancel')
       // No children: nothing to ask about them.
@@ -961,8 +1187,7 @@ describe('RequirementView', () => {
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
       await mountAt([READER], [ok(deletable({ has_children: true, can_delete_children: true }))])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       const promote = dialog().querySelector<HTMLInputElement>('input[value=promote]')!
       expect(promote.checked).toBe(true)
       expect(dialog().querySelector('legend')!.textContent).toBe('Its children')
@@ -984,8 +1209,7 @@ describe('RequirementView', () => {
       const del = vi.spyOn(client, 'DELETE').mockResolvedValue(ok(undefined))
       await mountAt([READER], [ok(deletable({ has_children: true, can_delete_children: false }))])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       expect(dialog().querySelector('input[type=radio]')).toBeNull()
       expect(dialog().textContent).toContain(
         "Its children move up to its parent. They can't be deleted with it",
@@ -998,19 +1222,17 @@ describe('RequirementView', () => {
       })
     })
 
-    it('Cancel deletes nothing and returns focus to Delete', async () => {
+    it('Cancel deletes nothing and returns focus to More actions', async () => {
       const del = vi.spyOn(client, 'DELETE')
       await mountAt([READER], [ok(deletable())])
 
-      button('Delete')!.focus()
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       ;(document.activeElement as HTMLButtonElement).click()
       await flushPromises()
 
       expect(del).not.toHaveBeenCalled()
       expect(document.querySelector('dialog[open]')).toBeNull()
-      expect(document.activeElement).toBe(button('Delete'))
+      expect(document.activeElement).toBe(moreButton())
     })
 
     it('a 403 says so in the dialog and reloads what the user may do (UI-FRM-7)', async () => {
@@ -1019,8 +1241,7 @@ describe('RequirementView', () => {
       )
       const { get, router } = await mountAt([READER], [ok(deletable()), ok(REFUNDS)])
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       dialog().querySelector('form')!.requestSubmit()
       await flushPromises()
 
@@ -1029,7 +1250,7 @@ describe('RequirementView', () => {
       )
       expect(get.mock.calls.filter((c) => c[0] === '/api/projects/{key}')).toHaveLength(2)
       expect(itemCalls(get)).toHaveLength(2)
-      expect(button('Delete')).toBeUndefined()
+      expect(await moreLabels()).not.toContain('Delete…')
       expect(router.currentRoute.value.name).toBe('project-requirement')
     })
 
@@ -1042,8 +1263,7 @@ describe('RequirementView', () => {
         [ok(deletable()), failed(404, { code: 'not_found', message: '', details: {} })],
       )
 
-      button('Delete')!.click()
-      await flushPromises()
+      await more('Delete…')
       dialog().querySelector('form')!.requestSubmit()
       await flushPromises()
 

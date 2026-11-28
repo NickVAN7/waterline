@@ -1,10 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/api/client'
 
 import { expectNoA11yViolations } from '@/test/a11y'
 import { stubDialog } from '@/test/overlay'
+import { choosePerson } from '@/test/picker'
 
 import ChangeRoleDialog from './ChangeRoleDialog.vue'
 import { fakeRoster, invalid, PEOPLE } from './fakeRoster'
@@ -13,7 +15,11 @@ const OLGA = { ...PEOPLE[0]!, role: 'owner' as const }
 
 async function openDialog() {
   const roster = fakeRoster()
-  const wrapper = mount(ChangeRoleDialog, { props: { roster }, attachTo: document.body })
+  const wrapper = mount(ChangeRoleDialog, {
+    props: { roster },
+    global: { plugins: [PrimeVue] },
+    attachTo: document.body,
+  })
   await wrapper.vm.open(OLGA)
   await flushPromises()
   return { wrapper, roster }
@@ -71,12 +77,8 @@ describe('ChangeRoleDialog', () => {
     await submit(wrapper)
 
     expect(wrapper.text()).toContain('Olga Owner is the last owner. Choose who becomes owner.')
-    // Active people other than Olga: Dee is deactivated.
-    expect(wrapper.findAll('#role-change-owner option').map((o) => o.text())).toEqual([
-      'Choose a person',
-      'Ada Admin (ada@acme.example)',
-    ])
     expect(document.activeElement?.id).toBe('role-change-owner')
+    expect(wrapper.get('#role-change-owner').attributes('role')).toBe('combobox')
     await expectNoA11yViolations(wrapper)
   })
 
@@ -86,7 +88,7 @@ describe('ChangeRoleDialog', () => {
     await wrapper.get('#role-change').setValue('admin')
     await submit(wrapper)
 
-    await wrapper.get('#role-change-owner').setValue('u-ada')
+    await choosePerson('role-change-owner', 'ada')
     await submit(wrapper)
 
     expect(roster.changeRole).toHaveBeenLastCalledWith('u-olga', 'admin', 'u-ada')

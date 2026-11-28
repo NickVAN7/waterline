@@ -12,9 +12,11 @@ from app.enums import (
     ProjectType,
     RestrictionCategory,
     RestrictionLevel,
+    TaskType,
 )
-from app.schemas.approval import ApprovalWorkItem, DecisionWorkItem
+from app.schemas.approval import ApprovalWorkItem
 from app.schemas.limits import NAME_MAX, PROJECT_DESCRIPTION_MAX
+from app.schemas.task import TaskWorkItem
 from app.schemas.user import AccessReason
 from app.schemas.workspace import NewUser
 
@@ -46,6 +48,26 @@ class ProjectUpdate(BaseModel):
     enabled_modules: list[ProjectModule] | None = None
 
 
+class GetStarted(BaseModel):
+    """The home's Get started checklist (design-doc §11, DL-201, DL-354), each step ticked from
+    the project's data; loose: a step started counts. Start your project's parts are its
+    requirement and its task (a test case joins in Slice 5)."""
+
+    hidden: bool
+    invite_team: bool
+    compile_plan: bool
+    has_requirement: bool
+    has_task: bool
+
+
+class HomeNumbers(BaseModel):
+    """The home's headline numbers (design-doc §11, Q11); untested requirements join in
+    Slice 5."""
+
+    blocked_tasks: int
+    pending_approvals: int
+
+
 class ProjectRead(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
@@ -63,6 +85,12 @@ class ProjectRead(BaseModel):
     restriction_level: RestrictionLevel | None
     restriction_categories: list[RestrictionCategory]
     modules_holding_data: list[ProjectModule]
+    # The task types this project offers, in `TaskType` order (DL-352).
+    task_types: list[TaskType]
+    # Only for the project's admins with content access, and None once every step is ticked.
+    get_started: GetStarted | None
+    # Only for a caller who may see the project's tasks and requirements (content, §3.1).
+    home_numbers: HomeNumbers | None
     allowed_actions: list[Action]
 
 
@@ -99,6 +127,16 @@ class ProjectItem(BaseModel):
     my_access: ProjectRole | Literal["inherited_admin"]
 
 
+class MemberProject(BaseModel):
+    """A project an org add can add the person to as well (Q12g, DL-379): the org's live
+    projects; whoever may add org members administers each."""
+
+    id: uuid.UUID
+    key: str
+    name: str
+    export_controlled: bool
+
+
 class ModuleNote(BaseModel):
     module: str
     note: str
@@ -131,19 +169,51 @@ class MyProjectItem(ProjectItem):
 
     is_favorite: bool
     allowed_actions: list[Action]
+    # Archived projects are on My work's organization lists, behind the toggle (DL-330).
+    archived: bool
+
+
+class OrgWork(BaseModel):
+    """One organization's section on My work (DL-329, DL-330, DL-349, DL-359): its first open
+    projects (Active, Planning, On hold, each by name) and how many there are, its first hidden
+    ones (Completed, Cancelled, then archived, each by name) and how many, and how many its org
+    list shows (all but the archived)."""
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    projects: list[MyProjectItem]
+    total: int
+    hidden: list[MyProjectItem]
+    hidden_total: int
+    listed_total: int
 
 
 class WorkSections(BaseModel):
     favorites: WorkSection[MyProjectItem]
-    projects: WorkSection[MyProjectItem]
+    # One item per organization the user can open a project in, by name (DL-359).
+    organizations: WorkSection[OrgWork]
     approvals: WorkSection[ApprovalWorkItem]
-    decisions: WorkSection[DecisionWorkItem]
+    # Open tasks assigned to the user, and those in review with them as reviewer (S3-C11).
+    tasks: WorkSection[TaskWorkItem]
+    reviews: WorkSection[TaskWorkItem]
+
+
+class WorkSummary(BaseModel):
+    """The summary tiles' one count no section's total gives (DL-349): the user's open assigned
+    tasks due before today plus 7 days, overdue included, and the overdue part; `available`
+    false when its query failed."""
+
+    available: bool
+    due_soon: int = 0
+    overdue: int = 0
 
 
 class MyWork(BaseModel):
     """`GET /api/me/work` (design-doc §11; DL-76): every section in one response."""
 
     sections: WorkSections
+    summary: WorkSummary
 
 
 class ProjectMemberRead(BaseModel):

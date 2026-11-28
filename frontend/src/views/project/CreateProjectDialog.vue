@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Creating a project in an org (build plan, "The projects API"; design-doc §1.1, §3.1, §5): a
-// name, a key checked live (UI-FRM-9), the type, a description, the modules (the type's
-// recommendations and each module's note, from module guidance), a first admin when the org's
-// entry in `/me` allows naming one (the org's active members and the workspace's active staff,
-// DL-152), and the restriction, without export control (DL-133). Created, the dialog opens the
+// name, a key checked live (UI-FRM-9), the type, a description, the modules once one has shipped
+// (the type's recommendations and each module's note, from module guidance; DL-402), a first admin when the org's
+// entry in `/me` allows naming one (Me, or Someone else searched in the `PersonPicker`, DL-422:
+// the org's active members and the workspace's active staff, DL-152), and the restriction, without export control (DL-133). Created, the dialog opens the
 // project.
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -15,6 +15,7 @@ import Button from '@/components/Button.vue'
 import FormAlert from '@/components/FormAlert.vue'
 import FormField from '@/components/FormField.vue'
 import ModalDialog from '@/components/ModalDialog.vue'
+import PersonPicker, { type Person } from '@/components/PersonPicker.vue'
 import SelectField from '@/components/SelectField.vue'
 import TextField from '@/components/TextField.vue'
 import { allows } from '@/composables/allowedActions'
@@ -24,7 +25,7 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 
 import RestrictionFields from './RestrictionFields.vue'
 import ModuleFields from './ModuleFields.vue'
-import { recommendedFor } from './modules'
+import { offersModules, recommendedFor } from './modules'
 
 type Org = components['schemas']['MeOrg']
 type ProjectType = components['schemas']['ProjectType']
@@ -50,7 +51,8 @@ const modules = ref<ProjectModule[]>([])
 const modulesEdited = ref(false)
 const categories = ref<Category[]>([])
 const guidance = ref<Guidance | null>(null)
-const people = ref<{ value: string; label: string }[]>([])
+const firstAdmin = ref<'me' | 'other'>('me')
+const adminPerson = ref<Person | null>(null)
 const pending = ref(false)
 const status = ref('')
 const errors = useFormErrors({
@@ -59,7 +61,8 @@ const errors = useFormErrors({
   type: 'Type',
   description: 'Description',
   enabled_modules: 'Modules',
-  first_admin_id: 'First admin',
+  // The field's own label: the error is the picker's, under First admin's Someone else.
+  first_admin_id: 'Person',
   restriction_level: 'Restriction',
   restriction_categories: 'Categories',
 })
@@ -110,11 +113,12 @@ async function open(): Promise<void> {
   }
   modulesEdited.value = false
   categories.value = []
-  people.value = []
+  firstAdmin.value = 'me'
+  adminPerson.value = null
   errors.reset()
   status.value = ''
   await dialog.value?.open()
-  await Promise.all([loadGuidance(), canNameAdmin.value ? loadPeople() : null])
+  await loadGuidance()
 }
 
 async function loadGuidance() {
@@ -127,22 +131,24 @@ async function loadGuidance() {
   }
 }
 
-async function loadPeople() {
-  try {
-    // shortcut: the first 200 candidates, as the other pickers (TD-41). The org's active
-    // members and the workspace's active staff (DL-152).
-    const candidates = await api(
-      client.GET('/api/orgs/{org_id}/first-admin-candidates', {
-        params: { path: { org_id: props.org.id }, query: { limit: 200 } },
-      }),
-    )
-    people.value = candidates.items
-      .filter((m) => m.user_id !== store.me?.user.id)
-      .map((m) => ({ value: m.user_id, label: `${m.name} (${m.email})` }))
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-    // The picker offers only "Me"; the creator becomes the first admin.
-  }
+// The org's active members and the workspace's active staff (DL-152), less the creator, who is Me.
+async function searchPeople(q: string): Promise<Person[]> {
+  const candidates = await api(
+    client.GET('/api/orgs/{org_id}/first-admin-candidates', {
+      params: { path: { org_id: props.org.id }, query: { limit: 20, ...(q ? { q } : {}) } },
+    }),
+  )
+  return candidates.items.filter((m) => m.user_id !== store.me?.user.id)
+}
+
+// What the user may do changed: `/me`'s org actions follow (UI-FRM-7).
+function searchFailed(error: ApiError) {
+  if (error.status === 403) store.load().catch(() => {})
+}
+
+function adminChosen(person: Person | null) {
+  values.value.first_admin_id = person?.user_id ?? ''
+  errors.clearField('first_admin_id')
 }
 
 async function focus(target: string) {
@@ -155,7 +161,13 @@ async function focus(target: string) {
 
 async function submit(): Promise<void> {
   if (pending.value) return
-  const empty = errors.requireFilled({ name: values.value.name, key: values.value.key })
+  const other = firstAdmin.value === 'other'
+  const empty = errors.requireFilled({
+    name: values.value.name,
+    key: values.value.key,
+    // Asked only for Someone else; Me needs no one named.
+    ...(other ? { first_admin_id: values.value.first_admin_id } : {}),
+  })
   if (empty) return focus(empty)
   pending.value = true
   status.value = 'Creating the project…'
@@ -172,7 +184,7 @@ async function submit(): Promise<void> {
           type: values.value.type,
           ...(values.value.description ? { description: values.value.description } : {}),
           ...(guidance.value ? { enabled_modules: modules.value } : {}),
-          ...(values.value.first_admin_id ? { first_admin_id: values.value.first_admin_id } : {}),
+          ...(other ? { first_admin_id: values.value.first_admin_id } : {}),
           restriction_level: values.value.level || null,
           restriction_categories: categories.value,
         } as components['schemas']['ProjectCreate'],
@@ -247,7 +259,11 @@ defineExpose({ open })
             label: PROJECT_TYPE[value],
           }))
         "
-        help="Picks the labels and the recommended modules; it can be changed later."
+        :help="
+          offersModules(guidance)
+            ? 'Picks the labels and the recommended modules; it can be changed later.'
+            : 'Picks the labels and the template new requirements start from; it can be changed later.'
+        "
         :error="errors.fieldErrors.value.type"
         @update:model-value="errors.clearField('type')"
       />
@@ -272,7 +288,7 @@ defineExpose({ open })
         </template>
       </FormField>
       <ModuleFields
-        v-if="guidance"
+        v-if="guidance && offersModules(guidance)"
         v-model="modules"
         prefix="create-project"
         :guidance="guidance"
@@ -280,16 +296,48 @@ defineExpose({ open })
         :error="errors.fieldErrors.value.enabled_modules"
         @edit="toggleModule"
       />
-      <SelectField
-        v-if="canNameAdmin"
-        id="create-project-first-admin-id"
-        v-model="values.first_admin_id"
-        label="First admin"
-        :options="[{ value: '', label: `Me (${store.me?.user.name ?? ''})` }, ...people]"
-        help="The project's first admin and lead. You can name another of the organization's members or the workspace's staff."
-        :error="errors.fieldErrors.value.first_admin_id"
-        @update:model-value="errors.clearField('first_admin_id')"
-      />
+      <fieldset v-if="canNameAdmin" class="m-0 flex flex-col gap-2 border-0 p-0">
+        <legend class="mb-2 font-medium">First admin</legend>
+        <p id="create-project-first-admin-help" class="m-0 -mt-1 text-sm text-text-muted">
+          The project's first admin and lead.
+        </p>
+        <label class="flex items-center gap-2">
+          <input
+            v-model="firstAdmin"
+            type="radio"
+            name="create-project-first-admin"
+            value="me"
+            aria-describedby="create-project-first-admin-help"
+            class="size-(--target-min)"
+          />
+          Me ({{ store.me?.user.name ?? '' }})
+        </label>
+        <label class="flex items-center gap-2">
+          <input
+            v-model="firstAdmin"
+            type="radio"
+            name="create-project-first-admin"
+            value="other"
+            aria-describedby="create-project-first-admin-help"
+            class="size-(--target-min)"
+          />
+          Someone else
+        </label>
+        <!-- Under Someone else, inside its group: it's that choice's person. -->
+        <div v-if="firstAdmin === 'other'" class="pl-8">
+          <PersonPicker
+            id="create-project-first-admin-id"
+            v-model="adminPerson"
+            label="Person"
+            help="Search the organization's members and the workspace's staff by name, email, or username."
+            required
+            :error="errors.fieldErrors.value.first_admin_id"
+            :search="searchPeople"
+            @failed="searchFailed"
+            @update:model-value="adminChosen"
+          />
+        </div>
+      </fieldset>
       <RestrictionFields
         v-model:level="values.level"
         v-model:categories="categories"

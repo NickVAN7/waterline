@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { client } from '@/api/client'
 import type { components } from '@/api/schema'
 import { expectNoA11yViolations } from '@/test/a11y'
+import { choosePerson } from '@/test/picker'
 import { failed, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { trail } from '@/test/trail'
 import {
   cleanUpAfterEach,
   emptyPastTheFirst,
@@ -68,8 +70,12 @@ describe('StaffView', () => {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })
     expect(wrapper.get('h1').text()).toBe('Workspace staff')
+    // Its trail (DL-327, UI-SHL-14).
+    expect(trail()).toEqual({ links: [['Workspace', '/workspace/staff']], current: 'Staff' })
     // The section nav is the sidebar's (AppLayout, DL-137), not the page's.
-    expect(wrapper.find('nav').exists()).toBe(false)
+    expect(wrapper.findAll('nav').map((nav) => nav.attributes('aria-label'))).toEqual([
+      'Breadcrumb',
+    ])
     expect(
       wrapper.findAll('tbody tr').map((tr) =>
         tr
@@ -80,17 +86,20 @@ describe('StaffView', () => {
     ).toEqual([
       ['Olga Owner', 'olga-owner@harbor.example', 'Owner'],
       ['Mo Member', 'mo-member@harbor.example', 'Member'],
-      ['Dee Gone Deactivated', 'dee-gone@harbor.example', 'Member'],
+      ['Dee Gone · Deactivated', 'dee-gone@harbor.example', 'Member'],
     ])
     await expectNoA11yViolations(wrapper)
   })
 
-  it('marks a deactivated person with a badge (UI-FBK-6, DL-102)', async () => {
-    staffAnswers([DEE])
+  it('mutes a deactivated person\'s row, "· Deactivated" after the name (UI-FBK-6, S3-C0k)', async () => {
+    staffAnswers()
 
     const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff')
 
-    expect(wrapper.get('tbody td').text()).toContain('Deactivated')
+    const muted = wrapper.findAll('tbody tr').map((tr) => tr.classes().includes('text-text-muted'))
+    // Olga and Mo active, Dee deactivated.
+    expect(muted).toEqual([false, false, true])
+    expect(wrapper.findAll('tbody tr')[2]!.get('td').text()).toBe('Dee Gone · Deactivated')
   })
 
   it('offers Add person only to those who may manage the staff', async () => {
@@ -115,7 +124,7 @@ describe('StaffView', () => {
       'workspace.view',
       'workspace_staff.manage',
     ])
-    const box = wrapper.get<HTMLInputElement>('#show-deactivated')
+    const box = wrapper.get<HTMLInputElement>('input[name=include_deactivated]')
     expect(box.element.labels?.[0]?.textContent?.trim()).toBe('Show deactivated')
     expect(box.element.checked).toBe(false)
 
@@ -134,6 +143,93 @@ describe('StaffView', () => {
     await expectNoA11yViolations(wrapper)
   })
 
+  it("sends the filter bar's search and role from the URL, dropping an unknown role (DL-419)", async () => {
+    const get = staffAnswers([OLGA])
+
+    const { wrapper } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?q=olga&role=owner&role=boss',
+      ['workspace.view'],
+    )
+
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, q: 'olga', role: ['owner'] },
+      },
+    })
+    expect(wrapper.get<HTMLInputElement>('input[type=search]').element.value).toBe('olga')
+    expect(wrapper.text()).toContain('Role: Owner')
+  })
+
+  it('sends Is none of from the URL, dropping a role no list has, even an object built-in (DL-419)', async () => {
+    const get = staffAnswers([OLGA])
+
+    const { wrapper } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?role__not=admin&role__not=toString&role__not=boss',
+      ['workspace.view'],
+    )
+
+    expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
+      params: {
+        path: { workspace_id: WORKSPACE_ID },
+        query: { limit: 25, offset: 0, role__not: ['admin'] },
+      },
+    })
+    expect(wrapper.text()).toContain('Role: not Admin')
+  })
+
+  it('names a search that matches no one, and Clear filters puts the search back (UI-FBK-8)', async () => {
+    staffAnswers([])
+    const { wrapper, router } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?q=zed&role=owner',
+      ['workspace.view'],
+    )
+
+    expect(wrapper.get('h3').text()).toBe('No people match “zed”')
+    await expectNoA11yViolations(wrapper)
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Clear filters')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/staff')
+    expect(document.activeElement).toBe(wrapper.get('input[type=search]').element)
+  })
+
+  it('keeps Show deactivated in the address when Clear filters undoes the search (DL-420)', async () => {
+    staffAnswers([])
+    const { wrapper, router } = await mountWorkspaceView(
+      StaffView,
+      '/workspace/staff?q=zed&include_deactivated=true',
+      ['workspace.view', 'workspace_staff.manage'],
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Clear filters')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/workspace/staff?include_deactivated=true')
+    expect(wrapper.get<HTMLInputElement>('input[name=include_deactivated]').element.checked).toBe(
+      true,
+    )
+  })
+
+  it('says no one matches the filters when there is no search', async () => {
+    staffAnswers([])
+
+    const { wrapper } = await mountWorkspaceView(StaffView, '/workspace/staff?role=owner', [
+      'workspace.view',
+    ])
+
+    expect(wrapper.get('h3').text()).toBe('No people match these filters')
+  })
+
   it("offers no Show deactivated to someone who can't manage the staff, and ignores it in a link (DL-294)", async () => {
     const get = staffAnswers([OLGA])
 
@@ -143,7 +239,7 @@ describe('StaffView', () => {
       ['workspace.view'],
     )
 
-    expect(wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(wrapper.find('input[name=include_deactivated]').exists()).toBe(false)
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
       params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 25, offset: 0 } },
     })
@@ -375,12 +471,12 @@ describe('StaffView', () => {
     await wrapper.get('#role-change').setValue('admin')
     await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
     await flushPromises()
-    await wrapper.get('#role-change-owner').setValue(MO.user_id)
+    await choosePerson('role-change-owner', 'mo')
     await wrapper.get('#role-change').element.closest('form')!.requestSubmit()
     await flushPromises()
 
     expect(get).toHaveBeenCalledWith('/api/workspaces/{workspace_id}/staff', {
-      params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 200 } },
+      params: { path: { workspace_id: WORKSPACE_ID }, query: { limit: 20, q: 'mo' } },
     })
     expect(patch).toHaveBeenLastCalledWith('/api/workspaces/{workspace_id}/staff/{user_id}', {
       params: { path: { workspace_id: WORKSPACE_ID, user_id: OLGA.user_id } },
@@ -412,7 +508,7 @@ describe('StaffView', () => {
     await wrapper.get('#remove-with-projects').setValue(false)
     await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
     await flushPromises()
-    await wrapper.get('#remove-owner').setValue(MO.user_id)
+    await choosePerson('remove-owner', 'mo')
     await wrapper.get('#remove-with-projects').element.closest('form')!.requestSubmit()
     await flushPromises()
 

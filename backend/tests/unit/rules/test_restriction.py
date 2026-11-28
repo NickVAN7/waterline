@@ -7,6 +7,10 @@ export control"; DL-82; DL-134; testing-strategy, "Effective restriction"):
 - `change(old, new)`: a higher level or an added category raises; a lower level or a removed
   category lowers; a change can do both, or neither. None ranks as Internal for these rules
   (DL-82), so a change between them is neither.
+- `needed_rights(kind, raise_, lower)`: a raise needs the raise action, a lower the lower
+  action, a change that does both needs both; one that does neither (the restriction already
+  held included) needs either, so the raise action: lower is never granted without raise
+  (§3.1, "Who sets it"; DL-82).
 """
 
 import pytest
@@ -14,7 +18,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from app.enums import RestrictionCategory, RestrictionLevel
-from app.rules.restriction import Change, Restriction, change, effective
+from app.rules.restriction import Change, Restriction, change, effective, needed_rights
 
 INTERNAL = RestrictionLevel.INTERNAL
 CONFIDENTIAL = RestrictionLevel.CONFIDENTIAL
@@ -228,3 +232,55 @@ def test_change_raises_and_lowers_exactly_as_the_level_rank_and_categories_say(
         raises=RANK[new.level] > RANK[old.level] or bool(new.categories - old.categories),
         lowers=RANK[new.level] < RANK[old.level] or bool(old.categories - new.categories),
     )
+
+
+# --- needed_rights(kind, raise_, lower) ---------------------------------------------------------
+
+# Distinct stand-ins for the two actions; the function is generic over the action type.
+RAISE = "raise-action"
+LOWER = "lower-action"
+
+
+def test_a_raise_needs_only_the_raise_action() -> None:
+    """§3.1: members (and project admins) raise; DL-82: the raise action."""
+    assert needed_rights(Change(raises=True, lowers=False), RAISE, LOWER) == [RAISE]
+
+
+def test_a_lower_needs_only_the_lower_action() -> None:
+    """§3.1: "Lowering a level or removing a category is project-admin only"; DL-82: the lower
+    action, and not the raise action as well."""
+    assert needed_rights(Change(raises=False, lowers=True), RAISE, LOWER) == [LOWER]
+
+
+def test_a_change_that_raises_and_lowers_needs_both_actions() -> None:
+    """§3.1 and DL-82: a change that both adds and removes needs both rights. The order is not
+    specified, so only the set and its size are asserted."""
+    result = needed_rights(Change(raises=True, lowers=True), RAISE, LOWER)
+
+    assert set(result) == {RAISE, LOWER}
+    assert len(result) == 2
+
+
+def test_a_change_that_neither_raises_nor_lowers_needs_the_raise_action() -> None:
+    """DL-82: neither needs either action; lower is never granted without raise, so the raise
+    action alone."""
+    assert needed_rights(Change(raises=False, lowers=False), RAISE, LOWER) == [RAISE]
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expected"),
+    [
+        # The restriction already held (DL-82).
+        (c(CONFIDENTIAL, PII), c(CONFIDENTIAL, PII), [RAISE]),
+        # None to Internal ranks the same (DL-82): neither.
+        (c(None), c(INTERNAL), [RAISE]),
+        # A higher level (§3.1: members can raise).
+        (c(INTERNAL), c(CONFIDENTIAL), [RAISE]),
+        # A removed category (§3.1: project-admin only).
+        (c(INTERNAL, EXPORT_CONTROLLED), c(INTERNAL), [LOWER]),
+    ],
+)
+def test_needed_rights_for_a_real_restriction_change(
+    old: Restriction, new: Restriction, expected: list[str]
+) -> None:
+    assert needed_rights(change(old, new), RAISE, LOWER) == expected

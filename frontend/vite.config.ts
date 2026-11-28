@@ -23,6 +23,9 @@ const contentSecurityPolicy = [
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  // Every bundled asset stays a file on our own origin: a small one inlined as a `data:` URI
+  // would be blocked by the CSP's `default-src 'self'` (DL-370).
+  build: { assetsInlineLimit: 0 },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -34,13 +37,13 @@ export default defineConfig({
     // No CORS headers or preflight answers from Vite: the API alone decides cross-origin
     // behaviour (the Slice 1 Origin check), and the app never needs it.
     cors: false,
-    // The Documentation page imports the user guide from outside `frontend/` (DL-308). Its folder,
-    // not the file: Vite checks a `?raw` import by its id, query and all. In Compose the folder
-    // holds only the mounted guide.
+    // Documentation imports the guide's pages and images from outside `frontend/` (DL-308,
+    // DL-335). In Compose the folder holds only the mounted guide. Its images are served from
+    // here, so the CSP's `default-src 'self'` covers them (no `img-src` needed, DL-341).
     fs: {
       allow: [
         searchForWorkspaceRoot(process.cwd()),
-        fileURLToPath(new URL('../docs/', import.meta.url)),
+        fileURLToPath(new URL('../docs/user-guide/', import.meta.url)),
       ],
     },
     headers: { 'Content-Security-Policy': contentSecurityPolicy },

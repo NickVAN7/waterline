@@ -4,3 +4,5 @@ coverage/
 dist/
 test-results/
 playwright-report/
+# Impeccable's state, if a run starts from frontend/ (DL-381; it broke `wl check` in S3-C0n, C2)
+.impeccable/

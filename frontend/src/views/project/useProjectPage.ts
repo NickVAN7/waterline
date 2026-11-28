@@ -8,9 +8,12 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { api, client } from '@/api/client'
-import { focusHeading, redirectInPlace, settlePage } from '@/app/routeFocus'
+import { focusHeading, redirectInPlace, replacedPage, settlePage } from '@/app/routeFocus'
 import { useLoad } from '@/composables/useLoad'
 import { useCurrentOrgStore } from '@/stores/currentOrg'
+
+const WHO_TO_ASK_EXPORT =
+  "This project's content is export-controlled: only its members can read it. Ask one of its admins to add you."
 
 export function useProjectPage(
   routeName:
@@ -63,5 +66,26 @@ export function useProjectPage(
     if ((await project.run()) && (await opened())) await focusHeading()
   }
 
-  return { key, project, notFound, retry }
+  /** After a refusal: the project read again, what the user may do with it, the shell's project
+   * too (UI-FRM-7). If the page has turned into another (the project gone, or `stillShown`
+   * false), it settles as a navigation does: title, and focus on the new `h1`, on a visit's first
+   * page too, since the user acted (UI-SHL-9). False when it has. */
+  async function reload(stillShown: () => boolean = () => true): Promise<boolean> {
+    await project.run()
+    if (project.data.value) nav.select(project.data.value)
+    if (notFound.value || !stillShown()) {
+      await replacedPage()
+      return false
+    }
+    return true
+  }
+
+  const exportControlled = computed(
+    () => !!project.data.value?.restriction_categories.includes('export_controlled'),
+  )
+  /** A content page's 403 who-to-ask: an export-controlled project's content is for its members
+   * only (design-doc §3.1), whatever the page's own reason. */
+  const whoToAsk = (own: string) => (exportControlled.value ? WHO_TO_ASK_EXPORT : own)
+
+  return { key, project, notFound, retry, reload, exportControlled, whoToAsk }
 }

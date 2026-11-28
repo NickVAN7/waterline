@@ -591,6 +591,7 @@ leave, be demoted, or be deactivated unless a replacement owner is named in the 
 | restriction_level | enum: internal / confidential, nullable | `RestrictionMixin`; null = None; the floor for the project's items (design-doc §3.1) |
 | restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii`, `export_controlled`; starts empty (no seeding by type) |
 | archived_at | timestamptz, nullable | archived = read-only, hidden by default |
+| get_started_hidden | boolean | Added in Slice 3. NOT NULL, default false; a project admin hid the home's Get started checklist (design-doc §11, DL-201; `PUT/DELETE …/get-started/hidden`, S3-C15) |
 | created_at / updated_at | timestamptz | |
 
 Composite FK `(organization_id, workspace_id)` → `organization(id, workspace_id)`: keeps
@@ -667,16 +668,16 @@ helper touches this table. Subtasks are numbered by `task.next_subtask_number` i
 |---|---|---|
 | id | UUID (PK) | |
 | project_id | UUID (FK → project) | |
-| name | varchar | e.g. Discover, Design, Build, Test, Deploy, Hypercare |
-| description | text, nullable | plain text |
+| name | varchar | e.g. Discover, Design, Build, Test, Deploy, Hypercare; at most 100 characters (DL-143) |
+| description | text, nullable | plain text; at most 2,000 characters (DL-143) |
 | rank | varchar | display order |
 | start_date / end_date | date, nullable | current plan |
 | baseline_start / baseline_end | date, nullable | approved plan, for slippage |
-| status | enum: planned / active / completed | several phases may be active at once |
+| status | enum: planned / active / completed | default planned; several phases may be active at once |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(project_id, name)`; `CHECK (end_date >= start_date)` when both are set. Phases may
-overlap. Hard delete only while unreferenced (service-layer check). Date and status changes are
+`UNIQUE(project_id, name)` (a 422 `taken` on `name`); `CHECK (end_date >= start_date)` when both
+are set (`ck_phase_dates`, a 422 `before_start` on `end_date`). Phases may overlap. Hard delete only while unreferenced (service-layer check). Date and status changes are
 logged.
 
 ### `workstream`
@@ -684,14 +685,14 @@ logged.
 |---|---|---|
 | id | UUID (PK) | |
 | project_id | UUID (FK → project) | |
-| name | varchar | e.g. Finance, Procure-to-Pay, Data Migration; components on software projects |
-| description | text, nullable | plain text |
-| lead_id | UUID (FK → user), nullable | |
+| name | varchar | e.g. Finance, Procure-to-Pay, Data Migration; components on software projects; at most 100 characters (DL-143) |
+| description | text, nullable | plain text; at most 2,000 characters (DL-143) |
+| lead_id | UUID (FK → user), nullable | an active project member when named; cleared when they leave the project (DL-409) |
 | rank | varchar | display order |
 | archived_at | timestamptz, nullable | hidden from pickers; still shown on existing items |
 | created_at / updated_at | timestamptz | |
 
-`UNIQUE(project_id, name)`.
+`UNIQUE(project_id, name)` (a 422 `taken` on `name`).
 
 ---
 
@@ -770,9 +771,9 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | number | integer | displayed `{KEY}-TA-n`; never reused |
 | requirement_id | UUID (FK → requirement), nullable | optional; unlinked tasks flagged in UI |
 | type | enum: feature / bug / chore / spike / config / data / training | labels mapped per project type |
-| title | varchar | |
-| description_md | text | markdown |
-| status | enum: todo / in_progress / blocked / in_review / done / cancelled | manually set |
+| title | varchar | at most 200 characters, as a requirement's (DL-143) |
+| description_md | text | markdown; at most 20,000 characters, as a requirement's (DL-143) |
+| status | enum: todo / in_progress / blocked / in_review / done / cancelled | default todo; manually set |
 | priority | enum: critical / high / medium / low | default medium |
 | severity | enum: s1 / s2 / s3 / s4, nullable | defect severity; shown for bugs |
 | start_date | date, nullable | |
@@ -785,8 +786,8 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 | sprint_id | UUID (FK → sprint), nullable | Added in Slice 4. Same project |
 | milestone_id | UUID (FK → milestone), nullable | Added in Slice 4. Same project |
 | workstream_id | UUID (FK → workstream), nullable | same project |
-| time_estimate | numeric, nullable | unit-agnostic |
-| time_taken | numeric, nullable | unit-agnostic |
+| time_estimate | numeric, nullable | unit-agnostic; 0 to 9,999,999.99 (DL-411) |
+| time_taken | numeric, nullable | unit-agnostic; 0 to 9,999,999.99 (DL-411) |
 | restriction_level | enum: internal / confidential, nullable | `RestrictionMixin` (design-doc §3.1) |
 | restriction_categories | text[] | `RestrictionMixin`; NOT NULL, default `{}`; values: `financial`, `proprietary`, `pii` |
 | next_subtask_number | integer, default 1 | subtask counter; incremented by a direct `UPDATE … RETURNING` outside the ORM so it doesn't bump `version` |
@@ -798,7 +799,9 @@ Many-to-many. Removing a row is logged as `unlinked` on both sides' history.
 `UNIQUE(project_id, number)`; `project_id` is immutable. Index on `(project_id, status, rank)`
 for board and backlog views. For My work (design-doc §11): `ix_task_assignee_id_status` on
 `(assignee_id, status)` (tasks assigned to the user) and `ix_task_reviewer_id_status` on
-`(reviewer_id, status)` (tasks in review with the user as reviewer).
+`(reviewer_id, status)` (tasks in review with the user as reviewer). `ix_task_requirement_id` (a
+requirement's tasks: its page, its coverage counts, the delete's linked-tasks choice) and
+`ix_task_phase_id` (a phase's hard delete only while unreferenced) (DL-407).
 `CHECK (restriction_categories <@ ARRAY['financial', 'proprietary', 'pii'])`.
 
 ### `subtask`
@@ -807,9 +810,9 @@ for board and backlog views. For My work (design-doc §11): `ix_task_assignee_id
 | id | UUID (PK) | |
 | task_id | UUID (FK → task) | immutable; a subtask cannot move to another task |
 | number | integer | number within its task; displayed `{KEY}-TA-{task number}.{number}` (e.g. `PMT-TA-45.2`); never reused |
-| title | varchar | |
-| description | text | plain text |
-| is_done | boolean | |
+| title | varchar | at most 200 characters (DL-412) |
+| description | text | plain text; at most 2,000 characters (DL-412) |
+| is_done | boolean | default false |
 | rank | varchar | order within its task |
 | created_at / updated_at | timestamptz | |
 
@@ -1029,7 +1032,7 @@ does (below), with the same limits.
 | target_user_id | UUID (FK → user), nullable | the user acted on |
 | entity_type | enum: workspace / organization / project / user, nullable | the entity changed, where it isn't just the target user |
 | entity_id | UUID, nullable | polymorphic, no FK |
-| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_restriction_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, the removed `role`, `lead_cleared` when it cleared the project's lead, and `via` (`org_member_removed` or `workspace_member_removed`) when an org or staff removal "with their projects" removed it, DL-78); never passwords, hashes, or tokens |
+| details | jsonb | NOT NULL, no default (`log_admin_event()` passes `{}` for an action without details); action-specific values (old/new role, old/new name or slug; for `user_updated`, the old and new value of every field changed (name, username, email); for `project_updated`, the changed fields, e.g. modules, status, lead; for `project_created`, the initial level and categories and any export-control confirmation; for `project_restriction_changed`, the old and new level and categories and any export-control confirmation; for a member added to an export-controlled project, the confirmation; for `project_member_removed`, the removed `role`, `lead_cleared` when it cleared the project's lead, `workstream_leads_cleared` (the workstream IDs) when it cleared workstream leads (DL-409), and `via` (`org_member_removed` or `workspace_member_removed`) when an org or staff removal "with their projects" removed it, DL-78); never passwords, hashes, or tokens |
 | occurred_at | timestamptz | NOT NULL, `server_default now()`: the transaction's start time, as for `created_at`; `log_admin_event()` never sets it |
 | created_at / updated_at | timestamptz | |
 
@@ -1115,6 +1118,25 @@ created. Project members create tags; renaming, deleting, and setting a tag's ty
 | created_at / updated_at | timestamptz | |
 
 Index `(entity_type, entity_id)`. Links only in v1; file uploads are v2+ (design-doc §16).
+
+### `saved_filter`
+A user's named filter-bar setup for one list in one project (design-doc §11, "Lists";
+`docs/reviews/s3/S3-plan.md`, Q8). Owned by the `saved_filter` area; added in S3-C32.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → user) | the owner; every query is scoped to the caller |
+| project_id | UUID (FK → project) | |
+| list | enum: requirements / tasks / activity / trash / project_members | the project list it filters; the backlog and the board share `tasks` (one task list, `GET …/tasks`) |
+| name | varchar | at most 100 characters |
+| query | text | the list's query string as the filter bar puts it in the URL; at most 2,000 characters; checked against the list's declared filters when applied, not when saved |
+| created_at / updated_at | timestamptz | |
+
+`UNIQUE(user_id, project_id, list, name)`, `user_error("name", "taken", …)`: a user can't reuse a
+name on the same list. No other index: rows are read by user (and project and list), which the
+unique constraint leads with, never by project alone. A saved filter of a project the user can
+no longer open stays and is left out.
 
 ---
 

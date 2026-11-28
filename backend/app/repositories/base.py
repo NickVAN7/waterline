@@ -1,10 +1,23 @@
 """Query helpers shared by every repository."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
-from sqlalchemy import ColumnElement, Result, and_, not_, or_, select, true, update
+from sqlalchemy import (
+    ColumnElement,
+    Result,
+    String,
+    Uuid,
+    and_,
+    column,
+    not_,
+    or_,
+    select,
+    true,
+    update,
+    values,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, class_mapper
 from sqlalchemy.orm.attributes import set_committed_value
@@ -12,6 +25,7 @@ from sqlalchemy.sql import Executable, Update
 
 from app.authz.scoping import Scope
 from app.core.base_model import INCLUDE_DELETED, IdMixin
+from app.enums import RestrictionLevel
 
 
 async def get_by_id[M: IdMixin](
@@ -91,6 +105,36 @@ async def direct_update(
     return {key: updated[key] for key in values}
 
 
+async def write_ranks(
+    session: AsyncSession, model: type[IdMixin], writes: Sequence[tuple[uuid.UUID, str]]
+) -> None:
+    """Each row's new rank in one statement (`UPDATE … FROM (VALUES …)`), outside the unit of
+    work: no `version` bump and `updated_at` held (a display-order change, DL-168; one
+    statement however many rows a rewrite takes, DL-345, TD-73). A loaded object gets its new
+    rank, so nothing is left expired."""
+    if not writes:
+        return
+    new = values(column("id", Uuid), column("rank", String), name="new_rank").data(list(writes))
+    mapper = class_mapper(model)
+    # Assigning a column to itself keeps its value and stops its onupdate from firing.
+    held = {
+        mapper.get_property_by_column(c).key: getattr(model, mapper.get_property_by_column(c).key)
+        for c in mapper.columns
+        if c.onupdate is not None
+    }
+    statement = (
+        update(model)
+        .where(model.id == new.c.id)
+        .values(rank=new.c.rank, **held)
+        .execution_options(synchronize_session=False)
+    )
+    await session.execute(statement)
+    for entity_id, rank in writes:
+        loaded = session.identity_map.get(mapper.identity_key_from_primary_key((entity_id,)))
+        if loaded is not None:
+            set_committed_value(loaded, "rank", rank)
+
+
 def scope_clause(
     scope: Scope,
     id_column: InstrumentedAttribute[uuid.UUID],
@@ -116,3 +160,17 @@ def scope_clause(
             raise ValueError("a content scope needs the export_controlled expression")
         inherited = and_(inherited, not_(export_controlled))
     return or_(id_column.in_(scope.ids), inherited)
+
+
+async def lock_stored_at(
+    session: AsyncSession, model: Any, project_id: uuid.UUID, levels: Collection[RestrictionLevel]
+) -> list[tuple[uuid.UUID, RestrictionLevel]]:
+    """The project's live items of `model` (a content item with `RestrictionMixin`) stored at
+    one of `levels`, locked, in id order (so two raises lock rows in the same order)."""
+    rows = await session.execute(
+        select(model.id, model.restriction_level)
+        .where(model.project_id == project_id, model.restriction_level.in_(levels))
+        .order_by(model.id)
+        .with_for_update()
+    )
+    return [(id_, RestrictionLevel(level)) for id_, level in rows]

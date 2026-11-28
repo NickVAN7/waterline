@@ -38,7 +38,8 @@ class RequirementUpdate(BaseModel):
     """Only the fields sent change. `version` is the one the caller read (a stale one is a
     409). A new revision, with `change_note`, only when `title` or `description_md` changes
     (design-doc §6.1). `status` may not be `approved` (DL-161); `reporter_id` needs
-    `requirement.reassign_reporter` (DL-211)."""
+    `requirement.reassign_reporter` (DL-211). A newly set `workstream_id` is one of the
+    project's live workstreams (404 outside it, 422 `archived`)."""
 
     version: int
     title: str | None = Field(default=None, max_length=REQUIREMENT_TITLE_MAX)
@@ -47,6 +48,8 @@ class RequirementUpdate(BaseModel):
     status: RequirementStatus | None = None
     priority: Priority | None = None
     reporter_id: uuid.UUID | None = None
+    # Null clears it; a newly set one is a live workstream of the project.
+    workstream_id: uuid.UUID | None = None
 
 
 class RequirementRestrictionUpdate(BaseModel):
@@ -74,6 +77,14 @@ class RequirementMove(BaseModel):
     before_id: uuid.UUID | None = None
 
 
+class RequirementAncestor(BaseModel):
+    """One of a requirement's ancestors: its number, shown as its ID, and its title, for the
+    Parent row (DL-328, TD-106)."""
+
+    number: int
+    title: str
+
+
 class RequirementRead(BaseModel):
     """One requirement, with the actions the caller may take on it. "Approved · modified" is
     derived: `approved_revision_id` set and not `current_revision_id` (design-doc §6.1)."""
@@ -85,6 +96,7 @@ class RequirementRead(BaseModel):
     description_md: str
     status: RequirementStatus
     priority: Priority
+    workstream_id: uuid.UUID | None
     reporter_id: uuid.UUID
     reporter_name: str
     # False shows the "Deactivated" badge after the reporter's name (TD-77).
@@ -102,11 +114,17 @@ class RequirementRead(BaseModel):
     has_children: bool
     # Whether the caller may delete the whole subtree with it (`?children=delete`, DL-222).
     can_delete_children: bool
+    # Whether the caller may delete the tasks linked to it and its live descendants with it
+    # (`?tasks=delete`, design-doc §9).
+    can_delete_tasks: bool
     approved_at: datetime | None
     version: int
     created_at: datetime
     updated_at: datetime
     allowed_actions: list[Action]
+    # Its ancestors, root first, for the breadcrumb trail and the Parent row (DL-327, DL-328):
+    # under the read's own scope, since v1 access is per project (design-doc §3).
+    ancestors: list[RequirementAncestor]
 
 
 class RequirementItem(BaseModel):
@@ -122,11 +140,19 @@ class RequirementItem(BaseModel):
     restriction_categories: list[RestrictionCategory]
     current_revision_id: uuid.UUID | None
     approved_revision_id: uuid.UUID | None
+    # A pending approval request on it: the tree's "Awaiting approval" badge (Q12b).
+    awaiting_approval: bool
+    # Its live tasks and those done, cancelled ones left out (coverage, DL-199).
+    task_count: int
+    tasks_done: int
+    # Not a match of the tree's filters: shown as the ancestor of one (DL-351).
+    context: bool
 
 
 class RequirementTree(BaseModel):
-    """The project's requirements in `(rank, id)` order, siblings in rank order (the client
-    nests them by `parent_id`); at most 2,000, with `truncated` above it (DL-159)."""
+    """The project's requirements matching the filters, with their ancestors as context, in
+    `(rank, id)` order, siblings in rank order (the client nests them by `parent_id`); at most
+    2,000 matches, with `truncated` above it (DL-159, DL-351)."""
 
     items: list[RequirementItem]
     truncated: bool

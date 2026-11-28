@@ -23,13 +23,10 @@ test('a project is created from the project selector, and opens', async ({ page 
   await page.keyboard.press('Enter')
   const selector = page.getByRole('dialog', { name: 'Projects' })
   await expect(selector).toHaveAccessibleDescription('Acme Manufacturing')
-  // All projects reads as a link apart from the rows; New project lines up with them (DL-137).
+  // All projects is a menu row set apart below the projects, not underlined like a link in text
+  // (owner, S2 feedback); New project lines up with it (DL-137).
   const allProjects = selector.getByRole('link', { name: 'All projects' })
-  await expect(allProjects).toHaveCSS('text-decoration-line', 'underline')
-  await expect(selector.getByRole('link', { name: /^ERP Rollout/ })).not.toHaveCSS(
-    'text-decoration-line',
-    'underline',
-  )
+  await expect(allProjects).not.toHaveCSS('text-decoration-line', 'underline')
   const newProject = selector.getByRole('button', { name: 'New project' })
   // Measured once the popover's opening animation has finished: it scales in.
   await page.waitForFunction(() =>
@@ -53,10 +50,23 @@ test('a project is created from the project selector, and opens', async ({ page 
   await dialog.getByRole('textbox', { name: 'Key', exact: true }).fill(key.toLowerCase())
   await expect(dialog.getByText('Key is available')).toBeVisible()
   await dialog.getByRole('combobox', { name: 'Type' }).selectOption('erp')
-  // The first-admin picker offers an org member and a workspace admin outside the org (DL-152).
-  const firstAdmin = dialog.getByRole('combobox', { name: 'First admin' })
-  await expect(firstAdmin.getByRole('option', { name: /^Liam Lewis/ })).toBeAttached()
-  await expect(firstAdmin.getByRole('option', { name: /^Wendy Walsh/ })).toBeAttached()
+  // The first admin starts on Me; Someone else searches an org member and a workspace admin
+  // outside the org (DL-152, DL-422). Back to Me, the creator stays first admin and lead.
+  await expect(dialog.getByRole('radio', { name: /^Me / })).toBeChecked()
+  await dialog.getByRole('radio', { name: 'Someone else' }).check()
+  const person = dialog.getByRole('combobox', { name: 'Person' })
+  const found = dialog.getByRole('listbox').getByRole('option')
+  await person.click()
+  await person.pressSequentially('liam')
+  await expect(found).toHaveText([/^Liam Lewis/])
+  await person.fill('')
+  await person.pressSequentially('wendy')
+  await expect(found).toHaveText([/^Wendy Walsh/])
+  // Esc closes the picker's list, not the dialog.
+  await page.keyboard.press('Escape')
+  await expect(dialog.getByRole('listbox')).toBeHidden()
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('radio', { name: /^Me / }).check()
   await dialog.getByRole('radio', { name: /^Confidential/ }).check()
   await dialog.getByRole('checkbox', { name: 'Financial' }).check()
   await expectNoA11yViolations(page)

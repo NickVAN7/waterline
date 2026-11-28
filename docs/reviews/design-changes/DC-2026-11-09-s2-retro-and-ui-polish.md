@@ -143,3 +143,30 @@ are small and test-covered, and only `checkpoint-reviewer` would be re-reviewed 
 
 - Decision B, at S3-C0f's re-cut.
 - The rest of `S2-ui-feedback.md`, in Slice 3's planning.
+
+## Appendix: the style sample (DL-342)
+
+The "Requirements sample" DL-342 names as the guide's tone was at the end of the Nov 9 handoff
+prompt and never committed; added verbatim on Nov 12, 2026 (DC-2026-11-12c). It guides tone and
+depth, not a template.
+
+## Style sample (Requirements page, condensed)
+
+> **Requirements** describe what a project has to deliver. Each one has an ID like
+> `PORTAL-RQ-7`, a status, a priority, and a description with its acceptance criteria. They sit
+> in a tree, so a large requirement can be broken into smaller ones under it.
+>
+> **Browse the tree.** Open **Requirements** in the project's sidebar. The tree starts with only
+> the top-level requirements showing: open a branch with its arrow. To open everything under one
+> requirement at once, select its row and choose **Expand requirement**. (Tip: ++→++ opens a
+> selected row's branch and ++←++ closes it.)
+>
+> **Create a requirement.** (1) Choose **New requirement**. (2) Give it a **Title**, then pick its
+> **Priority** and **Parent**. (3) Fill in the **Description**; it starts from your project
+> type's template, which includes an Acceptance Criteria heading. (4) Choose **Create
+> requirement**. New requirements start as Draft.
+>
+> Further sections: Open and edit a requirement (with the panel screenshot) · Change its status
+> or restriction · Get it approved (short, linking to Approvals) · See what changed · Move or
+> delete a requirement · Who can do this (a table: see; create, edit, move or change status;
+> raise or lower a restriction; request approval or approve by hand; delete).

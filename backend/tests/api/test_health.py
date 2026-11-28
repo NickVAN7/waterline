@@ -53,8 +53,10 @@ async def test_health_is_503_not_500_when_a_pooled_connection_has_died(
             await connection.execute(
                 text(
                     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
-                    " WHERE application_name = 'health-drop-test'"
-                )
+                    " WHERE application_name = 'health-drop-test' AND datname = :database"
+                ),
+                # Only this run's: another review copy's runs the same test at once (DL-392).
+                {"database": settings.test_database_url().database},
             )
             after = await client.get("/api/health")
     finally:

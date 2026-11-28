@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Collection
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,12 +24,30 @@ class ActivityRepository:
         entity_id: uuid.UUID,
         spec: ListSpec,
         query: BaseModel,
+        *,
+        requests: Select[uuid.UUID] | None = None,
     ) -> FeedResult[ActivityLog]:
-        """One item's entries, newest first (the `(entity_type, entity_id, id)` index)."""
-        statement = select(ActivityLog).where(
-            ActivityLog.entity_type == entity_type, ActivityLog.entity_id == entity_id
+        """One item's entries and every entry of its approval `requests`, newest first (the
+        `(entity_type, entity_id, id)` index; DL-388, DL-397)."""
+        own = and_(ActivityLog.entity_type == entity_type, ActivityLog.entity_id == entity_id)
+        if requests is not None:
+            own = or_(
+                own,
+                and_(
+                    ActivityLog.entity_type == ActivityEntityType.APPROVAL_REQUEST,
+                    ActivityLog.entity_id.in_(requests),
+                ),
+            )
+        return await fetch_feed(self.session, select(ActivityLog).where(own), spec, query)
+
+    async def project_feed(
+        self, project_id: uuid.UUID, spec: ListSpec, query: BaseModel, current_user_id: uuid.UUID
+    ) -> FeedResult[ActivityLog]:
+        """Every entry of the project, newest first, filtered (the `(project_id, id)` index)."""
+        statement = select(ActivityLog).where(ActivityLog.project_id == project_id)
+        return await fetch_feed(
+            self.session, statement, spec, query, current_user_id=current_user_id
         )
-        return await fetch_feed(self.session, statement, spec, query)
 
     async def last_deleters(
         self, entity_type: ActivityEntityType, entity_ids: Collection[uuid.UUID]

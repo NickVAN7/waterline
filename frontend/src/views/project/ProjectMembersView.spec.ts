@@ -11,8 +11,11 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { choosePerson } from '@/test/picker'
 import { project } from '@/test/projects'
 import { listPage } from '@/test/workspace'
+import { withTrailRoutes } from '@/test/router'
+import { trail } from '@/test/trail'
 
 import ProjectMembersView from './ProjectMembersView.vue'
 
@@ -66,7 +69,7 @@ async function mountAt(shown: Project, rows: Member[], next: Project[] = []) {
   }) as never)
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
+    routes: withTrailRoutes([
       { path: '/', name: 'my-work', component: Page },
       { path: '/status', name: 'status', component: Page },
       { path: '/:orgSlug/projects/:key', name: 'project-home', component: Page },
@@ -78,7 +81,7 @@ async function mountAt(shown: Project, rows: Member[], next: Project[] = []) {
         component: ProjectMembersView,
         meta: { settlesItself: true },
       },
-    ],
+    ]),
   })
   installRouteFocus(router)
   await router.push(`/acme/projects/${shown.key}/members`)
@@ -121,22 +124,37 @@ afterEach(() => {
 })
 
 describe('ProjectMembersView', () => {
-  it('lists the members with their roles, a deactivated one marked, under the project header', async () => {
-    const { wrapper } = await mountAt(project({ allowed_actions: ['project.view'] }), [
-      member('Ann Lee', { role: 'admin' }),
-      member('Dee Gone', { role: 'viewer', is_active: false }),
-    ])
+  // 15 s: past the 5 s default in a 4-core machine's full suite, under 1 s alone (TD-125).
+  it(
+    'lists the members with their roles, a deactivated one marked, under the project header',
+    { timeout: 15_000 },
+    async () => {
+      const { wrapper } = await mountAt(project({ allowed_actions: ['project.view'] }), [
+        member('Ann Lee', { role: 'admin' }),
+        member('Dee Gone', { role: 'viewer', is_active: false }),
+      ])
 
-    expect(wrapper.get('h1').text()).toBe('ERP rollout members')
-    expect(document.title).toBe('ERP rollout members · Waterline')
-    expect(
-      wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
-    ).toEqual([
-      ['Ann Lee', 'ann@acme.example', 'Admin', ''],
-      ['Dee Gone Deactivated', 'dee@acme.example', 'Viewer', ''],
-    ])
-    await expectNoA11yViolations(wrapper)
-  })
+      expect(wrapper.get('h1').text()).toBe('ERP rollout members')
+      // Its trail (DL-327, UI-SHL-14).
+      expect(trail()).toEqual({
+        links: [
+          ['Acme Manufacturing', '/acme/projects'],
+          ['ERP rollout', '/acme/projects/ERP'],
+        ],
+        current: 'Members',
+      })
+      expect(document.title).toBe('ERP members · Waterline')
+      expect(
+        wrapper.findAll('tbody tr').map((r) => r.findAll('td').map((c) => c.text().trim())),
+      ).toEqual([
+        ['Ann Lee', 'ann@acme.example', 'Admin'],
+        ['Dee Gone · Deactivated', 'dee@acme.example', 'Viewer'],
+      ])
+      // Nobody they may change, so no Actions column (TD-102).
+      expect(wrapper.findAll('thead th').map((th) => th.text())).toEqual(['Name', 'Email', 'Role'])
+      await expectNoA11yViolations(wrapper)
+    },
+  )
 
   it('offers no adding, row actions, or access review to someone who only sees the project', async () => {
     const { wrapper, get } = await mountAt(project({ allowed_actions: ['project.view'] }), [
@@ -154,12 +172,14 @@ describe('ProjectMembersView', () => {
     const viewer = await mountAt(project({ allowed_actions: ['project.view'] }), [
       member('Ann Lee'),
     ])
-    expect(viewer.wrapper.find('#show-deactivated').exists()).toBe(false)
+    expect(viewer.wrapper.find('input[name=include_deactivated]').exists()).toBe(false)
     viewer.wrapper.unmount()
 
     const admin = await mountAt(project({ allowed_actions: ADMIN }), [member('Ann Lee')])
 
-    expect(admin.wrapper.get('label:has(#show-deactivated)').text()).toBe('Show deactivated')
+    expect(admin.wrapper.get('label:has(input[name=include_deactivated])').text()).toBe(
+      'Show deactivated',
+    )
   })
 
   it("offers its admins Add member, Add by email, and the project's access review", async () => {
@@ -228,7 +248,7 @@ describe('ProjectMembersView', () => {
 
     expect((post.mock.calls[0]![1] as { body: unknown }).body).toEqual({
       email: 'out@else.example',
-      role: 'viewer',
+      role: 'member',
       export_control_confirmed: true,
     })
   })
@@ -312,7 +332,7 @@ describe('ProjectMembersView', () => {
     useCurrentUserStore().me = me()
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [
+      routes: withTrailRoutes([
         { path: '/', name: 'my-work', component: Page },
         { path: '/status', name: 'status', component: Page },
         {
@@ -321,7 +341,7 @@ describe('ProjectMembersView', () => {
           component: ProjectMembersView,
           meta: { settlesItself: true },
         },
-      ],
+      ]),
     })
     installRouteFocus(router)
     await router.push('/acme/projects/NOPE/members')
@@ -361,7 +381,7 @@ describe('ProjectMembersView', () => {
         name: 'Jane Doe',
         username: 'jane-doe',
         password: 'fake-fake-fake-01',
-        role: 'viewer',
+        role: 'member',
         export_control_confirmed: true,
       },
     })
@@ -382,16 +402,7 @@ describe('ProjectMembersView', () => {
     pageButton(wrapper, 'Add member')!.element.focus()
     await pageButton(wrapper, 'Add member')!.trigger('click')
     await flushPromises()
-    vi.useFakeTimers()
-    const input = wrapper.get<HTMLInputElement>('#add-member-person')
-    input.element.value = 'ann'
-    await input.trigger('input')
-    await vi.advanceTimersByTimeAsync(400)
-    vi.useRealTimers()
-    await flushPromises()
-    await input.trigger('keydown', { code: 'ArrowDown', key: 'ArrowDown' })
-    await input.trigger('keydown', { code: 'Enter', key: 'Enter' })
-    await flushPromises()
+    await choosePerson('add-member-person', 'ann')
 
     await openDialog(wrapper).get('form').trigger('submit')
     await flushPromises()
@@ -470,7 +481,7 @@ describe('ProjectMembersView', () => {
 
     expect((post.mock.calls[1]![1] as { body: unknown }).body).toEqual({
       email: 'out@else.example',
-      role: 'viewer',
+      role: 'member',
     })
     expect(wrapper.text()).toContain('out@else.example added to the project.')
   })

@@ -63,7 +63,12 @@ CLI_FMT = [
     "(cd tools/cli && uv run ruff check --fix . ../../.claude/hooks)",
 ]
 CLI_TEST = ["(cd tools/cli && uv run pytest)"]
-CLI_CHECK = ["uv lock --check", *CLI_LINT, *CLI_TEST]
+CLI_CHECK = [
+    "uv run python -m waterline_cli.doctor repo-state",
+    "uv lock --check",
+    *CLI_LINT,
+    *CLI_TEST,
+]
 E2E_COMPOSE = (
     "docker compose --project-name waterline-e2e --file docker-compose.yml"
     " --file docker-compose.e2e.yml"
@@ -120,6 +125,17 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
             [*E2E_RUN[:-1], "(cd frontend && npx playwright test --project light)", *E2E_DOWN],
             id="e2e-pass-through",
         ),
+        pytest.param(
+            ["docs-screenshots"],
+            [
+                *E2E_DOWN,
+                f"{E2E_COMPOSE} up --detach --wait --build",
+                f"{E2E_COMPOSE} run --rm api python -m app.cli seed --manual-pass",
+                "(cd frontend && npx playwright test --config playwright.screenshots.config.ts)",
+                *E2E_DOWN,
+            ],
+            id="docs-screenshots",
+        ),
         pytest.param(["audit"], AUDIT, id="audit"),
         pytest.param(["test"], [*BACKEND_TEST, *FRONTEND_TEST, *CLI_TEST], id="test"),
         pytest.param(["lint"], [*BACKEND_LINT, *FRONTEND_LINT, *CLI_LINT], id="lint"),
@@ -145,8 +161,9 @@ def test_every_command_accepts_dry_run(path: tuple[str, ...]) -> None:
         ),
         pytest.param(["up"], [MKDIR_NODE_MODULES, UP], id="up"),
         pytest.param(["up", "postgres"], [MKDIR_NODE_MODULES, f"{UP} postgres"], id="up-service"),
-        pytest.param(["down"], ["docker compose down"], id="down"),
-        pytest.param(["down", "-v"], ["docker compose down -v"], id="down-volumes"),
+        # Every profile: the `jobs` worker stops too (S3-C0u).
+        pytest.param(["down"], ["docker compose --profile '*' down"], id="down"),
+        pytest.param(["down", "-v"], ["docker compose --profile '*' down -v"], id="down-volumes"),
         pytest.param(["logs"], ["docker compose logs --follow"], id="logs"),
         pytest.param(["logs", "api"], ["docker compose logs --follow api"], id="logs-service"),
         pytest.param(["migrate"], ["docker compose run --rm --build migrate"], id="migrate"),
@@ -237,6 +254,56 @@ def test_check_full_runs_everything_ci_runs(monkeypatch: pytest.MonkeyPatch) -> 
         *AUDIT,
         *E2E,
     ]
+
+
+CI = Path(__file__).parents[3] / ".github/workflows/ci.yml"
+
+
+def test_ci_jobs_run_exactly_what_check_full_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI's parallel jobs (DL-392) together are `wl check --full`: no step dropped or added, so
+    a green `wl check --full` locally still means a green CI (DL-99)."""
+    monkeypatch.setattr(mutation, "is_current", _current)
+    *commands, timing = re.findall(r"^\s+run: uv run wl (.+)$", CI.read_text(), re.M)
+    assert commands == ["backend check", "frontend check", "cli check", "audit", "e2e"]
+    assert timing == "e2e --grep @timing"  # outside the gate (DL-403)
+
+    results = [runner.invoke(app, [*command.split(), "--dry-run"]) for command in commands]
+    assert [result.exit_code for result in results] == [0] * len(commands)
+    ci_steps = [line for result in results for line in result.stdout.splitlines()]
+
+    full = runner.invoke(app, ["check", "--full", "--dry-run"]).stdout.splitlines()
+    assert ci_steps == full
+
+
+def test_the_timing_job_is_reported_but_never_required() -> None:
+    """DL-403: the tree's timing test runs in its own job that can't fail the run, and the
+    required check doesn't wait on it. Bug: a slow runner turning the gate red again."""
+    timing = re.search(r"^  timing:\n(?:    .*\n|\n)*", CI.read_text(), re.M)
+    assert timing is not None
+    assert "    continue-on-error: true\n" in timing[0]
+    assert '          WL_TIMING_TEST: "1"\n' in timing[0]
+
+
+def test_wl_e2e_leaves_the_timing_test_out() -> None:
+    """DL-403: Playwright skips `@timing` unless `WL_TIMING_TEST` is set, and the tree's test is
+    the one so tagged. Bug: the filter or the tag dropped, putting it back in the gate."""
+    frontend = CI.parents[2] / "frontend"
+    config = (frontend / "playwright.config.ts").read_text()
+    assert "  grepInvert: process.env.WL_TIMING_TEST ? undefined : /@timing/,\n" in config
+    specs = "".join(p.read_text() for p in sorted((frontend / "e2e").glob("*.spec.ts")))
+    assert re.findall(r"^test\('(.+ @timing)'", specs, re.M) == [
+        "Expand requirement stops at 500 rows without freezing the page @timing"
+    ]
+
+
+def test_the_required_ci_check_fails_when_any_job_does() -> None:
+    """The ruleset's required check (DL-27) waits for every job and runs whatever they did:
+    without `if: always()` a failed job leaves it skipped, which GitHub counts as passed."""
+    check = re.search(r"^  check:\n(?:    .*\n|\n)*", CI.read_text(), re.M)
+    assert check is not None
+    assert "    name: wl check\n" in check[0]
+    assert "    needs: [backend, frontend, cli, audit, e2e]\n    if: always()\n" in check[0]
+    assert 'test "$RESULTS" = "success success success success success"' in check[0]
 
 
 def test_check_leaves_the_audit_and_end_to_end_tests_to_full(

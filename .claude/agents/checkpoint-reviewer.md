@@ -57,13 +57,14 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
      settings from): run `mktemp -d`, then, from `<repo>`,
      `uv run wl review-copy <that directory>/waterline --with-env` (DL-29; the git guard
      allows only one plain git command per call, so the clone-and-apply steps live in `wl`).
-     The copy's tests use the running stack's Postgres and the test database; the
-     `checkpoint` skill runs you only when no other reviewer is running tests.
+     The copy's tests use the running stack's Postgres and a test database of the copy's
+     own (DL-392), so other reviewers and the author may run tests at the same time.
    - Make the smallest change in the copy that should break the behavior, run the related tests
      there (`uv run --directory backend pytest --no-cov <tests>`), and record which test
      failed. If none fails, that's a **major** finding (a **blocker** in `app/rules/` or
      `app/authz/`).
-   - Delete the copy (`rm -rf <that directory>`), even if you stop early.
+   - Discard the copy (`uv run wl discard-copy <that directory>/waterline`, which drops its
+     test databases, then `rm -rf <that directory>`), even if you stop early.
    If the checkpoint added no behavior a test could catch (docs or configuration only), say so
    instead.
 
@@ -86,7 +87,8 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
    lookup or delete by a column with no index (Postgres doesn't index a foreign key's columns,
    and a unique constraint or index serves only its leading column); tables or lists that only
    grow, with no cleanup; check-then-write races; per-process state that must be shared; work
-   every process repeats.
+   every process repeats. Not a finding: an authorization-freshness race the concurrency policy
+   in `backend/CLAUDE.md` accepts (DL-393).
 6. **Tests:** every behavior added has a test at the right layer; edge cases and failure paths
    covered; factories used with explicit values where they matter; no test depends on another;
    coverage thresholds plausible. **Every new or changed test must catch a nameable bug:** for
@@ -109,8 +111,9 @@ don't reopen a resolution the owner decided. Sabotage-check **one** behavior the
    owner-approved change, is a **blocker**; so is a checkpoint that changes `app/rules/` or
    `app/authz/` with no "Spec tests" section.
 7. **Migrations:** match the schema doc; downgrade works; no edits to committed migrations.
-8. **Documentation:** `docs/developer-guide.md` and `docs/user-guide.md` accurately describe
-   what was built; design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`
+8. **Documentation:** `docs/developer-guide.md` and `docs/behavior-reference.md` accurately
+   describe what was built, and the guide under `docs/user-guide/` changed where what a user
+   does or sees changed (DL-335); design/schema/build-plan docs updated for any drift; `docs/tech-debt.md`
    entries have a reason and target, and a resolved one is moved under **Resolved**, shrunk to
    its heading, Added, and Status (DL-313); the root `CLAUDE.md`'s **Status** names this
    checkpoint and the next one (DL-315).

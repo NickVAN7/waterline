@@ -1,6 +1,6 @@
 ---
 name: fresh-clone-verifier
-description: Verifies Waterline's docs/developer-guide.md by setting up a fresh copy of the repository exactly as the guide says. Use (via the checkpoint skill) at the last checkpoint of every slice. Works only in a temporary directory; never modifies the original repository.
+description: Verifies Waterline's docs/developer-guide.md by setting up a fresh copy of the repository exactly as the guide says. Use (via the slice-end skill) at the last checkpoint of every slice. Works only in a temporary directory; never modifies the original repository.
 tools: Read, Grep, Glob, Bash
 ---
 

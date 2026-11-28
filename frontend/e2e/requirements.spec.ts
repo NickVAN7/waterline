@@ -119,7 +119,8 @@ function treeAtCap() {
   return { items, truncated: false }
 }
 
-test('Expand requirement stops at 500 rows without freezing the page', async ({
+// Tagged @timing: outside `wl e2e` and the gate, in CI's own `timing` job (DL-403).
+test('Expand requirement stops at 500 rows without freezing the page @timing', async ({
   page,
 }, testInfo) => {
   const { user, key } = runFor(testInfo)
@@ -252,6 +253,31 @@ test('creating a requirement: the editor and its Preview, its full page, then ed
   await expect(heading).toBeFocused()
   await expect(page).toHaveURL(new RegExp(`/acme/projects/${key}/requirements/\\d+$`))
 
+  // Its trail, above the h1: the org, the project, Requirements, then itself (DL-327).
+  const trail = page.getByRole('navigation', { name: 'Breadcrumb' })
+  await expect(trail.getByRole('link')).toHaveText([/Acme/, /./, 'Requirements'])
+  await expect(trail.locator('[aria-current=page]')).toHaveText(new RegExp(`^${key}-RQ-\\d+$`))
+  await expect(trail.getByRole('button', { name: /more level/ })).toBeHidden()
+  // Under 40rem the middle crumbs fold into "…"; its menu opens from the keyboard with focus in
+  // it, and Esc brings focus back.
+  await page.setViewportSize({ width: 320, height: size.height })
+  const fold = trail.getByRole('button', { name: 'Show 2 more levels' })
+  await expect(fold).toBeVisible()
+  await expect(trail.getByRole('link', { name: 'Requirements' })).toBeHidden()
+  await fold.focus()
+  await page.keyboard.press('Enter')
+  const folded = page.getByRole('menu', { name: 'Show 2 more levels' })
+  await expect(folded).toBeFocused()
+  await expect(folded.getByRole('menuitem')).toHaveText([/./, 'Requirements'])
+  await expectNoA11yViolations(page)
+  await page.keyboard.press('Escape')
+  await expect(folded).toBeHidden()
+  await expect(fold).toBeFocused()
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+  ).toBeLessThanOrEqual(0)
+  await page.setViewportSize(size)
+
   // Edited in place, with a change note (DL-263).
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const title = page.getByRole('textbox', { name: 'Title', exact: true })
@@ -289,6 +315,8 @@ test('creating a requirement: the editor and its Preview, its full page, then ed
 test("a requirement's side panel and page: a stored payload doesn't run, and its status changes", async ({
   page,
 }, testInfo) => {
+  // 60 s: about 33 s on a 4-core machine, past the 30 s default; 8 s on CI (TD-125).
+  test.setTimeout(60_000)
   const { user, key } = runFor(testInfo)
   await signIn(page, user)
   const payload = [
@@ -308,34 +336,144 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   })
   expect(patched.status()).toBe(200)
 
+  const other = await createRequirement(page, key, 'Another requirement')
+
   await page.goto(`/acme/projects/${key}/requirements`)
   const listUrl = page.url()
   const idLink = page.getByRole('link', { name: `${key}-RQ-${created.number}` })
+  const otherLink = page.getByRole('link', { name: `${key}-RQ-${other.number}` })
 
-  // The ID opens the side panel over the list (UI-SHL-11): its own URL, focus on its title.
+  // At 1280px the ID opens the split pane beside the list (UI-SHL-11, DL-321): its own URL, a
+  // named region, focus on its title, the list still usable.
   await idLink.focus()
   await page.keyboard.press('Enter')
-  const panel = page.getByRole('dialog', { name: 'Stored payload' })
+  const panel = page.getByRole('complementary', { name: `Requirement ${key}-RQ-${created.number}` })
   await expect(panel).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
   await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
   await expect(panel.locator('.markdown')).toContainText('Works')
+  // On a wide screen, the split pane is the layout's right column: from under the header to the
+  // window's foot, at its right edge; the page, its header and New requirement included, narrows
+  // beside it (UI-SHL-7, DL-356).
+  await page.setViewportSize({ width: 1920, height: 720 })
+  const placed = await panel.evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    const main = document.getElementById('main')!.getBoundingClientRect()
+    const header = document.querySelector('header')!.getBoundingClientRect()
+    return {
+      top: box.top - header.bottom,
+      bottom: document.documentElement.clientHeight - box.bottom,
+      right: document.documentElement.clientWidth - box.right,
+      mainEnd: box.left - main.right,
+    }
+  })
+  expect(placed).toEqual({ top: 0, bottom: 0, right: 0, mainEnd: 0 })
+  // The pane scrolls its own content: nothing in it, a visually hidden note included, makes the
+  // page taller than the window and scroll into blank space below the layout (S3-C0n trial).
+  const fits = await page.evaluate(() => ({
+    height: document.documentElement.scrollHeight,
+    window: window.innerHeight,
+  }))
+  expect(fits.height).toBe(fits.window)
+  const create = (await page.getByRole('button', { name: 'New requirement' }).boundingBox())!
+  const panelBox = (await panel.boundingBox())!
+  expect(create.x + create.width).toBeLessThan(panelBox.x)
+  // Forced colors: the panel's edge, the separator's line, stays drawn, as a border in the
+  // system's CanvasText: a background line would turn into Canvas and vanish (UI-TOK-6).
+  await page.emulateMedia({ forcedColors: 'active' })
+  const edge = await page
+    .getByRole('separator', { name: 'Resize the panel' })
+    .locator('span')
+    .evaluate((el) => {
+      const probe = document.createElement('div')
+      probe.style.color = 'CanvasText'
+      document.body.append(probe)
+      const canvasText = getComputedStyle(probe).color
+      probe.remove()
+      const style = getComputedStyle(el)
+      return {
+        color: style.borderLeftColor,
+        canvasText,
+        width: parseFloat(style.borderLeftWidth),
+        height: el.getBoundingClientRect().height,
+      }
+    })
+  expect(edge.color).toBe(edge.canvasText)
+  expect(edge.width).toBeGreaterThanOrEqual(1)
+  expect(edge.height).toBeGreaterThan(panelBox.height / 2)
+  await page.emulateMedia({ forcedColors: 'none' })
+  // At 80rem, the narrowest window the pane is beside the page in (DL-383), the page has the least
+  // room: the trail wraps, nothing cut off inside its nav (UI-SHL-14). The nav is measured, not
+  // the document: PrimeVue scrolls it on its own. The list keeps 30rem beside the pane's default
+  // width (DL-385).
+  await page.setViewportSize({ width: 1280, height: 720 })
+  const listTrail = page.getByRole('navigation', { name: 'Breadcrumb' })
+  await expect(listTrail.locator('[aria-current=page]')).toBeInViewport()
+  expect(await listTrail.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
+  expect(
+    await page.evaluate(() => {
+      const main = document.getElementById('main')!
+      const style = getComputedStyle(main)
+      return main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    }),
+  ).toBeGreaterThanOrEqual(480)
   expect(await page.evaluate(() => (window as unknown as { __xss?: string }).__xss)).toBeUndefined()
+  // Its row is marked by more than color (DL-324).
+  const openRow = page.getByRole('row', { name: /Stored payload/ })
+  await expect(openRow).toContainText('Open')
+  // Beside the pane a badge stays whole, never broken over lines, and a tree wider than its room
+  // scrolls in a named region the keyboard reaches (S3-C0n trial).
+  expect(
+    await openRow
+      .getByText('Draft', { exact: true })
+      .evaluate((el) => getComputedStyle(el).whiteSpace),
+  ).toBe('nowrap')
+  // Only the tree's: any other badge wraps, or a long one (a restriction with every category)
+  // would push a 320px page sideways.
+  expect(
+    await panel
+      .getByText('Status: Draft', { exact: true })
+      .evaluate((el) => getComputedStyle(el).whiteSpace),
+  ).toBe('normal')
+  await expect(page.getByRole('region', { name: 'Requirements' })).toHaveAttribute('tabindex', '0')
+  // The panel's tabs and the tree sit on the pane and the page, not raised above them: no fill
+  // of their own (S3-C0n trial). PrimeVue paints a tab list's fill and a tab panel's on the
+  // element around each.
+  const fills = await Promise.all(
+    [
+      panel.getByRole('tablist').locator('..'),
+      panel.getByRole('tabpanel').locator('..'),
+      page.getByRole('columnheader', { name: 'Title' }),
+    ].map((part) => part.evaluate((el) => getComputedStyle(el).backgroundColor)),
+  )
+  expect(fills).toEqual(['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'])
   await expectNoA11yViolations(page)
-  await expectOnlyTokenColors(page, 'dialog[open]')
+  await expectOnlyTokenColors(page, 'aside')
 
-  // A change in the panel, from the keyboard: its menu works over the inert page, and the row
-  // under it follows.
+  // A change in the panel, from the keyboard; the row beside it follows.
   const change = panel.getByRole('button', { name: `Change status of ${key}-RQ-${created.number}` })
   await change.focus()
   await page.keyboard.press('Enter')
   await expect(panel.getByRole('menu')).toBeFocused()
-  // Under its button, not where PrimeVue's document coordinates would put it in a fixed panel.
+  // Under its button, not where PrimeVue's document coordinates would put it.
   const button = (await change.boundingBox())!
   const opened = (await panel.getByRole('menu').boundingBox())!
   expect(Math.abs(opened.y - (button.y + button.height))).toBeLessThan(12)
   expect(Math.abs(opened.x - button.x)).toBeLessThan(12)
   await expectNoA11yViolations(page)
+  // The current status is listed, unavailable but in the text color, and so is the note under
+  // the list: both in tokens (DL-395).
+  const currentItem = panel.getByRole('menuitem', { name: /\(current\)$/ })
+  await expect(currentItem).toHaveAttribute('aria-disabled', 'true')
+  await expect(panel.getByText('Approved is set by an approval.')).toBeVisible()
+  await expectOnlyTokenColors(page, '.p-menu')
+  // In the text color, not the disabled tokens (a token too, so the check above can't tell),
+  // read where a blocked item's color goes: PrimeVue's item content, over the item's own.
+  const content = '.p-menu-item-content'
+  const otherItem = panel.getByRole('menuitem', { name: 'Deferred' }).locator(content)
+  const textColor = await otherItem.evaluate((el) => getComputedStyle(el).color)
+  await expect(currentItem.locator(content)).toHaveCSS('color', textColor)
   // Esc closes the menu alone, not the panel around it.
   await page.keyboard.press('Escape')
   await expect(panel.getByRole('menu')).toBeHidden()
@@ -345,30 +483,106 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await panel.getByRole('menu').getByRole('menuitem', { name: 'Deferred' }).click()
   await expect(panel.getByText('Status: Deferred')).toBeVisible()
   await expect(change).toBeFocused()
-  await expect(page.getByRole('row', { name: /Stored payload/ })).toContainText('Deferred')
+  await expect(openRow).toContainText('Deferred')
   // History, open below the description, shows the change, read back from the server (DL-147).
   await expect(
     panel.getByRole('tabpanel', { name: 'History' }).getByRole('listitem').first(),
   ).toContainText('changed the status from Draft to Deferred')
   // Checked once History has rendered, not on its skeleton (ui-reviewer, S2-C19).
   await expectNoA11yViolations(page)
-  await expectOnlyTokenColors(page, 'dialog[open]')
+  await expectOnlyTokenColors(page, 'aside')
 
-  // Esc in the edit form keeps the panel and what was typed; Cancel ends the edit.
+  // ⋯ More actions from the keyboard (DL-325): its menu under its button, in our colors.
+  const more = panel.getByRole('button', { name: `More actions for ${key}-RQ-${created.number}` })
+  await more.focus()
+  await page.keyboard.press('Enter')
+  const moreMenu = page.getByRole('menu', { name: `More actions for ${key}-RQ-${created.number}` })
+  await expect(moreMenu).toBeFocused()
+  const moreBox = (await more.boundingBox())!
+  const moreOpened = (await moreMenu.boundingBox())!
+  expect(Math.abs(moreOpened.y - (moreBox.y + moreBox.height))).toBeLessThan(12)
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, '[role=menu]')
+  // Esc in a dialog opened from the panel closes that dialog alone (UI-SHL-11), focus back on ⋯.
+  await moreMenu.getByRole('menuitem', { name: 'Change restriction…' }).click()
+  const restriction = page.getByRole('dialog', {
+    name: `Restriction of ${key}-RQ-${created.number}`,
+  })
+  await expect(restriction).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(restriction).toBeHidden()
+  await expect(panel).toBeVisible()
+  await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
+  await expect(more).toBeFocused()
+
+  // Esc in the edit form keeps the panel and what was typed.
   await panel.getByRole('button', { name: 'Edit' }).click()
-  const title = panel.getByLabel('Title')
+  const title = panel.getByRole('textbox', { name: 'Title', exact: true })
   await title.fill('Stored payload, edited')
   await page.keyboard.press('Escape')
   await expect(panel).toBeVisible()
   await expect(title).toHaveValue('Stored payload, edited')
-  await panel.getByRole('button', { name: 'Cancel' }).click()
-  await expect(panel.getByRole('button', { name: 'Edit' })).toBeFocused()
+  // Another ID with unsaved edits asks first (DL-323), on Keep editing, which keeps them.
+  await otherLink.click()
+  const discard = page.getByRole('dialog', { name: 'Discard your changes?' })
+  await expect(discard).toContainText(
+    `Your edits to ${key}-RQ-${created.number} aren't saved. Opening ${key}-RQ-${other.number} discards them.`,
+  )
+  await expect(discard.getByRole('button', { name: 'Keep editing' })).toBeFocused()
+  await expectNoA11yViolations(page)
+  await page.keyboard.press('Enter')
+  await expect(discard).toBeHidden()
+  await expect(title).toHaveValue('Stored payload, edited')
+  await expect(page).toHaveURL(`${listUrl}?open=RQ-${created.number}`)
+  // Discard changes swaps to the other, focus on its title.
+  await otherLink.click()
+  await discard.getByRole('button', { name: 'Discard changes' }).click()
+  const swapped = page.getByRole('complementary', { name: `Requirement ${key}-RQ-${other.number}` })
+  await expect(swapped.getByRole('heading', { name: 'Another requirement' })).toBeFocused()
+  await expect(page).toHaveURL(`${listUrl}?open=RQ-${other.number}`)
+  await expect(page.getByRole('row', { name: /Another requirement/ })).toContainText('Open')
+  await expect(openRow).not.toContainText('Open')
 
-  // Esc closes it as Back would: focus back on the ID, and no history entry left behind.
+  // The separator resizes it from the keyboard (DL-322), and the width is kept. At 1280 it opened
+  // at 512, not 560, so the list keeps 30rem (DL-385).
+  const separator = page.getByRole('separator', { name: 'Resize the panel' })
+  await separator.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(separator).toHaveAttribute('aria-valuenow', '528')
+  await expectFocusNotObscured(page)
+
+  // Esc closes it as Back would: focus back on the ID that opened it, no history entry left.
+  await swapped.getByRole('heading', { name: 'Another requirement' }).focus()
   await page.keyboard.press('Escape')
-  await expect(panel).toBeHidden()
+  await expect(swapped).toBeHidden()
   await expect(page).toHaveURL(listUrl)
+  await expect(otherLink).toBeFocused()
+  // The split pane is a sticky layer (UI-SHL-3): a row's focus beside it isn't covered.
+  await expectFocusNotObscured(page)
+
+  // Narrowing the window with an edit open keeps the edit and the focus in it (UI-SHL-11).
+  await idLink.click()
+  await panel.getByRole('button', { name: 'Edit' }).click()
+  await title.fill('Typed before narrowing')
+  await title.focus()
+  await page.setViewportSize({ width: 900, height: 900 })
+  // Below 80rem it's a modal overlay: a dialog over an inert page, with no separator. While
+  // editing, its title (and so its name) reads "Editing <ID>" (F17).
+  const editingOverlay = page.getByRole('dialog', { name: `Editing ${key}-RQ-${created.number}` })
+  await expect(editingOverlay).toBeVisible()
+  const overlayTitle = editingOverlay.getByRole('textbox', { name: 'Title', exact: true })
+  await expect(overlayTitle).toBeFocused()
+  await expect(overlayTitle).toHaveValue('Typed before narrowing')
+  await editingOverlay.getByRole('button', { name: 'Cancel' }).click()
+  const overlay = page.getByRole('dialog', { name: 'Stored payload' })
+  await overlay.getByRole('heading', { name: 'Stored payload' }).focus()
+  await expect(page.getByRole('separator')).toBeHidden()
+  await expectNoA11yViolations(page)
+  await expectOnlyTokenColors(page, 'dialog[open]')
+  await page.keyboard.press('Escape')
+  await expect(overlay).toBeHidden()
   await expect(idLink).toBeFocused()
+  await page.setViewportSize({ width: 1280, height: 720 })
   await page.goBack()
   await expect(page).not.toHaveURL(listUrl)
   await page.goForward()
@@ -380,6 +594,10 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(panel).toBeHidden()
   await expect(page).toHaveURL(listUrl)
   await idLink.click()
+  // Tab from the focused title reaches its icon buttons, after it on its row (DL-387, F16).
+  await expect(panel.getByRole('heading', { name: 'Stored payload' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(panel.getByRole('link', { name: 'Open full page' })).toBeFocused()
   await panel.getByRole('link', { name: 'Open full page' }).click()
 
   await expect(page).toHaveURL(new RegExp(`/requirements/${created.number}$`))
@@ -404,7 +622,8 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expect(menu).toBeFocused()
   await expectNoA11yViolations(page)
   await menu.getByRole('menuitem', { name: 'In progress' }).click()
-  await expect(page.getByText('Status: In progress')).toBeVisible()
+  // The badge, not the live region announcing the same words for a moment.
+  await expect(page.locator('span', { hasText: 'Status: In progress' })).toBeVisible()
   await expect(changeOnPage).toBeFocused()
   await expectNoA11yViolations(page)
 
@@ -416,4 +635,63 @@ test("a requirement's side panel and page: a stored payload doesn't run, and its
   await expectOnlyTokenColors(page, '[role=tablist]')
   await expectOnlyTokenColors(page, '[role=tabpanel]')
   await expectNoA11yViolations(page)
+})
+
+test("a fast drag of the panel's edge beside a link resizes it", async ({ page }, testInfo) => {
+  const { user, key } = runFor(testInfo)
+  await signIn(page, user)
+  const parent = await createRequirement(page, key, 'Flick parent')
+  const child = await createRequirement(page, key, 'Flick child', parent.id)
+  await page.goto(`/acme/projects/${key}/requirements?open=RQ-${child.number}`)
+  const panel = page.getByRole('complementary', { name: `Requirement ${key}-RQ-${child.number}` })
+  await expect(panel.getByRole('heading', { name: 'Flick child' })).toBeFocused()
+
+  // Pressed level with the Parent link just right of it, then moved in two quick steps: the press's
+  // default (a text selection) made Chromium drag that link and cancel the pointer, the width
+  // left as it was (S3-C0n trial). The real pointer, since jsdom has no default to prevent.
+  const separator = page.getByRole('separator', { name: 'Resize the panel' })
+  const edge = (await separator.boundingBox())!
+  const link = (await panel
+    .getByRole('link', { name: `${key}-RQ-${parent.number}` })
+    .boundingBox())!
+  const x = edge.x + edge.width / 2
+  const y = link.y + link.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x - 50, y)
+  await page.mouse.move(x - 100, y)
+  await page.mouse.up()
+
+  // From the default at 1280: 560, or narrower so the list keeps 30rem, 512 here (DL-385); then
+  // 100 wider.
+  await expect(separator).toHaveAttribute('aria-valuenow', '612')
+  await expect(separator).toBeFocused()
+  expect(await page.evaluate(() => getSelection()!.toString())).toBe('')
+})
+
+// At 320 CSS px the tree reflows (WCAG 1.4.10, UI-SHL-7): the IDs don't wrap and a row can hold
+// two badges ("Awaiting approval", S3-C0l), yet nothing scrolls the page sideways. The demo's
+// PORTAL has a requirement awaiting approval; a nested branch adds the indent.
+test('the requirement tree reflows at 320 px', async ({ page }, testInfo) => {
+  const { user, key } = runFor(testInfo)
+  await signIn(page, user)
+  const top = await createRequirement(page, key, 'Reflow parent with a long title to wrap')
+  const middle = await createRequirement(page, key, 'Reflow child', top.id)
+  await createRequirement(page, key, 'Reflow grandchild with a long title', middle.id)
+
+  await page.setViewportSize({ width: 320, height: 640 })
+  await page.goto(`/acme/projects/${key}/requirements`)
+  // The title selects the row; at this width a click on the row's middle lands on its ID link.
+  await page.getByText('Reflow parent with a long title to wrap', { exact: true }).click()
+  await page.getByRole('button', { name: 'Expand requirement' }).click()
+  await expect(page.getByRole('row', { name: /Reflow grandchild/ })).toBeVisible()
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+  // A branch's toggle keeps its 24px beside a long title in the narrow cell (UI-TOK-6, S3-C0n
+  // trial).
+  const toggle = await page
+    .getByRole('row', { name: /Reflow parent/ })
+    .locator('[data-pc-section="nodetogglebutton"]')
+    .boundingBox()
+  expect({ width: toggle!.width, height: toggle!.height }).toEqual({ width: 24, height: 24 })
 })

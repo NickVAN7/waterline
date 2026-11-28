@@ -6,9 +6,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.authz.actions import Action
+from app.core.csv import csv_response
 from app.core.db import SessionDep
 from app.core.lists import Feed, Page
-from app.enums import DeletedChildren
+from app.enums import DeletedChildren, LinkedTasks
 from app.routers.deps import (
     ERRORS,
     AuthzContextDep,
@@ -39,13 +40,15 @@ from app.schemas.requirement import (
 )
 from app.services.project import ProjectEntity
 from app.services.requirement import (
-    APPROVAL_REQUESTS,
+    REQUIREMENT_EXPORT,
     REVISIONS,
     TRASH,
+    TREE,
     ApprovalRequestEntity,
     RequirementEntity,
     RequirementService,
 )
+from app.services.requirement_approvals import APPROVAL_REQUESTS, RequirementApprovalService
 
 router = APIRouter(tags=["requirement"])
 
@@ -65,6 +68,8 @@ Deleted = Annotated[
 Restored = Annotated[
     RequirementEntity, Depends(authorized(load_deleted_requirement, Action.REQUIREMENT_RESTORE))
 ]
+TreeQuery = Annotated[TREE.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
+ExportQuery = Annotated[REQUIREMENT_EXPORT, Query()]  # pyright: ignore[reportInvalidTypeForm]
 TrashQuery = Annotated[TRASH.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 RevisionsQuery = Annotated[REVISIONS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
 ApprovalRequestsQuery = Annotated[APPROVAL_REQUESTS.query_model, Query()]  # pyright: ignore[reportInvalidTypeForm]
@@ -98,10 +103,28 @@ async def create_requirement(
 
 
 @router.get("/projects/{key}/requirements", responses=ERRORS)
-async def requirement_tree(project: ProjectContentViewed, session: SessionDep) -> RequirementTree:
-    """The project's requirements for the tree, siblings in rank order: complete up to 2,000,
-    with `truncated` above it (DL-159)."""
-    return await RequirementService(session).tree(project)
+async def requirement_tree(
+    project: ProjectContentViewed, query: TreeQuery, ctx: AuthzContextDep, session: SessionDep
+) -> RequirementTree:
+    """The project's requirements matching the filters, with their ancestors as context
+    (`context`), siblings in rank order: complete up to 2,000 matches, with `truncated` above
+    it (DL-159, DL-351). Each with its tasks and those done, cancelled ones left out."""
+    return await RequirementService(session).tree(ctx, project, query)
+
+
+# Before `…/requirements/{number}`, which would read `export.csv` as a number.
+@router.get(
+    "/projects/{key}/requirements/export.csv",
+    responses={200: {"content": {"text/csv": {}}, "description": "The CSV file"}, **ERRORS},
+    response_class=Response,
+)
+async def export_requirements(
+    project: ProjectContentViewed, query: ExportQuery, ctx: AuthzContextDep, session: SessionDep
+) -> Response:
+    """The tree's matches as a CSV file, without their context ancestors (DL-351): the tree's
+    filters, `columns=` in the order asked (every column by default), at most 2,000 rows with
+    `Waterline-Truncated: true` above it; every cell formula-escaped (S3-C14)."""
+    return csv_response(await RequirementService(session).export(ctx, project, query))
 
 
 @router.get("/projects/{key}/requirements/{number}", responses=ERRORS)
@@ -158,11 +181,14 @@ async def delete_requirement(
     ctx: AuthzContextDep,
     session: SessionDep,
     children: DeletedChildren = DeletedChildren.PROMOTE,
+    tasks: LinkedTasks = LinkedTasks.DETACH,
 ) -> None:
     """Move the requirement to the trash: its children promoted to its parent (`promote`, the
-    default) or deleted with it (`delete`, 403 if the caller may not delete each of them); a
-    pending approval request on it is cancelled."""
-    await RequirementService(session).delete(ctx, requirement, children)
+    default) or deleted with it (`delete`, 403 if the caller may not delete each of them); the
+    tasks linked to each deleted one detached (`detach`, the default) or deleted with it
+    (`delete`, 403 if the caller may not delete each task); a pending approval request on each
+    is cancelled."""
+    await RequirementService(session).delete(ctx, requirement, children, tasks)
 
 
 @router.post("/projects/{key}/requirements/{number}/restore", responses=ERRORS)
@@ -212,7 +238,7 @@ async def request_approval(
     """Request approval of the requirement's current revision from the named approvers. 404 for
     an approver without access to the project; 422 on `approver_ids` (`duplicate`,
     `account_inactive`) and on the body (`pending_exists`: one pending request at a time)."""
-    return await RequirementService(session).request_approval(ctx, requirement, body)
+    return await RequirementApprovalService(session).request_approval(ctx, requirement, body)
 
 
 @router.get("/projects/{key}/requirements/{number}/approval-requests", responses=ERRORS)
@@ -220,7 +246,7 @@ async def requirement_approval_requests(
     requirement: Viewed, query: ApprovalRequestsQuery, session: SessionDep
 ) -> Page[ApprovalRequestItem]:
     """The requirement's approval requests, newest first, with their approvers."""
-    return await RequirementService(session).approval_requests(requirement, query)
+    return await RequirementApprovalService(session).approval_requests(requirement, query)
 
 
 @router.get("/approval-requests/{request_id}", responses=ERRORS)
@@ -229,7 +255,7 @@ async def get_approval_request(
 ) -> ApprovalRequestRead:
     """The approval request, with the actions the caller may take on it; 404 for a deleted
     requirement's."""
-    return await RequirementService(session).read_approval_request(ctx, request)
+    return await RequirementApprovalService(session).read_approval_request(ctx, request)
 
 
 @router.post("/approval-requests/{request_id}/cancel", responses=ERRORS)
@@ -238,7 +264,7 @@ async def cancel_approval_request(
 ) -> ApprovalRequestRead:
     """Cancel the pending request; 422 on `id` (`not_pending`) for one already decided or
     cancelled."""
-    return await RequirementService(session).cancel_approval_request(ctx, request)
+    return await RequirementApprovalService(session).cancel_approval_request(ctx, request)
 
 
 @router.post("/approval-requests/{request_id}/decision", responses=ERRORS)
@@ -248,7 +274,7 @@ async def decide_approval_request(
     """Approve or reject on your own row, finally (403 once it's decided); 422 on `id`
     (`not_pending`) for a request already completed or cancelled. The last approval completes
     the request; any rejection rejects it."""
-    return await RequirementService(session).decide(ctx, request, body)
+    return await RequirementApprovalService(session).decide(ctx, request, body)
 
 
 @router.post("/projects/{key}/requirements/{number}/approve", responses=ERRORS)
@@ -257,4 +283,4 @@ async def approve_requirement(
 ) -> RequirementRead:
     """Approve the requirement's current revision by hand; a pending approval request on it is
     cancelled. 409 on a stale `version`."""
-    return await RequirementService(session).approve(ctx, requirement, body)
+    return await RequirementApprovalService(session).approve(ctx, requirement, body)
