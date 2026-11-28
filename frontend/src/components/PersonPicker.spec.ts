@@ -30,6 +30,7 @@ type Wrapper = ReturnType<typeof mountPicker>
 async function type(wrapper: Wrapper, text: string, wait = 400) {
   vi.useFakeTimers()
   const input = wrapper.get<HTMLInputElement>('#who')
+  input.element.focus()
   input.element.value = text
   await input.trigger('input')
   await vi.advanceTimersByTimeAsync(wait)
@@ -115,6 +116,27 @@ describe('PersonPicker (DL-422)', () => {
     expect(wrapper.get<HTMLInputElement>('#who').element.value).toBe('')
   })
 
+  it('keeps its list closed when focus has moved on before the search answers', async () => {
+    // A dialog's first focus can pass through the field (a browser's own `showModal()` focus
+    // before the dialog's `data-autofocus`): the answer, or PrimeVue's open after two frames,
+    // must not open the list once focus is elsewhere. Bug: the approvers' list open on opening.
+    let answer: (people: Person[]) => void = () => undefined
+    const search = vi.fn(() => new Promise<Person[]>((resolve) => (answer = resolve)))
+    const wrapper = mountPicker(search)
+    const elsewhere = document.body.appendChild(document.createElement('button'))
+
+    wrapper.get<HTMLInputElement>('#who').element.focus()
+    await flushPromises()
+    elsewhere.focus()
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    answer([ANN, BO])
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(search).toHaveBeenCalledWith('')
+    expect(document.querySelector('[role="listbox"]')).toBeNull()
+  })
+
   it("doesn't open its list on focus once someone is chosen (DL-137)", async () => {
     const search = vi.fn().mockResolvedValue([ANN])
     const wrapper = mountPicker(search, ANN)
@@ -135,7 +157,8 @@ describe('PersonPicker (DL-422)', () => {
       "Couldn't search. Type again to try again.",
     )
     expect(wrapper.get('#who').attributes('aria-describedby')).toBe('who-help who-search-failed')
-    expect(wrapper.emitted('failed')).toEqual([[UNREACHABLE]])
+    // The focus's search failed too: the last is the typed one.
+    expect(wrapper.emitted('failed')!.at(-1)).toEqual([UNREACHABLE])
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
   })
 

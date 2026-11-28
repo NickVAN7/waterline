@@ -7,6 +7,8 @@ export async function typeInPicker(id: string, typed: string): Promise<HTMLInput
   vi.useFakeTimers()
   // `input` alone, as typing fires: `change` comes on blur, and `force-selection` clears there.
   const input = document.getElementById(id) as HTMLInputElement
+  // Typed in, so focused: the picker's list opens only while its field has focus.
+  input.focus()
   input.value = typed
   input.dispatchEvent(new Event('input'))
   await vi.advanceTimersByTimeAsync(400)

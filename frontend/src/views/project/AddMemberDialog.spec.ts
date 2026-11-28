@@ -6,7 +6,7 @@ import { client } from '@/api/client'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { failed, ok, validationFailed } from '@/test/api'
 import { stubDialog } from '@/test/overlay'
-import { choosePerson } from '@/test/picker'
+import { choosePerson, typeInPicker } from '@/test/picker'
 import { listPage } from '@/test/workspace'
 
 import AddMemberDialog from './AddMemberDialog.vue'
@@ -70,18 +70,12 @@ describe('AddMemberDialog: the picker', () => {
 
   it('lists what the search finds as options, each with name and email', async () => {
     const { wrapper } = await openDialog()
-    vi.useFakeTimers()
-    const input = wrapper.get<HTMLInputElement>('#add-member-person')
-    input.element.value = 'ann'
-    await input.trigger('input')
-    await vi.advanceTimersByTimeAsync(400)
-    vi.useRealTimers()
-    await flushPromises()
+    const input = await typeInPicker('add-member-person', 'ann')
 
     expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toEqual([
       'Ann Lee (ann@acme.example)',
     ])
-    expect(input.attributes('aria-expanded')).toBe('true')
+    expect(input.getAttribute('aria-expanded')).toBe('true')
     await expectNoA11yViolations(wrapper)
   })
 

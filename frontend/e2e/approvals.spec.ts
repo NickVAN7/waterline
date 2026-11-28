@@ -44,6 +44,10 @@ test('an admin requests approval, and the approver reviews and decides', async (
   await page.keyboard.press('Enter')
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('group', { name: /^Approvers/ })).toBeFocused()
+  // The picker's list stays closed until the user moves to it (DL-137). Bug: the browser's own
+  // first focus on opening started a search, whose list opened after focus had moved on.
+  await page.waitForLoadState('networkidle')
+  await expect(dialog.getByRole('listbox')).toHaveCount(0)
   // Added from the searchable picker into the list (DL-422).
   const picker = dialog.getByRole('combobox', { name: 'Add an approver' })
   await picker.click()

@@ -11,6 +11,7 @@ import { useCurrentUserStore } from '@/stores/currentUser'
 import { expectNoA11yViolations } from '@/test/a11y'
 import { ACME, failed, me, noContent, ok, PASSWORD_POLICY, validationFailed } from '@/test/api'
 import { stubDialog, stubResizeObserver } from '@/test/overlay'
+import { choosePerson } from '@/test/picker'
 import { project } from '@/test/projects'
 import { listPage } from '@/test/workspace'
 import { withTrailRoutes } from '@/test/router'
@@ -401,16 +402,7 @@ describe('ProjectMembersView', () => {
     pageButton(wrapper, 'Add member')!.element.focus()
     await pageButton(wrapper, 'Add member')!.trigger('click')
     await flushPromises()
-    vi.useFakeTimers()
-    const input = wrapper.get<HTMLInputElement>('#add-member-person')
-    input.element.value = 'ann'
-    await input.trigger('input')
-    await vi.advanceTimersByTimeAsync(400)
-    vi.useRealTimers()
-    await flushPromises()
-    await input.trigger('keydown', { code: 'ArrowDown', key: 'ArrowDown' })
-    await input.trigger('keydown', { code: 'Enter', key: 'Enter' })
-    await flushPromises()
+    await choosePerson('add-member-person', 'ann')
 
     await openDialog(wrapper).get('form').trigger('submit')
     await flushPromises()

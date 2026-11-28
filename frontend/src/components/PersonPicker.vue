@@ -6,7 +6,9 @@
 // again retries it; it isn't the form's alert, whose Retry is the submit (UI-FRM-7). The caller
 // hears of it (`failed`) to act on a 403. Inside a modal dialog the list is in the picker's own
 // subtree (the page behind is inert), and the listbox scrolls itself, the element the combobox
-// controls, which axe's `scrollable-region-focusable` recognises.
+// controls, which axe's `scrollable-region-focusable` recognises. The list opens only while its
+// field has focus: PrimeVue opens it when a search answers (or two frames after it starts) wherever
+// focus is, and a dialog's first focus can pass through the field on its way to `data-autofocus`.
 import AutoComplete from 'primevue/autocomplete'
 import { nextTick, ref, watch } from 'vue'
 
@@ -47,6 +49,11 @@ const announcement = ref('')
 let announcing: ReturnType<typeof setTimeout> | undefined
 
 const optionLabel = (p: Person) => `${p.name} (${p.email})`
+const combobox = ref<InstanceType<typeof AutoComplete> & { hide: () => void }>()
+
+function closeUnlessFocused() {
+  if (document.activeElement !== document.getElementById(props.id)) combobox.value?.hide()
+}
 const failedId = `${props.id}-search-failed`
 
 function changed(next: Person | string | null) {
@@ -89,8 +96,9 @@ defineExpose({ focus: () => document.getElementById(props.id)?.focus() })
         [describedBy, searchFailed ? failedId : ''].filter(Boolean).join(' ') || undefined
       "
     >
-      <template #default="{ describedBy, invalid }">
+      <template #default="{ describedBy: fieldDescribedBy, invalid }">
         <AutoComplete
+          ref="combobox"
           :model-value="value"
           :input-id="id"
           :suggestions="suggestions"
@@ -104,7 +112,7 @@ defineExpose({ focus: () => document.getElementById(props.id)?.focus() })
           :input-props="{
             'aria-required': required ? 'true' : undefined,
             'aria-invalid': invalid ? 'true' : undefined,
-            'aria-describedby': describedBy,
+            'aria-describedby': fieldDescribedBy,
             autocomplete: 'off',
           }"
           :invalid="invalid"
@@ -114,6 +122,7 @@ defineExpose({ focus: () => document.getElementById(props.id)?.focus() })
           ]"
           class="w-full max-w-80"
           @complete="complete($event.query)"
+          @before-show="closeUnlessFocused"
           @update:model-value="changed"
         />
       </template>
